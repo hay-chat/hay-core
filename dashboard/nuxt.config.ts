@@ -1,21 +1,23 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import { defineNuxtConfig } from 'nuxt/config';
+import { defineNuxtConfig } from "nuxt/config";
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
 
   // Server configuration for local development
   devServer: {
-    host: '0.0.0.0',
     port: 5173,
   },
 
   // Runtime config for domain handling
   runtimeConfig: {
     public: {
-      baseDomain: process.env['NODE_ENV'] === 'development' ? 'hay.local' : 'hay.ai',
+      baseDomain:
+        process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.ai",
       apiBaseUrl:
-        process.env['NODE_ENV'] === 'development' ? 'https://hay.local' : 'https://api.hay.so',
+        process.env["NODE_ENV"] === "development"
+          ? "http://localhost:3000"
+          : "https://api.hay.so",
     },
   },
 
@@ -26,14 +28,14 @@ export default defineNuxtConfig({
   },
 
   // CSS framework
-  css: ['~/assets/css/main.css'],
+  css: ["~/assets/css/main.css"],
 
   // Modules
   modules: [
-    '@nuxtjs/tailwindcss',
-    '@pinia/nuxt',
-    '@pinia-plugin-persistedstate/nuxt',
-    '@vueuse/nuxt',
+    "@nuxtjs/tailwindcss",
+    "@pinia/nuxt",
+    "@pinia-plugin-persistedstate/nuxt",
+    "@vueuse/nuxt",
   ],
 
   // Auto-import configuration
@@ -41,98 +43,98 @@ export default defineNuxtConfig({
     // Auto-import Vue, Nuxt and VueUse functions
     presets: [
       {
-        from: 'vue',
+        from: "vue",
         imports: [
-          'ref',
-          'reactive',
-          'computed',
-          'watch',
-          'watchEffect',
-          'nextTick',
-          'onMounted',
-          'onUnmounted',
-          'onBeforeMount',
-          'onBeforeUnmount',
-          'onActivated',
-          'onDeactivated',
-          'onErrorCaptured',
-          'defineProps',
-          'defineEmits',
-          'defineExpose',
-          'withDefaults',
-          'provide',
-          'inject',
-          'readonly',
-          'shallowRef',
-          'shallowReactive',
-          'toRef',
-          'toRefs',
-          'toRaw',
-          'markRaw',
-          'customRef',
-          'triggerRef',
-          'isRef',
-          'isReactive',
-          'isReadonly',
-          'isProxy',
+          "ref",
+          "reactive",
+          "computed",
+          "watch",
+          "watchEffect",
+          "nextTick",
+          "onMounted",
+          "onUnmounted",
+          "onBeforeMount",
+          "onBeforeUnmount",
+          "onActivated",
+          "onDeactivated",
+          "onErrorCaptured",
+          "defineProps",
+          "defineEmits",
+          "defineExpose",
+          "withDefaults",
+          "provide",
+          "inject",
+          "readonly",
+          "shallowRef",
+          "shallowReactive",
+          "toRef",
+          "toRefs",
+          "toRaw",
+          "markRaw",
+          "customRef",
+          "triggerRef",
+          "isRef",
+          "isReactive",
+          "isReadonly",
+          "isProxy",
         ],
       },
     ],
     // Auto-import from directories
     dirs: [
-      'composables',
-      'composables/*/index.{ts,js,mjs,mts}',
-      'composables/**',
-      'utils',
-      'utils/*/index.{ts,js,mjs,mts}',
-      'utils/**',
-      'stores',
-      'stores/*/index.{ts,js,mjs,mts}',
-      'stores/**',
+      "composables",
+      "composables/*/index.{ts,js,mjs,mts}",
+      "composables/**",
+      "utils",
+      "utils/*/index.{ts,js,mjs,mts}",
+      "utils/**",
+      "stores",
+      "stores/*/index.{ts,js,mjs,mts}",
+      "stores/**",
     ],
   },
 
   // Auto-import components
   components: [
     {
-      path: '~/components',
+      path: "~/components",
       pathPrefix: false,
-      extensions: ['vue'],
+      extensions: ["vue"],
       // Enable auto-import for all component subdirectories
       global: true,
     },
     {
-      path: '~/components/ui',
-      prefix: '',
-      extensions: ['vue'],
+      path: "~/components/ui",
+      prefix: "",
+      extensions: ["vue"],
     },
     {
-      path: '~/components/auth',
-      prefix: '',
-      extensions: ['vue'],
+      path: "~/components/auth",
+      prefix: "",
+      extensions: ["vue"],
     },
     {
-      path: '~/components/layout',
-      prefix: '',
-      extensions: ['vue'],
+      path: "~/components/layout",
+      prefix: "",
+      extensions: ["vue"],
     },
   ],
 
   // App configuration
   app: {
     head: {
-      title: 'Hay Dashboard',
+      title: "Hay Dashboard",
       meta: [
-        { charset: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'description', content: 'Hay platform dashboard application' },
+        { charset: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "description", content: "Hay platform dashboard application" },
       ],
     },
   },
 
   // Build configuration
   build: {
-    transpile: ['@headlessui/vue'],
+    transpile: ["@headlessui/vue"],
   },
 
   // // Tailwind CSS configuration
@@ -143,7 +145,7 @@ export default defineNuxtConfig({
   // Vite configuration for additional auto-imports
   vite: {
     optimizeDeps: {
-      include: ['vue', 'vue-router', '@vueuse/core'],
+      include: ["vue", "vue-router", "@vueuse/core"],
     },
   },
 });

@@ -1,0 +1,15 @@
+{
+  "name": "hay-v3",
+  "version": "1.0.0",
+  "description": "Authentication system with multiple strategies",
+  "main": "server/main.ts",
+  "scripts": {
+    "dev": "cd server && npm run dev",
+    "build": "cd server && npm run build",
+    "start": "cd server && npm start",
+    "test": "cd server && npm test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

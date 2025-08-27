@@ -1,6 +1,12 @@
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { User, AuthTokens, LoginCredentials, SignupData } from '~/composables/useAuth';
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import type {
+  User,
+  AuthTokens,
+  LoginCredentials,
+  SignupData,
+} from "~/composables/useAuth";
+import { apiClient } from "~/utils/api-client";
 
 // API configuration
 const getApiBaseUrl = () => {
@@ -8,19 +14,19 @@ const getApiBaseUrl = () => {
   return (
     config.public.apiBaseUrl ||
     (() => {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const hostname = window.location.hostname;
         if (
-          hostname.includes('hay.local') ||
-          hostname.includes('hay.so') ||
-          hostname.includes('hay.ai')
+          hostname.includes("hay.local") ||
+          hostname.includes("hay.so") ||
+          hostname.includes("hay.ai")
         ) {
-          return '';
+          return "";
         }
       }
-      return process.env['NODE_ENV'] === 'production'
-        ? 'https://api.hay.so'
-        : 'http://localhost:3001';
+      return process.env["NODE_ENV"] === "production"
+        ? "https://api.hay.so"
+        : "http://localhost:3000";
     })()
   );
 };
@@ -29,7 +35,7 @@ const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiration
 const SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes of inactivity (increased from 30)
 
 export const useAuthStore = defineStore(
-  'auth',
+  "auth",
   () => {
     // State
     const user = ref<User | null>(null);
@@ -49,7 +55,10 @@ export const useAuthStore = defineStore(
 
     const accessToken = computed(() => {
       const token = tokens.value?.accessToken;
-      console.log('AccessToken getter called, token:', token ? 'exists' : 'null');
+      console.log(
+        "AccessToken getter called, token:",
+        token ? "exists" : "null"
+      );
       return token;
     });
 
@@ -78,17 +87,6 @@ export const useAuthStore = defineStore(
       lastActivity.value = Date.now();
     }
 
-    // Handle API errors
-    async function handleApiError(response: Response) {
-      try {
-        const errorData = await response.json();
-        error.value = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-      } catch {
-        error.value = `HTTP ${response.status}: ${response.statusText}`;
-      }
-      throw new Error(error.value || 'An error occurred');
-    }
-
     // Set auth data
     function setAuthData(newUser: User, newTokens: AuthTokens) {
       user.value = newUser;
@@ -106,33 +104,50 @@ export const useAuthStore = defineStore(
       cancelTokenRefresh();
     }
 
-    // Login
+    // Login using tRPC
     async function login(credentials: LoginCredentials) {
       isLoading.value = true;
       error.value = null;
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include', // Include cookies
-          body: JSON.stringify({
-            email: credentials.email,
-            password: credentials.password,
-          }),
-        });
+        // Debug: Log the incoming data
+        console.log("Login credentials received:", credentials);
 
-        if (!response.ok) {
-          await handleApiError(response);
+        // Make sure we have the required fields
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
         }
 
-        const data = await response.json();
-        setAuthData(data.user, data.tokens);
+        const data = await apiClient.auth.login.mutate({
+          email: credentials.email,
+          password: credentials.password,
+        });
 
-        return data;
-      } catch (err) {
+        // Transform the response to match expected format
+        const authData = {
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            fullName: data.user.email.split("@")[0], // Default to email prefix
+            organizationId: "", // TODO: Add organization support
+            organizationName: "",
+            role: "user" as const, // TODO: Add role support
+            emailVerified: true, // TODO: Add email verification support
+            createdAt: data.user.createdAt || new Date().toISOString(),
+            updatedAt: data.user.updatedAt || new Date().toISOString(),
+          },
+          tokens: {
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+            expiresAt: Date.now() + data.expiresIn * 1000,
+          },
+        };
+
+        setAuthData(authData.user, authData.tokens);
+
+        return authData;
+      } catch (err: any) {
+        error.value = err.message || "Login failed";
         clearAuthData();
         throw err;
       } finally {
@@ -140,67 +155,54 @@ export const useAuthStore = defineStore(
       }
     }
 
-    // Signup
+    // Signup using tRPC
     async function signup(signupData: SignupData) {
       isLoading.value = true;
       error.value = null;
 
       try {
-        const [firstName, lastName] = signupData.fullName.split(' ', 2);
+        // Debug: Log the incoming data
+        console.log("Signup data received:", signupData);
 
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/register`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            email: signupData.email,
-            password: signupData.password,
-            firstName: firstName || signupData.fullName,
-            lastName: lastName || '',
-          }),
+        // Make sure we have the required fields
+        if (!signupData?.email || !signupData?.password) {
+          throw new Error("Email and password are required");
+        }
+
+        const data = await apiClient.auth.register.mutate({
+          email: signupData.email,
+          password: signupData.password,
+          confirmPassword: signupData.password, // Use same password for confirmation
         });
 
-        if (!response.ok) {
-          await handleApiError(response);
-        }
+        // Transform the response to match expected format
+        const authData = {
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            fullName: signupData.fullName || data.user.email.split("@")[0],
+            organizationId: "", // TODO: Add organization support
+            organizationName: signupData.organizationName || "",
+            role: "user" as const, // TODO: Add role support
+            emailVerified: true, // TODO: Add email verification support
+            createdAt: data.user.createdAt || new Date().toISOString(),
+            updatedAt: data.user.updatedAt || new Date().toISOString(),
+          },
+          tokens: {
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+            expiresAt: Date.now() + data.expiresIn * 1000,
+          },
+        };
 
-        const data = await response.json();
-        setAuthData(data.user, data.tokens);
+        setAuthData(authData.user, authData.tokens);
 
-        // Create organization if provided
-        if (signupData.organizationName && tokens.value) {
-          try {
-            const orgResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/organizations`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${tokens.value.accessToken}`,
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                name: signupData.organizationName,
-              }),
-            });
+        // TODO: Handle organization creation if needed
+        // This might need a separate endpoint or be part of the registration process
 
-            if (orgResponse.ok) {
-              const orgData = await orgResponse.json();
-              if (user.value) {
-                user.value = {
-                  ...user.value,
-                  organizationId: orgData.id,
-                  organizationName: orgData.name,
-                };
-              }
-            }
-          } catch (orgError) {
-            console.warn('Organization creation failed:', orgError);
-          }
-        }
-
-        return data;
-      } catch (err) {
+        return authData;
+      } catch (err: any) {
+        error.value = err.message || "Signup failed";
         clearAuthData();
         throw err;
       } finally {
@@ -208,23 +210,16 @@ export const useAuthStore = defineStore(
       }
     }
 
-    // Logout
+    // Logout using tRPC
     async function logout() {
       isLoading.value = true;
 
       try {
         if (tokens.value?.accessToken) {
           try {
-            await fetch(`${getApiBaseUrl()}/api/v1/auth/logout`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${tokens.value.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-            });
+            await apiClient.auth.logout.mutate(tokens.value.accessToken);
           } catch (apiError) {
-            console.warn('Logout API call failed:', apiError);
+            console.warn("Logout API call failed:", apiError);
           }
         }
       } finally {
@@ -233,43 +228,36 @@ export const useAuthStore = defineStore(
       }
     }
 
-    // Refresh token
+    // Refresh token using tRPC
     async function refreshToken() {
       if (!tokens.value?.refreshToken) {
-        throw new Error('No refresh token available');
+        throw new Error("No refresh token available");
       }
 
       // Prevent multiple simultaneous refresh attempts
       if (isRefreshing) {
-        console.log('Token refresh already in progress, skipping...');
+        console.log("Token refresh already in progress, skipping...");
         return tokens.value;
       }
 
       isRefreshing = true;
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            refreshToken: tokens.value.refreshToken,
-          }),
+        const data = await apiClient.auth.refreshToken.mutate({
+          refreshToken: tokens.value.refreshToken,
         });
 
-        if (!response.ok) {
-          await handleApiError(response);
-        }
-
-        const data = await response.json();
+        const newTokens = {
+          accessToken: data.accessToken,
+          refreshToken: tokens.value.refreshToken, // Keep the same refresh token
+          expiresAt: Date.now() + data.expiresIn * 1000,
+        };
 
         if (user.value) {
-          setAuthData(user.value, data.tokens);
+          setAuthData(user.value, newTokens);
         }
 
-        return data.tokens;
+        return newTokens;
       } catch (err) {
         await logout();
         throw err;
@@ -278,32 +266,35 @@ export const useAuthStore = defineStore(
       }
     }
 
-    // Validate session
+    // Validate session using tRPC
     async function validateSession() {
       if (!tokens.value?.accessToken) {
         return false;
       }
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/me`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${tokens.value.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        });
+        const userData = await apiClient.auth.me.query(
+          tokens.value?.accessToken
+        );
 
-        if (response.ok) {
-          const userData = await response.json();
-          user.value = userData.user;
-          updateActivity();
-          return true;
-        }
+        // Transform the response to match our User type
+        user.value = {
+          id: userData.id,
+          email: userData.email,
+          fullName: userData.email.split("@")[0], // Default to email prefix if no name
+          organizationId: "", // TODO: Add organization support
+          organizationName: "",
+          role: "user", // TODO: Add role support
+          emailVerified: true, // TODO: Add email verification support
+          createdAt: new Date().toISOString(),
+          updatedAt:
+            userData.lastLoginAt?.toISOString() || new Date().toISOString(),
+        };
 
-        return false;
+        updateActivity();
+        return true;
       } catch (err) {
-        console.error('Session validation error:', err);
+        console.error("Session validation error:", err);
         return false;
       }
     }
@@ -317,12 +308,12 @@ export const useAuthStore = defineStore(
       isLoading.value = true;
 
       try {
-        console.log('Initializing auth...');
-        console.log('Current tokens:', tokens.value);
+        console.log("Initializing auth...");
+        console.log("Current tokens:", tokens.value);
 
         // Check if we have persisted tokens
         if (!tokens.value?.accessToken) {
-          console.log('No access token found, clearing auth data');
+          console.log("No access token found, clearing auth data");
           // No tokens stored, user needs to login
           clearAuthData();
           isInitialized.value = true;
@@ -336,7 +327,7 @@ export const useAuthStore = defineStore(
             try {
               await refreshToken();
             } catch (refreshError) {
-              console.error('Token refresh failed:', refreshError);
+              console.error("Token refresh failed:", refreshError);
               clearAuthData();
               isInitialized.value = true;
               return;
@@ -357,7 +348,7 @@ export const useAuthStore = defineStore(
           clearAuthData();
         }
       } catch (err) {
-        console.error('Auth initialization error:', err);
+        console.error("Auth initialization error:", err);
         clearAuthData();
       } finally {
         isLoading.value = false;
@@ -371,8 +362,9 @@ export const useAuthStore = defineStore(
       error.value = null;
 
       try {
-        if (typeof window !== 'undefined') {
-          window.location.href = `${getApiBaseUrl()}/api/v1/auth/oauth/${provider}`;
+        if (typeof window !== "undefined") {
+          // TODO: Update this to use tRPC OAuth endpoints when available
+          window.location.href = `${getApiBaseUrl()}/v1/auth/oauth/${provider}`;
         }
       } catch (err) {
         isLoading.value = false;
@@ -381,18 +373,9 @@ export const useAuthStore = defineStore(
     }
 
     // Forgot password
-    async function forgotPassword(email: string) {
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/password/reset-request`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        await handleApiError(response);
-      }
+    async function forgotPassword(_email: string) {
+      // TODO: Implement using tRPC when endpoint is available
+      throw new Error("Forgot password not yet implemented with tRPC");
     }
 
     // Token refresh management
@@ -412,7 +395,7 @@ export const useAuthStore = defineStore(
           try {
             await refreshToken();
           } catch (err) {
-            console.error('Auto-refresh failed:', err);
+            console.error("Auto-refresh failed:", err);
             await logout();
           }
         }, refreshTime);
@@ -422,7 +405,7 @@ export const useAuthStore = defineStore(
           try {
             await refreshToken();
           } catch (err) {
-            console.error('Immediate token refresh failed:', err);
+            console.error("Immediate token refresh failed:", err);
             await logout();
           }
         }, 1000); // 1 second delay to prevent immediate loop
@@ -439,10 +422,16 @@ export const useAuthStore = defineStore(
 
     // Session timeout management
     function startSessionTimer() {
-      if (typeof window === 'undefined') return;
+      if (typeof window === "undefined") return;
 
       // Listen for user activity
-      const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+      const activityEvents = [
+        "mousedown",
+        "keydown",
+        "scroll",
+        "touchstart",
+        "mousemove",
+      ];
 
       const handleActivity = () => {
         updateActivity();
@@ -453,19 +442,16 @@ export const useAuthStore = defineStore(
       });
 
       // Check session timeout periodically (every 5 minutes)
-      const sessionCheckInterval = setInterval(
-        () => {
-          if (isAuthenticated.value && isSessionTimedOut.value) {
-            console.log('Session timed out due to inactivity');
-            logout();
-            clearInterval(sessionCheckInterval);
-          }
-        },
-        5 * 60 * 1000,
-      );
+      const sessionCheckInterval = setInterval(() => {
+        if (isAuthenticated.value && isSessionTimedOut.value) {
+          console.log("Session timed out due to inactivity");
+          logout();
+          clearInterval(sessionCheckInterval);
+        }
+      }, 5 * 60 * 1000);
 
       // Cleanup on page unload
-      window.addEventListener('beforeunload', () => {
+      window.addEventListener("beforeunload", () => {
         clearInterval(sessionCheckInterval);
         activityEvents.forEach((event) => {
           window.removeEventListener(event, handleActivity);
@@ -494,7 +480,6 @@ export const useAuthStore = defineStore(
 
       // Actions
       updateActivity,
-      handleApiError,
       setAuthData,
       clearAuthData,
       login,
@@ -512,8 +497,8 @@ export const useAuthStore = defineStore(
   },
   {
     persist: {
-      key: 'hay-auth',
-      pick: ['user', 'tokens', 'lastActivity', 'isInitialized'],
+      key: "hay-auth",
+      pick: ["user", "tokens", "lastActivity", "isInitialized"],
     },
-  },
+  }
 );

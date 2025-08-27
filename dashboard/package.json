@@ -30,6 +30,8 @@
     "@nuxtjs/tailwindcss": "^6.8.4",
     "@pinia-plugin-persistedstate/nuxt": "^1.2.1",
     "@pinia/nuxt": "^0.5.1",
+    "@tanstack/vue-query": "^5.85.5",
+    "@trpc/client": "^11.5.0",
     "@vee-validate/zod": "^4.12.4",
     "@vueuse/nuxt": "^10.5.0",
     "class-variance-authority": "^0.7.0",
@@ -39,6 +41,7 @@
     "pinia": "^2.1.7",
     "radix-vue": "^1.2.3",
     "shadcn-nuxt": "^0.10.4",
+    "superjson": "^2.2.2",
     "tailwind-merge": "^2.0.0",
     "tailwindcss-animate": "^1.0.7",
     "vee-validate": "^4.12.4",
@@ -58,5 +61,8 @@
     "unplugin-vue-components": "^29.0.0",
     "vitest": "^0.34.6",
     "vue-tsc": "^3.0.5"
+  },
+  "overrides": {
+    "vite": "^6.0.0"
   }
 }

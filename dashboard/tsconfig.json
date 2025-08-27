@@ -14,5 +14,9 @@
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true
-  }
+  },
+  "exclude": [
+    "../server/**/*",
+    "../server"
+  ]
 }

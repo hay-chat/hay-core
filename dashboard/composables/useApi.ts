@@ -75,14 +75,15 @@ export const useApi = () => {
             await authStore.refreshToken();
 
             // Retry the original request with new token
-            return await apiClient(request as string, {
+            const retryOptions = {
               ...options,
               headers: {
                 ...((options.headers as any) || {}),
                 Authorization: `Bearer ${authStore.accessToken}`,
               },
               _retry: true,
-            } as any);
+            };
+            return await apiClient(request as string, retryOptions as any);
           } catch (error) {
             await authStore.logout();
             await navigateTo('/login');

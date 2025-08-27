@@ -1,5 +1,5 @@
 import { inferAsyncReturnType, initTRPC } from "@trpc/server";
-import { createContext } from "vm";
+import { createContext } from "./context";
 
 /**
  * Initialization of tRPC backend
