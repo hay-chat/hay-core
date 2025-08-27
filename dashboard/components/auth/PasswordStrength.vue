@@ -46,8 +46,8 @@
 </template>
 
 <script setup lang="ts">
-import { CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline';
-import { validatePassword } from '~/lib/utils';
+import { CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { validatePassword } from "@/lib/utils";
 
 export interface PasswordStrengthProps {
   password: string;
@@ -59,50 +59,50 @@ const validation = computed(() => validatePassword(props.password));
 
 const strengthText = computed(() => {
   switch (validation.value.strength) {
-    case 'weak':
-      return 'Weak';
-    case 'medium':
-      return 'Medium';
-    case 'strong':
-      return 'Strong';
+    case "weak":
+      return "Weak";
+    case "medium":
+      return "Medium";
+    case "strong":
+      return "Strong";
     default:
-      return 'Weak';
+      return "Weak";
   }
 });
 
 const strengthColor = computed(() => {
   switch (validation.value.strength) {
-    case 'weak':
-      return 'text-red-600';
-    case 'medium':
-      return 'text-yellow-600';
-    case 'strong':
-      return 'text-green-600';
+    case "weak":
+      return "text-red-600";
+    case "medium":
+      return "text-yellow-600";
+    case "strong":
+      return "text-green-600";
     default:
-      return 'text-red-600';
+      return "text-red-600";
   }
 });
 
 const strengthBarColor = computed(() => {
   switch (validation.value.strength) {
-    case 'weak':
-      return '[&>div]:bg-red-500';
-    case 'medium':
-      return '[&>div]:bg-yellow-500';
-    case 'strong':
-      return '[&>div]:bg-green-500';
+    case "weak":
+      return "[&>div]:bg-red-500";
+    case "medium":
+      return "[&>div]:bg-yellow-500";
+    case "strong":
+      return "[&>div]:bg-green-500";
     default:
-      return '[&>div]:bg-red-500';
+      return "[&>div]:bg-red-500";
   }
 });
 
 const strengthPercentage = computed(() => {
   switch (validation.value.strength) {
-    case 'weak':
+    case "weak":
       return 25;
-    case 'medium':
+    case "medium":
       return 60;
-    case 'strong':
+    case "strong":
       return 100;
     default:
       return 0;
@@ -110,6 +110,9 @@ const strengthPercentage = computed(() => {
 });
 
 const requirementClass = (met: boolean) => {
-  return ['flex items-center space-x-2 text-xs', met ? 'text-green-600' : 'text-gray-400'];
+  return [
+    "flex items-center space-x-2 text-xs",
+    met ? "text-green-600" : "text-gray-400",
+  ];
 };
 </script>

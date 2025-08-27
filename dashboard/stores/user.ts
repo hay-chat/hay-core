@@ -1,12 +1,18 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
 
-interface User {
+export interface User {
   id: string;
   email: string;
-  fullName: string;
-  organizationId: string;
-  organizationName: string;
+  firstName?: string;
+  lastName?: string;
+  isActive?: boolean;
+  isAdmin?: boolean;
+  organizationId?: string;
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 }
 
 export const useUserStore = defineStore("user", {
@@ -15,9 +21,12 @@ export const useUserStore = defineStore("user", {
     user: null as User | null,
   }),
   actions: {
-    async fetchUser() {
-      const user = await HayApi.user.me.query();
+    setUser(user: User) {
       this.user = user;
+    },
+
+    clearUser() {
+      this.user = null;
     },
   },
 });

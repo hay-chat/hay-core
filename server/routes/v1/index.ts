@@ -1,4 +1,4 @@
-import { router, t } from "@/trpc";
+import { router, t } from "@server/trpc";
 import { authRouter } from "./auth";
 import { documentsRouter } from "./documents";
 

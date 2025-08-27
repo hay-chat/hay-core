@@ -1,4 +1,4 @@
-import { validateEmail, validatePassword } from '~/lib/utils';
+import { validateEmail, validatePassword } from "@/lib/utils";
 
 export interface ValidationRule {
   required?: boolean;
@@ -16,14 +16,14 @@ export interface ValidationRules {
 
 export function useFormValidation<T extends Record<string, unknown>>(
   form: T,
-  rules: ValidationRules,
+  rules: ValidationRules
 ) {
   const errors = reactive<Record<string, string>>({});
   const touched = reactive<Record<string, boolean>>({});
 
   // Initialize errors
   Object.keys(rules).forEach((key) => {
-    errors[key] = '';
+    errors[key] = "";
     touched[key] = false;
   });
 
@@ -36,20 +36,20 @@ export function useFormValidation<T extends Record<string, unknown>>(
     touched[field as string] = true;
 
     // Required validation
-    if (rule.required && (!value || value.toString().trim() === '')) {
+    if (rule.required && (!value || value.toString().trim() === "")) {
       errors[field as string] = `${String(field)} is required`;
       return false;
     }
 
     // Skip other validations if field is empty and not required
     if (!value && !rule.required) {
-      errors[field as string] = '';
+      errors[field as string] = "";
       return true;
     }
 
     // Email validation
     if (rule.email && !validateEmail(value)) {
-      errors[field as string] = 'Please enter a valid email address';
+      errors[field as string] = "Please enter a valid email address";
       return false;
     }
 
@@ -61,7 +61,9 @@ export function useFormValidation<T extends Record<string, unknown>>(
 
     // Max length validation
     if (rule.maxLength && value.length > rule.maxLength) {
-      errors[field as string] = `Must be no more than ${rule.maxLength} characters`;
+      errors[
+        field as string
+      ] = `Must be no more than ${rule.maxLength} characters`;
       return false;
     }
 
@@ -69,14 +71,14 @@ export function useFormValidation<T extends Record<string, unknown>>(
     if (rule.password) {
       const passwordValidation = validatePassword(value);
       if (!passwordValidation.isValid) {
-        errors[field as string] = 'Password does not meet requirements';
+        errors[field as string] = "Password does not meet requirements";
         return false;
       }
     }
 
     // Match validation (for confirm password)
     if (rule.match && value !== form[rule.match as keyof T]) {
-      errors[field as string] = 'Values do not match';
+      errors[field as string] = "Values do not match";
       return false;
     }
 
@@ -90,7 +92,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
     }
 
     // Clear error if all validations pass
-    errors[field as string] = '';
+    errors[field as string] = "";
     return true;
   };
 
@@ -115,7 +117,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
       const hasError = errors[field];
 
       // If field is required, it must have a value
-      if (rule && rule.required && (!value || value.toString().trim() === '')) {
+      if (rule && rule.required && (!value || value.toString().trim() === "")) {
         return false;
       }
 
@@ -125,18 +127,18 @@ export function useFormValidation<T extends Record<string, unknown>>(
   });
 
   const hasAnyError = computed(() => {
-    return Object.values(errors).some((error) => error !== '');
+    return Object.values(errors).some((error) => error !== "");
   });
 
   const clearErrors = () => {
     Object.keys(errors).forEach((key) => {
-      errors[key] = '';
+      errors[key] = "";
       touched[key] = false;
     });
   };
 
   const clearError = (field: keyof T) => {
-    errors[field as string] = '';
+    errors[field as string] = "";
   };
 
   return {

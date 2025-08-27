@@ -1,7 +1,12 @@
 <template>
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <AuthProvider>
+    <div>
+      <!-- Nuxt will automatically handle layouts and page routing -->
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </div>
+  </AuthProvider>
 </template>
 
 <script setup lang="ts">

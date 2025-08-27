@@ -3,14 +3,17 @@
     <div class="space-y-6">
       <!-- Success State -->
       <div v-if="emailSent" class="text-center space-y-4">
-        <div class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100">
+        <div
+          class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100"
+        >
           <CheckCircleIcon class="w-6 h-6 text-green-600" />
         </div>
 
         <div>
           <CardTitle class="text-2xl">Check your email</CardTitle>
           <CardDescription class="mt-2">
-            We've sent a password reset link to <strong>{{ form.email }}</strong>
+            We've sent a password reset link to
+            <strong>{{ form.email }}</strong>
           </CardDescription>
         </div>
 
@@ -31,10 +34,14 @@
               @click="resendEmail"
             >
               <div v-if="resendLoading" class="flex items-center space-x-2">
-                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                <div
+                  class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"
+                ></div>
                 <span>Resending...</span>
               </div>
-              <span v-else-if="resendCooldown > 0"> Resend in {{ resendCooldown }}s </span>
+              <span v-else-if="resendCooldown > 0">
+                Resend in {{ resendCooldown }}s
+              </span>
               <span v-else>Resend email</span>
             </Button>
 
@@ -51,7 +58,8 @@
         <div class="text-center">
           <CardTitle class="text-2xl">Forgot your password?</CardTitle>
           <CardDescription class="mt-2">
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your email address and we'll send you a link to reset your
+            password.
           </CardDescription>
         </div>
 
@@ -70,16 +78,26 @@
           />
 
           <!-- Submit Button -->
-          <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
+          <Button
+            type="submit"
+            size="lg"
+            class="w-full"
+            :disabled="loading || !isFormValid"
+          >
             <div v-if="loading" class="flex items-center space-x-2">
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div
+                class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
+              ></div>
               <span>Sending reset link...</span>
             </div>
             <span v-else>Send reset link</span>
           </Button>
 
           <!-- Error Message -->
-          <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <div
+            v-if="error"
+            class="p-3 rounded-md bg-red-50 border border-red-200"
+          >
             <p class="text-sm text-red-800">{{ error }}</p>
           </div>
         </form>
@@ -101,10 +119,16 @@
         <div class="text-center space-y-2">
           <p class="text-sm text-gray-600">Need help?</p>
           <div class="space-x-4">
-            <NuxtLink to="/support" class="text-sm text-primary hover:text-primary/80 font-medium">
+            <NuxtLink
+              to="/support"
+              class="text-sm text-primary hover:text-primary/80 font-medium"
+            >
               Contact Support
             </NuxtLink>
-            <NuxtLink to="/help" class="text-sm text-primary hover:text-primary/80 font-medium">
+            <NuxtLink
+              to="/help"
+              class="text-sm text-primary hover:text-primary/80 font-medium"
+            >
               Help Center
             </NuxtLink>
           </div>
@@ -115,8 +139,8 @@
 </template>
 
 <script setup lang="ts">
-import { CheckCircleIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline';
-import { validateEmail } from '~/lib/utils';
+import { CheckCircleIcon, ArrowLeftIcon } from "@heroicons/vue/24/outline";
+import { validateEmail } from "@/lib/utils";
 
 // TODO: Import authentication composable/store
 // TODO: Import router for navigation
@@ -128,15 +152,15 @@ definePageMeta({
 
 // Form state
 const form = reactive({
-  email: '',
+  email: "",
 });
 
 const errors = reactive({
-  email: '',
+  email: "",
 });
 
 const loading = ref(false);
-const error = ref('');
+const error = ref("");
 const emailSent = ref(false);
 const resendLoading = ref(false);
 const resendCooldown = ref(0);
@@ -149,27 +173,27 @@ const isFormValid = computed(() => {
 // Methods
 const validateField = (field: keyof typeof errors) => {
   switch (field) {
-    case 'email':
+    case "email":
       if (!form.email) {
-        errors.email = 'Email is required';
+        errors.email = "Email is required";
       } else if (!validateEmail(form.email)) {
-        errors.email = 'Please enter a valid email address';
+        errors.email = "Please enter a valid email address";
       } else {
-        errors.email = '';
+        errors.email = "";
       }
       break;
   }
 };
 
 const handleSubmit = async () => {
-  validateField('email');
+  validateField("email");
 
   if (!isFormValid.value) {
     return;
   }
 
   loading.value = true;
-  error.value = '';
+  error.value = "";
 
   try {
     // TODO: Implement password reset request logic
@@ -177,7 +201,7 @@ const handleSubmit = async () => {
     // TODO: Handle different response scenarios
     // TODO: Log password reset attempt for security
 
-    console.log('Password reset request for:', form.email);
+    console.log("Password reset request for:", form.email);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -188,8 +212,8 @@ const handleSubmit = async () => {
     // TODO: Handle different types of errors
     // TODO: Show appropriate error messages
     // TODO: Handle rate limiting
-    error.value = 'Failed to send reset email. Please try again.';
-    console.error('Password reset error:', err);
+    error.value = "Failed to send reset email. Please try again.";
+    console.error("Password reset error:", err);
   } finally {
     loading.value = false;
   }
@@ -203,7 +227,7 @@ const resendEmail = async () => {
     // TODO: Check rate limiting on server side
     // TODO: Update resend timestamp
 
-    console.log('Resending password reset email to:', form.email);
+    console.log("Resending password reset email to:", form.email);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -211,8 +235,8 @@ const resendEmail = async () => {
     // Start cooldown timer
     startResendCooldown();
   } catch (err) {
-    error.value = 'Failed to resend email. Please try again.';
-    console.error('Resend error:', err);
+    error.value = "Failed to resend email. Please try again.";
+    console.error("Resend error:", err);
   } finally {
     resendLoading.value = false;
   }
@@ -234,14 +258,14 @@ const goBack = () => {
   // TODO: Use router navigation
   // await $router.push('/login')
   emailSent.value = false;
-  form.email = '';
-  errors.email = '';
-  error.value = '';
+  form.email = "";
+  errors.email = "";
+  error.value = "";
 };
 
 // Auto-focus email input when component mounts
 onMounted(() => {
-  const emailInput = document.getElementById('email');
+  const emailInput = document.getElementById("email");
   if (emailInput && !emailSent.value) {
     emailInput.focus();
   }
@@ -249,7 +273,12 @@ onMounted(() => {
 
 // SEO
 useHead({
-  title: 'Forgot Password - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Reset your Hay dashboard account password' }],
+  title: "Forgot Password - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Reset your Hay dashboard account password",
+    },
+  ],
 });
 </script>

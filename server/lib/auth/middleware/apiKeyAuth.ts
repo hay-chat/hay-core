@@ -1,14 +1,19 @@
-import { User } from '@/entities/user.entity';
-import { ApiKey } from '@/entities/apikey.entity';
-import { AuthUser } from '@/lib/auth/AuthUser';
-import { extractApiKeyFromHeader, verifyApiKey } from '@/lib/auth/utils/hashing';
-import { AppDataSource } from '@/database/data-source';
+import { User } from "@server/entities/user.entity";
+import { ApiKey } from "@server/entities/apikey.entity";
+import { AuthUser } from "@server/lib/auth/AuthUser";
+import {
+  extractApiKeyFromHeader,
+  verifyApiKey,
+} from "@server/lib/auth/utils/hashing";
+import { AppDataSource } from "@server/database/data-source";
 
 /**
  * Authenticate a user using API Key
  * Returns the authenticated user with API key scopes
  */
-export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthUser | null> {
+export async function authenticateApiKeyAuth(
+  authHeader?: string
+): Promise<AuthUser | null> {
   if (!authHeader) {
     return null;
   }
@@ -23,7 +28,7 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
   const apiKeys = await apiKeyRepository.find({
     where: { isActive: true },
-    relations: ['user'],
+    relations: ["user"],
   });
 
   // Find matching API key by verifying against all active keys
@@ -36,29 +41,30 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
   }
 
   if (!matchedApiKey) {
-    throw new Error('Invalid API key');
+    throw new Error("Invalid API key");
   }
 
   // Check if API key is expired
   if (matchedApiKey.isExpired()) {
-    throw new Error('API key has expired');
+    throw new Error("API key has expired");
   }
 
   // Check if the associated user exists and is active
   if (!matchedApiKey.user) {
     // If user is not loaded via relation, fetch it
     const userRepository = AppDataSource.getRepository(User);
-    matchedApiKey.user = await userRepository.findOne({
-      where: { id: matchedApiKey.userId },
-    }) || undefined;
+    matchedApiKey.user =
+      (await userRepository.findOne({
+        where: { id: matchedApiKey.userId },
+      })) || undefined;
   }
 
   if (!matchedApiKey.user) {
-    throw new Error('Associated user not found');
+    throw new Error("Associated user not found");
   }
 
   if (!matchedApiKey.user.isActive) {
-    throw new Error('Associated user account is deactivated');
+    throw new Error("Associated user account is deactivated");
   }
 
   // Update last used timestamp
@@ -66,7 +72,7 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
   await apiKeyRepository.save(matchedApiKey);
 
   // Create AuthUser instance with API key metadata
-  const authUser = new AuthUser(matchedApiKey.user, 'apikey', {
+  const authUser = new AuthUser(matchedApiKey.user, "apikey", {
     apiKeyId: matchedApiKey.id,
     scopes: matchedApiKey.scopes,
   });
@@ -78,7 +84,9 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
  * Validate an API key without fetching the full user
  * Used for quick authorization checks
  */
-export async function validateApiKey(authHeader?: string): Promise<{ apiKeyId: string; userId: string } | null> {
+export async function validateApiKey(
+  authHeader?: string
+): Promise<{ apiKeyId: string; userId: string } | null> {
   if (!authHeader) {
     return null;
   }
@@ -92,7 +100,7 @@ export async function validateApiKey(authHeader?: string): Promise<{ apiKeyId: s
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
   const apiKeys = await apiKeyRepository.find({
     where: { isActive: true },
-    select: ['id', 'userId', 'keyHash', 'expiresAt'],
+    select: ["id", "userId", "keyHash", "expiresAt"],
   });
 
   // Find matching API key
@@ -102,7 +110,7 @@ export async function validateApiKey(authHeader?: string): Promise<{ apiKeyId: s
       if (key.expiresAt && new Date() > key.expiresAt) {
         return null;
       }
-      
+
       return {
         apiKeyId: key.id,
         userId: key.userId,

@@ -1,28 +1,28 @@
-import { t } from "@/trpc";
+import { t } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { AppDataSource } from "@/database/data-source";
-import { User } from "@/entities/user.entity";
-import { ApiKey } from "@/entities/apikey.entity";
-import { Organization } from "@/entities/tenant.entity";
+import { AppDataSource } from "@server/database/data-source";
+import { User } from "@server/entities/user.entity";
+import { ApiKey } from "@server/entities/apikey.entity";
+import { Organization } from "@server/entities/tenant.entity";
 import {
   hashPassword,
   verifyPassword,
   generateApiKey,
   hashApiKey,
   generateSessionId,
-} from "@/lib/auth/utils/hashing";
+} from "@server/lib/auth/utils/hashing";
 import {
   generateTokens,
   verifyRefreshToken,
   refreshAccessToken,
-} from "@/lib/auth/utils/jwt";
+} from "@server/lib/auth/utils/jwt";
 import {
   protectedProcedure,
   publicProcedure,
   adminProcedure,
-} from "@/trpc/middleware/auth";
-import { ApiKeyResponse } from "@/types/auth.types";
+} from "@server/trpc/middleware/auth";
+import type { ApiKeyResponse } from "@server/types/auth.types";
 
 const loginSchema = z.object({
   email: z.email(),
@@ -118,7 +118,14 @@ export const authRouter = t.router({
   register: publicProcedure
     .input(registerSchema)
     .mutation(async ({ input }) => {
-      const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
+      const {
+        email,
+        password,
+        firstName,
+        lastName,
+        organizationName,
+        organizationSlug,
+      } = input;
 
       // Use a transaction for atomicity
       return await AppDataSource.transaction(async (manager) => {
@@ -141,11 +148,12 @@ export const authRouter = t.router({
 
         // Create organization if name provided
         if (organizationName) {
-          const orgSlug = organizationSlug || 
+          const orgSlug =
+            organizationSlug ||
             organizationName
               .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/(^-|-$)+/g, '');
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/(^-|-$)+/g, "");
 
           // Check if slug already exists
           const existingOrg = await organizationRepository.findOne({
@@ -163,7 +171,7 @@ export const authRouter = t.router({
             name: organizationName,
             slug: orgSlug,
             isActive: true,
-            plan: 'free',
+            plan: "free",
             limits: {
               maxUsers: 5,
               maxDocuments: 100,
@@ -187,7 +195,7 @@ export const authRouter = t.router({
           lastName: lastName || undefined,
           isActive: true,
           organizationId: organization?.id,
-          role: organization ? 'owner' : 'member', // Owner if creating org, otherwise member
+          role: organization ? "owner" : "member", // Owner if creating org, otherwise member
         });
 
         await userRepository.save(user);

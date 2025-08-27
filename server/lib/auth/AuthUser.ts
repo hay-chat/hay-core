@@ -1,5 +1,5 @@
-import { User } from '@/entities/user.entity';
-import { ApiKeyScope } from '@/types/auth.types';
+import { User } from "@server/entities/user.entity";
+import type { ApiKeyScope } from "@server/types/auth.types";
 
 /**
  * AuthUser class represents an authenticated user in the tRPC context
@@ -10,18 +10,18 @@ export class AuthUser {
   public readonly email: string;
   public readonly isActive: boolean;
   public readonly lastLoginAt?: Date;
-  
+
   // Authentication metadata
-  public readonly authMethod: 'basic' | 'jwt' | 'apikey';
+  public readonly authMethod: "basic" | "jwt" | "apikey";
   public readonly sessionId?: string;
   public readonly apiKeyId?: string;
   public readonly scopes?: ApiKeyScope[];
-  
+
   private readonly _user: User;
 
   constructor(
     user: User,
-    authMethod: 'basic' | 'jwt' | 'apikey',
+    authMethod: "basic" | "jwt" | "apikey",
     metadata?: {
       sessionId?: string;
       apiKeyId?: string;
@@ -33,7 +33,7 @@ export class AuthUser {
     this.email = user.email;
     this.isActive = user.isActive;
     this.lastLoginAt = user.lastLoginAt;
-    
+
     this.authMethod = authMethod;
     this.sessionId = metadata?.sessionId;
     this.apiKeyId = metadata?.apiKeyId;
@@ -45,29 +45,30 @@ export class AuthUser {
    */
   hasScope(resource: string, action: string): boolean {
     // For JWT and Basic auth, users have full access
-    if (this.authMethod !== 'apikey') {
+    if (this.authMethod !== "apikey") {
       return true;
     }
-    
+
     // For API key auth, check the scopes
     if (!this.scopes || this.scopes.length === 0) {
       return true; // No scopes means full access
     }
-    
-    return this.scopes.some(scope => 
-      (scope.resource === resource || scope.resource === '*') && 
-      (scope.actions.includes(action) || scope.actions.includes('*'))
+
+    return this.scopes.some(
+      (scope) =>
+        (scope.resource === resource || scope.resource === "*") &&
+        (scope.actions.includes(action) || scope.actions.includes("*"))
     );
   }
 
   /**
    * Check if the user can access a specific resource
    */
-  canAccess(resource: string, action: string = 'read'): boolean {
+  canAccess(resource: string, action: string = "read"): boolean {
     if (!this.isActive) {
       return false;
     }
-    
+
     return this.hasScope(resource, action);
   }
 
@@ -77,7 +78,7 @@ export class AuthUser {
   isAdmin(): boolean {
     // For now, only JWT and Basic auth users can be admins
     // API key users cannot have admin privileges
-    return this.authMethod !== 'apikey' && this.isActive;
+    return this.authMethod !== "apikey" && this.isActive;
   }
 
   /**
@@ -90,7 +91,7 @@ export class AuthUser {
   /**
    * Convert to JSON-safe object (removes sensitive data)
    */
-  toJSON(): Omit<AuthUser, '_user' | 'getUser'> {
+  toJSON(): Omit<AuthUser, "_user" | "getUser"> {
     return {
       id: this.id,
       email: this.email,

@@ -1,8 +1,8 @@
-import { AuthUser } from '@/lib/auth/AuthUser';
-import { authenticateBasicAuth } from './basicAuth';
-import { authenticateBearerAuth } from './bearerAuth';
-import { authenticateApiKeyAuth } from './apiKeyAuth';
-import { Request } from 'express';
+import { AuthUser } from "@server/lib/auth/AuthUser";
+import { authenticateBasicAuth } from "./basicAuth";
+import { authenticateBearerAuth } from "./bearerAuth";
+import { authenticateApiKeyAuth } from "./apiKeyAuth";
+import type { Request } from "express";
 
 /**
  * Main authentication middleware that tries all authentication methods
@@ -17,42 +17,47 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
 
   try {
     // Try Bearer token authentication first (most common)
-    if (authHeader.startsWith('Bearer ')) {
+    if (authHeader.startsWith("Bearer ")) {
       const authUser = await authenticateBearerAuth(authHeader);
       if (authUser) {
-        logAuthSuccess('jwt', authUser.id);
+        logAuthSuccess("jwt", authUser.id);
         return authUser;
       }
     }
 
     // Try Basic authentication
-    if (authHeader.startsWith('Basic ')) {
+    if (authHeader.startsWith("Basic ")) {
       const result = await authenticateBasicAuth(authHeader);
       if (result) {
         // Store tokens in response headers for the client
         if (req.res) {
-          req.res.setHeader('X-Access-Token', result.tokens.accessToken);
-          req.res.setHeader('X-Refresh-Token', result.tokens.refreshToken);
-          req.res.setHeader('X-Token-Expires-In', result.tokens.expiresIn.toString());
+          req.res.setHeader("X-Access-Token", result.tokens.accessToken);
+          req.res.setHeader("X-Refresh-Token", result.tokens.refreshToken);
+          req.res.setHeader(
+            "X-Token-Expires-In",
+            result.tokens.expiresIn.toString()
+          );
         }
-        logAuthSuccess('basic', result.user.id);
+        logAuthSuccess("basic", result.user.id);
         return result.user;
       }
     }
 
     // Try API key authentication
-    if (authHeader.startsWith('ApiKey ') || 
-        (authHeader.startsWith('Bearer ') && authHeader.includes('hay_'))) {
+    if (
+      authHeader.startsWith("ApiKey ") ||
+      (authHeader.startsWith("Bearer ") && authHeader.includes("hay_"))
+    ) {
       const authUser = await authenticateApiKeyAuth(authHeader);
       if (authUser) {
-        logAuthSuccess('apikey', authUser.id);
+        logAuthSuccess("apikey", authUser.id);
         return authUser;
       }
     }
 
     return null;
   } catch (error) {
-    logAuthFailure(authHeader.split(' ')[0], error);
+    logAuthFailure(authHeader.split(" ")[0], error);
     throw error;
   }
 }
@@ -62,11 +67,11 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
  */
 export async function requireAuth(req: Request): Promise<AuthUser> {
   const authUser = await authenticate(req);
-  
+
   if (!authUser) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
-  
+
   return authUser;
 }
 
@@ -100,7 +105,7 @@ export function requireScopes(
  */
 export function requireAdmin(authUser: AuthUser): void {
   if (!authUser.isAdmin()) {
-    throw new Error('Admin access required');
+    throw new Error("Admin access required");
   }
 }
 
@@ -110,6 +115,6 @@ function logAuthSuccess(method: string, userId: string): void {
 }
 
 function logAuthFailure(method: string, error: unknown): void {
-  const message = error instanceof Error ? error.message : 'Unknown error';
+  const message = error instanceof Error ? error.message : "Unknown error";
   console.error(`[Auth] Failed ${method} authentication: ${message}`);
 }

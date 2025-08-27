@@ -11,7 +11,12 @@
         :type="actualType"
         :placeholder="placeholder"
         :disabled="disabled"
-        :class="cn(errorMessage && 'border-red-500 focus-visible:ring-red-500', $props.class)"
+        :class="
+          cn(
+            errorMessage && 'border-red-500 focus-visible:ring-red-500',
+            $props.class
+          )
+        "
         @blur="handleBlur"
       />
       <div
@@ -34,8 +39,8 @@
 </template>
 
 <script setup lang="ts">
-import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { cn } from '~/lib/utils';
+import { EyeIcon, EyeSlashIcon } from "@heroicons/vue/24/outline";
+import { cn } from "@/lib/utils";
 
 export interface FormFieldProps {
   id: string;
@@ -52,16 +57,16 @@ export interface FormFieldProps {
 }
 
 const props = withDefaults(defineProps<FormFieldProps>(), {
-  type: 'text',
+  type: "text",
   required: false,
   disabled: false,
   showPasswordToggle: false,
-  modelValue: '',
-  class: '',
+  modelValue: "",
+  class: "",
 });
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string];
+  "update:modelValue": [value: string];
   blur: [event: FocusEvent];
 }>();
 
@@ -69,12 +74,12 @@ const showPassword = ref(false);
 
 const inputValue = computed({
   get: () => props.modelValue,
-  set: (value: string) => emit('update:modelValue', value),
+  set: (value: string) => emit("update:modelValue", value),
 });
 
 const actualType = computed(() => {
-  if (props.type === 'password' && props.showPasswordToggle) {
-    return showPassword.value ? 'text' : 'password';
+  if (props.type === "password" && props.showPasswordToggle) {
+    return showPassword.value ? "text" : "password";
   }
   return props.type;
 });
@@ -84,6 +89,6 @@ const togglePasswordVisibility = () => {
 };
 
 const handleBlur = (event: FocusEvent) => {
-  emit('blur', event);
+  emit("blur", event);
 };
 </script>

@@ -10,7 +10,10 @@
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+          <RefreshCw
+            class="mr-2 h-4 w-4"
+            :class="{ 'animate-spin': loading }"
+          />
           Refresh
         </Button>
       </div>
@@ -66,10 +69,10 @@
               plugin.status === 'active'
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                 : plugin.status === 'error'
-                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                  : plugin.status === 'configuring'
-                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                : plugin.status === 'configuring'
+                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
             ]"
           >
             <div
@@ -78,10 +81,10 @@
                 plugin.status === 'active'
                   ? 'bg-green-600 dark:bg-green-400'
                   : plugin.status === 'error'
-                    ? 'bg-red-600 dark:bg-red-400'
-                    : plugin.status === 'configuring'
-                      ? 'bg-yellow-600 dark:bg-yellow-400 animate-pulse'
-                      : 'bg-gray-600 dark:bg-gray-400',
+                  ? 'bg-red-600 dark:bg-red-400'
+                  : plugin.status === 'configuring'
+                  ? 'bg-yellow-600 dark:bg-yellow-400 animate-pulse'
+                  : 'bg-gray-600 dark:bg-gray-400',
               ]"
             ></div>
             {{ plugin.status }}
@@ -93,14 +96,18 @@
             <div
               :class="[
                 'p-3 rounded-lg',
-                plugin.available ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                plugin.available
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted text-muted-foreground',
               ]"
             >
               <component :is="getPluginIcon(plugin.type)" class="h-6 w-6" />
             </div>
             <div class="flex-1">
               <CardTitle class="text-lg">{{ plugin.name }}</CardTitle>
-              <CardDescription class="mt-1">{{ plugin.description }}</CardDescription>
+              <CardDescription class="mt-1">{{
+                plugin.description
+              }}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -111,7 +118,9 @@
             <!-- Type -->
             <div class="flex items-center justify-between text-sm">
               <span class="text-muted-foreground">Type</span>
-              <Badge variant="secondary">{{ formatPluginType(plugin.type) }}</Badge>
+              <Badge variant="secondary">{{
+                formatPluginType(plugin.type)
+              }}</Badge>
             </div>
 
             <!-- Model/Version -->
@@ -124,10 +133,14 @@
             </div>
 
             <!-- Usage Stats -->
-            <div v-if="plugin.usage" class="flex items-center justify-between text-sm">
+            <div
+              v-if="plugin.usage"
+              class="flex items-center justify-between text-sm"
+            >
               <span class="text-muted-foreground">Usage</span>
               <span class="font-medium">
-                {{ formatNumber(plugin.usage.monthlyUsage?.requests || 0) }} requests
+                {{ formatNumber(plugin.usage.monthlyUsage?.requests || 0) }}
+                requests
               </span>
             </div>
 
@@ -137,11 +150,16 @@
               class="flex items-center justify-between text-sm"
             >
               <span class="text-muted-foreground">Cost</span>
-              <span class="font-medium">${{ plugin.usage.monthlyUsage.cost.toFixed(2) }}</span>
+              <span class="font-medium"
+                >${{ plugin.usage.monthlyUsage.cost.toFixed(2) }}</span
+              >
             </div>
 
             <!-- Health Status -->
-            <div v-if="plugin.healthCheck" class="flex items-center justify-between text-sm">
+            <div
+              v-if="plugin.healthCheck"
+              class="flex items-center justify-between text-sm"
+            >
               <span class="text-muted-foreground">Health</span>
               <span
                 :class="[
@@ -152,7 +170,11 @@
                 ]"
               >
                 <component
-                  :is="plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle"
+                  :is="
+                    plugin.healthCheck.status === 'healthy'
+                      ? CheckCircle
+                      : XCircle
+                  "
                   class="h-4 w-4 mr-1"
                 />
                 {{ plugin.healthCheck.status }}
@@ -162,7 +184,10 @@
 
           <!-- Actions -->
           <div class="mt-6 flex space-x-2">
-            <NuxtLink :to="`/plugins/${plugin.pluginId || plugin.id}`" class="flex-1">
+            <NuxtLink
+              :to="`/plugins/${plugin.pluginId || plugin.id}`"
+              class="flex-1"
+            >
               <Button variant="outline" class="w-full" size="sm">
                 <Settings class="mr-2 h-4 w-4" />
                 Configure
@@ -190,13 +215,16 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading && filteredPlugins.length === 0" class="text-center py-12">
+    <div
+      v-else-if="!loading && filteredPlugins.length === 0"
+      class="text-center py-12"
+    >
       <Puzzle class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">No plugins found</h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
-          selectedCategory === 'all'
-            ? 'No plugins are available.'
+          selectedCategory === "all"
+            ? "No plugins are available."
             : `No ${selectedCategory} plugins found.`
         }}
       </p>
@@ -230,21 +258,33 @@
     <Card v-if="stats && !loading">
       <CardHeader>
         <CardTitle>Usage Overview</CardTitle>
-        <CardDescription>Total usage across all active plugins this month</CardDescription>
+        <CardDescription
+          >Total usage across all active plugins this month</CardDescription
+        >
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-3">
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Total Requests</p>
-            <p class="text-2xl font-bold">{{ formatNumber(stats.totalRequests) }}</p>
+            <p class="text-sm font-medium text-muted-foreground">
+              Total Requests
+            </p>
+            <p class="text-2xl font-bold">
+              {{ formatNumber(stats.totalRequests) }}
+            </p>
           </div>
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Total Tokens</p>
-            <p class="text-2xl font-bold">{{ formatNumber(stats.totalTokens) }}</p>
+            <p class="text-sm font-medium text-muted-foreground">
+              Total Tokens
+            </p>
+            <p class="text-2xl font-bold">
+              {{ formatNumber(stats.totalTokens) }}
+            </p>
           </div>
           <div class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Total Cost</p>
-            <p class="text-2xl font-bold">${{ stats.totalCost?.toFixed(2) || '0.00' }}</p>
+            <p class="text-2xl font-bold">
+              ${{ stats.totalCost?.toFixed(2) || "0.00" }}
+            </p>
           </div>
         </div>
       </CardContent>
@@ -267,7 +307,7 @@ import {
   Database,
   FileText,
   Layers,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 definePageMeta({
   // middleware: 'auth'
@@ -280,12 +320,12 @@ interface Plugin {
   name: string;
   description: string;
   type: string;
-  status: 'active' | 'inactive' | 'error' | 'configuring';
+  status: "active" | "inactive" | "error" | "configuring";
   available: boolean;
   configuration?: any;
   metadata?: any;
   healthCheck?: {
-    status: 'healthy' | 'unhealthy' | 'unknown';
+    status: "healthy" | "unhealthy" | "unknown";
     lastCheck?: Date;
     message?: string;
   };
@@ -300,7 +340,7 @@ interface Plugin {
 
 // State
 const loading = ref(false);
-const selectedCategory = ref('all');
+const selectedCategory = ref("all");
 const plugins = ref<Plugin[]>([]);
 const availablePlugins = ref<any[]>([]);
 const stats = ref<any>(null);
@@ -309,22 +349,24 @@ const stats = ref<any>(null);
 const categories = computed(() => {
   const allCount =
     plugins.value.length +
-    availablePlugins.value.filter((p) => !plugins.value.find((cp) => cp.pluginId === p.id)).length;
+    availablePlugins.value.filter(
+      (p) => !plugins.value.find((cp) => cp.pluginId === p.id)
+    ).length;
   const llmCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === 'llm_provider' || p.type === 'embedding_provider',
+    (p) => p.type === "llm_provider" || p.type === "embedding_provider"
   ).length;
   const vectorCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === 'vector_store',
+    (p) => p.type === "vector_store"
   ).length;
   const processorCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === 'document_processor',
+    (p) => p.type === "document_processor"
   ).length;
 
   return [
-    { id: 'all', name: 'All Plugins', count: allCount },
-    { id: 'llm', name: 'AI Providers', count: llmCount },
-    { id: 'vector', name: 'Vector Stores', count: vectorCount },
-    { id: 'processor', name: 'Processors', count: processorCount },
+    { id: "all", name: "All Plugins", count: allCount },
+    { id: "llm", name: "AI Providers", count: llmCount },
+    { id: "vector", name: "Vector Stores", count: vectorCount },
+    { id: "processor", name: "Processors", count: processorCount },
   ];
 });
 
@@ -341,25 +383,27 @@ const filteredPlugins = computed(() => {
         name: ap.name,
         description: ap.description,
         type: ap.type,
-        status: 'inactive' as const,
+        status: "inactive" as const,
         available: ap.available,
       })),
   ];
 
-  if (selectedCategory.value === 'all') {
+  if (selectedCategory.value === "all") {
     return allPlugins;
   }
 
-  if (selectedCategory.value === 'llm') {
-    return allPlugins.filter((p) => p.type === 'llm_provider' || p.type === 'embedding_provider');
+  if (selectedCategory.value === "llm") {
+    return allPlugins.filter(
+      (p) => p.type === "llm_provider" || p.type === "embedding_provider"
+    );
   }
 
-  if (selectedCategory.value === 'vector') {
-    return allPlugins.filter((p) => p.type === 'vector_store');
+  if (selectedCategory.value === "vector") {
+    return allPlugins.filter((p) => p.type === "vector_store");
   }
 
-  if (selectedCategory.value === 'processor') {
-    return allPlugins.filter((p) => p.type === 'document_processor');
+  if (selectedCategory.value === "processor") {
+    return allPlugins.filter((p) => p.type === "document_processor");
   }
 
   return allPlugins;
@@ -368,12 +412,12 @@ const filteredPlugins = computed(() => {
 // Methods
 const getPluginIcon = (type: string) => {
   switch (type) {
-    case 'llm_provider':
-    case 'embedding_provider':
+    case "llm_provider":
+    case "embedding_provider":
       return Brain;
-    case 'vector_store':
+    case "vector_store":
       return Database;
-    case 'document_processor':
+    case "document_processor":
       return FileText;
     default:
       return Layers;
@@ -381,55 +425,54 @@ const getPluginIcon = (type: string) => {
 };
 
 const formatPluginType = (type: string) => {
-  return type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
 const formatNumber = (num: number) => {
-  return new Intl.NumberFormat('en-US').format(num);
+  return new Intl.NumberFormat("en-US").format(num);
 };
 
 const refreshData = async () => {
-  loading.value = true;
-  try {
-    // Fetch configured plugins
-    const { data: configuredPlugins } = await $api('/api/v1/plugins');
-    plugins.value = configuredPlugins || [];
-
-    // Fetch available plugins
-    const { data: available } = await $api('/api/v1/plugins/available');
-    availablePlugins.value = available || [];
-
-    // Fetch usage stats
-    const { data: usageStats } = await $api('/api/v1/plugins/stats');
-    stats.value = usageStats;
-  } catch (error) {
-    console.error('Error fetching plugins:', error);
-    // TODO: Show error notification
-  } finally {
-    loading.value = false;
-  }
+  // loading.value = true;
+  // try {
+  //   // Fetch configured plugins
+  //   const { data: configuredPlugins } = await $api('/api/v1/plugins');
+  //   plugins.value = configuredPlugins || [];
+  //   // Fetch available plugins
+  //   const { data: available } = await $api('/api/v1/plugins/available');
+  //   availablePlugins.value = available || [];
+  //   // Fetch usage stats
+  //   const { data: usageStats } = await $api('/api/v1/plugins/stats');
+  //   stats.value = usageStats;
+  // } catch (error) {
+  //   console.error('Error fetching plugins:', error);
+  //   // TODO: Show error notification
+  // } finally {
+  //   loading.value = false;
+  // }
 };
 
 const togglePlugin = async (plugin: Plugin) => {
-  try {
-    const endpoint =
-      plugin.status === 'active'
-        ? `/api/v1/plugins/${plugin.pluginId}/disable`
-        : `/api/v1/plugins/${plugin.pluginId}/enable`;
-
-    await $api(endpoint, {
-      method: 'POST',
-    });
-
-    // Refresh data
-    await refreshData();
-
-    // TODO: Show success notification
-    console.log(`Plugin ${plugin.status === 'active' ? 'disabled' : 'enabled'} successfully`);
-  } catch (error) {
-    console.error('Error toggling plugin:', error);
-    // TODO: Show error notification
-  }
+  // try {
+  //   const endpoint =
+  //     plugin.status === "active"
+  //       ? `/api/v1/plugins/${plugin.pluginId}/disable`
+  //       : `/api/v1/plugins/${plugin.pluginId}/enable`;
+  //   await $api(endpoint, {
+  //     method: "POST",
+  //   });
+  //   // Refresh data
+  //   await refreshData();
+  //   // TODO: Show success notification
+  //   console.log(
+  //     `Plugin ${
+  //       plugin.status === "active" ? "disabled" : "enabled"
+  //     } successfully`
+  //   );
+  // } catch (error) {
+  //   console.error("Error toggling plugin:", error);
+  //   // TODO: Show error notification
+  // }
 };
 
 // Lifecycle
@@ -439,7 +482,9 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: 'Plugins - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Manage AI providers and integrations' }],
+  title: "Plugins - Hay Dashboard",
+  meta: [
+    { name: "description", content: "Manage AI providers and integrations" },
+  ],
 });
 </script>

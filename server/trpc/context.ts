@@ -1,6 +1,6 @@
-import { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import { AuthUser } from "@/lib/auth/AuthUser";
-import { authenticate } from "@/lib/auth/middleware";
+import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import { AuthUser } from "@server/lib/auth/AuthUser";
+import { authenticate } from "@server/lib/auth/middleware";
 
 export interface Context {
   user: AuthUser | null;

@@ -1,8 +1,8 @@
-import { User } from '@/entities/user.entity';
-import { AuthUser } from '@/lib/auth/AuthUser';
-import { parseBasicAuth, verifyPassword } from '@/lib/auth/utils/hashing';
-import { generateTokens } from '@/lib/auth/utils/jwt';
-import { AppDataSource } from '@/database/data-source';
+import { User } from "@server/entities/user.entity";
+import { AuthUser } from "@server/lib/auth/AuthUser";
+import { parseBasicAuth, verifyPassword } from "@server/lib/auth/utils/hashing";
+import { generateTokens } from "@server/lib/auth/utils/jwt";
+import { AppDataSource } from "@server/database/data-source";
 
 export interface BasicAuthResult {
   user: AuthUser;
@@ -17,18 +17,20 @@ export interface BasicAuthResult {
  * Authenticate a user using Basic Authentication (email:password)
  * Returns both the authenticated user and JWT tokens
  */
-export async function authenticateBasicAuth(authHeader?: string): Promise<BasicAuthResult | null> {
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+export async function authenticateBasicAuth(
+  authHeader?: string
+): Promise<BasicAuthResult | null> {
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }
 
   const credentials = parseBasicAuth(authHeader);
   if (!credentials) {
-    throw new Error('Invalid Basic Auth credentials format');
+    throw new Error("Invalid Basic Auth credentials format");
   }
 
   const { email, password } = credentials;
-  
+
   // Find user by email
   const userRepository = AppDataSource.getRepository(User);
   const user = await userRepository.findOne({
@@ -37,19 +39,22 @@ export async function authenticateBasicAuth(authHeader?: string): Promise<BasicA
 
   if (!user) {
     // Prevent timing attacks by still running password verification
-    await verifyPassword(password, '$argon2id$v=19$m=65536,t=3,p=4$fakesalt$fakehash');
-    throw new Error('Invalid credentials');
+    await verifyPassword(
+      password,
+      "$argon2id$v=19$m=65536,t=3,p=4$fakesalt$fakehash"
+    );
+    throw new Error("Invalid credentials");
   }
 
   // Verify password
   const isValidPassword = await verifyPassword(password, user.password);
   if (!isValidPassword) {
-    throw new Error('Invalid credentials');
+    throw new Error("Invalid credentials");
   }
 
   // Check if user is active
   if (!user.isActive) {
-    throw new Error('Account is deactivated');
+    throw new Error("Account is deactivated");
   }
 
   // Update last login time
@@ -60,7 +65,7 @@ export async function authenticateBasicAuth(authHeader?: string): Promise<BasicA
   const tokens = generateTokens(user);
 
   // Create AuthUser instance
-  const authUser = new AuthUser(user, 'basic', {
+  const authUser = new AuthUser(user, "basic", {
     sessionId: `basic_${Date.now()}_${Math.random().toString(36).substring(2)}`,
   });
 
@@ -74,8 +79,10 @@ export async function authenticateBasicAuth(authHeader?: string): Promise<BasicA
  * Validate Basic Auth credentials without generating tokens
  * Used for one-time authentication checks
  */
-export async function validateBasicAuth(authHeader?: string): Promise<AuthUser | null> {
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
+export async function validateBasicAuth(
+  authHeader?: string
+): Promise<AuthUser | null> {
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }
 
@@ -85,7 +92,7 @@ export async function validateBasicAuth(authHeader?: string): Promise<AuthUser |
   }
 
   const { email, password } = credentials;
-  
+
   // Find user by email
   const userRepository = AppDataSource.getRepository(User);
   const user = await userRepository.findOne({
@@ -108,5 +115,5 @@ export async function validateBasicAuth(authHeader?: string): Promise<AuthUser |
   }
 
   // Create AuthUser instance
-  return new AuthUser(user, 'basic');
+  return new AuthUser(user, "basic");
 }

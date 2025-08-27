@@ -2,7 +2,9 @@
   <div v-if="agent" class="space-y-8">
     <!-- Agent Header -->
     <div class="bg-background border rounded-lg p-6">
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div
+        class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
+      >
         <div class="flex items-start space-x-4">
           <div
             class="h-16 w-16 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
@@ -11,17 +13,19 @@
           </div>
           <div class="flex-1">
             <div class="flex items-center space-x-2">
-              <h1 class="text-2xl font-bold text-foreground">{{ agent.name }}</h1>
+              <h1 class="text-2xl font-bold text-foreground">
+                {{ agent.name }}
+              </h1>
               <div
                 :class="[
                   'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
                   agent.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : agent.status === 'inactive'
-                      ? 'bg-gray-100 text-gray-800'
-                      : agent.status === 'training'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-red-100 text-red-800',
+                    ? 'bg-gray-100 text-gray-800'
+                    : agent.status === 'training'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -30,17 +34,19 @@
                     agent.status === 'active'
                       ? 'bg-green-600'
                       : agent.status === 'inactive'
-                        ? 'bg-gray-600'
-                        : agent.status === 'training'
-                          ? 'bg-blue-600'
-                          : 'bg-red-600',
+                      ? 'bg-gray-600'
+                      : agent.status === 'training'
+                      ? 'bg-blue-600'
+                      : 'bg-red-600',
                   ]"
                 ></div>
                 {{ agent.status }}
               </div>
             </div>
             <p class="mt-2 text-muted-foreground">{{ agent.description }}</p>
-            <div class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground">
+            <div
+              class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground"
+            >
               <span>{{ agent.type }} agent</span>
               <span>•</span>
               <span>Created {{ formatDate(agent.createdAt) }}</span>
@@ -50,9 +56,13 @@
           </div>
         </div>
         <div class="flex space-x-3">
-          <Button variant="outline" :disabled="statusLoading" @click="toggleAgentStatus">
+          <Button
+            variant="outline"
+            :disabled="statusLoading"
+            @click="toggleAgentStatus"
+          >
             <Power class="mr-2 h-4 w-4" />
-            {{ agent.status === 'active' ? 'Disable' : 'Enable' }}
+            {{ agent.status === "active" ? "Disable" : "Enable" }}
           </Button>
           <Button variant="outline" @click="editAgent">
             <Settings class="mr-2 h-4 w-4" />
@@ -93,12 +103,18 @@
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium">Total Conversations</CardTitle>
+            <CardHeader
+              class="flex flex-row items-center justify-between space-y-0 pb-2"
+            >
+              <CardTitle class="text-sm font-medium"
+                >Total Conversations</CardTitle
+              >
               <MessageSquare class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div class="text-2xl font-bold">{{ agent.conversationCount.toLocaleString() }}</div>
+              <div class="text-2xl font-bold">
+                {{ agent.conversationCount.toLocaleString() }}
+              </div>
               <p class="text-xs text-muted-foreground">
                 <span class="text-green-600">+12%</span> from last month
               </p>
@@ -106,7 +122,9 @@
           </Card>
 
           <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader
+              class="flex flex-row items-center justify-between space-y-0 pb-2"
+            >
               <CardTitle class="text-sm font-medium">Resolution Rate</CardTitle>
               <CheckCircle class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -119,8 +137,12 @@
           </Card>
 
           <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium">Avg Response Time</CardTitle>
+            <CardHeader
+              class="flex flex-row items-center justify-between space-y-0 pb-2"
+            >
+              <CardTitle class="text-sm font-medium"
+                >Avg Response Time</CardTitle
+              >
               <Clock class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -132,12 +154,18 @@
           </Card>
 
           <Card>
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium">Satisfaction Score</CardTitle>
+            <CardHeader
+              class="flex flex-row items-center justify-between space-y-0 pb-2"
+            >
+              <CardTitle class="text-sm font-medium"
+                >Satisfaction Score</CardTitle
+              >
               <Star class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div class="text-2xl font-bold">{{ agent.satisfactionScore }}/5</div>
+              <div class="text-2xl font-bold">
+                {{ agent.satisfactionScore }}/5
+              </div>
               <p class="text-xs text-muted-foreground">
                 <span class="text-green-600">+0.2</span> from last month
               </p>
@@ -152,11 +180,14 @@
             <CardHeader>
               <CardTitle>Performance Trends</CardTitle>
               <CardDescription
-                >Resolution rate and response time over the last 30 days</CardDescription
+                >Resolution rate and response time over the last 30
+                days</CardDescription
               >
             </CardHeader>
             <CardContent>
-              <div class="h-80 flex items-center justify-center bg-muted/50 rounded-lg">
+              <div
+                class="h-80 flex items-center justify-center bg-muted/50 rounded-lg"
+              >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-12 w-12 mx-auto mb-2" />
                   <p>Performance chart will be rendered here</p>
@@ -170,7 +201,9 @@
           <Card class="lg:col-span-3">
             <CardHeader>
               <CardTitle>Recent Conversations</CardTitle>
-              <CardDescription>Latest interactions handled by this agent</CardDescription>
+              <CardDescription
+                >Latest interactions handled by this agent</CardDescription
+              >
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
@@ -180,7 +213,9 @@
                   class="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                   @click="viewConversation(conversation.id)"
                 >
-                  <div class="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                  <div
+                    class="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+                  >
                     <User class="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
@@ -197,8 +232,8 @@
                           conversation.status === 'resolved'
                             ? 'bg-green-100 text-green-800'
                             : conversation.status === 'active'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800',
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-red-100 text-red-800',
                         ]"
                       >
                         {{ conversation.status }}
@@ -220,7 +255,9 @@
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">Agent Playbooks</h3>
-            <p class="text-sm text-muted-foreground">Automated workflows and response patterns</p>
+            <p class="text-sm text-muted-foreground">
+              Automated workflows and response patterns
+            </p>
           </div>
           <Button @click="createPlaybook">
             <Plus class="mr-2 h-4 w-4" />
@@ -238,7 +275,9 @@
               <div class="flex items-start justify-between">
                 <div class="flex-1">
                   <CardTitle class="text-lg">{{ playbook.name }}</CardTitle>
-                  <CardDescription class="mt-1">{{ playbook.description }}</CardDescription>
+                  <CardDescription class="mt-1">{{
+                    playbook.description
+                  }}</CardDescription>
                 </div>
                 <div
                   :class="[
@@ -298,7 +337,9 @@
       <div v-if="activeTab === 'conversations'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h3 class="text-lg font-medium text-foreground">All Conversations</h3>
+            <h3 class="text-lg font-medium text-foreground">
+              All Conversations
+            </h3>
             <p class="text-sm text-muted-foreground">
               Complete conversation history for this agent
             </p>
@@ -331,12 +372,18 @@
               >
                 <div class="flex items-center justify-between">
                   <div class="flex items-center space-x-3">
-                    <div class="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                    <div
+                      class="h-10 w-10 rounded-full bg-muted flex items-center justify-center"
+                    >
                       <User class="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p class="font-medium text-foreground">{{ conversation.customerName }}</p>
-                      <p class="text-sm text-muted-foreground">{{ conversation.lastMessage }}</p>
+                      <p class="font-medium text-foreground">
+                        {{ conversation.customerName }}
+                      </p>
+                      <p class="text-sm text-muted-foreground">
+                        {{ conversation.lastMessage }}
+                      </p>
                     </div>
                   </div>
                   <div class="text-right">
@@ -346,10 +393,10 @@
                         conversation.status === 'resolved'
                           ? 'bg-green-100 text-green-800'
                           : conversation.status === 'active'
-                            ? 'bg-blue-100 text-blue-800'
-                            : conversation.status === 'escalated'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-800',
+                          ? 'bg-blue-100 text-blue-800'
+                          : conversation.status === 'escalated'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800',
                       ]"
                     >
                       {{ conversation.status }}
@@ -368,7 +415,9 @@
       <!-- Analytics Tab -->
       <div v-if="activeTab === 'analytics'" class="space-y-6">
         <div>
-          <h3 class="text-lg font-medium text-foreground">Performance Analytics</h3>
+          <h3 class="text-lg font-medium text-foreground">
+            Performance Analytics
+          </h3>
           <p class="text-sm text-muted-foreground">
             Detailed insights into agent performance and trends
           </p>
@@ -393,7 +442,9 @@
               <CardTitle>Response Time Trends</CardTitle>
             </CardHeader>
             <CardContent>
-              <div class="h-64 flex items-center justify-center bg-muted/50 rounded-lg">
+              <div
+                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+              >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Response time chart</p>
@@ -407,7 +458,9 @@
               <CardTitle>Resolution Rate by Day</CardTitle>
             </CardHeader>
             <CardContent>
-              <div class="h-64 flex items-center justify-center bg-muted/50 rounded-lg">
+              <div
+                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+              >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Resolution rate chart</p>
@@ -421,7 +474,9 @@
               <CardTitle>Conversation Volume</CardTitle>
             </CardHeader>
             <CardContent>
-              <div class="h-64 flex items-center justify-center bg-muted/50 rounded-lg">
+              <div
+                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+              >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Volume chart</p>
@@ -435,7 +490,9 @@
               <CardTitle>Customer Satisfaction</CardTitle>
             </CardHeader>
             <CardContent>
-              <div class="h-64 flex items-center justify-center bg-muted/50 rounded-lg">
+              <div
+                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+              >
                 <div class="text-center text-muted-foreground">
                   <Star class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Satisfaction chart</p>
@@ -510,21 +567,27 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Auto-escalation</p>
-                <p class="text-sm text-muted-foreground">Automatically escalate complex queries</p>
+                <p class="text-sm text-muted-foreground">
+                  Automatically escalate complex queries
+                </p>
               </div>
               <Checkbox v-model:checked="agentSettings.autoEscalation" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Learning Mode</p>
-                <p class="text-sm text-muted-foreground">Continue learning from conversations</p>
+                <p class="text-sm text-muted-foreground">
+                  Continue learning from conversations
+                </p>
               </div>
               <Checkbox v-model:checked="agentSettings.learningMode" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Real-time Analytics</p>
-                <p class="text-sm text-muted-foreground">Enable real-time performance tracking</p>
+                <p class="text-sm text-muted-foreground">
+                  Enable real-time performance tracking
+                </p>
               </div>
               <Checkbox v-model:checked="agentSettings.realTimeAnalytics" />
             </div>
@@ -535,7 +598,9 @@
         <Card>
           <CardHeader>
             <CardTitle class="text-red-600">Danger Zone</CardTitle>
-            <CardDescription>Irreversible actions for this agent</CardDescription>
+            <CardDescription
+              >Irreversible actions for this agent</CardDescription
+            >
           </CardHeader>
           <CardContent>
             <div class="flex items-center justify-between">
@@ -545,7 +610,9 @@
                   Permanently delete this agent and all its data
                 </p>
               </div>
-              <Button variant="destructive" @click="deleteAgent"> Delete Agent </Button>
+              <Button variant="destructive" @click="deleteAgent">
+                Delete Agent
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -572,10 +639,11 @@
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">Agent not found</h3>
     <p class="mt-2 text-sm text-muted-foreground">
-      The agent you're looking for doesn't exist or you don't have permission to view it.
+      The agent you're looking for doesn't exist or you don't have permission to
+      view it.
     </p>
     <div class="mt-6">
-      <Button @click="$router.push('/agents')"> Back to Agents </Button>
+      <Button @click="router.push('/agents')"> Back to Agents </Button>
     </div>
   </div>
 </template>
@@ -596,14 +664,14 @@ import {
   Play,
   Download,
   AlertCircle,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // Type definitions
 interface Agent {
   id: string;
   name: string;
   description: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   type: string;
   conversationCount: number;
   resolutionRate: number;
@@ -618,7 +686,7 @@ interface Playbook {
   name: string;
   description: string;
   trigger: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   usageCount?: number;
   successRate?: number;
 }
@@ -642,21 +710,22 @@ definePageMeta({
 
 // Get agent ID from route
 const route = useRoute();
-const agentId = route.params['id'] as string;
+const router = useRouter();
+const agentId = route.params["id"] as string;
 
 // State
 const loading = ref(true);
 const statusLoading = ref(false);
-const activeTab = ref('overview');
-const conversationFilter = ref('');
-const analyticsTimeframe = ref('30d');
+const activeTab = ref("overview");
+const conversationFilter = ref("");
+const analyticsTimeframe = ref("30d");
 
 // Agent form
 const agentSettings = reactive({
-  name: '',
-  description: '',
-  type: '',
-  language: 'en',
+  name: "",
+  description: "",
+  type: "",
+  language: "en",
   autoEscalation: false,
   learningMode: true,
   realTimeAnalytics: true,
@@ -664,40 +733,40 @@ const agentSettings = reactive({
 
 // Tab configuration
 const tabs = [
-  { id: 'overview', name: 'Overview', icon: BarChart3 },
-  { id: 'playbooks', name: 'Playbooks', icon: BookOpen },
-  { id: 'conversations', name: 'Conversations', icon: MessageSquare },
-  { id: 'analytics', name: 'Analytics', icon: BarChart3 },
-  { id: 'settings', name: 'Settings', icon: Settings },
+  { id: "overview", name: "Overview", icon: BarChart3 },
+  { id: "playbooks", name: "Playbooks", icon: BookOpen },
+  { id: "conversations", name: "Conversations", icon: MessageSquare },
+  { id: "analytics", name: "Analytics", icon: BarChart3 },
+  { id: "settings", name: "Settings", icon: Settings },
 ];
 
 // Mock data - TODO: Replace with real API calls
 const agent = ref<Agent | null>(null);
 const playbooks = ref<Playbook[]>([
   {
-    id: '1',
-    name: 'Welcome Message',
-    description: 'Greets new users and offers assistance',
-    trigger: 'User starts conversation',
-    status: 'active',
+    id: "1",
+    name: "Welcome Message",
+    description: "Greets new users and offers assistance",
+    trigger: "User starts conversation",
+    status: "active",
     usageCount: 245,
     successRate: 94,
   },
   {
-    id: '2',
-    name: 'Password Reset',
-    description: 'Guides users through password reset process',
-    trigger: 'Keywords: password, reset, forgot',
-    status: 'active',
+    id: "2",
+    name: "Password Reset",
+    description: "Guides users through password reset process",
+    trigger: "Keywords: password, reset, forgot",
+    status: "active",
     usageCount: 89,
     successRate: 87,
   },
   {
-    id: '3',
-    name: 'Billing Inquiry',
-    description: 'Handles billing questions and issues',
-    trigger: 'Keywords: billing, payment, invoice',
-    status: 'inactive',
+    id: "3",
+    name: "Billing Inquiry",
+    description: "Handles billing questions and issues",
+    trigger: "Keywords: billing, payment, invoice",
+    status: "inactive",
     usageCount: 156,
     successRate: 91,
   },
@@ -705,24 +774,24 @@ const playbooks = ref<Playbook[]>([
 
 const conversations = ref<Conversation[]>([
   {
-    id: '1',
-    customerName: 'John Smith',
-    lastMessage: 'Thank you for the help!',
-    status: 'resolved',
+    id: "1",
+    customerName: "John Smith",
+    lastMessage: "Thank you for the help!",
+    status: "resolved",
     updatedAt: new Date(Date.now() - 1000 * 60 * 5),
   },
   {
-    id: '2',
-    customerName: 'Sarah Johnson',
-    lastMessage: 'I need help with billing',
-    status: 'active',
+    id: "2",
+    customerName: "Sarah Johnson",
+    lastMessage: "I need help with billing",
+    status: "active",
     updatedAt: new Date(Date.now() - 1000 * 60 * 12),
   },
   {
-    id: '3',
-    customerName: 'Mike Wilson',
-    lastMessage: 'The integration is not working',
-    status: 'escalated',
+    id: "3",
+    customerName: "Mike Wilson",
+    lastMessage: "The integration is not working",
+    status: "escalated",
     updatedAt: new Date(Date.now() - 1000 * 60 * 25),
   },
 ]);
@@ -730,15 +799,17 @@ const conversations = ref<Conversation[]>([
 const recentConversations = computed(() => conversations.value.slice(0, 5));
 const filteredConversations = computed(() => {
   if (!conversationFilter.value) return conversations.value;
-  return conversations.value.filter((c) => c.status === conversationFilter.value);
+  return conversations.value.filter(
+    (c) => c.status === conversationFilter.value
+  );
 });
 
 // Methods
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   }).format(date);
 };
 
@@ -747,7 +818,7 @@ const formatTimeAgo = (date: Date) => {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return 'Just now';
+    return "Just now";
   } else if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
     return `${minutes}m ago`;
@@ -764,7 +835,7 @@ const loadAgent = async () => {
   loading.value = true;
   try {
     // TODO: Fetch agent data from API
-    console.log('Loading agent:', agentId);
+    console.log("Loading agent:", agentId);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -772,16 +843,17 @@ const loadAgent = async () => {
     // Mock agent data
     agent.value = {
       id: agentId,
-      name: 'Customer Support Bot',
-      description: 'Handles general customer inquiries and support tickets with high accuracy',
-      status: 'active',
-      type: 'customer-support',
+      name: "Customer Support Bot",
+      description:
+        "Handles general customer inquiries and support tickets with high accuracy",
+      status: "active",
+      type: "customer-support",
       conversationCount: 1234,
       resolutionRate: 94,
       avgResponseTime: 1.2,
       satisfactionScore: 4.6,
       lastActivity: new Date(Date.now() - 1000 * 60 * 15),
-      createdAt: new Date('2023-01-15'),
+      createdAt: new Date("2023-01-15"),
     };
 
     // Initialize form with agent data
@@ -789,7 +861,7 @@ const loadAgent = async () => {
     agentSettings.description = agent.value.description;
     agentSettings.type = agent.value.type;
   } catch (error) {
-    console.error('Error loading agent:', error);
+    console.error("Error loading agent:", error);
     // TODO: Show error notification
   } finally {
     loading.value = false;
@@ -800,19 +872,20 @@ const toggleAgentStatus = async () => {
   statusLoading.value = true;
   try {
     // TODO: Toggle agent status via API
-    console.log('Toggle agent status:', agentId);
+    console.log("Toggle agent status:", agentId);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Update local state
     if (agent.value) {
-      agent.value.status = agent.value.status === 'active' ? 'inactive' : 'active';
+      agent.value.status =
+        agent.value.status === "active" ? "inactive" : "active";
     }
 
     // TODO: Show success notification
   } catch (error) {
-    console.error('Error toggling agent status:', error);
+    console.error("Error toggling agent status:", error);
     // TODO: Show error notification
   } finally {
     statusLoading.value = false;
@@ -822,50 +895,50 @@ const toggleAgentStatus = async () => {
 const editAgent = () => {
   // TODO: Navigate to agent edit page
   // await navigateTo(`/agents/${agentId}/edit`)
-  console.log('Edit agent:', agentId);
+  console.log("Edit agent:", agentId);
 };
 
 const testAgent = () => {
   // TODO: Open agent test chat interface
-  console.log('Test agent:', agentId);
+  console.log("Test agent:", agentId);
 };
 
 const createPlaybook = () => {
   // TODO: Navigate to playbook creation
   // await navigateTo(`/agents/${agentId}/playbooks/new`)
-  console.log('Create playbook for agent:', agentId);
+  console.log("Create playbook for agent:", agentId);
 };
 
 const editPlaybook = (playbookId: string) => {
   // TODO: Navigate to playbook editor
-  console.log('Edit playbook:', playbookId);
+  console.log("Edit playbook:", playbookId);
 };
 
 const testPlaybook = (playbookId: string) => {
   // TODO: Test playbook functionality
-  console.log('Test playbook:', playbookId);
+  console.log("Test playbook:", playbookId);
 };
 
 const viewConversation = (conversationId: string) => {
   // TODO: Navigate to conversation detail
   // await navigateTo(`/conversations/${conversationId}`)
-  console.log('View conversation:', conversationId);
+  console.log("View conversation:", conversationId);
 };
 
 const exportConversations = () => {
   // TODO: Export conversation data
-  console.log('Export conversations for agent:', agentId);
+  console.log("Export conversations for agent:", agentId);
 };
 
 const saveAgentSettings = async () => {
   try {
     // TODO: Save agent settings via API
-    console.log('Save agent settings:', agentSettings);
+    console.log("Save agent settings:", agentSettings);
 
     // TODO: Update agent data
     // TODO: Show success notification
   } catch (error) {
-    console.error('Error saving agent settings:', error);
+    console.error("Error saving agent settings:", error);
     // TODO: Show error notification
   }
 };
@@ -874,12 +947,12 @@ const deleteAgent = async () => {
   try {
     // TODO: Show confirmation dialog
     // TODO: Delete agent via API
-    console.log('Delete agent:', agentId);
+    console.log("Delete agent:", agentId);
 
     // TODO: Navigate back to agents list
     // await navigateTo('/agents')
   } catch (error) {
-    console.error('Error deleting agent:', error);
+    console.error("Error deleting agent:", error);
     // TODO: Show error notification
   }
 };
@@ -897,8 +970,15 @@ onMounted(async () => {
 // SEO
 useHead({
   title: computed(() =>
-    agent.value ? `${agent.value.name} - Hay Dashboard` : 'Agent - Hay Dashboard',
+    agent.value
+      ? `${agent.value.name} - Hay Dashboard`
+      : "Agent - Hay Dashboard"
   ),
-  meta: [{ name: 'description', content: 'Manage and monitor your AI agent performance' }],
+  meta: [
+    {
+      name: "description",
+      content: "Manage and monitor your AI agent performance",
+    },
+  ],
 });
 </script>

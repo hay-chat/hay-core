@@ -1,22 +1,23 @@
 {
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
-    "module": "esnext",
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "paths": {
+      "@server/*": ["../server/*"],
+      "@/*": ["./*"],
+      "~/*": ["./*"],
+      "~~/*": ["./*"],
+      "@@/*": ["./*"]
+    }
   },
+  "include": [
+    "**/*",
+    ".nuxt/**/*"
+  ],
   "exclude": [
     "../server/**/*",
-    "../server"
+    "node_modules",
+    ".nuxt/dist"
   ]
 }

@@ -25,10 +25,21 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: true,
+    tsConfig: {
+      compilerOptions: {
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+        paths: {
+          "@server/*": ["../server/*"],
+          "@/*": ["./*"],
+        },
+      },
+      exclude: ["../server/**/*"],
+    },
   },
 
   // CSS framework
-  css: ["~/assets/css/main.css"],
+  css: ["@/assets/css/main.css"],
 
   // Modules
   modules: [
@@ -97,24 +108,24 @@ export default defineNuxtConfig({
   // Auto-import components
   components: [
     {
-      path: "~/components",
+      path: "@/components",
       pathPrefix: false,
       extensions: ["vue"],
       // Enable auto-import for all component subdirectories
       global: true,
     },
     {
-      path: "~/components/ui",
+      path: "@/components/ui",
       prefix: "",
       extensions: ["vue"],
     },
     {
-      path: "~/components/auth",
+      path: "@/components/auth",
       prefix: "",
       extensions: ["vue"],
     },
     {
-      path: "~/components/layout",
+      path: "@/components/layout",
       prefix: "",
       extensions: ["vue"],
     },
@@ -139,7 +150,7 @@ export default defineNuxtConfig({
 
   // Tailwind CSS configuration
   tailwindcss: {
-    cssPath: "~/assets/css/main.css",
+    cssPath: "@/assets/css/main.css",
   },
 
   // Vite configuration for additional auto-imports

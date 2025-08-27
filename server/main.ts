@@ -1,10 +1,10 @@
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import cors from "cors";
-import { config } from "@/config/env";
-import { appRouter } from "@/routes";
-import { createContext } from "@/trpc/context";
-import { initializeDatabase } from "@/database/data-source";
+import { config } from "@server/config/env";
+import { appRouter } from "@server/routes";
+import { createContext } from "@server/trpc/context";
+import { initializeDatabase } from "@server/database/data-source";
 import "reflect-metadata";
 import "dotenv/config";
 

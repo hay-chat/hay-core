@@ -10,7 +10,10 @@
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+          <RefreshCw
+            class="mr-2 h-4 w-4"
+            :class="{ 'animate-spin': loading }"
+          />
           Refresh
         </Button>
       </div>
@@ -23,7 +26,9 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-muted-foreground">Pending</p>
-              <p class="text-2xl font-bold text-yellow-600">{{ stats.pending || 0 }}</p>
+              <p class="text-2xl font-bold text-yellow-600">
+                {{ stats.pending || 0 }}
+              </p>
             </div>
             <Clock class="h-8 w-8 text-yellow-600 opacity-50" />
           </div>
@@ -35,7 +40,9 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-muted-foreground">Processing</p>
-              <p class="text-2xl font-bold text-blue-600">{{ stats.processing || 0 }}</p>
+              <p class="text-2xl font-bold text-blue-600">
+                {{ stats.processing || 0 }}
+              </p>
             </div>
             <Activity class="h-8 w-8 text-blue-600 opacity-50" />
           </div>
@@ -47,7 +54,9 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-muted-foreground">Completed</p>
-              <p class="text-2xl font-bold text-green-600">{{ stats.completed || 0 }}</p>
+              <p class="text-2xl font-bold text-green-600">
+                {{ stats.completed || 0 }}
+              </p>
             </div>
             <CheckCircle class="h-8 w-8 text-green-600 opacity-50" />
           </div>
@@ -59,7 +68,9 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-muted-foreground">Failed</p>
-              <p class="text-2xl font-bold text-red-600">{{ stats.failed || 0 }}</p>
+              <p class="text-2xl font-bold text-red-600">
+                {{ stats.failed || 0 }}
+              </p>
             </div>
             <XCircle class="h-8 w-8 text-red-600 opacity-50" />
           </div>
@@ -122,8 +133,12 @@
 
         <div v-else-if="!jobs.length" class="p-8 text-center">
           <Inbox class="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 class="mt-2 text-sm font-semibold text-foreground">No jobs found</h3>
-          <p class="mt-1 text-sm text-muted-foreground">There are no jobs matching your filters.</p>
+          <h3 class="mt-2 text-sm font-semibold text-foreground">
+            No jobs found
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            There are no jobs matching your filters.
+          </p>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -173,10 +188,16 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
-              <tr v-for="job in jobs" :key="job.id" class="hover:bg-muted/50 transition-colors">
+              <tr
+                v-for="job in jobs"
+                :key="job.id"
+                class="hover:bg-muted/50 transition-colors"
+              >
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <code class="text-xs bg-muted px-2 py-1 rounded">{{ job.id.slice(0, 8) }}</code>
+                    <code class="text-xs bg-muted px-2 py-1 rounded">{{
+                      job.id.slice(0, 8)
+                    }}</code>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
@@ -201,15 +222,21 @@
                           :style="{ width: `${job.progress || 0}%` }"
                         ></div>
                       </div>
-                      <span class="text-xs text-muted-foreground">{{ job.progress || 0 }}%</span>
+                      <span class="text-xs text-muted-foreground"
+                        >{{ job.progress || 0 }}%</span
+                      >
                     </div>
                   </div>
                   <span v-else class="text-sm text-muted-foreground">-</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground"
+                >
                   {{ formatDate(job.createdAt) }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground"
+                >
                   {{ formatDuration(job.duration) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -223,7 +250,10 @@
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="job.status === 'failed' && job.attempts < job.maxAttempts"
+                      v-if="
+                        job.status === 'failed' &&
+                        job.attempts < job.maxAttempts
+                      "
                       variant="ghost"
                       size="sm"
                       @click="retryJob(job)"
@@ -232,7 +262,9 @@
                       <RotateCw class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="['pending', 'queued', 'processing'].includes(job.status)"
+                      v-if="
+                        ['pending', 'queued', 'processing'].includes(job.status)
+                      "
                       variant="ghost"
                       size="sm"
                       @click="cancelJob(job)"
@@ -252,7 +284,8 @@
           <div class="flex items-center justify-between">
             <p class="text-sm text-muted-foreground">
               Showing {{ (currentPage - 1) * pageSize + 1 }} to
-              {{ Math.min(currentPage * pageSize, totalJobs) }} of {{ totalJobs }} jobs
+              {{ Math.min(currentPage * pageSize, totalJobs) }} of
+              {{ totalJobs }} jobs
             </p>
             <div class="flex space-x-2">
               <Button
@@ -287,7 +320,9 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm font-medium text-muted-foreground">ID</p>
-              <code class="text-xs bg-muted px-2 py-1 rounded">{{ selectedJob.id }}</code>
+              <code class="text-xs bg-muted px-2 py-1 rounded">{{
+                selectedJob.id
+              }}</code>
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Type</p>
@@ -307,19 +342,27 @@
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Attempts</p>
-              <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.maxAttempts }}</p>
+              <p class="text-sm">
+                {{ selectedJob.attempts }} / {{ selectedJob.maxAttempts }}
+              </p>
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Created</p>
-              <p class="text-sm">{{ formatDate(selectedJob.createdAt, true) }}</p>
+              <p class="text-sm">
+                {{ formatDate(selectedJob.createdAt, true) }}
+              </p>
             </div>
             <div v-if="selectedJob.startedAt">
               <p class="text-sm font-medium text-muted-foreground">Started</p>
-              <p class="text-sm">{{ formatDate(selectedJob.startedAt, true) }}</p>
+              <p class="text-sm">
+                {{ formatDate(selectedJob.startedAt, true) }}
+              </p>
             </div>
             <div v-if="selectedJob.completedAt">
               <p class="text-sm font-medium text-muted-foreground">Completed</p>
-              <p class="text-sm">{{ formatDate(selectedJob.completedAt, true) }}</p>
+              <p class="text-sm">
+                {{ formatDate(selectedJob.completedAt, true) }}
+              </p>
             </div>
           </div>
 
@@ -339,7 +382,9 @@
 
           <div v-if="selectedJob.error" class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Error</p>
-            <div class="bg-destructive/10 border border-destructive/20 p-3 rounded">
+            <div
+              class="bg-destructive/10 border border-destructive/20 p-3 rounded"
+            >
               <p class="text-sm text-destructive">{{ selectedJob.error }}</p>
             </div>
           </div>
@@ -363,7 +408,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   Activity,
   CheckCircle,
@@ -376,19 +420,7 @@ import {
   Search,
   X,
   XCircle,
-} from 'lucide-vue-next';
-import Badge from '@/components/ui/Badge.vue';
-import Button from '@/components/ui/Button.vue';
-import Card from '@/components/ui/Card.vue';
-import CardContent from '@/components/ui/CardContent.vue';
-import Dialog from '@/components/ui/Dialog.vue';
-import DialogContent from '@/components/ui/DialogContent.vue';
-import DialogHeader from '@/components/ui/DialogHeader.vue';
-import DialogTitle from '@/components/ui/DialogTitle.vue';
-import Input from '@/components/ui/Input.vue';
-import { useNuxtApp } from '#app';
-
-const { $api } = useNuxtApp();
+} from "lucide-vue-next";
 
 // State
 const loading = ref(false);
@@ -396,9 +428,9 @@ const jobs = ref<any[]>([]);
 const totalJobs = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
-const searchQuery = ref('');
-const statusFilter = ref('');
-const typeFilter = ref('');
+const searchQuery = ref("");
+const statusFilter = ref("");
+const typeFilter = ref("");
 const showDetailsModal = ref(false);
 const selectedJob = ref<any>(null);
 const stats = ref({
@@ -416,63 +448,58 @@ const totalPages = computed(() => Math.ceil(totalJobs.value / pageSize.value));
 
 // Methods
 const fetchJobs = async () => {
-  loading.value = true;
-  try {
-    const params: any = {
-      limit: pageSize.value,
-      offset: (currentPage.value - 1) * pageSize.value,
-    };
-
-    if (statusFilter.value) {
-      params.status = statusFilter.value;
-    }
-
-    if (typeFilter.value) {
-      params.type = typeFilter.value;
-    }
-
-    const response = await $api.get('/api/v1/jobs', { params });
-    jobs.value = response.jobs;
-    totalJobs.value = response.total;
-  } catch (error: any) {
-    console.error('Failed to fetch jobs:', error);
-  } finally {
-    loading.value = false;
-  }
+  // loading.value = true;
+  // try {
+  //   const params: any = {
+  //     limit: pageSize.value,
+  //     offset: (currentPage.value - 1) * pageSize.value,
+  //   };
+  //   if (statusFilter.value) {
+  //     params.status = statusFilter.value;
+  //   }
+  //   if (typeFilter.value) {
+  //     params.type = typeFilter.value;
+  //   }
+  //   const response = await $api.get("/api/v1/jobs", { params });
+  //   jobs.value = response.jobs;
+  //   totalJobs.value = response.total;
+  // } catch (error: any) {
+  //   console.error("Failed to fetch jobs:", error);
+  // } finally {
+  //   loading.value = false;
+  // }
 };
 
 const fetchStats = async () => {
-  try {
-    const response = await $api.get('/api/v1/jobs/stats');
-    const statsByStatus = response.byStatus || [];
-
-    stats.value = {
-      pending: 0,
-      processing: 0,
-      completed: 0,
-      failed: 0,
-    };
-
-    statsByStatus.forEach((stat: any) => {
-      switch (stat.status) {
-        case 'pending':
-        case 'queued':
-          stats.value.pending += parseInt(stat.count);
-          break;
-        case 'processing':
-          stats.value.processing += parseInt(stat.count);
-          break;
-        case 'completed':
-          stats.value.completed += parseInt(stat.count);
-          break;
-        case 'failed':
-          stats.value.failed += parseInt(stat.count);
-          break;
-      }
-    });
-  } catch (error: any) {
-    console.error('Failed to fetch job stats:', error);
-  }
+  // try {
+  //   const response = await $api.get('/api/v1/jobs/stats');
+  //   const statsByStatus = response.byStatus || [];
+  //   stats.value = {
+  //     pending: 0,
+  //     processing: 0,
+  //     completed: 0,
+  //     failed: 0,
+  //   };
+  //   statsByStatus.forEach((stat: any) => {
+  //     switch (stat.status) {
+  //       case 'pending':
+  //       case 'queued':
+  //         stats.value.pending += parseInt(stat.count);
+  //         break;
+  //       case 'processing':
+  //         stats.value.processing += parseInt(stat.count);
+  //         break;
+  //       case 'completed':
+  //         stats.value.completed += parseInt(stat.count);
+  //         break;
+  //       case 'failed':
+  //         stats.value.failed += parseInt(stat.count);
+  //         break;
+  //     }
+  //   });
+  // } catch (error: any) {
+  //   console.error('Failed to fetch job stats:', error);
+  // }
 };
 
 const refreshData = async () => {
@@ -500,56 +527,68 @@ const viewJobDetails = (job: any) => {
 };
 
 const retryJob = async (job: any) => {
-  try {
-    await $api.post(`/api/v1/jobs/${job.id}/retry`);
-    await refreshData();
-  } catch (error: any) {
-    console.error('Failed to retry job:', error);
-  }
+  // try {
+  //   await $api.post(`/api/v1/jobs/${job.id}/retry`);
+  //   await refreshData();
+  // } catch (error: any) {
+  //   console.error("Failed to retry job:", error);
+  // }
 };
 
 const cancelJob = async (job: any) => {
-  try {
-    await $api.post(`/api/v1/jobs/${job.id}/cancel`);
-    await refreshData();
-  } catch (error: any) {
-    console.error('Failed to cancel job:', error);
-  }
+  // try {
+  //   await $api.post(`/api/v1/jobs/${job.id}/cancel`);
+  //   await refreshData();
+  // } catch (error: any) {
+  //   console.error("Failed to cancel job:", error);
+  // }
 };
 
 // Formatting helpers
 const formatJobType = (type: string) => {
   return type
-    .split('_')
+    .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .join(" ");
 };
 
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
-  const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    pending: 'secondary',
-    queued: 'secondary',
-    processing: 'default',
-    completed: 'default', // Changed from 'success' to 'default' since Badge doesn't have success variant
-    failed: 'destructive',
-    cancelled: 'outline',
-    retrying: 'secondary', // Changed from 'warning' to 'secondary' since Badge doesn't have warning variant
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
+  const variants: Record<
+    string,
+    "default" | "secondary" | "destructive" | "outline"
+  > = {
+    pending: "secondary",
+    queued: "secondary",
+    processing: "default",
+    completed: "default", // Changed from 'success' to 'default' since Badge doesn't have success variant
+    failed: "destructive",
+    cancelled: "outline",
+    retrying: "secondary", // Changed from 'warning' to 'secondary' since Badge doesn't have warning variant
   };
-  return variants[status] || 'default';
+  return variants[status] || "default";
 };
 
 const getPriorityLabel = (priority: number) => {
-  const labels = ['Low', 'Normal', 'High', 'Critical'];
-  return labels[priority] || 'Unknown';
+  const labels = ["Low", "Normal", "High", "Critical"];
+  return labels[priority] || "Unknown";
 };
 
-const getPriorityVariant = (priority: number): 'default' | 'secondary' | 'destructive' | 'outline' => {
-  const variants: ('default' | 'secondary' | 'destructive' | 'outline')[] = ['outline', 'default', 'secondary', 'destructive'];
-  return variants[priority] || 'default';
+const getPriorityVariant = (
+  priority: number
+): "default" | "secondary" | "destructive" | "outline" => {
+  const variants: ("default" | "secondary" | "destructive" | "outline")[] = [
+    "outline",
+    "default",
+    "secondary",
+    "destructive",
+  ];
+  return variants[priority] || "default";
 };
 
 const formatDate = (date: string, includeTime = false) => {
-  if (!date) return '-';
+  if (!date) return "-";
   const d = new Date(date);
   if (includeTime) {
     return d.toLocaleString();
@@ -558,7 +597,7 @@ const formatDate = (date: string, includeTime = false) => {
 };
 
 const formatDuration = (duration: number | null) => {
-  if (!duration) return '-';
+  if (!duration) return "-";
 
   const seconds = Math.floor(duration / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -581,7 +620,11 @@ const setupWebSocket = () => {
     if (!loading.value) {
       fetchStats();
       // Only refresh jobs if we're viewing active jobs
-      if (['', 'pending', 'queued', 'processing', 'retrying'].includes(statusFilter.value)) {
+      if (
+        ["", "pending", "queued", "processing", "retrying"].includes(
+          statusFilter.value
+        )
+      ) {
         fetchJobs();
       }
     }

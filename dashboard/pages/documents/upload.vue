@@ -3,7 +3,9 @@
     <!-- Page Header -->
     <div>
       <div class="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <NuxtLink to="/documents" class="hover:text-foreground">Documents</NuxtLink>
+        <NuxtLink to="/documents" class="hover:text-foreground"
+          >Documents</NuxtLink
+        >
         <ChevronRight class="h-4 w-4" />
         <span>Upload</span>
       </div>
@@ -26,7 +28,10 @@
         >
           1
         </div>
-        <span :class="currentStep >= 1 ? 'text-foreground' : 'text-muted-foreground'"
+        <span
+          :class="
+            currentStep >= 1 ? 'text-foreground' : 'text-muted-foreground'
+          "
           >Select Files</span
         >
       </div>
@@ -42,7 +47,10 @@
         >
           2
         </div>
-        <span :class="currentStep >= 2 ? 'text-foreground' : 'text-muted-foreground'"
+        <span
+          :class="
+            currentStep >= 2 ? 'text-foreground' : 'text-muted-foreground'
+          "
           >Add Details</span
         >
       </div>
@@ -58,7 +66,12 @@
         >
           3
         </div>
-        <span :class="currentStep >= 3 ? 'text-foreground' : 'text-muted-foreground'">Upload</span>
+        <span
+          :class="
+            currentStep >= 3 ? 'text-foreground' : 'text-muted-foreground'
+          "
+          >Upload</span
+        >
       </div>
     </div>
 
@@ -67,8 +80,8 @@
       <CardHeader>
         <CardTitle>Select Files</CardTitle>
         <CardDescription>
-          Choose one or more documents to upload. Supported formats: PDF, TXT, MD, DOC, DOCX, HTML,
-          JSON, CSV
+          Choose one or more documents to upload. Supported formats: PDF, TXT,
+          MD, DOC, DOCX, HTML, JSON, CSV
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -83,7 +96,11 @@
         >
           <Upload class="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold mb-2">
-            {{ isDragging ? 'Drop files here' : 'Click to upload or drag and drop' }}
+            {{
+              isDragging
+                ? "Drop files here"
+                : "Click to upload or drag and drop"
+            }}
           </h3>
           <p class="text-sm text-muted-foreground mb-4">
             Support for multiple files up to 10MB each
@@ -96,7 +113,9 @@
 
         <!-- Selected Files List -->
         <div v-if="selectedFiles.length > 0" class="mt-6 space-y-2">
-          <h4 class="font-medium mb-2">Selected Files ({{ selectedFiles.length }})</h4>
+          <h4 class="font-medium mb-2">
+            Selected Files ({{ selectedFiles.length }})
+          </h4>
           <div
             v-for="(file, index) in selectedFiles"
             :key="index"
@@ -108,7 +127,9 @@
             />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium truncate">{{ file.name }}</p>
-              <p class="text-xs text-muted-foreground">{{ formatFileSize(file.size) }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ formatFileSize(file.size) }}
+              </p>
             </div>
             <Badge variant="outline">{{ getFileExtension(file.name) }}</Badge>
             <Button variant="ghost" size="sm" @click="removeFile(index)">
@@ -125,7 +146,10 @@
           >
             Clear All
           </Button>
-          <Button @click="currentStep = 2" :disabled="selectedFiles.length === 0">
+          <Button
+            @click="currentStep = 2"
+            :disabled="selectedFiles.length === 0"
+          >
             Next: Add Details
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -138,7 +162,8 @@
       <CardHeader>
         <CardTitle>Document Details</CardTitle>
         <CardDescription>
-          Provide metadata for your documents to help with organization and searchability.
+          Provide metadata for your documents to help with organization and
+          searchability.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,7 +175,10 @@
             class="p-4 border rounded-lg space-y-4"
           >
             <div class="flex items-center gap-3 mb-4">
-              <component :is="getFileIcon(file.type)" class="h-5 w-5 text-muted-foreground" />
+              <component
+                :is="getFileIcon(file.type)"
+                class="h-5 w-5 text-muted-foreground"
+              />
               <span class="font-medium">{{ file.name }}</span>
               <Badge variant="outline">{{ getFileExtension(file.name) }}</Badge>
             </div>
@@ -285,11 +313,20 @@
           </div>
 
           <!-- Individual File Progress -->
-          <div v-for="(file, index) in selectedFiles" :key="index" class="p-4 border rounded-lg">
+          <div
+            v-for="(file, index) in selectedFiles"
+            :key="index"
+            class="p-4 border rounded-lg"
+          >
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
-                <component :is="getFileIcon(file.type)" class="h-4 w-4 text-muted-foreground" />
-                <span class="text-sm font-medium">{{ file.documentName || file.name }}</span>
+                <component
+                  :is="getFileIcon(file.type)"
+                  class="h-4 w-4 text-muted-foreground"
+                />
+                <span class="text-sm font-medium">{{
+                  file.documentName || file.name
+                }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <Badge
@@ -300,15 +337,24 @@
                   <CheckCircle class="mr-1 h-3 w-3" />
                   Completed
                 </Badge>
-                <Badge v-else-if="file.uploadStatus === 'uploading'" variant="secondary">
+                <Badge
+                  v-else-if="file.uploadStatus === 'uploading'"
+                  variant="secondary"
+                >
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
                   Uploading
                 </Badge>
-                <Badge v-else-if="file.uploadStatus === 'processing'" variant="secondary">
+                <Badge
+                  v-else-if="file.uploadStatus === 'processing'"
+                  variant="secondary"
+                >
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
                   Processing
                 </Badge>
-                <Badge v-else-if="file.uploadStatus === 'error'" variant="destructive">
+                <Badge
+                  v-else-if="file.uploadStatus === 'error'"
+                  variant="destructive"
+                >
                   <AlertCircle class="mr-1 h-3 w-3" />
                   Error
                 </Badge>
@@ -322,16 +368,20 @@
               v-if="file.uploadStatus === 'error'"
               class="mt-2 p-2 bg-destructive/10 rounded text-sm text-destructive"
             >
-              {{ file.errorMessage || 'Upload failed. Please try again.' }}
+              {{ file.errorMessage || "Upload failed. Please try again." }}
             </div>
           </div>
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="resetUpload" :disabled="isUploading">
+          <Button
+            variant="outline"
+            @click="resetUpload"
+            :disabled="isUploading"
+          >
             Upload More Documents
           </Button>
-          <Button @click="navigateTo('/documents')" :disabled="isUploading">
+          <Button @click="router.push('/documents')" :disabled="isUploading">
             <CheckCircle class="mr-2 h-4 w-4" />
             View Documents
           </Button>
@@ -354,7 +404,9 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
+
+const router = useRouter();
 
 definePageMeta({
   // middleware: 'auth'
@@ -369,7 +421,7 @@ interface UploadFile extends File {
   tags?: string;
   isActive?: boolean;
   progress?: number;
-  uploadStatus?: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
+  uploadStatus?: "pending" | "uploading" | "processing" | "completed" | "error";
   errorMessage?: string;
 }
 
@@ -381,44 +433,48 @@ const isUploading = ref(false);
 const uploadedCount = ref(0);
 
 const globalSettings = ref({
-  category: '',
+  category: "",
   isActive: true,
 });
 
 // Computed
 const overallProgress = computed(() => {
   if (selectedFiles.value.length === 0) return 0;
-  const totalProgress = selectedFiles.value.reduce((sum, file) => sum + (file.progress || 0), 0);
+  const totalProgress = selectedFiles.value.reduce(
+    (sum, file) => sum + (file.progress || 0),
+    0
+  );
   return Math.round(totalProgress / selectedFiles.value.length);
 });
 
 // Methods
 const getFileIcon = (type: string) => {
   const mimeType = type.toLowerCase();
-  if (mimeType.includes('pdf') || mimeType.includes('doc')) return FileText;
-  if (mimeType.includes('json')) return FileJson;
-  if (mimeType.includes('text') || mimeType.includes('markdown')) return FileCode;
+  if (mimeType.includes("pdf") || mimeType.includes("doc")) return FileText;
+  if (mimeType.includes("json")) return FileJson;
+  if (mimeType.includes("text") || mimeType.includes("markdown"))
+    return FileCode;
   return File;
 };
 
 const getFileExtension = (filename: string) => {
-  const parts = filename.split('.');
-  return parts.length > 1 ? parts.pop()?.toUpperCase() : 'FILE';
+  const parts = filename.split(".");
+  return parts.length > 1 ? parts.pop()?.toUpperCase() : "FILE";
 };
 
 const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return "0 Bytes";
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 
 const selectFiles = () => {
-  const input = document.createElement('input');
-  input.type = 'file';
+  const input = document.createElement("input");
+  input.type = "file";
   input.multiple = true;
-  input.accept = '.pdf,.txt,.md,.doc,.docx,.html,.json,.csv';
+  input.accept = ".pdf,.txt,.md,.doc,.docx,.html,.json,.csv";
   input.onchange = (e) => {
     const target = e.target as HTMLInputElement;
     if (target.files) {
@@ -446,8 +502,17 @@ const addFiles = (files: File[]) => {
     }
 
     // Check file type
-    const validTypes = ['pdf', 'txt', 'md', 'doc', 'docx', 'html', 'json', 'csv'];
-    const extension = file.name.split('.').pop()?.toLowerCase();
+    const validTypes = [
+      "pdf",
+      "txt",
+      "md",
+      "doc",
+      "docx",
+      "html",
+      "json",
+      "csv",
+    ];
+    const extension = file.name.split(".").pop()?.toLowerCase();
     if (!extension || !validTypes.includes(extension)) {
       console.error(`File ${file.name} has unsupported format`);
       return false;
@@ -459,13 +524,13 @@ const addFiles = (files: File[]) => {
   // Add files with default metadata
   validFiles.forEach((file) => {
     const uploadFile = file as UploadFile;
-    uploadFile.documentName = file.name.replace(/\.[^/.]+$/, '');
-    uploadFile.category = '';
-    uploadFile.description = '';
-    uploadFile.tags = '';
+    uploadFile.documentName = file.name.replace(/\.[^/.]+$/, "");
+    uploadFile.category = "";
+    uploadFile.description = "";
+    uploadFile.tags = "";
     uploadFile.isActive = true;
     uploadFile.progress = 0;
-    uploadFile.uploadStatus = 'pending';
+    uploadFile.uploadStatus = "pending";
 
     selectedFiles.value.push(uploadFile);
   });
@@ -500,12 +565,12 @@ const startUpload = async () => {
 
     // Add files to form data
     for (const file of selectedFiles.value) {
-      formData.append('documents', file as File);
+      formData.append("documents", file as File);
     }
 
     // Add metadata for all files
-    formData.append('category', globalSettings.value.category || '');
-    formData.append('isActive', String(globalSettings.value.isActive));
+    formData.append("category", globalSettings.value.category || "");
+    formData.append("isActive", String(globalSettings.value.isActive));
 
     // Add individual file metadata if needed
     const fileMetadata = selectedFiles.value.map((file) => ({
@@ -515,64 +580,67 @@ const startUpload = async () => {
       tags: file.tags,
       isActive: file.isActive,
     }));
-    formData.append('fileMetadata', JSON.stringify(fileMetadata));
+    formData.append("fileMetadata", JSON.stringify(fileMetadata));
 
     // Add processing options
-    formData.append('includeMetadata', 'true');
-    formData.append('extractTables', 'true');
-    formData.append('chunkingStrategy', 'semantic');
-    formData.append('chunkSize', '1500');
+    formData.append("includeMetadata", "true");
+    formData.append("extractTables", "true");
+    formData.append("chunkingStrategy", "semantic");
+    formData.append("chunkSize", "1500");
 
     // Track individual file progress
     for (const file of selectedFiles.value) {
-      file.uploadStatus = 'uploading';
+      file.uploadStatus = "uploading";
       file.progress = 0;
     }
 
-    // Upload files to backend
-    const response = await $api('/api/v1/documents/upload', {
-      method: 'POST',
-      body: formData,
-      onUploadProgress: (progress: { loaded: number; total: number }) => {
-        // Update upload progress for all files
-        const percentage = Math.round((progress.loaded / progress.total) * 50); // 50% for upload
-        for (const file of selectedFiles.value) {
-          if (file.uploadStatus === 'uploading') {
-            file.progress = percentage;
-          }
-        }
-      },
-    });
+    // // Upload files to backend
+    // const response = await $api("/api/v1/documents/upload", {
+    //   method: "POST",
+    //   body: formData,
+    //   onUploadProgress: (progress: { loaded: number; total: number }) => {
+    //     // Update upload progress for all files
+    //     const percentage = Math.round((progress.loaded / progress.total) * 50); // 50% for upload
+    //     for (const file of selectedFiles.value) {
+    //       if (file.uploadStatus === "uploading") {
+    //         file.progress = percentage;
+    //       }
+    //     }
+    //   },
+    // });
 
-    // Process response
-    if (response.success && response.results) {
-      for (let i = 0; i < response.results.length; i++) {
-        const result = response.results[i];
-        const file = selectedFiles.value[i];
-        if (!file) continue;
+    // // Process response
+    // if (response.success && response.results) {
+    //   for (let i = 0; i < response.results.length; i++) {
+    //     const result = response.results[i];
+    //     const file = selectedFiles.value[i];
+    //     if (!file) continue;
 
-        if (result.status === 'queued') {
-          file.uploadStatus = 'processing';
-          file.progress = 50;
+    //     if (result.status === "queued") {
+    //       file.uploadStatus = "processing";
+    //       file.progress = 50;
 
-          // Poll for processing status
-          await pollProcessingStatus(result.documentId, file);
-        } else if (result.status === 'error') {
-          file.uploadStatus = 'error';
-          file.errorMessage = result.error || 'Upload failed';
-        }
-      }
-    }
+    //       // Poll for processing status
+    //       await pollProcessingStatus(result.documentId, file);
+    //     } else if (result.status === "error") {
+    //       file.uploadStatus = "error";
+    //       file.errorMessage = result.error || "Upload failed";
+    //     }
+    //   }
+    // }
 
-    uploadedCount.value = selectedFiles.value.filter((f) => f.uploadStatus === 'completed').length;
+    uploadedCount.value = selectedFiles.value.filter(
+      (f) => f.uploadStatus === "completed"
+    ).length;
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error("Upload error:", error);
 
     // Mark all files as error
     for (const file of selectedFiles.value) {
-      if (file.uploadStatus !== 'completed') {
-        file.uploadStatus = 'error';
-        file.errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      if (file.uploadStatus !== "completed") {
+        file.uploadStatus = "error";
+        file.errorMessage =
+          error instanceof Error ? error.message : "Upload failed";
       }
     }
   } finally {
@@ -585,26 +653,27 @@ const pollProcessingStatus = async (documentId: string, file: UploadFile) => {
   const maxAttempts = 30; // 30 seconds timeout
   let attempts = 0;
 
-  while (attempts < maxAttempts && file.uploadStatus === 'processing') {
+  while (attempts < maxAttempts && file.uploadStatus === "processing") {
     try {
-      const status = await $api(`/api/v1/documents/upload/status/${documentId}`);
-
-      if (status.success && status.status) {
-        if (status.status.status === 'completed') {
-          file.uploadStatus = 'completed';
-          file.progress = 100;
-          break;
-        } else if (status.status.status === 'error') {
-          file.uploadStatus = 'error';
-          file.errorMessage = status.status.error || 'Processing failed';
-          break;
-        } else {
-          // Still processing, update progress
-          file.progress = Math.min(95, 50 + attempts * 1.5);
-        }
-      }
+      // const status = await $api(
+      //   `/api/v1/documents/upload/status/${documentId}`
+      // );
+      // if (status.success && status.status) {
+      //   if (status.status.status === "completed") {
+      //     file.uploadStatus = "completed";
+      //     file.progress = 100;
+      //     break;
+      //   } else if (status.status.status === "error") {
+      //     file.uploadStatus = "error";
+      //     file.errorMessage = status.status.error || "Processing failed";
+      //     break;
+      //   } else {
+      //     // Still processing, update progress
+      //     file.progress = Math.min(95, 50 + attempts * 1.5);
+      //   }
+      // }
     } catch (error) {
-      console.error('Status polling error:', error);
+      console.error("Status polling error:", error);
     }
 
     // Wait 1 second before next poll
@@ -613,8 +682,8 @@ const pollProcessingStatus = async (documentId: string, file: UploadFile) => {
   }
 
   // Timeout - mark as completed anyway
-  if (file.uploadStatus === 'processing') {
-    file.uploadStatus = 'completed';
+  if (file.uploadStatus === "processing") {
+    file.uploadStatus = "completed";
     file.progress = 100;
   }
 };
@@ -624,14 +693,16 @@ const resetUpload = () => {
   selectedFiles.value = [];
   uploadedCount.value = 0;
   globalSettings.value = {
-    category: '',
+    category: "",
     isActive: true,
   };
 };
 
 // SEO
 useHead({
-  title: 'Upload Documents - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Upload documents to your knowledge base' }],
+  title: "Upload Documents - Hay Dashboard",
+  meta: [
+    { name: "description", content: "Upload documents to your knowledge base" },
+  ],
 });
 </script>

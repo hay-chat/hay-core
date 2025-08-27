@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "@/trpc";
-import { AuthUser } from "@/lib/auth/AuthUser";
-import { Context } from "../context";
+import { t } from "@server/trpc";
+import { AuthUser } from "@server/lib/auth/AuthUser";
+import type { Context } from "../context";
 
 /**
  * Middleware to ensure user is authenticated

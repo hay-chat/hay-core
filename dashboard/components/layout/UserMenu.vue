@@ -12,7 +12,9 @@
       >
         <span class="absolute -inset-1.5" />
         <span class="sr-only">Open user menu</span>
-        <div class="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+        <div
+          class="h-8 w-8 rounded-full bg-primary flex items-center justify-center"
+        >
           <span class="text-sm font-medium text-white">
             {{ userInitials }}
           </span>
@@ -40,8 +42,12 @@
       >
         <!-- User Info Section -->
         <div class="px-4 py-2 border-b border-border">
-          <p class="text-sm font-medium text-foreground">{{ user?.fullName || 'User' }}</p>
-          <p class="text-xs text-muted-foreground">{{ user?.email || '' }}</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ userStore.user?.firstName || "User" }}
+          </p>
+          <p class="text-xs text-muted-foreground">
+            {{ userStore.user?.email || "" }}
+          </p>
         </div>
 
         <!-- Navigation Items -->
@@ -55,7 +61,11 @@
             tabindex="-1"
             @click="dropdownOpen = false"
           >
-            <component :is="item.icon" class="mr-3 h-4 w-4" aria-hidden="true" />
+            <component
+              :is="item.icon"
+              class="mr-3 h-4 w-4"
+              aria-hidden="true"
+            />
             {{ item.name }}
           </NuxtLink>
         </div>
@@ -63,7 +73,9 @@
         <!-- Organization Switcher -->
         <div class="border-t border-border">
           <div class="px-4 py-2">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <p
+              class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Organization
             </p>
           </div>
@@ -115,43 +127,41 @@ import {
   ChevronDown,
   LogOut,
   UserCog,
-} from 'lucide-vue-next';
-import { useAuth } from '~/composables/useAuth';
+} from "lucide-vue-next";
+import { useAuthStore } from "@/stores/auth";
+
+const userStore = useUserStore();
+const authStore = useAuthStore();
+const organizationStore = useOrganizationStore();
 
 const dropdownOpen = ref(false);
 const showOrgSwitcher = ref(false);
 
-// Auth state
-const { user: authUser, logout, isLoading: _isLoading } = useAuth();
-
-// User data from auth state
-const user = computed(() => authUser);
-
 // Organization data from user state
 const currentOrganization = computed(() => ({
-  name: authUser?.organizationName || 'No Organization',
-  id: authUser?.organizationId || '',
+  name: organizationStore.current?.name || "No Organization",
+  id: organizationStore.current?.id || "",
 }));
 
 // User menu navigation items
 const userMenuItems = [
-  { name: 'Your Profile', href: '/profile', icon: User },
-  { name: 'Account Settings', href: '/settings/account', icon: UserCog },
-  { name: 'Preferences', href: '/settings/preferences', icon: Settings },
-  { name: 'Help & Support', href: '/help', icon: HelpCircle },
+  { name: "Your Profile", href: "/profile", icon: User },
+  { name: "Account Settings", href: "/settings/account", icon: UserCog },
+  { name: "Preferences", href: "/settings/preferences", icon: Settings },
+  { name: "Help & Support", href: "/help", icon: HelpCircle },
 ];
 
 // Computed user initials for avatar
 const userInitials = computed(() => {
-  if (!user.value?.fullName) return 'U';
+  if (!userStore.user?.firstName) return "U";
 
-  const names = user.value.fullName.split(' ');
+  const names = userStore.user.firstName.split(" ");
   if (names.length === 1) {
-    return names[0]?.charAt(0).toUpperCase() || 'U';
+    return names[0]?.charAt(0).toUpperCase() || "U";
   }
 
-  const firstInitial = names[0]?.charAt(0) || '';
-  const lastInitial = names[names.length - 1]?.charAt(0) || '';
+  const firstInitial = names[0]?.charAt(0) || "";
+  const lastInitial = names[names.length - 1]?.charAt(0) || "";
   return (firstInitial + lastInitial).toUpperCase();
 });
 
@@ -160,36 +170,43 @@ const handleSignOut = async () => {
   dropdownOpen.value = false;
 
   try {
-    await logout();
+    await authStore.logout();
     // Logout will clear tokens and auth state
     // Redirect to login page
-    await navigateTo('/login');
+    await navigateTo("/login");
   } catch (error) {
-    console.error('Sign out error:', error);
+    console.error("Sign out error:", error);
     // Even if logout API fails, we should still redirect
     // as local state is cleared
-    await navigateTo('/login');
+    await navigateTo("/login");
   }
 };
 
 // Close dropdown when clicking outside
 const handleClickOutside = (event: Event) => {
   const target = event.target as HTMLElement;
-  const dropdown = document.querySelector('[aria-labelledby="user-menu-button"]');
-  const button = document.getElementById('user-menu-button');
+  const dropdown = document.querySelector(
+    '[aria-labelledby="user-menu-button"]'
+  );
+  const button = document.getElementById("user-menu-button");
 
-  if (dropdown && button && !dropdown.contains(target) && !button.contains(target)) {
+  if (
+    dropdown &&
+    button &&
+    !dropdown.contains(target) &&
+    !button.contains(target)
+  ) {
     dropdownOpen.value = false;
   }
 };
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener("click", handleClickOutside);
 });
 
 // eslint-disable-next-line no-undef
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener("click", handleClickOutside);
 });
 
 // TODO: Add keyboard navigation support

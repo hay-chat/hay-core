@@ -1,4 +1,4 @@
-import { t } from "@/trpc";
+import { t } from "@server/trpc";
 import { z } from "zod";
 
 export const documentsRouter = t.router({

@@ -1,13 +1,12 @@
-import { inferAsyncReturnType, initTRPC } from "@trpc/server";
+import { initTRPC } from "@trpc/server";
 import { createContext } from "./context";
+import { v1Router } from "../routes/v1";
 
 /**
  * Initialization of tRPC backend
  * Should be done only once per backend!
  */
-export const t = initTRPC
-  .context<inferAsyncReturnType<typeof createContext>>()
-  .create();
+export const t = initTRPC.context<typeof createContext>().create();
 
 /**
  * Export reusable router and procedure helpers
@@ -15,3 +14,6 @@ export const t = initTRPC
  */
 export const router = t.router;
 export const publicProcedure = t.procedure;
+
+// Export the app router type for client-side type generation
+export type AppRouter = typeof v1Router;

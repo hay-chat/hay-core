@@ -4,7 +4,9 @@
       <!-- Header -->
       <div class="text-center">
         <CardTitle class="text-2xl">Create your account</CardTitle>
-        <CardDescription class="mt-2"> Get started with your Hay organization </CardDescription>
+        <CardDescription class="mt-2">
+          Get started with your Hay organization
+        </CardDescription>
       </div>
 
       {{ form }}
@@ -113,39 +115,70 @@
         <!-- Terms and Privacy Agreement -->
         <div class="space-y-3">
           <div class="flex items-start space-x-2">
-            <Checkbox id="terms" v-model:checked="form.acceptTerms" class="mt-1" />
-            <Label for="terms" class="text-sm text-gray-700 cursor-pointer leading-5">
+            <Checkbox
+              id="terms"
+              v-model:checked="form.acceptTerms"
+              class="mt-1"
+            />
+            <Label
+              for="terms"
+              class="text-sm text-gray-700 cursor-pointer leading-5"
+            >
               I agree to the
-              <NuxtLink to="/terms" class="text-primary hover:text-primary/80 font-medium">
+              <NuxtLink
+                to="/terms"
+                class="text-primary hover:text-primary/80 font-medium"
+              >
                 Terms of Service
               </NuxtLink>
               and
-              <NuxtLink to="/privacy" class="text-primary hover:text-primary/80 font-medium">
+              <NuxtLink
+                to="/privacy"
+                class="text-primary hover:text-primary/80 font-medium"
+              >
                 Privacy Policy
               </NuxtLink>
             </Label>
           </div>
 
           <div class="flex items-start space-x-2">
-            <Checkbox id="marketing" v-model:checked="form.acceptMarketing" class="mt-1" />
-            <Label for="marketing" class="text-sm text-gray-700 cursor-pointer leading-5">
-              I would like to receive product updates and marketing communications
+            <Checkbox
+              id="marketing"
+              v-model:checked="form.acceptMarketing"
+              class="mt-1"
+            />
+            <Label
+              for="marketing"
+              class="text-sm text-gray-700 cursor-pointer leading-5"
+            >
+              I would like to receive product updates and marketing
+              communications
               <span class="text-gray-500">(optional)</span>
             </Label>
           </div>
         </div>
 
         <!-- Submit Button -->
-        <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
-          <div v-if="loading" class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        <Button
+          type="submit"
+          size="lg"
+          class="w-full"
+          :disabled="authStore.isLoading || !isFormValid"
+        >
+          <div v-if="authStore.isLoading" class="flex items-center space-x-2">
+            <div
+              class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
+            ></div>
             <span>Creating account...</span>
           </div>
           <span v-else>Create account</span>
         </Button>
 
         <!-- Error Message -->
-        <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+        <div
+          v-if="error"
+          class="p-3 rounded-md bg-red-50 border border-red-200"
+        >
           <p class="text-sm text-red-800">{{ error }}</p>
         </div>
       </form>
@@ -154,7 +187,10 @@
       <div class="text-center">
         <p class="text-sm text-gray-600">
           Already have an account?
-          <NuxtLink to="/login" class="font-medium text-primary hover:text-primary/80">
+          <NuxtLink
+            to="/login"
+            class="font-medium text-primary hover:text-primary/80"
+          >
             Sign in
           </NuxtLink>
         </p>
@@ -164,53 +200,46 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick } from 'vue';
-import { validateEmail, validatePassword } from '~/lib/utils';
-import { useAuth } from '~/composables/useAuth';
+import { nextTick } from "vue";
+import { validateEmail, validatePassword } from "@/lib/utils";
 
 definePageMeta({
   layout: false,
-  middleware: 'guest', // Redirect authenticated users
+  middleware: "guest", // Redirect authenticated users
 });
 
 // Navigation
 const router = useRouter();
 
 // Auth composable - wrapped to handle SSR
-const auth = useAuth();
-const authLoading = computed(() => auth?.isLoading || false);
-const signup = auth?.signup || (async () => {});
-const socialLogin = auth?.socialLogin || (async () => {});
+const authStore = useAuthStore();
 
 // Form state
 const form = reactive({
-  organizationName: 'Teste',
-  email: 'teste@teste.com',
-  fullName: 'Teste',
-  password: 'Allonsy42@',
-  confirmPassword: 'Allonsy42@',
+  organizationName: "Teste",
+  email: "teste@teste.com",
+  fullName: "Teste",
+  password: "Allonsy42@",
+  confirmPassword: "Allonsy42@",
   acceptTerms: true,
   acceptMarketing: true,
 });
 
 const errors = reactive({
-  organizationName: '',
-  email: '',
-  fullName: '',
-  password: '',
-  confirmPassword: '',
+  organizationName: "",
+  email: "",
+  fullName: "",
+  password: "",
+  confirmPassword: "",
 });
 
-const error = ref('');
+const error = ref("");
 
 const socialLoading = reactive({
   google: false,
   github: false,
   microsoft: false,
 });
-
-// Computed
-const loading = computed(() => authLoading.value);
 
 const passwordValidation = computed(() => validatePassword(form.password));
 
@@ -232,57 +261,58 @@ const isFormValid = computed(() => {
 // Methods
 const validateField = (field: keyof typeof errors) => {
   switch (field) {
-    case 'organizationName':
+    case "organizationName":
       if (!form.organizationName) {
-        errors.organizationName = 'Organization name is required';
+        errors.organizationName = "Organization name is required";
       } else if (form.organizationName.length < 2) {
-        errors.organizationName = 'Organization name must be at least 2 characters';
+        errors.organizationName =
+          "Organization name must be at least 2 characters";
       } else {
-        errors.organizationName = '';
+        errors.organizationName = "";
       }
       break;
 
-    case 'email':
+    case "email":
       if (!form.email) {
-        errors.email = 'Email is required';
+        errors.email = "Email is required";
       } else if (!validateEmail(form.email)) {
-        errors.email = 'Please enter a valid email address';
+        errors.email = "Please enter a valid email address";
       } else {
-        errors.email = '';
+        errors.email = "";
       }
       break;
 
-    case 'fullName':
+    case "fullName":
       if (!form.fullName) {
-        errors.fullName = 'Full name is required';
+        errors.fullName = "Full name is required";
       } else if (form.fullName.length < 2) {
-        errors.fullName = 'Full name must be at least 2 characters';
+        errors.fullName = "Full name must be at least 2 characters";
       } else {
-        errors.fullName = '';
+        errors.fullName = "";
       }
       break;
 
-    case 'password':
+    case "password":
       if (!form.password) {
-        errors.password = 'Password is required';
+        errors.password = "Password is required";
       } else if (!passwordValidation.value.isValid) {
-        errors.password = 'Password does not meet requirements';
+        errors.password = "Password does not meet requirements";
       } else {
-        errors.password = '';
+        errors.password = "";
       }
       // Re-validate confirm password if it's been filled
       if (form.confirmPassword) {
-        validateField('confirmPassword');
+        validateField("confirmPassword");
       }
       break;
 
-    case 'confirmPassword':
+    case "confirmPassword":
       if (!form.confirmPassword) {
-        errors.confirmPassword = 'Please confirm your password';
+        errors.confirmPassword = "Please confirm your password";
       } else if (form.password !== form.confirmPassword) {
-        errors.confirmPassword = 'Passwords do not match';
+        errors.confirmPassword = "Passwords do not match";
       } else {
-        errors.confirmPassword = '';
+        errors.confirmPassword = "";
       }
       break;
   }
@@ -295,7 +325,7 @@ const handleSubmit = async () => {
   });
 
   if (!form.acceptTerms) {
-    error.value = 'You must accept the Terms of Service to continue';
+    error.value = "You must accept the Terms of Service to continue";
     return;
   }
 
@@ -303,10 +333,10 @@ const handleSubmit = async () => {
     return;
   }
 
-  error.value = '';
+  error.value = "";
 
   try {
-    await signup({
+    await authStore.signup({
       organizationName: form.organizationName,
       email: form.email,
       fullName: form.fullName,
@@ -316,41 +346,28 @@ const handleSubmit = async () => {
     });
 
     // Successful signup - redirect to dashboard
-    await router.push('/');
+    await router.push("/");
   } catch (err: any) {
     // Handle different types of registration errors
-    if (err.message.includes('already exists')) {
+    if (err.message.includes("already exists")) {
       error.value =
-        'An account with this email address already exists. Please try signing in instead.';
-    } else if (err.message.includes('Password')) {
+        "An account with this email address already exists. Please try signing in instead.";
+    } else if (err.message.includes("Password")) {
       error.value =
-        'Password does not meet security requirements. Please choose a stronger password.';
+        "Password does not meet security requirements. Please choose a stronger password.";
     } else {
-      error.value = 'Unable to create your account. Please check your information and try again.';
+      error.value =
+        "Unable to create your account. Please check your information and try again.";
     }
-    console.error('Signup error:', err);
-  }
-};
-
-const handleSocialSignup = async (provider: string) => {
-  socialLoading[provider as keyof typeof socialLoading] = true;
-  error.value = '';
-
-  try {
-    await socialLogin(provider);
-    // Social signup redirects to OAuth provider
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
-    error.value = `Failed to create account with ${provider}. Please try again.`;
-    console.error('Social signup error:', err);
-  } finally {
-    socialLoading[provider as keyof typeof socialLoading] = false;
+    console.error("Signup error:", err);
   }
 };
 
 // SEO
 useHead({
-  title: 'Sign Up - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Create your Hay organization account' }],
+  title: "Sign Up - Hay Dashboard",
+  meta: [
+    { name: "description", content: "Create your Hay organization account" },
+  ],
 });
 </script>

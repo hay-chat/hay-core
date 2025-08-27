@@ -10,10 +10,12 @@
       </NuxtLink>
       <div class="flex-1">
         <h1 class="text-2xl font-bold text-foreground">
-          {{ plugin?.name || 'Plugin Configuration' }}
+          {{ plugin?.name || "Plugin Configuration" }}
         </h1>
         <p class="mt-1 text-sm text-muted-foreground">
-          {{ plugin?.description || 'Configure plugin settings and monitor usage' }}
+          {{
+            plugin?.description || "Configure plugin settings and monitor usage"
+          }}
         </p>
       </div>
       <div class="flex items-center space-x-2">
@@ -23,8 +25,8 @@
             plugin?.status === 'active'
               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
               : plugin?.status === 'error'
-                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
           ]"
         >
           <div
@@ -33,13 +35,17 @@
               plugin?.status === 'active'
                 ? 'bg-green-600 dark:bg-green-400'
                 : plugin?.status === 'error'
-                  ? 'bg-red-600 dark:bg-red-400'
-                  : 'bg-gray-600 dark:bg-gray-400',
+                ? 'bg-red-600 dark:bg-red-400'
+                : 'bg-gray-600 dark:bg-gray-400',
             ]"
           ></div>
-          {{ plugin?.status || 'inactive' }}
+          {{ plugin?.status || "inactive" }}
         </div>
-        <Button v-if="plugin?.status === 'active'" variant="outline" @click="togglePlugin">
+        <Button
+          v-if="plugin?.status === 'active'"
+          variant="outline"
+          @click="togglePlugin"
+        >
           <PowerOff class="mr-2 h-4 w-4" />
           Disable
         </Button>
@@ -54,7 +60,9 @@
     <Card>
       <CardHeader>
         <CardTitle>Configuration</CardTitle>
-        <CardDescription> Configure API credentials and settings for this plugin </CardDescription>
+        <CardDescription>
+          Configure API credentials and settings for this plugin
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form @submit.prevent="saveConfiguration" class="space-y-6">
@@ -69,7 +77,9 @@
                 placeholder="Enter your API key"
                 class="pr-20"
               />
-              <div class="absolute inset-y-0 right-0 flex items-center pr-3 space-x-1">
+              <div
+                class="absolute inset-y-0 right-0 flex items-center pr-3 space-x-1"
+              >
                 <Button
                   type="button"
                   variant="ghost"
@@ -104,7 +114,11 @@
               class="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">Select a model</option>
-              <option v-for="model in availableModels" :key="model.id" :value="model.id">
+              <option
+                v-for="model in availableModels"
+                :key="model.id"
+                :value="model.id"
+              >
                 {{ model.name }} ({{ model.contextWindow }} tokens)
               </option>
             </select>
@@ -113,7 +127,11 @@
           <!-- Endpoint (optional) -->
           <div v-if="showEndpoint" class="space-y-2">
             <Label for="endpoint">API Endpoint (Optional)</Label>
-            <Input id="endpoint" v-model="config.endpoint" placeholder="https://api.example.com" />
+            <Input
+              id="endpoint"
+              v-model="config.endpoint"
+              placeholder="https://api.example.com"
+            />
             <p class="text-sm text-muted-foreground">
               Custom endpoint URL (leave empty for default)
             </p>
@@ -123,12 +141,23 @@
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <Label>Advanced Settings</Label>
-              <Button type="button" variant="ghost" size="sm" @click="showAdvanced = !showAdvanced">
-                <component :is="showAdvanced ? ChevronUp : ChevronDown" class="h-4 w-4" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                @click="showAdvanced = !showAdvanced"
+              >
+                <component
+                  :is="showAdvanced ? ChevronUp : ChevronDown"
+                  class="h-4 w-4"
+                />
               </Button>
             </div>
 
-            <div v-if="showAdvanced" class="space-y-4 pl-4 border-l-2 border-border">
+            <div
+              v-if="showAdvanced"
+              class="space-y-4 pl-4 border-l-2 border-border"
+            >
               <!-- Max Retries -->
               <div class="space-y-2">
                 <Label for="maxRetries">Max Retries</Label>
@@ -174,12 +203,23 @@
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <Label>Usage Limits</Label>
-              <Button type="button" variant="ghost" size="sm" @click="showLimits = !showLimits">
-                <component :is="showLimits ? ChevronUp : ChevronDown" class="h-4 w-4" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                @click="showLimits = !showLimits"
+              >
+                <component
+                  :is="showLimits ? ChevronUp : ChevronDown"
+                  class="h-4 w-4"
+                />
               </Button>
             </div>
 
-            <div v-if="showLimits" class="space-y-4 pl-4 border-l-2 border-border">
+            <div
+              v-if="showLimits"
+              class="space-y-4 pl-4 border-l-2 border-border"
+            >
               <!-- Max Requests -->
               <div class="space-y-2">
                 <Label for="maxRequests">Max Requests per Month</Label>
@@ -209,14 +249,21 @@
 
           <!-- Form Actions -->
           <div class="flex justify-between pt-6">
-            <Button type="button" variant="outline" @click="testConnection" :disabled="testing">
+            <Button
+              type="button"
+              variant="outline"
+              @click="testConnection"
+              :disabled="testing"
+            >
               <Zap class="mr-2 h-4 w-4" />
-              {{ testing ? 'Testing...' : 'Test Connection' }}
+              {{ testing ? "Testing..." : "Test Connection" }}
             </Button>
             <div class="space-x-2">
-              <Button type="button" variant="outline" @click="resetForm"> Cancel </Button>
+              <Button type="button" variant="outline" @click="resetForm">
+                Cancel
+              </Button>
               <Button type="submit" :disabled="saving">
-                {{ saving ? 'Saving...' : 'Save Changes' }}
+                {{ saving ? "Saving..." : "Save Changes" }}
               </Button>
             </div>
           </div>
@@ -236,7 +283,9 @@
         <div class="space-y-4">
           <div class="flex items-center space-x-4">
             <component
-              :is="plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle"
+              :is="
+                plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle
+              "
               :class="[
                 'h-8 w-8',
                 plugin.healthCheck.status === 'healthy'
@@ -246,14 +295,25 @@
             />
             <div>
               <p class="font-medium">
-                {{ plugin.healthCheck.status === 'healthy' ? 'Healthy' : 'Unhealthy' }}
+                {{
+                  plugin.healthCheck.status === "healthy"
+                    ? "Healthy"
+                    : "Unhealthy"
+                }}
               </p>
-              <p class="text-sm text-muted-foreground">{{ plugin.healthCheck.message }}</p>
+              <p class="text-sm text-muted-foreground">
+                {{ plugin.healthCheck.message }}
+              </p>
             </div>
           </div>
 
-          <div v-if="plugin.healthCheck.details" class="bg-muted rounded-lg p-4">
-            <pre class="text-xs">{{ JSON.stringify(plugin.healthCheck.details, null, 2) }}</pre>
+          <div
+            v-if="plugin.healthCheck.details"
+            class="bg-muted rounded-lg p-4"
+          >
+            <pre class="text-xs">{{
+              JSON.stringify(plugin.healthCheck.details, null, 2)
+            }}</pre>
           </div>
         </div>
       </CardContent>
@@ -263,20 +323,26 @@
     <Card v-if="plugin?.usage">
       <CardHeader>
         <CardTitle>Usage Statistics</CardTitle>
-        <CardDescription> Track API usage and costs for this plugin </CardDescription>
+        <CardDescription>
+          Track API usage and costs for this plugin
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-6 md:grid-cols-3">
           <!-- Monthly Requests -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Requests (This Month)</p>
+            <p class="text-sm font-medium text-muted-foreground">
+              Requests (This Month)
+            </p>
             <p class="text-2xl font-bold">
               {{ formatNumber(plugin.usage.monthlyUsage?.requests || 0) }}
             </p>
             <Progress
               v-if="limits.maxRequestsPerMonth"
               :value="
-                ((plugin.usage.monthlyUsage?.requests || 0) / limits.maxRequestsPerMonth) * 100
+                ((plugin.usage.monthlyUsage?.requests || 0) /
+                  limits.maxRequestsPerMonth) *
+                100
               "
               class="h-2"
             />
@@ -284,7 +350,9 @@
 
           <!-- Monthly Tokens -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Tokens (This Month)</p>
+            <p class="text-sm font-medium text-muted-foreground">
+              Tokens (This Month)
+            </p>
             <p class="text-2xl font-bold">
               {{ formatNumber(plugin.usage.monthlyUsage?.tokens || 0) }}
             </p>
@@ -292,13 +360,19 @@
 
           <!-- Monthly Cost -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Cost (This Month)</p>
+            <p class="text-sm font-medium text-muted-foreground">
+              Cost (This Month)
+            </p>
             <p class="text-2xl font-bold">
               ${{ (plugin.usage.monthlyUsage?.cost || 0).toFixed(2) }}
             </p>
             <Progress
               v-if="limits.maxCostPerMonth"
-              :value="((plugin.usage.monthlyUsage?.cost || 0) / limits.maxCostPerMonth) * 100"
+              :value="
+                ((plugin.usage.monthlyUsage?.cost || 0) /
+                  limits.maxCostPerMonth) *
+                100
+              "
               class="h-2"
             />
           </div>
@@ -322,7 +396,9 @@
             </div>
             <div>
               <span class="text-muted-foreground">Total Cost:</span>
-              <span class="ml-2 font-medium">${{ (plugin.usage.totalCost || 0).toFixed(2) }}</span>
+              <span class="ml-2 font-medium"
+                >${{ (plugin.usage.totalCost || 0).toFixed(2) }}</span
+              >
             </div>
           </div>
         </div>
@@ -332,8 +408,6 @@
 </template>
 
 <script setup lang="ts">
-const { $api } = useNuxtApp();
-
 import {
   ArrowLeft,
   Power,
@@ -346,7 +420,7 @@ import {
   Zap,
   CheckCircle,
   XCircle,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 definePageMeta({
   // middleware: 'auth'
@@ -358,9 +432,9 @@ const router = useRouter();
 // State
 const plugin = ref<any>(null);
 const config = ref<any>({
-  apiKey: '',
-  model: '',
-  endpoint: '',
+  apiKey: "",
+  model: "",
+  endpoint: "",
   maxRetries: 3,
   timeout: 60000,
   rateLimitPerMinute: 60,
@@ -378,19 +452,22 @@ const showLimits = ref(false);
 const showEndpoint = ref(false);
 
 // Computed
-const pluginId = computed(() => route.params['id'] as string);
+const pluginId = computed(() => route.params["id"] as string);
 
 const isLLMProvider = computed(() => {
-  return plugin.value?.type === 'llm_provider' || plugin.value?.type === 'embedding_provider';
+  return (
+    plugin.value?.type === "llm_provider" ||
+    plugin.value?.type === "embedding_provider"
+  );
 });
 
 const availableModels = computed(() => {
   // TODO: Fetch from plugin metadata
-  if (pluginId.value === 'openai') {
+  if (pluginId.value === "openai") {
     return [
-      { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo', contextWindow: 128000 },
-      { id: 'gpt-4', name: 'GPT-4', contextWindow: 8192 },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', contextWindow: 16385 },
+      { id: "gpt-4-turbo-preview", name: "GPT-4 Turbo", contextWindow: 128000 },
+      { id: "gpt-4", name: "GPT-4", contextWindow: 8192 },
+      { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", contextWindow: 16385 },
     ];
   }
   return [];
@@ -398,95 +475,89 @@ const availableModels = computed(() => {
 
 // Methods
 const loadPlugin = async () => {
-  loading.value = true;
-  try {
-    const { data } = await $api(`/api/v1/plugins/${pluginId.value}`);
-
-    plugin.value = data;
-
-    // Load configuration
-    if (data?.configuration) {
-      config.value = { ...config.value, ...data.configuration };
-    }
-
-    // Load limits
-    if (data?.limits) {
-      limits.value = { ...limits.value, ...data.limits };
-    }
-  } catch (error) {
-    console.error('Error loading plugin:', error);
-    // TODO: Show error notification
-  } finally {
-    loading.value = false;
-  }
+  // loading.value = true;
+  // try {
+  //   const { data } = await $api(`/api/v1/plugins/${pluginId.value}`);
+  //   plugin.value = data;
+  //   // Load configuration
+  //   if (data?.configuration) {
+  //     config.value = { ...config.value, ...data.configuration };
+  //   }
+  //   // Load limits
+  //   if (data?.limits) {
+  //     limits.value = { ...limits.value, ...data.limits };
+  //   }
+  // } catch (error) {
+  //   console.error("Error loading plugin:", error);
+  //   // TODO: Show error notification
+  // } finally {
+  //   loading.value = false;
+  // }
 };
 
 const saveConfiguration = async () => {
-  saving.value = true;
-  try {
-    const payload = {
-      ...config.value,
-      limits: limits.value,
-    };
-
-    await $api(`/api/v1/plugins/${pluginId.value}`, {
-      method: 'PUT',
-      body: payload,
-    });
-
-    // TODO: Show success notification
-    console.log('Configuration saved successfully');
-
-    // Reload plugin data
-    await loadPlugin();
-  } catch (error) {
-    console.error('Error saving configuration:', error);
-    // TODO: Show error notification
-  } finally {
-    saving.value = false;
-  }
+  // saving.value = true;
+  // try {
+  //   const payload = {
+  //     ...config.value,
+  //     limits: limits.value,
+  //   };
+  //   await $api(`/api/v1/plugins/${pluginId.value}`, {
+  //     method: "PUT",
+  //     body: payload,
+  //   });
+  //   // TODO: Show success notification
+  //   console.log("Configuration saved successfully");
+  //   // Reload plugin data
+  //   await loadPlugin();
+  // } catch (error) {
+  //   console.error("Error saving configuration:", error);
+  //   // TODO: Show error notification
+  // } finally {
+  //   saving.value = false;
+  // }
 };
 
 const testConnection = async () => {
-  testing.value = true;
-  try {
-    const { data } = await $api(`/api/v1/plugins/${pluginId.value}/test`, {
-      method: 'POST',
-    });
-
-    // TODO: Show test result notification
-    console.log('Connection test:', data);
-
-    // Reload plugin to get updated health status
-    await loadPlugin();
-  } catch (error) {
-    console.error('Error testing connection:', error);
-    // TODO: Show error notification
-  } finally {
-    testing.value = false;
-  }
+  // testing.value = true;
+  // try {
+  //   const { data } = await $api(`/api/v1/plugins/${pluginId.value}/test`, {
+  //     method: "POST",
+  //   });
+  //   // TODO: Show test result notification
+  //   console.log("Connection test:", data);
+  //   // Reload plugin to get updated health status
+  //   await loadPlugin();
+  // } catch (error) {
+  //   console.error("Error testing connection:", error);
+  //   // TODO: Show error notification
+  // } finally {
+  //   testing.value = false;
+  // }
 };
 
 const togglePlugin = async () => {
   try {
     const endpoint =
-      plugin.value?.status === 'active'
+      plugin.value?.status === "active"
         ? `/api/v1/plugins/${pluginId.value}/disable`
         : `/api/v1/plugins/${pluginId.value}/enable`;
 
-    await $api(endpoint, {
-      method: 'POST',
-    });
+    // await $api(endpoint, {
+    //   method: 'POST',
+    // });
 
     // Reload plugin data
     await loadPlugin();
 
     // TODO: Show success notification
     console.log(
-      `Plugin ${plugin.value?.status === 'active' ? 'disabled' : 'enabled'} successfully`,
+      `Plugin ${
+        plugin.value?.status === "active" ? "disabled" : "enabled"
+      } successfully`
     );
   } catch (error) {
-    console.error('Error toggling plugin:', error);
+    console.error("Error toggling plugin:", error);
     // TODO: Show error notification
   }
 };
@@ -502,28 +573,28 @@ const resetForm = () => {
 
 const generateApiKey = () => {
   // This would typically open a modal to the provider's API key generation page
-  window.open(getApiKeyUrl(), '_blank');
+  window.open(getApiKeyUrl(), "_blank");
 };
 
 const getApiKeyUrl = () => {
   const urls: Record<string, string> = {
-    openai: 'https://platform.openai.com/api-keys',
-    anthropic: 'https://console.anthropic.com/settings/keys',
-    cohere: 'https://dashboard.cohere.com/api-keys',
+    openai: "https://platform.openai.com/api-keys",
+    anthropic: "https://console.anthropic.com/settings/keys",
+    cohere: "https://dashboard.cohere.com/api-keys",
   };
-  return urls[pluginId.value] || '#';
+  return urls[pluginId.value] || "#";
 };
 
 const formatDate = (date: any) => {
-  if (!date) return 'Never';
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  if (!date) return "Never";
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
   }).format(new Date(date));
 };
 
 const formatNumber = (num: number) => {
-  return new Intl.NumberFormat('en-US').format(num);
+  return new Intl.NumberFormat("en-US").format(num);
 };
 
 // Lifecycle
@@ -533,7 +604,12 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: `${plugin.value?.name || 'Plugin'} Configuration - Hay Dashboard`,
-  meta: [{ name: 'description', content: 'Configure plugin settings and monitor usage' }],
+  title: `${plugin.value?.name || "Plugin"} Configuration - Hay Dashboard`,
+  meta: [
+    {
+      name: "description",
+      content: "Configure plugin settings and monitor usage",
+    },
+  ],
 });
 </script>
