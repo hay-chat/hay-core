@@ -1,0 +1,62 @@
+{
+  "name": "@hay/dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hay platform frontend dashboard",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "generate": "nuxt generate",
+    "postinstall": "nuxt prepare",
+    "test": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "type-check": "nuxt typecheck"
+  },
+  "keywords": [
+    "hay",
+    "dashboard",
+    "nuxt",
+    "vue",
+    "frontend"
+  ],
+  "author": "Hay Labs",
+  "license": "MIT",
+  "dependencies": {
+    "@headlessui/vue": "^1.7.16",
+    "@heroicons/vue": "^2.0.18",
+    "@nuxt/ui": "^2.11.1",
+    "@nuxtjs/tailwindcss": "^6.8.4",
+    "@pinia-plugin-persistedstate/nuxt": "^1.2.1",
+    "@pinia/nuxt": "^0.5.1",
+    "@vee-validate/zod": "^4.12.4",
+    "@vueuse/nuxt": "^10.5.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "lucide-vue-next": "^0.294.0",
+    "nuxt": "^3.8.2",
+    "pinia": "^2.1.7",
+    "radix-vue": "^1.2.3",
+    "shadcn-nuxt": "^0.10.4",
+    "tailwind-merge": "^2.0.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vee-validate": "^4.12.4",
+    "vue": "^3.3.8",
+    "vue-router": "^4.2.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@nuxt/devtools": "latest",
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
+    "eslint": "^8.54.0",
+    "eslint-plugin-vue": "^9.18.1",
+    "typescript": "^5.2.2",
+    "unplugin-auto-import": "^20.0.0",
+    "unplugin-vue-components": "^29.0.0",
+    "vitest": "^0.34.6",
+    "vue-tsc": "^3.0.5"
+  }
+}
