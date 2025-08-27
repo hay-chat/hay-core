@@ -1,25 +1,20 @@
 <template>
-  <AuthProvider>
-    <div>
-      <!-- Nuxt will automatically handle layouts and page routing -->
-      <NuxtLayout>
-        <NuxtPage />
-      </NuxtLayout>
-    </div>
-  </AuthProvider>
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
 </template>
 
 <script setup lang="ts">
 // Global app configuration
 useHead({
   htmlAttrs: {
-    lang: 'en',
+    lang: "en",
   },
   link: [
     {
-      rel: 'icon',
-      type: 'image/x-icon',
-      href: '/favicon.ico',
+      rel: "icon",
+      type: "image/x-icon",
+      href: "/favicon.ico",
     },
   ],
 });

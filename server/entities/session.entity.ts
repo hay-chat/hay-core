@@ -1,34 +1,43 @@
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { User } from './user.entity';
 
-export interface SessionEntity extends BaseEntity {
-  userId: string;
-  refreshTokenHash: string;
-  expiresAt: Date;
-  lastActivity: Date;
+@Entity('sessions')
+@Index('idx_sessions_user_id', ['userId'])
+@Index('idx_sessions_refresh_token_hash', ['refreshTokenHash'])
+@Index('idx_sessions_expires_at', ['expiresAt'])
+export class Session extends BaseEntity {
+  @Column({ type: 'uuid' })
+  userId!: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user?: User;
+
+  @Column({ type: 'varchar', length: 255 })
+  refreshTokenHash!: string;
+
+  @Column({ type: 'timestamptz' })
+  expiresAt!: Date;
+
+  @Column({ type: 'timestamptz' })
+  lastActivity!: Date;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   ipAddress?: string;
-  userAgent?: string;
-}
 
-export class Session implements SessionEntity {
-  id: string;
-  userId: string;
-  refreshTokenHash: string;
-  expiresAt: Date;
-  lastActivity: Date;
-  ipAddress?: string;
+  @Column({ type: 'text', nullable: true })
   userAgent?: string;
-  createdAt: Date;
-  updatedAt: Date;
 
-  constructor(data: SessionEntity) {
-    this.id = data.id;
-    this.userId = data.userId;
-    this.refreshTokenHash = data.refreshTokenHash;
-    this.expiresAt = data.expiresAt;
-    this.lastActivity = data.lastActivity;
-    this.ipAddress = data.ipAddress;
-    this.userAgent = data.userAgent;
-    this.createdAt = data.createdAt;
-    this.updatedAt = data.updatedAt;
+  @Column({ type: 'boolean', default: true })
+  isActive!: boolean;
+
+  isExpired(): boolean {
+    return new Date() > this.expiresAt;
+  }
+
+  toJSON(): any {
+    const { refreshTokenHash, ...sessionWithoutToken } = this;
+    return sessionWithoutToken;
   }
 }

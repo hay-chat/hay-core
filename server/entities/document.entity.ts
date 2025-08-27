@@ -1,5 +1,6 @@
-import { Column, Entity, Index } from "typeorm";
+import { Column, Entity, Index, ManyToOne, JoinColumn } from "typeorm";
 import { TenantScopedEntity } from "./base.entity";
+import { Organization } from "./tenant.entity";
 
 export enum DocumentationType {
   ARTICLE = "article",
@@ -69,4 +70,9 @@ export class Document extends TenantScopedEntity {
     name: string;
     size?: number;
   }>;
+
+  // Relationships - tenantId is inherited from TenantScopedEntity
+  @ManyToOne(() => Organization, (organization) => organization.documents)
+  @JoinColumn({ name: 'tenantId' })
+  organization!: Organization;
 }

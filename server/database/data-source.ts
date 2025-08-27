@@ -1,6 +1,10 @@
 import { DataSource } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { ApiKey } from '../entities/apikey.entity';
+import { Organization } from '../entities/tenant.entity';
+import { Document } from '../entities/document.entity';
+import { Job } from '../entities/job.entity';
+import { Session } from '../entities/session.entity';
 import { config } from '../config/env';
 import 'reflect-metadata';
 
@@ -13,7 +17,7 @@ export const AppDataSource = new DataSource({
   database: config.database.database,
   synchronize: config.database.synchronize,
   logging: config.database.logging,
-  entities: [User, ApiKey],
+  entities: [User, ApiKey, Organization, Document, Job, Session],
   migrations: ['./database/migrations/*.ts'],
   subscribers: [],
 });

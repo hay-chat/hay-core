@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@/database/data-source";
 import { User } from "@/entities/user.entity";
 import { ApiKey } from "@/entities/apikey.entity";
+import { Organization } from "@/entities/tenant.entity";
 import {
   hashPassword,
   verifyPassword,
@@ -33,6 +34,10 @@ const registerSchema = z
     email: z.email(),
     password: z.string().min(8),
     confirmPassword: z.string(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    organizationName: z.string().optional(),
+    organizationSlug: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -113,42 +118,90 @@ export const authRouter = t.router({
   register: publicProcedure
     .input(registerSchema)
     .mutation(async ({ input }) => {
-      const { email, password } = input;
+      const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
-      const userRepository = AppDataSource.getRepository(User);
+      // Use a transaction for atomicity
+      return await AppDataSource.transaction(async (manager) => {
+        const userRepository = manager.getRepository(User);
+        const organizationRepository = manager.getRepository(Organization);
 
-      // Check if user already exists
-      const existingUser = await userRepository.findOne({
-        where: { email: email.toLowerCase() },
-      });
-
-      if (existingUser) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "User already exists",
+        // Check if user already exists
+        const existingUser = await userRepository.findOne({
+          where: { email: email.toLowerCase() },
         });
-      }
 
-      // Hash password
-      const hashedPassword = await hashPassword(password, "argon2");
+        if (existingUser) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "User already exists",
+          });
+        }
 
-      // Create new user
-      const user = userRepository.create({
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        isActive: true,
+        let organization: Organization | null = null;
+
+        // Create organization if name provided
+        if (organizationName) {
+          const orgSlug = organizationSlug || 
+            organizationName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/(^-|-$)+/g, '');
+
+          // Check if slug already exists
+          const existingOrg = await organizationRepository.findOne({
+            where: { slug: orgSlug },
+          });
+
+          if (existingOrg) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Organization slug already exists",
+            });
+          }
+
+          organization = organizationRepository.create({
+            name: organizationName,
+            slug: orgSlug,
+            isActive: true,
+            plan: 'free',
+            limits: {
+              maxUsers: 5,
+              maxDocuments: 100,
+              maxApiKeys: 10,
+              maxJobs: 50,
+              maxStorageGb: 1,
+            },
+          });
+
+          await organizationRepository.save(organization);
+        }
+
+        // Hash password
+        const hashedPassword = await hashPassword(password, "argon2");
+
+        // Create new user
+        const user = userRepository.create({
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          isActive: true,
+          organizationId: organization?.id,
+          role: organization ? 'owner' : 'member', // Owner if creating org, otherwise member
+        });
+
+        await userRepository.save(user);
+
+        // Generate tokens
+        const sessionId = generateSessionId();
+        const tokens = generateTokens(user, sessionId);
+
+        return {
+          user: user.toJSON(),
+          organization: organization?.toJSON(),
+          ...tokens,
+        };
       });
-
-      await userRepository.save(user);
-
-      // Generate tokens
-      const sessionId = generateSessionId();
-      const tokens = generateTokens(user, sessionId);
-
-      return {
-        user: user.toJSON(),
-        ...tokens,
-      };
     }),
 
   refreshToken: publicProcedure

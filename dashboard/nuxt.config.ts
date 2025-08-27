@@ -34,7 +34,7 @@ export default defineNuxtConfig({
   modules: [
     "@nuxtjs/tailwindcss",
     "@pinia/nuxt",
-    "@pinia-plugin-persistedstate/nuxt",
+    "pinia-plugin-persistedstate/nuxt",
     "@vueuse/nuxt",
   ],
 
@@ -137,10 +137,10 @@ export default defineNuxtConfig({
     transpile: ["@headlessui/vue"],
   },
 
-  // // Tailwind CSS configuration
-  // tailwindcss: {
-  //   cssPath: '~/assets/css/main.css',
-  // },
+  // Tailwind CSS configuration
+  tailwindcss: {
+    cssPath: "~/assets/css/main.css",
+  },
 
   // Vite configuration for additional auto-imports
   vite: {

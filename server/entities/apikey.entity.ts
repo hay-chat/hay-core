@@ -2,11 +2,13 @@ import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { ApiKeyScope } from '../types/auth.types';
 import { User } from './user.entity';
+import { Organization } from './tenant.entity';
 
 @Entity('api_keys')
 @Index('idx_api_keys_user_id', ['userId'])
 @Index('idx_api_keys_key_hash', ['keyHash'])
 @Index('idx_api_keys_is_active', ['isActive'])
+@Index('idx_api_keys_organization', ['organizationId'])
 export class ApiKey extends BaseEntity {
   @Column({ type: 'uuid' })
   userId!: string;
@@ -14,6 +16,13 @@ export class ApiKey extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user?: User;
+
+  @Column({ type: 'uuid', nullable: true })
+  organizationId?: string;
+
+  @ManyToOne(() => Organization, (organization) => organization.apiKeys, { nullable: true })
+  @JoinColumn({ name: 'organizationId' })
+  organization?: Organization;
 
   @Column({ type: 'varchar', length: 255 })
   keyHash!: string;
