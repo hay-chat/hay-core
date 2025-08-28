@@ -25,13 +25,13 @@ import {
 import type { ApiKeyResponse } from "@server/types/auth.types";
 
 const loginSchema = z.object({
-  email: z.email(),
+  email: z.string().email(),
   password: z.string().min(8),
 });
 
 const registerSchema = z
   .object({
-    email: z.email(),
+    email: z.string().email(),
     password: z.string().min(8),
     confirmPassword: z.string(),
     firstName: z.string().optional(),
