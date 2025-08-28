@@ -1,7 +1,11 @@
 <template>
-  <Sidebar collapsible="icon" v-bind="$attrs">
-    <SidebarHeader>
-      <TeamSwitcher />
+  <Sidebar
+    collapsible="icon"
+    v-bind="$attrs"
+    class="border-r border-border bg-background text-lg font-semibold mb-2"
+  >
+    <SidebarHeader class="pb-2">
+      <OrgSwitcher />
     </SidebarHeader>
     <SidebarContent>
       <NavMain :items="navMain" />
@@ -24,9 +28,6 @@ import {
   BarChart,
   BookOpen,
   Puzzle,
-  Shield,
-  Folder,
-  MoreHorizontal,
   ListTodo,
 } from "lucide-vue-next";
 
@@ -38,7 +39,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-import TeamSwitcher from "./TeamSwitcher.vue";
+import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
 import NavUser from "./NavUser.vue";
 
@@ -51,8 +52,12 @@ const route = useRoute();
 
 // Get user data from store
 const user = computed(() => ({
-  name: userStore.user ? `${userStore.user.firstName || ''} ${userStore.user.lastName || ''}`.trim() || 'User' : 'User',
-  email: userStore.user?.email || 'user@example.com',
+  name: userStore.user
+    ? `${userStore.user.firstName || ""} ${
+        userStore.user.lastName || ""
+      }`.trim() || "User"
+    : "User",
+  email: userStore.user?.email || "user@example.com",
   avatar: "/avatars/user.jpg",
 }));
 

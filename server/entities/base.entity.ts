@@ -31,7 +31,7 @@ export abstract class BaseEntity extends TypeOrmBaseEntity {
   }
 }
 
-export abstract class TenantScopedEntity extends BaseEntity {
+export abstract class OrganizationScopedEntity extends BaseEntity {
   @Column({ type: "uuid" })
-  tenantId!: string;
+  organizationId!: string;
 }

@@ -1,16 +1,23 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "@server/trpc";
+import { t } from "@server/trpc/init";
 import { AuthUser } from "@server/lib/auth/AuthUser";
-import type { Context } from "../context";
+import type { Context } from "@server/trpc/context";
 
 /**
  * Middleware to ensure user is authenticated
  */
-const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
+export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Authentication required",
+    });
+  }
+
+  if (!ctx.organizationId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Organization ID is required",
     });
   }
 

@@ -2,7 +2,7 @@ import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import type { ApiKeyScope } from "../types/auth.types";
 import { User } from "./user.entity";
-import { Organization } from "./tenant.entity";
+import { Organization } from "./organization.entity";
 
 @Entity("api_keys")
 @Index("idx_api_keys_user_id", ["userId"])

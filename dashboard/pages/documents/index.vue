@@ -34,12 +34,15 @@
           />
           <Input
             v-model="searchQuery"
-            placeholder="Search documents..."
+            placeholder="Search documents using natural language..."
             class="pl-10"
-            @input="handleSearch"
+            @keyup.enter="searchDocuments"
           />
         </div>
       </div>
+      <Button @click="searchDocuments" :disabled="!searchQuery || searching">
+        {{ searching ? "Searching..." : "Search" }}
+      </Button>
       <div class="flex gap-2">
         <select
           v-model="typeFilter"
@@ -252,6 +255,24 @@
       </div>
     </div>
 
+    <!-- Search Results -->
+    <div v-if="searchResults.length > 0" class="space-y-4">
+      <h3 class="text-lg font-semibold">Search Results</h3>
+      <div class="grid gap-4">
+        <Card v-for="result in searchResults" :key="result.id">
+          <CardHeader>
+            <CardTitle class="text-base">{{ result.title }}</CardTitle>
+            <CardDescription>
+              Similarity: {{ (result.similarity * 100).toFixed(2) }}%
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm text-muted-foreground">{{ result.content }}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+
     <!-- Loading State -->
     <div v-if="loading" class="space-y-4">
       <div v-for="i in 5" :key="i" class="animate-pulse">
@@ -264,6 +285,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Upload Dialog -->
+    <Dialog v-model:open="showUploadDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+          <DialogDescription>
+            Upload a document to create embeddings for semantic search
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div>
+            <Label for="title">Title</Label>
+            <Input
+              id="title"
+              v-model="uploadForm.title"
+              placeholder="Enter document title"
+            />
+          </div>
+
+          <div>
+            <Label for="content">Content</Label>
+            <Textarea
+              id="content"
+              v-model="uploadForm.content"
+              placeholder="Enter or paste document content"
+              :rows="4"
+            />
+          </div>
+
+          <div>
+            <Label>Or Upload File</Label>
+            <div class="mt-2">
+              <input
+                type="file"
+                @change="handleFileUpload"
+                accept=".txt,.md,.pdf"
+                class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              <p class="text-xs text-muted-foreground mt-2">
+                Supported formats: .txt, .md, .pdf
+              </p>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-2">
+            <Button variant="outline" @click="showUploadDialog = false">
+              Cancel
+            </Button>
+            <Button @click="uploadDocument" :disabled="uploading">
+              {{ uploading ? "Uploading..." : "Upload" }}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -289,7 +366,9 @@ import {
 
 // State
 const loading = ref(false);
+const searching = ref(false);
 const searchQuery = ref("");
+const searchResults = ref<any[]>([]);
 const typeFilter = ref("");
 const statusFilter = ref("");
 const selectedDocuments = ref<string[]>([]);
@@ -297,6 +376,16 @@ const documents = ref<any[]>([]);
 const currentPage = ref(1);
 const totalPages = ref(1);
 const totalDocuments = ref(0);
+const showUploadDialog = ref(false);
+const uploading = ref(false);
+
+const uploadForm = ref({
+  title: "",
+  content: "",
+  fileBuffer: "",
+  mimeType: "",
+  fileName: "",
+});
 
 // Computed
 const filteredDocuments = computed(() => {
@@ -366,58 +455,69 @@ const formatDate = (date: Date) => {
 };
 
 const refreshData = async () => {
-  // loading.value = true;
-  // try {
-  //   // Fetch documents from API
-  //   const params = new URLSearchParams({
-  //     page: currentPage.value.toString(),
-  //     limit: "20",
-  //     ...(searchQuery.value && { search: searchQuery.value }),
-  //     ...(statusFilter.value && { status: statusFilter.value }),
-  //     ...(typeFilter.value && { type: typeFilter.value }),
-  //   });
-  //   // const response = await $api(`/api/v1/documents?${params.toString()}`);
-  //   if (response.data) {
-  //     // Map API response to our format
-  //     documents.value = response.data.map((doc: any) => ({
-  //       id: doc.id,
-  //       name: doc.title,
-  //       type: detectFileType(
-  //         doc.metadata?.mimeType || "",
-  //         doc.metadata?.extension || ""
-  //       ),
-  //       size: doc.metadata?.fileSize || 0,
-  //       status: mapDocumentStatus(doc.status, doc.metadata?.processingStatus),
-  //       updatedAt: new Date(doc.updatedAt),
-  //       uploadedBy: doc.createdBy || "Unknown",
-  //       description: doc.summary || doc.content?.substring(0, 100) || "",
-  //       metadata: doc.metadata,
-  //     }));
-  //     totalDocuments.value = response.total || documents.value.length;
-  //     totalPages.value =
-  //       response.totalPages || Math.ceil(totalDocuments.value / 20);
-  //   }
-  //   console.log("Documents refreshed successfully");
-  // } catch (error) {
-  //   console.error("Error refreshing data:", error);
-  //   // If API fails, show some sample data for demo purposes
-  //   documents.value = [
-  //     {
-  //       id: "demo-1",
-  //       name: "Sample Document",
-  //       type: "pdf",
-  //       size: 1024000,
-  //       status: "active",
-  //       updatedAt: new Date(),
-  //       uploadedBy: "Demo User",
-  //       description:
-  //         "This is a sample document. Upload real documents to see them here.",
-  //     },
-  //   ];
-  // } finally {
-  //   loading.value = false;
-  // }
+  loading.value = true;
+  try {
+    const result = await HayApi.documents.list.query();
+
+    // Map the result to the expected document format
+    documents.value = (result || []).map((doc: any) => ({
+      id: doc.id,
+      name: doc.title || "Untitled",
+      description: doc.description || doc.content?.substring(0, 100),
+      type: doc.type || "article",
+      category: doc.categories?.[0] || "general",
+      fileSize: doc.fileSize || 0,
+      status: doc.status || "draft",
+      createdAt: new Date(doc.createdAt),
+      updatedAt: new Date(doc.updatedAt),
+    }));
+  } catch (error) {
+    console.error("Failed to fetch documents:", error);
+  } finally {
+    loading.value = false;
+  }
 };
+
+// Search documents using vector similarity
+const searchDocuments = async () => {
+  if (!searchQuery.value.trim()) return;
+
+  searching.value = true;
+  try {
+    const results = await HayApi.documents.search.query({
+      query: searchQuery.value,
+      limit: 20,
+    });
+
+    // Map search results to document format
+    searchResults.value = (results || []).map((doc: any) => ({
+      id: doc.id,
+      name: doc.title,
+      description: doc.content,
+      type: doc.type,
+      status: doc.status,
+      similarity: doc.similarity,
+    }));
+
+    // Also update the main documents list with search results
+    documents.value = searchResults.value.map((doc: any) => ({
+      ...doc,
+      category: "search-result",
+      fileSize: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+  } catch (error) {
+    console.error("Search failed:", error);
+  } finally {
+    searching.value = false;
+  }
+};
+
+// Load documents on mount
+onMounted(() => {
+  refreshData();
+});
 
 // Helper function to detect file type from MIME type or extension
 const detectFileType = (mimeType: string, extension: string): string => {
@@ -451,10 +551,6 @@ const mapDocumentStatus = (
     return "archived";
   }
   return "draft";
-};
-
-const handleSearch = () => {
-  // Search is reactive through computed property
 };
 
 const applyFilters = () => {
@@ -585,6 +681,36 @@ const bulkDelete = async () => {
     console.error("Failed to delete documents");
   }
 };
+
+const handleFileUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const arrayBuffer = e.target?.result as ArrayBuffer;
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+
+    uploadForm.value.fileBuffer = base64;
+    uploadForm.value.mimeType = file.type || "text/plain";
+    uploadForm.value.fileName = file.name;
+
+    if (!uploadForm.value.title) {
+      uploadForm.value.title = file.name.replace(/\.[^/.]+$/, "");
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
+const uploadDocument = async () => {};
 
 // Lifecycle
 onMounted(async () => {

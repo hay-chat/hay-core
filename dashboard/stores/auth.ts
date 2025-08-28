@@ -52,15 +52,10 @@ export const useAuthStore = defineStore("auth", {
       userStore.setUser(result.user as User);
       this.isAuthenticated = true;
       this.updateActivity();
-
-      // Set cookie for SSR
-      if (process.client) {
-        const token = useCookie("auth-token");
-        token.value = result.accessToken;
-      }
     },
 
     async logout() {
+      const router = useRouter();
       try {
         await HayApi.auth.logout.mutate();
       } catch (error) {
@@ -72,11 +67,7 @@ export const useAuthStore = defineStore("auth", {
       userStore.clearUser();
       this.isAuthenticated = false;
 
-      // Clear cookie
-      if (process.client) {
-        const token = useCookie("auth-token");
-        token.value = null;
-      }
+      router.push("/login");
     },
 
     updateActivity() {
@@ -91,14 +82,27 @@ export const useAuthStore = defineStore("auth", {
       acceptTerms: boolean;
       acceptMarketing: boolean;
     }) {
-      await HayApi.auth.register.mutate({
+      const result = await HayApi.auth.register.mutate({
         organizationName: data.organizationName,
         email: data.email,
-        firstName: data.fullName.split(' ')[0],
-        lastName: data.fullName.split(' ').slice(1).join(' '),
+        firstName: data.fullName.split(" ")[0],
+        lastName: data.fullName.split(" ").slice(1).join(" "),
         password: data.password,
         confirmPassword: data.password,
       });
+
+      // Store tokens
+      this.tokens = {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+      };
+
+      // Store user data with organization
+      const userStore = useUserStore();
+      userStore.setUser(result.user as User);
+      this.isAuthenticated = true;
+      this.updateActivity();
     },
 
     async refreshTokens() {

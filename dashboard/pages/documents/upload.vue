@@ -405,10 +405,9 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-vue-next";
+import { HayApi } from "@/utils/api";
 
 const router = useRouter();
-
-const { $api } = useNuxtApp();
 
 interface UploadFile extends File {
   documentName?: string;
@@ -555,88 +554,104 @@ const startUpload = async () => {
   isUploading.value = true;
   uploadedCount.value = 0;
 
+  // Get organization/organization ID from auth or use default
+  // In production, this should come from your authenticated user's context
+  const authToken = useCookie("auth-token");
+  const organizationId = authToken.value ? "org_default" : "default"; // TODO: Parse from JWT or fetch from API
+
   try {
-    // Prepare form data for upload
-    const formData = new FormData();
-
-    // Add files to form data
-    for (const file of selectedFiles.value) {
-      formData.append("documents", file as File);
-    }
-
-    // Add metadata for all files
-    formData.append("category", globalSettings.value.category || "");
-    formData.append("isActive", String(globalSettings.value.isActive));
-
-    // Add individual file metadata if needed
-    const fileMetadata = selectedFiles.value.map((file) => ({
-      documentName: file.documentName,
-      category: file.category,
-      description: file.description,
-      tags: file.tags,
-      isActive: file.isActive,
-    }));
-    formData.append("fileMetadata", JSON.stringify(fileMetadata));
-
-    // Add processing options
-    formData.append("includeMetadata", "true");
-    formData.append("extractTables", "true");
-    formData.append("chunkingStrategy", "semantic");
-    formData.append("chunkSize", "1500");
-
-    // Track individual file progress
-    for (const file of selectedFiles.value) {
+    // Upload files sequentially to track individual progress
+    for (let i = 0; i < selectedFiles.value.length; i++) {
+      const file = selectedFiles.value[i];
       file.uploadStatus = "uploading";
-      file.progress = 0;
+      file.progress = 10;
+
+      try {
+        // Read file content as base64
+        const fileBuffer = await fileToBase64(file as File);
+        file.progress = 30;
+
+        // Prepare the document data
+        const documentData = {
+          title: file.documentName || file.name,
+          content: file.description || `Document: ${file.name}`,
+          fileBuffer: fileBuffer,
+          mimeType: file.type,
+          fileName: file.name,
+          organizationId: organizationId,
+          // Use enums from the server (lowercase values)
+          type: mapCategoryToDocumentType(
+            file.category || globalSettings.value.category
+          ) as any,
+          status: (file.isActive ? "published" : "draft") as any,
+          visibility: "private" as any,
+        };
+
+        file.progress = 50;
+
+        // Upload using tRPC
+        const response = await HayApi.documents.create.mutate(documentData);
+
+        if (response && response.id) {
+          file.uploadStatus = "completed";
+          file.progress = 100;
+          uploadedCount.value++;
+        } else {
+          throw new Error("Invalid response from server");
+        }
+      } catch (fileError) {
+        console.error(`Upload error for ${file.name}:`, fileError);
+        file.uploadStatus = "error";
+        file.errorMessage =
+          fileError instanceof Error ? fileError.message : "Upload failed";
+        file.progress = 0;
+      }
     }
 
-    // // Upload files to backend
-    // const response = await $api("/api/v1/documents/upload", {
-    //   method: "POST",
-    //   body: formData,
-    //   onUploadProgress: (progress: { loaded: number; total: number }) => {
-    //     // Update upload progress for all files
-    //     const percentage = Math.round((progress.loaded / progress.total) * 50); // 50% for upload
-    //     for (const file of selectedFiles.value) {
-    //       if (file.uploadStatus === "uploading") {
-    //         file.progress = percentage;
-    //       }
-    //     }
-    //   },
-    // });
-
-    // // Process response
-    // if (response.success && response.results) {
-    //   for (let i = 0; i < response.results.length; i++) {
-    //     const result = response.results[i];
-    //     const file = selectedFiles.value[i];
-    //     if (!file) continue;
-
-    //     if (result.status === "queued") {
-    //       file.uploadStatus = "processing";
-    //       file.progress = 50;
-
-    //       // Poll for processing status
-    //       await pollProcessingStatus(result.documentId, file);
-    //     } else if (result.status === "error") {
-    //       file.uploadStatus = "error";
-    //       file.errorMessage = result.error || "Upload failed";
-    //     }
-    //   }
-    // }
-
-    uploadedCount.value = selectedFiles.value.filter(
+    // Check if all files uploaded successfully
+    const allSuccess = selectedFiles.value.every(
       (f) => f.uploadStatus === "completed"
-    ).length;
+    );
+
+    if (allSuccess) {
+      // Show success notification
+      showNotification(
+        "Documents Uploaded",
+        `Successfully uploaded ${uploadedCount.value} document(s)`,
+        "success"
+      );
+    } else {
+      const failedCount = selectedFiles.value.filter(
+        (f) => f.uploadStatus === "error"
+      ).length;
+
+      if (failedCount > 0) {
+        showNotification(
+          "Some uploads failed",
+          `${uploadedCount.value} succeeded, ${failedCount} failed`,
+          "warning"
+        );
+      }
+    }
   } catch (error) {
     console.error("Upload error:", error);
 
-    // Mark all files as error
+    showNotification(
+      "Upload Failed",
+      error instanceof Error ? error.message : "Failed to upload documents",
+      "error"
+    );
+
+    // Mark all pending files as error
     for (const file of selectedFiles.value) {
-      if (file.uploadStatus !== "completed") {
+      if (
+        file.uploadStatus === "uploading" ||
+        file.uploadStatus === "pending"
+      ) {
         file.uploadStatus = "error";
         file.errorMessage =
           error instanceof Error ? error.message : "Upload failed";
+        file.progress = 0;
       }
     }
   } finally {
@@ -644,43 +659,54 @@ const startUpload = async () => {
   }
 };
 
-// Poll for document processing status
-const pollProcessingStatus = async (documentId: string, file: UploadFile) => {
-  const maxAttempts = 30; // 30 seconds timeout
-  let attempts = 0;
+// Helper function to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Remove the data:*/*;base64, prefix
+      const base64 = (reader.result as string).split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
 
-  while (attempts < maxAttempts && file.uploadStatus === "processing") {
-    try {
-      // const status = await $api(
-      //   `/api/v1/documents/upload/status/${documentId}`
-      // );
-      // if (status.success && status.status) {
-      //   if (status.status.status === "completed") {
-      //     file.uploadStatus = "completed";
-      //     file.progress = 100;
-      //     break;
-      //   } else if (status.status.status === "error") {
-      //     file.uploadStatus = "error";
-      //     file.errorMessage = status.status.error || "Processing failed";
-      //     break;
-      //   } else {
-      //     // Still processing, update progress
-      //     file.progress = Math.min(95, 50 + attempts * 1.5);
-      //   }
-      // }
-    } catch (error) {
-      console.error("Status polling error:", error);
-    }
+// Map UI category to server DocumentationType enum
+const mapCategoryToDocumentType = (
+  category: string
+): "article" | "guide" | "faq" | "tutorial" | "reference" | "policy" => {
+  const mapping: Record<
+    string,
+    "article" | "guide" | "faq" | "tutorial" | "reference" | "policy"
+  > = {
+    product: "guide",
+    api: "reference",
+    faq: "faq",
+    legal: "policy",
+    training: "tutorial",
+    technical: "reference",
+    other: "article",
+  };
+  return mapping[category] || "article";
+};
 
-    // Wait 1 second before next poll
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    attempts++;
-  }
+// Since the tRPC mutation is synchronous, we don't need polling anymore
+// The document is processed immediately on the server side
 
-  // Timeout - mark as completed anyway
-  if (file.uploadStatus === "processing") {
-    file.uploadStatus = "completed";
-    file.progress = 100;
+// Simple notification helper (you can replace with a proper toast library)
+const showNotification = (
+  title: string,
+  message: string,
+  type: "success" | "error" | "warning"
+) => {
+  // For now, just log to console. You can integrate with your preferred notification library
+  console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+
+  // You could also use the browser's native notification API or a Vue notification library
+  if (type === "error") {
+    console.error(message);
   }
 };
 

@@ -1,6 +1,7 @@
 import { Column, Entity, Index, ManyToOne, JoinColumn } from "typeorm";
-import { TenantScopedEntity } from "./base.entity";
-import { Organization } from "./tenant.entity";
+import { OrganizationScopedEntity } from "./base.entity";
+import { Organization } from "./organization.entity";
+import { VectorTransformer } from "../database/pgvector-type";
 
 export enum DocumentationType {
   ARTICLE = "article",
@@ -25,7 +26,7 @@ export enum DocumentVisibility {
 }
 
 @Entity("documents")
-export class Document extends TenantScopedEntity {
+export class Document extends OrganizationScopedEntity {
   @Column({ type: "varchar", nullable: true })
   title!: string;
 
@@ -71,8 +72,28 @@ export class Document extends TenantScopedEntity {
     size?: number;
   }>;
 
-  // Relationships - tenantId is inherited from TenantScopedEntity
+  @Column({ type: "text", nullable: true })
+  content?: string;
+
+  // TypeORM doesn't natively support pgvector, so we use a workaround
+  // The actual column type will be set to vector(1536) via migration
+  @Column({
+    type: 'text',
+    nullable: true,
+    transformer: VectorTransformer,
+  })
+  embedding?: number[] | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  embeddingMetadata?: {
+    model: string;
+    contentLength: number;
+    createdAt: Date;
+    [key: string]: any;
+  };
+
+  // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.documents)
-  @JoinColumn({ name: 'tenantId' })
+  @JoinColumn({ name: "organizationId" })
   organization!: Organization;
 }

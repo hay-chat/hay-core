@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
-import { Organization } from "@server/entities/tenant.entity";
+import { Organization } from "@server/entities/organization.entity";
 import {
   hashPassword,
   verifyPassword,
@@ -66,10 +66,11 @@ export const authRouter = t.router({
   login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     const { email, password } = input;
 
-    // Find user by email
+    // Find user by email with organization
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { email: email.toLowerCase() },
+      relations: ["organization"],
     });
 
     if (!user) {
@@ -109,8 +110,20 @@ export const authRouter = t.router({
     const sessionId = generateSessionId();
     const tokens = generateTokens(user, sessionId);
 
+    // Prepare organization data
+    const organizations = user.organization ? [{
+      id: user.organization.id,
+      name: user.organization.name,
+      slug: user.organization.slug,
+      role: user.role,
+    }] : [];
+
     return {
-      user: user.toJSON(),
+      user: {
+        ...user.toJSON(),
+        organizations,
+        activeOrganizationId: user.organizationId,
+      },
       ...tokens,
     };
   }),
@@ -204,9 +217,20 @@ export const authRouter = t.router({
         const sessionId = generateSessionId();
         const tokens = generateTokens(user, sessionId);
 
+        // Prepare organization data
+        const organizations = organization ? [{
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug,
+          role: user.role,
+        }] : [];
+
         return {
-          user: user.toJSON(),
-          organization: organization?.toJSON(),
+          user: {
+            ...user.toJSON(),
+            organizations,
+            activeOrganizationId: user.organizationId,
+          },
           ...tokens,
         };
       });
@@ -248,13 +272,41 @@ export const authRouter = t.router({
 
   // Protected endpoints
   me: protectedProcedure.query(async ({ ctx }) => {
-    const user = ctx.user!.getUser(); // protectedProcedure guarantees user exists
+    const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
+    
+    // Fetch user with organization data
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: userEntity.id },
+      relations: ["organization"],
+    });
+    
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+    
+    // Prepare organization data
+    const organizations = user.organization ? [{
+      id: user.organization.id,
+      name: user.organization.name,
+      slug: user.organization.slug,
+      role: user.role,
+    }] : [];
+    
     return {
       id: user.id,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
       authMethod: ctx.user!.authMethod,
+      organizations,
+      activeOrganizationId: user.organizationId,
+      role: user.role,
     };
   }),
 

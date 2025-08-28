@@ -4,6 +4,7 @@ import { authenticate } from "@server/lib/auth/middleware";
 
 export interface Context {
   user: AuthUser | null;
+  organizationId: string | null;
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
 }
@@ -23,8 +24,12 @@ export const createContext = async ({
     // Authentication errors will be handled by procedures that require auth
   }
 
+  // Extract organizationId from header
+  const organizationId = req.headers["x-organization-id"] as string | null || null;
+
   const context: Context = {
     user,
+    organizationId,
     req,
     res,
   };

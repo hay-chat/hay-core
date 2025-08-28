@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, JoinColumn } from "typeorm";
-import { TenantScopedEntity } from "./base.entity";
-import { Organization } from "./tenant.entity";
+import { OrganizationScopedEntity } from "./base.entity";
+import { Organization } from "./organization.entity";
 
 export enum JobStatus {
   PENDING = "pending",
@@ -20,7 +20,7 @@ export enum JobPriority {
 }
 
 @Entity("jobs")
-export class Job extends TenantScopedEntity {
+export class Job extends OrganizationScopedEntity {
   @Column({ type: "varchar", nullable: true })
   title!: string;
 
@@ -39,8 +39,8 @@ export class Job extends TenantScopedEntity {
   @Column({ type: "jsonb", nullable: true })
   result?: Record<string, any>;
 
-  // Relationships - tenantId is inherited from TenantScopedEntity
+  // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.jobs)
-  @JoinColumn({ name: 'tenantId' })
+  @JoinColumn({ name: "organizationId" })
   organization!: Organization;
 }

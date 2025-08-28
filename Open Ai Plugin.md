@@ -1,6 +1,6 @@
 PRD: OpenAI Plugin Implementation with Generic Model Abstraction Layer
 Project Overview
-Implement an OpenAI plugin as the first implementation of a generic model abstraction system. Business logic should interact with a unified HayModel interface that automatically routes to the tenant's configured AI provider (OpenAI, Anthropic, Llama, etc.).
+Implement an OpenAI plugin as the first implementation of a generic model abstraction system. Business logic should interact with a unified HayModel interface that automatically routes to the organization's configured AI provider (OpenAI, Anthropic, Llama, etc.).
 Architecture Context
 Layered Architecture:
 Business Logic Layer
@@ -22,9 +22,9 @@ Core Requirements
    export class HayModel {
    private modelPlugin: IModelPlugin;
 
-constructor(tenantId: string) {
-// Automatically resolve correct plugin based on tenant config
-this.modelPlugin = await this.resolveModelPlugin(tenantId);
+constructor(organizationId: string) {
+// Automatically resolve correct plugin based on organization config
+this.modelPlugin = await this.resolveModelPlugin(organizationId);
 }
 
 // Generic methods that business logic uses
@@ -61,11 +61,11 @@ name?: string;
 1.3 Model Resolution Service
 typescript// Location: /lib/models/ModelResolver.ts
 export class ModelResolver {
-async resolveForTenant(tenantId: string): Promise<IModelPlugin> {
-// 1. Get tenant configuration
+async resolveForOrganization(organizationId: string): Promise<IModelPlugin> {
+// 1. Get organization configuration
 // 2. Find enabled model provider
 // 3. Get plugin from registry
-// 4. Initialize with tenant-specific config
+// 4. Initialize with organization-specific config
 // 5. Return ready-to-use plugin
 }
 } 2. Plugin System
@@ -146,10 +146,10 @@ const openAIMessages = this.normalizeMessages(messages);
     return this.normalizeResponse(response);
 
 }
-} 4. Tenant Configuration
-4.1 Tenant Entity Extension
-typescript// Extend /entities/tenant.entity.ts
-interface TenantModelConfig {
+} 4. Organization Configuration
+4.1 Organization Entity Extension
+typescript// Extend /entities/organization.entity.ts
+interface OrganizationModelConfig {
 enabled: boolean;
 provider: 'openai' | 'anthropic' | 'llama' | string;
 modelName: string; // e.g., 'gpt-4', 'claude-3', etc.
@@ -157,23 +157,23 @@ config: Record<string, any>; // Provider-specific config
 fallbackProvider?: string; // If primary fails
 }
 
-class Tenant extends BaseEntity {
+class Organization extends BaseEntity {
 @Column('jsonb')
-modelConfig: TenantModelConfig;
+modelConfig: OrganizationModelConfig;
 }
 4.2 Configuration Service
-typescript// Location: /services/TenantConfigService.ts
-export class TenantConfigService {
-async getModelConfig(tenantId: string): Promise<TenantModelConfig>;
-async updateModelConfig(tenantId: string, config: TenantModelConfig): Promise<void>;
-async validateModelConfig(config: TenantModelConfig): Promise<boolean>;
+typescript// Location: /services/OrganizationConfigService.ts
+export class OrganizationConfigService {
+async getModelConfig(organizationId: string): Promise<OrganizationModelConfig>;
+async updateModelConfig(organizationId: string, config: OrganizationModelConfig): Promise<void>;
+async validateModelConfig(config: OrganizationModelConfig): Promise<boolean>;
 } 5. Usage in Business Logic
 5.1 Service Layer Example
 typescript// Location: /services/DocumentService.ts
 export class DocumentService {
-async processDocument(tenantId: string, documentId: string) {
+async processDocument(organizationId: string, documentId: string) {
 // No need to know which AI provider!
-const model = new HayModel(tenantId);
+const model = new HayModel(organizationId);
 
     const summary = await model.complete(
       `Summarize this document: ${documentContent}`,
@@ -189,10 +189,10 @@ const model = new HayModel(tenantId);
 typescript// Location: /routes/v1/chat/index.ts
 router.post('/chat', async (req, res) => {
 const { messages } = req.body;
-const tenantId = req.user.tenantId;
+const organizationId = req.user.organizationId;
 
 // Business logic doesn't care about provider
-const model = new HayModel(tenantId);
+const model = new HayModel(organizationId);
 const response = await model.chat(messages);
 
 res.json(response);
@@ -217,12 +217,12 @@ Implementation Scope
 IN SCOPE:
 
 HayModel abstraction layer - The main facade for all model interactions
-Model Resolution Service - Tenant-based plugin resolution
+Model Resolution Service - Organization-based plugin resolution
 Standard type definitions - Provider-agnostic interfaces
 OpenAI plugin - Full implementation as first provider
 BaseModelPlugin abstract class - Shared functionality
 Plugin Registry - Plugin management system
-Tenant model configuration - Database schema and service
+Organization model configuration - Database schema and service
 Response normalization - Convert all provider responses to standard format
 Error handling - Unified error handling across providers
 Unit and integration tests for all components
@@ -251,24 +251,24 @@ json{
 }
 
 Database Migration Needed:
-typescript// New migration: 004_add_tenant_model_config.ts
+typescript// New migration: 004_add_organization_model_config.ts
 
-- Add modelConfig column to tenants table
+- Add modelConfig column to organizations table
 
 Environment Variables:
 env# Default fallback (optional)
 DEFAULT_MODEL_PROVIDER=openai
 DEFAULT_MODEL_NAME=gpt-3.5-turbo
 
-# Provider API keys (used if not in tenant config)
+# Provider API keys (used if not in organization config)
 
 OPENAI_API_KEY=sk-...
 
 Success Criteria
 
 Abstraction Works: Business logic can use HayModel without knowing the provider
-Tenant Isolation: Each tenant can have different AI providers
-Provider Switching: Can change tenant's provider without code changes
+Organization Isolation: Each organization can have different AI providers
+Provider Switching: Can change organization's provider without code changes
 Consistent Responses: All providers return same response format
 Error Handling: Provider errors are normalized to standard errors
 Tests Pass: Full test coverage for abstraction layer and OpenAI plugin
@@ -279,19 +279,19 @@ typescript// Core test files needed:
 /tests/unit/lib/models/HayModel.test.ts // Facade tests
 /tests/unit/lib/models/ModelResolver.test.ts // Resolution logic tests
 /tests/unit/plugins/openai/index.test.ts // OpenAI plugin tests
-/tests/integration/models/model-switching.test.ts // Multi-tenant tests
+/tests/integration/models/model-switching.test.ts // Multi-organization tests
 
 // Test scenarios:
 
-- Different tenants using different providers
+- Different organizations using different providers
 - Fallback when primary provider fails
 - Response normalization across providers
 - Error handling and retries
 - Configuration validation
   Example Usage Scenarios
   typescript// Scenario 1: Document Processing (provider-agnostic)
-  async function analyzeDocument(tenantId: string, content: string) {
-  const model = new HayModel(tenantId); // Could be OpenAI, Anthropic, etc.
+  async function analyzeDocument(organizationId: string, content: string) {
+  const model = new HayModel(organizationId); // Could be OpenAI, Anthropic, etc.
   const analysis = await model.chat([
   { role: 'system', content: 'You are a document analyzer' },
   { role: 'user', content: `Analyze this: ${content}` }
@@ -300,14 +300,14 @@ typescript// Core test files needed:
   }
 
 // Scenario 2: Embedding Generation (same interface, any provider)
-async function generateEmbeddings(tenantId: string, texts: string[]) {
-const model = new HayModel(tenantId);
+async function generateEmbeddings(organizationId: string, texts: string[]) {
+const model = new HayModel(organizationId);
 return await model.embed(texts); // Works with any provider that supports embeddings
 }
 
 // Scenario 3: Streaming Response (if provider supports it)
-async function streamChat(tenantId: string, messages: Message[]) {
-const model = new HayModel(tenantId);
+async function streamChat(organizationId: string, messages: Message[]) {
+const model = new HayModel(organizationId);
 
 await model.stream(messages, (token) => {
 console.log('Token:', token); // Real-time streaming if supported
@@ -329,7 +329,7 @@ Architecture Diagram
 ↓
 ┌─────────────────────────────────────────────┐
 │ ModelResolver │
-│ - Reads tenant configuration │
+│ - Reads organization configuration │
 │ - Gets plugin from registry │
 └────────────────┬────────────────────────────┘
 │ Returns

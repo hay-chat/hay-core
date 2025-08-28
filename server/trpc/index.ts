@@ -1,19 +1,12 @@
-import { initTRPC } from "@trpc/server";
-import { createContext } from "./context";
 import { v1Router } from "../routes/v1";
+import { isAuthed } from "@server/trpc/middleware/auth";
+import { t, router, publicProcedure } from "./init";
+import { createContext } from "./context";
 
-/**
- * Initialization of tRPC backend
- * Should be done only once per backend!
- */
-export const t = initTRPC.context<typeof createContext>().create();
-
-/**
- * Export reusable router and procedure helpers
- * that can be used throughout the router
- */
-export const router = t.router;
-export const publicProcedure = t.procedure;
+// Re-export from init
+export { t, router, publicProcedure, createContext };
 
 // Export the app router type for client-side type generation
 export type AppRouter = typeof v1Router;
+
+export const authenticatedProcedure = t.procedure.use(isAuthed);

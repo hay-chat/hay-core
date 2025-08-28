@@ -36,11 +36,11 @@ export const config = {
     level: process.env.LOG_LEVEL || "debug",
   },
 
-  tenant: {
+  organization: {
     extractionMethods: (
-      process.env.TENANT_EXTRACTION_METHOD || "subdomain,header,jwt"
+      process.env.ORGANIZATION_EXTRACTION_METHOD || "subdomain,header,jwt"
     ).split(","),
-    defaultTenant: process.env.DEFAULT_TENANT || "default",
+    defaultOrganization: process.env.DEFAULT_ORGANIZATION || "default",
   },
 
   database: {
@@ -67,6 +67,26 @@ export const config = {
       process.env.JWT_REFRESH_SECRET ||
       "default-refresh-secret-change-in-production",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
+  },
+
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || "",
+    models: {
+      embedding: {
+        model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+        temperature: parseFloat(
+          process.env.OPENAI_EMBEDDING_TEMPERATURE || "0.7"
+        ),
+        maxTokens: parseInt(process.env.OPENAI_EMBEDDING_MAX_TOKENS || "2000"),
+        organizationId: process.env.OPENAI_EMBEDDING_ORG_ID || "",
+      },
+      chat: {
+        model: process.env.OPENAI_CHAT_MODEL || "gpt-4o",
+        temperature: parseFloat(process.env.OPENAI_CHAT_TEMPERATURE || "0.7"),
+        maxTokens: parseInt(process.env.OPENAI_CHAT_MAX_TOKENS || "2000"),
+        organizationId: process.env.OPENAI_CHAT_ORG_ID || "",
+      },
+    },
   },
 } as const;
 

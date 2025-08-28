@@ -9,8 +9,9 @@
   >
     <MenuItems
       :class="[
-        'absolute z-50 mt-2 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
-        align === 'end' ? 'right-0' : 'left-0'
+        'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md flex flex-col',
+        side === 'top' ? 'bottom-full mb-2' : 'mt-2',
+        align === 'end' ? 'right-0' : 'left-0',
       ]"
     >
       <slot />
@@ -19,9 +20,10 @@
 </template>
 
 <script setup lang="ts">
-import { MenuItems } from '@headlessui/vue';
+import { MenuItems } from "@headlessui/vue";
 
 defineProps<{
-  align?: 'start' | 'end';
+  align?: "start" | "end";
+  side?: "top" | "bottom";
 }>();
 </script>
