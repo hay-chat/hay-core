@@ -5,6 +5,7 @@ import { Organization } from "../entities/organization.entity";
 import { Document } from "../entities/document.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
+import { Embedding } from "../entities/embedding.entity";
 import { config } from "../config/env";
 import "reflect-metadata";
 
@@ -15,9 +16,10 @@ export const AppDataSource = new DataSource({
   username: config.database.username,
   password: config.database.password,
   database: config.database.database,
-  synchronize: config.database.synchronize,
+  synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: config.database.logging,
-  entities: [User, ApiKey, Organization, Document, Job, Session],
+  ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding],
   migrations: ["./database/migrations/*.ts"],
   subscribers: [],
 });
@@ -27,11 +29,12 @@ export async function initializeDatabase() {
   try {
     await AppDataSource.initialize();
 
-    // Enable pgvector extension if not already enabled
+    // Enable required extensions if not already enabled
     await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
+    await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
 
     console.log("✅ Database connection established");
-    console.log("✅ pgvector extension enabled");
+    console.log("✅ pgvector and pgcrypto extensions enabled");
     return true;
   } catch (error) {
     console.error("❌ Error during Data Source initialization:", error);

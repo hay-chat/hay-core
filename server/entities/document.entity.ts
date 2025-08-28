@@ -1,7 +1,6 @@
 import { Column, Entity, Index, ManyToOne, JoinColumn } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
-import { VectorTransformer } from "../database/pgvector-type";
 
 export enum DocumentationType {
   ARTICLE = "article",
@@ -60,10 +59,6 @@ export class Document extends OrganizationScopedEntity {
   @Column({ type: "simple-array", nullable: true })
   categories?: string[];
 
-  @Column({ type: "tsvector", nullable: true })
-  @Index("idx_doc_search_vector", { synchronize: false })
-  search_vector?: any;
-
   @Column({ type: "jsonb", nullable: true })
   attachments?: Array<{
     type: string;
@@ -74,15 +69,6 @@ export class Document extends OrganizationScopedEntity {
 
   @Column({ type: "text", nullable: true })
   content?: string;
-
-  // TypeORM doesn't natively support pgvector, so we use a workaround
-  // The actual column type will be set to vector(1536) via migration
-  @Column({
-    type: 'text',
-    nullable: true,
-    transformer: VectorTransformer,
-  })
-  embedding?: number[] | null;
 
   @Column({ type: "jsonb", nullable: true })
   embeddingMetadata?: {

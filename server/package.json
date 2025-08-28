@@ -5,11 +5,16 @@
   "main": "main.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon main.ts"
+    "dev": "nodemon main.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d ./database/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@langchain/community": "^0.3.53",
     "@langchain/core": "^0.3.72",
     "@langchain/langgraph": "^0.4.7",
     "@langchain/openai": "^0.6.9",
@@ -18,10 +23,10 @@
     "argon2": "^0.31.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
+    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "openai": "^5.16.0",
+    "openai": "^4.62.1",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.3",
     "pgvector": "^0.2.1",

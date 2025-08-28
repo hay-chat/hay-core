@@ -54,20 +54,40 @@ export const useAuthStore = defineStore("auth", {
       this.updateActivity();
     },
 
-    async logout() {
+    async logout(reason?: string) {
       const router = useRouter();
-      try {
-        await HayApi.auth.logout.mutate();
-      } catch (error) {
-        // Ignore errors on logout
+      
+      // Only try to call logout API if we have a valid token
+      if (this.tokens?.accessToken) {
+        try {
+          await HayApi.auth.logout.mutate();
+        } catch (error) {
+          // Ignore errors on logout - token might already be invalid
+          console.log('[Auth] Logout API call failed (expected if token expired):', error);
+        }
       }
 
+      // Clear all auth state
       this.tokens = null;
+      this.isAuthenticated = false;
+      this.isInitialized = false;
+      
+      // Clear user store
       const userStore = useUserStore();
       userStore.clearUser();
-      this.isAuthenticated = false;
+      
+      // Show notification if there's a reason
+      if (reason === 'token_expired' && process.client) {
+        const { $toast } = useNuxtApp();
+        if ($toast) {
+          $toast.error('Your session has expired. Please login again.');
+        }
+      }
 
-      router.push("/login");
+      // Navigate to login page
+      if (process.client) {
+        await router.push('/login');
+      }
     },
 
     updateActivity() {

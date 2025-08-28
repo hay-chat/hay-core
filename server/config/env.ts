@@ -74,6 +74,7 @@ export const config = {
     models: {
       embedding: {
         model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+        dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
         temperature: parseFloat(
           process.env.OPENAI_EMBEDDING_TEMPERATURE || "0.7"
         ),

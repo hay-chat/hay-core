@@ -20,7 +20,18 @@ export const createContext = async ({
     user = await authenticate(req);
   } catch (error) {
     // Log authentication errors but don't fail context creation
-    console.error("[Context] Authentication error:", error);
+    if (error instanceof Error) {
+      console.error("[Context] Authentication error:", error.message);
+      
+      // Store the error for procedures that require auth
+      // This allows us to provide better error messages
+      if (error.message.includes('Token has expired') || error.message.includes('token expired')) {
+        // We'll let the auth middleware handle this with proper TRPC error
+        (req as any).authError = error.message;
+      }
+    } else {
+      console.error("[Context] Authentication error:", error);
+    }
     // Authentication errors will be handled by procedures that require auth
   }
 
