@@ -705,7 +705,7 @@ interface Conversation {
 
 definePageMeta({
   // TODO: Add authentication middleware
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 // Get agent ID from route

@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 import {
   Home,
   MessageSquare,
@@ -28,7 +28,7 @@ import {
   Folder,
   MoreHorizontal,
   ListTodo,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 import {
   Sidebar,
@@ -36,26 +36,30 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
 
-import TeamSwitcher from './TeamSwitcher.vue';
-import NavMain from './NavMain.vue';
-import NavUser from './NavUser.vue';
+import TeamSwitcher from "./TeamSwitcher.vue";
+import NavMain from "./NavMain.vue";
+import NavUser from "./NavUser.vue";
+
+import { useUserStore } from "@/stores/user";
+
+const userStore = useUserStore();
 
 // Get current route
 const route = useRoute();
 
-// Sample data - replace with actual data from your stores/API
-const user = {
-  name: 'User Name',
-  email: 'user@example.com',
-  avatar: '/avatars/user.jpg',
-};
+// Get user data from store
+const user = computed(() => ({
+  name: userStore.user ? `${userStore.user.firstName || ''} ${userStore.user.lastName || ''}`.trim() || 'User' : 'User',
+  email: userStore.user?.email || 'user@example.com',
+  avatar: "/avatars/user.jpg",
+}));
 
 // Helper function to check if a path is active
 const isPathActive = (path: string): boolean => {
-  if (path === '/') {
-    return route.path === '/';
+  if (path === "/") {
+    return route.path === "/";
   }
   return route.path.startsWith(path);
 };
@@ -63,86 +67,86 @@ const isPathActive = (path: string): boolean => {
 // Make navMain reactive to route changes
 const navMain = computed(() => [
   {
-    title: 'Dashboard',
-    url: '/',
+    title: "Dashboard",
+    url: "/",
     icon: Home,
-    isActive: isPathActive('/'),
+    isActive: isPathActive("/"),
   },
   {
-    title: 'Conversations',
-    url: '/conversations',
+    title: "Conversations",
+    url: "/conversations",
     icon: MessageSquare,
-    badge: '3',
-    isActive: isPathActive('/conversations'),
+    badge: "3",
+    isActive: isPathActive("/conversations"),
   },
   {
-    title: 'Agents',
-    url: '/agents',
+    title: "Agents",
+    url: "/agents",
     icon: Users,
-    isActive: isPathActive('/agents'),
+    isActive: isPathActive("/agents"),
   },
   {
-    title: 'Documents',
-    url: '/documents',
+    title: "Documents",
+    url: "/documents",
     icon: FileText,
-    isActive: isPathActive('/documents'),
+    isActive: isPathActive("/documents"),
   },
   {
-    title: 'Queue',
-    url: '/queue',
+    title: "Queue",
+    url: "/queue",
     icon: ListTodo,
-    isActive: isPathActive('/queue'),
+    isActive: isPathActive("/queue"),
   },
   {
-    title: 'Playbooks',
-    url: '/playbooks',
+    title: "Playbooks",
+    url: "/playbooks",
     icon: BookOpen,
-    isActive: isPathActive('/playbooks'),
+    isActive: isPathActive("/playbooks"),
   },
   {
-    title: 'Insights',
-    url: '/insights',
+    title: "Insights",
+    url: "/insights",
     icon: BarChart,
-    isActive: isPathActive('/insights'),
+    isActive: isPathActive("/insights"),
   },
   {
-    title: 'Integrations',
-    url: '#',
+    title: "Integrations",
+    url: "#",
     icon: Puzzle,
-    isActive: isPathActive('/integrations'),
+    isActive: isPathActive("/integrations"),
     items: [
-      { 
-        title: 'Connectors', 
-        url: '/integrations/connectors',
-        isActive: route.path === '/integrations/connectors'
+      {
+        title: "Connectors",
+        url: "/integrations/connectors",
+        isActive: route.path === "/integrations/connectors",
       },
-      { 
-        title: 'Actions', 
-        url: '/integrations/actions',
-        isActive: route.path === '/integrations/actions'
+      {
+        title: "Actions",
+        url: "/integrations/actions",
+        isActive: route.path === "/integrations/actions",
       },
     ],
   },
   {
-    title: 'Settings',
-    url: '#',
+    title: "Settings",
+    url: "#",
     icon: Settings,
-    isActive: isPathActive('/settings'),
+    isActive: isPathActive("/settings"),
     items: [
-      { 
-        title: 'General', 
-        url: '/settings/general',
-        isActive: route.path === '/settings/general'
+      {
+        title: "General",
+        url: "/settings/general",
+        isActive: route.path === "/settings/general",
       },
-      { 
-        title: 'Security', 
-        url: '/settings/security',
-        isActive: route.path === '/settings/security'
+      {
+        title: "Security",
+        url: "/settings/security",
+        isActive: route.path === "/settings/security",
       },
-      { 
-        title: 'Billing', 
-        url: '/settings/billing',
-        isActive: route.path === '/settings/billing'
+      {
+        title: "Billing",
+        url: "/settings/billing",
+        isActive: route.path === "/settings/billing",
       },
     ],
   },

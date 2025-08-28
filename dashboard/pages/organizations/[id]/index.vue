@@ -514,7 +514,7 @@ const router = useRouter();
 
 definePageMeta({
   // TODO: Add authentication middleware
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 // Get organization ID from route

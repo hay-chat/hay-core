@@ -5,21 +5,13 @@
 </template>
 
 <script setup lang="ts">
-// import { useGlobalAuth } from '@/composables/useGlobalAuth';
+// Initialize auth on mount if not already done
+onMounted(async () => {
+  // await initialize();
+});
 
-// const { initialize, authStore, userStore } = useGlobalAuth();
-
-// // Provide auth store to child components
-// provide('auth', authStore);
-// provide('user', userStore);
-
-// // Initialize auth on mount if not already done
-// onMounted(async () => {
-//   await initialize();
-// });
-
-// // Cleanup on unmount
-// onUnmounted(() => {
-//   authStore.cancelTokenRefresh();
-// });
+// Cleanup on unmount
+onUnmounted(() => {
+  // authStore.cancelTokenRefresh();
+});
 </script>

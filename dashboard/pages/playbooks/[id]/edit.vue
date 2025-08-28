@@ -9,9 +9,11 @@
         </Button>
         <div>
           <h1 class="text-3xl font-bold tracking-tight">
-            {{ isNewPlaybook ? 'Create Playbook' : 'Edit Playbook' }}
+            {{ isNewPlaybook ? "Create Playbook" : "Edit Playbook" }}
           </h1>
-          <p class="text-muted-foreground">Configure automated conversation flows and responses</p>
+          <p class="text-muted-foreground">
+            Configure automated conversation flows and responses
+          </p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
@@ -25,7 +27,7 @@
         </Button>
         <Button :disabled="loading || !isValid" @click="savePlaybook">
           <Check class="h-4 w-4 mr-2" />
-          {{ isNewPlaybook ? 'Create' : 'Save' }}
+          {{ isNewPlaybook ? "Create" : "Save" }}
         </Button>
       </div>
     </div>
@@ -38,7 +40,9 @@
         <Card>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
-            <CardDescription>Set up the fundamental details of your playbook</CardDescription>
+            <CardDescription
+              >Set up the fundamental details of your playbook</CardDescription
+            >
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
@@ -98,7 +102,9 @@
         <Card>
           <CardHeader>
             <CardTitle>Trigger Configuration</CardTitle>
-            <CardDescription>Define when this playbook should be activated</CardDescription>
+            <CardDescription
+              >Define when this playbook should be activated</CardDescription
+            >
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
@@ -109,14 +115,21 @@
                   :key="trigger.id"
                   :class="[
                     'cursor-pointer transition-colors hover:bg-muted/50',
-                    playbook.triggerType === trigger.id ? 'ring-2 ring-primary' : '',
+                    playbook.triggerType === trigger.id
+                      ? 'ring-2 ring-primary'
+                      : '',
                   ]"
                   @click="playbook.triggerType = trigger.id"
                 >
                   <CardContent class="p-3 text-center">
-                    <component :is="trigger.icon" class="h-6 w-6 mx-auto text-primary mb-1" />
+                    <component
+                      :is="trigger.icon"
+                      class="h-6 w-6 mx-auto text-primary mb-1"
+                    />
                     <div class="font-medium text-sm">{{ trigger.name }}</div>
-                    <div class="text-xs text-muted-foreground">{{ trigger.description }}</div>
+                    <div class="text-xs text-muted-foreground">
+                      {{ trigger.description }}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -170,21 +183,37 @@
                   :key="index"
                   class="flex items-center space-x-2 p-3 border rounded-md"
                 >
-                  <select v-model="condition.field" class="px-2 py-1 text-sm border rounded">
+                  <select
+                    v-model="condition.field"
+                    class="px-2 py-1 text-sm border rounded"
+                  >
                     <option value="user_type">User Type</option>
-                    <option value="conversation_count">Conversation Count</option>
+                    <option value="conversation_count">
+                      Conversation Count
+                    </option>
                     <option value="time_of_day">Time of Day</option>
                     <option value="channel">Channel</option>
                   </select>
-                  <select v-model="condition.operator" class="px-2 py-1 text-sm border rounded">
+                  <select
+                    v-model="condition.operator"
+                    class="px-2 py-1 text-sm border rounded"
+                  >
                     <option value="equals">Equals</option>
                     <option value="not_equals">Not Equals</option>
                     <option value="greater_than">Greater Than</option>
                     <option value="less_than">Less Than</option>
                     <option value="contains">Contains</option>
                   </select>
-                  <Input v-model="condition.value" placeholder="Value" class="flex-1" />
-                  <Button variant="ghost" size="sm" @click="removeCondition(index)">
+                  <Input
+                    v-model="condition.value"
+                    placeholder="Value"
+                    class="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="removeCondition(index)"
+                  >
                     <X class="h-4 w-4" />
                   </Button>
                 </div>
@@ -201,13 +230,19 @@
         <Card>
           <CardHeader>
             <CardTitle>Response Flow</CardTitle>
-            <CardDescription>Design the conversation flow and responses</CardDescription>
+            <CardDescription
+              >Design the conversation flow and responses</CardDescription
+            >
           </CardHeader>
           <CardContent>
             <!-- Flow Builder -->
-            <div class="min-h-[400px] border-2 border-dashed border-muted rounded-lg p-6">
+            <div
+              class="min-h-[400px] border-2 border-dashed border-muted rounded-lg p-6"
+            >
               <div v-if="playbook.flow.length === 0" class="text-center py-12">
-                <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <MessageSquare
+                  class="h-12 w-12 text-muted-foreground mx-auto mb-4"
+                />
                 <h3 class="text-lg font-medium mb-2">Build Your Flow</h3>
                 <p class="text-muted-foreground mb-4">
                   Add response nodes to create your conversation flow
@@ -230,7 +265,11 @@
 
               <!-- Flow Nodes -->
               <div v-else class="space-y-4">
-                <div v-for="(node, index) in playbook.flow" :key="node.id" class="relative">
+                <div
+                  v-for="(node, index) in playbook.flow"
+                  :key="node.id"
+                  class="relative"
+                >
                   <!-- Connection Line -->
                   <div
                     v-if="index > 0"
@@ -242,8 +281,13 @@
                     <CardHeader class="pb-3">
                       <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-2">
-                          <component :is="getNodeIcon(node.type)" class="h-4 w-4" />
-                          <span class="font-medium">{{ getNodeLabel(node.type) }}</span>
+                          <component
+                            :is="getNodeIcon(node.type)"
+                            class="h-4 w-4"
+                          />
+                          <span class="font-medium">{{
+                            getNodeLabel(node.type)
+                          }}</span>
                         </div>
                         <div class="flex items-center space-x-1">
                           <Button
@@ -262,7 +306,11 @@
                           >
                             <ChevronDown class="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" @click="removeNode(index)">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            @click="removeNode(index)"
+                          >
                             <X class="h-4 w-4" />
                           </Button>
                         </div>
@@ -289,9 +337,13 @@
                             class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
                           >
                             <option value="">Select action</option>
-                            <option value="create-ticket">Create Support Ticket</option>
+                            <option value="create-ticket">
+                              Create Support Ticket
+                            </option>
                             <option value="escalate">Escalate to Human</option>
-                            <option value="collect-info">Collect Information</option>
+                            <option value="collect-info">
+                              Collect Information
+                            </option>
                             <option value="api-call">API Call</option>
                           </select>
                         </div>
@@ -349,15 +401,27 @@
                 <!-- Add Node Button -->
                 <div class="flex justify-center">
                   <div class="flex space-x-2">
-                    <Button variant="outline" size="sm" @click="addNode('text')">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      @click="addNode('text')"
+                    >
                       <MessageSquare class="h-4 w-4 mr-2" />
                       Text
                     </Button>
-                    <Button variant="outline" size="sm" @click="addNode('action')">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      @click="addNode('action')"
+                    >
                       <Zap class="h-4 w-4 mr-2" />
                       Action
                     </Button>
-                    <Button variant="outline" size="sm" @click="addNode('condition')">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      @click="addNode('condition')"
+                    >
                       <GitBranch class="h-4 w-4 mr-2" />
                       Condition
                     </Button>
@@ -404,7 +468,9 @@
         <Card>
           <CardHeader>
             <CardTitle>Available Actions</CardTitle>
-            <CardDescription>MCP actions you can use in this playbook</CardDescription>
+            <CardDescription
+              >MCP actions you can use in this playbook</CardDescription
+            >
           </CardHeader>
           <CardContent>
             <div class="space-y-2">
@@ -416,7 +482,9 @@
               >
                 <div>
                   <div class="font-medium text-sm">{{ action.name }}</div>
-                  <div class="text-xs text-muted-foreground">{{ action.description }}</div>
+                  <div class="text-xs text-muted-foreground">
+                    {{ action.description }}
+                  </div>
                 </div>
                 <Plus class="h-4 w-4 text-muted-foreground" />
               </div>
@@ -428,7 +496,9 @@
         <Card>
           <CardHeader>
             <CardTitle>Test Playbook</CardTitle>
-            <CardDescription>Test your playbook with sample inputs</CardDescription>
+            <CardDescription
+              >Test your playbook with sample inputs</CardDescription
+            >
           </CardHeader>
           <CardContent>
             <div class="space-y-3">
@@ -442,7 +512,11 @@
                   class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
                 />
               </div>
-              <Button class="w-full" :disabled="!testInput.trim()" @click="runTest">
+              <Button
+                class="w-full"
+                :disabled="!testInput.trim()"
+                @click="runTest"
+              >
                 <Play class="h-4 w-4 mr-2" />
                 Run Test
               </Button>
@@ -475,47 +549,47 @@ import {
   Target,
   Brain,
   Filter,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
 
 // Get route params
 const route = useRoute();
-const playbookId = route.params['id'] as string;
-const isNewPlaybook = playbookId === 'new';
+const playbookId = route.params["id"] as string;
+const isNewPlaybook = playbookId === "new";
 
 // Reactive state
 const loading = ref(false);
-const newKeyword = ref('');
-const testInput = ref('');
-const testResult = ref('');
+const newKeyword = ref("");
+const testInput = ref("");
+const testResult = ref("");
 
 // Playbook data
 const playbook = ref({
   id: playbookId,
-  name: '',
-  description: '',
-  category: '',
-  priority: 'medium',
-  status: 'draft',
-  triggerType: 'keywords',
+  name: "",
+  description: "",
+  category: "",
+  priority: "medium",
+  status: "draft",
+  triggerType: "keywords",
   keywords: [] as string[],
-  intent: '',
+  intent: "",
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   conditions: [] as any[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -527,45 +601,45 @@ const playbook = ref({
 // Configuration options
 const triggerTypes = [
   {
-    id: 'keywords',
-    name: 'Keywords',
-    description: 'Trigger on specific words',
+    id: "keywords",
+    name: "Keywords",
+    description: "Trigger on specific words",
     icon: Target,
   },
   {
-    id: 'intent',
-    name: 'Intent',
-    description: 'Trigger on detected intent',
+    id: "intent",
+    name: "Intent",
+    description: "Trigger on detected intent",
     icon: Brain,
   },
   {
-    id: 'conditions',
-    name: 'Conditions',
-    description: 'Trigger on custom conditions',
+    id: "conditions",
+    name: "Conditions",
+    description: "Trigger on custom conditions",
     icon: Filter,
   },
 ];
 
 const availableActions = ref([
   {
-    id: 'create-ticket',
-    name: 'Create Support Ticket',
-    description: 'Create a new support ticket',
+    id: "create-ticket",
+    name: "Create Support Ticket",
+    description: "Create a new support ticket",
   },
   {
-    id: 'get-user-info',
-    name: 'Get User Information',
-    description: 'Retrieve user account details',
+    id: "get-user-info",
+    name: "Get User Information",
+    description: "Retrieve user account details",
   },
   {
-    id: 'send-email',
-    name: 'Send Email',
-    description: 'Send email notification',
+    id: "send-email",
+    name: "Send Email",
+    description: "Send email notification",
   },
   {
-    id: 'update-crm',
-    name: 'Update CRM',
-    description: 'Update customer record',
+    id: "update-crm",
+    name: "Update CRM",
+    description: "Update customer record",
   },
 ]);
 
@@ -575,18 +649,22 @@ const canTest = computed(() => {
 });
 
 const isValid = computed(() => {
-  return playbook.value.name && playbook.value.triggerType && playbook.value.flow.length > 0;
+  return (
+    playbook.value.name &&
+    playbook.value.triggerType &&
+    playbook.value.flow.length > 0
+  );
 });
 
 // Methods
 const goBack = () => {
-  navigateTo('/playbooks');
+  navigateTo("/playbooks");
 };
 
 const addKeyword = () => {
   if (newKeyword.value.trim()) {
     playbook.value.keywords.push(newKeyword.value.trim());
-    newKeyword.value = '';
+    newKeyword.value = "";
   }
 };
 
@@ -596,9 +674,9 @@ const removeKeyword = (index: number) => {
 
 const addCondition = () => {
   playbook.value.conditions.push({
-    field: '',
-    operator: '',
-    value: '',
+    field: "",
+    operator: "",
+    value: "",
   });
 };
 
@@ -611,12 +689,12 @@ const addNode = (type: string) => {
   const newNode = {
     id: nodeId,
     type,
-    content: '',
-    action: '',
+    content: "",
+    action: "",
     parameters: {},
-    condition: '',
-    trueAction: '',
-    falseAction: '',
+    condition: "",
+    trueAction: "",
+    falseAction: "",
   };
   playbook.value.flow.push(newNode);
 };
@@ -641,11 +719,11 @@ const moveNodeDown = (index: number) => {
 
 const getNodeClass = (type: string) => {
   const classes = {
-    text: 'border-blue-200 bg-blue-50/50',
-    action: 'border-green-200 bg-green-50/50',
-    condition: 'border-orange-200 bg-orange-50/50',
+    text: "border-blue-200 bg-blue-50/50",
+    action: "border-green-200 bg-green-50/50",
+    condition: "border-orange-200 bg-orange-50/50",
   };
-  return classes[type as keyof typeof classes] || '';
+  return classes[type as keyof typeof classes] || "";
 };
 
 const getNodeIcon = (type: string) => {
@@ -659,29 +737,29 @@ const getNodeIcon = (type: string) => {
 
 const getNodeLabel = (type: string) => {
   const labels = {
-    text: 'Text Response',
-    action: 'Action',
-    condition: 'Condition',
+    text: "Text Response",
+    action: "Action",
+    condition: "Condition",
   };
   return labels[type as keyof typeof labels] || type;
 };
 
 const getStatusVariant = (status: string) => {
   const variants = {
-    active: 'success',
-    draft: 'outline',
-    inactive: 'secondary',
+    active: "success",
+    draft: "outline",
+    inactive: "secondary",
   };
-  return variants[status as keyof typeof variants] || 'default';
+  return variants[status as keyof typeof variants] || "default";
 };
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 };
 
@@ -689,13 +767,13 @@ const formatDate = (date: Date) => {
 const addActionToFlow = (action: any) => {
   const actionNode = {
     id: `node_${Date.now()}`,
-    type: 'action',
+    type: "action",
     action: action.id,
     parameters: {},
-    content: '',
-    condition: '',
-    trueAction: '',
-    falseAction: '',
+    content: "",
+    condition: "",
+    trueAction: "",
+    falseAction: "",
   };
   playbook.value.flow.push(actionNode);
 };
@@ -707,16 +785,16 @@ const runTest = () => {
 
 const testPlaybook = () => {
   // TODO: Open test modal with conversation simulator
-  console.log('Test playbook');
+  console.log("Test playbook");
 };
 
 const saveAsDraft = async () => {
   loading.value = true;
   try {
-    playbook.value.status = 'draft';
+    playbook.value.status = "draft";
     playbook.value.updatedAt = new Date();
     // TODO: Save playbook as draft
-    console.log('Save as draft:', playbook.value);
+    console.log("Save as draft:", playbook.value);
   } finally {
     loading.value = false;
   }
@@ -725,13 +803,13 @@ const saveAsDraft = async () => {
 const savePlaybook = async () => {
   loading.value = true;
   try {
-    playbook.value.status = 'active';
+    playbook.value.status = "active";
     playbook.value.updatedAt = new Date();
     // TODO: Save playbook
-    console.log('Save playbook:', playbook.value);
+    console.log("Save playbook:", playbook.value);
 
     // Navigate back to playbooks list
-    navigateTo('/playbooks');
+    navigateTo("/playbooks");
   } finally {
     loading.value = false;
   }
@@ -741,56 +819,58 @@ const savePlaybook = async () => {
 onMounted(async () => {
   if (!isNewPlaybook) {
     // TODO: Load existing playbook data
-    console.log('Loading playbook:', playbookId);
+    console.log("Loading playbook:", playbookId);
 
     // Mock data for existing playbook
     playbook.value = {
       id: playbookId,
-      name: 'Billing Issue Resolution',
-      description: 'Automated flow for common billing questions and payment issues',
-      category: 'customer-support',
-      priority: 'high',
-      status: 'active',
-      triggerType: 'keywords',
-      keywords: ['billing', 'payment', 'invoice', 'charge'],
-      intent: '',
+      name: "Billing Issue Resolution",
+      description:
+        "Automated flow for common billing questions and payment issues",
+      category: "customer-support",
+      priority: "high",
+      status: "active",
+      triggerType: "keywords",
+      keywords: ["billing", "payment", "invoice", "charge"],
+      intent: "",
       conditions: [],
       flow: [
         {
-          id: 'node_1',
-          type: 'text',
-          content: 'I understand you have a billing question. Let me help you with that.',
-          action: '',
+          id: "node_1",
+          type: "text",
+          content:
+            "I understand you have a billing question. Let me help you with that.",
+          action: "",
           parameters: {},
-          condition: '',
-          trueAction: '',
-          falseAction: '',
+          condition: "",
+          trueAction: "",
+          falseAction: "",
         },
         {
-          id: 'node_2',
-          type: 'action',
-          action: 'get-user-info',
-          parameters: { fields: ['account_status', 'billing_info'] },
-          content: '',
-          condition: '',
-          trueAction: '',
-          falseAction: '',
+          id: "node_2",
+          type: "action",
+          action: "get-user-info",
+          parameters: { fields: ["account_status", "billing_info"] },
+          content: "",
+          condition: "",
+          trueAction: "",
+          falseAction: "",
         },
       ],
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-15'),
+      createdAt: new Date("2024-01-01"),
+      updatedAt: new Date("2024-01-15"),
     };
   }
 });
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: `${isNewPlaybook ? 'Create' : 'Edit'} Playbook - Hay Dashboard`,
+  title: `${isNewPlaybook ? "Create" : "Edit"} Playbook - Hay Dashboard`,
 });
 </script>

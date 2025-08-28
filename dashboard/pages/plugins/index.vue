@@ -310,7 +310,7 @@ import {
 } from "lucide-vue-next";
 
 definePageMeta({
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 // Types

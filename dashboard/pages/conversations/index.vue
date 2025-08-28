@@ -4,7 +4,9 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Conversations</h1>
-        <p class="text-muted-foreground">Monitor and manage all customer conversations</p>
+        <p class="text-muted-foreground">
+          Monitor and manage all customer conversations
+        </p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm">
@@ -21,18 +23,24 @@
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Total Conversations</span>
           <MessageSquare class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ stats.total }}</div>
-          <p class="text-xs text-muted-foreground">+{{ stats.todayIncrease }} today</p>
+          <p class="text-xs text-muted-foreground">
+            +{{ stats.todayIncrease }} today
+          </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Active Now</span>
           <Activity class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -43,7 +51,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Avg Response Time</span>
           <Clock class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -54,7 +64,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Satisfaction Rate</span>
           <Heart class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -69,7 +81,9 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="relative">
-          <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search
+            class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+          />
           <Input
             v-model="searchQuery"
             placeholder="Search conversations..."
@@ -77,7 +91,10 @@
           />
         </div>
 
-        <select v-model="selectedStatus" class="px-3 py-2 text-sm border border-input rounded-md">
+        <select
+          v-model="selectedStatus"
+          class="px-3 py-2 text-sm border border-input rounded-md"
+        >
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="resolved">Resolved</option>
@@ -85,7 +102,10 @@
           <option value="closed">Closed</option>
         </select>
 
-        <select v-model="selectedAgent" class="px-3 py-2 text-sm border border-input rounded-md">
+        <select
+          v-model="selectedAgent"
+          class="px-3 py-2 text-sm border border-input rounded-md"
+        >
           <option value="">All Agents</option>
           <option v-for="agent in agents" :key="agent.id" :value="agent.id">
             {{ agent.name }}
@@ -106,9 +126,13 @@
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm" @click="toggleBulkMode">
           <CheckSquare class="h-4 w-4 mr-2" />
-          {{ bulkMode ? 'Exit' : 'Select' }}
+          {{ bulkMode ? "Exit" : "Select" }}
         </Button>
-        <Button v-if="selectedConversations.length > 0" variant="outline" size="sm">
+        <Button
+          v-if="selectedConversations.length > 0"
+          variant="outline"
+          size="sm"
+        >
           <Archive class="h-4 w-4 mr-2" />
           Archive ({{ selectedConversations.length }})
         </Button>
@@ -143,16 +167,19 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredConversations.length === 0" class="text-center py-12">
+    <div
+      v-else-if="filteredConversations.length === 0"
+      class="text-center py-12"
+    >
       <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">
-        {{ searchQuery ? 'No conversations found' : 'No conversations yet' }}
+        {{ searchQuery ? "No conversations found" : "No conversations yet" }}
       </h3>
       <p class="text-muted-foreground">
         {{
           searchQuery
-            ? 'Try adjusting your search terms or filters.'
-            : 'Conversations will appear here once customers start chatting.'
+            ? "Try adjusting your search terms or filters."
+            : "Conversations will appear here once customers start chatting."
         }}
       </p>
     </div>
@@ -166,7 +193,10 @@
               <tr>
                 <th v-if="bulkMode" class="text-left py-3 px-4 w-12">
                   <Checkbox
-                    :checked="selectedConversations.length === filteredConversations.length"
+                    :checked="
+                      selectedConversations.length ===
+                      filteredConversations.length
+                    "
                     @update:checked="toggleSelectAll"
                   />
                 </th>
@@ -190,7 +220,9 @@
                 <td v-if="bulkMode" class="py-3 px-4" @click.stop>
                   <Checkbox
                     :checked="selectedConversations.includes(conversation.id)"
-                    @update:checked="toggleConversationSelection(conversation.id)"
+                    @update:checked="
+                      toggleConversationSelection(conversation.id)
+                    "
                   />
                 </td>
                 <td class="py-3 px-4">
@@ -201,7 +233,9 @@
                       <User class="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <div class="font-medium">{{ conversation.customer.name }}</div>
+                      <div class="font-medium">
+                        {{ conversation.customer.name }}
+                      </div>
                       <div class="text-sm text-muted-foreground">
                         {{ conversation.customer.email }}
                       </div>
@@ -210,7 +244,9 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">
-                    <div class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div
+                      class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center"
+                    >
                       <Bot class="h-3 w-3 text-blue-600" />
                     </div>
                     <span class="text-sm">{{ conversation.agent.name }}</span>
@@ -219,31 +255,53 @@
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(conversation.status)">
                     <div class="flex items-center space-x-1">
-                      <component :is="getStatusIcon(conversation.status)" class="h-3 w-3" />
+                      <component
+                        :is="getStatusIcon(conversation.status)"
+                        class="h-3 w-3"
+                      />
                       <span>{{ conversation.status }}</span>
                     </div>
                   </Badge>
                 </td>
                 <td class="py-3 px-4 max-w-xs">
-                  <div class="truncate text-sm">{{ conversation.lastMessage.preview }}</div>
+                  <div class="truncate text-sm">
+                    {{ conversation.lastMessage.preview }}
+                  </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ conversation.lastMessage.sender === 'customer' ? 'Customer' : 'Agent' }}
+                    {{
+                      conversation.lastMessage.sender === "customer"
+                        ? "Customer"
+                        : "Agent"
+                    }}
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm">{{ formatDuration(conversation.duration) }}</td>
+                <td class="py-3 px-4 text-sm">
+                  {{ formatDuration(conversation.duration) }}
+                </td>
                 <td class="py-3 px-4">
-                  <div v-if="conversation.satisfaction" class="flex items-center space-x-1">
+                  <div
+                    v-if="conversation.satisfaction"
+                    class="flex items-center space-x-1"
+                  >
                     <Star class="h-4 w-4 text-yellow-500 fill-current" />
-                    <span class="text-sm">{{ conversation.satisfaction }}/5</span>
+                    <span class="text-sm"
+                      >{{ conversation.satisfaction }}/5</span
+                    >
                   </div>
-                  <span v-else class="text-xs text-muted-foreground">Not rated</span>
+                  <span v-else class="text-xs text-muted-foreground"
+                    >Not rated</span
+                  >
                 </td>
                 <td class="py-3 px-4 text-sm text-muted-foreground">
                   {{ formatDate(conversation.updatedAt) }}
                 </td>
                 <td class="py-3 px-4" @click.stop>
                   <div class="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      @click="viewConversation(conversation.id)"
+                    >
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
@@ -254,7 +312,11 @@
                     >
                       <UserCheck class="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" @click="showMoreActions(conversation.id)">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      @click="showMoreActions(conversation.id)"
+                    >
                       <MoreHorizontal class="h-4 w-4" />
                     </Button>
                   </div>
@@ -277,7 +339,12 @@
         {{ totalConversations }} conversations
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="previousPage">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="currentPage === 1"
+          @click="previousPage"
+        >
           <ChevronLeft class="h-4 w-4" />
           Previous
         </Button>
@@ -319,23 +386,23 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : variant === 'warning'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : variant === "warning"
+        ? "bg-yellow-100 text-yellow-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
@@ -343,10 +410,10 @@ const Badge = ({ variant = 'default', ...props }) =>
 // Reactive state
 const loading = ref(true);
 const realTimeEnabled = ref(true);
-const searchQuery = ref('');
-const selectedStatus = ref('');
-const selectedAgent = ref('');
-const selectedTimeframe = ref('week');
+const searchQuery = ref("");
+const selectedStatus = ref("");
+const selectedAgent = ref("");
+const selectedTimeframe = ref("week");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const currentPage = ref(1);
@@ -362,87 +429,89 @@ const stats = ref({
 });
 
 const agents = ref([
-  { id: '1', name: 'Customer Support Agent' },
-  { id: '2', name: 'Sales Assistant' },
-  { id: '3', name: 'Technical Support' },
+  { id: "1", name: "Customer Support Agent" },
+  { id: "2", name: "Sales Assistant" },
+  { id: "3", name: "Technical Support" },
 ]);
 
 const conversations = ref([
   {
-    id: '1',
+    id: "1",
     customer: {
-      name: 'Alice Johnson',
-      email: 'alice@example.com',
+      name: "Alice Johnson",
+      email: "alice@example.com",
     },
     agent: {
-      name: 'Customer Support Agent',
+      name: "Customer Support Agent",
     },
-    status: 'active',
+    status: "active",
     lastMessage: {
-      preview: 'I need help with my billing statement, can you explain this charge?',
-      sender: 'customer',
+      preview:
+        "I need help with my billing statement, can you explain this charge?",
+      sender: "customer",
     },
     duration: 485, // seconds
     satisfaction: null,
-    updatedAt: new Date('2024-01-15T14:30:00'),
-    createdAt: new Date('2024-01-15T14:22:00'),
+    updatedAt: new Date("2024-01-15T14:30:00"),
+    createdAt: new Date("2024-01-15T14:22:00"),
   },
   {
-    id: '2',
+    id: "2",
     customer: {
-      name: 'Bob Smith',
-      email: 'bob@example.com',
+      name: "Bob Smith",
+      email: "bob@example.com",
     },
     agent: {
-      name: 'Technical Support',
+      name: "Technical Support",
     },
-    status: 'resolved',
+    status: "resolved",
     lastMessage: {
-      preview: 'Thank you for your help! The issue is now resolved.',
-      sender: 'customer',
+      preview: "Thank you for your help! The issue is now resolved.",
+      sender: "customer",
     },
     duration: 1240,
     satisfaction: 5,
-    updatedAt: new Date('2024-01-15T13:45:00'),
-    createdAt: new Date('2024-01-15T13:24:00'),
+    updatedAt: new Date("2024-01-15T13:45:00"),
+    createdAt: new Date("2024-01-15T13:24:00"),
   },
   {
-    id: '3',
+    id: "3",
     customer: {
-      name: 'Carol Williams',
-      email: 'carol@example.com',
+      name: "Carol Williams",
+      email: "carol@example.com",
     },
     agent: {
-      name: 'Sales Assistant',
+      name: "Sales Assistant",
     },
-    status: 'escalated',
+    status: "escalated",
     lastMessage: {
-      preview: 'This requires special pricing approval for enterprise features.',
-      sender: 'agent',
+      preview:
+        "This requires special pricing approval for enterprise features.",
+      sender: "agent",
     },
     duration: 2100,
     satisfaction: null,
-    updatedAt: new Date('2024-01-15T12:20:00'),
-    createdAt: new Date('2024-01-15T11:45:00'),
+    updatedAt: new Date("2024-01-15T12:20:00"),
+    createdAt: new Date("2024-01-15T11:45:00"),
   },
   {
-    id: '4',
+    id: "4",
     customer: {
-      name: 'David Brown',
-      email: 'david@example.com',
+      name: "David Brown",
+      email: "david@example.com",
     },
     agent: {
-      name: 'Customer Support Agent',
+      name: "Customer Support Agent",
     },
-    status: 'closed',
+    status: "closed",
     lastMessage: {
-      preview: 'Perfect, that solved my problem. Thanks!',
-      sender: 'customer',
+      preview: "Perfect, that solved my problem. Thanks!",
+      sender: "customer",
     },
     duration: 320,
     satisfaction: 4,
-    updatedAt: new Date('2024-01-15T11:10:00'),
-    createdAt: new Date('2024-01-15T11:05:00'),
+    updatedAt: new Date("2024-01-15T11:10:00"),
+    createdAt: new Date("2024-01-15T11:05:00"),
   },
 ]);
 
@@ -454,31 +523,42 @@ const filteredConversations = computed(() => {
     .filter((conversation) => {
       const matchesSearch =
         !searchQuery.value ||
-        conversation.customer.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        conversation.customer.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        conversation.lastMessage.preview.toLowerCase().includes(searchQuery.value.toLowerCase());
+        conversation.customer.name
+          .toLowerCase()
+          .includes(searchQuery.value.toLowerCase()) ||
+        conversation.customer.email
+          .toLowerCase()
+          .includes(searchQuery.value.toLowerCase()) ||
+        conversation.lastMessage.preview
+          .toLowerCase()
+          .includes(searchQuery.value.toLowerCase());
 
-      const matchesStatus = !selectedStatus.value || conversation.status === selectedStatus.value;
+      const matchesStatus =
+        !selectedStatus.value || conversation.status === selectedStatus.value;
       const matchesAgent =
-        !selectedAgent.value || conversation.agent.name.includes(selectedAgent.value);
+        !selectedAgent.value ||
+        conversation.agent.name.includes(selectedAgent.value);
 
       // TODO: Implement timeframe filtering
       const matchesTimeframe = true;
 
       return matchesSearch && matchesStatus && matchesAgent && matchesTimeframe;
     })
-    .slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value);
+    .slice(
+      (currentPage.value - 1) * pageSize.value,
+      currentPage.value * pageSize.value
+    );
 });
 
 // Methods
 const getStatusVariant = (status: string) => {
   const variants = {
-    active: 'default',
-    resolved: 'success',
-    escalated: 'warning',
-    closed: 'secondary',
+    active: "default",
+    resolved: "success",
+    escalated: "warning",
+    closed: "secondary",
   };
-  return variants[status as keyof typeof variants] || 'default';
+  return variants[status as keyof typeof variants] || "default";
 };
 
 const getStatusIcon = (status: string) => {
@@ -515,7 +595,7 @@ const formatDate = (date: Date) => {
   } else if (minutes > 0) {
     return `${minutes}m ago`;
   } else {
-    return 'Just now';
+    return "Just now";
   }
 };
 
@@ -549,17 +629,17 @@ const viewConversation = (id: string) => {
 
 const takeOverConversation = (id: string) => {
   // TODO: Implement conversation takeover
-  console.log('Take over conversation:', id);
+  console.log("Take over conversation:", id);
 };
 
 const showMoreActions = (id: string) => {
   // TODO: Show more actions menu
-  console.log('Show more actions for conversation:', id);
+  console.log("Show more actions for conversation:", id);
 };
 
 const refreshConversations = () => {
   // TODO: Refresh conversations from API
-  console.log('Refresh conversations');
+  console.log("Refresh conversations");
 };
 
 const previousPage = () => {
@@ -594,13 +674,18 @@ onUnmounted(() => {
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: "auth",
 });
 
 // Head management
 useHead({
-  title: 'Conversations - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Monitor and manage all customer conversations' }],
+  title: "Conversations - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Monitor and manage all customer conversations",
+    },
+  ],
 });
 </script>

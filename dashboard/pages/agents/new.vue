@@ -12,7 +12,11 @@
     <div class="bg-background border rounded-lg p-6">
       <nav aria-label="Progress">
         <ol class="flex items-center justify-between">
-          <li v-for="(step, index) in steps" :key="step.id" class="relative flex-1">
+          <li
+            v-for="(step, index) in steps"
+            :key="step.id"
+            class="relative flex-1"
+          >
             <div class="flex items-center">
               <div class="relative flex items-center justify-center">
                 <div
@@ -21,24 +25,30 @@
                     currentStep > index
                       ? 'border-primary bg-primary text-white'
                       : currentStep === index
-                        ? 'border-primary bg-background text-primary'
-                        : 'border-muted bg-background text-muted-foreground',
+                      ? 'border-primary bg-background text-primary'
+                      : 'border-muted bg-background text-muted-foreground',
                   ]"
                 >
                   <CheckCircle v-if="currentStep > index" class="h-5 w-5" />
-                  <span v-else class="text-sm font-medium">{{ index + 1 }}</span>
+                  <span v-else class="text-sm font-medium">{{
+                    index + 1
+                  }}</span>
                 </div>
               </div>
               <div class="ml-4 flex-1">
                 <p
                   :class="[
                     'text-sm font-medium',
-                    currentStep >= index ? 'text-foreground' : 'text-muted-foreground',
+                    currentStep >= index
+                      ? 'text-foreground'
+                      : 'text-muted-foreground',
                   ]"
                 >
                   {{ step.title }}
                 </p>
-                <p class="text-xs text-muted-foreground">{{ step.description }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{ step.description }}
+                </p>
               </div>
             </div>
             <!-- Connecting line -->
@@ -57,8 +67,10 @@
     <!-- Step Content -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ steps[currentStep]?.title || '' }}</CardTitle>
-        <CardDescription>{{ steps[currentStep]?.description || '' }}</CardDescription>
+        <CardTitle>{{ steps[currentStep]?.title || "" }}</CardTitle>
+        <CardDescription>{{
+          steps[currentStep]?.description || ""
+        }}</CardDescription>
       </CardHeader>
       <CardContent>
         <!-- Step 1: Basic Information -->
@@ -161,7 +173,8 @@
         <div v-if="currentStep === 1" class="space-y-6">
           <div class="text-center">
             <p class="text-sm text-muted-foreground mb-6">
-              Choose how to populate your agent's knowledge base. You can select multiple sources.
+              Choose how to populate your agent's knowledge base. You can select
+              multiple sources.
             </p>
           </div>
 
@@ -170,7 +183,9 @@
             <Card
               :class="[
                 'cursor-pointer transition-colors hover:bg-muted/50',
-                agentForm.knowledgeSources.includes('zendesk') ? 'ring-2 ring-primary' : '',
+                agentForm.knowledgeSources.includes('zendesk')
+                  ? 'ring-2 ring-primary'
+                  : '',
               ]"
               @click="toggleKnowledgeSource('zendesk')"
             >
@@ -181,9 +196,12 @@
                     @update:checked="toggleKnowledgeSource('zendesk')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">Import from Zendesk</h4>
+                    <h4 class="font-medium text-foreground">
+                      Import from Zendesk
+                    </h4>
                     <p class="text-sm text-muted-foreground">
-                      Import articles, FAQs, and support documentation from your Zendesk account.
+                      Import articles, FAQs, and support documentation from your
+                      Zendesk account.
                     </p>
                   </div>
                   <ExternalLink class="h-5 w-5 text-muted-foreground" />
@@ -194,7 +212,9 @@
             <Card
               :class="[
                 'cursor-pointer transition-colors hover:bg-muted/50',
-                agentForm.knowledgeSources.includes('website') ? 'ring-2 ring-primary' : '',
+                agentForm.knowledgeSources.includes('website')
+                  ? 'ring-2 ring-primary'
+                  : '',
               ]"
               @click="toggleKnowledgeSource('website')"
             >
@@ -207,7 +227,8 @@
                   <div class="flex-1">
                     <h4 class="font-medium text-foreground">Scrape Website</h4>
                     <p class="text-sm text-muted-foreground">
-                      Automatically extract content from your website pages and documentation.
+                      Automatically extract content from your website pages and
+                      documentation.
                     </p>
                   </div>
                   <Globe class="h-5 w-5 text-muted-foreground" />
@@ -218,7 +239,9 @@
             <Card
               :class="[
                 'cursor-pointer transition-colors hover:bg-muted/50',
-                agentForm.knowledgeSources.includes('documents') ? 'ring-2 ring-primary' : '',
+                agentForm.knowledgeSources.includes('documents')
+                  ? 'ring-2 ring-primary'
+                  : '',
               ]"
               @click="toggleKnowledgeSource('documents')"
             >
@@ -229,9 +252,12 @@
                     @update:checked="toggleKnowledgeSource('documents')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">Upload Documents</h4>
+                    <h4 class="font-medium text-foreground">
+                      Upload Documents
+                    </h4>
                     <p class="text-sm text-muted-foreground">
-                      Upload PDF, DOCX, TXT files with your knowledge base content.
+                      Upload PDF, DOCX, TXT files with your knowledge base
+                      content.
                     </p>
                   </div>
                   <FileText class="h-5 w-5 text-muted-foreground" />
@@ -242,7 +268,9 @@
             <Card
               :class="[
                 'cursor-pointer transition-colors hover:bg-muted/50',
-                agentForm.knowledgeSources.includes('tickets') ? 'ring-2 ring-primary' : '',
+                agentForm.knowledgeSources.includes('tickets')
+                  ? 'ring-2 ring-primary'
+                  : '',
               ]"
               @click="toggleKnowledgeSource('tickets')"
             >
@@ -253,9 +281,12 @@
                     @update:checked="toggleKnowledgeSource('tickets')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">Import Support Tickets</h4>
+                    <h4 class="font-medium text-foreground">
+                      Import Support Tickets
+                    </h4>
                     <p class="text-sm text-muted-foreground">
-                      Learn from historical support tickets and their resolutions.
+                      Learn from historical support tickets and their
+                      resolutions.
                     </p>
                   </div>
                   <MessageSquare class="h-5 w-5 text-muted-foreground" />
@@ -265,7 +296,10 @@
           </div>
 
           <!-- Configuration for selected sources -->
-          <div v-if="agentForm.knowledgeSources.includes('website')" class="space-y-4">
+          <div
+            v-if="agentForm.knowledgeSources.includes('website')"
+            class="space-y-4"
+          >
             <Label>Website URLs to scrape</Label>
             <div class="space-y-2">
               <div
@@ -278,7 +312,11 @@
                   placeholder="https://example.com/docs"
                   class="flex-1"
                 />
-                <Button variant="outline" size="sm" @click="removeWebsiteUrl(index)">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="removeWebsiteUrl(index)"
+                >
                   <X class="h-4 w-4" />
                 </Button>
               </div>
@@ -289,11 +327,18 @@
             </div>
           </div>
 
-          <div v-if="agentForm.knowledgeSources.includes('documents')" class="space-y-4">
+          <div
+            v-if="agentForm.knowledgeSources.includes('documents')"
+            class="space-y-4"
+          >
             <Label>Upload Documents</Label>
-            <div class="border-2 border-dashed border-muted rounded-lg p-6 text-center">
+            <div
+              class="border-2 border-dashed border-muted rounded-lg p-6 text-center"
+            >
               <Upload class="mx-auto h-12 w-12 text-muted-foreground" />
-              <p class="mt-2 text-sm text-muted-foreground">Drop files here or click to upload</p>
+              <p class="mt-2 text-sm text-muted-foreground">
+                Drop files here or click to upload
+              </p>
               <p class="text-xs text-muted-foreground">
                 Supports PDF, DOCX, TXT files up to 10MB each
               </p>
@@ -317,9 +362,14 @@
                 @click="agentForm.tone = tone.id"
               >
                 <CardContent class="p-4 text-center">
-                  <component :is="tone.icon" class="h-8 w-8 mx-auto text-primary mb-2" />
+                  <component
+                    :is="tone.icon"
+                    class="h-8 w-8 mx-auto text-primary mb-2"
+                  />
                   <h4 class="font-medium text-foreground">{{ tone.name }}</h4>
-                  <p class="text-xs text-muted-foreground mt-1">{{ tone.description }}</p>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    {{ tone.description }}
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -329,19 +379,31 @@
             <Label>Response Style</Label>
             <div class="grid gap-3 mt-2 md:grid-cols-2">
               <div class="flex items-center space-x-2">
-                <Checkbox id="detailed" v-model:checked="agentForm.responseStyle.detailed" />
+                <Checkbox
+                  id="detailed"
+                  v-model:checked="agentForm.responseStyle.detailed"
+                />
                 <Label htmlFor="detailed">Detailed explanations</Label>
               </div>
               <div class="flex items-center space-x-2">
-                <Checkbox id="concise" v-model:checked="agentForm.responseStyle.concise" />
+                <Checkbox
+                  id="concise"
+                  v-model:checked="agentForm.responseStyle.concise"
+                />
                 <Label htmlFor="concise">Concise answers</Label>
               </div>
               <div class="flex items-center space-x-2">
-                <Checkbox id="examples" v-model:checked="agentForm.responseStyle.examples" />
+                <Checkbox
+                  id="examples"
+                  v-model:checked="agentForm.responseStyle.examples"
+                />
                 <Label htmlFor="examples">Include examples</Label>
               </div>
               <div class="flex items-center space-x-2">
-                <Checkbox id="stepByStep" v-model:checked="agentForm.responseStyle.stepByStep" />
+                <Checkbox
+                  id="stepByStep"
+                  v-model:checked="agentForm.responseStyle.stepByStep"
+                />
                 <Label htmlFor="stepByStep">Step-by-step instructions</Label>
               </div>
             </div>
@@ -357,7 +419,8 @@
               class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             ></textarea>
             <p class="text-xs text-muted-foreground mt-1">
-              These instructions will guide the agent's behavior in all conversations.
+              These instructions will guide the agent's behavior in all
+              conversations.
             </p>
           </div>
 
@@ -392,11 +455,15 @@
         <!-- Step 4: Review & Create -->
         <div v-if="currentStep === 3" class="space-y-6">
           <div class="bg-muted/50 rounded-lg p-6">
-            <h3 class="font-medium text-foreground mb-4">Agent Configuration Summary</h3>
+            <h3 class="font-medium text-foreground mb-4">
+              Agent Configuration Summary
+            </h3>
 
             <div class="grid gap-4 md:grid-cols-2">
               <div>
-                <h4 class="text-sm font-medium text-foreground">Basic Information</h4>
+                <h4 class="text-sm font-medium text-foreground">
+                  Basic Information
+                </h4>
                 <ul class="text-sm text-muted-foreground space-y-1 mt-2">
                   <li><strong>Name:</strong> {{ agentForm.name }}</li>
                   <li><strong>Type:</strong> {{ agentForm.type }}</li>
@@ -406,9 +473,14 @@
               </div>
 
               <div>
-                <h4 class="text-sm font-medium text-foreground">Knowledge Sources</h4>
+                <h4 class="text-sm font-medium text-foreground">
+                  Knowledge Sources
+                </h4>
                 <ul class="text-sm text-muted-foreground space-y-1 mt-2">
-                  <li v-for="source in agentForm.knowledgeSources" :key="source">
+                  <li
+                    v-for="source in agentForm.knowledgeSources"
+                    :key="source"
+                  >
                     • {{ getSourceDisplayName(source) }}
                   </li>
                 </ul>
@@ -417,41 +489,60 @@
               <div>
                 <h4 class="text-sm font-medium text-foreground">Personality</h4>
                 <ul class="text-sm text-muted-foreground space-y-1 mt-2">
-                  <li><strong>Tone:</strong> {{ getToneDisplayName(agentForm.tone) }}</li>
-                  <li><strong>Response Length:</strong> {{ agentForm.maxResponseLength }}</li>
-                  <li><strong>Escalation:</strong> {{ agentForm.escalationThreshold }}</li>
+                  <li>
+                    <strong>Tone:</strong>
+                    {{ getToneDisplayName(agentForm.tone) }}
+                  </li>
+                  <li>
+                    <strong>Response Length:</strong>
+                    {{ agentForm.maxResponseLength }}
+                  </li>
+                  <li>
+                    <strong>Escalation:</strong>
+                    {{ agentForm.escalationThreshold }}
+                  </li>
                 </ul>
               </div>
 
               <div>
                 <h4 class="text-sm font-medium text-foreground">Description</h4>
-                <p class="text-sm text-muted-foreground mt-2">{{ agentForm.description }}</p>
+                <p class="text-sm text-muted-foreground mt-2">
+                  {{ agentForm.description }}
+                </p>
               </div>
             </div>
           </div>
 
           <!-- Test Conversation Preview -->
           <div>
-            <h3 class="font-medium text-foreground mb-4">Test Conversation Preview</h3>
+            <h3 class="font-medium text-foreground mb-4">
+              Test Conversation Preview
+            </h3>
             <div class="border rounded-lg p-4 bg-background">
               <div class="space-y-3">
                 <div class="flex space-x-3">
-                  <div class="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                  <div
+                    class="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+                  >
                     <User class="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div class="flex-1">
-                    <p class="text-sm text-foreground">Hi, I need help with my account setup.</p>
+                    <p class="text-sm text-foreground">
+                      Hi, I need help with my account setup.
+                    </p>
                   </div>
                 </div>
                 <div class="flex space-x-3">
-                  <div class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div
+                    class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"
+                  >
                     <Bot class="h-4 w-4 text-primary" />
                   </div>
                   <div class="flex-1 bg-muted/50 rounded-lg p-3">
                     <p class="text-sm text-foreground">
-                      Hello! I'd be happy to help you with your account setup. To get started, could
-                      you please let me know what specific part of the setup you're having trouble
-                      with?
+                      Hello! I'd be happy to help you with your account setup.
+                      To get started, could you please let me know what specific
+                      part of the setup you're having trouble with?
                     </p>
                   </div>
                 </div>
@@ -464,22 +555,34 @@
 
     <!-- Navigation -->
     <div class="flex justify-between">
-      <Button variant="outline" :disabled="currentStep === 0" @click="previousStep">
+      <Button
+        variant="outline"
+        :disabled="currentStep === 0"
+        @click="previousStep"
+      >
         <ChevronLeft class="mr-2 h-4 w-4" />
         Previous
       </Button>
 
       <div class="flex space-x-3">
-        <Button variant="outline" :disabled="creating" @click="saveDraft"> Save Draft </Button>
+        <Button variant="outline" :disabled="creating" @click="saveDraft">
+          Save Draft
+        </Button>
 
-        <Button v-if="currentStep < steps.length - 1" :disabled="!canProceed" @click="nextStep">
+        <Button
+          v-if="currentStep < steps.length - 1"
+          :disabled="!canProceed"
+          @click="nextStep"
+        >
           Next
           <ChevronRight class="ml-2 h-4 w-4" />
         </Button>
 
         <Button v-else :disabled="creating || !canProceed" @click="createAgent">
           <div v-if="creating" class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <div
+              class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
+            ></div>
             <span>Creating Agent...</span>
           </div>
           <span v-else>Create Agent</span>
@@ -506,15 +609,10 @@ import {
   Smile,
   Briefcase,
   Zap,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import agent store/composable
 // TODO: Import router for navigation
-
-definePageMeta({
-  // TODO: Add authentication middleware
-  // middleware: 'auth'
-});
 
 // State
 const currentStep = ref(0);
@@ -522,74 +620,74 @@ const creating = ref(false);
 
 // Form data
 const agentForm = reactive({
-  name: '',
-  type: '',
-  description: '',
-  language: 'en',
-  timezone: 'UTC',
-  avatar: 'bot',
+  name: "",
+  type: "",
+  description: "",
+  language: "en",
+  timezone: "UTC",
+  avatar: "bot",
   knowledgeSources: [] as string[],
-  websiteUrls: [''],
-  tone: 'professional',
+  websiteUrls: [""],
+  tone: "professional",
   responseStyle: {
     detailed: false,
     concise: true,
     examples: false,
     stepByStep: false,
   },
-  customInstructions: '',
-  maxResponseLength: 'medium',
-  escalationThreshold: 'medium',
+  customInstructions: "",
+  maxResponseLength: "medium",
+  escalationThreshold: "medium",
 });
 
 // Configuration
 const steps = [
   {
-    id: 'basic',
-    title: 'Basic Information',
-    description: 'Set up the basic details for your agent',
+    id: "basic",
+    title: "Basic Information",
+    description: "Set up the basic details for your agent",
   },
   {
-    id: 'knowledge',
-    title: 'Knowledge Base',
-    description: 'Choose your knowledge sources',
+    id: "knowledge",
+    title: "Knowledge Base",
+    description: "Choose your knowledge sources",
   },
   {
-    id: 'personality',
-    title: 'Personality & Behavior',
-    description: 'Configure how your agent responds',
+    id: "personality",
+    title: "Personality & Behavior",
+    description: "Configure how your agent responds",
   },
   {
-    id: 'review',
-    title: 'Review & Create',
-    description: 'Review and create your agent',
+    id: "review",
+    title: "Review & Create",
+    description: "Review and create your agent",
   },
 ];
 
 const avatars = [
-  { id: 'bot', icon: Bot },
-  { id: 'smile', icon: Smile },
-  { id: 'briefcase', icon: Briefcase },
-  { id: 'zap', icon: Zap },
+  { id: "bot", icon: Bot },
+  { id: "smile", icon: Smile },
+  { id: "briefcase", icon: Briefcase },
+  { id: "zap", icon: Zap },
 ];
 
 const toneOptions = [
   {
-    id: 'professional',
-    name: 'Professional',
-    description: 'Formal and business-like',
+    id: "professional",
+    name: "Professional",
+    description: "Formal and business-like",
     icon: Briefcase,
   },
   {
-    id: 'friendly',
-    name: 'Friendly',
-    description: 'Warm and approachable',
+    id: "friendly",
+    name: "Friendly",
+    description: "Warm and approachable",
     icon: Smile,
   },
   {
-    id: 'casual',
-    name: 'Casual',
-    description: 'Relaxed and conversational',
+    id: "casual",
+    name: "Casual",
+    description: "Relaxed and conversational",
     icon: Zap,
   },
 ];
@@ -633,7 +731,7 @@ const toggleKnowledgeSource = (source: string) => {
 };
 
 const addWebsiteUrl = () => {
-  agentForm.websiteUrls.push('');
+  agentForm.websiteUrls.push("");
 };
 
 const removeWebsiteUrl = (index: number) => {
@@ -642,10 +740,10 @@ const removeWebsiteUrl = (index: number) => {
 
 const getSourceDisplayName = (source: string) => {
   const names: Record<string, string> = {
-    zendesk: 'Zendesk Import',
-    website: 'Website Scraping',
-    documents: 'Document Upload',
-    tickets: 'Support Tickets',
+    zendesk: "Zendesk Import",
+    website: "Website Scraping",
+    documents: "Document Upload",
+    tickets: "Support Tickets",
   };
   return names[source] || source;
 };
@@ -658,11 +756,11 @@ const getToneDisplayName = (tone: string) => {
 const saveDraft = async () => {
   try {
     // TODO: Save draft to local storage or API
-    console.log('Saving draft:', agentForm);
+    console.log("Saving draft:", agentForm);
 
     // TODO: Show success notification
   } catch (error) {
-    console.error('Error saving draft:', error);
+    console.error("Error saving draft:", error);
     // TODO: Show error notification
   }
 };
@@ -672,7 +770,7 @@ const createAgent = async () => {
 
   try {
     // TODO: Create agent via API
-    console.log('Creating agent:', agentForm);
+    console.log("Creating agent:", agentForm);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -680,9 +778,9 @@ const createAgent = async () => {
     // TODO: Redirect to agent detail page
     // await navigateTo(`/agents/${newAgentId}`)
 
-    console.log('Agent created successfully!');
+    console.log("Agent created successfully!");
   } catch (error) {
-    console.error('Error creating agent:', error);
+    console.error("Error creating agent:", error);
     // TODO: Show error notification
   } finally {
     creating.value = false;
@@ -697,7 +795,12 @@ const createAgent = async () => {
 
 // SEO
 useHead({
-  title: 'Create Agent - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Create a new AI agent for your organization' }],
+  title: "Create Agent - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Create a new AI agent for your organization",
+    },
+  ],
 });
 </script>

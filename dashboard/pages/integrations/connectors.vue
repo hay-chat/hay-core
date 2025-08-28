@@ -4,7 +4,9 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Connectors</h1>
-        <p class="text-muted-foreground">Connect your agents to various platforms and channels</p>
+        <p class="text-muted-foreground">
+          Connect your agents to various platforms and channels
+        </p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm">
@@ -21,7 +23,9 @@
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Total Connectors</span>
           <Plug class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -32,7 +36,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Connected</span>
           <CheckCircle class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -45,7 +51,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Messages Today</span>
           <MessageSquare class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -56,7 +64,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Uptime</span>
           <Activity class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -145,7 +155,10 @@
             </div>
 
             <div class="flex items-center space-x-2">
-              <Checkbox id="widget-greeting" v-model="widgetConfig.showGreeting" />
+              <Checkbox
+                id="widget-greeting"
+                v-model="widgetConfig.showGreeting"
+              />
               <Label for="widget-greeting">Show greeting message</Label>
             </div>
 
@@ -165,7 +178,9 @@
           <div class="space-y-4">
             <div>
               <Label>Preview</Label>
-              <div class="mt-1 border rounded-lg p-4 bg-gray-50 min-h-[200px] relative">
+              <div
+                class="mt-1 border rounded-lg p-4 bg-gray-50 min-h-[200px] relative"
+              >
                 <div class="absolute bottom-4 right-4">
                   <div
                     :class="[
@@ -182,9 +197,18 @@
                     v-if="showPreviewChat"
                     class="absolute bottom-20 right-0 w-80 h-96 bg-white border rounded-lg shadow-xl"
                   >
-                    <div :class="['p-4 rounded-t-lg', getThemeClass(widgetConfig.theme)]">
-                      <h3 class="font-medium text-white">{{ widgetConfig.title }}</h3>
-                      <p class="text-sm text-white/80">{{ widgetConfig.subtitle }}</p>
+                    <div
+                      :class="[
+                        'p-4 rounded-t-lg',
+                        getThemeClass(widgetConfig.theme),
+                      ]"
+                    >
+                      <h3 class="font-medium text-white">
+                        {{ widgetConfig.title }}
+                      </h3>
+                      <p class="text-sm text-white/80">
+                        {{ widgetConfig.subtitle }}
+                      </p>
                     </div>
                     <div class="p-4 h-80 overflow-y-auto">
                       <div v-if="widgetConfig.showGreeting" class="mb-4">
@@ -215,15 +239,24 @@
         <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
-              <div class="w-12 h-12 rounded-lg border-2 flex items-center justify-center">
-                <component :is="connector.icon" :class="['h-6 w-6', connector.iconColor]" />
+              <div
+                class="w-12 h-12 rounded-lg border-2 flex items-center justify-center"
+              >
+                <component
+                  :is="connector.icon"
+                  :class="['h-6 w-6', connector.iconColor]"
+                />
               </div>
               <div>
                 <CardTitle class="text-lg">{{ connector.name }}</CardTitle>
                 <CardDescription>{{ connector.description }}</CardDescription>
               </div>
             </div>
-            <Badge :variant="connector.status === 'connected' ? 'success' : 'secondary'">
+            <Badge
+              :variant="
+                connector.status === 'connected' ? 'success' : 'secondary'
+              "
+            >
               {{ connector.status }}
             </Badge>
           </div>
@@ -231,14 +264,21 @@
         <CardContent>
           <div class="space-y-4">
             <!-- Connection Stats -->
-            <div v-if="connector.status === 'connected'" class="grid gap-2 text-sm">
+            <div
+              v-if="connector.status === 'connected'"
+              class="grid gap-2 text-sm"
+            >
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Messages today:</span>
-                <span class="font-medium">{{ connector.stats?.messagesToday || 0 }}</span>
+                <span class="font-medium">{{
+                  connector.stats?.messagesToday || 0
+                }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Last activity:</span>
-                <span class="font-medium">{{ formatDate(connector.stats?.lastActivity) }}</span>
+                <span class="font-medium">{{
+                  formatDate(connector.stats?.lastActivity)
+                }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Status:</span>
@@ -250,7 +290,7 @@
                     ]"
                   ></div>
                   <span class="font-medium">{{
-                    connector.stats?.online ? 'Online' : 'Offline'
+                    connector.stats?.online ? "Online" : "Offline"
                   }}</span>
                 </div>
               </div>
@@ -284,15 +324,27 @@
               </Button>
 
               <template v-else>
-                <Button variant="outline" size="sm" @click="configureConnector(connector.id)">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="configureConnector(connector.id)"
+                >
                   <Settings class="h-3 w-3 mr-1" />
                   Configure
                 </Button>
-                <Button variant="outline" size="sm" @click="testConnector(connector.id)">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="testConnector(connector.id)"
+                >
                   <Zap class="h-3 w-3 mr-1" />
                   Test
                 </Button>
-                <Button variant="destructive" size="sm" @click="disconnectConnector(connector.id)">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  @click="disconnectConnector(connector.id)"
+                >
                   <Unplug class="h-3 w-3 mr-1" />
                   Disconnect
                 </Button>
@@ -333,37 +385,37 @@ import {
   Mail,
   Phone,
   Smartphone,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
 
 // Reactive state
-const selectedCategory = ref('all');
+const selectedCategory = ref("all");
 const connecting = ref<string | null>(null);
 const showPreviewChat = ref(false);
 const showEmbedCode = ref(false);
 
 // Widget configuration
 const widgetConfig = ref({
-  title: 'Chat with us',
+  title: "Chat with us",
   subtitle: "We're here to help",
-  position: 'bottom-right',
-  theme: 'blue',
+  position: "bottom-right",
+  theme: "blue",
   showGreeting: true,
 });
 
@@ -376,171 +428,171 @@ const stats = ref({
 });
 
 const categories = [
-  { id: 'all', name: 'All', icon: Globe },
-  { id: 'messaging', name: 'Messaging', icon: MessageSquare },
-  { id: 'social', name: 'Social', icon: Hash },
-  { id: 'email', name: 'Email', icon: Mail },
-  { id: 'voice', name: 'Voice', icon: Phone },
-  { id: 'web', name: 'Web', icon: Globe },
-  { id: 'mobile', name: 'Mobile', icon: Smartphone },
+  { id: "all", name: "All", icon: Globe },
+  { id: "messaging", name: "Messaging", icon: MessageSquare },
+  { id: "social", name: "Social", icon: Hash },
+  { id: "email", name: "Email", icon: Mail },
+  { id: "voice", name: "Voice", icon: Phone },
+  { id: "web", name: "Web", icon: Globe },
+  { id: "mobile", name: "Mobile", icon: Smartphone },
 ];
 
 const connectors = ref([
   {
-    id: 'slack',
-    name: 'Slack',
-    description: 'Connect to Slack channels and DMs',
-    category: 'messaging',
-    status: 'connected',
+    id: "slack",
+    name: "Slack",
+    description: "Connect to Slack channels and DMs",
+    category: "messaging",
+    status: "connected",
     icon: Hash,
-    iconColor: 'text-purple-600',
-    features: ['Channels', 'DMs', 'Bot Commands'],
+    iconColor: "text-purple-600",
+    features: ["Channels", "DMs", "Bot Commands"],
     stats: {
       messagesToday: 145,
-      lastActivity: new Date('2024-01-15T14:20:00'),
+      lastActivity: new Date("2024-01-15T14:20:00"),
       online: true,
     },
   },
   {
-    id: 'discord',
-    name: 'Discord',
-    description: 'Integrate with Discord servers',
-    category: 'messaging',
-    status: 'connected',
+    id: "discord",
+    name: "Discord",
+    description: "Integrate with Discord servers",
+    category: "messaging",
+    status: "connected",
     icon: MessageSquare,
-    iconColor: 'text-indigo-600',
-    features: ['Servers', 'DMs', 'Voice'],
+    iconColor: "text-indigo-600",
+    features: ["Servers", "DMs", "Voice"],
     stats: {
       messagesToday: 89,
-      lastActivity: new Date('2024-01-15T13:45:00'),
+      lastActivity: new Date("2024-01-15T13:45:00"),
       online: true,
     },
   },
   {
-    id: 'whatsapp',
-    name: 'WhatsApp Business',
-    description: 'Connect to WhatsApp Business API',
-    category: 'messaging',
-    status: 'disconnected',
+    id: "whatsapp",
+    name: "WhatsApp Business",
+    description: "Connect to WhatsApp Business API",
+    category: "messaging",
+    status: "disconnected",
     icon: MessageCircle,
-    iconColor: 'text-green-600',
-    features: ['Messages', 'Media', 'Templates'],
+    iconColor: "text-green-600",
+    features: ["Messages", "Media", "Templates"],
   },
   {
-    id: 'telegram',
-    name: 'Telegram',
-    description: 'Integrate with Telegram bots',
-    category: 'messaging',
-    status: 'connected',
+    id: "telegram",
+    name: "Telegram",
+    description: "Integrate with Telegram bots",
+    category: "messaging",
+    status: "connected",
     icon: MessageSquare,
-    iconColor: 'text-blue-600',
-    features: ['Bots', 'Groups', 'Channels'],
+    iconColor: "text-blue-600",
+    features: ["Bots", "Groups", "Channels"],
     stats: {
       messagesToday: 67,
-      lastActivity: new Date('2024-01-15T12:30:00'),
+      lastActivity: new Date("2024-01-15T12:30:00"),
       online: true,
     },
   },
   {
-    id: 'facebook',
-    name: 'Facebook Messenger',
-    description: 'Connect to Facebook Messenger',
-    category: 'social',
-    status: 'connected',
+    id: "facebook",
+    name: "Facebook Messenger",
+    description: "Connect to Facebook Messenger",
+    category: "social",
+    status: "connected",
     icon: MessageCircle,
-    iconColor: 'text-blue-500',
-    features: ['Messages', 'Quick Replies', 'Persistent Menu'],
+    iconColor: "text-blue-500",
+    features: ["Messages", "Quick Replies", "Persistent Menu"],
     stats: {
       messagesToday: 23,
-      lastActivity: new Date('2024-01-15T11:15:00'),
+      lastActivity: new Date("2024-01-15T11:15:00"),
       online: true,
     },
   },
   {
-    id: 'instagram',
-    name: 'Instagram',
-    description: 'Connect to Instagram Direct Messages',
-    category: 'social',
-    status: 'disconnected',
+    id: "instagram",
+    name: "Instagram",
+    description: "Connect to Instagram Direct Messages",
+    category: "social",
+    status: "disconnected",
     icon: MessageSquare,
-    iconColor: 'text-pink-600',
-    features: ['DMs', 'Story Replies', 'Comments'],
+    iconColor: "text-pink-600",
+    features: ["DMs", "Story Replies", "Comments"],
   },
   {
-    id: 'twitter',
-    name: 'Twitter/X',
-    description: 'Connect to Twitter DMs and mentions',
-    category: 'social',
-    status: 'disconnected',
+    id: "twitter",
+    name: "Twitter/X",
+    description: "Connect to Twitter DMs and mentions",
+    category: "social",
+    status: "disconnected",
     icon: Hash,
-    iconColor: 'text-gray-900',
-    features: ['DMs', 'Mentions', 'Tweets'],
+    iconColor: "text-gray-900",
+    features: ["DMs", "Mentions", "Tweets"],
   },
   {
-    id: 'email',
-    name: 'Email',
-    description: 'Handle email conversations',
-    category: 'email',
-    status: 'connected',
+    id: "email",
+    name: "Email",
+    description: "Handle email conversations",
+    category: "email",
+    status: "connected",
     icon: Mail,
-    iconColor: 'text-gray-600',
-    features: ['SMTP', 'IMAP', 'Templates'],
+    iconColor: "text-gray-600",
+    features: ["SMTP", "IMAP", "Templates"],
     stats: {
       messagesToday: 18,
-      lastActivity: new Date('2024-01-15T10:45:00'),
+      lastActivity: new Date("2024-01-15T10:45:00"),
       online: true,
     },
   },
   {
-    id: 'sms',
-    name: 'SMS',
-    description: 'Send and receive SMS messages',
-    category: 'voice',
-    status: 'disconnected',
+    id: "sms",
+    name: "SMS",
+    description: "Send and receive SMS messages",
+    category: "voice",
+    status: "disconnected",
     icon: Smartphone,
-    iconColor: 'text-green-600',
-    features: ['Two-way SMS', 'Bulk Messages', 'Short Codes'],
+    iconColor: "text-green-600",
+    features: ["Two-way SMS", "Bulk Messages", "Short Codes"],
   },
   {
-    id: 'voice',
-    name: 'Voice Calls',
-    description: 'Handle voice call interactions',
-    category: 'voice',
-    status: 'disconnected',
+    id: "voice",
+    name: "Voice Calls",
+    description: "Handle voice call interactions",
+    category: "voice",
+    status: "disconnected",
     icon: Phone,
-    iconColor: 'text-blue-600',
-    features: ['Inbound Calls', 'Call Recording', 'IVR'],
+    iconColor: "text-blue-600",
+    features: ["Inbound Calls", "Call Recording", "IVR"],
   },
   {
-    id: 'webchat',
-    name: 'Web Chat',
-    description: 'Website chat widget',
-    category: 'web',
-    status: 'connected',
+    id: "webchat",
+    name: "Web Chat",
+    description: "Website chat widget",
+    category: "web",
+    status: "connected",
     icon: Globe,
-    iconColor: 'text-orange-600',
-    features: ['Live Chat', 'File Sharing', 'Typing Indicators'],
+    iconColor: "text-orange-600",
+    features: ["Live Chat", "File Sharing", "Typing Indicators"],
     stats: {
       messagesToday: 0,
-      lastActivity: new Date('2024-01-15T09:30:00'),
+      lastActivity: new Date("2024-01-15T09:30:00"),
       online: true,
     },
   },
   {
-    id: 'mobile-app',
-    name: 'Mobile App',
-    description: 'In-app messaging for mobile apps',
-    category: 'mobile',
-    status: 'disconnected',
+    id: "mobile-app",
+    name: "Mobile App",
+    description: "In-app messaging for mobile apps",
+    category: "mobile",
+    status: "disconnected",
     icon: Smartphone,
-    iconColor: 'text-purple-600',
-    features: ['In-app Chat', 'Push Notifications', 'Rich Media'],
+    iconColor: "text-purple-600",
+    features: ["In-app Chat", "Push Notifications", "Rich Media"],
   },
 ]);
 
 // Computed properties
 const filteredConnectors = computed(() => {
-  if (selectedCategory.value === 'all') {
+  if (selectedCategory.value === "all") {
     return connectors.value;
   }
   return connectors.value.filter((c) => c.category === selectedCategory.value);
@@ -548,7 +600,7 @@ const filteredConnectors = computed(() => {
 
 // Methods
 const formatDate = (date: Date | undefined) => {
-  if (!date) return 'Never';
+  if (!date) return "Never";
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / 60000);
@@ -559,18 +611,18 @@ const formatDate = (date: Date | undefined) => {
   } else if (minutes > 0) {
     return `${minutes}m ago`;
   } else {
-    return 'Just now';
+    return "Just now";
   }
 };
 
 const getThemeClass = (theme: string) => {
   const themes: Record<string, string> = {
-    blue: 'bg-blue-600',
-    green: 'bg-green-600',
-    purple: 'bg-purple-600',
-    dark: 'bg-gray-900',
+    blue: "bg-blue-600",
+    green: "bg-green-600",
+    purple: "bg-purple-600",
+    dark: "bg-gray-900",
   };
-  return themes[theme as keyof typeof themes] || themes['blue'];
+  return themes[theme as keyof typeof themes] || themes["blue"];
 };
 
 const togglePreviewChat = () => {
@@ -579,14 +631,14 @@ const togglePreviewChat = () => {
 
 const saveWidgetConfig = () => {
   // TODO: Save widget configuration
-  console.log('Save widget config:', widgetConfig.value);
+  console.log("Save widget config:", widgetConfig.value);
 };
 
 const connectConnector = async (connectorId: string) => {
   connecting.value = connectorId;
   try {
     // TODO: Implement connector connection
-    console.log('Connect connector:', connectorId);
+    console.log("Connect connector:", connectorId);
 
     // Simulate OAuth flow or configuration
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -594,7 +646,7 @@ const connectConnector = async (connectorId: string) => {
     // Update connector status
     const connector = connectors.value.find((c) => c.id === connectorId);
     if (connector) {
-      connector.status = 'connected';
+      connector.status = "connected";
       connector.stats = {
         messagesToday: 0,
         lastActivity: new Date(),
@@ -608,28 +660,28 @@ const connectConnector = async (connectorId: string) => {
 
 const disconnectConnector = (connectorId: string) => {
   // TODO: Implement connector disconnection
-  console.log('Disconnect connector:', connectorId);
+  console.log("Disconnect connector:", connectorId);
 
   const connector = connectors.value.find((c) => c.id === connectorId);
   if (connector) {
-    connector.status = 'disconnected';
+    connector.status = "disconnected";
     delete connector.stats;
   }
 };
 
 const configureConnector = (connectorId: string) => {
   // TODO: Open connector configuration modal
-  console.log('Configure connector:', connectorId);
+  console.log("Configure connector:", connectorId);
 };
 
 const testConnector = (connectorId: string) => {
   // TODO: Test connector connection
-  console.log('Test connector:', connectorId);
+  console.log("Test connector:", connectorId);
 };
 
 const refreshConnectors = () => {
   // TODO: Refresh connector status
-  console.log('Refresh connectors');
+  console.log("Refresh connectors");
 };
 
 // Lifecycle
@@ -639,13 +691,18 @@ onMounted(() => {
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: 'Connectors - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Connect your agents to various platforms and channels' }],
+  title: "Connectors - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Connect your agents to various platforms and channels",
+    },
+  ],
 });
 </script>

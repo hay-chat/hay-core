@@ -423,7 +423,7 @@ import {
 } from "lucide-vue-next";
 
 definePageMeta({
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 const route = useRoute();

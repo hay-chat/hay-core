@@ -32,12 +32,16 @@
     <!-- KPI Cards -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Total Conversations</span>
           <MessageSquare class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div class="text-2xl font-bold">{{ formatNumber(kpis.totalConversations) }}</div>
+          <div class="text-2xl font-bold">
+            {{ formatNumber(kpis.totalConversations) }}
+          </div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingUp class="h-3 w-3 text-green-600" />
             <span class="text-green-600">+{{ kpis.conversationsGrowth }}%</span>
@@ -47,7 +51,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Resolution Rate</span>
           <CheckCircle class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -62,7 +68,9 @@
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Avg Response Time</span>
           <Clock class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -70,14 +78,18 @@
           <div class="text-2xl font-bold">{{ kpis.avgResponseTime }}s</div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingDown class="h-3 w-3 text-green-600" />
-            <span class="text-green-600">-{{ kpis.responseTimeImprovement }}%</span>
+            <span class="text-green-600"
+              >-{{ kpis.responseTimeImprovement }}%</span
+            >
             <span class="text-muted-foreground">vs last period</span>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader
+          class="flex flex-row items-center justify-between space-y-0 pb-2"
+        >
           <span class="text-sm font-medium">Customer Satisfaction</span>
           <Heart class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -98,7 +110,9 @@
       <Card>
         <CardHeader>
           <CardTitle>Conversation Volume</CardTitle>
-          <CardDescription>Messages and conversations over time</CardDescription>
+          <CardDescription
+            >Messages and conversations over time</CardDescription
+          >
         </CardHeader>
         <CardContent>
           <div
@@ -106,8 +120,12 @@
           >
             <div class="text-center">
               <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p class="text-sm text-muted-foreground">Chart will be rendered here</p>
-              <p class="text-xs text-muted-foreground">TODO: Integrate Chart.js/vue-chartjs</p>
+              <p class="text-sm text-muted-foreground">
+                Chart will be rendered here
+              </p>
+              <p class="text-xs text-muted-foreground">
+                TODO: Integrate Chart.js/vue-chartjs
+              </p>
             </div>
           </div>
         </CardContent>
@@ -124,9 +142,15 @@
             class="h-80 flex items-center justify-center border-2 border-dashed border-muted rounded-lg"
           >
             <div class="text-center">
-              <TrendingUp class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p class="text-sm text-muted-foreground">Line chart will be rendered here</p>
-              <p class="text-xs text-muted-foreground">TODO: Integrate Chart.js/vue-chartjs</p>
+              <TrendingUp
+                class="h-12 w-12 text-muted-foreground mx-auto mb-2"
+              />
+              <p class="text-sm text-muted-foreground">
+                Line chart will be rendered here
+              </p>
+              <p class="text-xs text-muted-foreground">
+                TODO: Integrate Chart.js/vue-chartjs
+              </p>
             </div>
           </div>
         </CardContent>
@@ -143,7 +167,11 @@
         </CardHeader>
         <CardContent>
           <div class="space-y-4">
-            <div v-for="bucket in responseTimeBuckets" :key="bucket.range" class="space-y-2">
+            <div
+              v-for="bucket in responseTimeBuckets"
+              :key="bucket.range"
+              class="space-y-2"
+            >
               <div class="flex items-center justify-between text-sm">
                 <span>{{ bucket.range }}</span>
                 <span class="font-medium">{{ bucket.percentage }}%</span>
@@ -180,7 +208,9 @@
                 </div>
                 <div>
                   <div class="font-medium">{{ issue.topic }}</div>
-                  <div class="text-sm text-muted-foreground">{{ issue.count }} conversations</div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ issue.count }} conversations
+                  </div>
                 </div>
               </div>
               <div class="text-right">
@@ -197,7 +227,9 @@
     <Card>
       <CardHeader>
         <CardTitle>Agent Performance</CardTitle>
-        <CardDescription>Individual agent metrics and statistics</CardDescription>
+        <CardDescription
+          >Individual agent metrics and statistics</CardDescription
+        >
       </CardHeader>
       <CardContent>
         <div class="overflow-x-auto">
@@ -207,7 +239,9 @@
                 <th class="text-left py-3 px-4 font-medium">Agent</th>
                 <th class="text-left py-3 px-4 font-medium">Conversations</th>
                 <th class="text-left py-3 px-4 font-medium">Resolution Rate</th>
-                <th class="text-left py-3 px-4 font-medium">Avg Response Time</th>
+                <th class="text-left py-3 px-4 font-medium">
+                  Avg Response Time
+                </th>
                 <th class="text-left py-3 px-4 font-medium">Satisfaction</th>
                 <th class="text-left py-3 px-4 font-medium">Status</th>
               </tr>
@@ -227,15 +261,19 @@
                     </div>
                     <div>
                       <div class="font-medium">{{ agent.name }}</div>
-                      <div class="text-sm text-muted-foreground">{{ agent.type }}</div>
+                      <div class="text-sm text-muted-foreground">
+                        {{ agent.type }}
+                      </div>
                     </div>
                   </div>
                 </td>
                 <td class="py-3 px-4">
-                  <div class="font-medium">{{ formatNumber(agent.conversations) }}</div>
+                  <div class="font-medium">
+                    {{ formatNumber(agent.conversations) }}
+                  </div>
                   <div class="text-sm text-muted-foreground">
-                    {{ agent.conversationsChange > 0 ? '+' : '' }}{{ agent.conversationsChange }}%
-                    change
+                    {{ agent.conversationsChange > 0 ? "+" : ""
+                    }}{{ agent.conversationsChange }}% change
                   </div>
                 </td>
                 <td class="py-3 px-4">
@@ -251,10 +289,14 @@
                   <div class="font-medium">{{ agent.avgResponseTime }}s</div>
                   <div
                     class="text-sm"
-                    :class="agent.responseTimeChange < 0 ? 'text-green-600' : 'text-red-600'"
+                    :class="
+                      agent.responseTimeChange < 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    "
                   >
-                    {{ agent.responseTimeChange > 0 ? '+' : '' }}{{ agent.responseTimeChange }}%
-                    change
+                    {{ agent.responseTimeChange > 0 ? "+" : ""
+                    }}{{ agent.responseTimeChange }}% change
                   </div>
                 </td>
                 <td class="py-3 px-4">
@@ -264,7 +306,11 @@
                   </div>
                 </td>
                 <td class="py-3 px-4">
-                  <Badge :variant="agent.status === 'active' ? 'success' : 'secondary'">
+                  <Badge
+                    :variant="
+                      agent.status === 'active' ? 'success' : 'secondary'
+                    "
+                  >
                     {{ agent.status }}
                   </Badge>
                 </td>
@@ -279,7 +325,9 @@
     <Card>
       <CardHeader>
         <CardTitle>Channel Performance</CardTitle>
-        <CardDescription>Performance metrics across different channels</CardDescription>
+        <CardDescription
+          >Performance metrics across different channels</CardDescription
+        >
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -295,7 +343,9 @@
             <div class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Messages:</span>
-                <span class="font-medium">{{ formatNumber(channel.messages) }}</span>
+                <span class="font-medium">{{
+                  formatNumber(channel.messages)
+                }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Resolution:</span>
@@ -336,27 +386,27 @@ import {
   Globe,
   MessageCircle,
   Mail,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
 
 // Reactive state
-const selectedTimeframe = ref('30d');
+const selectedTimeframe = ref("30d");
 
 // Mock data - TODO: Replace with actual API calls
 const kpis = ref({
@@ -371,77 +421,77 @@ const kpis = ref({
 });
 
 const responseTimeBuckets = ref([
-  { range: '0-5 seconds', percentage: 45 },
-  { range: '5-15 seconds', percentage: 32 },
-  { range: '15-30 seconds', percentage: 15 },
-  { range: '30-60 seconds', percentage: 6 },
-  { range: '60+ seconds', percentage: 2 },
+  { range: "0-5 seconds", percentage: 45 },
+  { range: "5-15 seconds", percentage: 32 },
+  { range: "15-30 seconds", percentage: 15 },
+  { range: "30-60 seconds", percentage: 6 },
+  { range: "60+ seconds", percentage: 2 },
 ]);
 
 const topIssues = ref([
-  { topic: 'Billing Questions', count: 1247, percentage: 28.5 },
-  { topic: 'Technical Support', count: 892, percentage: 20.4 },
-  { topic: 'Account Setup', count: 734, percentage: 16.8 },
-  { topic: 'Product Information', count: 567, percentage: 13.0 },
-  { topic: 'Refunds & Returns', count: 445, percentage: 10.2 },
-  { topic: 'Password Reset', count: 334, percentage: 7.6 },
-  { topic: 'Feature Requests', count: 156, percentage: 3.5 },
+  { topic: "Billing Questions", count: 1247, percentage: 28.5 },
+  { topic: "Technical Support", count: 892, percentage: 20.4 },
+  { topic: "Account Setup", count: 734, percentage: 16.8 },
+  { topic: "Product Information", count: 567, percentage: 13.0 },
+  { topic: "Refunds & Returns", count: 445, percentage: 10.2 },
+  { topic: "Password Reset", count: 334, percentage: 7.6 },
+  { topic: "Feature Requests", count: 156, percentage: 3.5 },
 ]);
 
 const agentPerformance = ref([
   {
-    id: '1',
-    name: 'Customer Support Agent',
-    type: 'AI Assistant',
+    id: "1",
+    name: "Customer Support Agent",
+    type: "AI Assistant",
     conversations: 4523,
     conversationsChange: 15.2,
     resolutionRate: 91.5,
     avgResponseTime: 3.8,
     responseTimeChange: -8.3,
     satisfaction: 4.7,
-    status: 'active',
+    status: "active",
   },
   {
-    id: '2',
-    name: 'Sales Assistant',
-    type: 'AI Assistant',
+    id: "2",
+    name: "Sales Assistant",
+    type: "AI Assistant",
     conversations: 3201,
     conversationsChange: 22.1,
     resolutionRate: 85.2,
     avgResponseTime: 4.1,
     responseTimeChange: -5.2,
     satisfaction: 4.5,
-    status: 'active',
+    status: "active",
   },
   {
-    id: '3',
-    name: 'Technical Support',
-    type: 'AI Assistant',
+    id: "3",
+    name: "Technical Support",
+    type: "AI Assistant",
     conversations: 2789,
     conversationsChange: 8.7,
     resolutionRate: 82.7,
     avgResponseTime: 5.2,
     responseTimeChange: -12.4,
     satisfaction: 4.4,
-    status: 'active',
+    status: "active",
   },
   {
-    id: '4',
-    name: 'Onboarding Helper',
-    type: 'AI Assistant',
+    id: "4",
+    name: "Onboarding Helper",
+    type: "AI Assistant",
     conversations: 1934,
     conversationsChange: 34.5,
     resolutionRate: 94.3,
     avgResponseTime: 2.9,
     responseTimeChange: -3.1,
     satisfaction: 4.8,
-    status: 'active',
+    status: "active",
   },
 ]);
 
 const channelPerformance = ref([
   {
-    name: 'Web Chat',
+    name: "Web Chat",
     icon: Globe,
     messages: 8945,
     resolutionRate: 89.2,
@@ -449,7 +499,7 @@ const channelPerformance = ref([
     satisfaction: 4.6,
   },
   {
-    name: 'Email',
+    name: "Email",
     icon: Mail,
     messages: 2341,
     resolutionRate: 92.7,
@@ -457,7 +507,7 @@ const channelPerformance = ref([
     satisfaction: 4.5,
   },
   {
-    name: 'Slack',
+    name: "Slack",
     icon: MessageSquare,
     messages: 1456,
     resolutionRate: 85.4,
@@ -465,7 +515,7 @@ const channelPerformance = ref([
     satisfaction: 4.7,
   },
   {
-    name: 'WhatsApp',
+    name: "WhatsApp",
     icon: MessageCircle,
     messages: 567,
     resolutionRate: 78.3,
@@ -477,21 +527,21 @@ const channelPerformance = ref([
 // Methods
 const formatNumber = (num: number) => {
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
+    return (num / 1000000).toFixed(1) + "M";
   } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K';
+    return (num / 1000).toFixed(1) + "K";
   }
   return num.toString();
 };
 
 const exportReport = () => {
   // TODO: Implement report export
-  console.log('Export report for timeframe:', selectedTimeframe.value);
+  console.log("Export report for timeframe:", selectedTimeframe.value);
 };
 
 const refreshData = () => {
   // TODO: Refresh analytics data
-  console.log('Refresh analytics data');
+  console.log("Refresh analytics data");
 };
 
 // Lifecycle
@@ -503,20 +553,23 @@ onMounted(() => {
 // Watch timeframe changes
 watch(selectedTimeframe, (newTimeframe) => {
   // TODO: Fetch new data when timeframe changes
-  console.log('Timeframe changed to:', newTimeframe);
+  console.log("Timeframe changed to:", newTimeframe);
 });
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: 'Analytics - Hay Dashboard',
+  title: "Analytics - Hay Dashboard",
   meta: [
-    { name: 'description', content: 'Monitor your chatbot performance and conversation insights' },
+    {
+      name: "description",
+      content: "Monitor your chatbot performance and conversation insights",
+    },
   ],
 });
 </script>

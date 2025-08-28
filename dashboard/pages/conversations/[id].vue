@@ -11,7 +11,9 @@
             Back to Conversations
           </Button>
           <div>
-            <h1 class="text-xl font-semibold">{{ conversation?.customer.name || 'Loading...' }}</h1>
+            <h1 class="text-xl font-semibold">
+              {{ conversation?.customer.name || "Loading..." }}
+            </h1>
             <p class="text-sm text-muted-foreground">
               {{ conversation?.customer.email }}
             </p>
@@ -19,7 +21,10 @@
         </div>
         <div class="flex items-center space-x-2">
           <Badge :variant="getStatusVariant(conversation?.status)">
-            <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
+            <component
+              :is="getStatusIcon(conversation?.status)"
+              class="h-3 w-3 mr-1"
+            />
             {{ conversation?.status }}
           </Badge>
           <Button variant="outline" size="sm" @click="exportConversation">
@@ -34,9 +39,13 @@
             @click="toggleSupervisionMode"
           >
             <Eye class="h-4 w-4 mr-2" />
-            {{ supervisionMode ? 'Exit Supervision' : 'Supervise' }}
+            {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
           </Button>
-          <Button v-if="conversation?.status === 'active'" size="sm" @click="takeOverConversation">
+          <Button
+            v-if="conversation?.status === 'active'"
+            size="sm"
+            @click="takeOverConversation"
+          >
             <UserCheck class="h-4 w-4 mr-2" />
             Take Over
           </Button>
@@ -49,7 +58,10 @@
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div
+          ref="messagesContainer"
+          class="flex-1 overflow-y-auto p-6 space-y-4"
+        >
           <div v-if="loading" class="space-y-4">
             <div v-for="i in 5" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
@@ -63,8 +75,12 @@
           </div>
 
           <div v-else-if="messages.length === 0" class="text-center py-12">
-            <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p class="text-muted-foreground">No messages in this conversation yet</p>
+            <MessageSquare
+              class="h-12 w-12 text-muted-foreground mx-auto mb-4"
+            />
+            <p class="text-muted-foreground">
+              No messages in this conversation yet
+            </p>
           </div>
 
           <div v-else class="space-y-4">
@@ -88,20 +104,30 @@
               ]"
             >
               <!-- Customer Message -->
-              <div v-if="message.sender === 'customer'" class="flex space-x-3 max-w-2xl">
-                <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+              <div
+                v-if="message.sender === 'customer'"
+                class="flex space-x-3 max-w-2xl"
+              >
+                <div
+                  class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
+                >
                   <User class="h-4 w-4 text-primary" />
                 </div>
                 <div class="flex-1">
                   <div class="flex items-center space-x-2 mb-1">
-                    <span class="text-sm font-medium">{{ conversation?.customer.name }}</span>
+                    <span class="text-sm font-medium">{{
+                      conversation?.customer.name
+                    }}</span>
                     <span class="text-xs text-muted-foreground">{{
                       formatTime(message.timestamp)
                     }}</span>
                   </div>
                   <div class="bg-muted p-3 rounded-lg">
                     <p class="text-sm">{{ message.content }}</p>
-                    <div v-if="'attachments' in message && (message as any).attachments?.length" class="mt-2 space-y-1">
+                    <div
+                      v-if="'attachments' in message && (message as any).attachments?.length"
+                      class="mt-2 space-y-1"
+                    >
                       <div
                         v-for="attachment in ('attachments' in message ? (message as any).attachments : [])"
                         :key="attachment.id"
@@ -122,8 +148,13 @@
                     <span class="text-xs text-muted-foreground">{{
                       formatTime(message.timestamp)
                     }}</span>
-                    <span class="text-sm font-medium">{{ message.agentName || 'Agent' }}</span>
-                    <div v-if="message.isPlaybook" class="flex items-center space-x-1">
+                    <span class="text-sm font-medium">{{
+                      message.agentName || "Agent"
+                    }}</span>
+                    <div
+                      v-if="message.isPlaybook"
+                      class="flex items-center space-x-1"
+                    >
                       <Badge variant="outline" class="text-xs">
                         <Zap class="h-2 w-2 mr-1" />
                         Playbook
@@ -143,32 +174,52 @@
                       v-if="supervisionMode && message.needsApproval"
                       class="mt-3 flex space-x-2"
                     >
-                      <Button size="sm" variant="outline" @click="approveMessage(message.id)">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        @click="approveMessage(message.id)"
+                      >
                         <Check class="h-3 w-3 mr-1" />
                         Approve
                       </Button>
-                      <Button size="sm" variant="outline" @click="editMessage(message.id)">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        @click="editMessage(message.id)"
+                      >
                         <Edit class="h-3 w-3 mr-1" />
                         Edit
                       </Button>
-                      <Button size="sm" variant="destructive" @click="rejectMessage(message.id)">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        @click="rejectMessage(message.id)"
+                      >
                         <X class="h-3 w-3 mr-1" />
                         Reject
                       </Button>
                     </div>
                   </div>
                 </div>
-                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <div
+                  class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
+                >
                   <Bot class="h-4 w-4 text-blue-600" />
                 </div>
               </div>
 
               <!-- System Message -->
-              <div v-if="message.type === 'system'" class="flex justify-center w-full">
+              <div
+                v-if="message.type === 'system'"
+                class="flex justify-center w-full"
+              >
                 <div
                   class="inline-flex items-center px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground"
                 >
-                  <component :is="getSystemMessageIcon((message as any).action)" class="h-3 w-3 mr-1" />
+                  <component
+                    :is="getSystemMessageIcon((message as any).action)"
+                    class="h-3 w-3 mr-1"
+                  />
                   {{ message.content }}
                 </div>
               </div>
@@ -176,13 +227,17 @@
 
             <!-- Typing indicator -->
             <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
-              <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+              <div
+                class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
+              >
                 <User class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
                 <div class="bg-muted p-3 rounded-lg">
                   <div class="flex space-x-1">
-                    <div class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"></div>
+                    <div
+                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                    ></div>
                     <div
                       class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
@@ -207,7 +262,9 @@
                 >You are now handling this conversation</span
               >
             </div>
-            <Button variant="outline" size="sm" @click="endTakeover"> End Takeover </Button>
+            <Button variant="outline" size="sm" @click="endTakeover">
+              End Takeover
+            </Button>
           </div>
         </div>
 
@@ -237,11 +294,15 @@
             </CardHeader>
             <CardContent class="space-y-3">
               <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <div
+                  class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
+                >
                   <User class="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div class="font-medium">{{ conversation?.customer.name }}</div>
+                  <div class="font-medium">
+                    {{ conversation?.customer.name }}
+                  </div>
                   <div class="text-sm text-muted-foreground">
                     {{ conversation?.customer.email }}
                   </div>
@@ -258,13 +319,17 @@
                 </div>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Conversations:</span>
-                  <span>{{ conversation?.customer.totalConversations || 0 }}</span>
+                  <span>{{
+                    conversation?.customer.totalConversations || 0
+                  }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Satisfaction:</span>
                   <div class="flex items-center space-x-1">
                     <Star class="h-3 w-3 text-yellow-500 fill-current" />
-                    <span>{{ conversation?.customer.avgSatisfaction || 'N/A' }}</span>
+                    <span>{{
+                      conversation?.customer.avgSatisfaction || "N/A"
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -283,7 +348,7 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Channel:</span>
-                <span>{{ conversation?.channel || 'Web Chat' }}</span>
+                <span>{{ conversation?.channel || "Web Chat" }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Duration:</span>
@@ -306,7 +371,10 @@
               <CardTitle class="text-base">Previous Conversations</CardTitle>
             </CardHeader>
             <CardContent>
-              <div v-if="previousConversations.length === 0" class="text-sm text-muted-foreground">
+              <div
+                v-if="previousConversations.length === 0"
+                class="text-sm text-muted-foreground"
+              >
                 No previous conversations
               </div>
               <div v-else class="space-y-3">
@@ -363,7 +431,9 @@
                   class="p-2 border rounded text-sm hover:bg-muted/50 cursor-pointer"
                 >
                   <div class="font-medium">{{ article.title }}</div>
-                  <div class="text-xs text-muted-foreground">{{ article.category }}</div>
+                  <div class="text-xs text-muted-foreground">
+                    {{ article.category }}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -400,160 +470,161 @@ import {
   XCircle,
   UserPlus,
   ArrowRight,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : variant === 'warning'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : variant === "warning"
+        ? "bg-yellow-100 text-yellow-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
 
 // Get conversation ID from route
 const route = useRoute();
-const conversationId = route.params['id'] as string;
+const conversationId = route.params["id"] as string;
 
 // Reactive state
 const loading = ref(true);
 const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
-const newMessage = ref('');
+const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
 
 // Mock data - TODO: Replace with actual API calls
 const conversation = ref({
   id: conversationId,
   customer: {
-    id: 'cust_123',
-    name: 'Alice Johnson',
-    email: 'alice@example.com',
-    joinDate: new Date('2023-06-15'),
+    id: "cust_123",
+    name: "Alice Johnson",
+    email: "alice@example.com",
+    joinDate: new Date("2023-06-15"),
     totalConversations: 8,
     avgSatisfaction: 4.5,
   },
   agent: {
-    name: 'Customer Support Agent',
+    name: "Customer Support Agent",
   },
-  status: 'active',
-  channel: 'Web Chat',
+  status: "active",
+  channel: "Web Chat",
   duration: 485,
-  createdAt: new Date('2024-01-15T14:22:00'),
-  updatedAt: new Date('2024-01-15T14:30:00'),
+  createdAt: new Date("2024-01-15T14:22:00"),
+  updatedAt: new Date("2024-01-15T14:30:00"),
 });
 
 const messages = ref([
   {
-    id: '1',
-    sender: 'customer',
-    content: "Hello, I need help with my billing statement. I see a charge that I don't recognize.",
-    timestamp: new Date('2024-01-15T14:22:00'),
-    type: 'message',
+    id: "1",
+    sender: "customer",
+    content:
+      "Hello, I need help with my billing statement. I see a charge that I don't recognize.",
+    timestamp: new Date("2024-01-15T14:22:00"),
+    type: "message",
   },
   {
-    id: '2',
-    sender: 'agent',
-    agentName: 'Customer Support Agent',
+    id: "2",
+    sender: "agent",
+    agentName: "Customer Support Agent",
     content:
       "Hello! I'd be happy to help you with your billing question. Let me look up your account details.",
-    timestamp: new Date('2024-01-15T14:22:30'),
-    type: 'message',
+    timestamp: new Date("2024-01-15T14:22:30"),
+    type: "message",
     isPlaybook: true,
   },
   {
-    id: '3',
-    type: 'system',
-    action: 'agent_joined',
-    content: 'Agent joined the conversation',
-    timestamp: new Date('2024-01-15T14:23:00'),
+    id: "3",
+    type: "system",
+    action: "agent_joined",
+    content: "Agent joined the conversation",
+    timestamp: new Date("2024-01-15T14:23:00"),
   },
   {
-    id: '4',
-    sender: 'agent',
-    agentName: 'Customer Support Agent',
+    id: "4",
+    sender: "agent",
+    agentName: "Customer Support Agent",
     content:
       "I can see your recent billing statement. Could you tell me the specific charge amount and date you're asking about?",
-    timestamp: new Date('2024-01-15T14:23:15'),
-    type: 'message',
+    timestamp: new Date("2024-01-15T14:23:15"),
+    type: "message",
   },
   {
-    id: '5',
-    sender: 'customer',
+    id: "5",
+    sender: "customer",
     content:
       "It's a charge for $29.99 on January 10th. The description just says \"Service Fee\" but I don't know what that's for.",
-    timestamp: new Date('2024-01-15T14:24:00'),
-    type: 'message',
+    timestamp: new Date("2024-01-15T14:24:00"),
+    type: "message",
   },
   {
-    id: '6',
-    sender: 'agent',
-    agentName: 'Customer Support Agent',
+    id: "6",
+    sender: "agent",
+    agentName: "Customer Support Agent",
     content:
-      'I understand your concern. Let me investigate this Service Fee charge for you. This might be related to a premium feature activation or an add-on service.',
-    timestamp: new Date('2024-01-15T14:24:30'),
-    type: 'message',
+      "I understand your concern. Let me investigate this Service Fee charge for you. This might be related to a premium feature activation or an add-on service.",
+    timestamp: new Date("2024-01-15T14:24:30"),
+    type: "message",
     needsApproval: false,
   },
 ]);
 
 const previousConversations = ref([
   {
-    id: 'conv_2',
-    subject: 'Account Setup Help',
-    status: 'resolved',
-    createdAt: new Date('2023-12-20'),
+    id: "conv_2",
+    subject: "Account Setup Help",
+    status: "resolved",
+    createdAt: new Date("2023-12-20"),
   },
   {
-    id: 'conv_1',
-    subject: 'Password Reset',
-    status: 'resolved',
-    createdAt: new Date('2023-11-15'),
+    id: "conv_1",
+    subject: "Password Reset",
+    status: "resolved",
+    createdAt: new Date("2023-11-15"),
   },
 ]);
 
 const relatedArticles = ref([
   {
-    id: 'kb_1',
-    title: 'Understanding Your Bill',
-    category: 'Billing',
+    id: "kb_1",
+    title: "Understanding Your Bill",
+    category: "Billing",
   },
   {
-    id: 'kb_2',
-    title: 'Service Fees Explained',
-    category: 'Billing',
+    id: "kb_2",
+    title: "Service Fees Explained",
+    category: "Billing",
   },
   {
-    id: 'kb_3',
-    title: 'How to Dispute Charges',
-    category: 'Support',
+    id: "kb_3",
+    title: "How to Dispute Charges",
+    category: "Support",
   },
 ]);
 
 // Methods
 const goBack = () => {
-  navigateTo('/conversations');
+  navigateTo("/conversations");
 };
 
 const getStatusVariant = (status: string) => {
   const variants = {
-    active: 'default',
-    resolved: 'success',
-    escalated: 'warning',
-    closed: 'secondary',
+    active: "default",
+    resolved: "success",
+    escalated: "warning",
+    closed: "secondary",
   };
-  return variants[status as keyof typeof variants] || 'default';
+  return variants[status as keyof typeof variants] || "default";
 };
 
 const getStatusIcon = (status: string) => {
@@ -576,18 +647,18 @@ const getSystemMessageIcon = (action: string) => {
 };
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 };
 
 const formatTime = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 };
 
@@ -604,20 +675,20 @@ const formatDuration = (seconds: number) => {
 const toggleSupervisionMode = () => {
   supervisionMode.value = !supervisionMode.value;
   // TODO: Enable/disable supervision mode
-  console.log('Supervision mode:', supervisionMode.value);
+  console.log("Supervision mode:", supervisionMode.value);
 };
 
 const takeOverConversation = () => {
   humanTakeover.value = true;
   supervisionMode.value = false;
   // TODO: Implement conversation takeover
-  console.log('Take over conversation');
+  console.log("Take over conversation");
 };
 
 const endTakeover = () => {
   humanTakeover.value = false;
   // TODO: End conversation takeover
-  console.log('End takeover');
+  console.log("End takeover");
 };
 
 const sendMessage = () => {
@@ -625,24 +696,24 @@ const sendMessage = () => {
 
   const message = {
     id: `msg_${Date.now()}`,
-    sender: 'human',
+    sender: "human",
     content: newMessage.value,
     timestamp: new Date(),
-    type: 'message',
+    type: "message",
   };
 
   messages.value.push(message);
-  newMessage.value = '';
+  newMessage.value = "";
 
   // TODO: Send message via API
-  console.log('Send message:', message);
+  console.log("Send message:", message);
 
   scrollToBottom();
 };
 
 const approveMessage = (messageId: string) => {
   // TODO: Approve agent message
-  console.log('Approve message:', messageId);
+  console.log("Approve message:", messageId);
   const message = messages.value.find((m) => m.id === messageId);
   if (message) {
     message.needsApproval = false;
@@ -651,17 +722,17 @@ const approveMessage = (messageId: string) => {
 
 const editMessage = (messageId: string) => {
   // TODO: Open message editor
-  console.log('Edit message:', messageId);
+  console.log("Edit message:", messageId);
 };
 
 const rejectMessage = (messageId: string) => {
   // TODO: Reject agent message
-  console.log('Reject message:', messageId);
+  console.log("Reject message:", messageId);
 };
 
 const exportConversation = () => {
   // TODO: Export conversation
-  console.log('Export conversation');
+  console.log("Export conversation");
 };
 
 const viewConversation = (id: string) => {
@@ -706,12 +777,14 @@ onUnmounted(() => {
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: `Conversation with ${conversation.value?.customer.name || 'Customer'} - Hay Dashboard`,
+  title: `Conversation with ${
+    conversation.value?.customer.name || "Customer"
+  } - Hay Dashboard`,
 });
 </script>

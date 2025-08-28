@@ -408,10 +408,6 @@ import {
 
 const router = useRouter();
 
-definePageMeta({
-  // middleware: 'auth'
-});
-
 const { $api } = useNuxtApp();
 
 interface UploadFile extends File {

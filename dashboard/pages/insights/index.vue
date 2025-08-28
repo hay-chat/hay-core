@@ -28,7 +28,11 @@
       </div>
       <div class="flex items-center space-x-2">
         <Label for="type-filter" class="text-sm">Type:</Label>
-        <select id="type-filter" v-model="selectedType" class="px-3 py-1 text-sm border rounded-md">
+        <select
+          id="type-filter"
+          v-model="selectedType"
+          class="px-3 py-1 text-sm border rounded-md"
+        >
           <option value="">All Types</option>
           <option value="new-playbook">New Playbook</option>
           <option value="improvement">Improvement</option>
@@ -87,7 +91,10 @@
         </div>
       </div>
 
-      <div v-else-if="filteredPendingInsights.length === 0" class="text-center py-12">
+      <div
+        v-else-if="filteredPendingInsights.length === 0"
+        class="text-center py-12"
+      >
         <Lightbulb class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 class="text-lg font-medium mb-2">No insights available</h3>
         <p class="text-muted-foreground">
@@ -123,7 +130,9 @@
             <p class="text-muted-foreground mb-4">{{ insight.description }}</p>
 
             <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+              <div
+                class="flex items-center space-x-4 text-sm text-muted-foreground"
+              >
                 <div class="flex items-center space-x-1">
                   <MessageSquare class="h-4 w-4" />
                   <span>{{ insight.affectedConversations }} conversations</span>
@@ -139,11 +148,19 @@
               </div>
 
               <div class="flex items-center space-x-2">
-                <Button variant="outline" size="sm" @click="previewInsight(insight)">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="previewInsight(insight)"
+                >
                   <Eye class="h-4 w-4 mr-2" />
                   Preview
                 </Button>
-                <Button variant="outline" size="sm" @click="rejectInsight(insight.id)">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="rejectInsight(insight.id)"
+                >
                   <X class="h-4 w-4 mr-2" />
                   Reject
                 </Button>
@@ -186,12 +203,14 @@
             >
               <div class="space-y-1">
                 <div class="flex items-center space-x-2">
-                  <Badge variant="outline">{{ getInsightTypeLabel(insight.type) }}</Badge>
+                  <Badge variant="outline">{{
+                    getInsightTypeLabel(insight.type)
+                  }}</Badge>
                   <span class="font-medium">{{ insight.title }}</span>
                 </div>
                 <p class="text-sm text-muted-foreground">
-                  Implemented {{ formatDate(insight.implementedAt) }} • {{ insight.performance }}%
-                  improvement achieved
+                  Implemented {{ formatDate(insight.implementedAt) }} •
+                  {{ insight.performance }}% improvement achieved
                 </p>
               </div>
               <div class="flex items-center space-x-2">
@@ -227,90 +246,90 @@ import {
   Download,
   BarChart3,
   ExternalLink,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = 'default', ...props }) =>
-  h('span', {
+const Badge = ({ variant = "default", ...props }) =>
+  h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-          ? 'bg-blue-100 text-blue-800'
-          : variant === 'destructive'
-            ? 'bg-red-100 text-red-800'
-            : variant === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+      variant === "outline"
+        ? "border border-gray-300 text-gray-700"
+        : variant === "secondary"
+        ? "bg-blue-100 text-blue-800"
+        : variant === "destructive"
+        ? "bg-red-100 text-red-800"
+        : variant === "success"
+        ? "bg-green-100 text-green-800"
+        : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
 
 // Reactive state
 const loading = ref(true);
-const selectedType = ref('');
-const selectedAgent = ref('');
-const selectedDateRange = ref('30d');
+const selectedType = ref("");
+const selectedAgent = ref("");
+const selectedDateRange = ref("30d");
 
 // Mock data - TODO: Replace with actual API calls
 const agents = ref([
-  { id: '1', name: 'Customer Support Agent' },
-  { id: '2', name: 'Sales Assistant' },
-  { id: '3', name: 'Technical Support' },
+  { id: "1", name: "Customer Support Agent" },
+  { id: "2", name: "Sales Assistant" },
+  { id: "3", name: "Technical Support" },
 ]);
 
 const pendingInsights = ref([
   {
-    id: '1',
-    type: 'new-playbook',
+    id: "1",
+    type: "new-playbook",
     title: 'Create "Billing Issues" Playbook',
     description:
-      'Detected pattern in 47 conversations where customers ask about billing. A dedicated playbook could improve resolution time by 35%.',
+      "Detected pattern in 47 conversations where customers ask about billing. A dedicated playbook could improve resolution time by 35%.",
     affectedConversations: 47,
-    agentName: 'Customer Support Agent',
+    agentName: "Customer Support Agent",
     impactScore: 35,
-    createdAt: new Date('2024-01-15'),
-    agentId: '1',
+    createdAt: new Date("2024-01-15"),
+    agentId: "1",
   },
   {
-    id: '2',
-    type: 'improvement',
-    title: 'Improve Product Information Responses',
+    id: "2",
+    type: "improvement",
+    title: "Improve Product Information Responses",
     description:
-      'Current product responses are too generic. Adding specific product details could increase customer satisfaction by 28%.',
+      "Current product responses are too generic. Adding specific product details could increase customer satisfaction by 28%.",
     affectedConversations: 23,
-    agentName: 'Sales Assistant',
+    agentName: "Sales Assistant",
     impactScore: 28,
-    createdAt: new Date('2024-01-14'),
-    agentId: '2',
+    createdAt: new Date("2024-01-14"),
+    agentId: "2",
   },
   {
-    id: '3',
-    type: 'pattern',
-    title: 'Technical Setup Questions Pattern',
+    id: "3",
+    type: "pattern",
+    title: "Technical Setup Questions Pattern",
     description:
-      'Users frequently ask similar setup questions. Creating a step-by-step guide playbook could reduce escalations.',
+      "Users frequently ask similar setup questions. Creating a step-by-step guide playbook could reduce escalations.",
     affectedConversations: 31,
-    agentName: 'Technical Support',
+    agentName: "Technical Support",
     impactScore: 42,
-    createdAt: new Date('2024-01-13'),
-    agentId: '3',
+    createdAt: new Date("2024-01-13"),
+    agentId: "3",
   },
 ]);
 
 const acceptedInsights = ref([
   {
-    id: '4',
-    type: 'improvement',
-    title: 'Enhanced Greeting Messages',
-    implementedAt: new Date('2024-01-10'),
+    id: "4",
+    type: "improvement",
+    title: "Enhanced Greeting Messages",
+    implementedAt: new Date("2024-01-10"),
     performance: 22,
   },
   {
-    id: '5',
-    type: 'new-playbook',
-    title: 'Password Reset Automation',
-    implementedAt: new Date('2024-01-08'),
+    id: "5",
+    type: "new-playbook",
+    title: "Password Reset Automation",
+    implementedAt: new Date("2024-01-08"),
     performance: 45,
   },
 ]);
@@ -319,7 +338,8 @@ const acceptedInsights = ref([
 const filteredPendingInsights = computed(() => {
   return pendingInsights.value.filter((insight) => {
     if (selectedType.value && insight.type !== selectedType.value) return false;
-    if (selectedAgent.value && insight.agentId !== selectedAgent.value) return false;
+    if (selectedAgent.value && insight.agentId !== selectedAgent.value)
+      return false;
     return true;
   });
 });
@@ -327,55 +347,59 @@ const filteredPendingInsights = computed(() => {
 // Methods
 const getInsightTypeLabel = (type: string) => {
   const labels = {
-    'new-playbook': 'New Playbook',
-    improvement: 'Improvement',
-    pattern: 'Pattern',
-    performance: 'Performance',
+    "new-playbook": "New Playbook",
+    improvement: "Improvement",
+    pattern: "Pattern",
+    performance: "Performance",
   };
   return labels[type as keyof typeof labels] || type;
 };
 
 const getInsightTypeVariant = (type: string) => {
   const variants = {
-    'new-playbook': 'default',
-    improvement: 'secondary',
-    pattern: 'success',
-    performance: 'destructive',
+    "new-playbook": "default",
+    improvement: "secondary",
+    pattern: "success",
+    performance: "destructive",
   };
-  return variants[type as keyof typeof variants] || 'default';
+  return variants[type as keyof typeof variants] || "default";
 };
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   }).format(date);
 };
 
 const previewInsight = (insight: any) => {
   // TODO: Open insight preview modal
-  console.log('Preview insight:', insight);
+  console.log("Preview insight:", insight);
 };
 
 const acceptInsight = (insightId: string) => {
   // TODO: Implement insight acceptance
-  console.log('Accept insight:', insightId);
+  console.log("Accept insight:", insightId);
 
   // Mock: Move to accepted insights
   const insight = pendingInsights.value.find((i) => i.id === insightId);
   if (insight) {
-    pendingInsights.value = pendingInsights.value.filter((i) => i.id !== insightId);
+    pendingInsights.value = pendingInsights.value.filter(
+      (i) => i.id !== insightId
+    );
     // TODO: Create actual playbook or implement improvement
   }
 };
 
 const rejectInsight = (insightId: string) => {
   // TODO: Implement insight rejection
-  console.log('Reject insight:', insightId);
+  console.log("Reject insight:", insightId);
 
   // Mock: Remove from pending
-  pendingInsights.value = pendingInsights.value.filter((i) => i.id !== insightId);
+  pendingInsights.value = pendingInsights.value.filter(
+    (i) => i.id !== insightId
+  );
 };
 
 // Lifecycle
@@ -392,15 +416,18 @@ onMounted(async () => {
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: 'Insights - Hay Dashboard',
+  title: "Insights - Hay Dashboard",
   meta: [
-    { name: 'description', content: 'AI-generated insights to improve your chatbot performance' },
+    {
+      name: "description",
+      content: "AI-generated insights to improve your chatbot performance",
+    },
   ],
 });
 </script>

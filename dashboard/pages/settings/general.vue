@@ -4,7 +4,9 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">General Settings</h1>
-        <p class="text-muted-foreground">Manage your platform preferences and configuration</p>
+        <p class="text-muted-foreground">
+          Manage your platform preferences and configuration
+        </p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="resetToDefaults">
@@ -83,7 +85,9 @@
               <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
               <option value="DD MMM YYYY">DD MMM YYYY</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatDatePreview() }}</p>
+            <p class="text-xs text-muted-foreground mt-1">
+              Preview: {{ formatDatePreview() }}
+            </p>
           </div>
 
           <div>
@@ -96,7 +100,9 @@
               <option value="12h">12-hour (AM/PM)</option>
               <option value="24h">24-hour</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatTimePreview() }}</p>
+            <p class="text-xs text-muted-foreground mt-1">
+              Preview: {{ formatTimePreview() }}
+            </p>
           </div>
         </div>
 
@@ -123,7 +129,9 @@
     <Card>
       <CardHeader>
         <CardTitle>Notification Preferences</CardTitle>
-        <CardDescription>Control how and when you receive notifications</CardDescription>
+        <CardDescription
+          >Control how and when you receive notifications</CardDescription
+        >
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- Email Notifications -->
@@ -137,7 +145,9 @@
                   Get notified when a new conversation starts
                 </p>
               </div>
-              <Checkbox v-model="settings.notifications.email.newConversations" />
+              <Checkbox
+                v-model="settings.notifications.email.newConversations"
+              />
             </div>
 
             <div class="flex items-center justify-between">
@@ -147,7 +157,9 @@
                   When a conversation needs human intervention
                 </p>
               </div>
-              <Checkbox v-model="settings.notifications.email.escalatedConversations" />
+              <Checkbox
+                v-model="settings.notifications.email.escalatedConversations"
+              />
             </div>
 
             <div class="flex items-center justify-between">
@@ -157,13 +169,17 @@
                   When agent performance drops below thresholds
                 </p>
               </div>
-              <Checkbox v-model="settings.notifications.email.performanceAlerts" />
+              <Checkbox
+                v-model="settings.notifications.email.performanceAlerts"
+              />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Weekly Reports</Label>
-                <p class="text-xs text-muted-foreground">Weekly performance summary emails</p>
+                <p class="text-xs text-muted-foreground">
+                  Weekly performance summary emails
+                </p>
               </div>
               <Checkbox v-model="settings.notifications.email.weeklyReports" />
             </div>
@@ -177,7 +193,9 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Real-time Alerts</Label>
-                <p class="text-xs text-muted-foreground">Show notifications in the dashboard</p>
+                <p class="text-xs text-muted-foreground">
+                  Show notifications in the dashboard
+                </p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.realTimeAlerts" />
             </div>
@@ -195,9 +213,13 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Feature Announcements</Label>
-                <p class="text-xs text-muted-foreground">New features and product updates</p>
+                <p class="text-xs text-muted-foreground">
+                  New features and product updates
+                </p>
               </div>
-              <Checkbox v-model="settings.notifications.inApp.featureAnnouncements" />
+              <Checkbox
+                v-model="settings.notifications.inApp.featureAnnouncements"
+              />
             </div>
           </div>
         </div>
@@ -226,7 +248,8 @@
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            No notifications will be sent during quiet hours (except critical alerts)
+            No notifications will be sent during quiet hours (except critical
+            alerts)
           </p>
         </div>
       </CardContent>
@@ -236,7 +259,10 @@
     <Card>
       <CardHeader>
         <CardTitle>Webhook Configuration</CardTitle>
-        <CardDescription>Configure external webhook endpoints for notifications</CardDescription>
+        <CardDescription
+          >Configure external webhook endpoints for
+          notifications</CardDescription
+        >
       </CardHeader>
       <CardContent class="space-y-4">
         <div>
@@ -269,7 +295,11 @@
         <div>
           <Label>Webhook Events</Label>
           <div class="grid gap-2 mt-2 md:grid-cols-2">
-            <div v-for="event in webhookEvents" :key="event.id" class="flex items-center space-x-2">
+            <div
+              v-for="event in webhookEvents"
+              :key="event.id"
+              class="flex items-center space-x-2"
+            >
               <Checkbox
                 :id="event.id"
                 :checked="settings.webhooks.events.includes(event.id)"
@@ -302,7 +332,9 @@
     <Card>
       <CardHeader>
         <CardTitle>Data Retention</CardTitle>
-        <CardDescription>Configure how long different types of data are kept</CardDescription>
+        <CardDescription
+          >Configure how long different types of data are kept</CardDescription
+        >
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
@@ -373,9 +405,9 @@
             <div class="text-sm">
               <p class="font-medium text-yellow-800">Data Retention Policy</p>
               <p class="text-yellow-700">
-                Changing retention settings will only affect new data. Existing data will be
-                retained according to previous settings. Consider compliance requirements before
-                making changes.
+                Changing retention settings will only affect new data. Existing
+                data will be retained according to previous settings. Consider
+                compliance requirements before making changes.
               </p>
             </div>
           </div>
@@ -386,16 +418,16 @@
 </template>
 
 <script setup lang="ts">
-import { Save, RotateCcw, Zap, FileText, AlertTriangle } from 'lucide-vue-next';
+import { Save, RotateCcw, Zap, FileText, AlertTriangle } from "lucide-vue-next";
 
 // Reactive state
 const originalSettings = ref({});
 const settings = ref({
-  defaultLanguage: 'en',
-  timezone: 'UTC',
-  dateFormat: 'MM/DD/YYYY',
-  timeFormat: '12h',
-  defaultAgent: '',
+  defaultLanguage: "en",
+  timezone: "UTC",
+  dateFormat: "MM/DD/YYYY",
+  timeFormat: "12h",
+  defaultAgent: "",
   notifications: {
     email: {
       newConversations: true,
@@ -409,66 +441,88 @@ const settings = ref({
       featureAnnouncements: true,
     },
     quietHours: {
-      start: '22:00',
-      end: '08:00',
+      start: "22:00",
+      end: "08:00",
     },
   },
   webhooks: {
-    url: '',
-    secret: '',
+    url: "",
+    secret: "",
     events: [] as string[],
   },
   dataRetention: {
-    conversations: '365',
-    analytics: '730',
-    logs: '90',
-    exports: '30',
+    conversations: "365",
+    analytics: "730",
+    logs: "90",
+    exports: "30",
   },
 });
 
 // Mock data - TODO: Replace with actual API calls
 const agents = ref([
-  { id: '1', name: 'Customer Support Agent' },
-  { id: '2', name: 'Sales Assistant' },
-  { id: '3', name: 'Technical Support' },
+  { id: "1", name: "Customer Support Agent" },
+  { id: "2", name: "Sales Assistant" },
+  { id: "3", name: "Technical Support" },
 ]);
 
 const webhookEvents = [
-  { id: 'conversation.started', name: 'Conversation Started' },
-  { id: 'conversation.ended', name: 'Conversation Ended' },
-  { id: 'conversation.escalated', name: 'Conversation Escalated' },
-  { id: 'agent.performance.alert', name: 'Agent Performance Alert' },
-  { id: 'system.error', name: 'System Error' },
-  { id: 'user.feedback', name: 'User Feedback Received' },
+  { id: "conversation.started", name: "Conversation Started" },
+  { id: "conversation.ended", name: "Conversation Ended" },
+  { id: "conversation.escalated", name: "Conversation Escalated" },
+  { id: "agent.performance.alert", name: "Agent Performance Alert" },
+  { id: "system.error", name: "System Error" },
+  { id: "user.feedback", name: "User Feedback Received" },
 ];
 
 // Computed properties
 const hasChanges = computed(() => {
-  return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
+  return (
+    JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value)
+  );
 });
 
 // Methods
 const formatDatePreview = () => {
   const now = new Date();
   const formats = {
-    'MM/DD/YYYY': `${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}/${now.getFullYear()}`,
-    'DD/MM/YYYY': `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`,
-    'YYYY-MM-DD': `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`,
-    'DD MMM YYYY': now.toLocaleDateString('en-US', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
+    "MM/DD/YYYY": `${(now.getMonth() + 1).toString().padStart(2, "0")}/${now
+      .getDate()
+      .toString()
+      .padStart(2, "0")}/${now.getFullYear()}`,
+    "DD/MM/YYYY": `${now.getDate().toString().padStart(2, "0")}/${(
+      now.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${now.getFullYear()}`,
+    "YYYY-MM-DD": `${now.getFullYear()}-${(now.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")}`,
+    "DD MMM YYYY": now.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     }),
   };
-  return formats[settings.value.dateFormat as keyof typeof formats] || 'Invalid format';
+  return (
+    formats[settings.value.dateFormat as keyof typeof formats] ||
+    "Invalid format"
+  );
 };
 
 const formatTimePreview = () => {
   const now = new Date();
-  if (settings.value.timeFormat === '12h') {
-    return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  if (settings.value.timeFormat === "12h") {
+    return now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   } else {
-    return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   }
 };
 
@@ -484,27 +538,31 @@ const toggleWebhookEvent = (eventId: string) => {
 const saveSettings = async () => {
   try {
     // TODO: Save settings to API
-    console.log('Saving settings:', settings.value);
+    console.log("Saving settings:", settings.value);
 
     // Update original settings to new saved state
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
     // TODO: Show success toast
-    console.log('Settings saved successfully');
+    console.log("Settings saved successfully");
   } catch (error) {
     // TODO: Show error toast
-    console.error('Failed to save settings:', error);
+    console.error("Failed to save settings:", error);
   }
 };
 
 const resetToDefaults = () => {
-  if (confirm('Are you sure you want to reset all settings to their default values?')) {
+  if (
+    confirm(
+      "Are you sure you want to reset all settings to their default values?"
+    )
+  ) {
     settings.value = {
-      defaultLanguage: 'en',
-      timezone: 'UTC',
-      dateFormat: 'MM/DD/YYYY',
-      timeFormat: '12h',
-      defaultAgent: '',
+      defaultLanguage: "en",
+      timezone: "UTC",
+      dateFormat: "MM/DD/YYYY",
+      timeFormat: "12h",
+      defaultAgent: "",
       notifications: {
         email: {
           newConversations: true,
@@ -518,20 +576,20 @@ const resetToDefaults = () => {
           featureAnnouncements: true,
         },
         quietHours: {
-          start: '22:00',
-          end: '08:00',
+          start: "22:00",
+          end: "08:00",
         },
       },
       webhooks: {
-        url: '',
-        secret: '',
+        url: "",
+        secret: "",
         events: [],
       },
       dataRetention: {
-        conversations: '365',
-        analytics: '730',
-        logs: '90',
-        exports: '30',
+        conversations: "365",
+        analytics: "730",
+        logs: "90",
+        exports: "30",
       },
     };
   }
@@ -540,18 +598,18 @@ const resetToDefaults = () => {
 const testWebhook = async () => {
   try {
     // TODO: Send test webhook
-    console.log('Testing webhook:', settings.value.webhooks.url);
+    console.log("Testing webhook:", settings.value.webhooks.url);
 
     // TODO: Show result toast
-    console.log('Webhook test sent successfully');
+    console.log("Webhook test sent successfully");
   } catch (error) {
-    console.error('Webhook test failed:', error);
+    console.error("Webhook test failed:", error);
   }
 };
 
 const viewWebhookLogs = () => {
   // TODO: Navigate to webhook logs page
-  console.log('View webhook logs');
+  console.log("View webhook logs");
 };
 
 // Lifecycle
@@ -566,13 +624,18 @@ onMounted(async () => {
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
-  middleware: 'auth',
+  layout: "default",
+  // middleware: 'auth',
 });
 
 // Head management
 useHead({
-  title: 'General Settings - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Manage your platform preferences and configuration' }],
+  title: "General Settings - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Manage your platform preferences and configuration",
+    },
+  ],
 });
 </script>

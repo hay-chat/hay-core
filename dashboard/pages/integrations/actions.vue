@@ -806,12 +806,6 @@ onMounted(async () => {
   }, 1000);
 });
 
-// Set page meta
-definePageMeta({
-  layout: "default",
-  middleware: "auth",
-});
-
 // Head management
 useHead({
   title: "MCP Actions - Hay Dashboard",

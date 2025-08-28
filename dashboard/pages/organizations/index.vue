@@ -10,7 +10,10 @@
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+          <RefreshCw
+            class="mr-2 h-4 w-4"
+            :class="{ 'animate-spin': loading }"
+          />
           Refresh
         </Button>
         <Button @click="createOrganization">
@@ -63,13 +66,15 @@
         <CardHeader class="pb-3">
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
-              <div class="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div
+                class="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center"
+              >
                 <Building2 class="h-6 w-6 text-primary" />
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg">{{ org.name }}</CardTitle>
                 <CardDescription class="mt-1">{{
-                  org.description || 'No description'
+                  org.description || "No description"
                 }}</CardDescription>
               </div>
             </div>
@@ -80,8 +85,8 @@
                   org.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : org.status === 'inactive'
-                      ? 'bg-gray-100 text-gray-800'
-                      : 'bg-red-100 text-red-800',
+                    ? 'bg-gray-100 text-gray-800'
+                    : 'bg-red-100 text-red-800',
                 ]"
               >
                 {{ org.status }}
@@ -131,7 +136,7 @@
                 @click.stop="switchToOrganization(org.id)"
               >
                 <Building2 class="mr-1 h-3 w-3" />
-                {{ org.id === currentOrganization?.id ? 'Current' : 'Switch' }}
+                {{ org.id === currentOrganization?.id ? "Current" : "Switch" }}
               </Button>
               <Button
                 variant="outline"
@@ -149,21 +154,36 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading && filteredOrganizations.length === 0" class="text-center py-12">
+    <div
+      v-else-if="!loading && filteredOrganizations.length === 0"
+      class="text-center py-12"
+    >
       <Building2 class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{ searchQuery || statusFilter ? 'No organizations found' : 'No organizations yet' }}
+        {{
+          searchQuery || statusFilter
+            ? "No organizations found"
+            : "No organizations yet"
+        }}
       </h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
           searchQuery || statusFilter
-            ? 'Try adjusting your search or filters.'
-            : 'Get started by creating your first organization.'
+            ? "Try adjusting your search or filters."
+            : "Get started by creating your first organization."
         }}
       </p>
       <div class="mt-6">
-        <Button @click="searchQuery || statusFilter ? clearFilters() : createOrganization()">
-          {{ searchQuery || statusFilter ? 'Clear Filters' : 'Create Organization' }}
+        <Button
+          @click="
+            searchQuery || statusFilter ? clearFilters() : createOrganization()
+          "
+        >
+          {{
+            searchQuery || statusFilter
+              ? "Clear Filters"
+              : "Create Organization"
+          }}
         </Button>
       </div>
     </div>
@@ -203,68 +223,75 @@
 </template>
 
 <script setup lang="ts">
-import { Building2, Plus, RefreshCw, Search, Settings, MoreVertical } from 'lucide-vue-next';
+import {
+  Building2,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  MoreVertical,
+} from "lucide-vue-next";
 
 // TODO: Import organization store/composable
 // TODO: Import router for navigation
 
 definePageMeta({
   // TODO: Add authentication middleware
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 // State
 const loading = ref(false);
-const searchQuery = ref('');
-const statusFilter = ref('');
+const searchQuery = ref("");
+const statusFilter = ref("");
 
 // Mock current organization - TODO: Get from store
 const currentOrganization = ref({
-  id: '1',
-  name: 'Acme Corp',
+  id: "1",
+  name: "Acme Corp",
 });
 
 // Mock organizations data - TODO: Replace with real API calls
 const organizations = ref([
   {
-    id: '1',
-    name: 'Acme Corp',
-    description: 'Main business organization',
-    status: 'active',
+    id: "1",
+    name: "Acme Corp",
+    description: "Main business organization",
+    status: "active",
     memberCount: 12,
     agentCount: 8,
     lastActivity: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    createdAt: new Date('2023-01-15'),
+    createdAt: new Date("2023-01-15"),
   },
   {
-    id: '2',
-    name: 'Customer Support Division',
-    description: 'Dedicated support team workspace',
-    status: 'active',
+    id: "2",
+    name: "Customer Support Division",
+    description: "Dedicated support team workspace",
+    status: "active",
     memberCount: 6,
     agentCount: 15,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    createdAt: new Date('2023-03-22'),
+    createdAt: new Date("2023-03-22"),
   },
   {
-    id: '3',
-    name: 'Sales Team',
-    description: 'Sales automation and lead management',
-    status: 'active',
+    id: "3",
+    name: "Sales Team",
+    description: "Sales automation and lead management",
+    status: "active",
     memberCount: 8,
     agentCount: 5,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-    createdAt: new Date('2023-05-10'),
+    createdAt: new Date("2023-05-10"),
   },
   {
-    id: '4',
-    name: 'Beta Testing Org',
-    description: 'Testing new features and integrations',
-    status: 'inactive',
+    id: "4",
+    name: "Beta Testing Org",
+    description: "Testing new features and integrations",
+    status: "inactive",
     memberCount: 3,
     agentCount: 2,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
-    createdAt: new Date('2023-07-01'),
+    createdAt: new Date("2023-07-01"),
   },
 ]);
 
@@ -277,7 +304,8 @@ const filteredOrganizations = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
       (org) =>
-        org.name.toLowerCase().includes(query) || org.description?.toLowerCase().includes(query),
+        org.name.toLowerCase().includes(query) ||
+        org.description?.toLowerCase().includes(query)
     );
   }
 
@@ -295,7 +323,7 @@ const formatTimeAgo = (date: Date) => {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return 'Just now';
+    return "Just now";
   } else if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
     return `${minutes}m ago`;
@@ -309,10 +337,10 @@ const formatTimeAgo = (date: Date) => {
 };
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   }).format(date);
 };
 
@@ -320,12 +348,12 @@ const refreshData = async () => {
   loading.value = true;
   try {
     // TODO: Fetch organizations from API
-    console.log('Refreshing organizations data...');
+    console.log("Refreshing organizations data...");
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
-    console.error('Error refreshing data:', error);
+    console.error("Error refreshing data:", error);
     // TODO: Show error notification
   } finally {
     loading.value = false;
@@ -343,20 +371,20 @@ const applyFilters = () => {
 };
 
 const clearFilters = () => {
-  searchQuery.value = '';
-  statusFilter.value = '';
+  searchQuery.value = "";
+  statusFilter.value = "";
 };
 
 const createOrganization = () => {
   // TODO: Open create organization modal or navigate to form
   // TODO: Implement organization creation workflow
-  console.log('Create organization');
+  console.log("Create organization");
 };
 
 const viewOrganization = (id: string) => {
   // TODO: Navigate to organization detail page
   // await navigateTo(`/organizations/${id}`)
-  console.log('View organization:', id);
+  console.log("View organization:", id);
 };
 
 const switchToOrganization = async (id: string) => {
@@ -365,7 +393,7 @@ const switchToOrganization = async (id: string) => {
     // TODO: Update current organization in store
     // TODO: Refresh user session with new organization context
     // TODO: Show success notification
-    console.log('Switch to organization:', id);
+    console.log("Switch to organization:", id);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -376,7 +404,7 @@ const switchToOrganization = async (id: string) => {
       currentOrganization.value = org;
     }
   } catch (error) {
-    console.error('Error switching organization:', error);
+    console.error("Error switching organization:", error);
     // TODO: Show error notification
   }
 };
@@ -388,14 +416,14 @@ const showOptionsMenu = (org: any) => {
   // - View settings
   // - Deactivate/Activate
   // - Delete (if allowed)
-  console.log('Show options for organization:', org.id);
+  console.log("Show options for organization:", org.id);
 };
 
 // Lifecycle
 onMounted(async () => {
   // TODO: Load organizations on mount
   // TODO: Set up real-time updates for organization list
-  console.log('Organizations page mounted');
+  console.log("Organizations page mounted");
 
   // Load data
   await refreshData();
@@ -410,7 +438,12 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: 'Organizations - Hay Dashboard',
-  meta: [{ name: 'description', content: 'Manage your organizations and workspaces' }],
+  title: "Organizations - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Manage your organizations and workspaces",
+    },
+  ],
 });
 </script>

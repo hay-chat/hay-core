@@ -205,7 +205,6 @@ import { validateEmail, validatePassword } from "@/lib/utils";
 
 definePageMeta({
   layout: false,
-  middleware: "guest", // Redirect authenticated users
 });
 
 // Navigation

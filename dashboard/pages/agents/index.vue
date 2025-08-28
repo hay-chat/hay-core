@@ -10,7 +10,10 @@
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+          <RefreshCw
+            class="mr-2 h-4 w-4"
+            :class="{ 'animate-spin': loading }"
+          />
           Refresh
         </Button>
         <Button @click="createAgent">
@@ -65,7 +68,10 @@
     <div v-if="selectedAgents.length > 0" class="bg-muted p-4 rounded-lg">
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
-          {{ selectedAgents.length }} agent{{ selectedAgents.length === 1 ? '' : 's' }} selected
+          {{ selectedAgents.length }} agent{{
+            selectedAgents.length === 1 ? "" : "s"
+          }}
+          selected
         </p>
         <div class="flex space-x-2">
           <Button variant="outline" size="sm" @click="bulkToggleStatus">
@@ -111,10 +117,17 @@
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg">{{ agent.name }}</CardTitle>
-                <CardDescription class="mt-1">{{ agent.description }}</CardDescription>
+                <CardDescription class="mt-1">{{
+                  agent.description
+                }}</CardDescription>
               </div>
             </div>
-            <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="showOptionsMenu(agent)">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-8 w-8 p-0"
+              @click="showOptionsMenu(agent)"
+            >
               <MoreVertical class="h-4 w-4" />
             </Button>
           </div>
@@ -129,10 +142,10 @@
                   agent.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : agent.status === 'inactive'
-                      ? 'bg-gray-100 text-gray-800'
-                      : agent.status === 'training'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-red-100 text-red-800',
+                    ? 'bg-gray-100 text-gray-800'
+                    : agent.status === 'training'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -141,15 +154,17 @@
                     agent.status === 'active'
                       ? 'bg-green-600'
                       : agent.status === 'inactive'
-                        ? 'bg-gray-600'
-                        : agent.status === 'training'
-                          ? 'bg-blue-600'
-                          : 'bg-red-600',
+                      ? 'bg-gray-600'
+                      : agent.status === 'training'
+                      ? 'bg-blue-600'
+                      : 'bg-red-600',
                   ]"
                 ></div>
                 {{ agent.status }}
               </div>
-              <span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+              <span
+                class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded"
+              >
                 {{ agent.type }}
               </span>
             </div>
@@ -158,7 +173,9 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p class="text-muted-foreground">Conversations</p>
-                <p class="font-medium">{{ agent.conversationCount.toLocaleString() }}</p>
+                <p class="font-medium">
+                  {{ agent.conversationCount.toLocaleString() }}
+                </p>
               </div>
               <div>
                 <p class="text-muted-foreground">Resolution Rate</p>
@@ -189,11 +206,21 @@
 
             <!-- Quick Actions -->
             <div class="flex space-x-2 pt-2">
-              <Button variant="outline" size="sm" class="flex-1" @click="toggleAgentStatus(agent)">
+              <Button
+                variant="outline"
+                size="sm"
+                class="flex-1"
+                @click="toggleAgentStatus(agent)"
+              >
                 <Power class="mr-1 h-3 w-3" />
-                {{ agent.status === 'active' ? 'Disable' : 'Enable' }}
+                {{ agent.status === "active" ? "Disable" : "Enable" }}
               </Button>
-              <Button variant="outline" size="sm" class="flex-1" @click="viewAgent(agent.id)">
+              <Button
+                variant="outline"
+                size="sm"
+                class="flex-1"
+                @click="viewAgent(agent.id)"
+              >
                 <Settings class="mr-1 h-3 w-3" />
                 Manage
               </Button>
@@ -204,21 +231,38 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
+    <div
+      v-else-if="!loading && filteredAgents.length === 0"
+      class="text-center py-12"
+    >
       <Bot class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{ searchQuery || statusFilter || typeFilter ? 'No agents found' : 'No agents yet' }}
+        {{
+          searchQuery || statusFilter || typeFilter
+            ? "No agents found"
+            : "No agents yet"
+        }}
       </h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
           searchQuery || statusFilter || typeFilter
-            ? 'Try adjusting your search or filters.'
-            : 'Get started by creating your first AI agent.'
+            ? "Try adjusting your search or filters."
+            : "Get started by creating your first AI agent."
         }}
       </p>
       <div class="mt-6">
-        <Button @click="searchQuery || statusFilter || typeFilter ? clearFilters() : createAgent()">
-          {{ searchQuery || statusFilter || typeFilter ? 'Clear Filters' : 'Create Agent' }}
+        <Button
+          @click="
+            searchQuery || statusFilter || typeFilter
+              ? clearFilters()
+              : createAgent()
+          "
+        >
+          {{
+            searchQuery || statusFilter || typeFilter
+              ? "Clear Filters"
+              : "Create Agent"
+          }}
         </Button>
       </div>
     </div>
@@ -266,102 +310,103 @@ import {
   Download,
   Trash2,
   Star,
-} from 'lucide-vue-next';
+} from "lucide-vue-next";
 
 // TODO: Import agent store/composable
 // TODO: Import router for navigation
 
 definePageMeta({
   // TODO: Add authentication middleware
-  // middleware: 'auth'
+  // // middleware: 'auth'
 });
 
 // State
 const loading = ref(false);
-const searchQuery = ref('');
-const statusFilter = ref('');
-const typeFilter = ref('');
+const searchQuery = ref("");
+const statusFilter = ref("");
+const typeFilter = ref("");
 const selectedAgents = ref<string[]>([]);
 
 // Mock agents data - TODO: Replace with real API calls
 const agents = ref([
   {
-    id: '1',
-    name: 'Customer Support Bot',
-    description: 'Handles general customer inquiries and support tickets',
-    status: 'active',
-    type: 'customer-support',
+    id: "1",
+    name: "Customer Support Bot",
+    description: "Handles general customer inquiries and support tickets",
+    status: "active",
+    type: "customer-support",
     conversationCount: 1234,
     resolutionRate: 94,
     avgResponseTime: 1.2,
     satisfactionScore: 4.6,
     lastActivity: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-    createdAt: new Date('2023-01-15'),
+    createdAt: new Date("2023-01-15"),
   },
   {
-    id: '2',
-    name: 'Sales Assistant',
-    description: 'Qualifies leads and schedules sales meetings',
-    status: 'active',
-    type: 'sales',
+    id: "2",
+    name: "Sales Assistant",
+    description: "Qualifies leads and schedules sales meetings",
+    status: "active",
+    type: "sales",
     conversationCount: 892,
     resolutionRate: 87,
     avgResponseTime: 2.1,
     satisfactionScore: 4.3,
     lastActivity: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
-    createdAt: new Date('2023-02-20'),
+    createdAt: new Date("2023-02-20"),
   },
   {
-    id: '3',
-    name: 'Technical Support',
-    description: 'Provides technical assistance and troubleshooting',
-    status: 'active',
-    type: 'technical',
+    id: "3",
+    name: "Technical Support",
+    description: "Provides technical assistance and troubleshooting",
+    status: "active",
+    type: "technical",
     conversationCount: 567,
     resolutionRate: 91,
     avgResponseTime: 3.5,
     satisfactionScore: 4.5,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    createdAt: new Date('2023-03-10'),
+    createdAt: new Date("2023-03-10"),
   },
   {
-    id: '4',
-    name: 'Billing Assistant',
-    description: 'Handles billing inquiries and payment issues',
-    status: 'inactive',
-    type: 'customer-support',
+    id: "4",
+    name: "Billing Assistant",
+    description: "Handles billing inquiries and payment issues",
+    status: "inactive",
+    type: "customer-support",
     conversationCount: 345,
     resolutionRate: 89,
     avgResponseTime: 1.8,
     satisfactionScore: 4.2,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    createdAt: new Date('2023-04-05'),
+    createdAt: new Date("2023-04-05"),
   },
   {
-    id: '5',
-    name: 'Product Demo Bot',
-    description: 'Provides product demonstrations and feature explanations',
-    status: 'training',
-    type: 'sales',
+    id: "5",
+    name: "Product Demo Bot",
+    description: "Provides product demonstrations and feature explanations",
+    status: "training",
+    type: "sales",
     conversationCount: 78,
     resolutionRate: 76,
     avgResponseTime: 4.2,
     satisfactionScore: 3.9,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-    createdAt: new Date('2023-11-12'),
+    createdAt: new Date("2023-11-12"),
   },
   {
-    id: '6',
-    name: 'General Assistant',
-    description: 'Handles miscellaneous inquiries and provides general information',
-    status: 'error',
-    type: 'general',
+    id: "6",
+    name: "General Assistant",
+    description:
+      "Handles miscellaneous inquiries and provides general information",
+    status: "error",
+    type: "general",
     conversationCount: 156,
     resolutionRate: 82,
     avgResponseTime: 2.8,
     satisfactionScore: 4.0,
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-    createdAt: new Date('2023-10-20'),
+    createdAt: new Date("2023-10-20"),
   },
 ]);
 
@@ -374,7 +419,8 @@ const filteredAgents = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
       (agent) =>
-        agent.name.toLowerCase().includes(query) || agent.description.toLowerCase().includes(query),
+        agent.name.toLowerCase().includes(query) ||
+        agent.description.toLowerCase().includes(query)
     );
   }
 
@@ -397,7 +443,7 @@ const formatTimeAgo = (date: Date) => {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return 'Just now';
+    return "Just now";
   } else if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
     return `${minutes}m ago`;
@@ -411,10 +457,10 @@ const formatTimeAgo = (date: Date) => {
 };
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   }).format(date);
 };
 
@@ -422,12 +468,12 @@ const refreshData = async () => {
   loading.value = true;
   try {
     // TODO: Fetch agents from API
-    console.log('Refreshing agents data...');
+    console.log("Refreshing agents data...");
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
-    console.error('Error refreshing data:', error);
+    console.error("Error refreshing data:", error);
     // TODO: Show error notification
   } finally {
     loading.value = false;
@@ -445,9 +491,9 @@ const applyFilters = () => {
 };
 
 const clearFilters = () => {
-  searchQuery.value = '';
-  statusFilter.value = '';
-  typeFilter.value = '';
+  searchQuery.value = "";
+  statusFilter.value = "";
+  typeFilter.value = "";
   selectedAgents.value = [];
 };
 
@@ -463,27 +509,27 @@ const toggleAgentSelection = (agentId: string) => {
 const createAgent = () => {
   // TODO: Navigate to agent creation wizard
   // await navigateTo('/agents/new')
-  console.log('Create agent');
+  console.log("Create agent");
 };
 
 const viewAgent = (id: string) => {
   // TODO: Navigate to agent detail page
   // await navigateTo(`/agents/${id}`)
-  console.log('View agent:', id);
+  console.log("View agent:", id);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toggleAgentStatus = async (agent: any) => {
   try {
     // TODO: Toggle agent status via API
-    console.log('Toggle agent status:', agent.id);
+    console.log("Toggle agent status:", agent.id);
 
     // Update local state
-    agent.status = agent.status === 'active' ? 'inactive' : 'active';
+    agent.status = agent.status === "active" ? "inactive" : "active";
 
     // TODO: Show success notification
   } catch (error) {
-    console.error('Error toggling agent status:', error);
+    console.error("Error toggling agent status:", error);
     // TODO: Show error notification
   }
 };
@@ -495,18 +541,18 @@ const showOptionsMenu = (agent: any) => {
   // - Clone agent
   // - Export settings
   // - Delete agent
-  console.log('Show options for agent:', agent.id);
+  console.log("Show options for agent:", agent.id);
 };
 
 const bulkToggleStatus = async () => {
   try {
     // TODO: Bulk toggle status for selected agents
-    console.log('Bulk toggle status for:', selectedAgents.value);
+    console.log("Bulk toggle status for:", selectedAgents.value);
 
     // TODO: Show success notification
     selectedAgents.value = [];
   } catch (error) {
-    console.error('Error bulk toggling status:', error);
+    console.error("Error bulk toggling status:", error);
     // TODO: Show error notification
   }
 };
@@ -514,12 +560,12 @@ const bulkToggleStatus = async () => {
 const bulkExport = async () => {
   try {
     // TODO: Export selected agents configuration
-    console.log('Bulk export agents:', selectedAgents.value);
+    console.log("Bulk export agents:", selectedAgents.value);
 
     // TODO: Generate and download export file
     // TODO: Show success notification
   } catch (error) {
-    console.error('Error exporting agents:', error);
+    console.error("Error exporting agents:", error);
     // TODO: Show error notification
   }
 };
@@ -528,13 +574,13 @@ const bulkDelete = async () => {
   try {
     // TODO: Show confirmation dialog
     // TODO: Delete selected agents
-    console.log('Bulk delete agents:', selectedAgents.value);
+    console.log("Bulk delete agents:", selectedAgents.value);
 
     // TODO: Remove from local state
     // TODO: Show success notification
     selectedAgents.value = [];
   } catch (error) {
-    console.error('Error deleting agents:', error);
+    console.error("Error deleting agents:", error);
     // TODO: Show error notification
   }
 };
@@ -542,7 +588,7 @@ const bulkDelete = async () => {
 // Lifecycle
 onMounted(async () => {
   // TODO: Load agents on mount
-  console.log('Agents page mounted');
+  console.log("Agents page mounted");
 
   // Load data
   await refreshData();
@@ -556,9 +602,12 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: 'AI Agents - Hay Dashboard',
+  title: "AI Agents - Hay Dashboard",
   meta: [
-    { name: 'description', content: 'Manage your AI agents and automate customer interactions' },
+    {
+      name: "description",
+      content: "Manage your AI agents and automate customer interactions",
+    },
   ],
 });
 </script>

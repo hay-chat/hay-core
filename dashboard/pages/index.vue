@@ -345,10 +345,6 @@ import {
   Zap,
 } from "lucide-vue-next";
 
-definePageMeta({
-  middleware: "auth",
-});
-
 // State
 const loading = ref(false);
 
