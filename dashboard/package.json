@@ -4,7 +4,9 @@
   "private": true,
   "description": "Hay platform frontend dashboard",
   "scripts": {
-    "dev": "nuxt dev",
+    "dev": "fuser -k 5173/tcp || true && nuxt dev",
+    "dev:clean": "fuser -k 5173/tcp || true && rm -rf .nuxt && nuxt dev",
+    "kill-ports": "fuser -k 5173/tcp || true",
     "build": "nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",

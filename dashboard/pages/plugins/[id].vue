@@ -474,93 +474,13 @@ const availableModels = computed(() => {
 });
 
 // Methods
-const loadPlugin = async () => {
-  // loading.value = true;
-  // try {
-  //   const { data } = await $api(`/api/v1/plugins/${pluginId.value}`);
-  //   plugin.value = data;
-  //   // Load configuration
-  //   if (data?.configuration) {
-  //     config.value = { ...config.value, ...data.configuration };
-  //   }
-  //   // Load limits
-  //   if (data?.limits) {
-  //     limits.value = { ...limits.value, ...data.limits };
-  //   }
-  // } catch (error) {
-  //   console.error("Error loading plugin:", error);
-  //   // TODO: Show error notification
-  // } finally {
-  //   loading.value = false;
-  // }
-};
+const loadPlugin = async () => {};
 
-const saveConfiguration = async () => {
-  // saving.value = true;
-  // try {
-  //   const payload = {
-  //     ...config.value,
-  //     limits: limits.value,
-  //   };
-  //   await $api(`/api/v1/plugins/${pluginId.value}`, {
-  //     method: "PUT",
-  //     body: payload,
-  //   });
-  //   // TODO: Show success notification
-  //   console.log("Configuration saved successfully");
-  //   // Reload plugin data
-  //   await loadPlugin();
-  // } catch (error) {
-  //   console.error("Error saving configuration:", error);
-  //   // TODO: Show error notification
-  // } finally {
-  //   saving.value = false;
-  // }
-};
+const saveConfiguration = async () => {};
 
-const testConnection = async () => {
-  // testing.value = true;
-  // try {
-  //   const { data } = await $api(`/api/v1/plugins/${pluginId.value}/test`, {
-  //     method: "POST",
-  //   });
-  //   // TODO: Show test result notification
-  //   console.log("Connection test:", data);
-  //   // Reload plugin to get updated health status
-  //   await loadPlugin();
-  // } catch (error) {
-  //   console.error("Error testing connection:", error);
-  //   // TODO: Show error notification
-  // } finally {
-  //   testing.value = false;
-  // }
-};
+const testConnection = async () => {};
 
-const togglePlugin = async () => {
-  try {
-    const endpoint =
-      plugin.value?.status === "active"
-        ? `/api/v1/plugins/${pluginId.value}/disable`
-        : `/api/v1/plugins/${pluginId.value}/enable`;
-
-    // await $api(endpoint, {
-    //   method: 'POST',
-    // });
-
-    // Reload plugin data
-    await loadPlugin();
-
-    // TODO: Show success notification
-    console.log(
-      `Plugin ${
-        plugin.value?.status === "active" ? "disabled" : "enabled"
-      } successfully`
-    );
-  } catch (error) {
-    console.error("Error toggling plugin:", error);
-    // TODO: Show error notification
-  }
-};
+const togglePlugin = async () => {};
 
 const resetForm = () => {
   if (plugin.value?.configuration) {

@@ -6,6 +6,8 @@ import { Document } from "../entities/document.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
 import { Embedding } from "../entities/embedding.entity";
+import { Agent } from "./entities/agent.entity";
+import { Playbook } from "./entities/playbook.entity";
 import { config } from "../config/env";
 import "reflect-metadata";
 
@@ -19,7 +21,7 @@ export const AppDataSource = new DataSource({
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: config.database.logging,
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding],
+  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook],
   migrations: ["./database/migrations/*.ts"],
   subscribers: [],
 });

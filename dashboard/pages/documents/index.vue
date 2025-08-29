@@ -209,7 +209,7 @@
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="text-destructive"
-                    @click="deleteDocument(document)"
+                    @click="() => deleteDocument(document)"
                   >
                     <Trash2 class="mr-2 h-4 w-4" />
                     Delete
@@ -255,6 +255,9 @@
       </div>
     </div>
 
+    <!-- Toast Container -->
+    <ToastContainer />
+
     <!-- Search Results -->
     <div v-if="searchResults.length > 0" class="space-y-4">
       <h3 class="text-lg font-semibold">Search Results</h3>
@@ -264,6 +267,8 @@
             <CardTitle class="text-base">{{ result.title }}</CardTitle>
             <CardDescription>
               Similarity: {{ (result.similarity * 100).toFixed(2) }}%
+
+              {{ result }}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -285,6 +290,16 @@
         </div>
       </div>
     </div>
+
+    <!-- Confirm Delete Dialog -->
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-text="Delete"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
 
     <!-- Upload Dialog -->
     <Dialog v-model:open="showUploadDialog">
@@ -346,6 +361,9 @@
 
 <script setup lang="ts">
 import { HayApi } from "@/utils/api";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import ToastContainer from "@/components/ui/ToastContainer.vue";
+import { useToast } from "@/composables/useToast";
 
 import {
   FileText,
@@ -378,6 +396,11 @@ const totalPages = ref(1);
 const totalDocuments = ref(0);
 const showUploadDialog = ref(false);
 const uploading = ref(false);
+const showDeleteDialog = ref(false);
+const deleteDialogTitle = ref("");
+const deleteDialogDescription = ref("");
+const documentToDelete = ref<any>(null);
+const isBulkDelete = ref(false);
 
 const uploadForm = ref({
   title: "",
@@ -386,6 +409,8 @@ const uploadForm = ref({
   mimeType: "",
   fileName: "",
 });
+
+const toast = useToast();
 
 // Computed
 const filteredDocuments = computed(() => {
@@ -590,12 +615,10 @@ const downloadDocument = async (document: any) => {
   try {
     // TODO: Download document via API
     console.log("Download document:", document);
-    // TODO: Show success notification
-    console.log("Document download started");
+    toast.info("Document download started");
   } catch (error) {
     console.error("Error downloading document:", error);
-    // TODO: Show error notification
-    console.error("Failed to download document");
+    toast.error("Failed to download document");
   }
 };
 
@@ -608,34 +631,27 @@ const archiveDocument = async (document: any) => {
   try {
     // TODO: Archive/unarchive via API
     document.status = document.status === "archived" ? "active" : "archived";
-    // TODO: Show success notification
-    console.log(
+    toast.success(
       `Document ${
         document.status === "archived" ? "archived" : "unarchived"
       } successfully`
     );
   } catch (error) {
     console.error("Error archiving document:", error);
-    // TODO: Show error notification
-    console.error("Failed to archive document");
+    toast.error("Failed to archive document");
   }
 };
 
-const deleteDocument = async (document: any) => {
-  try {
-    // TODO: Show confirmation dialog
-    // TODO: Delete via API
-    const index = documents.value.findIndex((d) => d.id === document.id);
-    if (index > -1) {
-      documents.value.splice(index, 1);
-    }
-    // TODO: Show success notification
-    console.log("Document deleted successfully");
-  } catch (error) {
-    console.error("Error deleting document:", error);
-    // TODO: Show error notification
-    console.error("Failed to delete document");
-  }
+const deleteDocument = (document: any) => {
+  documentToDelete.value = document;
+  isBulkDelete.value = false;
+  deleteDialogTitle.value = "Delete Document";
+  deleteDialogDescription.value = `Are you sure you want to delete "${document.name}"? This action cannot be undone and will also delete all associated embeddings.`;
+  
+  // Use nextTick to ensure state is settled before opening dialog
+  nextTick(() => {
+    showDeleteDialog.value = true;
+  });
 };
 
 const bulkArchive = async () => {
@@ -643,12 +659,10 @@ const bulkArchive = async () => {
     // TODO: Bulk archive via API
     console.log("Bulk archive:", selectedDocuments.value);
     selectedDocuments.value = [];
-    // TODO: Show success notification
-    console.log("Documents archived successfully");
+    toast.success("Documents archived successfully");
   } catch (error) {
     console.error("Error archiving documents:", error);
-    // TODO: Show error notification
-    console.error("Failed to archive documents");
+    toast.error("Failed to archive documents");
   }
 };
 
@@ -656,29 +670,116 @@ const bulkDownload = async () => {
   try {
     // TODO: Bulk download via API
     console.log("Bulk download:", selectedDocuments.value);
-    // TODO: Show success notification
-    console.log("Download started");
+    toast.info("Download started");
   } catch (error) {
     console.error("Error downloading documents:", error);
-    // TODO: Show error notification
-    console.error("Failed to download documents");
+    toast.error("Failed to download documents");
   }
 };
 
-const bulkDelete = async () => {
+const bulkDelete = () => {
+  if (selectedDocuments.value.length === 0) return;
+  
+  isBulkDelete.value = true;
+  deleteDialogTitle.value = "Delete Documents";
+  deleteDialogDescription.value = `Are you sure you want to delete ${selectedDocuments.value.length} document${
+    selectedDocuments.value.length === 1 ? "" : "s"
+  }? This action cannot be undone and will also delete all associated embeddings.`;
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (isBulkDelete.value) {
+    await performBulkDelete();
+  } else {
+    await performSingleDelete();
+  }
+};
+
+const performSingleDelete = async () => {
+  if (!documentToDelete.value) return;
+  
   try {
-    // TODO: Show confirmation dialog
-    // TODO: Bulk delete via API
+    const result = await HayApi.documents.delete.mutate({
+      id: documentToDelete.value.id,
+    });
+    
+    if (result.success) {
+      const index = documents.value.findIndex((d) => d.id === documentToDelete.value.id);
+      if (index > -1) {
+        documents.value.splice(index, 1);
+      }
+      
+      toast.success(result.message || "Document deleted successfully");
+    }
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    toast.error("Failed to delete document. Please try again.");
+  } finally {
+    documentToDelete.value = null;
+  }
+};
+
+const performBulkDelete = async () => {
+  const errors: string[] = [];
+  const successfulDeletes: string[] = [];
+  const totalCount = selectedDocuments.value.length;
+  
+  // Show initial progress toast with no auto-dismiss
+  const progressToastId = toast.info(`Deleting documents... 0/${totalCount}`, 0);
+  
+  try {
+    let deletedCount = 0;
+    
+    for (const documentId of selectedDocuments.value) {
+      try {
+        const result = await HayApi.documents.delete.mutate({
+          id: documentId,
+        });
+        
+        if (result.success) {
+          successfulDeletes.push(documentId);
+          deletedCount++;
+          
+          // Update progress toast
+          toast.update(
+            progressToastId,
+            `Deleting documents... ${deletedCount}/${totalCount}`
+          );
+        }
+      } catch (error) {
+        errors.push(documentId);
+        deletedCount++;
+        console.error(`Error deleting document ${documentId}:`, error);
+        
+        // Update progress toast even for errors
+        toast.update(
+          progressToastId,
+          `Deleting documents... ${deletedCount}/${totalCount}`
+        );
+      }
+    }
+    
+    // Remove the progress toast
+    toast.remove(progressToastId);
+    
     documents.value = documents.value.filter(
-      (doc) => !selectedDocuments.value.includes(doc.id)
+      (doc) => !successfulDeletes.includes(doc.id)
     );
+    
     selectedDocuments.value = [];
-    // TODO: Show success notification
-    console.log("Documents deleted successfully");
+    
+    if (errors.length > 0) {
+      toast.warning(
+        `Successfully deleted ${successfulDeletes.length} document(s). Failed to delete ${errors.length} document(s).`
+      );
+    } else {
+      toast.success(`Successfully deleted ${successfulDeletes.length} document(s)`);
+    }
   } catch (error) {
     console.error("Error deleting documents:", error);
-    // TODO: Show error notification
-    console.error("Failed to delete documents");
+    toast.remove(progressToastId);
+    toast.error("Failed to delete documents. Please try again.");
   }
 };
 

@@ -180,9 +180,6 @@
                 <Badge :variant="getStatusVariant(playbook.status)">
                   {{ playbook.status }}
                 </Badge>
-                <Badge variant="outline">
-                  {{ getCategoryLabel(playbook.category) }}
-                </Badge>
               </div>
               <h3 class="font-semibold">{{ playbook.name }}</h3>
               <p class="text-sm text-muted-foreground">
@@ -201,23 +198,13 @@
         <CardContent>
           <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Trigger:</span>
-              <span class="font-medium">{{ playbook.trigger }}</span>
+              <span class="text-muted-foreground">Agents:</span>
+              <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Usage (30d):</span>
-              <span class="font-medium">{{ playbook.usageCount }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Success Rate:</span>
-              <span class="font-medium text-green-600"
-                >{{ playbook.successRate }}%</span
-              >
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Last Updated:</span>
+              <span class="text-muted-foreground">Created:</span>
               <span class="font-medium">{{
-                formatDate(playbook.updatedAt)
+                formatDate(new Date(playbook.created_at))
               }}</span>
             </div>
           </div>
@@ -236,12 +223,9 @@
             <thead>
               <tr class="border-b">
                 <th class="text-left py-3 px-4 font-medium">Name</th>
-                <th class="text-left py-3 px-4 font-medium">Category</th>
-                <th class="text-left py-3 px-4 font-medium">Trigger</th>
+                <th class="text-left py-3 px-4 font-medium">Agents</th>
                 <th class="text-left py-3 px-4 font-medium">Status</th>
-                <th class="text-left py-3 px-4 font-medium">Usage (30d)</th>
-                <th class="text-left py-3 px-4 font-medium">Success Rate</th>
-                <th class="text-left py-3 px-4 font-medium">Updated</th>
+                <th class="text-left py-3 px-4 font-medium">Created</th>
                 <th class="text-left py-3 px-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -260,23 +244,14 @@
                     </div>
                   </div>
                 </td>
-                <td class="py-3 px-4">
-                  <Badge variant="outline">{{
-                    getCategoryLabel(playbook.category)
-                  }}</Badge>
-                </td>
-                <td class="py-3 px-4 text-sm">{{ playbook.trigger }}</td>
+                <td class="py-3 px-4 text-sm">{{ playbook.agents?.length || 0 }} agents</td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status)">
                     {{ playbook.status }}
                   </Badge>
                 </td>
-                <td class="py-3 px-4 text-sm">{{ playbook.usageCount }}</td>
-                <td class="py-3 px-4 text-sm text-green-600">
-                  {{ playbook.successRate }}%
-                </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ formatDate(playbook.updatedAt) }}
+                  {{ formatDate(new Date(playbook.created_at)) }}
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">
@@ -339,6 +314,14 @@ const Badge = ({ variant = "default", ...props }) =>
     ...props,
   });
 
+import { useRouter } from 'vue-router';
+import { useToast } from '~/composables/useToast';
+import type { Playbook } from '~/types/playbook';
+
+const { $trpc } = useNuxtApp();
+const { toast } = useToast();
+const router = useRouter();
+
 // Reactive state
 const loading = ref(true);
 const searchQuery = ref("");
@@ -346,79 +329,23 @@ const selectedCategory = ref("");
 const selectedStatus = ref("");
 const viewMode = ref<"grid" | "table">("grid");
 
-// Mock data - TODO: Replace with actual API calls
-const stats = ref({
-  total: 24,
-  active: 18,
-  avgSuccessRate: 87,
-  totalTriggers: 1248,
-  newThisMonth: 3,
-});
+// Data from API
+const playbooks = ref<Playbook[]>([]);
 
-const playbooks = ref([
-  {
-    id: "1",
-    name: "Billing Issue Resolution",
-    description:
-      "Automated flow for common billing questions and payment issues",
-    category: "customer-support",
-    status: "active",
-    trigger: "billing, payment, invoice",
-    usageCount: 145,
-    successRate: 92,
-    updatedAt: new Date("2024-01-15"),
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    id: "2",
-    name: "Product Demo Request",
-    description:
-      "Captures lead information and schedules product demonstrations",
-    category: "sales",
-    status: "active",
-    trigger: "demo, trial, see product",
-    usageCount: 89,
-    successRate: 78,
-    updatedAt: new Date("2024-01-14"),
-    createdAt: new Date("2024-01-02"),
-  },
-  {
-    id: "3",
-    name: "Password Reset Help",
-    description: "Guides users through password reset process",
-    category: "technical",
-    status: "active",
-    trigger: "password, forgot, reset",
-    usageCount: 234,
-    successRate: 95,
-    updatedAt: new Date("2024-01-13"),
-    createdAt: new Date("2024-01-03"),
-  },
-  {
-    id: "4",
-    name: "Feature Request Collection",
-    description: "Collects and categorizes feature requests from users",
-    category: "custom",
-    status: "draft",
-    trigger: "feature, request, suggestion",
-    usageCount: 12,
-    successRate: 85,
-    updatedAt: new Date("2024-01-12"),
-    createdAt: new Date("2024-01-10"),
-  },
-  {
-    id: "5",
-    name: "Refund Process",
-    description: "Handles refund requests and initiates return process",
-    category: "customer-support",
-    status: "inactive",
-    trigger: "refund, return, money back",
-    usageCount: 67,
-    successRate: 88,
-    updatedAt: new Date("2024-01-11"),
-    createdAt: new Date("2024-01-05"),
-  },
-]);
+// Stats computed from playbooks
+const stats = computed(() => {
+  const total = playbooks.value.length;
+  const active = playbooks.value.filter(p => p.status === 'active').length;
+  const draft = playbooks.value.filter(p => p.status === 'draft').length;
+  
+  return {
+    total,
+    active,
+    avgSuccessRate: 0, // This would need to be calculated from actual usage data
+    totalTriggers: 0, // This would need to be calculated from actual usage data
+    newThisMonth: 0, // This would need to be calculated based on created_at dates
+  };
+});
 
 // Computed properties
 const filteredPlaybooks = computed(() => {
@@ -426,17 +353,17 @@ const filteredPlaybooks = computed(() => {
     const matchesSearch =
       !searchQuery.value ||
       playbook.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      playbook.description
+      (playbook.description && playbook.description
         .toLowerCase()
-        .includes(searchQuery.value.toLowerCase()) ||
-      playbook.trigger.toLowerCase().includes(searchQuery.value.toLowerCase());
+        .includes(searchQuery.value.toLowerCase())) ||
+      (playbook.instructions && playbook.instructions
+        .toLowerCase()
+        .includes(searchQuery.value.toLowerCase()));
 
-    const matchesCategory =
-      !selectedCategory.value || playbook.category === selectedCategory.value;
     const matchesStatus =
       !selectedStatus.value || playbook.status === selectedStatus.value;
 
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 });
 
@@ -473,12 +400,12 @@ const toggleView = () => {
 
 const createPlaybook = () => {
   // TODO: Navigate to playbook creation
-  navigateTo("/playbooks/new");
+  router.push("/playbooks/new");
 };
 
 const editPlaybook = (id: string) => {
   // TODO: Navigate to playbook editor
-  navigateTo(`/playbooks/${id}/edit`);
+  router.push(`/playbooks/${id}/edit`);
 };
 
 const duplicatePlaybook = (id: string) => {
@@ -486,9 +413,22 @@ const duplicatePlaybook = (id: string) => {
   console.log("Duplicate playbook:", id);
 };
 
-const deletePlaybook = (id: string) => {
-  // TODO: Implement playbook deletion with confirmation
-  console.log("Delete playbook:", id);
+const deletePlaybook = async (id: string) => {
+  if (!confirm('Are you sure you want to delete this playbook?')) {
+    return;
+  }
+  
+  try {
+    await $trpc.playbooks.delete.mutate({ id });
+    
+    // Remove from local list
+    playbooks.value = playbooks.value.filter(p => p.id !== id);
+    
+    toast('success', 'Playbook deleted successfully');
+  } catch (error) {
+    console.error('Failed to delete playbook:', error);
+    toast('error', 'Failed to delete playbook');
+  }
 };
 
 const togglePlaybookStatus = (id: string) => {
@@ -496,16 +436,23 @@ const togglePlaybookStatus = (id: string) => {
   console.log("Toggle status for playbook:", id);
 };
 
+// Fetch playbooks from API
+const fetchPlaybooks = async () => {
+  try {
+    loading.value = true;
+    const response = await $trpc.playbooks.list.query();
+    playbooks.value = response || [];
+  } catch (error) {
+    console.error('Failed to fetch playbooks:', error);
+    toast('error', 'Failed to load playbooks');
+  } finally {
+    loading.value = false;
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
-  // TODO: Fetch playbooks from API
-  // await fetchPlaybooks()
-  // await fetchStats()
-
-  // Simulate loading
-  setTimeout(() => {
-    loading.value = false;
-  }, 1000);
+  await fetchPlaybooks();
 });
 
 // Set page meta

@@ -1,24 +1,13 @@
 <template>
   <div class="container mx-auto max-w-4xl py-8">
-    <div class="mb-8 flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold mb-2">Edit Playbook</h1>
-        <p class="text-muted-foreground">
-          Update your playbook configuration
-        </p>
-      </div>
-      <Button variant="ghost" @click="() => router.push('/playbooks')">
-        <ArrowLeft class="h-4 w-4 mr-2" />
-        Back to list
-      </Button>
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">Create New Playbook</h1>
+      <p class="text-muted-foreground">
+        Define automated conversation flows for your agents
+      </p>
     </div>
 
-    <div v-if="loading" class="text-center py-12">
-      <Loader2 class="h-8 w-8 animate-spin mx-auto mb-4" />
-      <p class="text-muted-foreground">Loading playbook...</p>
-    </div>
-
-    <Card v-else-if="playbook">
+    <Card>
       <CardContent class="p-6">
         <form @submit.prevent="handleSubmit" class="space-y-6">
           <!-- Name Field -->
@@ -83,7 +72,7 @@
 
           <!-- Agent Selection -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">Assigned Agents</label>
+            <label class="text-sm font-medium">Assign Agents</label>
             <div v-if="loadingAgents" class="p-4 text-center text-muted-foreground">
               Loading agents...
             </div>
@@ -116,62 +105,37 @@
             </div>
           </div>
 
-          <!-- Metadata -->
-          <div class="space-y-2 text-sm text-muted-foreground">
-            <div>Created: {{ formatDate(playbook.created_at) }}</div>
-            <div>Last updated: {{ formatDate(playbook.updated_at) }}</div>
-          </div>
-
           <!-- Form Actions -->
-          <div class="flex justify-between pt-4">
+          <div class="flex justify-end space-x-4 pt-4">
             <Button
               type="button"
-              variant="destructive"
-              @click="handleDelete"
+              variant="outline"
+              @click="handleCancel"
               :disabled="isSubmitting"
             >
-              <Trash2 class="h-4 w-4 mr-2" />
-              Delete Playbook
+              Cancel
             </Button>
-            
-            <div class="flex space-x-4">
-              <Button
-                type="button"
-                variant="outline"
-                @click="handleCancel"
-                :disabled="isSubmitting"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" :disabled="isSubmitting || !form.name">
-                <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
-              </Button>
-            </div>
+            <Button type="submit" :disabled="isSubmitting || !form.name">
+              <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
+              {{ isSubmitting ? 'Creating...' : 'Create Playbook' }}
+            </Button>
           </div>
         </form>
       </CardContent>
     </Card>
-
-    <div v-else class="text-center py-12">
-      <p class="text-red-500">Playbook not found</p>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { Loader2, ArrowLeft, Trash2 } from 'lucide-vue-next';
-import type { Playbook, Agent, PlaybookStatus } from '~/types/playbook';
+import { useRouter } from 'vue-router';
+import { Loader2 } from 'lucide-vue-next';
+import type { PlaybookStatus, Agent } from '~/types/playbook';
 import { useToast } from '~/composables/useToast';
 
 const router = useRouter();
-const route = useRoute();
 const { $trpc } = useNuxtApp();
 const { toast } = useToast();
-
-const playbookId = route.params.id as string;
 
 // Form state
 const form = ref({
@@ -183,59 +147,21 @@ const form = ref({
 });
 
 // UI state
-const loading = ref(true);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
-const playbook = ref<Playbook | null>(null);
 const errors = ref<Record<string, string>>({});
 
-// Format date
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(date));
-};
-
-// Load playbook and agents on mount
+// Load agents on mount
 onMounted(async () => {
   try {
-    // Load playbook
-    loading.value = true;
-    const playbookResponse = await $trpc.playbooks.get.query({ id: playbookId });
-    
-    if (!playbookResponse) {
-      toast('error', 'Playbook not found');
-      await router.push('/playbooks');
-      return;
-    }
-    
-    playbook.value = playbookResponse;
-    
-    // Populate form
-    form.value = {
-      name: playbookResponse.name,
-      description: playbookResponse.description || '',
-      instructions: playbookResponse.instructions || '',
-      status: playbookResponse.status,
-      agentIds: playbookResponse.agents?.map((a: any) => a.id) || []
-    };
-    
-    // Load agents
     loadingAgents.value = true;
-    const agentsResponse = await $trpc.agents.list.query();
-    agents.value = agentsResponse || [];
-    
+    const response = await $trpc.agents.list.query();
+    agents.value = response || [];
   } catch (error) {
-    console.error('Failed to load data:', error);
-    toast('error', 'Failed to load playbook');
-    await router.push('/playbooks');
+    console.error('Failed to load agents:', error);
+    toast('error', 'Failed to load agents. Please try again.');
   } finally {
-    loading.value = false;
     loadingAgents.value = false;
   }
 });
@@ -266,45 +192,21 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
     
-    await $trpc.playbooks.update.mutate({
-      id: playbookId,
-      data: {
-        name: form.value.name,
-        description: form.value.description || undefined,
-        instructions: form.value.instructions || undefined,
-        status: form.value.status,
-        agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined
-      }
+    const response = await $trpc.playbooks.create.mutate({
+      name: form.value.name,
+      description: form.value.description || undefined,
+      instructions: form.value.instructions || undefined,
+      status: form.value.status,
+      agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined
     });
 
-    toast('success', 'Playbook updated successfully');
+    toast('success', 'Playbook created successfully');
 
-    await router.push('/playbooks');
+    // Navigate to the playbook edit page or list
+    await router.push(`/playbooks/${response.id}/edit`);
   } catch (error) {
-    console.error('Failed to update playbook:', error);
-    toast('error', 'Failed to update playbook. Please try again.');
-  } finally {
-    isSubmitting.value = false;
-  }
-};
-
-// Handle delete
-const handleDelete = async () => {
-  if (!confirm('Are you sure you want to delete this playbook? This action cannot be undone.')) {
-    return;
-  }
-
-  try {
-    isSubmitting.value = true;
-    
-    await $trpc.playbooks.delete.mutate({ id: playbookId });
-
-    toast('success', 'Playbook deleted successfully');
-
-    await router.push('/playbooks');
-  } catch (error) {
-    console.error('Failed to delete playbook:', error);
-    toast('error', 'Failed to delete playbook. Please try again.');
+    console.error('Failed to create playbook:', error);
+    toast('error', 'Failed to create playbook. Please try again.');
   } finally {
     isSubmitting.value = false;
   }
@@ -322,11 +224,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: 'Edit Playbook - Hay Dashboard',
+  title: 'Create Playbook - Hay Dashboard',
   meta: [
     {
       name: 'description',
-      content: 'Edit your automated conversation playbook'
+      content: 'Create a new automated conversation playbook'
     }
   ]
 });

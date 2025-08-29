@@ -3,7 +3,7 @@ import { authenticateBasicAuth } from "./basicAuth";
 import { authenticateBearerAuth } from "./bearerAuth";
 import { authenticateApiKeyAuth } from "./apiKeyAuth";
 import type { Request } from "express";
-
+import { TRPCError } from "@trpc/server";
 /**
  * Main authentication middleware that tries all authentication methods
  * Returns AuthUser if authenticated, null otherwise
@@ -69,7 +69,10 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
   const authUser = await authenticate(req);
 
   if (!authUser) {
-    throw new Error("Authentication required");
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
   }
 
   return authUser;

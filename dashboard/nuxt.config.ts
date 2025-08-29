@@ -14,7 +14,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       baseDomain:
-        process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.ai",
+        process.env["NODE_ENV"] === "development" ? "localhost:5173" : "hay.ai",
       apiBaseUrl:
         process.env["NODE_ENV"] === "development"
           ? "http://localhost:3000"

@@ -17,25 +17,22 @@ async function startServer() {
 
   const server = express();
 
-  // Add CORS middleware
+  // Add CORS middleware with proper configuration
   server.use(
     cors({
-      origin:
-        process.env.NODE_ENV === "production"
-          ? ["https://hay.so", "https://hay.ai", "https://hay.local"]
-          : [
-              "http://localhost:3001",
-              "http://localhost:5173",
-              "http://localhost:4000",
-              "http://127.0.0.1:3001",
-              "http://127.0.0.1:4000",
-            ],
+      origin: "http://localhost:5173",
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-organization-id"],
+      exposedHeaders: ["Content-Range", "X-Total-Count"],
+      maxAge: 86400,
+      optionsSuccessStatus: 204,
     })
   );
 
-  // Add JSON parsing middleware
-  server.use(express.json());
+  // Add JSON parsing middleware with increased size limit for document uploads
+  server.use(express.json({ limit: "50mb" }));
+  server.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
   // Add tRPC middleware with context
   server.use(
@@ -46,8 +43,43 @@ async function startServer() {
     })
   );
 
+  // Before starting the server, attempt to kill any process using the same port.
+  // This is a destructive operation, so let's discuss the implications:
+  // - This will forcibly terminate any process (not just Node) using the configured port.
+  // - This is generally safe in local/dev environments, but should be avoided in production.
+  // - We'll use 'child_process' to execute a platform-specific command.
+  // - If the port is not in use, the command will have no effect.
+
+  // Only run this in development mode for safety.
+  if (process.env.NODE_ENV === "development") {
+    const { execSync } = require("child_process");
+    const port = config.server.port;
+
+    try {
+      if (process.platform === "win32") {
+        // Windows: find and kill process using the port
+        execSync(
+          `for /f "tokens=5" %a in ('netstat -aon ^| find ":${port}" ^| find "LISTENING"') do taskkill /F /PID %a`,
+          { stdio: "ignore" }
+        );
+      } else {
+        // Unix/macOS: find and kill process using the port
+        execSync(`lsof -ti tcp:${port} | xargs -r kill -9`, {
+          stdio: "ignore",
+        });
+      }
+      console.log(`🛑 Killed any process running on port ${port}`);
+    } catch (err) {
+      // If no process is found, lsof/xargs/for will fail, which is fine
+      // Only log if it's not the "no process found" error
+      // (We ignore errors here to avoid blocking server start)
+    }
+  }
+
   server.listen(config.server.port, () => {
-    console.log(`🚀 Server is running on port ${config.server.port}`);
+    console.log(
+      `🚀 Server is running on port http://localhost:${config.server.port}`
+    );
   });
 }
 

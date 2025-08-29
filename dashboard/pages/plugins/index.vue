@@ -293,8 +293,6 @@
 </template>
 
 <script setup lang="ts">
-const { $api } = useNuxtApp();
-
 import {
   RefreshCw,
   Settings,
@@ -432,48 +430,9 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat("en-US").format(num);
 };
 
-const refreshData = async () => {
-  // loading.value = true;
-  // try {
-  //   // Fetch configured plugins
-  //   const { data: configuredPlugins } = await $api('/api/v1/plugins');
-  //   plugins.value = configuredPlugins || [];
-  //   // Fetch available plugins
-  //   const { data: available } = await $api('/api/v1/plugins/available');
-  //   availablePlugins.value = available || [];
-  //   // Fetch usage stats
-  //   const { data: usageStats } = await $api('/api/v1/plugins/stats');
-  //   stats.value = usageStats;
-  // } catch (error) {
-  //   console.error('Error fetching plugins:', error);
-  //   // TODO: Show error notification
-  // } finally {
-  //   loading.value = false;
-  // }
-};
+const refreshData = async () => {};
 
-const togglePlugin = async (plugin: Plugin) => {
-  // try {
-  //   const endpoint =
-  //     plugin.status === "active"
-  //       ? `/api/v1/plugins/${plugin.pluginId}/disable`
-  //       : `/api/v1/plugins/${plugin.pluginId}/enable`;
-  //   await $api(endpoint, {
-  //     method: "POST",
-  //   });
-  //   // Refresh data
-  //   await refreshData();
-  //   // TODO: Show success notification
-  //   console.log(
-  //     `Plugin ${
-  //       plugin.status === "active" ? "disabled" : "enabled"
-  //     } successfully`
-  //   );
-  // } catch (error) {
-  //   console.error("Error toggling plugin:", error);
-  //   // TODO: Show error notification
-  // }
-};
+const togglePlugin = async (plugin: Plugin) => {};
 
 // Lifecycle
 onMounted(async () => {

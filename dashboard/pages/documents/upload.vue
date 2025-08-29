@@ -309,7 +309,10 @@
               <span>Overall Progress</span>
               <span>{{ uploadedCount }}/{{ selectedFiles.length }} files</span>
             </div>
-            <Progress :value="overallProgress" class="h-2" />
+            <Progress
+              :value="(uploadedCount / selectedFiles.length) * 100"
+              class="h-2"
+            />
           </div>
 
           <!-- Individual File Progress -->
@@ -362,7 +365,18 @@
               </div>
             </div>
 
-            <Progress :value="file.progress || 0" class="h-1" />
+            <Progress
+              :value="
+                file.uploadStatus === 'completed'
+                  ? 100
+                  : file.uploadStatus === 'processing'
+                  ? 50
+                  : file.uploadStatus === 'uploading'
+                  ? 25
+                  : 0
+              "
+              class="h-1"
+            />
 
             <div
               v-if="file.uploadStatus === 'error'"
@@ -415,7 +429,6 @@ interface UploadFile extends File {
   description?: string;
   tags?: string;
   isActive?: boolean;
-  progress?: number;
   uploadStatus?: "pending" | "uploading" | "processing" | "completed" | "error";
   errorMessage?: string;
 }
@@ -432,15 +445,7 @@ const globalSettings = ref({
   isActive: true,
 });
 
-// Computed
-const overallProgress = computed(() => {
-  if (selectedFiles.value.length === 0) return 0;
-  const totalProgress = selectedFiles.value.reduce(
-    (sum, file) => sum + (file.progress || 0),
-    0
-  );
-  return Math.round(totalProgress / selectedFiles.value.length);
-});
+// Computed properties removed - using uploadedCount directly in template
 
 // Methods
 const getFileIcon = (type: string) => {
@@ -524,7 +529,6 @@ const addFiles = (files: File[]) => {
     uploadFile.description = "";
     uploadFile.tags = "";
     uploadFile.isActive = true;
-    uploadFile.progress = 0;
     uploadFile.uploadStatus = "pending";
 
     selectedFiles.value.push(uploadFile);
@@ -560,16 +564,14 @@ const startUpload = async () => {
   const organizationId = authToken.value ? "org_default" : "default"; // TODO: Parse from JWT or fetch from API
 
   try {
-    // Upload files sequentially to track individual progress
+    // Upload files sequentially
     for (let i = 0; i < selectedFiles.value.length; i++) {
       const file = selectedFiles.value[i];
       file.uploadStatus = "uploading";
-      file.progress = 10;
 
       try {
         // Read file content as base64
         const fileBuffer = await fileToBase64(file as File);
-        file.progress = 30;
 
         // Prepare the document data
         const documentData = {
@@ -587,14 +589,13 @@ const startUpload = async () => {
           visibility: "private" as any,
         };
 
-        file.progress = 50;
+        file.uploadStatus = "processing";
 
         // Upload using tRPC
         const response = await HayApi.documents.create.mutate(documentData);
 
         if (response && response.id) {
           file.uploadStatus = "completed";
-          file.progress = 100;
           uploadedCount.value++;
         } else {
           throw new Error("Invalid response from server");
@@ -604,7 +605,6 @@ const startUpload = async () => {
         file.uploadStatus = "error";
         file.errorMessage =
           fileError instanceof Error ? fileError.message : "Upload failed";
-        file.progress = 0;
       }
     }
 
@@ -651,7 +651,6 @@ const startUpload = async () => {
         file.uploadStatus = "error";
         file.errorMessage =
           error instanceof Error ? error.message : "Upload failed";
-        file.progress = 0;
       }
     }
   } finally {

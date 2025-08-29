@@ -447,60 +447,9 @@ let socket: any = null;
 const totalPages = computed(() => Math.ceil(totalJobs.value / pageSize.value));
 
 // Methods
-const fetchJobs = async () => {
-  // loading.value = true;
-  // try {
-  //   const params: any = {
-  //     limit: pageSize.value,
-  //     offset: (currentPage.value - 1) * pageSize.value,
-  //   };
-  //   if (statusFilter.value) {
-  //     params.status = statusFilter.value;
-  //   }
-  //   if (typeFilter.value) {
-  //     params.type = typeFilter.value;
-  //   }
-  //   const response = await $api.get("/api/v1/jobs", { params });
-  //   jobs.value = response.jobs;
-  //   totalJobs.value = response.total;
-  // } catch (error: any) {
-  //   console.error("Failed to fetch jobs:", error);
-  // } finally {
-  //   loading.value = false;
-  // }
-};
+const fetchJobs = async () => {};
 
-const fetchStats = async () => {
-  // try {
-  //   const response = await $api.get('/api/v1/jobs/stats');
-  //   const statsByStatus = response.byStatus || [];
-  //   stats.value = {
-  //     pending: 0,
-  //     processing: 0,
-  //     completed: 0,
-  //     failed: 0,
-  //   };
-  //   statsByStatus.forEach((stat: any) => {
-  //     switch (stat.status) {
-  //       case 'pending':
-  //       case 'queued':
-  //         stats.value.pending += parseInt(stat.count);
-  //         break;
-  //       case 'processing':
-  //         stats.value.processing += parseInt(stat.count);
-  //         break;
-  //       case 'completed':
-  //         stats.value.completed += parseInt(stat.count);
-  //         break;
-  //       case 'failed':
-  //         stats.value.failed += parseInt(stat.count);
-  //         break;
-  //     }
-  //   });
-  // } catch (error: any) {
-  //   console.error('Failed to fetch job stats:', error);
-  // }
-};
+const fetchStats = async () => {};
 
 const refreshData = async () => {
   await Promise.all([fetchJobs(), fetchStats()]);
@@ -526,23 +475,9 @@ const viewJobDetails = (job: any) => {
   showDetailsModal.value = true;
 };
 
-const retryJob = async (job: any) => {
-  // try {
-  //   await $api.post(`/api/v1/jobs/${job.id}/retry`);
-  //   await refreshData();
-  // } catch (error: any) {
-  //   console.error("Failed to retry job:", error);
-  // }
-};
+const retryJob = async (job: any) => {};
 
-const cancelJob = async (job: any) => {
-  // try {
-  //   await $api.post(`/api/v1/jobs/${job.id}/cancel`);
-  //   await refreshData();
-  // } catch (error: any) {
-  //   console.error("Failed to cancel job:", error);
-  // }
-};
+const cancelJob = async (job: any) => {};
 
 // Formatting helpers
 const formatJobType = (type: string) => {

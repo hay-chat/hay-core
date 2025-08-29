@@ -122,14 +122,31 @@
                 }}</CardDescription>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 w-8 p-0"
-              @click="showOptionsMenu(agent)"
-            >
-              <MoreVertical class="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+                  <MoreVertical class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem @click="viewAgent(agent.id)">
+                  <Settings class="mr-2 h-4 w-4" />
+                  Manage
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleAgentStatus(agent)">
+                  <Power class="mr-2 h-4 w-4" />
+                  {{ agent.status === "active" ? "Disable" : "Enable" }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  class="text-destructive"
+                  @click="() => deleteAgent(agent)"
+                >
+                  <Trash2 class="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent>
@@ -295,6 +312,19 @@
         </CardContent>
       </Card>
     </div>
+
+    <!-- Toast Container -->
+    <ToastContainer />
+
+    <!-- Confirm Delete Dialog -->
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-text="Delete"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 
@@ -312,12 +342,14 @@ import {
   Star,
 } from "lucide-vue-next";
 
-// TODO: Import agent store/composable
-// TODO: Import router for navigation
+import { useRouter } from "vue-router";
+import { useToast } from "@/composables/useToast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import ToastContainer from "@/components/ui/ToastContainer.vue";
+import { HayApi } from "@/utils/api";
 
 definePageMeta({
-  // TODO: Add authentication middleware
-  // // middleware: 'auth'
+  // Auth is handled by global middleware
 });
 
 // State
@@ -326,89 +358,18 @@ const searchQuery = ref("");
 const statusFilter = ref("");
 const typeFilter = ref("");
 const selectedAgents = ref<string[]>([]);
+const router = useRouter();
+const toast = useToast();
 
-// Mock agents data - TODO: Replace with real API calls
-const agents = ref([
-  {
-    id: "1",
-    name: "Customer Support Bot",
-    description: "Handles general customer inquiries and support tickets",
-    status: "active",
-    type: "customer-support",
-    conversationCount: 1234,
-    resolutionRate: 94,
-    avgResponseTime: 1.2,
-    satisfactionScore: 4.6,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-    createdAt: new Date("2023-01-15"),
-  },
-  {
-    id: "2",
-    name: "Sales Assistant",
-    description: "Qualifies leads and schedules sales meetings",
-    status: "active",
-    type: "sales",
-    conversationCount: 892,
-    resolutionRate: 87,
-    avgResponseTime: 2.1,
-    satisfactionScore: 4.3,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
-    createdAt: new Date("2023-02-20"),
-  },
-  {
-    id: "3",
-    name: "Technical Support",
-    description: "Provides technical assistance and troubleshooting",
-    status: "active",
-    type: "technical",
-    conversationCount: 567,
-    resolutionRate: 91,
-    avgResponseTime: 3.5,
-    satisfactionScore: 4.5,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    createdAt: new Date("2023-03-10"),
-  },
-  {
-    id: "4",
-    name: "Billing Assistant",
-    description: "Handles billing inquiries and payment issues",
-    status: "inactive",
-    type: "customer-support",
-    conversationCount: 345,
-    resolutionRate: 89,
-    avgResponseTime: 1.8,
-    satisfactionScore: 4.2,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    createdAt: new Date("2023-04-05"),
-  },
-  {
-    id: "5",
-    name: "Product Demo Bot",
-    description: "Provides product demonstrations and feature explanations",
-    status: "training",
-    type: "sales",
-    conversationCount: 78,
-    resolutionRate: 76,
-    avgResponseTime: 4.2,
-    satisfactionScore: 3.9,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-    createdAt: new Date("2023-11-12"),
-  },
-  {
-    id: "6",
-    name: "General Assistant",
-    description:
-      "Handles miscellaneous inquiries and provides general information",
-    status: "error",
-    type: "general",
-    conversationCount: 156,
-    resolutionRate: 82,
-    avgResponseTime: 2.8,
-    satisfactionScore: 4.0,
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-    createdAt: new Date("2023-10-20"),
-  },
-]);
+// Agents data from API
+const agents = ref<any[]>([]);
+
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const deleteDialogTitle = ref("");
+const deleteDialogDescription = ref("");
+const agentToDelete = ref<any>(null);
+const isBulkDelete = ref(false);
 
 // Computed
 const filteredAgents = computed(() => {
@@ -467,14 +428,25 @@ const formatDate = (date: Date) => {
 const refreshData = async () => {
   loading.value = true;
   try {
-    // TODO: Fetch agents from API
-    console.log("Refreshing agents data...");
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  } catch (error) {
+    const result = await HayApi.agents.list.query();
+    agents.value = result.map((agent: any) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description || '',
+      status: agent.enabled ? 'active' : 'inactive',
+      type: 'general',
+      conversationCount: 0,
+      resolutionRate: 0,
+      avgResponseTime: 0,
+      satisfactionScore: 0,
+      lastActivity: new Date(agent.updated_at),
+      createdAt: new Date(agent.created_at),
+      enabled: agent.enabled,
+      instructions: agent.instructions
+    }));
+  } catch (error: any) {
     console.error("Error refreshing data:", error);
-    // TODO: Show error notification
+    toast.error(error.message || 'Failed to load agents');
   } finally {
     loading.value = false;
   }
@@ -507,41 +479,44 @@ const toggleAgentSelection = (agentId: string) => {
 };
 
 const createAgent = () => {
-  // TODO: Navigate to agent creation wizard
-  // await navigateTo('/agents/new')
-  console.log("Create agent");
+  router.push('/agents/create');
 };
 
 const viewAgent = (id: string) => {
-  // TODO: Navigate to agent detail page
-  // await navigateTo(`/agents/${id}`)
-  console.log("View agent:", id);
+  router.push(`/agents/${id}`);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toggleAgentStatus = async (agent: any) => {
   try {
-    // TODO: Toggle agent status via API
-    console.log("Toggle agent status:", agent.id);
+    const newEnabledState = agent.status !== "active";
+    await HayApi.agents.update.mutate({
+      id: agent.id,
+      data: {
+        enabled: newEnabledState
+      }
+    });
 
     // Update local state
-    agent.status = agent.status === "active" ? "inactive" : "active";
-
-    // TODO: Show success notification
-  } catch (error) {
+    agent.status = newEnabledState ? "active" : "inactive";
+    agent.enabled = newEnabledState;
+    
+    toast.success(`Agent ${newEnabledState ? 'enabled' : 'disabled'} successfully`);
+  } catch (error: any) {
     console.error("Error toggling agent status:", error);
-    // TODO: Show error notification
+    toast.error(error.message || 'Failed to toggle agent status');
   }
 };
 
-const showOptionsMenu = (agent: any) => {
-  // TODO: Show context menu with options like:
-  // - View details
-  // - Edit configuration
-  // - Clone agent
-  // - Export settings
-  // - Delete agent
-  console.log("Show options for agent:", agent.id);
+const deleteAgent = (agent: any) => {
+  agentToDelete.value = agent;
+  isBulkDelete.value = false;
+  deleteDialogTitle.value = "Delete Agent";
+  deleteDialogDescription.value = `Are you sure you want to delete "${agent.name}"? This action cannot be undone and will also delete all associated data.`;
+  
+  nextTick(() => {
+    showDeleteDialog.value = true;
+  });
 };
 
 const bulkToggleStatus = async () => {
@@ -570,27 +545,91 @@ const bulkExport = async () => {
   }
 };
 
-const bulkDelete = async () => {
-  try {
-    // TODO: Show confirmation dialog
-    // TODO: Delete selected agents
-    console.log("Bulk delete agents:", selectedAgents.value);
+const bulkDelete = () => {
+  if (selectedAgents.value.length === 0) return;
+  
+  isBulkDelete.value = true;
+  deleteDialogTitle.value = "Delete Agents";
+  deleteDialogDescription.value = `Are you sure you want to delete ${selectedAgents.value.length} agent${
+    selectedAgents.value.length === 1 ? "" : "s"
+  }? This action cannot be undone and will also delete all associated data.`;
+  showDeleteDialog.value = true;
+};
 
-    // TODO: Remove from local state
-    // TODO: Show success notification
+const confirmDelete = async () => {
+  if (isBulkDelete.value) {
+    await performBulkDelete();
+  } else {
+    await performSingleDelete();
+  }
+};
+
+const performSingleDelete = async () => {
+  if (!agentToDelete.value) return;
+  
+  try {
+    const result = await HayApi.agents.delete.mutate({
+      id: agentToDelete.value.id,
+    });
+    
+    if (result.success) {
+      const index = agents.value.findIndex((a) => a.id === agentToDelete.value.id);
+      if (index > -1) {
+        agents.value.splice(index, 1);
+      }
+      
+      toast.success(result.message || 'Agent deleted successfully');
+    }
+  } catch (error: any) {
+    console.error("Error deleting agent:", error);
+    toast.error(error.message || 'Failed to delete agent. Please try again.');
+  } finally {
+    agentToDelete.value = null;
+  }
+};
+
+const performBulkDelete = async () => {
+  const errors: string[] = [];
+  const successfulDeletes: string[] = [];
+  const totalCount = selectedAgents.value.length;
+  
+  try {
+    for (const agentId of selectedAgents.value) {
+      try {
+        const result = await HayApi.agents.delete.mutate({
+          id: agentId,
+        });
+        
+        if (result.success) {
+          successfulDeletes.push(agentId);
+        }
+      } catch (error) {
+        errors.push(agentId);
+        console.error(`Error deleting agent ${agentId}:`, error);
+      }
+    }
+    
+    agents.value = agents.value.filter(
+      (agent) => !successfulDeletes.includes(agent.id)
+    );
+    
     selectedAgents.value = [];
-  } catch (error) {
+    
+    if (errors.length > 0) {
+      toast.warning(
+        `Successfully deleted ${successfulDeletes.length} agent(s). Failed to delete ${errors.length} agent(s).`
+      );
+    } else {
+      toast.success(`Successfully deleted ${successfulDeletes.length} agent(s)`);
+    }
+  } catch (error: any) {
     console.error("Error deleting agents:", error);
-    // TODO: Show error notification
+    toast.error(error.message || 'Failed to delete agents. Please try again.');
   }
 };
 
 // Lifecycle
 onMounted(async () => {
-  // TODO: Load agents on mount
-  console.log("Agents page mounted");
-
-  // Load data
   await refreshData();
 });
 

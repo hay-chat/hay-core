@@ -5,7 +5,9 @@
   "main": "main.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon main.ts",
+    "dev": "fuser -k 3000/tcp 4000/tcp 5000/tcp || true && nodemon main.ts",
+    "dev:clean": "fuser -k 3000/tcp 4000/tcp 5000/tcp || true && nodemon main.ts",
+    "kill-ports": "fuser -k 3000/tcp 4000/tcp 5000/tcp || true",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d ./database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",

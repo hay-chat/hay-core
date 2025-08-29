@@ -31,6 +31,7 @@ export class VectorStoreService {
   private vectorStore: TypeORMVectorStore | null = null;
   private embeddings: OpenAIEmbeddings;
   private readonly embeddingDim: number;
+  private _initialized: boolean = false;
 
   constructor() {
     // Initialize OpenAI embeddings
@@ -41,6 +42,10 @@ export class VectorStoreService {
     });
 
     this.embeddingDim = parseInt(process.env.EMBEDDING_DIM || "1536");
+  }
+
+  get initialized(): boolean {
+    return this._initialized;
   }
 
   /**
@@ -70,6 +75,8 @@ export class VectorStoreService {
         tableName: "embeddings",
       }
     );
+    
+    this._initialized = true;
   }
 
   /**

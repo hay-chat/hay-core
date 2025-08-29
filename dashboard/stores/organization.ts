@@ -1,10 +1,5 @@
 import { defineStore } from "pinia";
-
-export interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-}
+import type { Organization } from "./user";
 
 export const useOrganizationStore = defineStore("organization", {
   persist: true,

@@ -1,4 +1,4 @@
-import { beforeEach } from 'vitest';
+import { beforeEach } from "vitest";
 
 // Global test setup
 beforeEach(() => {
@@ -6,7 +6,7 @@ beforeEach(() => {
 });
 
 // Mock window and global objects
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: {
     getItem: () => null,
     setItem: () => {},
@@ -16,12 +16,12 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-Object.defineProperty(window, 'location', {
+Object.defineProperty(window, "location", {
   value: {
-    href: '',
-    origin: 'http://localhost:3000',
-    protocol: 'http:',
-    host: 'localhost:3000',
+    href: "",
+    origin: "http://localhost:5173",
+    protocol: "http:",
+    host: "localhost:5173",
   },
   writable: true,
 });
