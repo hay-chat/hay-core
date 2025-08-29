@@ -3,12 +3,14 @@ import { authRouter } from "./auth";
 import { documentsRouter } from "./documents";
 import { agentsRouter } from "./agents";
 import { playbooksRouter } from "./playbooks";
+import { conversationsRouter } from "./conversations";
 
 const AppRouter = router({
   auth: authRouter,
   documents: documentsRouter,
   agents: agentsRouter,
   playbooks: playbooksRouter,
+  conversations: conversationsRouter,
 });
 
 export const v1Router = AppRouter;
