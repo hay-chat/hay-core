@@ -84,7 +84,7 @@ async function startServer() {
 
     // Start the orchestrator worker if database is connected
     if (dbConnected) {
-      orchestratorWorker.start(5000); // Check every second
+      orchestratorWorker.start(config.orchestrator.interval); // Check every second
       console.log("🤖 Orchestrator worker started");
     }
   });

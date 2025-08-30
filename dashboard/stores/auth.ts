@@ -46,7 +46,7 @@ export const useAuthStore = defineStore("auth", {
       this.tokens = {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+        expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
       };
       const userStore = useUserStore();
       userStore.setUser(result.user as User);
@@ -115,7 +115,7 @@ export const useAuthStore = defineStore("auth", {
       this.tokens = {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+        expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
       };
 
       // Store user data with organization
@@ -130,21 +130,30 @@ export const useAuthStore = defineStore("auth", {
         throw new Error("No refresh token available");
       }
 
-      const result = await HayApi.auth.refreshToken.mutate({
-        refreshToken: this.tokens.refreshToken,
-      });
+      try {
+        const result = await HayApi.auth.refreshToken.mutate({
+          refreshToken: this.tokens.refreshToken,
+        });
 
-      // Keep the existing refresh token, only update access token
-      this.tokens = {
-        accessToken: result.accessToken,
-        refreshToken: this.tokens.refreshToken, // Keep existing refresh token
-        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
-      };
+        // Keep the existing refresh token, only update access token
+        this.tokens = {
+          accessToken: result.accessToken,
+          refreshToken: this.tokens.refreshToken, // Keep existing refresh token
+          expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
+        };
 
-      // Update cookie
-      if (process.client) {
-        const token = useCookie("auth-token");
-        token.value = result.accessToken;
+        // Update cookie
+        if (process.client) {
+          const token = useCookie("auth-token");
+          token.value = result.accessToken;
+        }
+        
+        this.updateActivity();
+        return;
+      } catch (error) {
+        // If refresh fails, clear auth state
+        console.error('[Auth] Failed to refresh token:', error);
+        throw error;
       }
     },
   },

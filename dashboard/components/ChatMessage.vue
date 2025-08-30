@@ -5,7 +5,9 @@
     </div>
     <div class="chat-message__content">
       <div class="chat-message__header">
-        <span v-if="senderName" class="chat-message__sender">{{ senderName }}</span>
+        <span v-if="senderName" class="chat-message__sender">{{
+          senderName
+        }}</span>
         <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
@@ -14,13 +16,15 @@
           </Badge>
         </div>
       </div>
-      <div :class="['chat-message__bubble', {
-        'chat-message__bubble--needs-approval': metadata?.needsApproval
-      }]">
-        <div
-          class="chat-message__text"
-          v-html="markdownToHtml(content)"
-        ></div>
+      <div
+        :class="[
+          'chat-message__bubble',
+          {
+            'chat-message__bubble--needs-approval': metadata?.needsApproval,
+          },
+        ]"
+      >
+        <div class="chat-message__text" v-html="markdownToHtml(content)"></div>
         <div v-if="attachments?.length" class="chat-message__attachments">
           <div
             v-for="attachment in attachments"
@@ -49,10 +53,7 @@
           v-else-if="metadata && variant === 'agent'"
           class="chat-message__metadata"
         >
-          <div
-            v-if="metadata.tool"
-            class="chat-message__tool"
-          >
+          <div v-if="metadata.tool" class="chat-message__tool">
             <Wrench class="chat-message__tool-icon" />
             <span>Used: {{ metadata.tool }}</span>
           </div>
@@ -127,9 +128,9 @@ const formattedTime = computed(() => {
 });
 
 const avatarIcon = computed(() => {
-  if (props.variant === 'customer') return User;
-  if (props.variant === 'agent') return Bot;
-  
+  if (props.variant === "customer") return User;
+  if (props.variant === "agent") return Bot;
+
   // System message icons
   const action = props.metadata?.action;
   switch (action) {
@@ -270,7 +271,22 @@ const avatarIcon = computed(() => {
 
 /* Markdown content styles */
 .chat-message__text :deep(ol) {
-  @apply list-decimal pl-4 my-2;
+  @apply list-decimal pl-8 my-2;
+}
+
+.chat-message__text :deep(ul) {
+  @apply list-disc pl-8 my-2;
+}
+
+.chat-message__text :deep(ol ol),
+.chat-message__text :deep(ol ul),
+.chat-message__text :deep(ul ol),
+.chat-message__text :deep(ul ul) {
+  @apply my-1 pl-4;
+}
+
+.chat-message__text :deep(li) {
+  @apply my-1;
 }
 
 .chat-message__text :deep(p) {

@@ -11,6 +11,7 @@ import {
 import { Organization } from "../../entities/organization.entity";
 import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
+import { Customer } from "./customer.entity";
 
 @Entity("conversations")
 export class Conversation {
@@ -35,6 +36,9 @@ export class Conversation {
 
   @Column({ type: "timestamptz", nullable: true })
   ended_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  closed_at!: Date | null;
 
   @Column({ type: "jsonb", nullable: true })
   context!: Record<string, any> | null;
@@ -67,6 +71,13 @@ export class Conversation {
 
   @Column({ type: "timestamptz", nullable: true })
   last_processed_at!: Date | null;
+
+  @Column({ type: "uuid", nullable: true })
+  customer_id!: string | null;
+
+  @ManyToOne(() => Customer, customer => customer.conversations, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "customer_id" })
+  customer!: Customer | null;
 
   @OneToMany(() => Message, message => message.conversation)
   messages!: Message[];

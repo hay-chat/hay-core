@@ -1,15 +1,18 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { MessageRepository } from "../repositories/message.repository";
+import { CustomerService } from "./customer.service";
 import { Conversation } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageRepository: MessageRepository;
+  private customerService: CustomerService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
+    this.customerService = new CustomerService();
   }
 
   async createConversation(organizationId: string, data: {
@@ -18,7 +21,15 @@ export class ConversationService {
     playbook_id?: string | null;
     metadata?: Record<string, any>;
     status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
+    customer_id?: string | null;
   }): Promise<Conversation> {
+    // If no customer_id is provided, create an anonymous customer
+    let customerId = data.customer_id;
+    if (!customerId) {
+      const anonymousCustomer = await this.customerService.createAnonymousCustomer(organizationId);
+      customerId = anonymousCustomer.id;
+    }
+
     return await this.conversationRepository.create({
       title: data.title || "New Conversation",
       agent_id: data.agentId || null,
@@ -27,7 +38,8 @@ export class ConversationService {
       status: data.status || "open",
       context: {},
       metadata: data.metadata || {},
-      needs_processing: data.status === "open" || data.status === "processing"
+      needs_processing: data.status === "open" || data.status === "processing",
+      customer_id: customerId
     });
   }
 
@@ -55,11 +67,17 @@ export class ConversationService {
       cooldown_until?: Date | null;
       last_user_message_at?: Date;
       ended_at?: Date;
+      closed_at?: Date | null;
       context?: Record<string, any>;
       resolution_metadata?: { resolved: boolean; confidence: number; reason: string };
     }
   ): Promise<Conversation | null> {
-    return await this.conversationRepository.update(conversationId, organizationId, data);
+    // Automatically set closed_at when status changes to closed or resolved
+    const updateData = { ...data };
+    if (data.status === 'closed' || data.status === 'resolved') {
+      updateData.closed_at = new Date();
+    }
+    return await this.conversationRepository.update(conversationId, organizationId, updateData);
   }
 
   async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {

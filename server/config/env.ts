@@ -69,6 +69,10 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
+  orchestrator: {
+    interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
+  },
+
   conversation: {
     cooldownInterval: parseInt(
       process.env.CONVERSATION_COOLDOWN_INTERVAL || "10000",

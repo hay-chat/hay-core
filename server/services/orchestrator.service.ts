@@ -244,7 +244,7 @@ export class OrchestratorService {
   ): Promise<void> {
     await this.conversationService.addMessage(conversationId, organizationId, {
       content:
-        "I apologize, but there are no available agents to assist you at the moment. A human representative will help you shortly.",
+        "I understand you'd like assistance. I'll make sure a human representative is notified to help you as soon as possible.",
       type: MessageType.AI_MESSAGE,
       sender: "system",
     });
@@ -263,6 +263,35 @@ export class OrchestratorService {
     conversation: any,
     organizationId: string
   ): Promise<OrchestrationPlan> {
+    // First check if user is requesting human assistance
+    const humanRequestPatterns = [
+      /\b(speak|talk|chat)\s+(to|with)\s+(a\s+)?(human|person|agent|representative|someone)/i,
+      /\b(want|need|like)\s+(a\s+)?(human|person|agent|representative)/i,
+      /transfer\s+me/i,
+      /real\s+person/i,
+      /live\s+support/i,
+      /customer\s+service/i
+    ];
+    
+    if (humanRequestPatterns.some(pattern => pattern.test(userMessage))) {
+      console.log(`[Orchestrator] Detected human assistance request, using human escalation playbook`);
+      
+      // Try to find the human escalation playbook
+      const playbooks = await this.playbookService.getPlaybooks(organizationId);
+      const humanEscalationPlaybook = playbooks.find(
+        p => p.trigger === 'human_escalation' && p.status === 'active'
+      );
+      
+      if (humanEscalationPlaybook) {
+        return {
+          path: "playbook",
+          agentId: conversation.agent_id,
+          playbookId: humanEscalationPlaybook.id,
+          requiredFields: [],
+        };
+      }
+    }
+    
     // Check if we should use document retrieval or playbook path
     let useDocQA = false;
     
@@ -349,10 +378,28 @@ export class OrchestratorService {
         5
       );
 
-      if (!results || results.length === 0) {
+      // Filter out test data and potentially fake information
+      const filteredResults = results?.filter(r => {
+        const content = r.content?.toLowerCase() || '';
+        const metadata = r.metadata || {};
+        
+        // Check for obvious test/example data patterns
+        const isFakeData = 
+          content.includes('@example.com') ||
+          content.includes('1-800-') ||
+          content.includes('support@example') ||
+          content.includes('test-') ||
+          content.includes('example.com') ||
+          metadata.source?.toLowerCase().includes('test') ||
+          metadata.source?.toLowerCase().includes('example');
+        
+        return !isFakeData;
+      }) || [];
+
+      if (!filteredResults || filteredResults.length === 0) {
         return {
           content:
-            "I couldn't find any relevant information about that in my knowledge base. Would you like me to connect you with a human representative who can help?",
+            "I don't have specific information about that in my knowledge base. I'd be happy to help you with other questions, or I can connect you with a human representative who might have more details.",
           includeEnder: false,
           metadata: {
             path: "docqa",
@@ -362,7 +409,7 @@ export class OrchestratorService {
       }
 
       // Format results with citations
-      const formattedResults = results
+      const formattedResults = filteredResults
         .map(
           (r, i) =>
             `[${i + 1}] ${r.content} (${
@@ -451,12 +498,30 @@ export class OrchestratorService {
         5 // Get top 5 most relevant documents
       );
       
-      if (searchResults && searchResults.length > 0) {
-        console.log(`[Orchestrator] Found ${searchResults.length} relevant documents`);
+      // Filter out test data and potentially fake information
+      const filteredSearchResults = searchResults?.filter(r => {
+        const content = r.content?.toLowerCase() || '';
+        const metadata = r.metadata || {};
+        
+        // Check for obvious test/example data patterns
+        const isFakeData = 
+          content.includes('@example.com') ||
+          content.includes('1-800-') ||
+          content.includes('support@example') ||
+          content.includes('test-') ||
+          content.includes('example.com') ||
+          metadata.source?.toLowerCase().includes('test') ||
+          metadata.source?.toLowerCase().includes('example');
+        
+        return !isFakeData;
+      }) || [];
+      
+      if (filteredSearchResults && filteredSearchResults.length > 0) {
+        console.log(`[Orchestrator] Found ${filteredSearchResults.length} relevant documents (filtered from ${searchResults?.length || 0})`);
         
         // Format the retrieved documents as context
         ragContext = "\n\n## Relevant Information from Knowledge Base:\n";
-        searchResults.forEach((result, index) => {
+        filteredSearchResults.forEach((result, index) => {
           ragContext += `\n[Document ${index + 1}] (Relevance: ${(result.similarity || 0).toFixed(2)}):\n`;
           ragContext += result.content;
           if (result.metadata?.source) {
@@ -485,25 +550,55 @@ export class OrchestratorService {
       
       // Add any additional context from playbook
       if (playbook.instructions) {
-        systemPrompt += `\n\nInstructions:\n${playbook.instructions}`;
+        // Handle both JSON object and string formats for instructions
+        const instructionText = typeof playbook.instructions === 'object' 
+          ? playbook.instructions.text || JSON.stringify(playbook.instructions)
+          : playbook.instructions;
+        systemPrompt += `\n\nInstructions:\n${instructionText}`;
       }
     } else {
       console.log(`[Orchestrator] No playbook found, using default AI assistant`);
-      // Default system prompt
+      // Default system prompt with anti-hallucination instructions
       systemPrompt = `You are a helpful AI assistant. Your role is to assist users with their requests in a friendly and professional manner.
       
       Guidelines:
-      - Be helpful and informative
+      - Be helpful and informative based ONLY on information you have been provided
       - Ask clarifying questions when needed
       - Provide clear and concise answers
-      - Be polite and professional`;
+      - Be polite and professional
+      - NEVER make up contact information, URLs, or specific details you don't have
+      - When you don't know something, say "I don't have that specific information"
+      - For human assistance requests, acknowledge and say you'll help connect them without providing fake contact details`;
     }
 
     // Add RAG context to system prompt if available
     if (ragContext) {
       systemPrompt += ragContext;
-      systemPrompt += "\n\nPlease use the above information from the knowledge base to help answer the user's question when relevant.";
+      systemPrompt += "\n\nIMPORTANT: Use ONLY the above information from the knowledge base when answering questions. If the information needed is not available above, you MUST say you don't have that information rather than making something up.";
     }
+
+    // Add strict anti-hallucination instructions
+    systemPrompt += `\n\n## CRITICAL INSTRUCTIONS - NEVER VIOLATE THESE RULES:\n\n1. **NEVER make up or invent information**, especially:
+   - Contact information (emails, phone numbers, addresses)
+   - Website URLs or portals
+   - Support hours or availability
+   - Company policies or procedures
+   - Product features or specifications
+   - Names of people or departments
+\n2. **When you don't have specific information**, you MUST:
+   - Acknowledge that you don't have that information
+   - Offer to help in other ways if possible
+   - Suggest that a human representative can provide the specific details
+\n3. **NEVER use example or placeholder data** like:
+   - "support@example.com" or any @example.com emails
+   - "1-800-" numbers or any made-up phone numbers  
+   - "example.com" or any fictional websites
+   - Generic department names you're not certain exist
+\n4. **For requests to speak with a human**:
+   - Simply acknowledge the request
+   - Say you'll help connect them with a human representative
+   - Do NOT provide fake contact information
+   - Do NOT make up support hours or availability`
 
     // Add conversation context if there's history
     if (conversationHistory && messages.length > 1) {
@@ -777,7 +872,7 @@ Respond with ONLY the title, nothing else.`;
         organizationId,
         {
           content:
-            "I'll connect you with a human representative right away. Is there anything specific you'd like me to note for them?",
+            "I understand you'd like to speak with a human representative. I'll make sure your request is prioritized. Is there anything specific you'd like me to note for them about your inquiry?",
           type: MessageType.AI_MESSAGE,
           sender: "system",
         }

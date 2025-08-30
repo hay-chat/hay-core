@@ -22,6 +22,7 @@ export class Embedding {
 
   @Column({
     type: "text",
+    nullable: true,
     transformer: {
       to: (value: number[] | null): string | null => {
         if (!value || !Array.isArray(value)) return null;
@@ -42,7 +43,7 @@ export class Embedding {
       }
     }
   })
-  embedding!: number[];
+  embedding?: number[] | null;
 
   // Relationships
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })

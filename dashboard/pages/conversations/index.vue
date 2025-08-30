@@ -11,11 +11,10 @@
       <div class="flex items-center space-x-2">
         <Button
           size="sm"
-          @click="createConversation"
-          :disabled="creatingConversation"
+          @click="openPlayground"
         >
           <Plus class="h-4 w-4 mr-2" />
-          New Conversation
+          Conversation Playground
         </Button>
         <Button variant="outline" size="sm">
           <Download class="h-4 w-4 mr-2" />
@@ -147,15 +146,6 @@
       </div>
     </div>
 
-    <!-- Real-time indicator -->
-    <div
-      v-if="realTimeEnabled"
-      class="flex items-center space-x-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-md"
-    >
-      <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-      <span>Real-time updates enabled</span>
-    </div>
-
     <!-- Loading State -->
     <div v-if="loading" class="space-y-4">
       <div v-for="i in 5" :key="i" class="animate-pulse">
@@ -203,11 +193,10 @@
       </p>
       <Button
         v-if="!searchQuery"
-        @click="createConversation"
-        :disabled="creatingConversation"
+        @click="openPlayground"
       >
         <Plus class="h-4 w-4 mr-2" />
-        New Conversation
+        Start Playground
       </Button>
     </div>
 
@@ -415,7 +404,6 @@ const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
-const creatingConversation = ref(false);
 
 // API data
 const conversations = ref<any[]>([]);
@@ -611,20 +599,8 @@ const showMoreActions = (id: string) => {
   console.log("Show more actions for conversation:", id);
 };
 
-const createConversation = async () => {
-  try {
-    creatingConversation.value = true;
-    const conversation = await HayApi.conversations.create.mutate({
-      title: "New Conversation",
-    });
-    await fetchConversations();
-    router.push(`/conversations/${conversation.id}`);
-  } catch (err) {
-    console.error("Failed to create conversation:", err);
-    error.value = "Failed to create conversation";
-  } finally {
-    creatingConversation.value = false;
-  }
+const openPlayground = () => {
+  router.push("/conversations/playground");
 };
 
 const fetchConversations = async () => {

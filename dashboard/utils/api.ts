@@ -19,6 +19,61 @@ function getOrganizationId(): string {
   return userStore.activeOrganization?.id || "";
 }
 
+// Check if token is about to expire (within 1 minute)
+function isTokenExpiringSoon(): boolean {
+  const authStore = useAuthStore();
+  if (!authStore.tokens?.expiresAt) return false;
+  
+  const timeUntilExpiry = authStore.tokens.expiresAt - Date.now();
+  return timeUntilExpiry < 60000; // Less than 1 minute
+}
+
+// Track if we're currently refreshing to avoid multiple refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
+
+// Refresh the access token
+async function refreshTokenIfNeeded(): Promise<void> {
+  const authStore = useAuthStore();
+  
+  // If not authenticated or no refresh token, skip
+  if (!authStore.isAuthenticated || !authStore.tokens?.refreshToken) {
+    return;
+  }
+  
+  // Check if token is expiring soon
+  if (!isTokenExpiringSoon()) {
+    return;
+  }
+  
+  // If already refreshing, wait for the existing refresh to complete
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+  
+  isRefreshing = true;
+  
+  refreshPromise = authStore.refreshTokens()
+    .then(() => {
+      console.log('[API] Token refreshed successfully');
+    })
+    .catch((error) => {
+      console.error('[API] Failed to refresh token:', error);
+      // If refresh fails, logout the user
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          authStore.logout('token_expired');
+        }, 0);
+      }
+    })
+    .finally(() => {
+      isRefreshing = false;
+      refreshPromise = null;
+    });
+  
+  return refreshPromise;
+}
+
 // Error link to handle token expiration
 const errorLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
@@ -70,9 +125,39 @@ const errorLink: TRPCLink<AppRouter> = () => {
   };
 };
 
+// Token refresh link to check and refresh token before requests
+const tokenRefreshLink: TRPCLink<AppRouter> = () => {
+  return ({ next, op }) => {
+    return observable((observer) => {
+      // Check and refresh token before making the request
+      refreshTokenIfNeeded()
+        .then(() => {
+          // Continue with the request after token refresh (if needed)
+          const unsubscribe = next(op).subscribe({
+            next(value) {
+              observer.next(value);
+            },
+            error(err) {
+              observer.error(err);
+            },
+            complete() {
+              observer.complete();
+            },
+          });
+          
+          return unsubscribe;
+        })
+        .catch((error) => {
+          observer.error(error);
+        });
+    });
+  };
+};
+
 export const HayApi = createTRPCClient<AppRouter>({
   links: [
-    errorLink,
+    tokenRefreshLink,  // Check token before requests
+    errorLink,         // Handle errors including expired tokens
     httpLink({
       url: "http://localhost:3000/v1",
       // You can pass any HTTP headers you wish here

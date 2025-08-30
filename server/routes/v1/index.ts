@@ -5,6 +5,7 @@ import { agentsRouter } from "./agents";
 import { playbooksRouter } from "./playbooks";
 import { conversationsRouter } from "./conversations";
 import { embeddingsRouter } from "./embeddings";
+import { customersRouter } from "./customers";
 
 const AppRouter = router({
   auth: authRouter,
@@ -13,6 +14,7 @@ const AppRouter = router({
   playbooks: playbooksRouter,
   conversations: conversationsRouter,
   embeddings: embeddingsRouter,
+  customers: customersRouter,
 });
 
 export const v1Router = AppRouter;

@@ -38,7 +38,7 @@ export class HayService {
     Hay.model = new ChatOpenAI({
       openAIApiKey: process.env.OPENAI_API_KEY,
       modelName: "gpt-4-turbo-preview",
-      temperature: 0.7,
+      temperature: 0.5, // Lower temperature for more consistent, less creative responses
       maxTokens: 2000
     });
 

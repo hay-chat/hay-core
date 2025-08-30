@@ -33,6 +33,7 @@ const createConversationSchema = z.object({
   status: z
     .enum(["open", "processing", "pending-human", "resolved", "closed"])
     .optional(),
+  customer_id: z.string().uuid().optional(),
 });
 
 const updateConversationSchema = z.object({
@@ -41,6 +42,7 @@ const updateConversationSchema = z.object({
     .enum(["open", "processing", "pending-human", "resolved", "closed"])
     .optional(),
   metadata: z.record(z.any()).optional(),
+  customer_id: z.string().uuid().optional(),
 });
 
 const messageSchema = z.object({
