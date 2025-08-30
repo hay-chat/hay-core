@@ -1,46 +1,107 @@
-import { AppDataSource } from "../database/data-source";
-import { Document } from "../entities/document.entity";
+import {
+  Document,
+  DocumentationType,
+  DocumentationStatus,
+  DocumentVisibility,
+} from "../entities/document.entity";
+import { BaseRepository } from "./base.repository";
+import { SelectQueryBuilder } from "typeorm";
+import type { ListParams } from "../trpc/middleware/pagination";
 
-export class DocumentRepository {
-  private repository = AppDataSource.getRepository(Document);
-
-  async create(data: Partial<Document>): Promise<Document> {
-    const document = this.repository.create(data);
-    return await this.repository.save(document);
+export class DocumentRepository extends BaseRepository<Document> {
+  constructor() {
+    super(Document);
   }
 
-  async findById(id: string, organizationId: string): Promise<Document | null> {
-    return await this.repository.findOne({
-      where: { id, organizationId },
-    });
-  }
+  /**
+   * Apply document-specific filters
+   */
+  protected override applyFilters(
+    queryBuilder: SelectQueryBuilder<Document>,
+    filters?: Record<string, any>,
+    organizationId?: string
+  ): void {
+    if (!filters) return;
 
-  async findByOrganization(organizationId: string): Promise<Document[]> {
-    return await this.repository.find({
-      where: { organizationId },
-    });
-  }
-
-  async update(id: string, organizationId: string, data: Partial<Document>): Promise<Document | null> {
-    const result = await this.repository.update(
-      { id, organizationId },
-      data
-    );
-    
-    if (result.affected === 0) {
-      return null;
+    // Apply document-specific filters
+    if (filters.type) {
+      queryBuilder.andWhere("entity.type = :type", { type: filters.type });
     }
-    
-    return await this.findById(id, organizationId);
+
+    if (filters.status) {
+      queryBuilder.andWhere("entity.status = :status", {
+        status: filters.status,
+      });
+    }
+
+    if (filters.visibility) {
+      queryBuilder.andWhere("entity.visibility = :visibility", {
+        visibility: filters.visibility,
+      });
+    }
+
+    if (filters.agentId) {
+      queryBuilder.andWhere("entity.agentId = :agentId", {
+        agentId: filters.agentId,
+      });
+    }
+
+    if (filters.playbookId) {
+      queryBuilder.andWhere("entity.playbookId = :playbookId", {
+        playbookId: filters.playbookId,
+      });
+    }
+
+    // Apply any other generic filters
+    super.applyFilters(queryBuilder, filters, organizationId);
   }
 
-  async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.repository.delete({
-      id,
-      organizationId,
+  /**
+   * Apply document-specific search functionality
+   */
+  protected override applySearch(
+    queryBuilder: SelectQueryBuilder<Document>,
+    search?: { query?: string; searchFields?: string[] }
+  ): void {
+    if (!search?.query) return;
+
+    // Default search fields for documents
+    const searchFields = search.searchFields || ["title", "content"];
+
+    const searchConditions = searchFields
+      .map((field, index) => `entity.${field} ILIKE :searchQuery${index}`)
+      .join(" OR ");
+
+    if (searchConditions) {
+      queryBuilder.andWhere(
+        `(${searchConditions})`,
+        searchFields.reduce((params, _, index) => {
+          params[`searchQuery${index}`] = `%${search.query}%`;
+          return params;
+        }, {} as Record<string, any>)
+      );
+    }
+  }
+
+  /**
+   * Apply document-specific includes/relations
+   */
+  protected override applyIncludes(
+    queryBuilder: SelectQueryBuilder<Document>,
+    include?: string[]
+  ): void {
+    if (!include || include.length === 0) return;
+
+    include.forEach((relation) => {
+      switch (relation) {
+        case "organization":
+          queryBuilder.leftJoinAndSelect("entity.organization", "organization");
+          break;
+        default:
+          // Try to apply generic relation
+          super.applyIncludes(queryBuilder, [relation]);
+      }
     });
-    
-    return result.affected !== 0;
   }
 }
 

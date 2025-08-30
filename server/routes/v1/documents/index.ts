@@ -12,11 +12,11 @@ import {
   DocumentationStatus,
   DocumentVisibility,
 } from "@server/entities/document.entity";
+import { documentListInputSchema } from "@server/types/entity-list-inputs";
+import { createListProcedure } from "@server/trpc/procedures/list";
 
 export const documentsRouter = t.router({
-  list: authenticatedProcedure.query(async ({ ctx }) => {
-    return await documentRepository.findByOrganization(ctx.organizationId!);
-  }),
+  list: createListProcedure(documentListInputSchema, documentRepository),
   search: authenticatedProcedure
     .input(
       z.object({

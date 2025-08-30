@@ -218,7 +218,12 @@
           <div v-else class="text-center py-8 text-muted-foreground">
             <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No agents created yet</p>
-            <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
+            <Button
+              variant="outline"
+              size="sm"
+              class="mt-4"
+              @click="createAgent"
+            >
               Create Your First Agent
             </Button>
           </div>
@@ -286,7 +291,9 @@
           <div v-else class="text-center py-8 text-muted-foreground">
             <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No conversations yet</p>
-            <p class="text-sm mt-2">Start chatting with your agents to see conversations here</p>
+            <p class="text-sm mt-2">
+              Start chatting with your agents to see conversations here
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -368,13 +375,13 @@ const conversations = ref<any[]>([]);
 
 // Computed properties for dashboard data
 const metrics = computed(() => {
-  const activeAgents = agents.value.filter(a => a.enabled).length;
+  const activeAgents = agents.value.filter((a) => a.enabled).length;
   const totalConversations = conversations.value.length;
-  
+
   // Calculate metrics based on real data
   return {
     activeAgents,
-    newAgentsThisWeek: agents.value.filter(a => {
+    newAgentsThisWeek: agents.value.filter((a) => {
       const createdAt = new Date(a.createdAt);
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       return createdAt > weekAgo;
@@ -427,16 +434,16 @@ const recentActivity = ref([
 const topAgents = computed(() => {
   // Group conversations by agent and count them
   const agentConversationCounts = new Map<string, number>();
-  
-  conversations.value.forEach(conv => {
+
+  conversations.value.forEach((conv) => {
     const count = agentConversationCounts.get(conv.agentId) || 0;
     agentConversationCounts.set(conv.agentId, count + 1);
   });
-  
+
   // Map agents with their conversation counts
   const agentsWithStats = agents.value
-    .filter(agent => agent.enabled)
-    .map(agent => ({
+    .filter((agent) => agent.enabled)
+    .map((agent) => ({
       id: agent.id,
       name: agent.name,
       conversations: agentConversationCounts.get(agent.id) || 0,
@@ -444,12 +451,12 @@ const topAgents = computed(() => {
     }))
     .sort((a, b) => b.conversations - a.conversations)
     .slice(0, 4); // Get top 4 agents
-  
+
   // If no agents, return empty array
   if (agentsWithStats.length === 0) {
     return [];
   }
-  
+
   return agentsWithStats;
 });
 
@@ -457,16 +464,19 @@ const topAgents = computed(() => {
 const recentConversations = computed(() => {
   return conversations.value
     .slice(0, 4) // Get 4 most recent
-    .map(conv => {
+    .map((conv) => {
       // Get the last message if available
-      const lastMessage = conv.messages && conv.messages.length > 0 
-        ? conv.messages[conv.messages.length - 1]
-        : null;
-      
+      const lastMessage =
+        conv.messages && conv.messages.length > 0
+          ? conv.messages[conv.messages.length - 1]
+          : null;
+
       return {
         id: conv.id,
         customerName: conv.title || "New Conversation",
-        lastMessage: lastMessage ? lastMessage.content.substring(0, 50) + "..." : "No messages yet",
+        lastMessage: lastMessage
+          ? lastMessage.content.substring(0, 50) + "..."
+          : "No messages yet",
         status: conv.status || "active",
         updatedAt: new Date(conv.updatedAt || conv.createdAt),
       };
@@ -501,9 +511,11 @@ const fetchDashboardData = async () => {
     // Fetch agents and conversations in parallel
     const [agentsData, conversationsData] = await Promise.all([
       HayApi.agents.list.query(),
-      HayApi.conversations.list.query()
+      HayApi.conversations.list.query({
+        pagination: { page: 1, limit: 10 },
+      }),
     ]);
-    
+
     agents.value = agentsData || [];
     conversations.value = conversationsData?.items || conversationsData || [];
   } catch (error) {
@@ -526,15 +538,15 @@ const refreshData = async () => {
 };
 
 const createAgent = () => {
-  router.push('/agents/create');
+  router.push("/agents/create");
 };
 
 const viewAllAgents = () => {
-  router.push('/agents');
+  router.push("/agents");
 };
 
 const viewAllConversations = () => {
-  router.push('/conversations');
+  router.push("/conversations");
 };
 
 const viewConversation = (id: string) => {
@@ -542,15 +554,15 @@ const viewConversation = (id: string) => {
 };
 
 const viewInsights = () => {
-  router.push('/insights');
+  router.push("/insights");
 };
 
 const managePlaybooks = () => {
-  router.push('/playbooks');
+  router.push("/playbooks");
 };
 
 const viewAnalytics = () => {
-  router.push('/analytics');
+  router.push("/analytics");
 };
 
 // Lifecycle

@@ -358,37 +358,15 @@
     </Card>
 
     <!-- Pagination -->
-    <div
-      v-if="!loading && filteredConversations.length > 0"
-      class="flex items-center justify-between"
-    >
-      <div class="text-sm text-muted-foreground">
-        Showing {{ (currentPage - 1) * pageSize + 1 }} to
-        {{ Math.min(currentPage * pageSize, filteredConversations.length) }} of
-        {{ filteredConversations.length }} conversations
-      </div>
-      <div class="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="currentPage === 1"
-          @click="previousPage"
-        >
-          <ChevronLeft class="h-4 w-4" />
-          Previous
-        </Button>
-        <span class="px-3 py-1 text-sm border rounded">{{ currentPage }}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="currentPage * pageSize >= filteredConversations.length"
-          @click="nextPage"
-        >
-          Next
-          <ChevronRight class="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+    <DataPagination
+      v-if="!loading && totalConversations > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :items-per-page="pageSize"
+      :total-items="totalConversations"
+      @page-change="handlePageChange"
+      @items-per-page-change="handleItemsPerPageChange"
+    />
   </div>
 </template>
 
@@ -420,6 +398,7 @@ import {
 import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
 import Badge from "@/components/ui/Badge.vue";
+import DataPagination from "@/components/DataPagination.vue";
 
 // Router
 const router = useRouter();
@@ -435,12 +414,17 @@ const selectedTimeframe = ref("week");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const currentPage = ref(1);
-const pageSize = ref(25);
+const pageSize = ref(10);
 const creatingConversation = ref(false);
 
 // API data
 const conversations = ref<any[]>([]);
 const totalConversations = ref(0);
+
+// Computed total pages
+const totalPages = computed(() => 
+  Math.ceil(totalConversations.value / pageSize.value)
+);
 
 // Computed stats based on real conversations
 const stats = computed(() => {
@@ -480,7 +464,8 @@ const agents = ref([
   { id: "3", name: "Technical Support" },
 ]);
 
-// Computed properties
+// For now, we'll use the conversations directly from API (already paginated)
+// In the future, we should pass filters to the API
 const filteredConversations = computed(() => {
   return conversations.value.filter((conversation) => {
     const matchesSearch =
@@ -503,12 +488,9 @@ const filteredConversations = computed(() => {
   });
 });
 
-// Paginated conversations
+// Use filtered conversations directly since API already handles pagination
 const paginatedConversations = computed(() => {
-  return filteredConversations.value.slice(
-    (currentPage.value - 1) * pageSize.value,
-    currentPage.value * pageSize.value
-  );
+  return filteredConversations.value;
 });
 
 // Methods
@@ -651,14 +633,12 @@ const fetchConversations = async () => {
     error.value = null;
 
     const response = await HayApi.conversations.list.query({
-      limit: 100,
-      offset: 0,
-      orderBy: "created_at",
-      orderDirection: "desc",
+      pagination: { page: currentPage.value, limit: pageSize.value },
+      sorting: { orderBy: "created_at", orderDirection: "desc" },
     });
 
     conversations.value = response.items;
-    totalConversations.value = response.total;
+    totalConversations.value = response.pagination.total;
   } catch (err) {
     console.error("Failed to fetch conversations:", err);
     error.value = "Failed to load conversations";
@@ -672,16 +652,15 @@ const refreshConversations = async () => {
   await fetchConversations();
 };
 
-const previousPage = () => {
-  if (currentPage.value > 1) {
-    currentPage.value--;
-  }
+const handlePageChange = async (page: number) => {
+  currentPage.value = page;
+  await fetchConversations();
 };
 
-const nextPage = () => {
-  if (currentPage.value * pageSize.value < filteredConversations.value.length) {
-    currentPage.value++;
-  }
+const handleItemsPerPageChange = async (itemsPerPage: number) => {
+  pageSize.value = itemsPerPage;
+  currentPage.value = 1; // Reset to first page when changing page size
+  await fetchConversations();
 };
 
 // Lifecycle

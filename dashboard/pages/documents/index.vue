@@ -255,6 +255,17 @@
       </div>
     </div>
 
+    <!-- Pagination -->
+    <DataPagination
+      v-if="!loading && totalDocuments > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :items-per-page="pageSize"
+      :total-items="totalDocuments"
+      @page-change="handlePageChange"
+      @items-per-page-change="handleItemsPerPageChange"
+    />
+
     <!-- Toast Container -->
     <ToastContainer />
 
@@ -363,6 +374,7 @@
 import { HayApi } from "@/utils/api";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import ToastContainer from "@/components/ui/ToastContainer.vue";
+import DataPagination from "@/components/DataPagination.vue";
 import { useToast } from "@/composables/useToast";
 
 import {
@@ -392,8 +404,13 @@ const statusFilter = ref("");
 const selectedDocuments = ref<string[]>([]);
 const documents = ref<any[]>([]);
 const currentPage = ref(1);
-const totalPages = ref(1);
+const pageSize = ref(10);
 const totalDocuments = ref(0);
+
+// Computed total pages
+const totalPages = computed(() => 
+  Math.ceil(totalDocuments.value / pageSize.value)
+);
 const showUploadDialog = ref(false);
 const uploading = ref(false);
 const showDeleteDialog = ref(false);
@@ -482,20 +499,23 @@ const formatDate = (date: Date) => {
 const refreshData = async () => {
   loading.value = true;
   try {
-    const result = await HayApi.documents.list.query();
+    const result = await HayApi.documents.list.query({
+      pagination: { page: currentPage.value, limit: pageSize.value },
+    });
 
     // Map the result to the expected document format
-    documents.value = (result || []).map((doc: any) => ({
+    documents.value = (result.items || []).map((doc: any) => ({
       id: doc.id,
       name: doc.title || "Untitled",
       description: doc.description || doc.content?.substring(0, 100),
       type: doc.type || "article",
       category: doc.categories?.[0] || "general",
-      fileSize: doc.fileSize || 0,
+      fileSize: doc.attachments?.[0]?.size || 0,
       status: doc.status || "draft",
-      createdAt: new Date(doc.createdAt),
-      updatedAt: new Date(doc.updatedAt),
+      createdAt: new Date(doc.created_at || doc.createdAt),
+      updatedAt: new Date(doc.updated_at || doc.updatedAt),
     }));
+    totalDocuments.value = result.pagination.total;
   } catch (error) {
     console.error("Failed to fetch documents:", error);
   } finally {
@@ -537,6 +557,18 @@ const searchDocuments = async () => {
   } finally {
     searching.value = false;
   }
+};
+
+// Pagination handlers
+const handlePageChange = async (page: number) => {
+  currentPage.value = page;
+  await refreshData();
+};
+
+const handleItemsPerPageChange = async (itemsPerPage: number) => {
+  pageSize.value = itemsPerPage;
+  currentPage.value = 1; // Reset to first page when changing page size
+  await refreshData();
 };
 
 // Load documents on mount
@@ -647,7 +679,7 @@ const deleteDocument = (document: any) => {
   isBulkDelete.value = false;
   deleteDialogTitle.value = "Delete Document";
   deleteDialogDescription.value = `Are you sure you want to delete "${document.name}"? This action cannot be undone and will also delete all associated embeddings.`;
-  
+
   // Use nextTick to ensure state is settled before opening dialog
   nextTick(() => {
     showDeleteDialog.value = true;
@@ -679,10 +711,12 @@ const bulkDownload = async () => {
 
 const bulkDelete = () => {
   if (selectedDocuments.value.length === 0) return;
-  
+
   isBulkDelete.value = true;
   deleteDialogTitle.value = "Delete Documents";
-  deleteDialogDescription.value = `Are you sure you want to delete ${selectedDocuments.value.length} document${
+  deleteDialogDescription.value = `Are you sure you want to delete ${
+    selectedDocuments.value.length
+  } document${
     selectedDocuments.value.length === 1 ? "" : "s"
   }? This action cannot be undone and will also delete all associated embeddings.`;
   showDeleteDialog.value = true;
@@ -698,18 +732,20 @@ const confirmDelete = async () => {
 
 const performSingleDelete = async () => {
   if (!documentToDelete.value) return;
-  
+
   try {
     const result = await HayApi.documents.delete.mutate({
       id: documentToDelete.value.id,
     });
-    
+
     if (result.success) {
-      const index = documents.value.findIndex((d) => d.id === documentToDelete.value.id);
+      const index = documents.value.findIndex(
+        (d) => d.id === documentToDelete.value.id
+      );
       if (index > -1) {
         documents.value.splice(index, 1);
       }
-      
+
       toast.success(result.message || "Document deleted successfully");
     }
   } catch (error) {
@@ -724,23 +760,26 @@ const performBulkDelete = async () => {
   const errors: string[] = [];
   const successfulDeletes: string[] = [];
   const totalCount = selectedDocuments.value.length;
-  
+
   // Show initial progress toast with no auto-dismiss
-  const progressToastId = toast.info(`Deleting documents... 0/${totalCount}`, 0);
-  
+  const progressToastId = toast.info(
+    `Deleting documents... 0/${totalCount}`,
+    0
+  );
+
   try {
     let deletedCount = 0;
-    
+
     for (const documentId of selectedDocuments.value) {
       try {
         const result = await HayApi.documents.delete.mutate({
           id: documentId,
         });
-        
+
         if (result.success) {
           successfulDeletes.push(documentId);
           deletedCount++;
-          
+
           // Update progress toast
           toast.update(
             progressToastId,
@@ -751,7 +790,7 @@ const performBulkDelete = async () => {
         errors.push(documentId);
         deletedCount++;
         console.error(`Error deleting document ${documentId}:`, error);
-        
+
         // Update progress toast even for errors
         toast.update(
           progressToastId,
@@ -759,22 +798,24 @@ const performBulkDelete = async () => {
         );
       }
     }
-    
+
     // Remove the progress toast
     toast.remove(progressToastId);
-    
+
     documents.value = documents.value.filter(
       (doc) => !successfulDeletes.includes(doc.id)
     );
-    
+
     selectedDocuments.value = [];
-    
+
     if (errors.length > 0) {
       toast.warning(
         `Successfully deleted ${successfulDeletes.length} document(s). Failed to delete ${errors.length} document(s).`
       );
     } else {
-      toast.success(`Successfully deleted ${successfulDeletes.length} document(s)`);
+      toast.success(
+        `Successfully deleted ${successfulDeletes.length} document(s)`
+      );
     }
   } catch (error) {
     console.error("Error deleting documents:", error);

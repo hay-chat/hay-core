@@ -168,7 +168,7 @@
       class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
     >
       <Card
-        v-for="playbook in filteredPlaybooks"
+        v-for="playbook in paginatedPlaybooks"
         :key="playbook.id"
         class="hover:shadow-md transition-shadow cursor-pointer"
         @click="editPlaybook(playbook.id)"
@@ -231,7 +231,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="playbook in filteredPlaybooks"
+                v-for="playbook in paginatedPlaybooks"
                 :key="playbook.id"
                 class="border-b hover:bg-muted/50 cursor-pointer"
                 @click="editPlaybook(playbook.id)"
@@ -277,6 +277,17 @@
         </div>
       </CardContent>
     </Card>
+
+    <!-- Pagination -->
+    <DataPagination
+      v-if="!loading && filteredPlaybooks.length > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :items-per-page="pageSize"
+      :total-items="filteredPlaybooks.length"
+      @page-change="handlePageChange"
+      @items-per-page-change="handleItemsPerPageChange"
+    />
 
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
@@ -328,6 +339,7 @@ import { useRouter } from 'vue-router';
 import { useToast } from '~/composables/useToast';
 import type { Playbook } from '~/types/playbook';
 import { HayApi } from '@/utils/api';
+import DataPagination from '@/components/DataPagination.vue';
 
 const { toast } = useToast();
 const router = useRouter();
@@ -338,6 +350,8 @@ const searchQuery = ref("");
 const selectedCategory = ref("");
 const selectedStatus = ref("");
 const viewMode = ref<"grid" | "table">("grid");
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 // Data from API
 const playbooks = ref<any[]>([]);
@@ -376,6 +390,18 @@ const filteredPlaybooks = computed(() => {
     return matchesSearch && matchesStatus;
   });
 });
+
+// Paginated playbooks
+const paginatedPlaybooks = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return filteredPlaybooks.value.slice(start, end);
+});
+
+// Total pages
+const totalPages = computed(() => 
+  Math.ceil(filteredPlaybooks.value.length / pageSize.value)
+);
 
 // Methods
 const getCategoryLabel = (category: string) => {
@@ -474,6 +500,16 @@ const fetchPlaybooks = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// Pagination handlers
+const handlePageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+const handleItemsPerPageChange = (itemsPerPage: number) => {
+  pageSize.value = itemsPerPage;
+  currentPage.value = 1; // Reset to first page when changing page size
 };
 
 // Lifecycle

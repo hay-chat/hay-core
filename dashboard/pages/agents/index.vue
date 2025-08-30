@@ -96,7 +96,7 @@
       class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
     >
       <Card
-        v-for="agent in filteredAgents"
+        v-for="agent in paginatedAgents"
         :key="agent.id"
         :class="[
           'hover:shadow-md transition-shadow',
@@ -313,6 +313,17 @@
       </Card>
     </div>
 
+    <!-- Pagination -->
+    <DataPagination
+      v-if="!loading && filteredAgents.length > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :items-per-page="pageSize"
+      :total-items="filteredAgents.length"
+      @page-change="handlePageChange"
+      @items-per-page-change="handleItemsPerPageChange"
+    />
+
     <!-- Toast Container -->
     <ToastContainer />
 
@@ -360,6 +371,8 @@ const typeFilter = ref("");
 const selectedAgents = ref<string[]>([]);
 const router = useRouter();
 const toast = useToast();
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 // Agents data from API
 const agents = ref<any[]>([]);
@@ -397,6 +410,18 @@ const filteredAgents = computed(() => {
 
   return filtered;
 });
+
+// Paginated agents
+const paginatedAgents = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return filteredAgents.value.slice(start, end);
+});
+
+// Total pages
+const totalPages = computed(() => 
+  Math.ceil(filteredAgents.value.length / pageSize.value)
+);
 
 // Methods
 const formatTimeAgo = (date: Date) => {
@@ -626,6 +651,16 @@ const performBulkDelete = async () => {
     console.error("Error deleting agents:", error);
     toast.error(error.message || 'Failed to delete agents. Please try again.');
   }
+};
+
+// Pagination handlers
+const handlePageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+const handleItemsPerPageChange = (itemsPerPage: number) => {
+  pageSize.value = itemsPerPage;
+  currentPage.value = 1; // Reset to first page when changing page size
 };
 
 // Lifecycle
