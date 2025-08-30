@@ -422,7 +422,7 @@ const conversations = ref<any[]>([]);
 const totalConversations = ref(0);
 
 // Computed total pages
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(totalConversations.value / pageSize.value)
 );
 
