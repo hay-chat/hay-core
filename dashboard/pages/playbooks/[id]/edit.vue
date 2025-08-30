@@ -21,20 +21,40 @@
     <Card v-else-if="playbook">
       <CardContent class="p-6">
         <form @submit.prevent="handleSubmit" class="space-y-6">
-          <!-- Name Field -->
+          <!-- Title Field -->
           <div class="space-y-2">
-            <label for="name" class="text-sm font-medium">
-              Playbook Name <span class="text-red-500">*</span>
+            <label for="title" class="text-sm font-medium">
+              Playbook Title <span class="text-red-500">*</span>
             </label>
             <Input
-              id="name"
-              v-model="form.name"
+              id="title"
+              v-model="form.title"
               placeholder="e.g., Customer Support Automation"
-              :class="errors.name ? 'border-red-500' : ''"
+              :class="errors.title ? 'border-red-500' : ''"
               required
             />
-            <p v-if="errors.name" class="text-sm text-red-500">
-              {{ errors.name }}
+            <p v-if="errors.title" class="text-sm text-red-500">
+              {{ errors.title }}
+            </p>
+          </div>
+
+          <!-- Trigger Field -->
+          <div class="space-y-2">
+            <label for="trigger" class="text-sm font-medium">
+              Trigger <span class="text-red-500">*</span>
+            </label>
+            <Input
+              id="trigger"
+              v-model="form.trigger"
+              placeholder="e.g., customer_inquiry, ticket_created"
+              :class="errors.trigger ? 'border-red-500' : ''"
+              required
+            />
+            <p v-if="errors.trigger" class="text-sm text-red-500">
+              {{ errors.trigger }}
+            </p>
+            <p class="text-sm text-muted-foreground">
+              Define when this playbook should be activated
             </p>
           </div>
 
@@ -143,7 +163,7 @@
               >
                 Cancel
               </Button>
-              <Button type="submit" :disabled="isSubmitting || !form.name">
+              <Button type="submit" :disabled="isSubmitting || !form.title || !form.trigger">
                 <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
                 {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
               </Button>
@@ -156,6 +176,16 @@
     <div v-else class="text-center py-12">
       <p class="text-red-500">Playbook not found</p>
     </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-text="Delete"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 
@@ -165,19 +195,20 @@ import { useRouter, useRoute } from 'vue-router';
 import { Loader2, ArrowLeft, Trash2 } from 'lucide-vue-next';
 import type { Playbook, Agent, PlaybookStatus } from '~/types/playbook';
 import { useToast } from '~/composables/useToast';
+import { HayApi } from '@/utils/api';
 
 const router = useRouter();
 const route = useRoute();
-const { $trpc } = useNuxtApp();
 const { toast } = useToast();
 
 const playbookId = route.params.id as string;
 
 // Form state
 const form = ref({
-  name: '',
+  title: '',
+  trigger: '',
   description: '',
-  instructions: '',
+  instructions: {} as any,
   status: 'draft' as PlaybookStatus,
   agentIds: [] as string[]
 });
@@ -186,8 +217,8 @@ const form = ref({
 const loading = ref(true);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
-const agents = ref<Agent[]>([]);
-const playbook = ref<Playbook | null>(null);
+const agents = ref<any[]>([]);
+const playbook = ref<any>(null);
 const errors = ref<Record<string, string>>({});
 
 // Format date
@@ -206,7 +237,7 @@ onMounted(async () => {
   try {
     // Load playbook
     loading.value = true;
-    const playbookResponse = await $trpc.playbooks.get.query({ id: playbookId });
+    const playbookResponse = await HayApi.playbooks.get.query({ id: playbookId });
     
     if (!playbookResponse) {
       toast('error', 'Playbook not found');
@@ -218,16 +249,17 @@ onMounted(async () => {
     
     // Populate form
     form.value = {
-      name: playbookResponse.name,
+      title: playbookResponse.title,
+      trigger: playbookResponse.trigger,
       description: playbookResponse.description || '',
-      instructions: playbookResponse.instructions || '',
+      instructions: playbookResponse.instructions || {},
       status: playbookResponse.status,
       agentIds: playbookResponse.agents?.map((a: any) => a.id) || []
     };
     
     // Load agents
     loadingAgents.value = true;
-    const agentsResponse = await $trpc.agents.list.query();
+    const agentsResponse = await HayApi.agents.list.query();
     agents.value = agentsResponse || [];
     
   } catch (error) {
@@ -244,13 +276,23 @@ onMounted(async () => {
 const validateForm = () => {
   errors.value = {};
   
-  if (!form.value.name || form.value.name.trim().length === 0) {
-    errors.value.name = 'Playbook name is required';
+  if (!form.value.title || form.value.title.trim().length === 0) {
+    errors.value.title = 'Playbook title is required';
     return false;
   }
   
-  if (form.value.name.length > 255) {
-    errors.value.name = 'Playbook name must be less than 255 characters';
+  if (form.value.title.length > 255) {
+    errors.value.title = 'Playbook title must be less than 255 characters';
+    return false;
+  }
+  
+  if (!form.value.trigger || form.value.trigger.trim().length === 0) {
+    errors.value.trigger = 'Trigger is required';
+    return false;
+  }
+  
+  if (form.value.trigger.length > 255) {
+    errors.value.trigger = 'Trigger must be less than 255 characters';
     return false;
   }
   
@@ -266,10 +308,11 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
     
-    await $trpc.playbooks.update.mutate({
+    await HayApi.playbooks.update.mutate({
       id: playbookId,
       data: {
-        name: form.value.name,
+        title: form.value.title,
+        trigger: form.value.trigger,
         description: form.value.description || undefined,
         instructions: form.value.instructions || undefined,
         status: form.value.status,
@@ -288,16 +331,23 @@ const handleSubmit = async () => {
   }
 };
 
-// Handle delete
-const handleDelete = async () => {
-  if (!confirm('Are you sure you want to delete this playbook? This action cannot be undone.')) {
-    return;
-  }
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const deleteDialogTitle = ref('Delete Playbook');
+const deleteDialogDescription = ref('');
 
+// Handle delete
+const handleDelete = () => {
+  if (!playbook.value) return;
+  deleteDialogDescription.value = `Are you sure you want to delete "${playbook.value.title}"? This action cannot be undone.`;
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
   try {
     isSubmitting.value = true;
     
-    await $trpc.playbooks.delete.mutate({ id: playbookId });
+    await HayApi.playbooks.delete.mutate({ id: playbookId });
 
     toast('success', 'Playbook deleted successfully');
 
@@ -307,6 +357,7 @@ const handleDelete = async () => {
     toast('error', 'Failed to delete playbook. Please try again.');
   } finally {
     isSubmitting.value = false;
+    showDeleteDialog.value = false;
   }
 };
 

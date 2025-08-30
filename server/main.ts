@@ -5,6 +5,7 @@ import { config } from "@server/config/env";
 import { appRouter } from "@server/routes";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
+import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -80,6 +81,25 @@ async function startServer() {
     console.log(
       `🚀 Server is running on port http://localhost:${config.server.port}`
     );
+
+    // Start the orchestrator worker if database is connected
+    if (dbConnected) {
+      orchestratorWorker.start(5000); // Check every second
+      console.log("🤖 Orchestrator worker started");
+    }
+  });
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log("SIGTERM received, shutting down gracefully");
+    orchestratorWorker.stop();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", () => {
+    console.log("SIGINT received, shutting down gracefully");
+    orchestratorWorker.stop();
+    process.exit(0);
   });
 }
 

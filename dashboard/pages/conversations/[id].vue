@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col">
+  <div class="h-screen flex flex-col -m-4 md:-m-6">
     <!-- Header -->
     <div
       class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
@@ -12,10 +12,10 @@
           </Button>
           <div>
             <h1 class="text-xl font-semibold">
-              {{ conversation?.customer.name || "Loading..." }}
+              {{ conversation?.title || "Loading..." }}
             </h1>
             <p class="text-sm text-muted-foreground">
-              {{ conversation?.customer.email }}
+              Conversation #{{ conversation?.id?.slice(0, 8) }}
             </p>
           </div>
         </div>
@@ -25,14 +25,24 @@
               :is="getStatusIcon(conversation?.status)"
               class="h-3 w-3 mr-1"
             />
-            {{ conversation?.status }}
+            {{ formatStatus(conversation?.status) }}
+          </Badge>
+          <Badge
+            v-if="
+              conversation?.cooldown_until &&
+              new Date(conversation.cooldown_until) > new Date()
+            "
+            variant="destructive"
+          >
+            <Clock class="h-3 w-3 mr-1" />
+            Cooldown {{ formatCountdown(conversation.cooldown_until) }}
           </Badge>
           <Button variant="outline" size="sm" @click="exportConversation">
             <Download class="h-4 w-4 mr-2" />
             Export
           </Button>
           <Button
-            v-if="conversation?.status === 'active'"
+            v-if="conversation?.status === 'open'"
             variant="outline"
             size="sm"
             :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
@@ -42,7 +52,10 @@
             {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
           </Button>
           <Button
-            v-if="conversation?.status === 'active'"
+            v-if="
+              conversation?.status === 'open' ||
+              conversation?.status === 'pending-human'
+            "
             size="sm"
             @click="takeOverConversation"
           >
@@ -62,7 +75,7 @@
           ref="messagesContainer"
           class="flex-1 overflow-y-auto p-6 space-y-4"
         >
-          <div v-if="loading" class="space-y-4">
+          <div v-if="messagesLoading" class="space-y-4">
             <div v-for="i in 5" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
                 <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
@@ -90,139 +103,37 @@
                 class="inline-flex items-center px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground"
               >
                 <Clock class="h-3 w-3 mr-1" />
-                Conversation started {{ formatDate(conversation?.createdAt) }}
+                Conversation started {{ formatDate(conversation?.created_at) }}
               </div>
             </div>
 
             <!-- Messages -->
-            <div
-              v-for="message in messages"
-              :key="message.id"
-              :class="[
-                'flex space-x-3',
-                message.sender === 'customer' ? 'justify-start' : 'justify-end',
-              ]"
-            >
-              <!-- Customer Message -->
-              <div
-                v-if="message.sender === 'customer'"
-                class="flex space-x-3 max-w-2xl"
-              >
-                <div
-                  class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
-                >
-                  <User class="h-4 w-4 text-primary" />
-                </div>
-                <div class="flex-1">
-                  <div class="flex items-center space-x-2 mb-1">
-                    <span class="text-sm font-medium">{{
-                      conversation?.customer.name
-                    }}</span>
-                    <span class="text-xs text-muted-foreground">{{
-                      formatTime(message.timestamp)
-                    }}</span>
-                  </div>
-                  <div class="bg-muted p-3 rounded-lg">
-                    <p class="text-sm">{{ message.content }}</p>
-                    <div
-                      v-if="'attachments' in message && (message as any).attachments?.length"
-                      class="mt-2 space-y-1"
-                    >
-                      <div
-                        v-for="attachment in ('attachments' in message ? (message as any).attachments : [])"
-                        :key="attachment.id"
-                        class="flex items-center space-x-2 text-xs text-muted-foreground"
-                      >
-                        <Paperclip class="h-3 w-3" />
-                        <span>{{ attachment.name }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Agent Message -->
-              <div v-else class="flex space-x-3 max-w-2xl justify-end">
-                <div class="flex-1 text-right">
-                  <div class="flex items-center justify-end space-x-2 mb-1">
-                    <span class="text-xs text-muted-foreground">{{
-                      formatTime(message.timestamp)
-                    }}</span>
-                    <span class="text-sm font-medium">{{
-                      message.agentName || "Agent"
-                    }}</span>
-                    <div
-                      v-if="message.isPlaybook"
-                      class="flex items-center space-x-1"
-                    >
-                      <Badge variant="outline" class="text-xs">
-                        <Zap class="h-2 w-2 mr-1" />
-                        Playbook
-                      </Badge>
-                    </div>
-                  </div>
-                  <div
-                    :class="[
-                      'p-3 rounded-lg inline-block text-left',
-                      supervisionMode && message.needsApproval
-                        ? 'bg-orange-50 border border-orange-200'
-                        : 'bg-primary text-primary-foreground',
-                    ]"
-                  >
-                    <p class="text-sm">{{ message.content }}</p>
-                    <div
-                      v-if="supervisionMode && message.needsApproval"
-                      class="mt-3 flex space-x-2"
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        @click="approveMessage(message.id)"
-                      >
-                        <Check class="h-3 w-3 mr-1" />
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        @click="editMessage(message.id)"
-                      >
-                        <Edit class="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        @click="rejectMessage(message.id)"
-                      >
-                        <X class="h-3 w-3 mr-1" />
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
-                >
-                  <Bot class="h-4 w-4 text-blue-600" />
-                </div>
-              </div>
-
-              <!-- System Message -->
-              <div
-                v-if="message.type === 'system'"
-                class="flex justify-center w-full"
-              >
-                <div
-                  class="inline-flex items-center px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground"
-                >
-                  <component
-                    :is="getSystemMessageIcon((message as any).action)"
-                    class="h-3 w-3 mr-1"
-                  />
-                  {{ message.content }}
-                </div>
-              </div>
+            <div v-for="message in messages" :key="message.id">
+              <ChatMessage
+                :variant="message.sender as 'customer' | 'agent' | 'system'"
+                :content="message.content"
+                :timestamp="message.timestamp"
+                :sender-name="
+                  message.sender === 'customer'
+                    ? 'Customer'
+                    : message.agentName || 'AI Assistant'
+                "
+                :attachments="'attachments' in message ? (message as any).attachments : undefined"
+                :metadata="message.sender === 'agent' ? {
+                  isPlaybook: message.isPlaybook,
+                  needsApproval: supervisionMode && message.needsApproval,
+                  action: message.sender === 'system' ? (message as any).action : undefined
+                } : undefined"
+                @approve="
+                  message.needsApproval ? approveMessage(message.id) : undefined
+                "
+                @edit="
+                  message.needsApproval ? editMessage(message.id) : undefined
+                "
+                @reject="
+                  message.needsApproval ? rejectMessage(message.id) : undefined
+                "
+              />
             </div>
 
             <!-- Typing indicator -->
@@ -300,37 +211,26 @@
                   <User class="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div class="font-medium">
-                    {{ conversation?.customer.name }}
-                  </div>
+                  <div class="font-medium">Customer</div>
                   <div class="text-sm text-muted-foreground">
-                    {{ conversation?.customer.email }}
+                    {{ conversation?.id?.slice(0, 8) }}
                   </div>
                 </div>
               </div>
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Customer ID:</span>
-                  <span>{{ conversation?.customer.id }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Join Date:</span>
-                  <span>{{ formatDate(conversation?.customer.joinDate) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Conversations:</span>
-                  <span>{{
-                    conversation?.customer.totalConversations || 0
+                  <span class="text-muted-foreground">Conversation ID:</span>
+                  <span class="font-mono text-xs">{{
+                    conversation?.id?.slice(0, 8)
                   }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Satisfaction:</span>
-                  <div class="flex items-center space-x-1">
-                    <Star class="h-3 w-3 text-yellow-500 fill-current" />
-                    <span>{{
-                      conversation?.customer.avgSatisfaction || "N/A"
-                    }}</span>
-                  </div>
+                  <span class="text-muted-foreground">Status:</span>
+                  <span>{{ conversation?.status }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Created:</span>
+                  <span>{{ formatDate(conversation?.created_at) }}</span>
                 </div>
               </div>
             </CardContent>
@@ -344,15 +244,11 @@
             <CardContent class="space-y-3 text-sm">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Agent:</span>
-                <span>{{ conversation?.agent.name }}</span>
+                <span>{{ conversation?.agent?.name || "AI Assistant" }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Channel:</span>
-                <span>{{ conversation?.channel || "Web Chat" }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">Duration:</span>
-                <span>{{ formatDuration(conversation?.duration) }}</span>
+                <span class="text-muted-foreground">Status:</span>
+                <span>{{ formatStatus(conversation?.status) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Messages:</span>
@@ -360,7 +256,11 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Created:</span>
-                <span>{{ formatDate(conversation?.createdAt) }}</span>
+                <span>{{ formatDate(conversation?.created_at) }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-muted-foreground">Updated:</span>
+                <span>{{ formatDate(conversation?.updated_at) }}</span>
               </div>
             </CardContent>
           </Card>
@@ -451,14 +351,7 @@ import {
   Eye,
   UserCheck,
   MessageSquare,
-  User,
-  Bot,
   Clock,
-  Paperclip,
-  Zap,
-  Check,
-  Edit,
-  X,
   Send,
   AlertTriangle,
   Star,
@@ -468,28 +361,10 @@ import {
   Circle,
   CheckCircle,
   XCircle,
-  UserPlus,
-  ArrowRight,
+  User,
 } from "lucide-vue-next";
-
-// TODO: Import actual Badge component when available
-const Badge = ({ variant = "default", ...props }) =>
-  h("span", {
-    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === "outline"
-        ? "border border-gray-300 text-gray-700"
-        : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : variant === "warning"
-        ? "bg-yellow-100 text-yellow-800"
-        : "bg-gray-100 text-gray-800"
-    }`,
-    ...props,
-  });
+import { HayApi } from "@/utils/api";
+import Badge from "@/components/ui/Badge.vue";
 
 // Get conversation ID from route
 const route = useRoute();
@@ -497,169 +372,84 @@ const conversationId = route.params["id"] as string;
 
 // Reactive state
 const loading = ref(true);
+const messagesLoading = ref(true);
 const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
 
-// Mock data - TODO: Replace with actual API calls
-const conversation = ref({
-  id: conversationId,
-  customer: {
-    id: "cust_123",
-    name: "Alice Johnson",
-    email: "alice@example.com",
-    joinDate: new Date("2023-06-15"),
-    totalConversations: 8,
-    avgSatisfaction: 4.5,
-  },
-  agent: {
-    name: "Customer Support Agent",
-  },
-  status: "active",
-  channel: "Web Chat",
-  duration: 485,
-  createdAt: new Date("2024-01-15T14:22:00"),
-  updatedAt: new Date("2024-01-15T14:30:00"),
-});
+// Data from API
+const conversation = ref<any>(null);
+const messages = ref<any[]>([]);
 
-const messages = ref([
-  {
-    id: "1",
-    sender: "customer",
-    content:
-      "Hello, I need help with my billing statement. I see a charge that I don't recognize.",
-    timestamp: new Date("2024-01-15T14:22:00"),
-    type: "message",
-  },
-  {
-    id: "2",
-    sender: "agent",
-    agentName: "Customer Support Agent",
-    content:
-      "Hello! I'd be happy to help you with your billing question. Let me look up your account details.",
-    timestamp: new Date("2024-01-15T14:22:30"),
-    type: "message",
-    isPlaybook: true,
-  },
-  {
-    id: "3",
-    type: "system",
-    action: "agent_joined",
-    content: "Agent joined the conversation",
-    timestamp: new Date("2024-01-15T14:23:00"),
-  },
-  {
-    id: "4",
-    sender: "agent",
-    agentName: "Customer Support Agent",
-    content:
-      "I can see your recent billing statement. Could you tell me the specific charge amount and date you're asking about?",
-    timestamp: new Date("2024-01-15T14:23:15"),
-    type: "message",
-  },
-  {
-    id: "5",
-    sender: "customer",
-    content:
-      "It's a charge for $29.99 on January 10th. The description just says \"Service Fee\" but I don't know what that's for.",
-    timestamp: new Date("2024-01-15T14:24:00"),
-    type: "message",
-  },
-  {
-    id: "6",
-    sender: "agent",
-    agentName: "Customer Support Agent",
-    content:
-      "I understand your concern. Let me investigate this Service Fee charge for you. This might be related to a premium feature activation or an add-on service.",
-    timestamp: new Date("2024-01-15T14:24:30"),
-    type: "message",
-    needsApproval: false,
-  },
-]);
-
-const previousConversations = ref([
-  {
-    id: "conv_2",
-    subject: "Account Setup Help",
-    status: "resolved",
-    createdAt: new Date("2023-12-20"),
-  },
-  {
-    id: "conv_1",
-    subject: "Password Reset",
-    status: "resolved",
-    createdAt: new Date("2023-11-15"),
-  },
-]);
-
-const relatedArticles = ref([
-  {
-    id: "kb_1",
-    title: "Understanding Your Bill",
-    category: "Billing",
-  },
-  {
-    id: "kb_2",
-    title: "Service Fees Explained",
-    category: "Billing",
-  },
-  {
-    id: "kb_3",
-    title: "How to Dispute Charges",
-    category: "Support",
-  },
-]);
+const previousConversations = ref<any[]>([]);
+const relatedArticles = ref<any[]>([]);
 
 // Methods
 const goBack = () => {
   navigateTo("/conversations");
 };
 
-const getStatusVariant = (status: string) => {
-  const variants = {
-    active: "default",
-    resolved: "success",
-    escalated: "warning",
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" | undefined => {
+  const variants: Record<
+    string,
+    "default" | "secondary" | "destructive" | "outline"
+  > = {
+    open: "default",
+    "pending-human": "destructive",
+    resolved: "secondary",
+    processing: "outline",
     closed: "secondary",
   };
-  return variants[status as keyof typeof variants] || "default";
+  return variants[status] || "default";
 };
 
 const getStatusIcon = (status: string) => {
   const icons = {
-    active: Circle,
+    open: Circle,
+    "pending-human": AlertTriangle,
     resolved: CheckCircle,
+    active: Circle,
     escalated: AlertTriangle,
     closed: XCircle,
   };
   return icons[status as keyof typeof icons] || Circle;
 };
 
-const getSystemMessageIcon = (action: string) => {
-  const icons = {
-    agent_joined: UserPlus,
-    escalated: AlertTriangle,
-    transferred: ArrowRight,
+const formatStatus = (status: string) => {
+  const labels = {
+    open: "Open",
+    "pending-human": "Pending Human",
+    resolved: "Resolved",
   };
-  return icons[action as keyof typeof icons] || Circle;
+  return labels[status as keyof typeof labels] || status;
 };
 
-const formatDate = (date: Date) => {
+const formatCountdown = (cooldownUntil: Date | string) => {
+  const target = new Date(cooldownUntil);
+  const now = new Date();
+  const seconds = Math.floor((target.getTime() - now.getTime()) / 1000);
+
+  if (seconds <= 0) return "0s";
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+};
+
+const formatDate = (date: Date | string | undefined) => {
+  if (!date) return "N/A";
+  const dateObj = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
-};
-
-const formatTime = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  }).format(dateObj);
 };
 
 const formatDuration = (seconds: number) => {
@@ -691,24 +481,34 @@ const endTakeover = () => {
   console.log("End takeover");
 };
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (!newMessage.value.trim()) return;
 
-  const message = {
-    id: `msg_${Date.now()}`,
-    sender: "human",
-    content: newMessage.value,
-    timestamp: new Date(),
-    type: "message",
-  };
+  try {
+    // Send message via API
+    const result = await HayApi.conversations.sendMessage.mutate({
+      conversationId,
+      content: newMessage.value,
+      role: "user",
+    });
 
-  messages.value.push(message);
-  newMessage.value = "";
+    // Add message to local list
+    messages.value.push({
+      id: result.id,
+      sender: "customer",
+      content: newMessage.value,
+      timestamp: new Date(),
+      type: "HumanMessage",
+    });
 
-  // TODO: Send message via API
-  console.log("Send message:", message);
+    newMessage.value = "";
+    scrollToBottom();
 
-  scrollToBottom();
+    // Refresh messages after a short delay to get any AI response
+    setTimeout(() => fetchMessages(), 2000);
+  } catch (error) {
+    console.error("Failed to send message:", error);
+  }
 };
 
 const approveMessage = (messageId: string) => {
@@ -748,26 +548,82 @@ const scrollToBottom = () => {
   });
 };
 
+// Fetch conversation data
+const fetchConversation = async () => {
+  try {
+    loading.value = true;
+    const result = await HayApi.conversations.get.query({ id: conversationId });
+    conversation.value = result;
+  } catch (error) {
+    console.error("Failed to fetch conversation:", error);
+    // Show error toast or redirect
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Fetch messages
+const fetchMessages = async () => {
+  try {
+    messagesLoading.value = true;
+    const result = await HayApi.conversations.getMessages.query({
+      conversationId,
+      limit: 100,
+    });
+
+    console.log("Fetched messages:", result); // Debug log
+
+    // Transform messages to match the component format
+    messages.value = result.map((msg: any) => {
+      // Determine the sender based on message type
+      let sender = "system";
+      if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
+        sender = "agent";
+      } else if (msg.type === "HumanMessage" || msg.type === "HUMAN_MESSAGE") {
+        sender = "customer";
+      } else if (
+        msg.type === "SystemMessage" ||
+        msg.type === "SYSTEM_MESSAGE"
+      ) {
+        sender = "system";
+      } else if (msg.sender) {
+        // Use sender field if available
+        sender =
+          msg.sender === "assistant"
+            ? "agent"
+            : msg.sender === "user"
+            ? "customer"
+            : msg.sender;
+      }
+
+      return {
+        id: msg.id,
+        content: msg.content,
+        timestamp: msg.created_at,
+        type: msg.type,
+        sender,
+        agentName: sender === "agent" ? "AI Assistant" : undefined,
+        isPlaybook: msg.metadata?.playbook_id ? true : false,
+        metadata: msg.metadata,
+      };
+    });
+
+    console.log("Transformed messages:", messages.value); // Debug log
+
+    nextTick(() => scrollToBottom());
+  } catch (error) {
+    console.error("Failed to fetch messages:", error);
+  } finally {
+    messagesLoading.value = false;
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
-  // TODO: Fetch conversation data from API
-  // await fetchConversation(conversationId)
-  // await fetchMessages(conversationId)
-  // setupWebSocketConnection()
+  // Fetch conversation and messages in parallel
+  await Promise.all([fetchConversation(), fetchMessages()]);
 
-  // Simulate loading
-  setTimeout(() => {
-    loading.value = false;
-    scrollToBottom();
-  }, 1000);
-
-  // Simulate typing indicator
-  setTimeout(() => {
-    isTyping.value = true;
-    setTimeout(() => {
-      isTyping.value = false;
-    }, 2000);
-  }, 3000);
+  // TODO: Setup WebSocket connection for real-time updates
 });
 
 // eslint-disable-next-line no-undef
@@ -783,8 +639,8 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: `Conversation with ${
-    conversation.value?.customer.name || "Customer"
-  } - Hay Dashboard`,
+  title: computed(
+    () => `${conversation.value?.title || "Conversation"} - Hay Dashboard`
+  ),
 });
 </script>

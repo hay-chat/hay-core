@@ -11,34 +11,37 @@ export interface Agent {
   enabled: boolean;
   instructions?: string | null;
   organization_id: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Playbook {
   id: string;
-  name: string;
+  title: string;
+  trigger: string;
   description?: string | null;
-  instructions?: string | null;
+  instructions?: any;
   status: PlaybookStatus;
   organization_id: string;
   agents?: Agent[];
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreatePlaybookInput {
-  name: string;
+  title: string;
+  trigger: string;
   description?: string;
-  instructions?: string;
+  instructions?: any;
   status?: PlaybookStatus;
   agentIds?: string[];
 }
 
 export interface UpdatePlaybookInput {
-  name?: string;
+  title?: string;
+  trigger?: string;
   description?: string;
-  instructions?: string;
+  instructions?: any;
   status?: PlaybookStatus;
   agentIds?: string[];
 }

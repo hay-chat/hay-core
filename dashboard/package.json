@@ -14,7 +14,7 @@
     "test": "vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "type-check": "nuxt typecheck",
+    "typecheck": "nuxt typecheck",
     "generate:trpc": "tsx scripts/generate-trpc-types.ts"
   },
   "keywords": [

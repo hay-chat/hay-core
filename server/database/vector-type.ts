@@ -1,9 +1,9 @@
-import { ColumnType } from "typeorm";
-
-export class VectorType implements ColumnType {
-  constructor(private dimensions?: number) {}
-
-  sqlType = this.dimensions ? `vector(${this.dimensions})` : "vector";
+export class VectorType {
+  sqlType: string;
+  
+  constructor(private dimensions?: number) {
+    this.sqlType = this.dimensions ? `vector(${this.dimensions})` : "vector";
+  }
 }
 
 export const VectorColumnType = (dimensions?: number) => ({

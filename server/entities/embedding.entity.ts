@@ -20,7 +20,8 @@ export class Embedding {
   @Column({ type: "jsonb", nullable: true })
   metadata?: Record<string, any>;
 
-  @Column("simple-array", {
+  @Column({
+    type: "text",
     transformer: {
       to: (value: number[] | null): string | null => {
         if (!value || !Array.isArray(value)) return null;
@@ -30,10 +31,14 @@ export class Embedding {
         if (!value) return null;
         if (Array.isArray(value)) return value;
         
-        const cleaned = value.replace(/[\[\]]/g, '');
-        if (!cleaned) return null;
+        // Handle pgvector format
+        if (typeof value === 'string') {
+          const cleaned = value.replace(/[\[\]]/g, '');
+          if (!cleaned) return null;
+          return cleaned.split(',').map(v => parseFloat(v.trim()));
+        }
         
-        return cleaned.split(',').map(v => parseFloat(v.trim()));
+        return null;
       }
     }
   })

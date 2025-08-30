@@ -152,15 +152,16 @@ export class VectorStoreService {
     
     // Use raw SQL for organization-scoped similarity search
     // This ensures proper multi-tenancy filtering
+    // Cast the embedding column to vector type for the comparison
     const searchQuery = `
       SELECT 
         id,
         "pageContent" as content,
         metadata,
-        1 - (embedding <=> $1::vector) as similarity
+        1 - (embedding::vector <=> $1::vector) as similarity
       FROM embeddings
       WHERE "organizationId" = $2
-      ORDER BY embedding <=> $1::vector
+      ORDER BY embedding::vector <=> $1::vector
       LIMIT $3
     `;
 

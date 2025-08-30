@@ -188,7 +188,7 @@
           </div>
         </CardHeader>
         <CardContent>
-          <div class="space-y-4">
+          <div v-if="topAgents.length > 0" class="space-y-4">
             <div
               v-for="agent in topAgents"
               :key="agent.id"
@@ -215,6 +215,13 @@
               </div>
             </div>
           </div>
+          <div v-else class="text-center py-8 text-muted-foreground">
+            <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No agents created yet</p>
+            <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
+              Create Your First Agent
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -233,7 +240,7 @@
           </div>
         </CardHeader>
         <CardContent>
-          <div class="space-y-4">
+          <div v-if="recentConversations.length > 0" class="space-y-4">
             <div
               v-for="conversation in recentConversations"
               :key="conversation.id"
@@ -275,6 +282,11 @@
                 </div>
               </div>
             </div>
+          </div>
+          <div v-else class="text-center py-8 text-muted-foreground">
+            <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No conversations yet</p>
+            <p class="text-sm mt-2">Start chatting with your agents to see conversations here</p>
           </div>
         </CardContent>
       </Card>
@@ -344,20 +356,36 @@ import {
   AlertCircle,
   Zap,
 } from "lucide-vue-next";
+import { HayApi } from "@/utils/api";
 
 // State
 const loading = ref(false);
+const router = useRouter();
 
-// Mock data - TODO: Replace with real API calls
-const metrics = ref({
-  activeAgents: 12,
-  newAgentsThisWeek: 3,
-  totalConversations: 24567,
-  conversationsGrowth: 12.5,
-  resolutionRate: 94,
-  resolutionRateChange: 2.1,
-  avgResponseTime: 1.8,
-  responseTimeImprovement: 15.3,
+// Real data - fetched from API
+const agents = ref<any[]>([]);
+const conversations = ref<any[]>([]);
+
+// Computed properties for dashboard data
+const metrics = computed(() => {
+  const activeAgents = agents.value.filter(a => a.enabled).length;
+  const totalConversations = conversations.value.length;
+  
+  // Calculate metrics based on real data
+  return {
+    activeAgents,
+    newAgentsThisWeek: agents.value.filter(a => {
+      const createdAt = new Date(a.createdAt);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return createdAt > weekAgo;
+    }).length,
+    totalConversations,
+    conversationsGrowth: totalConversations > 0 ? 12.5 : 0, // Mock for now
+    resolutionRate: 94, // Mock for now
+    resolutionRateChange: 2.1, // Mock for now
+    avgResponseTime: 1.8, // Mock for now
+    responseTimeImprovement: 15.3, // Mock for now
+  };
 });
 
 const recentActivity = ref([
@@ -395,63 +423,55 @@ const recentActivity = ref([
   },
 ]);
 
-const topAgents = ref([
-  {
-    id: 1,
-    name: "Customer Support Bot",
-    conversations: 1234,
-    resolutionRate: 96,
-  },
-  {
-    id: 2,
-    name: "Sales Assistant",
-    conversations: 892,
-    resolutionRate: 94,
-  },
-  {
-    id: 3,
-    name: "Technical Support",
-    conversations: 567,
-    resolutionRate: 91,
-  },
-  {
-    id: 4,
-    name: "Billing Assistant",
-    conversations: 345,
-    resolutionRate: 89,
-  },
-]);
+// Computed property for top agents based on conversation count
+const topAgents = computed(() => {
+  // Group conversations by agent and count them
+  const agentConversationCounts = new Map<string, number>();
+  
+  conversations.value.forEach(conv => {
+    const count = agentConversationCounts.get(conv.agentId) || 0;
+    agentConversationCounts.set(conv.agentId, count + 1);
+  });
+  
+  // Map agents with their conversation counts
+  const agentsWithStats = agents.value
+    .filter(agent => agent.enabled)
+    .map(agent => ({
+      id: agent.id,
+      name: agent.name,
+      conversations: agentConversationCounts.get(agent.id) || 0,
+      resolutionRate: 90 + Math.floor(Math.random() * 10), // Mock resolution rate for now
+    }))
+    .sort((a, b) => b.conversations - a.conversations)
+    .slice(0, 4); // Get top 4 agents
+  
+  // If no agents, return empty array
+  if (agentsWithStats.length === 0) {
+    return [];
+  }
+  
+  return agentsWithStats;
+});
 
-const recentConversations = ref([
-  {
-    id: 1,
-    customerName: "John Smith",
-    lastMessage: "Thank you for the help with my account setup!",
-    status: "resolved",
-    updatedAt: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-  },
-  {
-    id: 2,
-    customerName: "Sarah Johnson",
-    lastMessage: "I need help with billing questions...",
-    status: "active",
-    updatedAt: new Date(Date.now() - 1000 * 60 * 12), // 12 minutes ago
-  },
-  {
-    id: 3,
-    customerName: "Mike Wilson",
-    lastMessage: "The integration is not working properly",
-    status: "escalated",
-    updatedAt: new Date(Date.now() - 1000 * 60 * 25), // 25 minutes ago
-  },
-  {
-    id: 4,
-    customerName: "Lisa Brown",
-    lastMessage: "How do I export my data?",
-    status: "active",
-    updatedAt: new Date(Date.now() - 1000 * 60 * 35), // 35 minutes ago
-  },
-]);
+// Computed property for recent conversations
+const recentConversations = computed(() => {
+  return conversations.value
+    .slice(0, 4) // Get 4 most recent
+    .map(conv => {
+      // Get the last message if available
+      const lastMessage = conv.messages && conv.messages.length > 0 
+        ? conv.messages[conv.messages.length - 1]
+        : null;
+      
+      return {
+        id: conv.id,
+        customerName: conv.title || "New Conversation",
+        lastMessage: lastMessage ? lastMessage.content.substring(0, 50) + "..." : "No messages yet",
+        status: conv.status || "active",
+        updatedAt: new Date(conv.updatedAt || conv.createdAt),
+      };
+    });
+});
 
 // Methods
 const formatNumber = (num: number) => {
@@ -476,72 +496,68 @@ const formatTimeAgo = (date: Date) => {
   }
 };
 
+const fetchDashboardData = async () => {
+  try {
+    // Fetch agents and conversations in parallel
+    const [agentsData, conversationsData] = await Promise.all([
+      HayApi.agents.list.query(),
+      HayApi.conversations.list.query()
+    ]);
+    
+    agents.value = agentsData || [];
+    conversations.value = conversationsData?.items || conversationsData || [];
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+    // Set empty arrays on error to prevent UI issues
+    agents.value = [];
+    conversations.value = [];
+  }
+};
+
 const refreshData = async () => {
   loading.value = true;
   try {
-    // TODO: Implement data refresh logic
-    // TODO: Fetch latest metrics from API
-    // TODO: Update dashboard state
-    console.log("Refreshing dashboard data...");
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await fetchDashboardData();
   } catch (error) {
     console.error("Error refreshing data:", error);
-    // TODO: Show error notification
   } finally {
     loading.value = false;
   }
 };
 
 const createAgent = () => {
-  // TODO: Navigate to agent creation page
-  // await navigateTo('/agents/new')
-  console.log("Navigate to agent creation");
+  router.push('/agents/create');
 };
 
 const viewAllAgents = () => {
-  // TODO: Navigate to agents list page
-  // await navigateTo('/agents')
-  console.log("Navigate to agents list");
+  router.push('/agents');
 };
 
 const viewAllConversations = () => {
-  // TODO: Navigate to conversations list page
-  // await navigateTo('/conversations')
-  console.log("Navigate to conversations list");
+  router.push('/conversations');
 };
 
-const viewConversation = (id: number) => {
-  // TODO: Navigate to specific conversation
-  // await navigateTo(`/conversations/${id}`)
-  console.log("Navigate to conversation:", id);
+const viewConversation = (id: string) => {
+  router.push(`/conversations/${id}`);
 };
 
 const viewInsights = () => {
-  // TODO: Navigate to insights page
-  // await navigateTo('/insights')
-  console.log("Navigate to insights");
+  router.push('/insights');
 };
 
 const managePlaybooks = () => {
-  // TODO: Navigate to playbooks page
-  // await navigateTo('/playbooks')
-  console.log("Navigate to playbooks");
+  router.push('/playbooks');
 };
 
 const viewAnalytics = () => {
-  // TODO: Navigate to analytics page
-  // await navigateTo('/analytics')
-  console.log("Navigate to analytics");
+  router.push('/analytics');
 };
 
 // Lifecycle
 onMounted(async () => {
-  // TODO: Load initial dashboard data
-  // TODO: Set up WebSocket connection for real-time updates
-  // TODO: Start periodic data refresh
-  console.log("Dashboard mounted - loading initial data");
+  loading.value = true;
+  await fetchDashboardData();
+  loading.value = false;
 });
 
 // TODO: Set up WebSocket listeners for real-time updates

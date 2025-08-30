@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture Overview
 
 This is a full-stack TypeScript application with:
+
 - **Frontend**: Nuxt 3 dashboard (Vue 3) with Tailwind CSS, located in `/dashboard`
 - **Backend**: Express server with tRPC API, TypeORM, and PostgreSQL with pgvector, located in `/server`
 - **Database**: PostgreSQL with pgvector extension for embeddings and vector search
@@ -23,7 +24,7 @@ npm run dev
 # Backend (port 3000)
 cd server && npm run dev
 
-# Frontend (port 5173)  
+# Frontend (port 5173)
 cd dashboard && npm run dev
 ```
 
@@ -71,6 +72,12 @@ cd dashboard && npm test
 
 1. **Navigation**: Avoid using `navigateTo()`, instead initiate a router and use `router.push()`
 2. **API Calls**: Always use `HayApi` for tRPC calls to the server, not `$api` methods
+
+```ts
+import { Hay } from "@/utils/api";
+const response = await Hay.conversations.create();
+```
+
 3. **State Management**: Uses Pinia stores with persistence (auth, user, organization)
 4. **Components**: Auto-imported from `/components` subdirectories
 5. **Composables**: Auto-imported from `/composables` directory
@@ -112,6 +119,7 @@ cd dashboard && npm test
 ## Environment Setup
 
 Copy `.env.example` to `.env` and configure:
+
 - Database credentials (PostgreSQL required)
 - JWT secrets (generate secure random strings for production)
 - OpenAI API key for AI features

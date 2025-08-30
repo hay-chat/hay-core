@@ -13,17 +13,19 @@ const playbookStatusEnum = z.enum([
 ]);
 
 const createPlaybookSchema = z.object({
-  name: z.string().min(1).max(255),
+  title: z.string().min(1).max(255),
+  trigger: z.string().min(1).max(255),
   description: z.string().optional(),
-  instructions: z.string().optional(),
+  instructions: z.any().optional(),
   status: playbookStatusEnum.optional().default(PlaybookStatus.DRAFT),
   agentIds: z.array(z.string().uuid()).optional()
 });
 
 const updatePlaybookSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
+  title: z.string().min(1).max(255).optional(),
+  trigger: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  instructions: z.string().optional(),
+  instructions: z.any().optional(),
   status: playbookStatusEnum.optional(),
   agentIds: z.array(z.string().uuid()).optional()
 });

@@ -29,6 +29,7 @@ import {
   BookOpen,
   Puzzle,
   ListTodo,
+  TestTube,
 } from "lucide-vue-next";
 
 import {
@@ -113,6 +114,12 @@ const navMain = computed(() => [
     url: "/insights",
     icon: BarChart,
     isActive: isPathActive("/insights"),
+  },
+  {
+    title: "Test Customer",
+    url: "/test-customer",
+    icon: TestTube,
+    isActive: isPathActive("/test-customer"),
   },
   {
     title: "Integrations",

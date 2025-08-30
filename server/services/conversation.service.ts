@@ -13,13 +13,21 @@ export class ConversationService {
   }
 
   async createConversation(organizationId: string, data: {
-    title: string;
-    agentId: string;
+    title?: string;
+    agentId?: string | null;
+    playbook_id?: string | null;
+    metadata?: Record<string, any>;
+    status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
   }): Promise<Conversation> {
     return await this.conversationRepository.create({
-      title: data.title,
-      agent_id: data.agentId,
-      organization_id: organizationId
+      title: data.title || "New Conversation",
+      agent_id: data.agentId || null,
+      playbook_id: data.playbook_id || null,
+      organization_id: organizationId,
+      status: data.status || "open",
+      context: {},
+      metadata: data.metadata || {},
+      needs_processing: data.status === "open" || data.status === "processing"
     });
   }
 
@@ -31,15 +39,24 @@ export class ConversationService {
     return await this.conversationRepository.findByAgent(agentId, organizationId);
   }
 
-  async getConversation(organizationId: string, conversationId: string): Promise<Conversation | null> {
+  async getConversation(conversationId: string, organizationId: string): Promise<Conversation | null> {
     return await this.conversationRepository.findById(conversationId, organizationId);
   }
 
   async updateConversation(
-    organizationId: string,
     conversationId: string,
+    organizationId: string,
     data: {
       title?: string;
+      status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
+      needs_processing?: boolean;
+      last_processed_at?: Date | null;
+      agent_id?: string | null;
+      cooldown_until?: Date | null;
+      last_user_message_at?: Date;
+      ended_at?: Date;
+      context?: Record<string, any>;
+      resolution_metadata?: { resolved: boolean; confidence: number; reason: string };
     }
   ): Promise<Conversation | null> {
     return await this.conversationRepository.update(conversationId, organizationId, data);
@@ -49,16 +66,29 @@ export class ConversationService {
     return await this.conversationRepository.delete(conversationId, organizationId);
   }
 
-  async addMessage(conversationId: string, data: {
+  async addMessage(conversationId: string, organizationId: string, data: {
     content: string;
     type: MessageType;
+    sender?: string;
     usage_metadata?: Record<string, any>;
+    metadata?: Record<string, any>;
   }): Promise<Message> {
+    // Update last_user_message_at if it's a user message
+    if (data.type === MessageType.HUMAN_MESSAGE) {
+      const now = new Date();
+      await this.conversationRepository.update(conversationId, organizationId, {
+        last_user_message_at: now,
+        // Don't set cooldown here - let the orchestrator manage it
+      });
+    }
+
     return await this.messageRepository.create({
       conversation_id: conversationId,
       content: data.content,
       type: data.type,
-      usage_metadata: data.usage_metadata || null
+      sender: data.sender || null,
+      usage_metadata: data.usage_metadata || null,
+      metadata: data.metadata || null
     });
   }
 
@@ -81,7 +111,7 @@ export class ConversationService {
     return await this.messageRepository.findByConversation(conversationId);
   }
 
-  async getLastMessages(conversationId: string, limit: number = 10): Promise<Message[]> {
+  async getLastMessages(conversationId: string, organizationId: string, limit: number = 10): Promise<Message[]> {
     const messages = await this.messageRepository.getLastMessages(conversationId, limit);
     return messages.reverse();
   }

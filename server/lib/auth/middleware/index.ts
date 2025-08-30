@@ -114,7 +114,7 @@ export function requireAdmin(authUser: AuthUser): void {
 
 // Logging helpers
 function logAuthSuccess(method: string, userId: string): void {
-  console.log(`[Auth] Successful ${method} authentication for user ${userId}`);
+  // console.log(`[Auth] Successful ${method} authentication for user ${userId}`);
 }
 
 function logAuthFailure(method: string, error: unknown): void {

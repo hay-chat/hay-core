@@ -9,6 +9,14 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
+        <Button
+          size="sm"
+          @click="createConversation"
+          :disabled="creatingConversation"
+        >
+          <Plus class="h-4 w-4 mr-2" />
+          New Conversation
+        </Button>
         <Button variant="outline" size="sm">
           <Download class="h-4 w-4 mr-2" />
           Export
@@ -166,6 +174,17 @@
       </div>
     </div>
 
+    <!-- Error State -->
+    <div v-else-if="error" class="text-center py-12">
+      <AlertTriangle class="h-12 w-12 text-red-500 mx-auto mb-4" />
+      <h3 class="text-lg font-medium mb-2">Error Loading Conversations</h3>
+      <p class="text-muted-foreground mb-4">{{ error }}</p>
+      <Button @click="fetchConversations" variant="outline">
+        <RefreshCcw class="h-4 w-4 mr-2" />
+        Try Again
+      </Button>
+    </div>
+
     <!-- Empty State -->
     <div
       v-else-if="filteredConversations.length === 0"
@@ -175,18 +194,26 @@
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No conversations found" : "No conversations yet" }}
       </h3>
-      <p class="text-muted-foreground">
+      <p class="text-muted-foreground mb-4">
         {{
           searchQuery
             ? "Try adjusting your search terms or filters."
-            : "Conversations will appear here once customers start chatting."
+            : "Click 'New Conversation' to start your first conversation."
         }}
       </p>
+      <Button
+        v-if="!searchQuery"
+        @click="createConversation"
+        :disabled="creatingConversation"
+      >
+        <Plus class="h-4 w-4 mr-2" />
+        New Conversation
+      </Button>
     </div>
 
     <!-- Conversations Table -->
     <Card v-else>
-      <CardContent class="p-0">
+      <CardContent class="!p-0">
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="border-b">
@@ -194,8 +221,9 @@
                 <th v-if="bulkMode" class="text-left py-3 px-4 w-12">
                   <Checkbox
                     :checked="
+                      selectedConversations.length > 0 &&
                       selectedConversations.length ===
-                      filteredConversations.length
+                        paginatedConversations.length
                     "
                     @update:checked="toggleSelectAll"
                   />
@@ -212,7 +240,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="conversation in filteredConversations"
+                v-for="conversation in paginatedConversations"
                 :key="conversation.id"
                 class="border-b hover:bg-muted/50 cursor-pointer"
                 @click="!bulkMode && viewConversation(conversation.id)"
@@ -234,10 +262,10 @@
                     </div>
                     <div>
                       <div class="font-medium">
-                        {{ conversation.customer.name }}
+                        {{ conversation.title || "Untitled Conversation" }}
                       </div>
-                      <div class="text-sm text-muted-foreground">
-                        {{ conversation.customer.email }}
+                      <div class="text-xs text-muted-foreground">
+                        {{ conversation.id.slice(0, 8) }}...
                       </div>
                     </div>
                   </div>
@@ -249,43 +277,41 @@
                     >
                       <Bot class="h-3 w-3 text-blue-600" />
                     </div>
-                    <span class="text-sm">{{ conversation.agent.name }}</span>
+                    <span class="text-sm">{{
+                      conversation.agent?.name || "AI Assistant"
+                    }}</span>
                   </div>
                 </td>
                 <td class="py-3 px-4">
-                  <Badge :variant="getStatusVariant(conversation.status)">
-                    <div class="flex items-center space-x-1">
-                      <component
-                        :is="getStatusIcon(conversation.status)"
-                        class="h-3 w-3"
-                      />
-                      <span>{{ conversation.status }}</span>
-                    </div>
+                  <Badge :variant="getStatusVariant(conversation?.status)">
+                    <component
+                      :is="getStatusIcon(conversation?.status)"
+                      class="h-3 w-3 mr-1"
+                    />
+                    {{ formatStatus(conversation?.status) }}
                   </Badge>
                 </td>
                 <td class="py-3 px-4 max-w-xs">
                   <div class="truncate text-sm">
-                    {{ conversation.lastMessage.preview }}
+                    {{
+                      conversation.metadata?.lastMessage || "No messages yet"
+                    }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{
-                      conversation.lastMessage.sender === "customer"
-                        ? "Customer"
-                        : "Agent"
-                    }}
+                    {{ conversation.metadata?.lastSender || "-" }}
                   </div>
                 </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ formatDuration(conversation.duration) }}
+                  {{ formatDuration(getDuration(conversation)) }}
                 </td>
                 <td class="py-3 px-4">
                   <div
-                    v-if="conversation.satisfaction"
+                    v-if="conversation.metadata?.satisfaction"
                     class="flex items-center space-x-1"
                   >
                     <Star class="h-4 w-4 text-yellow-500 fill-current" />
                     <span class="text-sm"
-                      >{{ conversation.satisfaction }}/5</span
+                      >{{ conversation.metadata.satisfaction }}/5</span
                     >
                   </div>
                   <span v-else class="text-xs text-muted-foreground"
@@ -293,7 +319,7 @@
                   >
                 </td>
                 <td class="py-3 px-4 text-sm text-muted-foreground">
-                  {{ formatDate(conversation.updatedAt) }}
+                  {{ formatDate(new Date(conversation.updated_at)) }}
                 </td>
                 <td class="py-3 px-4" @click.stop>
                   <div class="flex items-center space-x-2">
@@ -305,7 +331,10 @@
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="conversation.status === 'active'"
+                      v-if="
+                        conversation.status === 'open' ||
+                        conversation.status === 'pending-human'
+                      "
                       variant="ghost"
                       size="sm"
                       @click="takeOverConversation(conversation.id)"
@@ -335,8 +364,8 @@
     >
       <div class="text-sm text-muted-foreground">
         Showing {{ (currentPage - 1) * pageSize + 1 }} to
-        {{ Math.min(currentPage * pageSize, totalConversations) }} of
-        {{ totalConversations }} conversations
+        {{ Math.min(currentPage * pageSize, filteredConversations.length) }} of
+        {{ filteredConversations.length }} conversations
       </div>
       <div class="flex items-center space-x-2">
         <Button
@@ -352,7 +381,7 @@
         <Button
           variant="outline"
           size="sm"
-          :disabled="currentPage * pageSize >= totalConversations"
+          :disabled="currentPage * pageSize >= filteredConversations.length"
           @click="nextPage"
         >
           Next
@@ -386,29 +415,18 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  Plus,
 } from "lucide-vue-next";
+import { HayApi } from "@/utils/api";
+import { useRouter } from "vue-router";
+import Badge from "@/components/ui/Badge.vue";
 
-// TODO: Import actual Badge component when available
-const Badge = ({ variant = "default", ...props }) =>
-  h("span", {
-    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === "outline"
-        ? "border border-gray-300 text-gray-700"
-        : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : variant === "warning"
-        ? "bg-yellow-100 text-yellow-800"
-        : "bg-gray-100 text-gray-800"
-    }`,
-    ...props,
-  });
+// Router
+const router = useRouter();
 
 // Reactive state
 const loading = ref(true);
+const error = ref<string | null>(null);
 const realTimeEnabled = ref(true);
 const searchQuery = ref("");
 const selectedStatus = ref("");
@@ -418,157 +436,131 @@ const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(25);
+const creatingConversation = ref(false);
 
-// Mock data - TODO: Replace with actual API calls
-const stats = ref({
-  total: 1847,
-  active: 23,
-  avgResponseTime: 4.2,
-  satisfactionRate: 92,
-  todayIncrease: 45,
+// API data
+const conversations = ref<any[]>([]);
+const totalConversations = ref(0);
+
+// Computed stats based on real conversations
+const stats = computed(() => {
+  const total = totalConversations.value;
+  const active = conversations.value.filter(
+    (c) => c.status === "open" || c.status === "processing"
+  ).length;
+  const resolved = conversations.value.filter(
+    (c) => c.status === "resolved"
+  ).length;
+  const today = conversations.value.filter((c) => {
+    const created = new Date(c.created_at);
+    const now = new Date();
+    return created.toDateString() === now.toDateString();
+  }).length;
+
+  // Calculate average response time (mock for now)
+  const avgResponseTime = 4.2;
+
+  // Calculate satisfaction rate (mock for now)
+  const satisfactionRate =
+    resolved > 0 ? Math.round((resolved / total) * 100) : 0;
+
+  return {
+    total,
+    active,
+    avgResponseTime,
+    satisfactionRate,
+    todayIncrease: today,
+  };
 });
 
+// Mock agents for now - TODO: fetch from API
 const agents = ref([
   { id: "1", name: "Customer Support Agent" },
   { id: "2", name: "Sales Assistant" },
   { id: "3", name: "Technical Support" },
 ]);
 
-const conversations = ref([
-  {
-    id: "1",
-    customer: {
-      name: "Alice Johnson",
-      email: "alice@example.com",
-    },
-    agent: {
-      name: "Customer Support Agent",
-    },
-    status: "active",
-    lastMessage: {
-      preview:
-        "I need help with my billing statement, can you explain this charge?",
-      sender: "customer",
-    },
-    duration: 485, // seconds
-    satisfaction: null,
-    updatedAt: new Date("2024-01-15T14:30:00"),
-    createdAt: new Date("2024-01-15T14:22:00"),
-  },
-  {
-    id: "2",
-    customer: {
-      name: "Bob Smith",
-      email: "bob@example.com",
-    },
-    agent: {
-      name: "Technical Support",
-    },
-    status: "resolved",
-    lastMessage: {
-      preview: "Thank you for your help! The issue is now resolved.",
-      sender: "customer",
-    },
-    duration: 1240,
-    satisfaction: 5,
-    updatedAt: new Date("2024-01-15T13:45:00"),
-    createdAt: new Date("2024-01-15T13:24:00"),
-  },
-  {
-    id: "3",
-    customer: {
-      name: "Carol Williams",
-      email: "carol@example.com",
-    },
-    agent: {
-      name: "Sales Assistant",
-    },
-    status: "escalated",
-    lastMessage: {
-      preview:
-        "This requires special pricing approval for enterprise features.",
-      sender: "agent",
-    },
-    duration: 2100,
-    satisfaction: null,
-    updatedAt: new Date("2024-01-15T12:20:00"),
-    createdAt: new Date("2024-01-15T11:45:00"),
-  },
-  {
-    id: "4",
-    customer: {
-      name: "David Brown",
-      email: "david@example.com",
-    },
-    agent: {
-      name: "Customer Support Agent",
-    },
-    status: "closed",
-    lastMessage: {
-      preview: "Perfect, that solved my problem. Thanks!",
-      sender: "customer",
-    },
-    duration: 320,
-    satisfaction: 4,
-    updatedAt: new Date("2024-01-15T11:10:00"),
-    createdAt: new Date("2024-01-15T11:05:00"),
-  },
-]);
-
-const totalConversations = computed(() => filteredConversations.value.length);
-
 // Computed properties
 const filteredConversations = computed(() => {
-  return conversations.value
-    .filter((conversation) => {
-      const matchesSearch =
-        !searchQuery.value ||
-        conversation.customer.name
-          .toLowerCase()
-          .includes(searchQuery.value.toLowerCase()) ||
-        conversation.customer.email
-          .toLowerCase()
-          .includes(searchQuery.value.toLowerCase()) ||
-        conversation.lastMessage.preview
-          .toLowerCase()
-          .includes(searchQuery.value.toLowerCase());
+  return conversations.value.filter((conversation) => {
+    const matchesSearch =
+      !searchQuery.value ||
+      conversation.title
+        ?.toLowerCase()
+        .includes(searchQuery.value.toLowerCase()) ||
+      conversation.id.toLowerCase().includes(searchQuery.value.toLowerCase());
 
-      const matchesStatus =
-        !selectedStatus.value || conversation.status === selectedStatus.value;
-      const matchesAgent =
-        !selectedAgent.value ||
-        conversation.agent.name.includes(selectedAgent.value);
+    const matchesStatus =
+      !selectedStatus.value || conversation.status === selectedStatus.value;
 
-      // TODO: Implement timeframe filtering
-      const matchesTimeframe = true;
+    const matchesAgent =
+      !selectedAgent.value || conversation.agent_id === selectedAgent.value;
 
-      return matchesSearch && matchesStatus && matchesAgent && matchesTimeframe;
-    })
-    .slice(
-      (currentPage.value - 1) * pageSize.value,
-      currentPage.value * pageSize.value
-    );
+    // TODO: Implement timeframe filtering
+    const matchesTimeframe = true;
+
+    return matchesSearch && matchesStatus && matchesAgent && matchesTimeframe;
+  });
+});
+
+// Paginated conversations
+const paginatedConversations = computed(() => {
+  return filteredConversations.value.slice(
+    (currentPage.value - 1) * pageSize.value,
+    currentPage.value * pageSize.value
+  );
 });
 
 // Methods
-const getStatusVariant = (status: string) => {
-  const variants = {
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
+  const variants: Record<
+    string,
+    "default" | "secondary" | "destructive" | "outline"
+  > = {
+    open: "default",
+    "pending-human": "destructive",
+    resolved: "secondary",
     active: "default",
-    resolved: "success",
-    escalated: "warning",
+    escalated: "destructive",
     closed: "secondary",
   };
-  return variants[status as keyof typeof variants] || "default";
+  return variants[status] || "default";
 };
 
 const getStatusIcon = (status: string) => {
   const icons = {
-    active: Circle,
+    open: Circle,
+    "pending-human": AlertTriangle,
     resolved: CheckCircle,
+    active: Circle,
     escalated: AlertTriangle,
     closed: XCircle,
   };
   return icons[status as keyof typeof icons] || Circle;
+};
+
+const formatStatus = (status: string) => {
+  const labels = {
+    open: "Open",
+    processing: "Processing",
+    "pending-human": "Pending Human",
+    resolved: "Resolved",
+    closed: "Closed",
+  };
+  return labels[status as keyof typeof labels] || status;
+};
+
+const getDuration = (conversation: any) => {
+  if (conversation.ended_at) {
+    const start = new Date(conversation.created_at);
+    const end = new Date(conversation.ended_at);
+    return Math.floor((end.getTime() - start.getTime()) / 1000);
+  }
+  const start = new Date(conversation.created_at);
+  const now = new Date();
+  return Math.floor((now.getTime() - start.getTime()) / 1000);
 };
 
 const formatDuration = (seconds: number) => {
@@ -608,7 +600,7 @@ const toggleBulkMode = () => {
 
 const toggleSelectAll = (checked: boolean) => {
   if (checked) {
-    selectedConversations.value = filteredConversations.value.map((c) => c.id);
+    selectedConversations.value = paginatedConversations.value.map((c) => c.id);
   } else {
     selectedConversations.value = [];
   }
@@ -624,7 +616,7 @@ const toggleConversationSelection = (id: string) => {
 };
 
 const viewConversation = (id: string) => {
-  navigateTo(`/conversations/${id}`);
+  router.push(`/conversations/${id}`);
 };
 
 const takeOverConversation = (id: string) => {
@@ -637,9 +629,47 @@ const showMoreActions = (id: string) => {
   console.log("Show more actions for conversation:", id);
 };
 
-const refreshConversations = () => {
-  // TODO: Refresh conversations from API
-  console.log("Refresh conversations");
+const createConversation = async () => {
+  try {
+    creatingConversation.value = true;
+    const conversation = await HayApi.conversations.create.mutate({
+      title: "New Conversation",
+    });
+    await fetchConversations();
+    router.push(`/conversations/${conversation.id}`);
+  } catch (err) {
+    console.error("Failed to create conversation:", err);
+    error.value = "Failed to create conversation";
+  } finally {
+    creatingConversation.value = false;
+  }
+};
+
+const fetchConversations = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const response = await HayApi.conversations.list.query({
+      limit: 100,
+      offset: 0,
+      orderBy: "created_at",
+      orderDirection: "desc",
+    });
+
+    conversations.value = response.items;
+    totalConversations.value = response.total;
+  } catch (err) {
+    console.error("Failed to fetch conversations:", err);
+    error.value = "Failed to load conversations";
+    conversations.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
+
+const refreshConversations = async () => {
+  await fetchConversations();
 };
 
 const previousPage = () => {
@@ -649,22 +679,16 @@ const previousPage = () => {
 };
 
 const nextPage = () => {
-  if (currentPage.value * pageSize.value < totalConversations.value) {
+  if (currentPage.value * pageSize.value < filteredConversations.value.length) {
     currentPage.value++;
   }
 };
 
 // Lifecycle
 onMounted(async () => {
-  // TODO: Fetch conversations from API
-  // await fetchConversations()
-  // await fetchAgents()
-  // setupRealTimeUpdates()
-
-  // Simulate loading
-  setTimeout(() => {
-    loading.value = false;
-  }, 1000);
+  await fetchConversations();
+  // TODO: Fetch agents from API
+  // TODO: Setup real-time updates via WebSocket
 });
 
 // eslint-disable-next-line no-undef

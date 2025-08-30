@@ -10,20 +10,40 @@
     <Card>
       <CardContent class="p-6">
         <form @submit.prevent="handleSubmit" class="space-y-6">
-          <!-- Name Field -->
+          <!-- Title Field -->
           <div class="space-y-2">
-            <label for="name" class="text-sm font-medium">
-              Playbook Name <span class="text-red-500">*</span>
+            <label for="title" class="text-sm font-medium">
+              Playbook Title <span class="text-red-500">*</span>
             </label>
             <Input
-              id="name"
-              v-model="form.name"
+              id="title"
+              v-model="form.title"
               placeholder="e.g., Customer Support Automation"
-              :class="errors.name ? 'border-red-500' : ''"
+              :class="errors.title ? 'border-red-500' : ''"
               required
             />
-            <p v-if="errors.name" class="text-sm text-red-500">
-              {{ errors.name }}
+            <p v-if="errors.title" class="text-sm text-red-500">
+              {{ errors.title }}
+            </p>
+          </div>
+
+          <!-- Trigger Field -->
+          <div class="space-y-2">
+            <label for="trigger" class="text-sm font-medium">
+              Trigger <span class="text-red-500">*</span>
+            </label>
+            <Input
+              id="trigger"
+              v-model="form.trigger"
+              placeholder="e.g., customer_inquiry, ticket_created"
+              :class="errors.trigger ? 'border-red-500' : ''"
+              required
+            />
+            <p v-if="errors.trigger" class="text-sm text-red-500">
+              {{ errors.trigger }}
+            </p>
+            <p class="text-sm text-muted-foreground">
+              Define when this playbook should be activated
             </p>
           </div>
 
@@ -115,7 +135,7 @@
             >
               Cancel
             </Button>
-            <Button type="submit" :disabled="isSubmitting || !form.name">
+            <Button type="submit" :disabled="isSubmitting || !form.title || !form.trigger">
               <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
               {{ isSubmitting ? 'Creating...' : 'Create Playbook' }}
             </Button>
@@ -132,16 +152,17 @@ import { useRouter } from 'vue-router';
 import { Loader2 } from 'lucide-vue-next';
 import type { PlaybookStatus, Agent } from '~/types/playbook';
 import { useToast } from '~/composables/useToast';
+import { HayApi } from '@/utils/api';
 
 const router = useRouter();
-const { $trpc } = useNuxtApp();
 const { toast } = useToast();
 
 // Form state
 const form = ref({
-  name: '',
+  title: '',
+  trigger: '',
   description: '',
-  instructions: '',
+  instructions: {} as any,
   status: 'draft' as PlaybookStatus,
   agentIds: [] as string[]
 });
@@ -149,14 +170,14 @@ const form = ref({
 // UI state
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
-const agents = ref<Agent[]>([]);
+const agents = ref<any[]>([]);
 const errors = ref<Record<string, string>>({});
 
 // Load agents on mount
 onMounted(async () => {
   try {
     loadingAgents.value = true;
-    const response = await $trpc.agents.list.query();
+    const response = await HayApi.agents.list.query();
     agents.value = response || [];
   } catch (error) {
     console.error('Failed to load agents:', error);
@@ -170,13 +191,23 @@ onMounted(async () => {
 const validateForm = () => {
   errors.value = {};
   
-  if (!form.value.name || form.value.name.trim().length === 0) {
-    errors.value.name = 'Playbook name is required';
+  if (!form.value.title || form.value.title.trim().length === 0) {
+    errors.value.title = 'Playbook title is required';
     return false;
   }
   
-  if (form.value.name.length > 255) {
-    errors.value.name = 'Playbook name must be less than 255 characters';
+  if (form.value.title.length > 255) {
+    errors.value.title = 'Playbook title must be less than 255 characters';
+    return false;
+  }
+  
+  if (!form.value.trigger || form.value.trigger.trim().length === 0) {
+    errors.value.trigger = 'Trigger is required';
+    return false;
+  }
+  
+  if (form.value.trigger.length > 255) {
+    errors.value.trigger = 'Trigger must be less than 255 characters';
     return false;
   }
   
@@ -192,8 +223,9 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
     
-    const response = await $trpc.playbooks.create.mutate({
-      name: form.value.name,
+    const response = await HayApi.playbooks.create.mutate({
+      title: form.value.title,
+      trigger: form.value.trigger,
       description: form.value.description || undefined,
       instructions: form.value.instructions || undefined,
       status: form.value.status,

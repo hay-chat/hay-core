@@ -42,6 +42,23 @@ export class Message {
   @Column({ type: "jsonb", nullable: true })
   usage_metadata!: Record<string, any> | null;
 
+  @Column({ type: "varchar", length: 100, nullable: true })
+  sender!: string | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  metadata!: {
+    model?: string;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    latency_ms?: number;
+    plan?: string;
+    path?: "docqa" | "playbook";
+    tools?: string[];
+    playbook_id?: string;
+    confidence?: number;
+  } | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

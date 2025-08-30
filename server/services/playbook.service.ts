@@ -1,6 +1,6 @@
 import { PlaybookRepository } from "../repositories/playbook.repository";
 import { AgentRepository } from "../repositories/agent.repository";
-import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
+import { Playbook, PlaybookStatus, PlaybookKind } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 
 export class PlaybookService {
@@ -13,9 +13,10 @@ export class PlaybookService {
   }
 
   async createPlaybook(organizationId: string, data: {
-    name: string;
+    title: string;
+    trigger: string;
     description?: string;
-    instructions?: string;
+    instructions?: any;
     status?: PlaybookStatus;
     agentIds?: string[];
   }): Promise<Playbook> {
@@ -46,7 +47,7 @@ export class PlaybookService {
     return await this.playbookRepository.findByStatus(organizationId, status);
   }
 
-  async getPlaybook(organizationId: string, playbookId: string): Promise<Playbook | null> {
+  async getPlaybook(playbookId: string, organizationId: string): Promise<Playbook | null> {
     return await this.playbookRepository.findById(playbookId, organizationId);
   }
 
@@ -54,9 +55,10 @@ export class PlaybookService {
     organizationId: string,
     playbookId: string,
     data: {
-      name?: string;
+      title?: string;
+      trigger?: string;
       description?: string;
-      instructions?: string;
+      instructions?: any;
       status?: PlaybookStatus;
       agentIds?: string[];
     }
@@ -95,5 +97,24 @@ export class PlaybookService {
 
   async removeAgentFromPlaybook(organizationId: string, playbookId: string, agentId: string): Promise<Playbook | null> {
     return await this.playbookRepository.removeAgent(playbookId, agentId, organizationId);
+  }
+
+  async getActivePlaybook(kind: string, organizationId: string, trigger?: string): Promise<Playbook | null> {
+    const playbooks = await this.playbookRepository.findByOrganization(organizationId);
+    
+    // First try org-specific playbook
+    let playbook = playbooks.find(p => 
+      p.kind === kind && 
+      p.status === PlaybookStatus.ACTIVE &&
+      (!trigger || p.trigger === trigger)
+    );
+
+    if (!playbook) {
+      // TODO: Fallback to system playbooks
+      // For now, return null
+      return null;
+    }
+
+    return playbook;
   }
 }

@@ -1,12 +1,15 @@
-import { Repository } from "typeorm";
+import { Repository, In } from "typeorm";
 import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
+import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
 
 export class PlaybookRepository {
   private repository: Repository<Playbook>;
+  private agentRepository: Repository<Agent>;
 
   constructor() {
     this.repository = AppDataSource.getRepository(Playbook);
+    this.agentRepository = AppDataSource.getRepository(Agent);
   }
 
   async create(data: Partial<Playbook>): Promise<Playbook> {
@@ -66,6 +69,27 @@ export class PlaybookRepository {
     });
     
     return result.affected !== 0;
+  }
+
+  async assignAgents(playbookId: string, agentIds: string[], organizationId: string): Promise<Playbook | null> {
+    const playbook = await this.findById(playbookId, organizationId);
+    if (!playbook) {
+      return null;
+    }
+
+    if (agentIds.length > 0) {
+      const agents = await this.agentRepository.find({
+        where: {
+          id: In(agentIds),
+          organization_id: organizationId
+        }
+      });
+      playbook.agents = agents;
+    } else {
+      playbook.agents = [];
+    }
+
+    return await this.repository.save(playbook);
   }
 
   async addAgent(playbookId: string, agentId: string, organizationId: string): Promise<Playbook | null> {

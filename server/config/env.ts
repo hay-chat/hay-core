@@ -69,6 +69,17 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
+  conversation: {
+    cooldownInterval: parseInt(
+      process.env.CONVERSATION_COOLDOWN_INTERVAL || "10000",
+      10
+    ),
+    inactivityInterval: parseInt(
+      process.env.CONVERSATION_INACTIVITY_INTERVAL || "1800000",
+      10
+    ),
+  },
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY || "",
     models: {

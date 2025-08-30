@@ -20,12 +20,34 @@ export class Conversation {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
-  @Column({ type: "uuid" })
-  agent_id!: string;
+  @Column({ 
+    type: "enum",
+    enum: ["open", "processing", "pending-human", "resolved", "closed"],
+    default: "open"
+  })
+  status!: "open" | "processing" | "pending-human" | "resolved" | "closed";
 
-  @ManyToOne(() => Agent, { onDelete: "CASCADE" })
+  @Column({ type: "timestamptz", nullable: true })
+  cooldown_until!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  last_user_message_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  ended_at!: Date | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  context!: Record<string, any> | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  resolution_metadata!: { resolved: boolean; confidence: number; reason: string } | null;
+
+  @Column({ type: "uuid", nullable: true })
+  agent_id!: string | null;
+
+  @ManyToOne(() => Agent, { onDelete: "SET NULL", nullable: true })
   @JoinColumn({ name: "agent_id" })
-  agent!: Agent;
+  agent!: Agent | null;
 
   @Column({ type: "uuid" })
   organization_id!: string;
@@ -33,6 +55,18 @@ export class Conversation {
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
   @JoinColumn({ name: "organization_id" })
   organization!: Organization;
+
+  @Column({ type: "uuid", nullable: true })
+  playbook_id!: string | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  metadata!: Record<string, any> | null;
+
+  @Column({ type: "boolean", default: false })
+  needs_processing!: boolean;
+
+  @Column({ type: "timestamptz", nullable: true })
+  last_processed_at!: Date | null;
 
   @OneToMany(() => Message, message => message.conversation)
   messages!: Message[];

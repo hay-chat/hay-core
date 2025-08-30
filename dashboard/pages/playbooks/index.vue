@@ -110,7 +110,7 @@
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="archived">Archived</option>
           <option value="draft">Draft</option>
         </select>
       </div>
@@ -181,7 +181,7 @@
                   {{ playbook.status }}
                 </Badge>
               </div>
-              <h3 class="font-semibold">{{ playbook.name }}</h3>
+              <h3 class="font-semibold">{{ playbook.title }}</h3>
               <p class="text-sm text-muted-foreground">
                 {{ playbook.description }}
               </p>
@@ -238,7 +238,7 @@
               >
                 <td class="py-3 px-4">
                   <div>
-                    <div class="font-medium">{{ playbook.name }}</div>
+                    <div class="font-medium">{{ playbook.title }}</div>
                     <div class="text-sm text-muted-foreground">
                       {{ playbook.description }}
                     </div>
@@ -277,6 +277,16 @@
         </div>
       </CardContent>
     </Card>
+
+    <!-- Delete Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-text="Delete"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 
@@ -317,8 +327,8 @@ const Badge = ({ variant = "default", ...props }) =>
 import { useRouter } from 'vue-router';
 import { useToast } from '~/composables/useToast';
 import type { Playbook } from '~/types/playbook';
+import { HayApi } from '@/utils/api';
 
-const { $trpc } = useNuxtApp();
 const { toast } = useToast();
 const router = useRouter();
 
@@ -330,7 +340,7 @@ const selectedStatus = ref("");
 const viewMode = ref<"grid" | "table">("grid");
 
 // Data from API
-const playbooks = ref<Playbook[]>([]);
+const playbooks = ref<any[]>([]);
 
 // Stats computed from playbooks
 const stats = computed(() => {
@@ -352,11 +362,11 @@ const filteredPlaybooks = computed(() => {
   return playbooks.value.filter((playbook) => {
     const matchesSearch =
       !searchQuery.value ||
-      playbook.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      playbook.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       (playbook.description && playbook.description
         .toLowerCase()
         .includes(searchQuery.value.toLowerCase())) ||
-      (playbook.instructions && playbook.instructions
+      (playbook.trigger && playbook.trigger
         .toLowerCase()
         .includes(searchQuery.value.toLowerCase()));
 
@@ -381,7 +391,7 @@ const getCategoryLabel = (category: string) => {
 const getStatusVariant = (status: string) => {
   const variants = {
     active: "success",
-    inactive: "secondary",
+    archived: "secondary",
     draft: "outline",
   };
   return variants[status as keyof typeof variants] || "default";
@@ -413,21 +423,37 @@ const duplicatePlaybook = (id: string) => {
   console.log("Duplicate playbook:", id);
 };
 
-const deletePlaybook = async (id: string) => {
-  if (!confirm('Are you sure you want to delete this playbook?')) {
-    return;
-  }
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const playbookToDelete = ref<any>(null);
+const deleteDialogTitle = ref('Delete Playbook');
+const deleteDialogDescription = ref('');
+
+const deletePlaybook = (id: string) => {
+  const playbook = playbooks.value.find(p => p.id === id);
+  if (!playbook) return;
+  
+  playbookToDelete.value = playbook;
+  deleteDialogDescription.value = `Are you sure you want to delete "${playbook.title}"? This action cannot be undone.`;
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!playbookToDelete.value) return;
   
   try {
-    await $trpc.playbooks.delete.mutate({ id });
+    await HayApi.playbooks.delete.mutate({ id: playbookToDelete.value.id });
     
     // Remove from local list
-    playbooks.value = playbooks.value.filter(p => p.id !== id);
+    playbooks.value = playbooks.value.filter(p => p.id !== playbookToDelete.value!.id);
     
     toast('success', 'Playbook deleted successfully');
   } catch (error) {
     console.error('Failed to delete playbook:', error);
     toast('error', 'Failed to delete playbook');
+  } finally {
+    playbookToDelete.value = null;
+    showDeleteDialog.value = false;
   }
 };
 
@@ -440,7 +466,7 @@ const togglePlaybookStatus = (id: string) => {
 const fetchPlaybooks = async () => {
   try {
     loading.value = true;
-    const response = await $trpc.playbooks.list.query();
+    const response = await HayApi.playbooks.list.query();
     playbooks.value = response || [];
   } catch (error) {
     console.error('Failed to fetch playbooks:', error);

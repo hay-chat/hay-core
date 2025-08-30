@@ -18,19 +18,44 @@ export enum PlaybookStatus {
   ARCHIVED = "archived"
 }
 
+export enum PlaybookKind {
+  WELCOME = "welcome",
+  ENDER = "ender",
+  CUSTOM = "custom"
+}
+
 @Entity("playbooks")
 export class Playbook {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
   @Column({ type: "varchar", length: 255 })
-  name!: string;
+  title!: string;
+
+  @Column({ type: "varchar", length: 255 })
+  trigger!: string;
 
   @Column({ type: "text", nullable: true })
   description!: string | null;
 
+  @Column({ type: "jsonb", nullable: true })
+  instructions!: any;
+
+  @Column({
+    type: "enum",
+    enum: PlaybookKind,
+    default: PlaybookKind.CUSTOM
+  })
+  kind!: PlaybookKind;
+
+  @Column({ type: "jsonb", nullable: true })
+  required_fields!: string[] | null;
+
   @Column({ type: "text", nullable: true })
-  instructions!: string | null;
+  prompt_template!: string | null;
+
+  @Column({ type: "boolean", default: false })
+  is_system!: boolean;
 
   @Column({
     type: "enum",
@@ -39,14 +64,14 @@ export class Playbook {
   })
   status!: PlaybookStatus;
 
-  @Column({ type: "uuid" })
-  organization_id!: string;
+  @Column({ type: "uuid", nullable: true })
+  organization_id!: string | null;
 
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
   @JoinColumn({ name: "organization_id" })
   organization!: Organization;
 
-  @ManyToMany(() => Agent)
+  @ManyToMany(() => Agent, agent => agent.playbooks)
   @JoinTable({
     name: "playbook_agents",
     joinColumn: {
