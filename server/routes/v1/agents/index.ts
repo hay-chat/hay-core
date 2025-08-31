@@ -9,14 +9,20 @@ const createAgentSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   enabled: z.boolean().optional().default(true),
-  instructions: z.string().optional()
+  instructions: z.string().optional(),
+  tone: z.string().optional(),
+  avoid: z.string().optional(),
+  trigger: z.string().optional()
 });
 
 const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   enabled: z.boolean().optional(),
-  instructions: z.string().optional()
+  instructions: z.string().optional(),
+  tone: z.string().optional(),
+  avoid: z.string().optional(),
+  trigger: z.string().optional()
 });
 
 export const agentsRouter = t.router({

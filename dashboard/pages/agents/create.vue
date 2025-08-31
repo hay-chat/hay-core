@@ -46,6 +46,45 @@
         />
       </div>
 
+      <div>
+        <label for="tone" class="block text-sm font-medium mb-2"
+          >Tone</label
+        >
+        <textarea
+          id="tone"
+          v-model="form.tone"
+          rows="3"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Describe the communication tone (e.g., professional, friendly, casual)..."
+        />
+      </div>
+
+      <div>
+        <label for="avoid" class="block text-sm font-medium mb-2"
+          >Things to Avoid</label
+        >
+        <textarea
+          id="avoid"
+          v-model="form.avoid"
+          rows="3"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="List things the agent should avoid (e.g., technical jargon, certain topics)..."
+        />
+      </div>
+
+      <div>
+        <label for="trigger" class="block text-sm font-medium mb-2"
+          >Trigger Conditions</label
+        >
+        <textarea
+          id="trigger"
+          v-model="form.trigger"
+          rows="3"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Define when this agent should be triggered (e.g., specific keywords, conditions)..."
+        />
+      </div>
+
       <div class="flex items-center space-x-2">
         <input
           id="enabled"
@@ -89,6 +128,9 @@ const form = ref({
   name: "",
   description: "",
   instructions: "",
+  tone: "",
+  avoid: "",
+  trigger: "",
   enabled: true,
 });
 
@@ -105,6 +147,9 @@ const handleSubmit = async () => {
       name: form.value.name,
       description: form.value.description || undefined,
       instructions: form.value.instructions || undefined,
+      tone: form.value.tone || undefined,
+      avoid: form.value.avoid || undefined,
+      trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
     });
 

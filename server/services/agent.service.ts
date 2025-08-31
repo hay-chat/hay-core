@@ -13,6 +13,9 @@ export class AgentService {
     description?: string;
     enabled?: boolean;
     instructions?: string;
+    tone?: string;
+    avoid?: string;
+    trigger?: string;
   }): Promise<Agent> {
     return await this.agentRepository.create({
       ...data,
@@ -36,6 +39,9 @@ export class AgentService {
       description?: string;
       enabled?: boolean;
       instructions?: string;
+      tone?: string;
+      avoid?: string;
+      trigger?: string;
     }
   ): Promise<Agent | null> {
     return await this.agentRepository.update(agentId, organizationId, data);

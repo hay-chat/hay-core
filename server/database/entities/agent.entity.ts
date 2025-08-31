@@ -28,6 +28,15 @@ export class Agent {
   @Column({ type: "text", nullable: true })
   instructions!: string | null;
 
+  @Column({ type: "text", nullable: true })
+  tone!: string | null;
+
+  @Column({ type: "text", nullable: true })
+  avoid!: string | null;
+
+  @Column({ type: "text", nullable: true })
+  trigger!: string | null;
+
   @Column({ type: "uuid" })
   organization_id!: string;
 

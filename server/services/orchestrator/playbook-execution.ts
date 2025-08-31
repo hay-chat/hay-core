@@ -1,6 +1,7 @@
 import type { ExecutionResult, OrchestrationPlan } from "./types";
 import { PlaybookService } from "../playbook.service";
 import { VectorStoreService } from "../vector-store.service";
+import { AgentService } from "../agent.service";
 import { Hay } from "../hay.service";
 import { MessageType } from "../../database/entities/message.entity";
 
@@ -13,10 +14,12 @@ export class PlaybookExecution {
    * Creates a new PlaybookExecution instance.
    * @param playbookService - Service for managing playbooks
    * @param vectorStoreService - Service for vector-based document retrieval
+   * @param agentService - Service for managing agents
    */
   constructor(
     private playbookService: PlaybookService,
-    private vectorStoreService: VectorStoreService
+    private vectorStoreService: VectorStoreService,
+    private agentService: AgentService
   ) {}
 
   /**
@@ -39,6 +42,11 @@ export class PlaybookExecution {
     console.log(`[Orchestrator] Looking for playbook ${plan.playbookId}`);
     const playbook = plan.playbookId
       ? await this.playbookService.getPlaybook(plan.playbookId, organizationId)
+      : null;
+
+    // Fetch agent if available
+    const agent = plan.agentId
+      ? await this.agentService.getAgent(organizationId, plan.agentId)
       : null;
 
     // Initialize Hay service
@@ -64,6 +72,7 @@ export class PlaybookExecution {
     // Construct the prompt
     const { systemPrompt, userPrompt } = this.constructPrompts(
       playbook,
+      agent,
       userPromptContent,
       conversationHistory,
       messages,
@@ -205,8 +214,9 @@ export class PlaybookExecution {
 
   /**
    * Constructs system and user prompts for AI generation.
-   * Combines playbook instructions, RAG context, and anti-hallucination guidelines.
+   * Combines playbook instructions, agent settings, RAG context, and anti-hallucination guidelines.
    * @param playbook - The playbook containing instructions (if any)
+   * @param agent - The agent with tone, avoid, and trigger settings
    * @param userPromptContent - The user's message content
    * @param conversationHistory - Formatted conversation history
    * @param messages - Array of conversation messages
@@ -215,6 +225,7 @@ export class PlaybookExecution {
    */
   private constructPrompts(
     playbook: any,
+    agent: any,
     userPromptContent: string,
     conversationHistory: string,
     messages: any[],
@@ -249,6 +260,25 @@ export class PlaybookExecution {
       - NEVER make up contact information, URLs, or specific details you don't have
       - When you don't know something, say "I don't have that specific information"
       - For human assistance requests, acknowledge and say you'll help connect them without providing fake contact details`;
+    }
+
+    // Add agent-specific instructions if available
+    if (agent) {
+      if (agent.instructions) {
+        systemPrompt += `\n\n## Agent Instructions:\n${agent.instructions}`;
+      }
+      
+      if (agent.tone) {
+        systemPrompt += `\n\n## Communication Tone:\n${agent.tone}`;
+      }
+      
+      if (agent.avoid) {
+        systemPrompt += `\n\n## Things to Avoid:\n${agent.avoid}`;
+      }
+      
+      if (agent.trigger) {
+        systemPrompt += `\n\n## Trigger Conditions:\n${agent.trigger}`;
+      }
     }
 
     // Add conversation flow instructions

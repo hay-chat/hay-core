@@ -38,7 +38,7 @@ export class OrchestratorService {
     this.agentRouting = new AgentRouting(agentService, conversationService);
     this.planCreation = new PlanCreation(playbookService, vectorStoreService);
     this.documentRetrieval = new DocumentRetrieval(vectorStoreService);
-    this.playbookExecution = new PlaybookExecution(playbookService, vectorStoreService);
+    this.playbookExecution = new PlaybookExecution(playbookService, vectorStoreService, agentService);
     this.conversationManagement = new ConversationManagement(conversationService);
     this.messageProcessing = new MessageProcessing(conversationService);
     this.playbookHelpers = new PlaybookHelpers(playbookService);
