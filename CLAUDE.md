@@ -6,26 +6,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a full-stack TypeScript application with:
 
-- **Frontend**: Nuxt 3 dashboard (Vue 3) with Tailwind CSS, located in `/dashboard`
+- **Frontend**: Nuxt 3 dashboard (Vue 3) with Tailwind CSS and shadcn/ui components, located in `/dashboard`
 - **Backend**: Express server with tRPC API, TypeORM, and PostgreSQL with pgvector, located in `/server`
 - **Database**: PostgreSQL with pgvector extension for embeddings and vector search
 - **Authentication**: JWT-based with multiple strategies (Bearer, API Key, Basic Auth)
 - **AI Integration**: OpenAI for embeddings and chat, LangChain for agents
+- **UI Components**: shadcn-vue components with Radix Vue primitives
 
 ## Critical Development Commands
 
 ### Running the Application
 
 ```bash
-# Start both frontend and backend (from root)
+# Start backend only (from root)
 npm run dev
 
-# Or run separately:
-# Backend (port 3000)
+# Run frontend and backend separately:
+# Backend (port 3000) - includes port cleanup
 cd server && npm run dev
 
-# Frontend (port 5173)
+# Frontend (port 5173) - includes port cleanup
 cd dashboard && npm run dev
+
+# Clean development (removes .nuxt cache)
+cd dashboard && npm run dev:clean
+
+# Kill ports if needed
+cd server && npm run kill-ports     # Kills ports 3000, 4000, 5000
+cd dashboard && npm run kill-ports  # Kills port 5173
 ```
 
 ### Database Management
@@ -52,18 +60,25 @@ npm run migration:revert
 cd dashboard
 npm run lint          # Run ESLint
 npm run lint:fix      # Fix ESLint issues
-npm run type-check    # Run TypeScript type checking (nuxt typecheck)
+npm run typecheck     # Run TypeScript type checking (nuxt typecheck)
 
-# Backend (no linting configured yet)
+# Backend
 cd server
-npx tsc --noEmit     # Type check TypeScript files
+npm run typecheck     # Type check TypeScript files
 ```
 
 ### Testing
 
 ```bash
-# Frontend tests
+# Frontend tests (Vitest)
 cd dashboard && npm test
+```
+
+### Additional Commands
+
+```bash
+# Generate tRPC types for frontend
+cd dashboard && npm run generate:trpc
 ```
 
 ## Important Conventions
@@ -71,7 +86,7 @@ cd dashboard && npm test
 ### Frontend (Dashboard)
 
 1. **Navigation**: Avoid using `navigateTo()`, instead initiate a router and use `router.push()`
-2. **API Calls**: Always use `HayApi` for tRPC calls to the server, not `$api` methods
+2. **API Calls**: Always use `Hay` for tRPC calls to the server
 
 ```ts
 import { Hay } from "@/utils/api";
@@ -81,6 +96,8 @@ const response = await Hay.conversations.create();
 3. **State Management**: Uses Pinia stores with persistence (auth, user, organization)
 4. **Components**: Auto-imported from `/components` subdirectories
 5. **Composables**: Auto-imported from `/composables` directory
+6. **UI Components**: Use shadcn-vue components from `/components/ui` directory
+7. **Styling**: Tailwind CSS with custom animations and class-variance-authority for component variants
 
 ### Backend (Server)
 
@@ -88,6 +105,8 @@ const response = await Hay.conversations.create();
 2. **Authentication**: Handled via middleware with JWT tokens and organization context
 3. **Database**: Uses TypeORM with migrations (never use `synchronize: true` in production)
 4. **Vector Store**: PostgreSQL with pgvector for embedding storage and similarity search
+5. **Orchestrator Service**: Modular service architecture in `/server/services/orchestrator/` for conversation management
+6. **Naming Strategy**: Custom database naming strategy for consistent column naming
 
 ### API Communication
 
@@ -100,30 +119,42 @@ const response = await Hay.conversations.create();
 
 ```
 /
-├── dashboard/          # Nuxt 3 frontend application
-│   ├── pages/         # File-based routing
-│   ├── components/    # Vue components (auto-imported)
-│   ├── stores/        # Pinia state management
-│   ├── composables/   # Vue composables (auto-imported)
-│   └── utils/         # Utility functions (auto-imported)
+├── dashboard/              # Nuxt 3 frontend application
+│   ├── pages/             # File-based routing
+│   ├── components/        # Vue components (auto-imported)
+│   │   ├── ui/           # shadcn-vue UI components
+│   │   ├── layout/       # Layout components
+│   │   └── auth/         # Authentication components
+│   ├── stores/            # Pinia state management
+│   ├── composables/       # Vue composables (auto-imported)
+│   └── utils/             # Utility functions (auto-imported)
 │
-└── server/            # Express + tRPC backend
-    ├── routes/v1/     # tRPC API routes
-    ├── entities/      # TypeORM entities
-    ├── database/      # Database config and migrations
-    ├── services/      # Business logic services
-    ├── repositories/  # Data access layer
-    └── lib/auth/      # Authentication strategies
+└── server/                # Express + tRPC backend
+    ├── routes/v1/         # tRPC API routes
+    ├── entities/          # TypeORM entities
+    ├── database/          # Database config and migrations
+    │   ├── migrations/    # Database migrations
+    │   └── naming-strategy.ts  # Custom naming strategy
+    ├── services/          # Business logic services
+    │   └── orchestrator/  # Modular orchestrator services
+    ├── repositories/      # Data access layer
+    └── lib/auth/          # Authentication strategies
 ```
 
 ## Environment Setup
 
 Copy `.env.example` to `.env` and configure:
 
-- Database credentials (PostgreSQL required)
-- JWT secrets (generate secure random strings for production)
-- OpenAI API key for AI features
-- Ensure pgvector extension is installed in PostgreSQL
+- **Database**: PostgreSQL with pgvector extension (required)
+  - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
+  - Ensure pgvector extension is installed: `CREATE EXTENSION IF NOT EXISTS vector;`
+- **JWT Configuration**: Generate secure random strings for production
+  - `JWT_SECRET`, `JWT_REFRESH_SECRET`
+- **OpenAI**: Required for AI features
+  - `OPENAI_API_KEY`
+  - Models: `text-embedding-3-small` for embeddings, `gpt-4o` for chat
+- **CORS**: Configure allowed origins for frontend access
+  - Default: `http://localhost:3001,http://localhost:5173`
 
 ## General Guidelines
 

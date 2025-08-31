@@ -46,6 +46,17 @@ async function refreshTokenIfNeeded(): Promise<void> {
     return;
   }
   
+  // Check if there's a refresh token available before attempting refresh
+  if (!authStore.tokens?.refreshToken) {
+    console.log('[API] No refresh token available, skipping refresh');
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        authStore.logout('token_expired');
+      }, 0);
+    }
+    return Promise.reject(new Error('No refresh token available'));
+  }
+  
   // If already refreshing, wait for the existing refresh to complete
   if (isRefreshing && refreshPromise) {
     return refreshPromise;

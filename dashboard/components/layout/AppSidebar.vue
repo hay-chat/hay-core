@@ -116,12 +116,6 @@ const navMain = computed(() => [
     isActive: isPathActive("/insights"),
   },
   {
-    title: "Test Customer",
-    url: "/test-customer",
-    icon: TestTube,
-    isActive: isPathActive("/test-customer"),
-  },
-  {
     title: "Integrations",
     url: "#",
     icon: Puzzle,

@@ -163,6 +163,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     queryBuilder: SelectQueryBuilder<T>,
     sorting: { orderBy?: string; orderDirection: "asc" | "desc" }
   ): void {
+    // Default to created_at if no orderBy specified
     const orderBy = sorting.orderBy || "created_at";
     const direction = sorting.orderDirection.toUpperCase() as "ASC" | "DESC";
 

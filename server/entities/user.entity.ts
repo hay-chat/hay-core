@@ -13,19 +13,19 @@ export class User extends BaseEntity {
   @Column({ type: "varchar", length: 255 })
   password!: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true, name: "firstName" })
   firstName?: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true, name: "lastName" })
   lastName?: string;
 
-  @Column({ type: "boolean", default: true })
+  @Column({ type: "boolean", default: true, name: "isActive" })
   isActive!: boolean;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: "timestamptz", nullable: true, name: "lastLoginAt" })
   lastLoginAt?: Date;
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "uuid", nullable: true, name: "organizationId" })
   organizationId?: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })

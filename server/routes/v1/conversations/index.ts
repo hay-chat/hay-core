@@ -12,6 +12,7 @@ import { VectorStoreService } from "../../../services/vector-store.service";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
+import { config } from "../../../config/env";
 
 const conversationService = new ConversationService();
 const playbookService = new PlaybookService();
@@ -149,6 +150,15 @@ export const conversationsRouter = t.router({
           code: "NOT_FOUND",
           message: "Conversation not found",
         });
+      }
+
+      // Generate title when conversation is closed or resolved
+      if (input.data.status === 'closed' || input.data.status === 'resolved') {
+        await orchestratorService.generateConversationTitle(
+          input.id,
+          ctx.organizationId!,
+          false
+        );
       }
 
       return conversation;
@@ -321,10 +331,13 @@ export const conversationsRouter = t.router({
 
       // Mark conversation as needing processing if it's a user message
       if (input.role === "user" || !input.role) {
-        // Set cooldown to 10 seconds from now
+        // Set cooldown based on configuration
         // This allows the user to keep typing, and we'll process when they stop
         const cooldownUntil = new Date();
-        cooldownUntil.setSeconds(cooldownUntil.getSeconds() + 10);
+        const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
+        cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
+
+        console.log(`[Conversations] Setting cooldown for ${cooldownSeconds} seconds (until ${cooldownUntil.toISOString()})`);
 
         await conversationService.updateConversation(
           input.conversationId,

@@ -22,11 +22,11 @@ export const AppDataSource = new DataSource({
   password: config.database.password,
   database: config.database.database,
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
-  logging: config.database.logging,
+  logging: false, // Disable verbose logging
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
   entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook, Conversation, Message, Customer],
   migrations: ["./database/migrations/*.ts"],
-  subscribers: [],
+  subscribers: []
 });
 
 // Initialize the data source

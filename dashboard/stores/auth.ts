@@ -126,19 +126,21 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async refreshTokens() {
-      if (!this.tokens?.refreshToken) {
+      // Store refresh token in a local variable to prevent race conditions
+      const currentTokens = this.tokens;
+      if (!currentTokens?.refreshToken) {
         throw new Error("No refresh token available");
       }
 
       try {
         const result = await HayApi.auth.refreshToken.mutate({
-          refreshToken: this.tokens.refreshToken,
+          refreshToken: currentTokens.refreshToken,
         });
 
         // Keep the existing refresh token, only update access token
         this.tokens = {
           accessToken: result.accessToken,
-          refreshToken: this.tokens.refreshToken, // Keep existing refresh token
+          refreshToken: currentTokens.refreshToken, // Keep existing refresh token
           expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
         };
 

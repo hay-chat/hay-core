@@ -1,10 +1,10 @@
 <template>
-  <div :class="['chat-message', `chat-message--${variant}`]">
-    <div class="chat-message__avatar">
+  <div :class="['chat-message', `chat-message--${variant}`, { 'chat-message--inverted': inverted, 'chat-message--no-header': showHeader === false }]">
+    <div v-if="showHeader !== false" class="chat-message__avatar">
       <component :is="avatarIcon" class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
-      <div class="chat-message__header">
+      <div v-if="showHeader !== false" class="chat-message__header">
         <span v-if="senderName" class="chat-message__sender">{{
           senderName
         }}</span>
@@ -109,6 +109,8 @@ interface Props {
   senderName?: string;
   attachments?: Attachment[];
   metadata?: Metadata;
+  inverted?: boolean;
+  showHeader?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -167,6 +169,15 @@ const avatarIcon = computed(() => {
   @apply ml-auto flex-row-reverse;
 }
 
+/* Inverted mode (for playground where user is the customer) */
+.chat-message--inverted.chat-message--customer {
+  @apply ml-auto flex-row-reverse mr-0;
+}
+
+.chat-message--inverted.chat-message--agent {
+  @apply mr-auto flex-row ml-0;
+}
+
 .chat-message--system {
   @apply justify-center mx-auto my-4;
 }
@@ -176,12 +187,38 @@ const avatarIcon = computed(() => {
   @apply w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0;
 }
 
+/* No header state - add left padding to align with messages that have avatars */
+.chat-message--no-header:not(.chat-message--system) .chat-message__content {
+  @apply ml-11; /* 8 (avatar width) + 3 (gap) = 11 */
+}
+
+.chat-message--no-header.chat-message--agent .chat-message__content {
+  @apply mr-11 ml-0; /* Reverse for agent messages */
+}
+
+.chat-message--no-header.chat-message--inverted.chat-message--customer .chat-message__content {
+  @apply mr-11 ml-0; /* Reverse for inverted customer messages */
+}
+
+.chat-message--no-header.chat-message--inverted.chat-message--agent .chat-message__content {
+  @apply ml-11 mr-0; /* Normal for inverted agent messages */
+}
+
 .chat-message--customer .chat-message__avatar {
   @apply bg-primary/10;
 }
 
 .chat-message--agent .chat-message__avatar {
   @apply bg-blue-100;
+}
+
+/* Inverted avatar colors */
+.chat-message--inverted.chat-message--customer .chat-message__avatar {
+  @apply bg-blue-100;
+}
+
+.chat-message--inverted.chat-message--agent .chat-message__avatar {
+  @apply bg-primary/10;
 }
 
 .chat-message--system .chat-message__avatar {
@@ -200,6 +237,15 @@ const avatarIcon = computed(() => {
   @apply text-blue-600;
 }
 
+/* Inverted avatar icon colors */
+.chat-message--inverted.chat-message--customer .chat-message__avatar-icon {
+  @apply text-blue-600;
+}
+
+.chat-message--inverted.chat-message--agent .chat-message__avatar-icon {
+  @apply text-primary;
+}
+
 .chat-message--system .chat-message__avatar-icon {
   @apply w-3 h-3 text-muted-foreground;
 }
@@ -213,6 +259,15 @@ const avatarIcon = computed(() => {
   @apply text-right;
 }
 
+/* Inverted content alignment */
+.chat-message--inverted.chat-message--customer .chat-message__content {
+  @apply text-right;
+}
+
+.chat-message--inverted.chat-message--agent .chat-message__content {
+  @apply text-left;
+}
+
 .chat-message--system .chat-message__content {
   @apply inline-flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full;
 }
@@ -224,6 +279,15 @@ const avatarIcon = computed(() => {
 
 .chat-message--agent .chat-message__header {
   @apply justify-end;
+}
+
+/* Inverted header alignment */
+.chat-message--inverted.chat-message--customer .chat-message__header {
+  @apply justify-end;
+}
+
+.chat-message--inverted.chat-message--agent .chat-message__header {
+  @apply justify-start;
 }
 
 .chat-message--system .chat-message__header {
@@ -249,6 +313,15 @@ const avatarIcon = computed(() => {
 
 .chat-message--agent .chat-message__bubble {
   @apply bg-primary text-primary-foreground;
+}
+
+/* Inverted bubble colors */
+.chat-message--inverted.chat-message--customer .chat-message__bubble {
+  @apply bg-primary text-primary-foreground;
+}
+
+.chat-message--inverted.chat-message--agent .chat-message__bubble {
+  @apply bg-muted text-foreground;
 }
 
 .chat-message__bubble--needs-approval {

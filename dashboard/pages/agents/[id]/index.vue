@@ -102,75 +102,44 @@
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium"
-                >Total Conversations</CardTitle
-              >
-              <MessageSquare class="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div class="text-2xl font-bold">
-                {{ agent.conversationCount.toLocaleString() }}
-              </div>
-              <p class="text-xs text-muted-foreground">
-                <span class="text-green-600">+12%</span> from last month
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Total Conversations"
+            :icon="MessageSquare"
+            :metric="agent.conversationCount"
+            subtitle="+12%"
+            subtitle-suffix="from last month"
+            subtitle-color="green"
+          />
 
-          <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium">Resolution Rate</CardTitle>
-              <CheckCircle class="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div class="text-2xl font-bold">{{ agent.resolutionRate }}%</div>
-              <p class="text-xs text-muted-foreground">
-                <span class="text-green-600">+2%</span> improvement
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Resolution Rate"
+            :icon="CheckCircle"
+            :metric="`${agent.resolutionRate}%`"
+            subtitle="+2%"
+            subtitle-suffix="improvement"
+            subtitle-color="green"
+            :format-metric="false"
+          />
 
-          <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium"
-                >Avg Response Time</CardTitle
-              >
-              <Clock class="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div class="text-2xl font-bold">{{ agent.avgResponseTime }}s</div>
-              <p class="text-xs text-muted-foreground">
-                <span class="text-green-600">-15%</span> faster
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Avg Response Time"
+            :icon="Clock"
+            :metric="`${agent.avgResponseTime}s`"
+            subtitle="-15%"
+            subtitle-suffix="faster"
+            subtitle-color="green"
+            :format-metric="false"
+          />
 
-          <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium"
-                >Satisfaction Score</CardTitle
-              >
-              <Star class="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div class="text-2xl font-bold">
-                {{ agent.satisfactionScore }}/5
-              </div>
-              <p class="text-xs text-muted-foreground">
-                <span class="text-green-600">+0.2</span> from last month
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Satisfaction Score"
+            :icon="Star"
+            :metric="`${agent.satisfactionScore}/5`"
+            subtitle="+0.2"
+            subtitle-suffix="from last month"
+            subtitle-color="green"
+            :format-metric="false"
+          />
         </div>
 
         <!-- Charts and Recent Activity -->

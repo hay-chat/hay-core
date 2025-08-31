@@ -29,59 +29,37 @@
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Total Conversations</span>
-          <MessageSquare class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.total }}</div>
-          <p class="text-xs text-muted-foreground">
-            +{{ stats.todayIncrease }} today
-          </p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Total Conversations"
+        :icon="MessageSquare"
+        :metric="stats.total"
+        :subtitle="`+${stats.todayIncrease} today`"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Active Now</span>
-          <Activity class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.active }}</div>
-          <p class="text-xs text-muted-foreground">Real-time conversations</p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Active Now"
+        :icon="Activity"
+        :metric="stats.active"
+        subtitle="Real-time conversations"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Avg Response Time</span>
-          <Clock class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.avgResponseTime }}s</div>
-          <p class="text-xs text-green-600">-12% from yesterday</p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Avg Response Time"
+        :icon="Clock"
+        :metric="`${stats.avgResponseTime}s`"
+        :format-metric="false"
+        subtitle="-12% from yesterday"
+        subtitle-color="green"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Satisfaction Rate</span>
-          <Heart class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.satisfactionRate }}%</div>
-          <p class="text-xs text-green-600">+3.2% this week</p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Satisfaction Rate"
+        :icon="Heart"
+        :metric="`${stats.satisfactionRate}%`"
+        :format-metric="false"
+        subtitle="+3.2% this week"
+        subtitle-color="green"
+      />
     </div>
 
     <!-- Filters and Search -->
@@ -291,7 +269,7 @@
                   </div>
                 </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ formatDuration(getDuration(conversation)) }}
+                  {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
                 </td>
                 <td class="py-3 px-4">
                   <div
@@ -308,7 +286,7 @@
                   >
                 </td>
                 <td class="py-3 px-4 text-sm text-muted-foreground">
-                  {{ formatDate(new Date(conversation.updated_at)) }}
+                  {{ formatRelativeTime(conversation.updated_at) }}
                 </td>
                 <td class="py-3 px-4" @click.stop>
                   <div class="flex items-center space-x-2">
@@ -386,8 +364,10 @@ import {
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
+import { formatRelativeTime, formatDuration } from "~/utils/date";
 import Badge from "@/components/ui/Badge.vue";
 import DataPagination from "@/components/DataPagination.vue";
+import MetricCard from "@/components/MetricCard.vue";
 
 // Router
 const router = useRouter();
@@ -522,44 +502,7 @@ const formatStatus = (status: string) => {
   return labels[status as keyof typeof labels] || status;
 };
 
-const getDuration = (conversation: any) => {
-  if (conversation.ended_at) {
-    const start = new Date(conversation.created_at);
-    const end = new Date(conversation.ended_at);
-    return Math.floor((end.getTime() - start.getTime()) / 1000);
-  }
-  const start = new Date(conversation.created_at);
-  const now = new Date();
-  return Math.floor((now.getTime() - start.getTime()) / 1000);
-};
 
-const formatDuration = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  }
-  return `${minutes}m`;
-};
-
-const formatDate = (date: Date) => {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) {
-    return `${days}d ago`;
-  } else if (hours > 0) {
-    return `${hours}h ago`;
-  } else if (minutes > 0) {
-    return `${minutes}m ago`;
-  } else {
-    return "Just now";
-  }
-};
 
 const toggleBulkMode = () => {
   bulkMode.value = !bulkMode.value;

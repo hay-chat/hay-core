@@ -37,7 +37,7 @@
               </option>
             </select>
           </div>
-          
+
           <Badge :variant="getStatusVariant(conversation?.status)">
             <component
               :is="getStatusIcon(conversation?.status)"
@@ -45,7 +45,7 @@
             />
             {{ formatStatus(conversation?.status) }}
           </Badge>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -84,14 +84,12 @@
             <MessageSquare
               class="h-12 w-12 text-muted-foreground mx-auto mb-4"
             />
-            <p class="text-muted-foreground">
-              Send a message to start testing
-            </p>
+            <p class="text-muted-foreground">Send a message to start testing</p>
           </div>
 
           <div v-else class="space-y-4">
             <!-- Messages -->
-            <div v-for="message in messages" :key="message.id">
+            <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
                 :variant="message.sender as 'customer' | 'agent' | 'system'"
                 :content="message.content"
@@ -101,6 +99,8 @@
                     ? 'You (Test Customer)'
                     : 'AI Assistant'
                 "
+                :show-header="shouldShowHeader(index)"
+                :inverted="true"
               />
             </div>
 
@@ -140,10 +140,10 @@
               placeholder="Type your test message..."
               class="flex-1"
               @keyup.enter="sendMessage"
-              :disabled="isSending || !conversation"
+              :disabled="!conversation"
             />
-            <Button 
-              :disabled="!newMessage.trim() || isSending || !conversation" 
+            <Button
+              :disabled="!newMessage.trim() || !conversation"
               @click="sendMessage"
             >
               <Send class="h-4 w-4" />
@@ -204,7 +204,9 @@
                 <span class="text-muted-foreground">Status:</span>
                 <Badge
                   :variant="
-                    orchestratorStatus === 'processing' ? 'default' : 'secondary'
+                    orchestratorStatus === 'processing'
+                      ? 'default'
+                      : 'secondary'
                   "
                 >
                   {{ orchestratorStatus }}
@@ -218,7 +220,10 @@
                 <span class="text-muted-foreground">Processing Count:</span>
                 <span>{{ processingCount }}</span>
               </div>
-              <div v-if="conversation?.playbook_id" class="flex justify-between">
+              <div
+                v-if="conversation?.playbook_id"
+                class="flex justify-between"
+              >
                 <span class="text-muted-foreground">Active Playbook:</span>
                 <span class="font-medium">
                   {{ getPlaybookName(conversation.playbook_id) }}
@@ -233,36 +238,36 @@
               <CardTitle class="text-base">Test Scenarios</CardTitle>
             </CardHeader>
             <CardContent class="space-y-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 class="w-full justify-start"
                 @click="sendQuickMessage('What are your business hours?')"
               >
                 <Clock class="h-4 w-4 mr-2" />
                 Ask About Hours
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 class="w-full justify-start"
                 @click="sendQuickMessage('I need help with my account')"
               >
                 <HelpCircle class="h-4 w-4 mr-2" />
                 Request Support
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 class="w-full justify-start"
                 @click="sendQuickMessage('How much does it cost?')"
               >
                 <DollarSign class="h-4 w-4 mr-2" />
                 Pricing Question
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 class="w-full justify-start"
                 @click="sendQuickMessage('I want to speak to a human')"
               >
@@ -285,11 +290,15 @@
                 </li>
                 <li class="flex items-start">
                   <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Try switching playbooks to test different scenarios</span>
+                  <span
+                    >Try switching playbooks to test different scenarios</span
+                  >
                 </li>
                 <li class="flex items-start">
                   <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Use "New Test" to start fresh with a new conversation</span>
+                  <span
+                    >Use "New Test" to start fresh with a new conversation</span
+                  >
                 </li>
               </ul>
             </CardContent>
@@ -346,6 +355,18 @@ let pollingInterval: NodeJS.Timeout | null = null;
 
 // Navigation
 const router = useRouter();
+
+// Methods
+const shouldShowHeader = (index: number): boolean => {
+  // Always show header for first message
+  if (index === 0) return true;
+  
+  // Check if previous message has same sender type
+  const currentMessage = messages.value[index];
+  const previousMessage = messages.value[index - 1];
+  
+  return currentMessage.sender !== previousMessage.sender;
+};
 
 const exitPlayground = () => {
   stopPolling();
@@ -417,7 +438,7 @@ const scrollToBottom = () => {
 const createTestConversation = async () => {
   try {
     messagesLoading.value = true;
-    
+
     const response = await HayApi.conversations.create.mutate({
       title: "Playground Test - " + new Date().toLocaleTimeString(),
       metadata: {
@@ -430,7 +451,7 @@ const createTestConversation = async () => {
 
     conversation.value = response;
     messages.value = [];
-    
+
     // Start polling for updates
     startPolling();
   } catch (error) {
@@ -446,14 +467,17 @@ const sendMessage = async () => {
 
   const message = newMessage.value;
   newMessage.value = "";
-  
+
+  // Generate a unique ID for the temp message
+  const tempMessageId = Date.now().toString();
+
   try {
     isSending.value = true;
     isAgentTyping.value = true;
-    
+
     // Add message to UI immediately
     const tempMessage = {
-      id: Date.now().toString(),
+      id: tempMessageId,
       sender: "customer",
       content: message,
       timestamp: new Date(),
@@ -471,7 +495,7 @@ const sendMessage = async () => {
 
     // Update with actual message from server
     const messageIndex = messages.value.findIndex(
-      (m) => m.id === tempMessage.id
+      (m) => m.id === tempMessageId
     );
     if (messageIndex !== -1) {
       messages.value[messageIndex] = {
@@ -487,7 +511,7 @@ const sendMessage = async () => {
   } catch (error) {
     console.error("Failed to send message:", error);
     // Remove temp message on error
-    messages.value = messages.value.filter((m) => m.id !== Date.now().toString());
+    messages.value = messages.value.filter((m) => m.id !== tempMessageId);
   } finally {
     isSending.value = false;
   }
@@ -507,7 +531,7 @@ const resetConversation = async () => {
   try {
     isResetting.value = true;
     stopPolling();
-    
+
     // Close current conversation if exists
     if (conversation.value) {
       await HayApi.conversations.update.mutate({
@@ -515,7 +539,7 @@ const resetConversation = async () => {
         data: { status: "closed" },
       });
     }
-    
+
     // Create new conversation
     await createTestConversation();
   } catch (error) {
@@ -551,7 +575,7 @@ const pollConversation = async () => {
 
     // Check for new messages
     const allMessages = response.messages || [];
-    
+
     // Transform messages to match the component format
     const transformedMessages = allMessages.map((msg: any) => {
       let sender = "system";
@@ -560,8 +584,12 @@ const pollConversation = async () => {
       } else if (msg.type === "HumanMessage" || msg.type === "HUMAN_MESSAGE") {
         sender = "customer";
       } else if (msg.sender) {
-        sender = msg.sender === "assistant" ? "agent" : 
-                 msg.sender === "user" ? "customer" : msg.sender;
+        sender =
+          msg.sender === "assistant"
+            ? "agent"
+            : msg.sender === "user"
+            ? "customer"
+            : msg.sender;
       }
 
       return {
@@ -613,13 +641,15 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopPolling();
-  
+
   // Close test conversation
   if (conversation.value) {
-    HayApi.conversations.update.mutate({
-      id: conversation.value.id,
-      data: { status: "closed" },
-    }).catch(console.error);
+    HayApi.conversations.update
+      .mutate({
+        id: conversation.value.id,
+        data: { status: "closed" },
+      })
+      .catch(console.error);
   }
 });
 

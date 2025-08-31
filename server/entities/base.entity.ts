@@ -11,16 +11,16 @@ export abstract class BaseEntity extends TypeOrmBaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @CreateDateColumn({ type: "timestamptz" })
+  @CreateDateColumn({ type: "timestamptz", name: "createdAt" })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: "timestamptz" })
+  @UpdateDateColumn({ type: "timestamptz", name: "updatedAt" })
   updatedAt!: Date;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar", nullable: true, name: "createdBy" })
   createdBy?: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar", nullable: true, name: "updatedBy" })
   updatedBy?: string;
 
   @Column({ type: "jsonb", nullable: true })
@@ -32,6 +32,6 @@ export abstract class BaseEntity extends TypeOrmBaseEntity {
 }
 
 export abstract class OrganizationScopedEntity extends BaseEntity {
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", name: "organizationId" })
   organizationId!: string;
 }

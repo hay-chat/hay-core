@@ -25,77 +25,43 @@
 
     <!-- Key Metrics Cards -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <CardTitle class="text-sm font-medium">Active Agents</CardTitle>
-          <Bot class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ metrics.activeAgents }}</div>
-          <p class="text-xs text-muted-foreground">
-            <span class="text-green-600">+{{ metrics.newAgentsThisWeek }}</span>
-            new this week
-          </p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Active Agents"
+        :icon="Bot"
+        :metric="metrics.activeAgents"
+        :subtitle="`+${metrics.newAgentsThisWeek}`"
+        subtitle-suffix="new this week"
+        subtitle-color="green"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <CardTitle class="text-sm font-medium">Total Conversations</CardTitle>
-          <MessageSquare class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">
-            {{ formatNumber(metrics.totalConversations) }}
-          </div>
-          <p class="text-xs text-muted-foreground">
-            <span class="text-green-600"
-              >+{{ metrics.conversationsGrowth }}%</span
-            >
-            from last month
-          </p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Total Conversations"
+        :icon="MessageSquare"
+        :metric="metrics.totalConversations"
+        :subtitle="`+${metrics.conversationsGrowth}%`"
+        subtitle-suffix="from last month"
+        subtitle-color="green"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <CardTitle class="text-sm font-medium">Resolution Rate</CardTitle>
-          <CheckCircle class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ metrics.resolutionRate }}%</div>
-          <p class="text-xs text-muted-foreground">
-            <span class="text-green-600"
-              >+{{ metrics.resolutionRateChange }}%</span
-            >
-            improvement
-          </p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Resolution Rate"
+        :icon="CheckCircle"
+        :metric="`${metrics.resolutionRate}%`"
+        :subtitle="`+${metrics.resolutionRateChange}%`"
+        subtitle-suffix="improvement"
+        subtitle-color="green"
+        :format-metric="false"
+      />
 
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <CardTitle class="text-sm font-medium">Avg Response Time</CardTitle>
-          <Clock class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ metrics.avgResponseTime }}s</div>
-          <p class="text-xs text-muted-foreground">
-            <span class="text-green-600"
-              >-{{ metrics.responseTimeImprovement }}%</span
-            >
-            faster
-          </p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Avg Response Time"
+        :icon="Clock"
+        :metric="`${metrics.avgResponseTime}s`"
+        :subtitle="`-${metrics.responseTimeImprovement}%`"
+        subtitle-suffix="faster"
+        subtitle-color="green"
+        :format-metric="false"
+      />
     </div>
 
     <!-- Charts and Activity -->

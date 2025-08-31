@@ -108,7 +108,7 @@
             </div>
 
             <!-- Messages -->
-            <div v-for="message in messages" :key="message.id">
+            <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
                 :variant="message.sender as 'customer' | 'agent' | 'system'"
                 :content="message.content"
@@ -118,6 +118,7 @@
                     ? 'Customer'
                     : message.agentName || 'AI Assistant'
                 "
+                :show-header="shouldShowHeader(index)"
                 :attachments="'attachments' in message ? (message as any).attachments : undefined"
                 :metadata="message.sender === 'agent' ? {
                   isPlaybook: message.isPlaybook,
@@ -387,6 +388,17 @@ const previousConversations = ref<any[]>([]);
 const relatedArticles = ref<any[]>([]);
 
 // Methods
+const shouldShowHeader = (index: number): boolean => {
+  // Always show header for first message
+  if (index === 0) return true;
+  
+  // Check if previous message has same sender type
+  const currentMessage = messages.value[index];
+  const previousMessage = messages.value[index - 1];
+  
+  return currentMessage.sender !== previousMessage.sender;
+};
+
 const goBack = () => {
   navigateTo("/conversations");
 };
