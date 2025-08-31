@@ -4,6 +4,9 @@ import { AgentService } from "./agent.service";
 import { VectorStoreService } from "./vector-store.service";
 import { config } from "../config/env";
 import { getUTCNow, addMilliseconds, formatUTC } from "../utils/date.utils";
+import { v4 as uuidv4 } from "uuid";
+import * as os from "os";
+import { MessageType } from "../database/entities/message.entity";
 
 // Import orchestrator modules
 import type { ExecutionResult } from "./orchestrator/types";
@@ -52,6 +55,9 @@ export class OrchestratorService {
   ): Promise<void> {
     console.log(`[Orchestrator] Processing conversation ${conversationId}`);
     
+    // Generate a unique identifier for this server instance
+    const instanceId = `${os.hostname()}-${process.pid}-${uuidv4()}`;
+    
     const conversation = await this.conversationService.getConversation(
       conversationId,
       organizationId
@@ -67,12 +73,26 @@ export class OrchestratorService {
       return;
     }
 
-    // Check if cooldown has expired
+    // Check if conversation is already being processed by another instance
+    const now = getUTCNow();
+    if (
+      conversation.processing_locked_until &&
+      new Date(conversation.processing_locked_until) > now
+    ) {
+      const lockEnd = new Date(conversation.processing_locked_until);
+      const remainingMs = lockEnd.getTime() - now.getTime();
+      console.log(`[Orchestrator] Conversation ${conversationId} is locked by ${conversation.processing_locked_by}:
+        - Now: ${formatUTC(now)}
+        - Locked until: ${formatUTC(lockEnd)}
+        - Remaining: ${Math.round(remainingMs / 1000)} seconds`);
+      return;
+    }
+
+    // Check if cooldown has expired (backward compatibility)
     if (
       conversation.cooldown_until &&
-      new Date(conversation.cooldown_until) > getUTCNow()
+      new Date(conversation.cooldown_until) > now
     ) {
-      const now = getUTCNow();
       const cooldownEnd = new Date(conversation.cooldown_until);
       const remainingMs = cooldownEnd.getTime() - now.getTime();
       console.log(`[Orchestrator] Conversation ${conversationId} is in cooldown:
@@ -82,20 +102,21 @@ export class OrchestratorService {
       return;
     }
 
-    // IMMEDIATELY set a cooldown to prevent duplicate processing
+    // IMMEDIATELY set a processing lock to prevent duplicate processing
     // This prevents race conditions where multiple workers pick up the same conversation
-    const processingCooldown = addMilliseconds(getUTCNow(), 30000); // 30 second processing window
+    const processingLockUntil = addMilliseconds(now, 30000); // 30 second processing window
     
     await this.conversationService.updateConversation(
       conversationId,
       organizationId,
       {
-        cooldown_until: processingCooldown,
+        processing_locked_until: processingLockUntil,
+        processing_locked_by: instanceId,
         needs_processing: false // Mark as being processed
       }
     );
     
-    console.log(`[Orchestrator] Set processing lock until ${processingCooldown.toISOString()}`);
+    console.log(`[Orchestrator] Set processing lock until ${processingLockUntil.toISOString()} by instance ${instanceId}`);
 
     try {
       // Step 1: Agent Routing (if needed)
@@ -164,22 +185,26 @@ export class OrchestratorService {
       const latency = Date.now() - startTime;
       console.log(`[Orchestrator] Execution completed in ${latency}ms`);
 
-      // Step 4: Save assistant message (no longer adding hardcoded enders)
-      await this.messageProcessing.saveAssistantMessage(
-        conversationId,
-        organizationId,
-        result.content,
-        result.metadata,
-        latency,
-        plan.path
-      );
-
-      // Step 5: Check if user wants to close the conversation
-      await this.conversationManagement.detectResolution(
+      // Step 4: Check if user wants to close the conversation BEFORE processing
+      // This allows us to detect closure intent early and avoid unnecessary processing
+      const conversationClosed = await this.detectAndHandleClosureIntent(
         conversationId,
         organizationId,
         combinedUserMessage
       );
+      
+      // If conversation was closed, skip saving the AI response
+      if (!conversationClosed) {
+        // Step 5: Save assistant message (no longer adding hardcoded enders)
+        await this.messageProcessing.saveAssistantMessage(
+          conversationId,
+          organizationId,
+          result.content,
+          result.metadata,
+          latency,
+          plan.path
+        );
+      }
 
       // Step 6: Update conversation status if needed
       await this.messageProcessing.updateConversationStatus(
@@ -191,20 +216,19 @@ export class OrchestratorService {
       // Generate title after 2 user messages
       await this.conversationManagement.generateTitle(conversationId, organizationId);
 
-      // Clear cooldown since we're done processing
-      await this.messageProcessing.clearCooldownAndMarkProcessed(
-        conversationId,
-        organizationId
-      );
+      // Clear processing lock and cooldown since we're done processing
+      await this.clearProcessingLock(conversationId, organizationId);
       
       console.log(`[Orchestrator] ✅ Conversation ${conversationId} processing complete`);
     } catch (error) {
       console.error(`[Orchestrator] ❌ Error processing conversation ${conversationId}:`, error);
-      // Clear cooldown on error so conversation can be retried
+      // Clear processing lock on error so conversation can be retried
       await this.conversationService.updateConversation(
         conversationId,
         organizationId,
         {
+          processing_locked_until: null,
+          processing_locked_by: null,
           cooldown_until: null,
           needs_processing: true // Re-enable processing on error
         }
@@ -226,6 +250,75 @@ export class OrchestratorService {
       organizationId,
       userMessage
     );
+  }
+  
+  private async detectAndHandleClosureIntent(
+    conversationId: string,
+    organizationId: string,
+    userMessage: string
+  ): Promise<boolean> {
+    // Quick check for obvious closure intents
+    const immediateClosurePatterns = [
+      /^(bye|goodbye|tchau|até|see you|até logo|adeus)$/i,
+      /^(thanks|thank you|obrigad[oa]|valeu)[,.]?\s*(bye|goodbye|tchau)?$/i,
+      /^(no|não|nao)\s+(thanks|obrigad[oa]|need|preciso|quero).*$/i,
+      /^(problem|issue|problema)\s+(solved|resolved|resolvid[oa])$/i,
+    ];
+    
+    const normalized = userMessage.trim().toLowerCase();
+    
+    if (immediateClosurePatterns.some(pattern => pattern.test(normalized))) {
+      console.log(`[Orchestrator] Immediate closure intent detected: "${userMessage}"`);
+      
+      // Determine if this is a positive resolution
+      const positivePatterns = [
+        /^(thanks|thank you|obrigad[oa]|valeu)/i,
+        /^(problem|issue|problema)\s+(solved|resolved|resolvid[oa])$/i,
+      ];
+      
+      const isPositive = positivePatterns.some(pattern => pattern.test(normalized));
+      const finalStatus = isPositive ? "resolved" : "resolved"; // Default to resolved for immediate closures
+      const reason = isPositive ? "customer_satisfied" : "user_indicated_completion";
+      
+      // Send a goodbye message before closing
+      await this.conversationService.addMessage(conversationId, organizationId, {
+        content: "Thank you for contacting us! Have a great day! 👋",
+        type: MessageType.AI_MESSAGE,
+        sender: "assistant",
+        metadata: {
+          reason: "conversation_closure"
+        }
+      });
+      
+      // Close the conversation
+      await this.conversationService.updateConversation(
+        conversationId,
+        organizationId,
+        {
+          status: finalStatus,
+          ended_at: getUTCNow(),
+          resolution_metadata: {
+            resolved: true,
+            confidence: 0.95,
+            reason,
+          },
+        }
+      );
+      
+      // Generate title for closed conversation
+      await this.conversationManagement.generateTitle(conversationId, organizationId, true);
+      
+      return true; // Conversation was closed
+    }
+    
+    // For non-obvious cases, still run detection but after response
+    await this.conversationManagement.detectResolution(
+      conversationId,
+      organizationId,
+      userMessage
+    );
+    
+    return false; // Conversation continues
   }
 
   async checkInactiveConversations(organizationId: string): Promise<void> {
@@ -275,5 +368,22 @@ export class OrchestratorService {
     force: boolean = false
   ): Promise<void> {
     await this.conversationManagement.generateTitle(conversationId, organizationId, force);
+  }
+
+  private async clearProcessingLock(
+    conversationId: string,
+    organizationId: string
+  ): Promise<void> {
+    await this.conversationService.updateConversation(
+      conversationId,
+      organizationId,
+      {
+        processing_locked_until: null,
+        processing_locked_by: null,
+        cooldown_until: null,
+        needs_processing: false,
+        last_processed_at: getUTCNow(),
+      }
+    );
   }
 }

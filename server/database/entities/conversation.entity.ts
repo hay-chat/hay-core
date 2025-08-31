@@ -72,6 +72,12 @@ export class Conversation {
   @Column({ type: "timestamptz", nullable: true })
   last_processed_at!: Date | null;
 
+  @Column({ type: "timestamptz", nullable: true })
+  processing_locked_until!: Date | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  processing_locked_by!: string | null;
+
   @Column({ type: "uuid", nullable: true })
   customer_id!: string | null;
 

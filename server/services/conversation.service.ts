@@ -66,6 +66,8 @@ export class ConversationService {
       last_processed_at?: Date | null;
       agent_id?: string | null;
       cooldown_until?: Date | null;
+      processing_locked_until?: Date | null;
+      processing_locked_by?: string | null;
       last_user_message_at?: Date;
       ended_at?: Date;
       closed_at?: Date | null;

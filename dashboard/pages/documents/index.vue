@@ -137,23 +137,28 @@
               <div class="flex items-center gap-2">
                 <component
                   :is="getFileIcon(document.type)"
-                  class="h-4 w-4 text-muted-foreground"
+                  class="h-4 w-4 min-w-4 text-muted-foreground"
                 />
-                {{ document.title || document.name }}
+                <div
+                  class="truncate max-w-[150px]"
+                  :title="document.title || document.name"
+                >
+                  {{ document.title || document.name }}
+                </div>
               </div>
             </TableCell>
             <TableCell>
               <span
                 class="inline-flex items-center px-2 py-1 rounded-md bg-muted text-xs"
               >
-                {{ document.type ? document.type.toUpperCase() : 'DOC' }}
+                {{ document.type ? document.type.toUpperCase() : "DOC" }}
               </span>
             </TableCell>
             <TableCell>
               <div v-if="document.sourceUrl" class="flex items-center gap-1">
                 <Globe class="h-3 w-3 text-muted-foreground" />
-                <a 
-                  :href="document.sourceUrl" 
+                <a
+                  :href="document.sourceUrl"
                   target="_blank"
                   class="text-xs text-blue-600 hover:underline truncate max-w-[150px]"
                   :title="document.sourceUrl"
@@ -161,11 +166,16 @@
                   {{ getHostname(document.sourceUrl) }}
                 </a>
               </div>
-              <Badge v-else-if="document.importMethod === 'upload'" variant="outline">
+              <Badge
+                v-else-if="document.importMethod === 'upload'"
+                variant="outline"
+              >
                 <Upload class="h-3 w-3 mr-1" />
                 Upload
               </Badge>
-              <Badge v-else variant="outline">{{ document.importMethod || 'Unknown' }}</Badge>
+              <Badge v-else variant="outline">{{
+                document.importMethod || "Unknown"
+              }}</Badge>
             </TableCell>
             <TableCell>
               <div
@@ -222,7 +232,7 @@
                     <Edit class="mr-2 h-4 w-4" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     v-if="document.sourceUrl && document.importMethod === 'web'"
                     @click="recrawlDocument(document)"
                   >
@@ -438,7 +448,7 @@ const pageSize = ref(10);
 const totalDocuments = ref(0);
 
 // Computed total pages
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(totalDocuments.value / pageSize.value)
 );
 const showUploadDialog = ref(false);
@@ -702,9 +712,13 @@ const recrawlDocument = async (document: any) => {
     const response = await HayApi.documents.recrawl.mutate({
       documentId: document.id,
     });
-    
-    toast.success(`Update started for ${document.title || document.name}. Check the job queue for progress.`);
-    
+
+    toast.success(
+      `Update started for ${
+        document.title || document.name
+      }. Check the job queue for progress.`
+    );
+
     // Optionally redirect to job queue
     // router.push('/queue');
   } catch (error) {
