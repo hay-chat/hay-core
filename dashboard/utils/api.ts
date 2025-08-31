@@ -165,6 +165,24 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   };
 };
 
+// Create a base client without token refresh for auth endpoints
+export const HayAuthApi = createTRPCClient<AppRouter>({
+  links: [
+    errorLink,         // Handle errors including expired tokens
+    httpLink({
+      url: "http://localhost:3000/v1",
+      // You can pass any HTTP headers you wish here
+      async headers() {
+        return {
+          authorization: getAuthToken(),
+          "x-organization-id": getOrganizationId(),
+        };
+      },
+    }),
+  ],
+});
+
+// Main API client with token refresh middleware
 export const HayApi = createTRPCClient<AppRouter>({
   links: [
     tokenRefreshLink,  // Check token before requests
@@ -181,3 +199,6 @@ export const HayApi = createTRPCClient<AppRouter>({
     }),
   ],
 });
+
+// Export alias for backward compatibility
+export const Hay = HayApi;

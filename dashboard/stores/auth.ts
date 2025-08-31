@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { HayApi } from "@/utils/api";
+import { HayApi, HayAuthApi } from "@/utils/api";
 import { useUserStore, type User } from "./user";
 
 interface Tokens {
@@ -26,7 +26,7 @@ export const useAuthStore = defineStore("auth", {
   actions: {
     async initializeAuth() {
       try {
-        const user = await HayApi.auth.me.query();
+        const user = await HayAuthApi.auth.me.query();
         const userStore = useUserStore();
         userStore.setUser(user as User);
         this.isAuthenticated = true;
@@ -39,7 +39,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async login(email: string, password: string) {
-      const result = await HayApi.auth.login.mutate({
+      const result = await HayAuthApi.auth.login.mutate({
         email,
         password,
       });
@@ -60,7 +60,7 @@ export const useAuthStore = defineStore("auth", {
       // Only try to call logout API if we have a valid token
       if (this.tokens?.accessToken) {
         try {
-          await HayApi.auth.logout.mutate();
+          await HayAuthApi.auth.logout.mutate();
         } catch (error) {
           // Ignore errors on logout - token might already be invalid
           console.log('[Auth] Logout API call failed (expected if token expired):', error);
@@ -102,7 +102,7 @@ export const useAuthStore = defineStore("auth", {
       acceptTerms: boolean;
       acceptMarketing: boolean;
     }) {
-      const result = await HayApi.auth.register.mutate({
+      const result = await HayAuthApi.auth.register.mutate({
         organizationName: data.organizationName,
         email: data.email,
         firstName: data.fullName.split(" ")[0],
@@ -133,7 +133,7 @@ export const useAuthStore = defineStore("auth", {
       }
 
       try {
-        const result = await HayApi.auth.refreshToken.mutate({
+        const result = await HayAuthApi.auth.refreshToken.mutate({
           refreshToken: currentTokens.refreshToken,
         });
 

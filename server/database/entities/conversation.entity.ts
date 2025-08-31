@@ -50,14 +50,14 @@ export class Conversation {
   agent_id!: string | null;
 
   @ManyToOne(() => Agent, { onDelete: "SET NULL", nullable: true })
-  @JoinColumn({ name: "agent_id" })
+  @JoinColumn()
   agent!: Agent | null;
 
   @Column({ type: "uuid" })
   organization_id!: string;
 
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "organization_id" })
+  @JoinColumn()
   organization!: Organization;
 
   @Column({ type: "uuid", nullable: true })
@@ -76,7 +76,7 @@ export class Conversation {
   customer_id!: string | null;
 
   @ManyToOne(() => Customer, customer => customer.conversations, { onDelete: "SET NULL", nullable: true })
-  @JoinColumn({ name: "customer_id" })
+  @JoinColumn()
   customer!: Customer | null;
 
   @OneToMany(() => Message, message => message.conversation)

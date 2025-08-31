@@ -103,9 +103,9 @@ export class VectorStoreService {
     // Insert directly using raw SQL to handle our custom columns properly
     const insertQuery = `
       INSERT INTO embeddings (
-        "organizationId", 
-        "documentId", 
-        "pageContent", 
+        "organization_id", 
+        "document_id", 
+        "page_content", 
         metadata, 
         embedding
       )
@@ -156,11 +156,11 @@ export class VectorStoreService {
     const searchQuery = `
       SELECT 
         id,
-        "pageContent" as content,
+        "page_content" as content,
         metadata,
         1 - (embedding::vector <=> $1::vector) as similarity
       FROM embeddings
-      WHERE "organizationId" = $2
+      WHERE "organization_id" = $2
       ORDER BY embedding::vector <=> $1::vector
       LIMIT $3
     `;
@@ -188,7 +188,7 @@ export class VectorStoreService {
    */
   async deleteByDocumentId(orgId: string, docId: string): Promise<number> {
     const result = await AppDataSource.query(
-      `DELETE FROM embeddings WHERE "organizationId" = $1 AND "documentId" = $2`,
+      `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
       [orgId, docId]
     );
     
@@ -204,7 +204,7 @@ export class VectorStoreService {
    */
   async deleteByOrganizationId(orgId: string): Promise<number> {
     const result = await AppDataSource.query(
-      `DELETE FROM embeddings WHERE "organizationId" = $1`,
+      `DELETE FROM embeddings WHERE "organization_id" = $1`,
       [orgId]
     );
     
@@ -225,9 +225,9 @@ export class VectorStoreService {
     const stats = await AppDataSource.query(`
       SELECT 
         COUNT(*)::int as "totalEmbeddings",
-        COUNT(DISTINCT "documentId")::int as "totalDocuments"
+        COUNT(DISTINCT "document_id")::int as "totalDocuments"
       FROM embeddings
-      WHERE "organizationId" = $1
+      WHERE "organization_id" = $1
     `, [orgId]);
 
     const result = stats[0];

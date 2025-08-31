@@ -13,19 +13,19 @@ export class User extends BaseEntity {
   @Column({ type: "varchar", length: 255 })
   password!: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true, name: "firstName" })
+  @Column({ type: "varchar", length: 255, nullable: true })
   firstName?: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true, name: "lastName" })
+  @Column({ type: "varchar", length: 255, nullable: true })
   lastName?: string;
 
-  @Column({ type: "boolean", default: true, name: "isActive" })
+  @Column({ type: "boolean", default: true })
   isActive!: boolean;
 
-  @Column({ type: "timestamptz", nullable: true, name: "lastLoginAt" })
+  @Column({ type: "timestamptz", nullable: true })
   lastLoginAt?: Date;
 
-  @Column({ type: "uuid", nullable: true, name: "organizationId" })
+  @Column({ type: "uuid", nullable: true })
   organizationId?: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })
@@ -38,7 +38,7 @@ export class User extends BaseEntity {
   @ManyToOne(() => Organization, (organization) => organization.users, {
     nullable: true,
   })
-  @JoinColumn({ name: "organizationId" })
+  @JoinColumn()
   organization?: Organization;
 
   // Helper methods

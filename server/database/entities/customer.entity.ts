@@ -41,7 +41,7 @@ export class Customer {
   organization_id!: string;
 
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "organization_id" })
+  @JoinColumn()
   organization!: Organization;
 
   @OneToMany(() => Conversation, conversation => conversation.customer)

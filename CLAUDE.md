@@ -13,6 +13,20 @@ This is a full-stack TypeScript application with:
 - **AI Integration**: OpenAI for embeddings and chat, LangChain for agents
 - **UI Components**: shadcn-vue components with Radix Vue primitives
 
+## Database Conventions - CRITICAL
+
+**⚠️ IMPORTANT: Before making ANY database-related changes, you MUST read and follow `/server/database/DATABASE_CONVENTIONS.md`**
+
+This includes:
+
+- Creating or modifying entities
+- Writing migrations
+- Using raw SQL queries
+- Adding indexes or constraints
+- Any TypeORM configuration changes
+
+The database uses snake_case naming with TypeORM's SnakeNamingStrategy for automatic conversion. Never mix naming conventions.
+
 ## Critical Development Commands
 
 ### Running the Application

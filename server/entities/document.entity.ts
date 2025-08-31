@@ -80,6 +80,6 @@ export class Document extends OrganizationScopedEntity {
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.documents)
-  @JoinColumn({ name: "organization_id" })
+  @JoinColumn()
   organization!: Organization;
 }

@@ -14,7 +14,7 @@ export class Embedding {
   @Column({ type: "uuid", nullable: true })
   documentId?: string;
 
-  @Column({ type: "text", name: "pageContent" })
+  @Column({ type: "text" })
   pageContent!: string;
 
   @Column({ type: "jsonb", nullable: true })
@@ -47,10 +47,10 @@ export class Embedding {
 
   // Relationships
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "organizationId" })
+  @JoinColumn()
   organization!: Organization;
 
   @ManyToOne(() => Document, { onDelete: "CASCADE", nullable: true })
-  @JoinColumn({ name: "documentId" })
+  @JoinColumn()
   document?: Document;
 }

@@ -10,38 +10,38 @@ import { Organization } from "./organization.entity";
 @Index("idx_api_keys_is_active", ["isActive"])
 @Index("idx_api_keys_organization", ["organizationId"])
 export class ApiKey extends BaseEntity {
-  @Column({ type: "uuid", name: "user_id" })
+  @Column({ type: "uuid" })
   userId!: string;
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "user_id" })
+  @JoinColumn()
   user?: User;
 
-  @Column({ type: "uuid", nullable: true, name: "organization_id" })
+  @Column({ type: "uuid", nullable: true })
   organizationId?: string;
 
   @ManyToOne(() => Organization, (organization) => organization.apiKeys, {
     nullable: true,
   })
-  @JoinColumn({ name: "organization_id" })
+  @JoinColumn()
   organization?: Organization;
 
-  @Column({ type: "varchar", length: 255, name: "key_hash" })
+  @Column({ type: "varchar", length: 255 })
   keyHash!: string;
 
   @Column({ type: "varchar", length: 255 })
   name!: string;
 
-  @Column({ type: "timestamptz", nullable: true, name: "last_used_at" })
+  @Column({ type: "timestamptz", nullable: true })
   lastUsedAt?: Date;
 
-  @Column({ type: "timestamptz", nullable: true, name: "expires_at" })
+  @Column({ type: "timestamptz", nullable: true })
   expiresAt?: Date;
 
   @Column({ type: "jsonb", default: [] })
   scopes!: ApiKeyScope[];
 
-  @Column({ type: "boolean", default: true, name: "is_active" })
+  @Column({ type: "boolean", default: true })
   isActive!: boolean;
 
   isExpired(): boolean {

@@ -11,6 +11,9 @@ import { Playbook } from "./entities/playbook.entity";
 import { Conversation } from "./entities/conversation.entity";
 import { Message } from "./entities/message.entity";
 import { Customer } from "./entities/customer.entity";
+import { PluginRegistry } from "../entities/plugin-registry.entity";
+import { PluginInstance } from "../entities/plugin-instance.entity";
+import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import "reflect-metadata";
 
@@ -24,9 +27,10 @@ export const AppDataSource = new DataSource({
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook, Conversation, Message, Customer],
+  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook, Conversation, Message, Customer, PluginRegistry, PluginInstance],
   migrations: ["./database/migrations/*.ts"],
-  subscribers: []
+  subscribers: [],
+  namingStrategy: new SnakeNamingStrategy()
 });
 
 // Initialize the data source

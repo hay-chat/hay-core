@@ -18,7 +18,7 @@ export class Organization extends BaseEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   description?: string;
 
-  @Column({ type: 'boolean', default: true, name: 'isActive' })
+  @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

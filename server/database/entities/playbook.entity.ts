@@ -68,7 +68,7 @@ export class Playbook {
   organization_id!: string | null;
 
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "organization_id" })
+  @JoinColumn()
   organization!: Organization;
 
   @ManyToMany(() => Agent, agent => agent.playbooks)

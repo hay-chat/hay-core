@@ -41,6 +41,6 @@ export class Job extends OrganizationScopedEntity {
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.jobs)
-  @JoinColumn({ name: "organizationId" })
+  @JoinColumn()
   organization!: Organization;
 }

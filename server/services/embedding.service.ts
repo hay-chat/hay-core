@@ -1,5 +1,4 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { openai as openaiPlugin } from "../plugins/openai/manifest";
 import { config } from "@server/config/env";
 
 export class EmbeddingService {
