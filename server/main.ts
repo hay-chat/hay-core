@@ -13,6 +13,10 @@ import "reflect-metadata";
 import "dotenv/config";
 
 async function startServer() {
+  // Set server timezone to UTC for consistent timestamp handling
+  process.env.TZ = 'UTC';
+  console.log(`🌍 Server timezone set to UTC`);
+  
   // Initialize database connection (optional)
   const dbConnected = await initializeDatabase();
   if (!dbConnected) {

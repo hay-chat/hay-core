@@ -93,7 +93,7 @@
     <!-- Agents Grid -->
     <div
       v-if="!loading && filteredAgents.length > 0"
-      class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+      class="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
     >
       <Card
         v-for="agent in paginatedAgents"
@@ -285,7 +285,7 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
@@ -419,7 +419,7 @@ const paginatedAgents = computed(() => {
 });
 
 // Total pages
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(filteredAgents.value.length / pageSize.value)
 );
 
@@ -457,9 +457,9 @@ const refreshData = async () => {
     agents.value = result.map((agent: any) => ({
       id: agent.id,
       name: agent.name,
-      description: agent.description || '',
-      status: agent.enabled ? 'active' : 'inactive',
-      type: 'general',
+      description: agent.description || "",
+      status: agent.enabled ? "active" : "inactive",
+      type: "general",
       conversationCount: 0,
       resolutionRate: 0,
       avgResponseTime: 0,
@@ -467,11 +467,11 @@ const refreshData = async () => {
       lastActivity: new Date(agent.updated_at),
       createdAt: new Date(agent.created_at),
       enabled: agent.enabled,
-      instructions: agent.instructions
+      instructions: agent.instructions,
     }));
   } catch (error: any) {
     console.error("Error refreshing data:", error);
-    toast.error(error.message || 'Failed to load agents');
+    toast.error(error.message || "Failed to load agents");
   } finally {
     loading.value = false;
   }
@@ -504,7 +504,7 @@ const toggleAgentSelection = (agentId: string) => {
 };
 
 const createAgent = () => {
-  router.push('/agents/create');
+  router.push("/agents/create");
 };
 
 const viewAgent = (id: string) => {
@@ -518,18 +518,20 @@ const toggleAgentStatus = async (agent: any) => {
     await HayApi.agents.update.mutate({
       id: agent.id,
       data: {
-        enabled: newEnabledState
-      }
+        enabled: newEnabledState,
+      },
     });
 
     // Update local state
     agent.status = newEnabledState ? "active" : "inactive";
     agent.enabled = newEnabledState;
-    
-    toast.success(`Agent ${newEnabledState ? 'enabled' : 'disabled'} successfully`);
+
+    toast.success(
+      `Agent ${newEnabledState ? "enabled" : "disabled"} successfully`
+    );
   } catch (error: any) {
     console.error("Error toggling agent status:", error);
-    toast.error(error.message || 'Failed to toggle agent status');
+    toast.error(error.message || "Failed to toggle agent status");
   }
 };
 
@@ -538,7 +540,7 @@ const deleteAgent = (agent: any) => {
   isBulkDelete.value = false;
   deleteDialogTitle.value = "Delete Agent";
   deleteDialogDescription.value = `Are you sure you want to delete "${agent.name}"? This action cannot be undone and will also delete all associated data.`;
-  
+
   nextTick(() => {
     showDeleteDialog.value = true;
   });
@@ -572,10 +574,12 @@ const bulkExport = async () => {
 
 const bulkDelete = () => {
   if (selectedAgents.value.length === 0) return;
-  
+
   isBulkDelete.value = true;
   deleteDialogTitle.value = "Delete Agents";
-  deleteDialogDescription.value = `Are you sure you want to delete ${selectedAgents.value.length} agent${
+  deleteDialogDescription.value = `Are you sure you want to delete ${
+    selectedAgents.value.length
+  } agent${
     selectedAgents.value.length === 1 ? "" : "s"
   }? This action cannot be undone and will also delete all associated data.`;
   showDeleteDialog.value = true;
@@ -591,23 +595,25 @@ const confirmDelete = async () => {
 
 const performSingleDelete = async () => {
   if (!agentToDelete.value) return;
-  
+
   try {
     const result = await HayApi.agents.delete.mutate({
       id: agentToDelete.value.id,
     });
-    
+
     if (result.success) {
-      const index = agents.value.findIndex((a) => a.id === agentToDelete.value.id);
+      const index = agents.value.findIndex(
+        (a) => a.id === agentToDelete.value.id
+      );
       if (index > -1) {
         agents.value.splice(index, 1);
       }
-      
-      toast.success(result.message || 'Agent deleted successfully');
+
+      toast.success(result.message || "Agent deleted successfully");
     }
   } catch (error: any) {
     console.error("Error deleting agent:", error);
-    toast.error(error.message || 'Failed to delete agent. Please try again.');
+    toast.error(error.message || "Failed to delete agent. Please try again.");
   } finally {
     agentToDelete.value = null;
   }
@@ -617,14 +623,14 @@ const performBulkDelete = async () => {
   const errors: string[] = [];
   const successfulDeletes: string[] = [];
   const totalCount = selectedAgents.value.length;
-  
+
   try {
     for (const agentId of selectedAgents.value) {
       try {
         const result = await HayApi.agents.delete.mutate({
           id: agentId,
         });
-        
+
         if (result.success) {
           successfulDeletes.push(agentId);
         }
@@ -633,23 +639,25 @@ const performBulkDelete = async () => {
         console.error(`Error deleting agent ${agentId}:`, error);
       }
     }
-    
+
     agents.value = agents.value.filter(
       (agent) => !successfulDeletes.includes(agent.id)
     );
-    
+
     selectedAgents.value = [];
-    
+
     if (errors.length > 0) {
       toast.warning(
         `Successfully deleted ${successfulDeletes.length} agent(s). Failed to delete ${errors.length} agent(s).`
       );
     } else {
-      toast.success(`Successfully deleted ${successfulDeletes.length} agent(s)`);
+      toast.success(
+        `Successfully deleted ${successfulDeletes.length} agent(s)`
+      );
     }
   } catch (error: any) {
     console.error("Error deleting agents:", error);
-    toast.error(error.message || 'Failed to delete agents. Please try again.');
+    toast.error(error.message || "Failed to delete agents. Please try again.");
   }
 };
 

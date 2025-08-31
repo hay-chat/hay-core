@@ -1,9 +1,16 @@
 export interface HayPluginManifest {
   name: string;
   version: string;
-  type: Array<"mcp-connector" | "retriever" | "playbook">;
+  type: Array<"mcp-connector" | "retriever" | "playbook" | "document_importer">;
   entry: string;
   capabilities?: {
+    document_importer?: {
+      name: string;
+      description: string;
+      icon?: string;
+      supportedFormats?: string[];
+      configSchema?: Record<string, any>;
+    };
     mcp?: {
       tools?: Array<{
         name: string;

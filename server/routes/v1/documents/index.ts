@@ -11,9 +11,14 @@ import {
   DocumentationType,
   DocumentationStatus,
   DocumentVisibility,
+  ImportMethod,
 } from "@server/entities/document.entity";
 import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
+import { WebScraperService } from "@server/services/web-scraper.service";
+import { HtmlProcessor } from "@server/processors/html.processor";
+import { jobRepository } from "@server/repositories/job.repository";
+import { JobStatus, JobPriority } from "@server/entities/job.entity";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -396,4 +401,486 @@ export const documentsRouter = t.router({
 
     return stats;
   }),
+
+  discoverWebPages: authenticatedProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new Error("Organization ID is required");
+      }
+
+      // Create a job for page discovery
+      const job = await jobRepository.create({
+        title: `Discover pages from ${new URL(input.url).hostname}`,
+        description: `Discovering documentation pages from ${input.url}`,
+        status: JobStatus.QUEUED,
+        priority: JobPriority.NORMAL,
+        data: {
+          type: 'page_discovery',
+          url: input.url,
+          progress: {
+            status: 'starting',
+            pagesFound: 0,
+            pagesProcessed: 0,
+            totalEstimated: 0,
+            currentUrl: null,
+            discoveredPages: []
+          }
+        },
+        organizationId: ctx.organizationId,
+      });
+
+      // Start the discovery process asynchronously
+      processPageDiscovery(ctx.organizationId, job.id, input.url);
+
+      return {
+        jobId: job.id,
+        message: "Page discovery started. Poll job status for progress.",
+      };
+    }),
+
+  getDiscoveryJob: authenticatedProcedure
+    .input(
+      z.object({
+        jobId: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const job = await jobRepository.findById(input.jobId, ctx.organizationId!);
+      
+      if (!job) {
+        throw new Error("Job not found");
+      }
+
+      return {
+        id: job.id,
+        status: job.status,
+        progress: job.data?.progress || null,
+        result: job.result,
+        error: job.result?.error || null,
+      };
+    }),
+
+  importFromWeb: authenticatedProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+        pages: z.array(z.object({
+          url: z.string(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          selected: z.boolean(),
+        })),
+        metadata: z.object({
+          type: z.nativeEnum(DocumentationType).optional(),
+          status: z.nativeEnum(DocumentationStatus).optional(),
+          visibility: z.nativeEnum(DocumentVisibility).optional(),
+          tags: z.array(z.string()).optional(),
+          categories: z.array(z.string()).optional(),
+        }).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new Error("Organization ID is required");
+      }
+
+      // Filter selected pages
+      const selectedPages = input.pages.filter(p => p.selected);
+      
+      if (selectedPages.length === 0) {
+        throw new Error("No pages selected for import");
+      }
+
+      // Create a job for web import
+      const job = await jobRepository.create({
+        title: `Import from ${new URL(input.url).hostname}`,
+        description: `Importing ${selectedPages.length} pages from ${input.url}`,
+        status: JobStatus.QUEUED,
+        priority: JobPriority.NORMAL,
+        data: {
+          type: 'web_import',
+          url: input.url,
+          pages: selectedPages,
+          metadata: input.metadata,
+        },
+        organizationId: ctx.organizationId,
+      });
+
+      // Start the import process asynchronously
+      processWebImport(ctx.organizationId, job.id, input.url, selectedPages, input.metadata);
+
+      return {
+        jobId: job.id,
+        message: "Web import started. Check the job queue for progress.",
+      };
+    }),
+
+  recrawl: authenticatedProcedure
+    .input(
+      z.object({
+        documentId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find the document
+      const document = await documentRepository.findById(
+        input.documentId,
+        ctx.organizationId!
+      );
+
+      if (!document) {
+        throw new Error("Document not found");
+      }
+
+      if (!document.sourceUrl) {
+        throw new Error("Document has no source URL to recrawl");
+      }
+
+      if (document.importMethod !== ImportMethod.WEB) {
+        throw new Error("Only web-imported documents can be recrawled");
+      }
+
+      // Create a job for recrawling
+      const job = await jobRepository.create({
+        title: `Recrawl ${document.title}`,
+        description: `Updating document from ${document.sourceUrl}`,
+        status: JobStatus.QUEUED,
+        priority: JobPriority.HIGH,
+        data: {
+          type: 'web_recrawl',
+          documentId: document.id,
+          url: document.sourceUrl,
+        },
+        organizationId: ctx.organizationId!,
+      });
+
+      // Start the recrawl process asynchronously
+      processWebRecrawl(ctx.organizationId!, job.id, document);
+
+      return {
+        jobId: job.id,
+        message: "Recrawl started. Check the job queue for progress.",
+      };
+    }),
+
+  getImporters: authenticatedProcedure.query(async ({ ctx }) => {
+    // Get enabled plugins with document_importer capability
+    // For now, return only the native web importer
+    // TODO: Load plugins with document_importer capability
+    
+    return {
+      native: [
+        {
+          id: 'web',
+          name: 'Import from Website',
+          description: 'Crawl and import documentation from any website',
+          icon: 'globe',
+          supportedFormats: ['html', 'xhtml'],
+        },
+        {
+          id: 'upload',
+          name: 'Upload Files',
+          description: 'Upload documents from your computer',
+          icon: 'upload',
+          supportedFormats: ['pdf', 'txt', 'md', 'doc', 'docx', 'html', 'json', 'csv'],
+        },
+      ],
+      plugins: [], // TODO: Load from plugin system
+    };
+  }),
 });
+
+// Async function to process web import
+async function processWebImport(
+  organizationId: string,
+  jobId: string,
+  url: string,
+  selectedPages: any[],
+  metadata?: any
+) {
+  try {
+    // Update job status to processing
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.PROCESSING,
+    });
+
+    // Initialize scraper
+    const scraper = new WebScraperService();
+    const htmlProcessor = new HtmlProcessor();
+
+    // Track progress
+    scraper.on('progress', async (progress) => {
+      await jobRepository.update(jobId, organizationId, {
+        data: {
+          type: 'web_import',
+          url,
+          pages: selectedPages,
+          metadata,
+          progress,
+        },
+      });
+    });
+
+    // Scrape only the selected pages
+    const pages = await scraper.scrapeSelectedPages(selectedPages);
+
+    if (pages.length === 0) {
+      throw new Error("No pages found to import");
+    }
+
+    // Process each page and create documents
+    const documents = [];
+    for (const page of pages) {
+      // Convert HTML to markdown
+      const processed = await htmlProcessor.process(
+        Buffer.from(page.html),
+        page.title
+      );
+
+      // Create document
+      const document = await documentRepository.create({
+        title: page.title || metadata?.title || 'Untitled',
+        content: processed.content,
+        type: metadata?.type || DocumentationType.ARTICLE,
+        status: metadata?.status || DocumentationStatus.PUBLISHED,
+        visibility: metadata?.visibility || DocumentVisibility.PRIVATE,
+        tags: metadata?.tags,
+        categories: metadata?.categories,
+        importMethod: ImportMethod.WEB,
+        sourceUrl: page.url,
+        lastCrawledAt: page.crawledAt,
+        organizationId,
+      });
+
+      // Create embeddings
+      if (!vectorStoreService.initialized) {
+        await vectorStoreService.initialize();
+      }
+
+      const chunks = splitTextIntoChunks(processed.content, {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+      });
+
+      const vectorChunks = chunks.map((content, index) => ({
+        content,
+        metadata: createChunkMetadata(index, chunks.length, {
+          documentId: document.id,
+          documentTitle: document.title,
+          documentType: document.type,
+          sourceUrl: page.url,
+        }),
+      }));
+
+      await vectorStoreService.addChunks(
+        organizationId,
+        document.id,
+        vectorChunks
+      );
+
+      documents.push(document);
+    }
+
+    // Update job as completed
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.COMPLETED,
+      result: {
+        documentsCreated: documents.length,
+        documentIds: documents.map(d => d.id),
+      },
+    });
+
+  } catch (error) {
+    console.error('Web import error:', error);
+    
+    // Update job as failed
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.FAILED,
+      result: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+}
+
+// Async function to process page discovery
+async function processPageDiscovery(
+  organizationId: string,
+  jobId: string,
+  url: string
+) {
+  try {
+    // Update job status to processing
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.PROCESSING,
+      data: {
+        type: 'page_discovery',
+        url,
+        progress: {
+          status: 'discovering',
+          pagesFound: 0,
+          pagesProcessed: 0,
+          totalEstimated: 0,
+          currentUrl: url,
+          discoveredPages: []
+        }
+      }
+    });
+
+    // Initialize scraper
+    const scraper = new WebScraperService();
+    const discoveredPages: any[] = [];
+
+    // Listen for discovery progress events
+    scraper.on('discovery-progress', async (progress: any) => {
+      // Update job with progress
+      await jobRepository.update(jobId, organizationId, {
+        data: {
+          type: 'page_discovery',
+          url,
+          progress: {
+            status: 'discovering',
+            pagesFound: progress.found,
+            pagesProcessed: progress.processed,
+            totalEstimated: progress.total,
+            currentUrl: progress.currentUrl,
+            discoveredPages: discoveredPages
+          }
+        }
+      });
+    });
+
+    // Discover URLs
+    const pages = await scraper.discoverUrls(url);
+    
+    // Store discovered pages
+    discoveredPages.push(...pages);
+
+    // Update job as completed with results
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.COMPLETED,
+      data: {
+        type: 'page_discovery',
+        url,
+        progress: {
+          status: 'completed',
+          pagesFound: pages.length,
+          pagesProcessed: pages.length,
+          totalEstimated: pages.length,
+          currentUrl: null,
+          discoveredPages: pages
+        }
+      },
+      result: {
+        pages,
+        totalFound: pages.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in page discovery:', error);
+    
+    // Update job as failed
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.FAILED,
+      result: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+}
+
+// Async function to process web recrawl
+async function processWebRecrawl(
+  organizationId: string,
+  jobId: string,
+  document: any
+) {
+  try {
+    // Update job status to processing
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.PROCESSING,
+    });
+
+    // Initialize scraper and processor
+    const scraper = new WebScraperService();
+    const htmlProcessor = new HtmlProcessor();
+
+    // Scrape the single URL
+    const pages = await scraper.scrapeWebsite(document.sourceUrl);
+
+    if (pages.length === 0) {
+      throw new Error("Failed to recrawl the page");
+    }
+
+    const page = pages[0];
+
+    // Convert HTML to markdown
+    const processed = await htmlProcessor.process(
+      Buffer.from(page.html),
+      page.title
+    );
+
+    // Update document
+    await documentRepository.update(document.id, organizationId, {
+      content: processed.content,
+      lastCrawledAt: new Date(),
+    });
+
+    // Regenerate embeddings
+    if (!vectorStoreService.initialized) {
+      await vectorStoreService.initialize();
+    }
+
+    // Delete old embeddings
+    await vectorStoreService.deleteByDocumentId(organizationId, document.id);
+
+    // Create new embeddings
+    const chunks = splitTextIntoChunks(processed.content, {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+    });
+
+    const vectorChunks = chunks.map((content, index) => ({
+      content,
+      metadata: createChunkMetadata(index, chunks.length, {
+        documentId: document.id,
+        documentTitle: document.title,
+        documentType: document.type,
+        sourceUrl: document.sourceUrl,
+      }),
+    }));
+
+    const embeddingIds = await vectorStoreService.addChunks(
+      organizationId,
+      document.id,
+      vectorChunks
+    );
+
+    // Update job as completed
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.COMPLETED,
+      result: {
+        documentId: document.id,
+        embeddingsCreated: embeddingIds.length,
+        chunksCreated: chunks.length,
+      },
+    });
+
+  } catch (error) {
+    console.error('Recrawl error:', error);
+    
+    // Update job as failed
+    await jobRepository.update(jobId, organizationId, {
+      status: JobStatus.FAILED,
+      result: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+}

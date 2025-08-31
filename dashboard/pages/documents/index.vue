@@ -16,10 +16,10 @@
           />
           Refresh
         </Button>
-        <NuxtLink to="/documents/upload">
+        <NuxtLink to="/documents/import">
           <Button>
             <Upload class="mr-2 h-4 w-4" />
-            Upload Document
+            Import Document
           </Button>
         </NuxtLink>
       </div>
@@ -112,10 +112,10 @@
             </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
-            <TableHead>Size</TableHead>
+            <TableHead>Source</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Modified</TableHead>
-            <TableHead>Uploaded By</TableHead>
+            <TableHead>Last Crawled</TableHead>
             <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -139,17 +139,34 @@
                   :is="getFileIcon(document.type)"
                   class="h-4 w-4 text-muted-foreground"
                 />
-                {{ document.name }}
+                {{ document.title || document.name }}
               </div>
             </TableCell>
             <TableCell>
               <span
                 class="inline-flex items-center px-2 py-1 rounded-md bg-muted text-xs"
               >
-                {{ document.type.toUpperCase() }}
+                {{ document.type ? document.type.toUpperCase() : 'DOC' }}
               </span>
             </TableCell>
-            <TableCell>{{ formatFileSize(document.size) }}</TableCell>
+            <TableCell>
+              <div v-if="document.sourceUrl" class="flex items-center gap-1">
+                <Globe class="h-3 w-3 text-muted-foreground" />
+                <a 
+                  :href="document.sourceUrl" 
+                  target="_blank"
+                  class="text-xs text-blue-600 hover:underline truncate max-w-[150px]"
+                  :title="document.sourceUrl"
+                >
+                  {{ getHostname(document.sourceUrl) }}
+                </a>
+              </div>
+              <Badge v-else-if="document.importMethod === 'upload'" variant="outline">
+                <Upload class="h-3 w-3 mr-1" />
+                Upload
+              </Badge>
+              <Badge v-else variant="outline">{{ document.importMethod || 'Unknown' }}</Badge>
+            </TableCell>
             <TableCell>
               <div
                 :class="[
@@ -179,7 +196,12 @@
               </div>
             </TableCell>
             <TableCell>{{ formatDate(document.updatedAt) }}</TableCell>
-            <TableCell>{{ document.uploadedBy }}</TableCell>
+            <TableCell>
+              <span v-if="document.lastCrawledAt" class="text-sm">
+                {{ formatDate(document.lastCrawledAt) }}
+              </span>
+              <span v-else class="text-muted-foreground text-sm">-</span>
+            </TableCell>
             <TableCell class="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -199,6 +221,13 @@
                   <DropdownMenuItem @click="editDocument(document)">
                     <Edit class="mr-2 h-4 w-4" />
                     Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    v-if="document.sourceUrl && document.importMethod === 'web'"
+                    @click="recrawlDocument(document)"
+                  >
+                    <RefreshCw class="mr-2 h-4 w-4" />
+                    Update from Source
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="archiveDocument(document)">
@@ -249,8 +278,8 @@
         >
           Clear Filters
         </Button>
-        <NuxtLink v-else to="/documents/upload">
-          <Button>Upload Document</Button>
+        <NuxtLink v-else to="/documents/import">
+          <Button>Import Document</Button>
         </NuxtLink>
       </div>
     </div>
@@ -392,6 +421,7 @@ import {
   FileCode,
   FileJson,
   File,
+  Globe,
 } from "lucide-vue-next";
 
 // State
@@ -463,6 +493,14 @@ const allSelected = computed(() => {
 });
 
 // Methods
+const getHostname = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+};
+
 const getFileIcon = (type: string) => {
   switch (type) {
     case "pdf":
@@ -657,6 +695,22 @@ const downloadDocument = async (document: any) => {
 const editDocument = (document: any) => {
   // TODO: Open edit dialog
   console.log("Edit document:", document);
+};
+
+const recrawlDocument = async (document: any) => {
+  try {
+    const response = await HayApi.documents.recrawl.mutate({
+      documentId: document.id,
+    });
+    
+    toast.success(`Update started for ${document.title || document.name}. Check the job queue for progress.`);
+    
+    // Optionally redirect to job queue
+    // router.push('/queue');
+  } catch (error) {
+    console.error("Recrawl error:", error);
+    toast.error("Failed to start document update");
+  }
 };
 
 const archiveDocument = async (document: any) => {

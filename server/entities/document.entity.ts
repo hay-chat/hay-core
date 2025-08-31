@@ -24,6 +24,12 @@ export enum DocumentVisibility {
   INTERNAL = "internal",
 }
 
+export enum ImportMethod {
+  UPLOAD = "upload",
+  WEB = "web",
+  PLUGIN = "plugin",
+}
+
 @Entity("documents")
 export class Document extends OrganizationScopedEntity {
   @Column({ type: "varchar", nullable: true })
@@ -77,6 +83,19 @@ export class Document extends OrganizationScopedEntity {
     createdAt: Date;
     [key: string]: any;
   };
+
+  @Column({
+    type: "enum",
+    enum: ImportMethod,
+    default: ImportMethod.UPLOAD,
+  })
+  importMethod!: ImportMethod;
+
+  @Column({ type: "varchar", nullable: true })
+  sourceUrl?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastCrawledAt?: Date;
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.documents)

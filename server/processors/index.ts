@@ -1,11 +1,13 @@
 import { PdfProcessor } from './pdf.processor';
 import { TextProcessor } from './text.processor';
+import { HtmlProcessor } from './html.processor';
 import { BaseProcessor } from './base.processor';
 
 export class DocumentProcessorFactory {
   private processors: BaseProcessor[] = [
     new PdfProcessor(),
-    new TextProcessor()
+    new TextProcessor(),
+    new HtmlProcessor()
   ];
   
   getProcessor(mimeType: string): BaseProcessor | null {
