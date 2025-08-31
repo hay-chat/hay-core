@@ -3,6 +3,7 @@ import { MessageRepository } from "../repositories/message.repository";
 import { CustomerService } from "./customer.service";
 import { Conversation } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
+import { getUTCNow } from "../utils/date.utils";
 
 export class ConversationService {
   private conversationRepository: ConversationRepository;
@@ -75,7 +76,7 @@ export class ConversationService {
     // Automatically set closed_at when status changes to closed or resolved
     const updateData = { ...data };
     if (data.status === 'closed' || data.status === 'resolved') {
-      updateData.closed_at = new Date();
+      updateData.closed_at = getUTCNow();
     }
     return await this.conversationRepository.update(conversationId, organizationId, updateData);
   }
@@ -93,7 +94,7 @@ export class ConversationService {
   }): Promise<Message> {
     // Update last_user_message_at if it's a user message
     if (data.type === MessageType.HUMAN_MESSAGE) {
-      const now = new Date();
+      const now = getUTCNow();
       await this.conversationRepository.update(conversationId, organizationId, {
         last_user_message_at: now,
         // Don't set cooldown here - let the orchestrator manage it

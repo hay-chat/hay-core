@@ -1,6 +1,7 @@
 import { ConversationService } from "../conversation.service";
 import { MessageType } from "../../database/entities/message.entity";
 import { PlaybookHelpers } from "./playbook-helpers";
+import { getUTCNow } from "../../utils/date.utils";
 
 /**
  * Manages ender messages and conversation conclusion patterns.
@@ -202,7 +203,7 @@ export class EnderManagement {
     }
 
     const lastMessage = messages[0];
-    const now = new Date();
+    const now = getUTCNow();
     const lastMessageTime = new Date(lastMessage.created_at);
     const timeSinceLastMessage = now.getTime() - lastMessageTime.getTime();
 

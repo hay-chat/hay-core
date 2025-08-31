@@ -2,6 +2,7 @@ import { ConversationService } from "../conversation.service";
 import { MessageType } from "../../database/entities/message.entity";
 import { Hay } from "../hay.service";
 import { config } from "../../config/env";
+import { getUTCNow, formatUTC } from "../../utils/date.utils";
 
 /**
  * Manages conversation lifecycle operations including title generation,
@@ -238,7 +239,7 @@ Respond with ONLY the title, nothing else.`;
       organizationId,
       {
         status: "resolved",
-        ended_at: new Date(),
+        ended_at: getUTCNow(),
         resolution_metadata: {
           resolved: true,
           confidence: 0.9,
@@ -333,7 +334,7 @@ Respond with ONLY the title, nothing else.`;
         (conv) => conv.status === "open"
       );
 
-      const now = new Date();
+      const now = getUTCNow();
       const inactivityThreshold = config.conversation.inactivityInterval;
       
       console.log(`[Orchestrator] Found ${openConversations.length} open conversations, checking for inactivity (threshold: ${inactivityThreshold}ms)`);
@@ -356,8 +357,8 @@ Respond with ONLY the title, nothing else.`;
         const timeSinceLastMessage = now.getTime() - lastMessageTime.getTime();
 
         console.log(`[Orchestrator] Conversation ${conversation.id}: 
-          - Now: ${now.toISOString()}
-          - Last message time: ${lastMessageTime.toISOString()} 
+          - Now: ${formatUTC(now)}
+          - Last message time: ${formatUTC(lastMessageTime)} 
           - Time since last message: ${timeSinceLastMessage}ms (${Math.round(timeSinceLastMessage / 1000 / 60)} minutes)
           - Threshold: ${inactivityThreshold}ms (${Math.round(inactivityThreshold / 1000 / 60)} minutes)`);
 
@@ -386,7 +387,7 @@ Respond with ONLY the title, nothing else.`;
             organizationId,
             {
               status: "resolved",
-              ended_at: new Date(),
+              ended_at: getUTCNow(),
               resolution_metadata: {
                 resolved: true,
                 confidence: 1.0,

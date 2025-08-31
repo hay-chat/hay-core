@@ -1,5 +1,6 @@
 import { ConversationService } from "../conversation.service";
 import { MessageType } from "../../database/entities/message.entity";
+import { getUTCNow } from "../../utils/date.utils";
 
 /**
  * Handles message processing operations for the orchestrator.
@@ -129,7 +130,7 @@ export class MessageProcessing {
       organizationId,
       {
         status: status,
-        ended_at: status === "resolved" ? new Date() : undefined,
+        ended_at: status === "resolved" ? getUTCNow() : undefined,
       }
     );
   }
@@ -150,7 +151,7 @@ export class MessageProcessing {
       {
         cooldown_until: null,
         needs_processing: false,
-        last_processed_at: new Date(),
+        last_processed_at: getUTCNow(),
       }
     );
   }

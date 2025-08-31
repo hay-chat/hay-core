@@ -3,6 +3,7 @@ import { PlaybookService } from "./playbook.service";
 import { AgentService } from "./agent.service";
 import { VectorStoreService } from "./vector-store.service";
 import { config } from "../config/env";
+import { getUTCNow, addMilliseconds, formatUTC } from "../utils/date.utils";
 
 // Import orchestrator modules
 import type { ExecutionResult } from "./orchestrator/types";
@@ -69,22 +70,21 @@ export class OrchestratorService {
     // Check if cooldown has expired
     if (
       conversation.cooldown_until &&
-      new Date(conversation.cooldown_until) > new Date()
+      new Date(conversation.cooldown_until) > getUTCNow()
     ) {
-      const now = new Date();
+      const now = getUTCNow();
       const cooldownEnd = new Date(conversation.cooldown_until);
       const remainingMs = cooldownEnd.getTime() - now.getTime();
       console.log(`[Orchestrator] Conversation ${conversationId} is in cooldown:
-        - Now: ${now.toISOString()}
-        - Cooldown until: ${cooldownEnd.toISOString()}
+        - Now: ${formatUTC(now)}
+        - Cooldown until: ${formatUTC(cooldownEnd)}
         - Remaining: ${Math.round(remainingMs / 1000)} seconds`);
       return;
     }
 
     // IMMEDIATELY set a cooldown to prevent duplicate processing
     // This prevents race conditions where multiple workers pick up the same conversation
-    const processingCooldown = new Date();
-    processingCooldown.setSeconds(processingCooldown.getSeconds() + 30); // 30 second processing window
+    const processingCooldown = addMilliseconds(getUTCNow(), 30000); // 30 second processing window
     
     await this.conversationService.updateConversation(
       conversationId,

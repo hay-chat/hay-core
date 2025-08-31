@@ -4,6 +4,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginManagerService } from "./plugin-manager.service";
 import { environmentManagerService } from "./environment-manager.service";
+import { getUTCNow } from "../utils/date.utils";
 
 interface ProcessInfo {
   process: ChildProcess;
@@ -96,7 +97,7 @@ export class ProcessManagerService {
         pluginInstanceId: instance.id,
         organizationId,
         pluginName: plugin.name,
-        startedAt: new Date(),
+        startedAt: getUTCNow(),
         restartAttempts: 0,
       };
 
