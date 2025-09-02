@@ -8,9 +8,7 @@
   "node-version": "22.10.0",
   "workspaces": [
     "dashboard",
-    "server",
-    "plugins/webchat",
-    "plugins/zendesk/zendesk-mcp-server"
+    "server"
   ],
   "scripts": {
     "dev": "npm run dev:server & npm run dev:dashboard",
