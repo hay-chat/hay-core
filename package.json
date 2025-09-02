@@ -5,6 +5,7 @@
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
   "license": "MIT",
+  "node-version": "22.10.0",
   "workspaces": [
     "dashboard",
     "server",
@@ -20,7 +21,7 @@
     "build:dashboard": "cd dashboard && npm run build",
     "build:server": "cd server && npm run build",
     "build:plugins": "cd plugins/webchat && npm run build",
-    "build:unified": "UNIFIED_MODE=true NODE_ENV=production cd dashboard && npm run build",
+    "build:unified": "UNIFIED_MODE=true NODE_ENV=production npm run build:dashboard && cd ../ && npm run build:server",
     "build:unified:full": "./build.sh",
     "preview": "cd dashboard && npm run preview",
     "start": "cd server && npm start",
