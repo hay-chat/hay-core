@@ -22,7 +22,7 @@
     "build:server": "cd server && npm run build",
     "build:plugins": "cd plugins/webchat && npm run build",
     "preview": "cd dashboard && npm run preview",
-    "start": "cd server && npm start",
+    "start": "npm run start:server & npm run start:dashboard",
     "start:server": "cd server && npm start",
     "start:dashboard": "cd dashboard && npm run preview",
     "test": "npm run test:dashboard && npm run test:server",
