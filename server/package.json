@@ -7,7 +7,7 @@
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
     "build": "tsc",
-    "start": "node dist/main.js",
+    "start": "node start-production.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
@@ -16,14 +16,17 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts"
   },
   "devDependencies": {
-    "tsconfig-paths": "^4.2.0",
     "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.3.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
-    "@types/cors": "^2.8.19",
     "@types/ws": "^8.18.1",
-    "@types/node": "^24.3.0"
+    "tsconfig-paths": "^4.2.0"
+  },
+  "dependencies": {
+    "module-alias": "^2.2.3"
   }
 }

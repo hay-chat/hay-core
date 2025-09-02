@@ -15,7 +15,7 @@ services:
       cd server && npm ci --include=dev && cd ..
       npm run build:dashboard
       npm run build:server
-    run_command: UNIFIED_MODE=true NODE_ENV=production cd server && node dist/main.js
+    run_command: UNIFIED_MODE=true NODE_ENV=production cd server && node start-production.js
     envs:
       - key: NODE_ENV
         value: production

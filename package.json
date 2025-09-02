@@ -25,7 +25,7 @@
     "build:unified:full": "./build.sh",
     "preview": "cd dashboard && npm run preview",
     "start": "cd server && npm start",
-    "start:unified": "UNIFIED_MODE=true NODE_ENV=production cd server && node dist/main.js",
+    "start:unified": "UNIFIED_MODE=true NODE_ENV=production cd server && node start-production.js",
     "dev:unified": "npm run build:unified && npm run start:unified",
     "test": "npm run test:dashboard && npm run test:server",
     "test:dashboard": "cd dashboard && npm test",

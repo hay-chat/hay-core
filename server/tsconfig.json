@@ -4,6 +4,7 @@
     "module": "commonjs",
     "outDir": "./dist",
     "rootDir": "../",
+    "noEmit": false,
     "types": ["node"],
     "baseUrl": "../",
     "paths": {
