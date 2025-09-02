@@ -165,12 +165,23 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   };
 };
 
+// Get API base URL from runtime config
+function getApiUrl(): string {
+  // Check if we're in a Nuxt context
+  if (typeof window !== 'undefined' && window.$nuxt) {
+    const config = useRuntimeConfig();
+    return `${config.public.apiBaseUrl}/v1`;
+  }
+  // Fallback for production
+  return "https://hay.chat/v1";
+}
+
 // Create a base client without token refresh for auth endpoints
 export const HayAuthApi = createTRPCClient<AppRouter>({
   links: [
     errorLink,         // Handle errors including expired tokens
     httpLink({
-      url: "http://localhost:3001/v1",
+      url: getApiUrl(),
       // You can pass any HTTP headers you wish here
       async headers() {
         return {
@@ -188,7 +199,7 @@ export const HayApi = createTRPCClient<AppRouter>({
     tokenRefreshLink,  // Check token before requests
     errorLink,         // Handle errors including expired tokens
     httpLink({
-      url: "http://localhost:3001/v1",
+      url: getApiUrl(),
       // You can pass any HTTP headers you wish here
       async headers() {
         return {
