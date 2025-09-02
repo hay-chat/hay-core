@@ -19,12 +19,15 @@ export const config = {
   domain: {
     base:
       process.env.BASE_DOMAIN ||
-      (process.env.NODE_ENV === "development" ? "hay.local" : "hay.ai"),
+      (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat"),
     protocol: process.env.APP_PROTOCOL || "http",
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:5173"],
+    origin: process.env.CORS_ORIGIN?.split(",") || [
+      "http://localhost:5173",
+      "https://hay.chat",
+    ],
     credentials: true,
   },
 

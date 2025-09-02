@@ -14,7 +14,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       baseDomain:
-        process.env["NODE_ENV"] === "development" ? "localhost:5173" : "hay.ai",
+        process.env["NODE_ENV"] === "development"
+          ? "localhost:5173"
+          : "hay.chat",
       apiBaseUrl:
         process.env["UNIFIED_MODE"] === "true"
           ? "" // Use same origin in unified mode
@@ -28,8 +30,8 @@ export default defineNuxtConfig({
   nitro: {
     preset: process.env["UNIFIED_MODE"] === "true" ? "node-server" : undefined,
     output: {
-      dir: "../dashboard/.output"
-    }
+      dir: "../dashboard/.output",
+    },
   },
 
   // Enable TypeScript
