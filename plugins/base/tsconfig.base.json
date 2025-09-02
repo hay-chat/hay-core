@@ -15,7 +15,8 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node"]
+    "types": ["node"],
+    "downlevelIteration": true
   },
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }
