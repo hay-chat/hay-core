@@ -1,0 +1,133 @@
+name: hay-svs3r
+region: lon
+services:
+- name: hay-dashboard
+  github:
+    repo: rgrjnr/hay-core
+    branch: master
+    deploy_on_push: true
+  build_command: |
+    npm install
+    npm run build:dashboard
+  run_command: npm run start:dashboard
+  source_dir: /
+  environment_slug: node-js
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  instance_count: 1
+  http_port: 3000
+  health_check:
+    http_path: /
+    initial_delay_seconds: 10
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+  envs:
+  - key: NODE_ENV
+    value: production
+    scope: RUN_AND_BUILD_TIME
+  - key: NUXT_PUBLIC_API_URL
+    value: https://hay-svs3r-server.ondigitalocean.app/v1
+    scope: RUN_AND_BUILD_TIME
+  - key: NITRO_PORT
+    value: "3000"
+    scope: RUN_TIME
+
+- name: hay-server
+  github:
+    repo: rgrjnr/hay-core
+    branch: master
+    deploy_on_push: true
+  build_command: |
+    npm install
+    npm run build:server
+  run_command: npm run start:server
+  source_dir: /
+  environment_slug: node-js
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  instance_count: 1
+  http_port: 3001
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 10
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+  envs:
+  - key: NODE_ENV
+    value: production
+    scope: RUN_AND_BUILD_TIME
+  - key: PORT
+    value: "3001"
+    scope: RUN_TIME
+  - key: WS_PORT
+    value: "3002"
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_HOST
+    value: aws-1-sa-east-1.pooler.supabase.com
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_PORT
+    value: "5432"
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_USERNAME
+    value: postgres.taaqwnxzqausxwyeliss
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_NAME
+    value: postgres
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_SSL
+    value: "true"
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_PASSWORD
+    value: "${DB_PASSWORD}"
+    type: SECRET
+    scope: RUN_AND_BUILD_TIME
+  - key: JWT_SECRET
+    value: "${JWT_SECRET}"
+    type: SECRET
+    scope: RUN_AND_BUILD_TIME
+  - key: JWT_REFRESH_SECRET
+    value: "${JWT_REFRESH_SECRET}"
+    type: SECRET
+    scope: RUN_AND_BUILD_TIME
+  - key: JWT_EXPIRES_IN
+    value: 60m
+    scope: RUN_AND_BUILD_TIME
+  - key: JWT_REFRESH_EXPIRES_IN
+    value: 7d
+    scope: RUN_AND_BUILD_TIME
+  - key: OPENAI_API_KEY
+    value: "${OPENAI_API_KEY}"
+    type: SECRET
+    scope: RUN_AND_BUILD_TIME
+  - key: CONVERSATION_COOLDOWN_INTERVAL
+    value: "10000"
+    scope: RUN_AND_BUILD_TIME
+  - key: CONVERSATION_INACTIVITY_INTERVAL
+    value: "1800000"
+    scope: RUN_AND_BUILD_TIME
+  - key: CORS_ORIGIN
+    value: https://hay-svs3r.ondigitalocean.app,https://hay-svs3r-dashboard.ondigitalocean.app
+    scope: RUN_AND_BUILD_TIME
+
+domains:
+- domain: hay-svs3r.ondigitalocean.app
+  type: DEFAULT
+  zone: ""
+
+ingress:
+  rules:
+  - match:
+      path:
+        prefix: /v1
+    component:
+      name: hay-server
+  - match:
+      path:
+        prefix: /
+    component:
+      name: hay-dashboard
+
+features:
+- buildpack-stack=ubuntu-22
