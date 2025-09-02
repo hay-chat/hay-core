@@ -20,7 +20,7 @@ export default defineNuxtConfig({
       apiBaseUrl:
         process.env["NODE_ENV"] === "development"
           ? "http://localhost:3001"
-          : "https://hay.chat",
+          : "https://api.hay.chat",
     },
   },
 

@@ -168,7 +168,7 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
 // Get API base URL - this will be replaced at build time by Nuxt
 const API_BASE_URL = process.env.NODE_ENV === 'development' 
   ? 'http://localhost:3001/v1'
-  : 'https://hay.chat/v1';
+  : 'https://api.hay.chat/v1';
 
 // Create a base client without token refresh for auth endpoints
 export const HayAuthApi = createTRPCClient<AppRouter>({

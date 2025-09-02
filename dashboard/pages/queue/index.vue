@@ -421,6 +421,7 @@ import {
   X,
   XCircle,
 } from "lucide-vue-next";
+import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/websocket";
 
 // State
 const loading = ref(false);
@@ -439,9 +440,6 @@ const stats = ref({
   completed: 0,
   failed: 0,
 });
-
-// WebSocket connection
-let socket: any = null;
 
 // Computed
 const totalPages = computed(() => Math.ceil(totalJobs.value / pageSize.value));
@@ -549,24 +547,96 @@ const formatDuration = (duration: number | null) => {
 
 // Setup WebSocket for real-time updates
 const setupWebSocket = () => {
-  // We'll implement this after confirming the WebSocket service setup
-  // For now, just poll every 5 seconds when on this page
-  const interval = setInterval(() => {
-    if (!loading.value) {
-      fetchStats();
-      // Only refresh jobs if we're viewing active jobs
-      if (
-        ["", "pending", "queued", "processing", "retrying"].includes(
-          statusFilter.value
-        )
-      ) {
-        fetchJobs();
-      }
-    }
-  }, 5000);
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: NodeJS.Timeout | null = null;
+  let pollInterval: NodeJS.Timeout | null = null;
 
+  const connect = () => {
+    // Try to establish WebSocket connection
+    ws = createAuthenticatedWebSocket();
+    
+    if (!ws) {
+      // Fall back to polling if WebSocket fails to create
+      startPolling();
+      return;
+    }
+
+    ws.onopen = () => {
+      console.log('WebSocket connected for queue updates');
+      // Stop polling if it was running
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+
+    ws.onmessage = (event) => {
+      const message = parseWebSocketMessage(event.data);
+      if (message) {
+        // Handle different message types for queue updates
+        if (message.type === 'queue_update' || message.type === 'job_update') {
+          fetchStats();
+          if (
+            ["", "pending", "queued", "processing", "retrying"].includes(
+              statusFilter.value
+            )
+          ) {
+            fetchJobs();
+          }
+        }
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected, falling back to polling');
+      // Fall back to polling and try to reconnect
+      startPolling();
+      
+      // Try to reconnect after 5 seconds
+      if (!reconnectTimeout) {
+        reconnectTimeout = setTimeout(() => {
+          reconnectTimeout = null;
+          connect();
+        }, 5000);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      ws?.close();
+    };
+  };
+
+  const startPolling = () => {
+    if (!pollInterval) {
+      pollInterval = setInterval(() => {
+        if (!loading.value) {
+          fetchStats();
+          // Only refresh jobs if we're viewing active jobs
+          if (
+            ["", "pending", "queued", "processing", "retrying"].includes(
+              statusFilter.value
+            )
+          ) {
+            fetchJobs();
+          }
+        }
+      }, 5000);
+    }
+  };
+
+  // Start connection
+  connect();
+
+  // Cleanup on unmount
   onUnmounted(() => {
-    clearInterval(interval);
+    ws?.close();
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+    }
+    if (pollInterval) {
+      clearInterval(pollInterval);
+    }
   });
 };
 
