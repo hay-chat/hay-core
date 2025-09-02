@@ -49,26 +49,22 @@ export default defineNuxtConfig({
         },
       },
 
-      // Only include necessary files for the dashboard
+      // Only include dashboard files - no server files at all
       include: [
-        "./**/*",
-        "../server/routes/v1/index.ts", // Only the main router file for types
-        "../server/trpc/app-router-type.ts", // Type definitions
+        "./**/*.ts",
+        "./**/*.vue",
+        "./**/*.js",
+        "./**/*.mjs"
       ],
       exclude: [
-        "../server/**/*.spec.ts",
-        "../server/**/*.test.ts",
-        "../server/lib/**/*",
-        "../server/services/**/*",
-        "../server/processors/**/*",
-        "../server/entities/**/*",
-        "../server/repositories/**/*",
-        "../server/workers/**/*",
-        "../server/database/**/*",
-        "../server/config/**/*",
-        "../server/main.ts",
-        "../server/unified.ts",
-        "../server/server-utils.ts",
+        "node_modules",
+        ".nuxt",
+        ".output",
+        "dist",
+        "../server/**/*",  // Exclude ALL server files
+        "../plugins/**/*", // Exclude plugins
+        "**/*.spec.ts",
+        "**/*.test.ts"
       ],
     },
   },

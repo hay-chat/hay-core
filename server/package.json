@@ -16,6 +16,14 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts"
   },
   "devDependencies": {
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/uuid": "^9.0.8",
+    "@types/cors": "^2.8.19",
+    "@types/ws": "^8.18.1",
+    "@types/node": "^24.3.0"
   }
 }

@@ -2,11 +2,25 @@
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "skipLibCheck": true,
+    "types": ["node"],
     "paths": {
       "@/*": ["./*"],
       "~/*": ["./*"],
       "@server/*": ["../server/*"],
       "@plugins/*": ["../plugins/*"]
     }
-  }
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.vue",
+    "./.nuxt/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "../server/**/*",
+    "../plugins/**/*",
+    "../**/*.spec.ts",
+    "../**/*.test.ts"
+  ]
 }
