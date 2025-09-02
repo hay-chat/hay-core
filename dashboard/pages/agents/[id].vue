@@ -140,7 +140,7 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
-const { toast } = useToast();
+const toast = useToast();
 
 const loading = ref(true);
 const isLoading = ref(false);
@@ -175,7 +175,7 @@ const loadAgent = async () => {
     }
   } catch (error: any) {
     console.error("Failed to load agent:", error);
-    toast("error", error.message || "Failed to load agent");
+    toast.error(error.message || "Failed to load agent");
   } finally {
     loading.value = false;
   }
@@ -183,7 +183,7 @@ const loadAgent = async () => {
 
 const handleSubmit = async () => {
   if (!form.value.name.trim()) {
-    toast("error", "Agent name is required");
+    toast.error("Agent name is required");
     return;
   }
 
@@ -203,11 +203,11 @@ const handleSubmit = async () => {
       },
     });
 
-    toast("success", "Agent updated successfully");
+    toast.success("Agent updated successfully");
     await router.push("/agents");
   } catch (error: any) {
     console.error("Failed to update agent:", error);
-    toast("error", error.message || "Failed to update agent");
+    toast.error(error.message || "Failed to update agent");
   } finally {
     isLoading.value = false;
   }

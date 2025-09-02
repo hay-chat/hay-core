@@ -275,3 +275,5 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     });
   }
 }
+
+export const conversationRepository = new ConversationRepository();

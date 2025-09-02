@@ -832,6 +832,7 @@ const performBulkDelete = async () => {
   // Show initial progress toast with no auto-dismiss
   const progressToastId = toast.info(
     `Deleting documents... 0/${totalCount}`,
+    undefined,
     0
   );
 

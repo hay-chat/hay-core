@@ -47,7 +47,7 @@ export class PlaybookService {
     return await this.playbookRepository.findByStatus(organizationId, status);
   }
 
-  async getPlaybook(playbookId: string, organizationId: string): Promise<Playbook | null> {
+  async getPlaybook(organizationId: string, playbookId: string): Promise<Playbook | null> {
     return await this.playbookRepository.findById(playbookId, organizationId);
   }
 

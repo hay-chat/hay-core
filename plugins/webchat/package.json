@@ -1,0 +1,30 @@
+{
+  "name": "@hay/plugin-webchat",
+  "version": "1.0.0",
+  "description": "Webchat connector plugin for Hay",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "mkdir -p dist/widget dist/ui && cp src/widget/* dist/widget/ 2>/dev/null || true && cp src/ui/* dist/ui/ 2>/dev/null || true",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "hay",
+    "plugin",
+    "webchat",
+    "chat",
+    "connector"
+  ],
+  "author": "Hay Team",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.3.3"
+  }
+}

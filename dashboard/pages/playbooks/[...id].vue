@@ -2,12 +2,12 @@
   <div class="container mx-auto max-w-4xl py-8">
     <div class="mb-8 flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold mb-2">Edit Playbook</h1>
+        <h1 class="text-3xl font-bold mb-2">{{ isEditMode ? 'Edit' : 'Create New' }} Playbook</h1>
         <p class="text-muted-foreground">
-          Update your playbook configuration
+          {{ isEditMode ? 'Update your playbook configuration' : 'Define automated conversation flows for your agents' }}
         </p>
       </div>
-      <Button variant="ghost" @click="() => router.push('/playbooks')">
+      <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
         <ArrowLeft class="h-4 w-4 mr-2" />
         Back to list
       </Button>
@@ -18,7 +18,7 @@
       <p class="text-muted-foreground">Loading playbook...</p>
     </div>
 
-    <Card v-else-if="playbook">
+    <Card v-else-if="!isEditMode || playbook">
       <CardContent class="p-6">
         <form @submit.prevent="handleSubmit" class="space-y-6">
           <!-- Title Field -->
@@ -72,20 +72,13 @@
           </div>
 
           <!-- Instructions Field -->
-          <div class="space-y-2">
-            <label for="instructions" class="text-sm font-medium">
-              Instructions
-            </label>
-            <Textarea
-              id="instructions"
-              v-model="form.instructions"
-              placeholder="Enter detailed instructions for agents..."
-              :rows="8"
-            />
-            <p class="text-sm text-muted-foreground">
-              Provide clear instructions that agents will follow when executing this playbook
-            </p>
-          </div>
+          <InstructionsEditor
+            v-model="form.instructions"
+            label="Instructions"
+            placeholder="Enter step 1..."
+            hint="Create numbered step-by-step instructions that agents will follow when executing this playbook"
+            :error="errors.instructions"
+          />
 
           <!-- Status Field -->
           <div class="space-y-2">
@@ -103,7 +96,7 @@
 
           <!-- Agent Selection -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">Assigned Agents</label>
+            <label class="text-sm font-medium">{{ isEditMode ? 'Assigned' : 'Assign' }} Agents</label>
             <div v-if="loadingAgents" class="p-4 text-center text-muted-foreground">
               Loading agents...
             </div>
@@ -136,8 +129,8 @@
             </div>
           </div>
 
-          <!-- Metadata -->
-          <div class="space-y-2 text-sm text-muted-foreground">
+          <!-- Metadata (only in edit mode) -->
+          <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-muted-foreground">
             <div>Created: {{ formatDate(playbook.created_at) }}</div>
             <div>Last updated: {{ formatDate(playbook.updated_at) }}</div>
           </div>
@@ -145,6 +138,7 @@
           <!-- Form Actions -->
           <div class="flex justify-between pt-4">
             <Button
+              v-if="isEditMode"
               type="button"
               variant="destructive"
               @click="handleDelete"
@@ -154,7 +148,7 @@
               Delete Playbook
             </Button>
             
-            <div class="flex space-x-4">
+            <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
               <Button
                 type="button"
                 variant="outline"
@@ -165,7 +159,9 @@
               </Button>
               <Button type="submit" :disabled="isSubmitting || !form.title || !form.trigger">
                 <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+                {{ isSubmitting 
+                  ? (isEditMode ? 'Saving...' : 'Creating...') 
+                  : (isEditMode ? 'Save Changes' : 'Create Playbook') }}
               </Button>
             </div>
           </div>
@@ -179,6 +175,7 @@
 
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
+      v-if="isEditMode"
       v-model:open="showDeleteDialog"
       :title="deleteDialogTitle"
       :description="deleteDialogDescription"
@@ -190,31 +187,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Loader2, ArrowLeft, Trash2 } from 'lucide-vue-next';
-import type { Playbook, Agent, PlaybookStatus } from '~/types/playbook';
+import type { PlaybookStatus } from '~/types/playbook';
 import { useToast } from '~/composables/useToast';
 import { HayApi } from '@/utils/api';
 
 const router = useRouter();
 const route = useRoute();
-const { toast } = useToast();
+const toast = useToast();
 
-const playbookId = route.params.id as string;
+// Determine if we're in edit mode based on route
+const isEditMode = computed(() => {
+  const id = route.params.id;
+  return Array.isArray(id) ? id[0] !== 'new' : id !== 'new';
+});
+
+const playbookId = computed(() => {
+  const id = route.params.id;
+  if (Array.isArray(id)) {
+    return id[0] === 'new' ? null : id[0];
+  }
+  return id === 'new' ? null : id;
+});
 
 // Form state
 const form = ref({
   title: '',
   trigger: '',
   description: '',
-  instructions: {} as any,
+  instructions: null as any,
   status: 'draft' as PlaybookStatus,
   agentIds: [] as string[]
 });
 
 // UI state
-const loading = ref(true);
+const loading = ref(false);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
 const agents = ref<any[]>([]);
@@ -232,40 +241,46 @@ const formatDate = (date: string | Date) => {
   }).format(new Date(date));
 };
 
-// Load playbook and agents on mount
+// Load data on mount
 onMounted(async () => {
   try {
-    // Load playbook
-    loading.value = true;
-    const playbookResponse = await HayApi.playbooks.get.query({ id: playbookId });
-    
-    if (!playbookResponse) {
-      toast('error', 'Playbook not found');
-      await router.push('/playbooks');
-      return;
-    }
-    
-    playbook.value = playbookResponse;
-    
-    // Populate form
-    form.value = {
-      title: playbookResponse.title,
-      trigger: playbookResponse.trigger,
-      description: playbookResponse.description || '',
-      instructions: playbookResponse.instructions || {},
-      status: playbookResponse.status,
-      agentIds: playbookResponse.agents?.map((a: any) => a.id) || []
-    };
-    
     // Load agents
     loadingAgents.value = true;
     const agentsResponse = await HayApi.agents.list.query();
     agents.value = agentsResponse || [];
     
+    // Load playbook if in edit mode
+    if (isEditMode.value && playbookId.value) {
+      loading.value = true;
+      const playbookResponse = await HayApi.playbooks.get.query({ id: playbookId.value });
+      
+      if (!playbookResponse) {
+        toast.error('Playbook not found');
+        await router.push('/playbooks');
+        return;
+      }
+      
+      playbook.value = playbookResponse;
+      
+      // Populate form
+      form.value = {
+        title: playbookResponse.title,
+        trigger: playbookResponse.trigger,
+        description: playbookResponse.description || '',
+        instructions: playbookResponse.instructions || null,
+        status: playbookResponse.status,
+        agentIds: playbookResponse.agents?.map((a: any) => a.id) || []
+      };
+    }
+    
   } catch (error) {
     console.error('Failed to load data:', error);
-    toast('error', 'Failed to load playbook');
-    await router.push('/playbooks');
+    if (isEditMode.value) {
+      toast.error('Failed to load playbook');
+      await router.push('/playbooks');
+    } else {
+      toast.error('Failed to load agents');
+    }
   } finally {
     loading.value = false;
     loadingAgents.value = false;
@@ -308,24 +323,36 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
     
-    await HayApi.playbooks.update.mutate({
-      id: playbookId,
-      data: {
-        title: form.value.title,
-        trigger: form.value.trigger,
-        description: form.value.description || undefined,
-        instructions: form.value.instructions || undefined,
-        status: form.value.status,
-        agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined
-      }
-    });
-
-    toast('success', 'Playbook updated successfully');
+    const payload = {
+      title: form.value.title,
+      trigger: form.value.trigger,
+      description: form.value.description || undefined,
+      instructions: form.value.instructions || null,
+      status: form.value.status,
+      agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined
+    };
+    
+    if (isEditMode.value && playbookId.value) {
+      // Update existing playbook
+      await HayApi.playbooks.update.mutate({
+        id: playbookId.value,
+        data: payload
+      });
+      toast.success('Playbook updated successfully');
+    } else {
+      // Create new playbook
+      const response = await HayApi.playbooks.create.mutate(payload);
+      toast.success('Playbook created successfully');
+      
+      // Navigate to the edit page after creation
+      await router.push(`/playbooks/${response.id}`);
+      return;
+    }
 
     await router.push('/playbooks');
   } catch (error) {
-    console.error('Failed to update playbook:', error);
-    toast('error', 'Failed to update playbook. Please try again.');
+    console.error('Failed to save playbook:', error);
+    toast.error(`Failed to ${isEditMode.value ? 'update' : 'create'} playbook. Please try again.`);
   } finally {
     isSubmitting.value = false;
   }
@@ -344,17 +371,19 @@ const handleDelete = () => {
 };
 
 const confirmDelete = async () => {
+  if (!playbookId.value) return;
+  
   try {
     isSubmitting.value = true;
     
-    await HayApi.playbooks.delete.mutate({ id: playbookId });
+    await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
-    toast('success', 'Playbook deleted successfully');
+    toast.success('Playbook deleted successfully');
 
     await router.push('/playbooks');
   } catch (error) {
     console.error('Failed to delete playbook:', error);
-    toast('error', 'Failed to delete playbook. Please try again.');
+    toast.error('Failed to delete playbook. Please try again.');
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
@@ -373,11 +402,15 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: 'Edit Playbook - Hay Dashboard',
+  title: computed(() => `${isEditMode.value ? 'Edit' : 'Create'} Playbook - Hay Dashboard`),
   meta: [
     {
       name: 'description',
-      content: 'Edit your automated conversation playbook'
+      content: computed(() => 
+        isEditMode.value 
+          ? 'Edit your automated conversation playbook' 
+          : 'Create a new automated conversation playbook'
+      )
     }
   ]
 });

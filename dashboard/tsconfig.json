@@ -1,23 +1,12 @@
 {
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
     "paths": {
-      "@server/*": ["../server/*"],
       "@/*": ["./*"],
       "~/*": ["./*"],
-      "~~/*": ["./*"],
-      "@@/*": ["./*"]
+      "@server/*": ["../server/*"],
+      "@plugins/*": ["../plugins/*"]
     }
-  },
-  "include": [
-    "**/*",
-    ".nuxt/**/*"
-  ],
-  "exclude": [
-    "../server/**/*",
-    "node_modules",
-    ".nuxt/dist"
-  ]
+  }
 }

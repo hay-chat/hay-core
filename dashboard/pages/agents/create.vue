@@ -121,7 +121,7 @@ import { useToast } from "@/composables/useToast";
 import { HayApi } from "@/utils/api";
 
 const router = useRouter();
-const { toast } = useToast();
+const toast = useToast();
 
 const isLoading = ref(false);
 const form = ref({
@@ -136,7 +136,7 @@ const form = ref({
 
 const handleSubmit = async () => {
   if (!form.value.name.trim()) {
-    toast("error", "Agent name is required");
+    toast.error("Agent name is required");
     return;
   }
 
@@ -153,11 +153,11 @@ const handleSubmit = async () => {
       enabled: form.value.enabled,
     });
 
-    toast("success", "Agent created successfully");
+    toast.success("Agent created successfully");
     await router.push("/agents");
   } catch (error: any) {
     console.error("Failed to create agent:", error);
-    toast("error", error.message || "Failed to create agent");
+    toast.error(error.message || "Failed to create agent");
   } finally {
     isLoading.value = false;
   }

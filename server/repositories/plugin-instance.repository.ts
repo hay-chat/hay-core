@@ -1,10 +1,10 @@
-import { Repository, FindManyOptions } from "typeorm";
+import { Repository, type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { AppDataSource } from "@server/database/data-source";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
-  protected repository: Repository<PluginInstance>;
+  protected override repository: Repository<PluginInstance>;
 
   constructor() {
     super(PluginInstance);
@@ -21,7 +21,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
-  async findByOrganization(organizationId: string): Promise<PluginInstance[]> {
+  override async findByOrganization(organizationId: string): Promise<PluginInstance[]> {
     return this.repository.find({
       where: { organizationId },
       relations: ["plugin"],

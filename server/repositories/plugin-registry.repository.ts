@@ -4,15 +4,15 @@ import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import { AppDataSource } from "@server/database/data-source";
 
 export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
-  protected repository: Repository<PluginRegistry>;
+  protected override repository: Repository<PluginRegistry>;
 
   constructor() {
     super(PluginRegistry);
     this.repository = AppDataSource.getRepository(PluginRegistry);
   }
 
-  async findByName(name: string): Promise<PluginRegistry | null> {
-    return this.repository.findOne({ where: { name } });
+  async findByPluginId(pluginId: string): Promise<PluginRegistry | null> {
+    return this.repository.findOne({ where: { pluginId } });
   }
 
   async getAllPlugins(): Promise<PluginRegistry[]> {
@@ -64,7 +64,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   }
 
   async upsertPlugin(plugin: Partial<PluginRegistry>): Promise<PluginRegistry> {
-    const existing = await this.findByName(plugin.name!);
+    const existing = await this.findByPluginId(plugin.pluginId!);
     
     if (existing) {
       await this.repository.update(existing.id, {

@@ -22,6 +22,11 @@ export class PluginManagerService {
     console.log("🔍 Discovering plugins...");
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
+    console.log("📦 Plugin registry loaded:", Array.from(this.registry.entries()).map(([id, p]) => ({ 
+      pluginId: id, 
+      dbId: p.id, 
+      name: p.name 
+    })));
   }
 
   /**
@@ -59,7 +64,7 @@ export class PluginManagerService {
       const manifestModule = await import(manifestPath);
       const manifest: HayPluginManifest = manifestModule.manifest || manifestModule.default;
       
-      if (!manifest || !manifest.name) {
+      if (!manifest || !manifest.id) {
         console.warn(`⚠️  Invalid manifest at ${pluginPath}`);
         return;
       }
@@ -69,13 +74,14 @@ export class PluginManagerService {
       
       // Upsert plugin in registry
       const plugin = await pluginRegistryRepository.upsertPlugin({
+        pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
         manifest: manifest as any,
         checksum,
       });
       
-      this.registry.set(manifest.name, plugin);
+      this.registry.set(manifest.id, plugin);
       console.log(`✅ Registered plugin: ${manifest.name} v${manifest.version}`);
     } catch (error) {
       console.error(`Failed to register plugin at ${pluginPath}:`, error);
@@ -113,31 +119,31 @@ export class PluginManagerService {
   private async loadRegistryFromDatabase(): Promise<void> {
     const plugins = await pluginRegistryRepository.getAllPlugins();
     for (const plugin of plugins) {
-      this.registry.set(plugin.name, plugin);
+      this.registry.set(plugin.pluginId, plugin);
     }
   }
 
   /**
    * Install a plugin (run npm install)
    */
-  async installPlugin(pluginName: string): Promise<void> {
-    const plugin = this.registry.get(pluginName);
+  async installPlugin(pluginId: string): Promise<void> {
+    const plugin = this.registry.get(pluginId);
     if (!plugin) {
-      throw new Error(`Plugin ${pluginName} not found`);
+      throw new Error(`Plugin ${pluginId} not found`);
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
     const installCommand = manifest.capabilities?.mcp?.installCommand;
     
     if (!installCommand) {
-      console.log(`ℹ️  No install command for plugin ${pluginName}`);
+      console.log(`ℹ️  No install command for plugin ${plugin.name}`);
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       return;
     }
 
     try {
-      console.log(`📦 Installing plugin ${pluginName}...`);
-      const pluginPath = path.join(this.pluginsDir, pluginName.replace("hay-plugin-", ""));
+      console.log(`📦 Installing plugin ${plugin.name}...`);
+      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
       
       execSync(installCommand, {
         cwd: pluginPath,
@@ -147,36 +153,37 @@ export class PluginManagerService {
       
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       plugin.installed = true;
-      console.log(`✅ Plugin ${pluginName} installed successfully`);
+      console.log(`✅ [HAY OK] Plugin ${plugin.name} installed successfully`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await pluginRegistryRepository.updateInstallStatus(plugin.id, false, errorMessage);
       plugin.installed = false;
-      throw new Error(`Failed to install plugin ${pluginName}: ${errorMessage}`);
+      console.error(`❌ [HAY FAILED] Plugin ${plugin.name} installation failed`);
+      throw new Error(`Failed to install plugin ${plugin.name}: ${errorMessage}`);
     }
   }
 
   /**
    * Build a plugin (run build command)
    */
-  async buildPlugin(pluginName: string): Promise<void> {
-    const plugin = this.registry.get(pluginName);
+  async buildPlugin(pluginId: string): Promise<void> {
+    const plugin = this.registry.get(pluginId);
     if (!plugin) {
-      throw new Error(`Plugin ${pluginName} not found`);
+      throw new Error(`Plugin ${pluginId} not found`);
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
     const buildCommand = manifest.capabilities?.mcp?.buildCommand;
     
     if (!buildCommand) {
-      console.log(`ℹ️  No build command for plugin ${pluginName}`);
+      console.log(`ℹ️  No build command for plugin ${plugin.name}`);
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
       return;
     }
 
     try {
-      console.log(`🔨 Building plugin ${pluginName}...`);
-      const pluginPath = path.join(this.pluginsDir, pluginName.replace("hay-plugin-", ""));
+      console.log(`🔨 Building plugin ${plugin.name}...`);
+      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
       
       execSync(buildCommand, {
         cwd: pluginPath,
@@ -186,12 +193,13 @@ export class PluginManagerService {
       
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
       plugin.built = true;
-      console.log(`✅ Plugin ${pluginName} built successfully`);
+      console.log(`✅ [HAY OK] Plugin ${plugin.name} built successfully`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await pluginRegistryRepository.updateBuildStatus(plugin.id, false, errorMessage);
       plugin.built = false;
-      throw new Error(`Failed to build plugin ${pluginName}: ${errorMessage}`);
+      console.error(`❌ [HAY FAILED] Plugin ${plugin.name} build failed`);
+      throw new Error(`Failed to build plugin ${plugin.name}: ${errorMessage}`);
     }
   }
 
@@ -203,33 +211,33 @@ export class PluginManagerService {
   }
 
   /**
-   * Get a plugin by name
+   * Get a plugin by ID
    */
-  getPlugin(name: string): PluginRegistry | undefined {
-    return this.registry.get(name);
+  getPlugin(pluginId: string): PluginRegistry | undefined {
+    return this.registry.get(pluginId);
   }
 
   /**
    * Check if a plugin needs installation
    */
-  needsInstallation(pluginName: string): boolean {
-    const plugin = this.registry.get(pluginName);
+  needsInstallation(pluginId: string): boolean {
+    const plugin = this.registry.get(pluginId);
     return plugin ? !plugin.installed : true;
   }
 
   /**
    * Check if a plugin needs building
    */
-  needsBuilding(pluginName: string): boolean {
-    const plugin = this.registry.get(pluginName);
+  needsBuilding(pluginId: string): boolean {
+    const plugin = this.registry.get(pluginId);
     return plugin ? !plugin.built : true;
   }
 
   /**
    * Get plugin start command
    */
-  getStartCommand(pluginName: string): string | undefined {
-    const plugin = this.registry.get(pluginName);
+  getStartCommand(pluginId: string): string | undefined {
+    const plugin = this.registry.get(pluginId);
     if (!plugin) return undefined;
     
     const manifest = plugin.manifest as HayPluginManifest;

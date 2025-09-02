@@ -341,7 +341,7 @@ import type { Playbook } from '~/types/playbook';
 import { HayApi } from '@/utils/api';
 import DataPagination from '@/components/DataPagination.vue';
 
-const { toast } = useToast();
+const toast = useToast();
 const router = useRouter();
 
 // Reactive state
@@ -440,8 +440,7 @@ const createPlaybook = () => {
 };
 
 const editPlaybook = (id: string) => {
-  // TODO: Navigate to playbook editor
-  router.push(`/playbooks/${id}/edit`);
+  router.push(`/playbooks/${id}`);
 };
 
 const duplicatePlaybook = (id: string) => {
@@ -473,10 +472,10 @@ const confirmDelete = async () => {
     // Remove from local list
     playbooks.value = playbooks.value.filter(p => p.id !== playbookToDelete.value!.id);
     
-    toast('success', 'Playbook deleted successfully');
+    toast.success('Playbook deleted successfully');
   } catch (error) {
     console.error('Failed to delete playbook:', error);
-    toast('error', 'Failed to delete playbook');
+    toast.error('Failed to delete playbook');
   } finally {
     playbookToDelete.value = null;
     showDeleteDialog.value = false;
@@ -496,7 +495,7 @@ const fetchPlaybooks = async () => {
     playbooks.value = response || [];
   } catch (error) {
     console.error('Failed to fetch playbooks:', error);
-    toast('error', 'Failed to load playbooks');
+    toast.error('Failed to load playbooks');
   } finally {
     loading.value = false;
   }

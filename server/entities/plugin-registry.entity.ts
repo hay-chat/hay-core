@@ -8,10 +8,13 @@ import {
 } from "typeorm";
 
 @Entity("plugin_registry")
-@Index(["name"], { unique: true })
+@Index(["pluginId"], { unique: true })
 export class PluginRegistry {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
+
+  @Column({ type: "varchar", length: 255 })
+  pluginId!: string;
 
   @Column({ type: "varchar", length: 255 })
   name!: string;

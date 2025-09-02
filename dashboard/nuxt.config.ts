@@ -33,9 +33,12 @@ export default defineNuxtConfig({
         paths: {
           "@server/*": ["../server/*"],
           "@/*": ["./*"],
+          "~/*": ["./*"],
         },
       },
-      exclude: ["../server/**/*"],
+      // Only include server route files needed for type definitions
+      include: ["../server/routes/**/*.ts"],
+      exclude: ["../server/**/*.spec.ts", "../server/**/*.test.ts"],
     },
   },
 

@@ -1,5 +1,6 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn, ChildProcess, execSync, exec } from "child_process";
 import path from "path";
+import { platform } from "os";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginManagerService } from "./plugin-manager.service";
@@ -49,22 +50,26 @@ export class ProcessManagerService {
       return;
     }
 
-    const plugin = await pluginManagerService.getPlugin(instance.plugin.name);
+    const plugin = await pluginManagerService.getPlugin(instance.plugin.pluginId);
     if (!plugin) {
-      throw new Error(`Plugin ${instance.plugin.name} not found in registry`);
+      throw new Error(`Plugin ${instance.plugin.pluginId} not found in registry`);
     }
 
     // Ensure plugin is installed and built
     if (!plugin.installed) {
-      await pluginManagerService.installPlugin(plugin.name);
+      await pluginManagerService.installPlugin(plugin.pluginId);
     }
     if (!plugin.built) {
-      await pluginManagerService.buildPlugin(plugin.name);
+      await pluginManagerService.buildPlugin(plugin.pluginId);
     }
 
-    const startCommand = pluginManagerService.getStartCommand(plugin.name);
+    const startCommand = pluginManagerService.getStartCommand(plugin.pluginId);
     if (!startCommand) {
-      throw new Error(`No start command defined for plugin ${plugin.name}`);
+      // Some plugins (like chat-connectors) don't need a separate process
+      // They just serve assets and handle webhooks
+      console.log(`ℹ️  Plugin ${plugin.name} doesn't require a separate process`);
+      await pluginInstanceRepository.updateStatus(instance.id, "running");
+      return;
     }
 
     // Update status to starting
@@ -78,19 +83,41 @@ export class ProcessManagerService {
       );
 
       // Parse command and args
-      const [command, ...args] = startCommand.split(" ");
       const pluginPath = path.join(
         process.cwd(),
         "plugins",
         plugin.name.replace("hay-plugin-", "")
       );
 
-      // Spawn the process
-      const childProcess = spawn(command, args, {
-        cwd: pluginPath,
-        env,
-        stdio: ["pipe", "pipe", "pipe", "ipc"],
-      });
+      let childProcess: ChildProcess;
+      
+      // Check if command contains shell operators or needs special handling
+      if (startCommand.includes("&&") || startCommand.includes("||")) {
+        // For complex shell commands, execute them properly
+        // Handle commands like "cd directory && npm run start"
+        const commands = startCommand.split("&&").map(cmd => cmd.trim());
+        let finalCwd = pluginPath;
+        let finalCommand = startCommand;
+        
+        // Check if first command is a cd command
+        if (commands[0].startsWith("cd ")) {
+          const targetDir = commands[0].substring(3).trim();
+          finalCwd = path.join(pluginPath, targetDir);
+          // Remove the cd command and join the rest
+          finalCommand = commands.slice(1).join(" && ").trim();
+        }
+        
+        // If there's still a command to run after handling cd
+        if (finalCommand) {
+          // Use cross-platform execution
+          childProcess = this.spawnCommand(finalCommand, finalCwd, env);
+        } else {
+          throw new Error("No command to execute after directory change");
+        }
+      } else {
+        // Use cross-platform execution for simple commands too
+        childProcess = this.spawnCommand(startCommand, pluginPath, env);
+      }
 
       const processInfo: ProcessInfo = {
         process: childProcess,
@@ -104,9 +131,11 @@ export class ProcessManagerService {
       this.processes.set(processKey, processInfo);
 
       // Update process ID and status
+      // Note: exec might not have PID immediately, but we can still track the process
+      const pid = childProcess.pid || "managed";
       await pluginInstanceRepository.updateProcessId(
         instance.id,
-        String(childProcess.pid)
+        String(pid)
       );
       await pluginInstanceRepository.updateStatus(instance.id, "running");
 
@@ -114,7 +143,7 @@ export class ProcessManagerService {
       this.setupProcessHandlers(processKey, processInfo);
 
       console.log(
-        `✅ Started plugin ${plugin.name} for org ${organizationId} (PID: ${childProcess.pid})`
+        `✅ Started plugin ${plugin.name} for org ${organizationId} (PID: ${pid})`
       );
     } catch (error) {
       await pluginInstanceRepository.updateStatus(
@@ -309,6 +338,63 @@ export class ProcessManagerService {
   }
 
   /**
+   * Cross-platform command spawning helper
+   */
+  private spawnCommand(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
+    console.log(`Executing command: ${command} in ${cwd}`);
+    
+    // Parse the command to check if it needs shell execution
+    const [cmd] = command.split(" ");
+    
+    // For npm/npx/node commands or complex shell commands, use exec
+    // exec properly handles shell scripts and complex commands
+    if (cmd === "npm" || cmd === "npx" || cmd === "node" || command.includes("&&") || command.includes("||")) {
+      const childProcess = exec(command, {
+        cwd,
+        env: { ...process.env, ...env }, // Merge environments to preserve PATH
+      });
+      
+      // exec returns a ChildProcess with PID
+      // The PID should be available immediately after exec
+      if (childProcess.pid) {
+        console.log(`Started process with PID: ${childProcess.pid}`);
+      }
+      
+      // Pipe outputs for visibility
+      if (childProcess.stdout) {
+        childProcess.stdout.pipe(process.stdout);
+      }
+      if (childProcess.stderr) {
+        childProcess.stderr.pipe(process.stderr);
+      }
+      
+      return childProcess;
+    } else {
+      // For simple commands, use spawn which gives us better control
+      const args = command.split(" ").slice(1);
+      const childProcess = spawn(cmd, args, {
+        cwd,
+        env: { ...process.env, ...env },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      
+      if (childProcess.pid) {
+        console.log(`Started process with PID: ${childProcess.pid}`);
+      }
+      
+      // Pipe outputs
+      if (childProcess.stdout) {
+        childProcess.stdout.pipe(process.stdout);
+      }
+      if (childProcess.stderr) {
+        childProcess.stderr.pipe(process.stderr);
+      }
+      
+      return childProcess;
+    }
+  }
+
+  /**
    * Get process key for organization and plugin
    */
   private getProcessKey(organizationId: string, pluginId: string): string {
@@ -327,6 +413,53 @@ export class ProcessManagerService {
    */
   isRunning(organizationId: string, pluginId: string): boolean {
     return this.processes.has(this.getProcessKey(organizationId, pluginId));
+  }
+
+  /**
+   * Send message to plugin process
+   */
+  async sendToPlugin(
+    organizationId: string,
+    pluginId: string,
+    action: string,
+    payload?: any
+  ): Promise<any> {
+    const processKey = this.getProcessKey(organizationId, pluginId);
+    const processInfo = this.processes.get(processKey);
+
+    if (!processInfo) {
+      throw new Error(`Plugin process not running for ${processKey}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      const messageId = `${Date.now()}-${Math.random()}`;
+      const timeout = setTimeout(() => {
+        reject(new Error(`Plugin message timeout for ${action}`));
+      }, 30000); // 30 second timeout
+
+      // Set up one-time response handler
+      const responseHandler = (message: any) => {
+        if (message.responseId === messageId) {
+          clearTimeout(timeout);
+          processInfo.process.off("message", responseHandler);
+          
+          if (message.error) {
+            reject(new Error(message.error));
+          } else {
+            resolve(message.result);
+          }
+        }
+      };
+
+      processInfo.process.on("message", responseHandler);
+
+      // Send the message
+      processInfo.process.send({
+        id: messageId,
+        action,
+        payload,
+      });
+    });
   }
 
   /**

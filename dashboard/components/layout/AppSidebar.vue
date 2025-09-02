@@ -122,14 +122,9 @@ const navMain = computed(() => [
     isActive: isPathActive("/integrations"),
     items: [
       {
-        title: "Connectors",
-        url: "/integrations/connectors",
-        isActive: route.path === "/integrations/connectors",
-      },
-      {
-        title: "Actions",
-        url: "/integrations/actions",
-        isActive: route.path === "/integrations/actions",
+        title: "Marketplace",
+        url: "/integrations/marketplace",
+        isActive: route.path === "/integrations/marketplace",
       },
     ],
   },

@@ -35,11 +35,11 @@ export abstract class HayPlugin {
     return this.manifest.version;
   }
 
-  getTypes(): Array<"mcp-connector" | "retriever" | "playbook"> {
+  getTypes(): Array<"mcp-connector" | "retriever" | "playbook" | "document_importer" | "chat-connector"> {
     return this.manifest.type;
   }
 
-  hasCapability(capability: "mcp-connector" | "retriever" | "playbook"): boolean {
+  hasCapability(capability: "mcp-connector" | "retriever" | "playbook" | "document_importer" | "chat-connector"): boolean {
     return this.manifest.type.includes(capability);
   }
 

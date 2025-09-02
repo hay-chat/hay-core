@@ -1,20 +1,339 @@
 import type { HayPluginManifest } from "../base";
 
 export const manifest: HayPluginManifest = {
-  name: "hay-plugin-zendesk",
+  id: "hay-plugin-zendesk",
+  name: "Zendesk Integration",
+  description:
+    "Connect your Zendesk account to manage tickets, customers, and support workflows",
   version: "1.2.0",
   type: ["mcp-connector", "retriever", "playbook"],
   entry: "./dist/index.js",
   capabilities: {
     mcp: {
       tools: [
-        { name: "create_invoice", input_schema: "JSONSchemaRefOrInline" },
-        { name: "get_balance", input_schema: "JSONSchemaRefOrInline" },
+        // Ticket Management
+        {
+          name: "list_tickets",
+          label: "List Tickets",
+          description: "List tickets in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_ticket",
+          label: "Get Ticket",
+          description: "Get a specific ticket by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_ticket",
+          label: "Create Ticket",
+          description: "Create a new ticket",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_ticket",
+          label: "Update Ticket",
+          description: "Update an existing ticket",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_ticket",
+          label: "Delete Ticket",
+          description: "Delete a ticket",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // User Management
+        {
+          name: "list_users",
+          label: "List Users",
+          description: "List users in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_user",
+          label: "Get User",
+          description: "Get a specific user by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_user",
+          label: "Create User",
+          description: "Create a new user",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_user",
+          label: "Update User",
+          description: "Update an existing user",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_user",
+          label: "Delete User",
+          description: "Delete a user",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Organization Management
+        {
+          name: "list_organizations",
+          label: "List Organizations",
+          description: "List organizations in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_organization",
+          label: "Get Organization",
+          description: "Get a specific organization by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_organization",
+          label: "Create Organization",
+          description: "Create a new organization",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_organization",
+          label: "Update Organization",
+          description: "Update an existing organization",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_organization",
+          label: "Delete Organization",
+          description: "Delete an organization",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Group Management
+        {
+          name: "list_groups",
+          label: "List Groups",
+          description: "List agent groups in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_group",
+          label: "Get Group",
+          description: "Get a specific group by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_group",
+          label: "Create Group",
+          description: "Create a new agent group",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_group",
+          label: "Update Group",
+          description: "Update an existing group",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_group",
+          label: "Delete Group",
+          description: "Delete a group",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Macro Management
+        {
+          name: "list_macros",
+          label: "List Macros",
+          description: "List macros in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_macro",
+          label: "Get Macro",
+          description: "Get a specific macro by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_macro",
+          label: "Create Macro",
+          description: "Create a new macro",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_macro",
+          label: "Update Macro",
+          description: "Update an existing macro",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_macro",
+          label: "Delete Macro",
+          description: "Delete a macro",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // View Management
+        {
+          name: "list_views",
+          label: "List Views",
+          description: "List views in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_view",
+          label: "Get View",
+          description: "Get a specific view by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_view",
+          label: "Create View",
+          description: "Create a new view",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_view",
+          label: "Update View",
+          description: "Update an existing view",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_view",
+          label: "Delete View",
+          description: "Delete a view",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Trigger Management
+        {
+          name: "list_triggers",
+          label: "List Triggers",
+          description: "List triggers in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_trigger",
+          label: "Get Trigger",
+          description: "Get a specific trigger by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_trigger",
+          label: "Create Trigger",
+          description: "Create a new trigger",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_trigger",
+          label: "Update Trigger",
+          description: "Update an existing trigger",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_trigger",
+          label: "Delete Trigger",
+          description: "Delete a trigger",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Automation Management
+        {
+          name: "list_automations",
+          label: "List Automations",
+          description: "List automations in Zendesk",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_automation",
+          label: "Get Automation",
+          description: "Get a specific automation by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_automation",
+          label: "Create Automation",
+          description: "Create a new automation",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_automation",
+          label: "Update Automation",
+          description: "Update an existing automation",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_automation",
+          label: "Delete Automation",
+          description: "Delete an automation",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Help Center
+        {
+          name: "list_articles",
+          label: "List Articles",
+          description: "List Help Center articles",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "get_article",
+          label: "Get Article",
+          description: "Get a specific Help Center article by ID",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "create_article",
+          label: "Create Article",
+          description: "Create a new Help Center article",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "update_article",
+          label: "Update Article",
+          description: "Update an existing Help Center article",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+        {
+          name: "delete_article",
+          label: "Delete Article",
+          description: "Delete a Help Center article",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Search
+        {
+          name: "search",
+          label: "Search",
+          description: "Search across Zendesk data",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Support
+        {
+          name: "support_info",
+          label: "Support Info",
+          description: "Get information about Zendesk Support configuration",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Talk
+        {
+          name: "get_talk_stats",
+          label: "Get Talk Stats",
+          description: "Get Zendesk Talk statistics",
+          input_schema: "JSONSchemaRefOrInline",
+        },
+
+        // Chat
+        {
+          name: "get_chat_conversations",
+          label: "Get Chat Conversations",
+          description: "Get Zendesk Chat conversations",
+          input_schema: "JSONSchemaRefOrInline",
+        },
       ],
       transport: "sse|websocket|http",
       auth: ["oauth2", "jwt", "apiKey"],
       installCommand: "cd zendesk-mcp-server && npm install",
-      buildCommand: "cd zendesk-mcp-server && npm run build",
       startCommand: "cd zendesk-mcp-server && npm run start",
     },
   },
@@ -27,6 +346,7 @@ export const manifest: HayPluginManifest = {
       type: "string",
       description: "The subdomain of the Zendesk account",
       label: "Zendesk Subdomain",
+      placeholder: "yourcompany",
       required: true,
       regex: "^[a-z0-9]+",
       env: "ZENDESK_SUBDOMAIN",
@@ -35,6 +355,7 @@ export const manifest: HayPluginManifest = {
       type: "string",
       description: "The email of the Zendesk account",
       label: "Zendesk Email",
+      placeholder: "admin@example.com",
       required: true,
       regex: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
       env: "ZENDESK_EMAIL",
@@ -43,6 +364,7 @@ export const manifest: HayPluginManifest = {
       type: "string",
       description: "The API token of the Zendesk account",
       label: "Zendesk API Token",
+      placeholder: "Enter your Zendesk API token",
       required: true,
       encrypted: true,
       env: "ZENDESK_API_TOKEN",

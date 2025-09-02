@@ -15,28 +15,28 @@
     <div class="space-y-1">
       <p class="text-sm text-gray-600">Password must contain:</p>
       <ul class="space-y-1">
-        <li :class="requirementClass(validation.requirements.length)">
-          <CheckIcon v-if="validation.requirements.length" class="h-3 w-3" />
+        <li :class="requirementClass(validation.hasMinLength)">
+          <CheckIcon v-if="validation.hasMinLength" class="h-3 w-3" />
           <XMarkIcon v-else class="h-3 w-3" />
           At least 8 characters
         </li>
-        <li :class="requirementClass(validation.requirements.uppercase)">
-          <CheckIcon v-if="validation.requirements.uppercase" class="h-3 w-3" />
+        <li :class="requirementClass(validation.hasUpperCase)">
+          <CheckIcon v-if="validation.hasUpperCase" class="h-3 w-3" />
           <XMarkIcon v-else class="h-3 w-3" />
           One uppercase letter
         </li>
-        <li :class="requirementClass(validation.requirements.lowercase)">
-          <CheckIcon v-if="validation.requirements.lowercase" class="h-3 w-3" />
+        <li :class="requirementClass(validation.hasLowerCase)">
+          <CheckIcon v-if="validation.hasLowerCase" class="h-3 w-3" />
           <XMarkIcon v-else class="h-3 w-3" />
           One lowercase letter
         </li>
-        <li :class="requirementClass(validation.requirements.number)">
-          <CheckIcon v-if="validation.requirements.number" class="h-3 w-3" />
+        <li :class="requirementClass(validation.hasNumber)">
+          <CheckIcon v-if="validation.hasNumber" class="h-3 w-3" />
           <XMarkIcon v-else class="h-3 w-3" />
           One number
         </li>
-        <li :class="requirementClass(validation.requirements.special)">
-          <CheckIcon v-if="validation.requirements.special" class="h-3 w-3" />
+        <li :class="requirementClass(validation.hasSpecialChar)">
+          <CheckIcon v-if="validation.hasSpecialChar" class="h-3 w-3" />
           <XMarkIcon v-else class="h-3 w-3" />
           One special character
         </li>
@@ -55,7 +55,29 @@ export interface PasswordStrengthProps {
 
 const props = defineProps<PasswordStrengthProps>();
 
-const validation = computed(() => validatePassword(props.password));
+const validation = computed(() => {
+  const result = validatePassword(props.password);
+  
+  // Calculate strength based on requirements met
+  let requirementsMet = 0;
+  if (result.hasMinLength) requirementsMet++;
+  if (result.hasUpperCase) requirementsMet++;
+  if (result.hasLowerCase) requirementsMet++;
+  if (result.hasNumber) requirementsMet++;
+  if (result.hasSpecialChar) requirementsMet++;
+  
+  let strength: 'weak' | 'medium' | 'strong' = 'weak';
+  if (requirementsMet >= 5) {
+    strength = 'strong';
+  } else if (requirementsMet >= 3) {
+    strength = 'medium';
+  }
+  
+  return {
+    ...result,
+    strength
+  };
+});
 
 const strengthText = computed(() => {
   switch (validation.value.strength) {
