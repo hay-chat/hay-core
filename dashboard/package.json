@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "fuser -k 5173/tcp 2>/dev/null || true && nuxt dev",
-    "dev:clean": "fuser -k 5173/tcp 2>/dev/null || true && rm -rf .nuxt && nuxt dev",
+    "dev": "fuser -k 3000/tcp 2>/dev/null || true && nuxt dev",
+    "dev:clean": "fuser -k 3000/tcp 2>/dev/null || true && rm -rf .nuxt && nuxt dev",
     "build": "nuxt build",
     "build:prod": "NODE_ENV=production nuxt build",
     "preview": "nuxt preview",
