@@ -64,23 +64,32 @@ export async function initializeDatabase() {
     console.error("❌ Error during Data Source initialization:");
     
     // Log detailed error information
+    interface DbError extends Error {
+      code?: string;
+      errno?: number;
+      syscall?: string;
+      address?: string;
+      port?: number;
+    }
+    
     if (error instanceof Error) {
-      console.error("  - Error message:", error.message);
-      console.error("  - Error name:", error.name);
-      if ('code' in error) {
-        console.error("  - Error code:", (error as any).code);
+      const dbError = error as DbError;
+      console.error("  - Error message:", dbError.message);
+      console.error("  - Error name:", dbError.name);
+      if (dbError.code) {
+        console.error("  - Error code:", dbError.code);
       }
-      if ('errno' in error) {
-        console.error("  - Error errno:", (error as any).errno);
+      if (dbError.errno) {
+        console.error("  - Error errno:", dbError.errno);
       }
-      if ('syscall' in error) {
-        console.error("  - Error syscall:", (error as any).syscall);
+      if (dbError.syscall) {
+        console.error("  - Error syscall:", dbError.syscall);
       }
-      if ('address' in error) {
-        console.error("  - Error address:", (error as any).address);
+      if (dbError.address) {
+        console.error("  - Error address:", dbError.address);
       }
-      if ('port' in error) {
-        console.error("  - Error port:", (error as any).port);
+      if (dbError.port) {
+        console.error("  - Error port:", dbError.port);
       }
     } else {
       console.error("  - Full error:", error);
