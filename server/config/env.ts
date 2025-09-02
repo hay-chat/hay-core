@@ -13,7 +13,6 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || "3000", 10),
     host: process.env.HOST || "localhost",
-    unifiedMode: process.env.UNIFIED_MODE === "true",
   },
 
   domain: {

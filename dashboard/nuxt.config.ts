@@ -18,19 +18,9 @@ export default defineNuxtConfig({
           ? "localhost:5173"
           : "hay.chat",
       apiBaseUrl:
-        process.env["UNIFIED_MODE"] === "true"
-          ? "" // Use same origin in unified mode
-          : process.env["NODE_ENV"] === "development"
+        process.env["NODE_ENV"] === "development"
           ? "http://localhost:3000"
           : "https://api.hay.so",
-    },
-  },
-
-  // Nitro configuration for unified mode
-  nitro: {
-    preset: process.env["UNIFIED_MODE"] === "true" ? "node-server" : undefined,
-    output: {
-      dir: "../dashboard/.output",
     },
   },
 
