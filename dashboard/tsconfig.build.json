@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": false,
+    "types": ["node"]
+  },
+  "include": [
+    "./**/*",
+    "../server/routes/v1/index.ts",
+    "../server/trpc/app-router-type.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".nuxt",
+    ".output",
+    "../server/lib/**/*",
+    "../server/services/**/*",
+    "../server/processors/**/*",
+    "../server/entities/**/*",
+    "../server/repositories/**/*",
+    "../server/workers/**/*",
+    "../server/database/**/*",
+    "../server/config/**/*",
+    "../server/main.ts",
+    "../server/unified.ts",
+    "../server/server-utils.ts",
+    "../server/**/*.spec.ts",
+    "../server/**/*.test.ts"
+  ]
+}

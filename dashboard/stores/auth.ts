@@ -78,7 +78,7 @@ export const useAuthStore = defineStore("auth", {
       
       // Show notification if there's a reason
       if (reason === 'token_expired' && process.client) {
-        const { $toast } = useNuxtApp();
+        const { $toast } = useNuxtApp() as any;
         if ($toast) {
           $toast.error('Your session has expired. Please login again.');
         }

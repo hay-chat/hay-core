@@ -6,6 +6,7 @@
     "dev": "fuser -k 5173/tcp 2>/dev/null || true && nuxt dev",
     "dev:clean": "fuser -k 5173/tcp 2>/dev/null || true && rm -rf .nuxt && nuxt dev",
     "build": "nuxt build",
+    "build:prod": "NODE_ENV=production nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",
     "typecheck": "nuxt typecheck",
@@ -16,5 +17,11 @@
     "@editorjs/list": "^2.0.8",
     "editorjs-mention-tool": "^1.0.2",
     "editorjs-undo": "^2.0.28"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/uuid": "^9.0.8"
   }
 }

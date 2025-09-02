@@ -48,9 +48,28 @@ export default defineNuxtConfig({
           "~/*": ["./*"],
         },
       },
-      // Only include server route files needed for type definitions
-      include: ["../server/routes/**/*.ts"],
-      exclude: ["../server/**/*.spec.ts", "../server/**/*.test.ts"],
+
+      // Only include necessary files for the dashboard
+      include: [
+        "./**/*",
+        "../server/routes/v1/index.ts", // Only the main router file for types
+        "../server/trpc/app-router-type.ts", // Type definitions
+      ],
+      exclude: [
+        "../server/**/*.spec.ts",
+        "../server/**/*.test.ts",
+        "../server/lib/**/*",
+        "../server/services/**/*",
+        "../server/processors/**/*",
+        "../server/entities/**/*",
+        "../server/repositories/**/*",
+        "../server/workers/**/*",
+        "../server/database/**/*",
+        "../server/config/**/*",
+        "../server/main.ts",
+        "../server/unified.ts",
+        "../server/server-utils.ts",
+      ],
     },
   },
 
