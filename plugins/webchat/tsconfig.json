@@ -1,10 +1,11 @@
 {
   "extends": "../base/tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*", "manifest.ts"]
+  "include": ["index.ts", "src/**/*.ts", "manifest.ts"]
 }
