@@ -1,0 +1,70 @@
+{
+  "$schema": "../base/plugin-manifest.schema.json",
+  "id": "hay-plugin-zendesk",
+  "name": "Zendesk Integration",
+  "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
+  "version": "1.2.0",
+  "author": "Hay",
+  "type": ["mcp-connector", "retriever", "playbook"],
+  "entry": "./dist/index.js",
+  "enabled": true,
+  "category": "integration",
+  "icon": "zendesk",
+  "marketplace": {
+    "featured": true,
+    "tags": ["support", "ticketing", "customer-service", "helpdesk"]
+  },
+  "capabilities": {
+    "mcp": {
+      "serverPath": "./zendesk-mcp-server/dist/index.js",
+      "installCommand": "cd zendesk-mcp-server && npm install",
+      "buildCommand": "cd zendesk-mcp-server && npm run build",
+      "startCommand": "node zendesk-mcp-server/dist/index.js"
+    }
+  },
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "subdomain": {
+          "type": "string",
+          "description": "Your Zendesk subdomain (e.g., 'yourcompany' from yourcompany.zendesk.com)"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address for API authentication"
+        },
+        "apiToken": {
+          "type": "string",
+          "description": "API token for authentication (keep this secure)"
+        },
+        "syncInterval": {
+          "type": "integer",
+          "description": "How often to sync data (in minutes)",
+          "minimum": 5,
+          "maximum": 1440,
+          "default": 60
+        },
+        "autoSync": {
+          "type": "boolean",
+          "description": "Enable automatic synchronization",
+          "default": true
+        },
+        "maxTicketsPerSync": {
+          "type": "integer",
+          "description": "Maximum number of tickets to sync at once",
+          "minimum": 10,
+          "maximum": 1000,
+          "default": 100
+        }
+      },
+      "required": ["subdomain", "email", "apiToken"]
+    },
+    "defaults": {
+      "syncInterval": 60,
+      "autoSync": true,
+      "maxTicketsPerSync": 100
+    }
+  }
+}

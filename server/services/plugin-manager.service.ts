@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
+import Ajv from "ajv";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
@@ -9,10 +10,15 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 export class PluginManagerService {
   private pluginsDir: string;
   private registry: Map<string, PluginRegistry> = new Map();
+  private ajv: Ajv;
+  private manifestSchema: Record<string, unknown> | null = null;
 
   constructor() {
     // Look for plugins in the root /plugins directory
     this.pluginsDir = path.join(process.cwd(), "..", "plugins");
+    
+    // Initialize AJV for JSON schema validation
+    this.ajv = new Ajv({ allErrors: true, strict: false });
   }
 
   /**
@@ -20,6 +26,10 @@ export class PluginManagerService {
    */
   async initialize(): Promise<void> {
     console.log("🔍 Discovering plugins...");
+    
+    // Load the manifest schema
+    await this.loadManifestSchema();
+    
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
     console.log("📦 Plugin registry loaded:", Array.from(this.registry.entries()).map(([id, p]) => ({ 
@@ -27,6 +37,23 @@ export class PluginManagerService {
       dbId: p.id, 
       name: p.name 
     })));
+  }
+
+  /**
+   * Load the JSON schema for plugin manifests
+   */
+  private async loadManifestSchema(): Promise<void> {
+    try {
+      const schemaPath = path.join(this.pluginsDir, "base", "plugin-manifest.schema.json");
+      const schemaContent = await fs.readFile(schemaPath, "utf-8");
+      this.manifestSchema = JSON.parse(schemaContent);
+      if (this.manifestSchema) {
+        this.ajv.compile(this.manifestSchema);
+      }
+      console.log("✅ Loaded plugin manifest schema");
+    } catch (error) {
+      console.warn("⚠️  Could not load plugin manifest schema, validation will be skipped:", error);
+    }
   }
 
   /**
@@ -52,44 +79,42 @@ export class PluginManagerService {
    */
   private async registerPlugin(pluginPath: string): Promise<void> {
     try {
-      // Check if we're running from compiled code
-      const isProduction = __filename.includes('dist');
+      // First, try to load manifest.json
+      const jsonManifestPath = path.join(pluginPath, "manifest.json");
+      const jsonExists = await fs.access(jsonManifestPath).then(() => true).catch(() => false);
       
-      // In production, look for compiled manifest in dist folder
-      // In development, use TypeScript source files
-      let manifestPath: string;
+      let manifest: HayPluginManifest;
       
-      if (isProduction) {
-        // First, check if plugin has a dist folder with compiled manifest
-        const distManifestPath = path.join(pluginPath, "dist", "manifest.js");
-        const distExists = await fs.access(distManifestPath).then(() => true).catch(() => false);
+      if (jsonExists) {
+        // Load and validate JSON manifest
+        const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
+        manifest = JSON.parse(manifestContent);
         
-        if (distExists) {
-          manifestPath = distManifestPath;
-        } else {
-          // Fallback to root manifest.js if no dist folder
-          manifestPath = path.join(pluginPath, "manifest.js");
-          const rootJsExists = await fs.access(manifestPath).then(() => true).catch(() => false);
+        // Validate manifest against schema if available
+        if (this.manifestSchema) {
+          const validate = this.ajv.compile(this.manifestSchema);
+          const valid = validate(manifest);
           
-          if (!rootJsExists) {
-            console.warn(`⚠️  No compiled manifest found for plugin at ${pluginPath}. Please build the plugin.`);
+          if (!valid) {
+            console.warn(`⚠️  Invalid manifest at ${pluginPath}:`);
+            console.warn(validate.errors);
             return;
           }
         }
       } else {
-        // Development mode - use TypeScript files
-        manifestPath = path.join(pluginPath, "manifest.ts");
-        const tsExists = await fs.access(manifestPath).then(() => true).catch(() => false);
+        // Fallback to TypeScript manifest for backward compatibility
+        const tsManifestPath = path.join(pluginPath, "manifest.ts");
+        const tsExists = await fs.access(tsManifestPath).then(() => true).catch(() => false);
         
-        if (!tsExists) {
-          console.warn(`⚠️  No manifest.ts found for plugin at ${pluginPath}`);
+        if (tsExists) {
+          console.warn(`⚠️  Plugin at ${pluginPath} is using deprecated manifest.ts. Please migrate to manifest.json`);
+          const manifestModule = await import(tsManifestPath);
+          manifest = manifestModule.manifest || manifestModule.default;
+        } else {
+          console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
           return;
         }
       }
-
-      // Import the manifest dynamically
-      const manifestModule = await import(manifestPath);
-      const manifest: HayPluginManifest = manifestModule.manifest || manifestModule.default;
       
       if (!manifest || !manifest.id) {
         console.warn(`⚠️  Invalid manifest at ${pluginPath}`);
@@ -104,7 +129,7 @@ export class PluginManagerService {
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
-        manifest: manifest as any,
+        manifest: manifest as unknown as Record<string, unknown>,
         checksum,
       });
       

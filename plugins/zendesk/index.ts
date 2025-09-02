@@ -1,5 +1,8 @@
 import { HayPlugin } from '../base';
-import { manifest } from './manifest';
+import manifestJson from './manifest.json';
+import type { HayPluginManifest } from '../base';
+
+const manifest = manifestJson as HayPluginManifest;
 
 export class ZendeskPlugin extends HayPlugin {
   private zendeskClient: any; // Would be actual Zendesk SDK client

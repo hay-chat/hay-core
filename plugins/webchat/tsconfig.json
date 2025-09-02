@@ -7,5 +7,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*.ts", "manifest.ts"]
+  "include": ["index.ts", "src/**/*.ts", "manifest.json"]
 }

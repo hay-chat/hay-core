@@ -1,0 +1,211 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Hay Plugin Manifest",
+  "description": "Schema for Hay plugin manifest files",
+  "type": "object",
+  "required": ["id", "name", "version", "description", "author", "type", "entry"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^hay-plugin-[a-z0-9-]+$",
+      "description": "Unique identifier for the plugin (must start with 'hay-plugin-')"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name of the plugin"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*)?$",
+      "description": "Semantic version of the plugin"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what the plugin does"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or organization name"
+    },
+    "type": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["chat-connector", "mcp-connector", "retriever", "playbook", "workflow", "analytics"]
+      },
+      "description": "Plugin type(s) for categorization and functionality"
+    },
+    "entry": {
+      "type": "string",
+      "description": "Path to the compiled plugin entry point (e.g., './dist/index.js')"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the plugin is enabled by default"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["integration", "chat", "analytics", "automation", "utility"],
+      "description": "Plugin category for marketplace organization"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icon identifier or URL for the plugin"
+    },
+    "marketplace": {
+      "type": "object",
+      "properties": {
+        "featured": {
+          "type": "boolean",
+          "default": false
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "chat": {
+          "type": "boolean",
+          "description": "Whether the plugin provides chat capabilities"
+        },
+        "mcp": {
+          "type": "object",
+          "description": "MCP server configuration",
+          "properties": {
+            "serverPath": {
+              "type": "string",
+              "description": "Path to the MCP server entry point"
+            },
+            "installCommand": {
+              "type": "string",
+              "description": "Command to install dependencies"
+            },
+            "buildCommand": {
+              "type": "string",
+              "description": "Command to build the plugin"
+            },
+            "startCommand": {
+              "type": "string",
+              "description": "Command to start the MCP server"
+            }
+          }
+        },
+        "ui": {
+          "type": "object",
+          "description": "UI extension capabilities",
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "component"],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "component": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "meta": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "requiresAuth": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "path"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "api": {
+          "type": "object",
+          "description": "API route extensions",
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["method", "path", "handler"],
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "handler": {
+                    "type": "string"
+                  },
+                  "middleware": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "NPM dependencies required by the plugin",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Plugin configuration schema",
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema for plugin configuration"
+        },
+        "defaults": {
+          "type": "object",
+          "description": "Default configuration values"
+        }
+      }
+    }
+  }
+}

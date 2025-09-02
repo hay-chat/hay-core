@@ -3,6 +3,6 @@
   "compilerOptions": {
     "rootDir": "./"
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "manifest.json"],
   "exclude": ["node_modules", "dist", "zendesk-mcp-server"]
 }

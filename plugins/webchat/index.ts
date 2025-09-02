@@ -1,5 +1,8 @@
 import { WebchatPlugin } from './src/WebchatPlugin';
-import { manifest } from './manifest';
+import manifestJson from './manifest.json';
+import type { HayPluginManifest } from '../base';
+
+const manifest = manifestJson as HayPluginManifest;
 
 // Create and export plugin instance
 const plugin = new WebchatPlugin(manifest);
