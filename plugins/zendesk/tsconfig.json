@@ -1,0 +1,12 @@
+{
+  "extends": "../base/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "../base": ["../base/index"],
+      "../base/*": ["../base/*"]
+    }
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist", "zendesk-mcp-server"],
+  "references": [{ "path": "../base" }]
+}

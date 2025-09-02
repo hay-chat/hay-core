@@ -52,12 +52,39 @@ export class PluginManagerService {
    */
   private async registerPlugin(pluginPath: string): Promise<void> {
     try {
-      const manifestPath = path.join(pluginPath, "manifest.ts");
-      const manifestExists = await fs.access(manifestPath).then(() => true).catch(() => false);
+      // Check if we're running from compiled code
+      const isProduction = __filename.includes('dist');
       
-      if (!manifestExists) {
-        console.warn(`⚠️  No manifest found for plugin at ${pluginPath}`);
-        return;
+      // In production, look for compiled manifest in dist folder
+      // In development, use TypeScript source files
+      let manifestPath: string;
+      
+      if (isProduction) {
+        // First, check if plugin has a dist folder with compiled manifest
+        const distManifestPath = path.join(pluginPath, "dist", "manifest.js");
+        const distExists = await fs.access(distManifestPath).then(() => true).catch(() => false);
+        
+        if (distExists) {
+          manifestPath = distManifestPath;
+        } else {
+          // Fallback to root manifest.js if no dist folder
+          manifestPath = path.join(pluginPath, "manifest.js");
+          const rootJsExists = await fs.access(manifestPath).then(() => true).catch(() => false);
+          
+          if (!rootJsExists) {
+            console.warn(`⚠️  No compiled manifest found for plugin at ${pluginPath}. Please build the plugin.`);
+            return;
+          }
+        }
+      } else {
+        // Development mode - use TypeScript files
+        manifestPath = path.join(pluginPath, "manifest.ts");
+        const tsExists = await fs.access(manifestPath).then(() => true).catch(() => false);
+        
+        if (!tsExists) {
+          console.warn(`⚠️  No manifest.ts found for plugin at ${pluginPath}`);
+          return;
+        }
       }
 
       // Import the manifest dynamically

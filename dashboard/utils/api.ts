@@ -170,7 +170,7 @@ export const HayAuthApi = createTRPCClient<AppRouter>({
   links: [
     errorLink,         // Handle errors including expired tokens
     httpLink({
-      url: "http://localhost:3000/v1",
+      url: "http://localhost:3001/v1",
       // You can pass any HTTP headers you wish here
       async headers() {
         return {
@@ -188,7 +188,7 @@ export const HayApi = createTRPCClient<AppRouter>({
     tokenRefreshLink,  // Check token before requests
     errorLink,         // Handle errors including expired tokens
     httpLink({
-      url: "http://localhost:3000/v1",
+      url: "http://localhost:3001/v1",
       // You can pass any HTTP headers you wish here
       async headers() {
         return {

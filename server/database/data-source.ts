@@ -28,7 +28,9 @@ export const AppDataSource = new DataSource({
   logging: false, // Disable verbose logging
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
   entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook, Conversation, Message, Customer, PluginRegistry, PluginInstance],
-  migrations: ["./database/migrations/*.ts"],
+  migrations: __filename.includes('dist') 
+    ? [__dirname + "/migrations/*.js"]   // Production: compiled JS files in same relative location
+    : ["./database/migrations/*.ts"],    // Development: TypeScript files
   subscribers: [],
   namingStrategy: new SnakeNamingStrategy()
 });

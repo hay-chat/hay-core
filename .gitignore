@@ -1,5 +1,8 @@
 dist
 node_modules
+# Plugin build outputs
+plugins/*/dist/
+plugins/*/*/dist/
 
 # Logs
 logs

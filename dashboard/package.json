@@ -10,7 +10,8 @@
     "preview": "nuxt preview",
     "generate": "nuxt generate",
     "typecheck": "nuxt typecheck",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "start": "cd .output && node server/index.mjs"
   },
   "dependencies": {
     "@editorjs/editorjs": "^2.30.8",

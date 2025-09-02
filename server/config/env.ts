@@ -2,7 +2,12 @@ import dotenv from "dotenv";
 import path from "path";
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+// In production, the compiled code is in server/dist/server/config, so we need to go up 4 levels to project root
+// In development, the source is in server/config, so we need to go up 2 levels to project root
+const envPath = __dirname.includes('dist') 
+  ? path.resolve(__dirname, "../../../../.env")  // Production: server/dist/server/config -> project root
+  : path.resolve(__dirname, "../../.env");        // Development: server/config -> project root
+dotenv.config({ path: envPath });
 
 export const config = {
   env: process.env.NODE_ENV || "development",
@@ -11,8 +16,9 @@ export const config = {
   isTest: process.env.NODE_ENV === "test",
 
   server: {
-    port: parseInt(process.env.PORT || "3000", 10),
+    port: parseInt(process.env.PORT || "3001", 10),
     host: process.env.HOST || "localhost",
+    wsPort: parseInt(process.env.WS_PORT || process.env.PORT || "3001", 10), // WebSocket port, defaults to same as server port
   },
 
   domain: {
@@ -24,6 +30,7 @@ export const config = {
 
   cors: {
     origin: process.env.CORS_ORIGIN?.split(",") || [
+      "http://localhost:3000",
       "http://localhost:5173",
       "https://hay.chat",
     ],
@@ -54,7 +61,7 @@ export const config = {
     password: process.env.DB_PASSWORD || "hay_password",
     database: process.env.DB_NAME || "hay_db",
     ssl: process.env.DB_SSL === "true",
-    synchronize: true,
+    synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
     connectionTimeout: parseInt(

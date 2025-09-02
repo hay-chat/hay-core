@@ -1,0 +1,19 @@
+{
+  "name": "@hay/plugin-base",
+  "version": "1.0.0",
+  "description": "Base classes and types for Hay plugins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build"
+  },
+  "keywords": ["hay", "plugin", "base"],
+  "author": "Hay",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

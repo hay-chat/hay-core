@@ -7,7 +7,7 @@ export default defineNuxtConfig({
 
   // Server configuration for local development
   devServer: {
-    port: 5173,
+    port: 3000,
   },
 
   // Runtime config for domain handling
@@ -15,11 +15,11 @@ export default defineNuxtConfig({
     public: {
       baseDomain:
         process.env["NODE_ENV"] === "development"
-          ? "localhost:5173"
+          ? "localhost:3000"
           : "hay.chat",
       apiBaseUrl:
         process.env["NODE_ENV"] === "development"
-          ? "http://localhost:3000"
+          ? "http://localhost:3001"
           : "https://api.hay.so",
     },
   },

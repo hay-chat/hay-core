@@ -4,7 +4,7 @@ import { join } from "path";
 // This script generates TypeScript types from your tRPC server
 // Run this script whenever you update your server routes
 
-const SERVER_URL = "http://localhost:3000";
+const SERVER_URL = "http://localhost:3001";
 const OUTPUT_PATH = join(__dirname, "../types/trpc.ts");
 
 try {

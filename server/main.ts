@@ -108,7 +108,12 @@ async function startServer() {
   const httpServer = createServer(server);
 
   // Initialize WebSocket server
-  websocketService.initialize(httpServer);
+  // If WS_PORT is different from PORT, run WebSocket on separate port
+  if (config.server.wsPort !== config.server.port) {
+    websocketService.initialize(config.server.wsPort);
+  } else {
+    websocketService.initialize(httpServer);
+  }
 
   httpServer.on('error', (error: any) => {
     if (error.code === 'EADDRINUSE') {
@@ -124,7 +129,7 @@ async function startServer() {
       `🚀 Server is running on port http://localhost:${config.server.port}`
     );
     console.log(
-      `🔌 WebSocket server is running on ws://localhost:${config.server.port}/ws`
+      `🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`
     );
 
     // Start the orchestrator worker if database is connected

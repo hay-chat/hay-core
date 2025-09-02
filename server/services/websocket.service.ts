@@ -24,19 +24,30 @@ export class WebSocketService {
 
   /**
    * Initialize WebSocket server
+   * Can run on the same HTTP server or on a separate port
    */
-  initialize(server: Server): void {
-    this.wss = new WebSocketServer({ 
-      server,
-      path: '/ws',
-      clientTracking: true,
-    });
+  initialize(serverOrPort: Server | number): void {
+    if (typeof serverOrPort === 'number') {
+      // Standalone WebSocket server on a separate port
+      this.wss = new WebSocketServer({ 
+        port: serverOrPort,
+        path: '/ws',
+        clientTracking: true,
+      });
+      console.log(`🔌 WebSocket server initialized on standalone port ${serverOrPort}`);
+    } else {
+      // WebSocket server attached to existing HTTP server
+      this.wss = new WebSocketServer({ 
+        server: serverOrPort,
+        path: '/ws',
+        clientTracking: true,
+      });
+      console.log('🔌 WebSocket server initialized');
+    }
 
     this.wss.on('connection', (ws, req) => {
       this.handleConnection(ws, req);
     });
-
-    console.log('🔌 WebSocket server initialized');
   }
 
   /**

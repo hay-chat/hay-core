@@ -83,7 +83,7 @@ export const useDomain = () => {
     // If organization is provided and we're in development, use organization subdomain
     if (organization && process.env["NODE_ENV"] === "development") {
       const baseDomain = config.public.baseDomain;
-      apiUrl = `http://${organization}.${baseDomain}:3000`;
+      apiUrl = `http://${organization}.${baseDomain}:3001`;
     }
 
     return `${apiUrl}${endpoint}`;

@@ -1,0 +1,19 @@
+{
+  "name": "@hay/plugin-zendesk",
+  "version": "1.2.0",
+  "description": "Zendesk integration plugin for Hay",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build"
+  },
+  "keywords": ["hay", "plugin", "zendesk"],
+  "author": "Hay",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
