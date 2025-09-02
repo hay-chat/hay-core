@@ -37,10 +37,23 @@ export const AppDataSource = new DataSource({
 
 // Initialize the data source
 export async function initializeDatabase() {
+  // Log database configuration for debugging
+  console.log("🔍 Database Configuration:");
+  console.log("  - Type:", config.database.type);
+  console.log("  - Host:", config.database.host);
+  console.log("  - Port:", config.database.port);
+  console.log("  - Database:", config.database.database);
+  console.log("  - Username:", config.database.username);
+  console.log("  - SSL:", config.database.ssl);
+  console.log("  - Connection Timeout:", config.database.connectionTimeout, "ms");
+  console.log("  - Max Connections:", config.database.maxConnections);
+  
   try {
+    console.log("🔄 Attempting to connect to database...");
     await AppDataSource.initialize();
 
     // Enable required extensions if not already enabled
+    console.log("🔄 Enabling database extensions...");
     await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
     await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
 
@@ -48,7 +61,31 @@ export async function initializeDatabase() {
     console.log("✅ pgvector and pgcrypto extensions enabled");
     return true;
   } catch (error) {
-    console.error("❌ Error during Data Source initialization:", error);
+    console.error("❌ Error during Data Source initialization:");
+    
+    // Log detailed error information
+    if (error instanceof Error) {
+      console.error("  - Error message:", error.message);
+      console.error("  - Error name:", error.name);
+      if ('code' in error) {
+        console.error("  - Error code:", (error as any).code);
+      }
+      if ('errno' in error) {
+        console.error("  - Error errno:", (error as any).errno);
+      }
+      if ('syscall' in error) {
+        console.error("  - Error syscall:", (error as any).syscall);
+      }
+      if ('address' in error) {
+        console.error("  - Error address:", (error as any).address);
+      }
+      if ('port' in error) {
+        console.error("  - Error port:", (error as any).port);
+      }
+    } else {
+      console.error("  - Full error:", error);
+    }
+    
     console.warn(
       "⚠️  Running without database connection - authentication will not work properly"
     );
