@@ -17,7 +17,6 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts"
   },
   "devDependencies": {
-    "@types/ajv": "^1.0.4",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",

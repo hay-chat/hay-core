@@ -54,15 +54,15 @@ const emit = defineEmits<{
 }>();
 
 let editor: EditorJS | null = null;
-let undo: Undo | null = null;
+let undo: any = null;
 let isInternalUpdate = false;
 const editorId = `editor-${Math.random().toString(36).substr(2, 9)}`;
 const mcpTools = ref<any[]>([]);
 const documents = ref<any[]>([]);
 let menuEl: HTMLDivElement | null = null;
 let activeIndex = 0;
-let currentQuery = '';
-let commandMode: 'select' | 'actions' | 'documents' = 'select';
+let currentQuery = "";
+let commandMode: "select" | "actions" | "documents" = "select";
 
 // Fetch MCP tools from the API
 const fetchMCPTools = async () => {
@@ -82,15 +82,17 @@ const fetchDocuments = async () => {
     const result = await HayApi.documents.list.query({
       pagination: { page: 1, limit: 100 },
     });
-    
+
     // Safely map documents with default values
-    documents.value = (result.items || []).map((doc: any) => ({
-      id: doc.id || '',
-      name: doc.name || doc.title || 'Untitled Document',
-      type: doc.type || 'document',
-      url: doc.url || '',
-    })).filter(doc => doc.id && doc.name); // Filter out invalid documents
-    
+    documents.value = (result.items || [])
+      .map((doc: any) => ({
+        id: doc.id || "",
+        name: doc.name || doc.title || "Untitled Document",
+        type: doc.type || "document",
+        url: doc.url || "",
+      }))
+      .filter((doc) => doc.id && doc.name); // Filter out invalid documents
+
     console.log("Fetched documents:", documents.value);
   } catch (error) {
     console.error("Failed to fetch documents:", error);
@@ -101,8 +103,8 @@ const fetchDocuments = async () => {
 // Type-ahead helper functions
 function ensureMenu() {
   if (!menuEl) {
-    menuEl = document.createElement('div');
-    menuEl.className = 'mcp-menu';
+    menuEl = document.createElement("div");
+    menuEl.className = "mcp-menu";
     document.body.appendChild(menuEl);
   }
   return menuEl;
@@ -110,25 +112,29 @@ function ensureMenu() {
 
 function showMenu(rect: DOMRect, items: any[]) {
   const el = ensureMenu();
-  el.style.display = 'block';
-  el.style.position = 'fixed';
+  el.style.display = "block";
+  el.style.position = "fixed";
   el.style.left = `${rect.left}px`;
   el.style.top = `${rect.bottom + 6}px`;
-  el.style.zIndex = '9999';
-  
-  let html = '';
-  
-  if (commandMode === 'select') {
+  el.style.zIndex = "9999";
+
+  let html = "";
+
+  if (commandMode === "select") {
     // Show type selection menu
     html = `
-      <div class="mcp-item ${activeIndex === 0 ? 'active' : ''}" data-type="actions">
+      <div class="mcp-item ${
+        activeIndex === 0 ? "active" : ""
+      }" data-type="actions">
         <div class="mcp-item-icon">⚡</div>
         <div class="mcp-item-content">
           <div class="mcp-item-name">Actions</div>
           <div class="mcp-item-meta">Insert MCP tool action</div>
         </div>
       </div>
-      <div class="mcp-item ${activeIndex === 1 ? 'active' : ''}" data-type="documents">
+      <div class="mcp-item ${
+        activeIndex === 1 ? "active" : ""
+      }" data-type="documents">
         <div class="mcp-item-icon">📄</div>
         <div class="mcp-item-content">
           <div class="mcp-item-name">Documents</div>
@@ -136,49 +142,59 @@ function showMenu(rect: DOMRect, items: any[]) {
         </div>
       </div>
     `;
-  } else if (commandMode === 'actions') {
+  } else if (commandMode === "actions") {
     // Show actions (MCP tools)
-    html = items.map((tool, i) => `
-      <div class="mcp-item mcp-item-action ${i === activeIndex ? 'active' : ''}" data-id="${tool.id}">
+    html = items
+      .map(
+        (tool, i) => `
+      <div class="mcp-item mcp-item-action ${
+        i === activeIndex ? "active" : ""
+      }" data-id="${tool.id}">
         <div class="mcp-item-icon">⚡</div>
         <div class="mcp-item-content">
           <div class="mcp-item-name">${tool.name}</div>
           <div class="mcp-item-meta">${tool.label} - ${tool.pluginName}</div>
         </div>
       </div>
-    `).join('');
-  } else if (commandMode === 'documents') {
+    `
+      )
+      .join("");
+  } else if (commandMode === "documents") {
     // Show documents
-    html = items.map((doc, i) => {
-      let metaInfo = doc.type || 'document';
-      if (doc.url) {
-        try {
-          metaInfo += ' • ' + new URL(doc.url).hostname;
-        } catch (e) {
-          // Invalid URL, just show type
+    html = items
+      .map((doc, i) => {
+        let metaInfo = doc.type || "document";
+        if (doc.url) {
+          try {
+            metaInfo += " • " + new URL(doc.url).hostname;
+          } catch (e) {
+            // Invalid URL, just show type
+          }
         }
-      }
-      return `
-        <div class="mcp-item mcp-item-document ${i === activeIndex ? 'active' : ''}" data-id="${doc.id}">
+        return `
+        <div class="mcp-item mcp-item-document ${
+          i === activeIndex ? "active" : ""
+        }" data-id="${doc.id}">
           <div class="mcp-item-icon">📄</div>
           <div class="mcp-item-content">
-            <div class="mcp-item-name">${doc.name || 'Untitled'}</div>
+            <div class="mcp-item-name">${doc.name || "Untitled"}</div>
             <div class="mcp-item-meta">${metaInfo}</div>
           </div>
         </div>
       `;
-    }).join('');
+      })
+      .join("");
   }
-  
+
   el.innerHTML = html;
-  
+
   // Add mouse interactions
-  el.querySelectorAll('.mcp-item').forEach((node, i) => {
-    node.addEventListener('mouseenter', () => { 
-      activeIndex = i; 
-      showMenu(rect, items); 
+  el.querySelectorAll(".mcp-item").forEach((node, i) => {
+    node.addEventListener("mouseenter", () => {
+      activeIndex = i;
+      showMenu(rect, items);
     });
-    node.addEventListener('mousedown', (e) => {
+    node.addEventListener("mousedown", (e) => {
       e.preventDefault();
       handleItemSelection(items[i]);
     });
@@ -186,10 +202,10 @@ function showMenu(rect: DOMRect, items: any[]) {
 }
 
 function hideMenu() {
-  if (menuEl) menuEl.style.display = 'none';
+  if (menuEl) menuEl.style.display = "none";
   activeIndex = 0;
-  currentQuery = '';
-  commandMode = 'select';
+  currentQuery = "";
+  commandMode = "select";
 }
 
 function getCaretRect(): DOMRect | null {
@@ -197,9 +213,9 @@ function getCaretRect(): DOMRect | null {
   if (!sel || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0).cloneRange();
   if (range.getClientRects().length) return range.getClientRects()[0];
-  
-  const dummy = document.createElement('span');
-  dummy.appendChild(document.createTextNode('\u200b'));
+
+  const dummy = document.createElement("span");
+  dummy.appendChild(document.createTextNode("\u200b"));
   range.insertNode(dummy);
   const rect = dummy.getBoundingClientRect();
   dummy.remove();
@@ -209,56 +225,64 @@ function getCaretRect(): DOMRect | null {
 function findSlashToken() {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
-  
+
   const anchor = sel.anchorNode;
   if (!anchor) return null;
-  
+
   // Handle both text nodes and element nodes
   let textNode: Text | null = null;
-  let text = '';
+  let text = "";
   let caretOffset = sel.anchorOffset;
-  
+
   if (anchor.nodeType === Node.TEXT_NODE) {
     textNode = anchor as Text;
-    text = textNode.textContent || '';
+    text = textNode.textContent || "";
   } else if (anchor.nodeType === Node.ELEMENT_NODE) {
     // If we're in an element, try to find the text node
     const element = anchor as Element;
-    if (element.childNodes.length > 0 && caretOffset < element.childNodes.length) {
+    if (
+      element.childNodes.length > 0 &&
+      caretOffset < element.childNodes.length
+    ) {
       const child = element.childNodes[caretOffset];
       if (child.nodeType === Node.TEXT_NODE) {
         textNode = child as Text;
-        text = textNode.textContent || '';
+        text = textNode.textContent || "";
         caretOffset = 0; // Reset offset for the text node
       }
     }
   }
-  
+
   if (!textNode || !text) return null;
-  
+
   // Find the slash token
-  const left = text.lastIndexOf('/', caretOffset - 1);
+  const left = text.lastIndexOf("/", caretOffset - 1);
   if (left === -1) return null;
 
   // Stop at whitespace or certain punctuation
   const token = text.slice(left, caretOffset);
-  if (!token.startsWith('/')) return null;
+  if (!token.startsWith("/")) return null;
   if (/[\s\n\r]/.test(token)) return null;
 
   return { node: textNode, start: left, end: caretOffset, token };
 }
 
-function replaceRangeWithSpan(node: Text, start: number, end: number, span: HTMLElement) {
-  const text = node.textContent || '';
+function replaceRangeWithSpan(
+  node: Text,
+  start: number,
+  end: number,
+  span: HTMLElement
+) {
+  const text = node.textContent || "";
   const before = text.slice(0, start);
   const after = text.slice(end);
 
   const parent = node.parentNode!;
-  
+
   // Create text nodes
   const beforeNode = before ? document.createTextNode(before) : null;
-  const afterNode = document.createTextNode(after || ' '); // Always ensure there's at least a space after
-  
+  const afterNode = document.createTextNode(after || " "); // Always ensure there's at least a space after
+
   // Insert nodes in order
   if (beforeNode) {
     parent.insertBefore(beforeNode, node);
@@ -277,24 +301,27 @@ function replaceRangeWithSpan(node: Text, start: number, end: number, span: HTML
 }
 
 function handleItemSelection(item: any) {
-  if (commandMode === 'select') {
+  if (commandMode === "select") {
     // Type selection - move to next mode
-    const type = activeIndex === 0 ? 'actions' : 'documents';
-    commandMode = type as 'actions' | 'documents';
+    const type = activeIndex === 0 ? "actions" : "documents";
+    commandMode = type as "actions" | "documents";
     activeIndex = 0;
-    
+
     const ctx = findSlashToken();
     if (!ctx) return;
-    
+
     const rect = getCaretRect();
     if (rect) {
-      const items = commandMode === 'actions' ? filterTools(currentQuery) : filterDocuments(currentQuery);
+      const items =
+        commandMode === "actions"
+          ? filterTools(currentQuery)
+          : filterDocuments(currentQuery);
       showMenu(rect, items);
     }
-  } else if (commandMode === 'actions') {
+  } else if (commandMode === "actions") {
     insertAction(item);
     hideMenu();
-  } else if (commandMode === 'documents') {
+  } else if (commandMode === "documents") {
     insertDocument(item);
     hideMenu();
   }
@@ -303,25 +330,25 @@ function handleItemSelection(item: any) {
 function insertAction(tool: any) {
   const ctx = findSlashToken();
   if (!ctx) {
-    console.log('No slash token context found');
+    console.log("No slash token context found");
     return;
   }
 
-  const span = document.createElement('span');
-  span.className = 'mcp-merge-field mcp-action';
-  span.contentEditable = 'false';
+  const span = document.createElement("span");
+  span.className = "mcp-merge-field mcp-action";
+  span.contentEditable = "false";
   span.dataset.mcpTool = tool.id;
   span.dataset.plugin = tool.pluginName;
   span.textContent = `⚡${tool.name}`;
-  
+
   replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
-  
+
   // Force focus back to editor after insertion
   const holder = document.getElementById(editorId);
   if (holder) {
     holder.focus();
   }
-  
+
   // Trigger Editor.js save to capture the change
   if (editor) {
     setTimeout(() => {
@@ -333,25 +360,25 @@ function insertAction(tool: any) {
 function insertDocument(doc: any) {
   const ctx = findSlashToken();
   if (!ctx) {
-    console.log('No slash token context found');
+    console.log("No slash token context found");
     return;
   }
 
-  const span = document.createElement('span');
-  span.className = 'mcp-merge-field mcp-document';
-  span.contentEditable = 'false';
+  const span = document.createElement("span");
+  span.className = "mcp-merge-field mcp-document";
+  span.contentEditable = "false";
   span.dataset.documentId = doc.id;
   span.dataset.documentName = doc.name;
   span.textContent = `📄${doc.name}`;
-  
+
   replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
-  
+
   // Force focus back to editor after insertion
   const holder = document.getElementById(editorId);
   if (holder) {
     holder.focus();
   }
-  
+
   // Trigger Editor.js save to capture the change
   if (editor) {
     setTimeout(() => {
@@ -362,16 +389,17 @@ function insertDocument(doc: any) {
 
 function filterTools(query: string) {
   const q = query.toLowerCase();
-  return mcpTools.value.filter(tool => 
-    tool.name.toLowerCase().includes(q) || 
-    tool.label.toLowerCase().includes(q) ||
-    tool.pluginName.toLowerCase().includes(q)
+  return mcpTools.value.filter(
+    (tool) =>
+      tool.name.toLowerCase().includes(q) ||
+      tool.label.toLowerCase().includes(q) ||
+      tool.pluginName.toLowerCase().includes(q)
   );
 }
 
 function filterDocuments(query: string) {
   const q = query.toLowerCase();
-  return documents.value.filter(doc => {
+  return documents.value.filter((doc) => {
     if (!doc) return false;
     const nameMatch = doc.name && doc.name.toLowerCase().includes(q);
     const typeMatch = doc.type && doc.type.toLowerCase().includes(q);
@@ -380,43 +408,43 @@ function filterDocuments(query: string) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (menuEl && menuEl.style.display === 'block') {
+  if (menuEl && menuEl.style.display === "block") {
     let items: any[] = [];
-    
-    if (commandMode === 'select') {
-      items = [{ type: 'actions' }, { type: 'documents' }];
-    } else if (commandMode === 'actions') {
+
+    if (commandMode === "select") {
+      items = [{ type: "actions" }, { type: "documents" }];
+    } else if (commandMode === "actions") {
       items = filterTools(currentQuery);
-    } else if (commandMode === 'documents') {
+    } else if (commandMode === "documents") {
       items = filterDocuments(currentQuery);
     }
-    
-    const maxIndex = commandMode === 'select' ? 2 : items.length;
-    
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { 
+
+    const maxIndex = commandMode === "select" ? 2 : items.length;
+
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      
-      if (e.key === 'ArrowDown') {
+
+      if (e.key === "ArrowDown") {
         activeIndex = (activeIndex + 1) % maxIndex; // Wrap around
       } else {
         activeIndex = activeIndex === 0 ? maxIndex - 1 : activeIndex - 1; // Wrap around
       }
-      
+
       const rect = getCaretRect();
       if (rect) showMenu(rect, items);
       return false; // Extra prevention
     }
-    
-    if (e.key === 'Escape') { 
+
+    if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      hideMenu(); 
-      return false; 
+      hideMenu();
+      return false;
     }
-    
-    if (e.key === 'Enter' || e.key === 'Tab') {
+
+    if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
       e.stopPropagation();
       if (items.length > 0) {
@@ -429,25 +457,25 @@ function onKeyDown(e: KeyboardEvent) {
 
 function onKeyUp() {
   const ctx = findSlashToken();
-  if (!ctx) { 
-    hideMenu(); 
-    return; 
+  if (!ctx) {
+    hideMenu();
+    return;
   }
-  
+
   const fullToken = ctx.token.slice(1); // Remove '/'
-  
+
   // Check for shortcuts
-  if (fullToken.startsWith('a')) {
-    commandMode = 'actions';
+  if (fullToken.startsWith("a")) {
+    commandMode = "actions";
     currentQuery = fullToken.slice(1); // Remove 'a'
     activeIndex = 0;
-  } else if (fullToken.startsWith('d')) {
-    commandMode = 'documents';
+  } else if (fullToken.startsWith("d")) {
+    commandMode = "documents";
     currentQuery = fullToken.slice(1); // Remove 'd'
     activeIndex = 0;
   } else {
     // No shortcut, show type selection
-    if (commandMode === 'select') {
+    if (commandMode === "select") {
       currentQuery = fullToken;
     } else {
       // Already in a mode, update query
@@ -458,17 +486,17 @@ function onKeyUp() {
       currentQuery = newQuery;
     }
   }
-  
+
   let items: any[] = [];
-  if (commandMode === 'select') {
-    items = [{ type: 'actions' }, { type: 'documents' }];
-  } else if (commandMode === 'actions') {
+  if (commandMode === "select") {
+    items = [{ type: "actions" }, { type: "documents" }];
+  } else if (commandMode === "actions") {
     items = filterTools(currentQuery);
-  } else if (commandMode === 'documents') {
+  } else if (commandMode === "documents") {
     items = filterDocuments(currentQuery);
   }
-  
-  if (commandMode !== 'select' && items.length === 0) {
+
+  if (commandMode !== "select" && items.length === 0) {
     hideMenu();
     return;
   }
@@ -488,11 +516,11 @@ const initEditor = async () => {
       holder: editorId,
       placeholder: props.placeholder,
       minHeight: 200,
-      hideToolbar: true,  // Hide the block settings toolbar
+      hideToolbar: true, // Hide the block settings toolbar
       tools: {
         list: {
           class: List as any,
-          inlineToolbar: false,  // Disable inline toolbar for list
+          inlineToolbar: false, // Disable inline toolbar for list
           config: {
             defaultStyle: "ordered",
           },
@@ -501,7 +529,7 @@ const initEditor = async () => {
           class: MCPMergeField,
         },
       },
-      inlineToolbar: false,  // Disable inline toolbar completely
+      inlineToolbar: false, // Disable inline toolbar completely
       defaultBlock: "list",
       data: initialData,
       onChange: async () => {
@@ -534,20 +562,20 @@ const initEditor = async () => {
       console.warn("Undo plugin initialization failed:", undoError);
       undo = null;
     }
-    
+
     // Add event listeners for type-ahead
     const holder = document.getElementById(editorId);
     if (holder) {
       // Use capture phase to ensure we get events before Editor.js processes them
-      holder.addEventListener('keyup', onKeyUp, true);
-      holder.addEventListener('keydown', onKeyDown, true);
-      
+      holder.addEventListener("keyup", onKeyUp, true);
+      holder.addEventListener("keydown", onKeyDown, true);
+
       // Also listen for input events to catch any text changes
-      holder.addEventListener('input', onKeyUp, true);
+      holder.addEventListener("input", onKeyUp, true);
     }
-    
+
     // Add global click listener to hide menu
-    document.addEventListener('click', (e) => {
+    document.addEventListener("click", (e) => {
       if (menuEl && e.target instanceof Node && !menuEl.contains(e.target)) {
         hideMenu();
       }
@@ -559,10 +587,7 @@ const initEditor = async () => {
 
 onMounted(async () => {
   // Fetch MCP tools and documents first
-  await Promise.all([
-    fetchMCPTools(),
-    fetchDocuments(),
-  ]);
+  await Promise.all([fetchMCPTools(), fetchDocuments()]);
 
   // Then initialize the editor after ensuring data is loaded
   await nextTick();
@@ -573,17 +598,17 @@ onBeforeUnmount(() => {
   // Remove event listeners (matching the capture phase used in setup)
   const holder = document.getElementById(editorId);
   if (holder) {
-    holder.removeEventListener('keyup', onKeyUp, true);
-    holder.removeEventListener('keydown', onKeyDown, true);
-    holder.removeEventListener('input', onKeyUp, true);
+    holder.removeEventListener("keyup", onKeyUp, true);
+    holder.removeEventListener("keydown", onKeyDown, true);
+    holder.removeEventListener("input", onKeyUp, true);
   }
-  
+
   // Clean up menu
   if (menuEl) {
     menuEl.remove();
     menuEl = null;
   }
-  
+
   // Destroy undo if it exists and has a destroy method
   if (undo && typeof undo.destroy === "function") {
     try {
@@ -714,7 +739,7 @@ kbd {
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
   border-radius: 0.375rem;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 0.875em;
   cursor: default;
   user-select: none;
