@@ -2,26 +2,29 @@ import { Repository, SelectQueryBuilder } from "typeorm";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
+import type { ListParams } from "../trpc/middleware/pagination";
 
 export class ConversationRepository extends BaseRepository<Conversation> {
-  private legacyRepository: Repository<Conversation>;
-
   constructor() {
     super(Conversation);
-    this.legacyRepository = AppDataSource.getRepository(Conversation);
   }
 
   /**
    * Override base methods to handle organization_id field naming
    */
   override async create(data: Partial<Conversation>): Promise<Conversation> {
-    const conversation = this.legacyRepository.create(data);
-    return await this.legacyRepository.save(conversation);
+    const conversation = this.repository.create(data);
+    return await this.repository.save(conversation);
   }
 
-  override async findById(id: string): Promise<Conversation | null> {
-    return await this.legacyRepository.findOne({
-      where: { id },
+  override async findById(id: string, organizationId?: string): Promise<Conversation | null> {
+    const whereCondition: { id: string; organization_id?: string } = { id };
+    if (organizationId) {
+      whereCondition.organization_id = organizationId;
+    }
+    
+    return await this.repository.findOne({
+      where: whereCondition,
       relations: ["messages"],
     });
   }
@@ -30,7 +33,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     agentId: string,
     organizationId: string
   ): Promise<Conversation[]> {
-    return await this.legacyRepository.find({
+    return await this.repository.find({
       where: { agent_id: agentId, organization_id: organizationId },
       order: { created_at: "DESC" },
     });
@@ -39,13 +42,31 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   override async findByOrganization(
     organizationId: string
   ): Promise<Conversation[]> {
-    return await this.legacyRepository.find({
+    return await this.repository.find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
     });
   }
 
   override async update(
+    id: string,
+    organizationId: string,
+    data: Partial<Conversation>
+  ): Promise<Conversation | null> {
+    // For single conversation updates, organizationId is optional for security
+    // but we still validate it exists if provided
+    const conversation = await this.findById(id, organizationId);
+    if (!conversation) {
+      return null;
+    }
+
+    await this.repository.update({ id }, data);
+
+    return await this.findById(id);
+  }
+
+  // Simple update method for internal use (orchestrator, etc.)
+  async updateById(
     id: string,
     data: Partial<Conversation>
   ): Promise<Conversation | null> {
@@ -54,13 +75,50 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.legacyRepository.update({ id }, data);
+    await this.repository.update({ id }, data);
 
     return await this.findById(id);
   }
 
+  /**
+   * Get conversations that are available for processing
+   * Includes both open conversations and stuck processing conversations (past lock expiry)
+   */
+  async getAvailableForProcessing(): Promise<Conversation[]> {
+    if (!this.repository) {
+      console.error("[ConversationRepository] Repository not initialized");
+      return [];
+    }
+
+    try {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+      const queryBuilder = this.repository.createQueryBuilder("conversation");
+
+      // Only select conversations that are truly available for processing
+      queryBuilder.where(
+        "(conversation.status = :openStatus OR " +
+          "(conversation.status = :processingStatus AND conversation.processing_locked_until < :fiveMinutesAgo)) AND " +
+          "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
+        {
+          openStatus: "open",
+          processingStatus: "processing", 
+          fiveMinutesAgo,
+        }
+      );
+
+      queryBuilder.leftJoinAndSelect("conversation.messages", "messages");
+      queryBuilder.orderBy("conversation.created_at", "ASC");
+
+      return await queryBuilder.getMany();
+    } catch (error) {
+      console.error("[ConversationRepository] Error getting available conversations:", error);
+      return [];
+    }
+  }
+
   override async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.legacyRepository.delete({
+    const result = await this.repository.delete({
       id,
       organization_id: organizationId,
     });
@@ -72,11 +130,11 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    * Override pagination method to handle organization_id field naming
    */
   override async paginateQuery(
-    listParams: any,
+    listParams: ListParams,
     organizationId: string,
     baseWhere?: Record<string, any>
   ) {
-    const queryBuilder = this.legacyRepository.createQueryBuilder("entity");
+    const queryBuilder = this.repository.createQueryBuilder("entity");
 
     // Use organization_id instead of organizationId for conversations
     queryBuilder.where("entity.organization_id = :organizationId", {
@@ -147,7 +205,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Conversation>,
     filters?: Record<string, any>,
-    organizationId?: string
+    _organizationId?: string
   ): void {
     if (!filters) return;
 
@@ -204,7 +262,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         searchFields.reduce((params, _, index) => {
           params[`searchQuery${index}`] = `%${search.query}%`;
           return params;
-        }, {} as Record<string, any>)
+        }, {} as Record<string, string>)
       );
     }
   }

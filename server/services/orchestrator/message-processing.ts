@@ -25,34 +25,50 @@ export class MessageProcessing {
     conversationId: string,
     organizationId: string
   ): Promise<{ messages: any[]; combinedMessage: string }> {
-    // Get recent messages for context
+    // Get recent messages for context (ordered by created_at DESC)
     const messages = await this.conversationService.getLastMessages(
       conversationId,
       organizationId,
-      20 // Increased to get more context
+      20
     );
 
     console.log(`[Orchestrator] Found ${messages.length} recent messages`);
     console.log(
       `[Orchestrator] Message types:`,
-      messages.map((m) => ({ id: m.id, type: m.type, sender: m.sender }))
+      messages.map((m) => ({ id: m.id, type: m.type, sender: m.sender, created_at: m.created_at }))
     );
 
-    // Find all unprocessed user messages (sent after last AI message)
+    if (messages.length === 0) {
+      console.log(`[Orchestrator] No messages found in conversation`);
+      return { messages: [], combinedMessage: "" };
+    }
+
+    // Sort messages by created_at ASC to get chronological order
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    // Find the last AI message (BOT_AGENT)
     let lastAiMessageIndex = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].type === MessageType.AI_MESSAGE) {
+    for (let i = sortedMessages.length - 1; i >= 0; i--) {
+      if (sortedMessages[i].type === MessageType.BOT_AGENT) {
         lastAiMessageIndex = i;
+        console.log(`[Orchestrator] Found last AI message at index ${i}: "${sortedMessages[i].content.substring(0, 50)}..."`);
         break;
       }
     }
 
-    const unprocessedUserMessages = messages.filter(
+    // Get customer messages that came AFTER the last AI message
+    const unprocessedUserMessages = sortedMessages.filter(
       (m: any, index: number) =>
-        m.type === MessageType.HUMAN_MESSAGE && index > lastAiMessageIndex
+        m.type === MessageType.CUSTOMER && index > lastAiMessageIndex
     );
 
+    console.log(`[Orchestrator] Last AI message index: ${lastAiMessageIndex}`);
+    console.log(`[Orchestrator] Found ${unprocessedUserMessages.length} unprocessed customer messages`);
+
     if (unprocessedUserMessages.length === 0) {
+      console.log(`[Orchestrator] No unprocessed customer messages found - conversation up to date`);
       return { messages: [], combinedMessage: "" };
     }
 
@@ -65,10 +81,7 @@ export class MessageProcessing {
       `[Orchestrator] Processing ${unprocessedUserMessages.length} unprocessed user messages`
     );
     console.log(
-      `[Orchestrator] Combined message: "${combinedUserMessage.substring(
-        0,
-        200
-      )}..."`
+      `[Orchestrator] Combined message: "${combinedUserMessage.substring(0, 200)}..."`
     );
 
     return {
@@ -97,7 +110,7 @@ export class MessageProcessing {
     console.log(`[Orchestrator] Saving assistant response...`);
     await this.conversationService.addMessage(conversationId, organizationId, {
       content: content,
-      type: MessageType.AI_MESSAGE,
+      type: MessageType.BOT_AGENT,
       sender: "assistant",
       metadata: {
         ...metadata,
@@ -171,7 +184,7 @@ export class MessageProcessing {
     await this.conversationService.addMessage(conversationId, organizationId, {
       content:
         "I apologize, but I encountered an issue processing your request. Please try again or I can connect you with a human representative.",
-      type: MessageType.AI_MESSAGE,
+      type: MessageType.BOT_AGENT,
       sender: "system",
       metadata: {
         error: error.message,

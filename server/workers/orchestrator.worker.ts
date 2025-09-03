@@ -1,14 +1,8 @@
-import { ConversationRepository } from "../repositories/conversation.repository";
-import { OrchestratorService } from "../services/orchestrator.service";
-import { ConversationService } from "../services/conversation.service";
-import { PlaybookService } from "../services/playbook.service";
-import { AgentService } from "../services/agent.service";
-import { VectorStoreService } from "../services/vector-store.service";
+import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 
 export class OrchestratorWorker {
-  private orchestratorService?: OrchestratorService;
-  private conversationRepository?: ConversationRepository;
+  private orchestrator?: Orchestrator;
   private intervalId: NodeJS.Timeout | null = null;
   private inactivityCheckIntervalId: NodeJS.Timeout | null = null;
   private isProcessing = false;
@@ -26,20 +20,7 @@ export class OrchestratorWorker {
     }
 
     try {
-      const conversationService = new ConversationService();
-      const playbookService = new PlaybookService();
-      const agentService = new AgentService();
-      const vectorStoreService = new VectorStoreService();
-
-      this.orchestratorService = new OrchestratorService(
-        conversationService,
-        playbookService,
-        agentService,
-        vectorStoreService
-      );
-      
-      // Create repository instance - now safe because DataSource is initialized
-      this.conversationRepository = new ConversationRepository();
+      this.orchestrator = new Orchestrator();
       this.initialized = true;
       console.log("[Worker] Orchestrator worker initialized successfully");
     } catch (error) {
@@ -93,29 +74,13 @@ export class OrchestratorWorker {
       // Initialize if not already done
       await this.initialize();
 
-      if (!this.initialized || !this.conversationRepository || !this.orchestratorService) {
+      if (!this.initialized || !this.orchestrator) {
         // Skip if not initialized
         return;
       }
 
-      // Find conversations ready for processing
-      const conversations = await this.conversationRepository.findReadyForProcessing();
-      
-      if (conversations.length > 0) {
-        console.log(`Processing ${conversations.length} conversations`);
-      }
-
-      // Process each conversation
-      for (const conversation of conversations) {
-        try {
-          await this.orchestratorService.processConversation(
-            conversation.id,
-            conversation.organization_id
-          );
-        } catch (error) {
-          console.error(`Error processing conversation ${conversation.id}:`, error);
-        }
-      }
+      // Run the orchestrator loop
+      await this.orchestrator.loop();
     } catch (error) {
       console.error("Orchestrator tick error:", error);
     } finally {
@@ -128,31 +93,20 @@ export class OrchestratorWorker {
       // Initialize if not already done
       await this.initialize();
 
-      if (!this.initialized || !this.conversationRepository || !this.orchestratorService) {
+      if (!this.initialized || !this.orchestrator) {
         // Skip if not initialized
         return;
       }
 
-      console.log("[Worker] Running inactivity check across all organizations");
+      console.log("[Worker] Running inactivity check");
 
-      // Get all open conversations to find unique organization IDs
-      const allOpenConversations = await this.conversationRepository.findAllOpenConversations();
-      const organizationIds = [...new Set(allOpenConversations.map(c => c.organization_id))];
-
-      console.log(`[Worker] Found ${organizationIds.length} organizations with open conversations`);
-
-      // Check inactive conversations for each organization
-      for (const orgId of organizationIds) {
-        try {
-          await this.orchestratorService.checkInactiveConversations(orgId);
-        } catch (error) {
-          console.error(`[Worker] Error checking inactive conversations for org ${orgId}:`, error);
-        }
-      }
+      // Call the orchestrator's inactivity check method
+      await this.orchestrator.checkInactivity();
     } catch (error) {
       console.error("[Worker] Inactivity check error:", error);
     }
   }
+
 }
 
 // Export singleton instance

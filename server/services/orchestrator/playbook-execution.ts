@@ -80,7 +80,7 @@ export class PlaybookExecution {
 
     // Use the provided user message or get the last one from messages
     const userPromptContent = userMessage || 
-      messages.filter(m => m.type === MessageType.HUMAN_MESSAGE).pop()?.content;
+      messages.filter(m => m.type === MessageType.CUSTOMER).pop()?.content;
     
     if (!userPromptContent) {
       return {
@@ -160,9 +160,9 @@ export class PlaybookExecution {
    */
   private buildConversationHistory(messages: any[]): string {
     return messages.map(msg => {
-      if (msg.type === MessageType.HUMAN_MESSAGE) {
+      if (msg.type === MessageType.CUSTOMER) {
         return `User: ${msg.content}`;
-      } else if (msg.type === MessageType.AI_MESSAGE) {
+      } else if (msg.type === MessageType.BOT_AGENT) {
         return `Assistant: ${msg.content}`;
       }
       return null;
@@ -421,7 +421,7 @@ export class PlaybookExecution {
 
     // Check if this might be a response to "Is there anything else?"
     const lastAssistantMessage = messages
-      .filter(m => m.type === MessageType.AI_MESSAGE)
+      .filter(m => m.type === MessageType.BOT_AGENT)
       .pop();
     
     if (lastAssistantMessage?.content.includes("Is there anything else") ||

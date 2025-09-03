@@ -1,4 +1,4 @@
-type Intent =
+export type Intent =
   | "greet"
   | "question"
   | "request"
@@ -8,17 +8,17 @@ type Intent =
   | "other"
   | "unknown";
 
-type Sentiment = "positive" | "neutral" | "negative";
+export type Sentiment = "positive" | "neutral" | "negative";
 
-type Step = "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
+export type Step = "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
 
-interface Perception {
+export interface Perception {
   intent: { label: Intent; score: number; rationale?: string };
   sentiment: { label: Sentiment; score: number };
   playbookCandidates: Array<{ id: string; score: number; rationale?: string }>;
 }
 
-interface RagPack {
+export interface RagPack {
   query: string;
   results: Array<{
     docId: string;
@@ -29,7 +29,7 @@ interface RagPack {
   version: string; // index/version for cache/invalidation
 }
 
-interface PlaybookState {
+export interface PlaybookState {
   id: string;
   stepId: string;
   data: Record<string, any>;
@@ -37,21 +37,21 @@ interface PlaybookState {
   history: Array<{ stepId: string; ts: string; notes?: string }>;
 }
 
-interface ToolCall {
+export interface ToolCall {
   name: string;
   args: Record<string, any>;
 }
 
-interface PlannerOutput {
+export interface PlannerOutput {
   step: Step;
   userMessage?: string; // for ASK or RESPOND
   tool?: ToolCall; // for CALL_TOOL
   handoff?: { reason: string; fields?: Record<string, any> };
   close?: { reason?: string };
-  rationale?: string; // store, don’t show
+  rationale?: string; // store, don't show
 }
 
-interface ConversationContext {
+export interface ConversationContext {
   version: "v1";
   lastTurn: number;
   activePlaybook?: PlaybookState;

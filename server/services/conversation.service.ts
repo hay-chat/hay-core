@@ -97,7 +97,7 @@ export class ConversationService {
     metadata?: Record<string, any>;
   }): Promise<Message> {
     // Update last_user_message_at if it's a user message
-    if (data.type === MessageType.HUMAN_MESSAGE) {
+    if (data.type === MessageType.CUSTOMER) {
       const now = getUTCNow();
       await this.conversationRepository.update(conversationId, organizationId, {
         last_user_message_at: now,

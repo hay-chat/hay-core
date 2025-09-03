@@ -123,7 +123,7 @@ export const conversationsRouter = t.router({
         ctx.organizationId!,
         {
           content: welcomeMessage,
-          type: MessageType.AI_MESSAGE,
+          type: MessageType.BOT_AGENT,
           sender: "assistant",
         }
       );
@@ -153,7 +153,7 @@ export const conversationsRouter = t.router({
       }
 
       // Generate title when conversation is closed or resolved
-      if (input.data.status === 'closed' || input.data.status === 'resolved') {
+      if (input.data.status === "closed" || input.data.status === "resolved") {
         await orchestratorService.generateConversationTitle(
           input.id,
           ctx.organizationId!,
@@ -235,7 +235,7 @@ export const conversationsRouter = t.router({
       );
 
       // Check for resolution detection if it's a user message
-      if (input.message.type === MessageType.HUMAN_MESSAGE) {
+      if (input.message.type === MessageType.CUSTOMER) {
         await orchestratorService.detectResolution(
           input.conversationId,
           ctx.organizationId!,
@@ -316,8 +316,8 @@ export const conversationsRouter = t.router({
       // Add the message
       const messageType =
         input.role === "assistant"
-          ? MessageType.AI_MESSAGE
-          : MessageType.HUMAN_MESSAGE;
+          ? MessageType.BOT_AGENT
+          : MessageType.CUSTOMER;
 
       const message = await conversationService.addMessage(
         input.conversationId,
@@ -334,18 +334,20 @@ export const conversationsRouter = t.router({
         // Set cooldown based on configuration
         // This allows the user to keep typing, and we'll process when they stop
         const cooldownUntil = new Date();
-        const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
+        const cooldownSeconds = Math.floor(
+          config.conversation.cooldownInterval / 1000
+        );
         cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
 
-        console.log(`[Conversations] Setting cooldown for ${cooldownSeconds} seconds (until ${cooldownUntil.toISOString()})`);
+        // console.log(`[Conversations] Setting cooldown for ${cooldownSeconds} seconds (until ${cooldownUntil.toISOString()})`);
 
         await conversationService.updateConversation(
           input.conversationId,
           ctx.organizationId!,
           {
             status: "open",
-            needs_processing: true,
-            cooldown_until: cooldownUntil,
+            // needs_processing: true,
+            // cooldown_until: cooldownUntil,
             last_user_message_at: new Date(),
           }
         );

@@ -147,7 +147,7 @@ export const playbookListInputSchema = baseListInputSchema.extend({
 export const messageFiltersSchema = z
   .object({
     conversationId: z.string().uuid().optional(),
-    type: z.enum(["HUMAN_MESSAGE", "AI_MESSAGE", "SYSTEM_MESSAGE"]).optional(),
+    type: z.enum(["CUSTOMER", "BOT_AGENT", "SYSTEM"]).optional(),
     sender: z.string().optional(),
   })
   .optional();

@@ -89,6 +89,7 @@
 
           <div v-else class="space-y-4">
             <!-- Messages -->
+            {{ messages }}
             <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
                 :variant="message.sender as 'customer' | 'agent' | 'system'"
@@ -360,11 +361,11 @@ const router = useRouter();
 const shouldShowHeader = (index: number): boolean => {
   // Always show header for first message
   if (index === 0) return true;
-  
+
   // Check if previous message has same sender type
   const currentMessage = messages.value[index];
   const previousMessage = messages.value[index - 1];
-  
+
   return currentMessage.sender !== previousMessage.sender;
 };
 

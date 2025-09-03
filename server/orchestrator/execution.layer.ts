@@ -1,16 +1,344 @@
 import { Conversation } from "@server/database/entities/conversation.entity";
-import { Message } from "@server/database/entities/message.entity";
-import { LLMLayer } from "./llm.layer";
+import { Message, MessageType } from "@server/database/entities/message.entity";
+import { LLMService } from "@server/services/orchestrator/llm.service";
+import { MessageService } from "@server/services/orchestrator/message.service";
+import { ConversationManagement } from "@server/services/orchestrator/conversation-management";
+import { ConversationService } from "@server/services/conversation.service";
+import { StatusManager } from "@server/services/orchestrator/status-manager";
+import { ToolExecutionService } from "@server/services/orchestrator/tool-execution.service";
+import { PlannerOutput, ToolCall, Perception } from "./types";
 
 export class ExecutionLayer {
-  private llm: LLMLayer;
+  private llmService: LLMService;
+  private messageService: MessageService;
+  private conversationManagement: ConversationManagement;
+  private statusManager: StatusManager;
+  private toolExecutionService: ToolExecutionService;
+
   constructor() {
     console.log("ExecutionLayer initialized");
-    this.llm = new LLMLayer();
+    this.llmService = new LLMService();
+    this.messageService = new MessageService();
+
+    const conversationService = new ConversationService();
+    this.conversationManagement = new ConversationManagement(
+      conversationService
+    );
+    this.statusManager = new StatusManager(conversationService);
+    this.toolExecutionService = new ToolExecutionService();
   }
 
-  async execute(conversation: Conversation) {
-    // Execute
-    return await this.llm.generateResponse(conversation.context as Message[]);
+  async execute(
+    conversation: Conversation,
+    context: {
+      perception?: Perception;
+      retrieval?: {
+        rag: any;
+        playbookAction: string;
+        selectedPlaybook?: any;
+        systemMessages: Partial<Message>[];
+      };
+    }
+  ): Promise<Partial<Message> | null> {
+    try {
+      const plannerOutput = await this.generatePlannerOutput(
+        conversation,
+        context
+      );
+
+      switch (plannerOutput.step) {
+        case "ASK":
+          return await this.handleAsk(plannerOutput);
+
+        case "RESPOND":
+          return await this.handleRespond(plannerOutput);
+
+        case "CALL_TOOL":
+          return await this.handleToolCall(plannerOutput, conversation);
+
+        case "HANDOFF":
+          return await this.handleHandoff(plannerOutput, conversation);
+
+        case "CLOSE":
+          return await this.handleClose(plannerOutput, conversation);
+
+        default:
+          throw new Error(`Unknown step: ${plannerOutput.step}`);
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error("Error in execution layer:", error);
+      return this.messageService.createAssistantResponse(
+        "I apologize, but I encountered an error while processing your request. Please try again.",
+        { error: true, error_message: err.message }
+      );
+    }
+  }
+
+  private async generatePlannerOutput(
+    conversation: Conversation,
+    context: {
+      perception?: Perception;
+      retrieval?: {
+        rag: any;
+        playbookAction: string;
+        selectedPlaybook?: any;
+        systemMessages: Partial<Message>[];
+      };
+    }
+  ): Promise<PlannerOutput> {
+    const plannerSchema = {
+      type: "object",
+      properties: {
+        step: {
+          type: "string",
+          enum: ["ASK", "RESPOND", "CALL_TOOL", "HANDOFF", "CLOSE"],
+        },
+        userMessage: {
+          type: "string",
+          description: "Message to send to user (for ASK or RESPOND steps)",
+        },
+        tool: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            args: { type: "object" },
+          },
+          description: "Tool to call (for CALL_TOOL step)",
+        },
+        handoff: {
+          type: "object",
+          properties: {
+            reason: { type: "string" },
+            fields: { type: "object" },
+          },
+          description: "Handoff details (for HANDOFF step)",
+        },
+        close: {
+          type: "object",
+          properties: {
+            reason: { type: "string" },
+          },
+          description: "Close reason (for CLOSE step)",
+        },
+        rationale: {
+          type: "string",
+          description: "Explanation of why this step was chosen",
+        },
+      },
+      required: ["step", "rationale"],
+    };
+
+    return await this.llmService.chat<PlannerOutput>({
+      message: conversation.messages as Message[],
+      jsonSchema: plannerSchema,
+    });
+  }
+
+  private async handleAsk(
+    plannerOutput: PlannerOutput
+  ): Promise<Partial<Message>> {
+    return this.messageService.createAssistantResponse(
+      plannerOutput.userMessage ||
+        "I need more information to help you better. Could you please provide more details?",
+      {
+        plan: "ASK",
+        rationale: plannerOutput.rationale,
+      }
+    );
+  }
+
+  private async handleRespond(
+    plannerOutput: PlannerOutput
+  ): Promise<Partial<Message>> {
+    return this.messageService.createAssistantResponse(
+      plannerOutput.userMessage ||
+        "I understand your request. Let me help you with that.",
+      {
+        plan: "RESPOND",
+        rationale: plannerOutput.rationale,
+      }
+    );
+  }
+
+  private async handleToolCall(
+    plannerOutput: PlannerOutput,
+    conversation: Conversation
+  ): Promise<Partial<Message> | null> {
+    if (!plannerOutput.tool) {
+      throw new Error("Tool call step requires tool specification");
+    }
+
+    const isValidToolCall = await this.validateToolCall(
+      plannerOutput.tool,
+      conversation
+    );
+    if (!isValidToolCall) {
+      return this.messageService.createAssistantResponse(
+        "I apologize, but I cannot execute that tool call due to invalid parameters.",
+        {
+          plan: "CALL_TOOL",
+          error: "Invalid tool call",
+          attempted_tool: plannerOutput.tool.name,
+        }
+      );
+    }
+
+    const toolCallJson = {
+      tool_name: plannerOutput.tool.name,
+      arguments: plannerOutput.tool.args,
+    };
+
+    return this.messageService.createToolCallResponse(toolCallJson, {
+      plan: "CALL_TOOL",
+      rationale: plannerOutput.rationale,
+      requires_execution: true,
+    });
+  }
+
+  private async handleHandoff(
+    plannerOutput: PlannerOutput,
+    conversation: Conversation
+  ): Promise<Partial<Message>> {
+    await this.updateConversationStatus(conversation, "pending-human");
+
+    return this.messageService.createAssistantResponse(
+      "I'm transferring you to a human agent who can better assist you with this request.",
+      {
+        plan: "HANDOFF",
+        rationale: plannerOutput.rationale,
+        handoff_reason: plannerOutput.handoff?.reason,
+        handoff_fields: plannerOutput.handoff?.fields,
+      }
+    );
+  }
+
+  private async handleClose(
+    plannerOutput: PlannerOutput,
+    conversation: Conversation
+  ): Promise<Partial<Message>> {
+    await this.updateConversationStatus(conversation, "closed");
+
+    return this.messageService.createAssistantResponse(
+      "Thank you for contacting us. This conversation is now closed. Feel free to start a new conversation if you need further assistance.",
+      {
+        plan: "CLOSE",
+        rationale: plannerOutput.rationale,
+        close_reason: plannerOutput.close?.reason,
+      }
+    );
+  }
+
+  private async validateToolCall(
+    tool: ToolCall,
+    _conversation: Conversation
+  ): Promise<boolean> {
+    try {
+      if (!tool.name || !tool.args) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error validating tool call:", error);
+      return false;
+    }
+  }
+
+  private async updateConversationStatus(
+    conversation: Conversation,
+    status: "pending-human" | "closed"
+  ): Promise<void> {
+    try {
+      const conversationRepository = (
+        await import("@server/repositories/conversation.repository")
+      ).ConversationRepository;
+      const repo = new conversationRepository();
+
+      await repo.updateById(conversation.id, {
+        status,
+        ...(status === "closed" && {
+          closed_at: new Date(),
+          ended_at: new Date(),
+        }),
+      });
+    } catch (error) {
+      console.error("Error updating conversation status:", error);
+    }
+  }
+
+  // Conversation management methods integrated into ExecutionLayer
+  async loadConversation(conversationId: string): Promise<Conversation> {
+    return await this.conversationManagement.loadConversation(conversationId);
+  }
+
+  async lockConversation(conversationId: string): Promise<void> {
+    console.log(`[ExecutionLayer] Locking conversation ${conversationId}`);
+    await this.conversationManagement.lockConversation(conversationId);
+  }
+
+  async unlockConversation(conversationId: string): Promise<void> {
+    console.log(`[ExecutionLayer] Unlocking conversation ${conversationId}`);
+    await this.conversationManagement.unlockConversation(conversationId);
+  }
+
+  getLastHumanMessage(conversation: Conversation): Message | undefined {
+    return this.messageService.getLastHumanMessage(conversation);
+  }
+
+  getAllHumanMessages(conversation: Conversation): Message[] {
+    return this.messageService.getAllHumanMessages(conversation);
+  }
+
+  async saveMessage(
+    conversation: Conversation,
+    message: Message
+  ): Promise<Message> {
+    return await this.messageService.saveMessage(conversation, message);
+  }
+
+  async saveSystemMessages(
+    conversation: Conversation,
+    systemMessages: Partial<Message>[]
+  ): Promise<void> {
+    for (const systemMessage of systemMessages) {
+      await this.messageService.saveSystemMessage(conversation, systemMessage);
+    }
+  }
+
+  async updateOrchestrationStatus(
+    conversationId: string,
+    organizationId: string,
+    perception: any,
+    retrieval: any
+  ): Promise<void> {
+    // The statusManager doesn't have an updateOrchestrationStatus method anymore,
+    // so we'll call updateStatus directly with the orchestration data
+    await this.statusManager.updateStatus(conversationId, organizationId, {
+      state: "processing",
+      intent_analysis: perception,
+      documents_used:
+        retrieval.rag?.results?.map((r: any) => ({
+          document_id: r.docId || "unknown",
+          title: "Document",
+          snippet: r.snippet || "",
+          relevance_score: r.sim || 0,
+        })) || [],
+      current_playbook: retrieval.selectedPlaybook
+        ? {
+            id: retrieval.selectedPlaybook.id,
+            title: retrieval.selectedPlaybook.title || "Unknown Playbook",
+            trigger: retrieval.playbookAction,
+            started_at: new Date().toISOString(),
+          }
+        : undefined,
+    });
+  }
+
+  async handleToolExecution(
+    conversation: Conversation,
+    result: Partial<Message>
+  ): Promise<void> {
+    await this.toolExecutionService.handleToolExecution(conversation, result);
   }
 }

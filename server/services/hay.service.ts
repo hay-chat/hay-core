@@ -97,7 +97,7 @@ export class HayService {
       organizationId,
       {
         content: aiContent,
-        type: MessageType.AI_MESSAGE,
+        type: MessageType.BOT_AGENT,
         usage_metadata: usage,
       }
     );
@@ -106,7 +106,7 @@ export class HayService {
       id: aiMessage.id,
       content: aiContent,
       usage_metadata: usage,
-      type: MessageType.AI_MESSAGE,
+      type: MessageType.BOT_AGENT,
       created_at: aiMessage.created_at,
     };
   }
@@ -150,7 +150,7 @@ export class HayService {
       organizationId,
       {
         content: aiContent,
-        type: MessageType.AI_MESSAGE,
+        type: MessageType.BOT_AGENT,
         usage_metadata: usage,
       }
     );
@@ -159,7 +159,7 @@ export class HayService {
       id: aiMessage.id,
       content: aiContent,
       usage_metadata: usage,
-      type: MessageType.AI_MESSAGE,
+      type: MessageType.BOT_AGENT,
       created_at: aiMessage.created_at,
     };
   }
@@ -228,7 +228,7 @@ export class HayService {
     if (toolOutput) {
       await Hay.conversationService.addMessage(conversationId, organizationId, {
         content: toolOutput,
-        type: MessageType.TOOL_MESSAGE,
+        type: MessageType.TOOL_RESPONSE,
         usage_metadata: { tool_name: name },
       });
     }
@@ -247,23 +247,23 @@ export class HayService {
 
   private static toLangChainMessage(message: HayInputMessage): BaseMessage {
     switch (message.type) {
-      case MessageType.HUMAN_MESSAGE:
+      case MessageType.CUSTOMER:
         return new HumanMessage(message.content);
-      case MessageType.AI_MESSAGE:
+      case MessageType.BOT_AGENT:
         return new AIMessage(message.content);
-      case MessageType.SYSTEM_MESSAGE:
+      case MessageType.SYSTEM:
         return new SystemMessage(message.content);
-      case MessageType.FUNCTION_MESSAGE:
+      case MessageType.TOOL_CALL:
         return new FunctionMessage({
           content: message.content,
           name: message.usage_metadata?.function_name || "function",
         });
-      case MessageType.TOOL_MESSAGE:
+      case MessageType.TOOL_RESPONSE:
         return new ToolMessage({
           content: message.content,
           tool_call_id: message.usage_metadata?.tool_call_id || "tool",
         });
-      case MessageType.CHAT_MESSAGE:
+      case MessageType.CUSTOMER:
       default:
         return new HumanMessage(message.content);
     }

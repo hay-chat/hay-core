@@ -43,6 +43,7 @@ export class PlaybookMatcher {
   }> {
     console.log(`[PlaybookMatcher] Analyzing message for playbook selection`);
 
+
     // Step 1: Detect intents from the user message (for backwards compatibility)
     const intentAnalysis = await this.intentDetector.detectIntents(
       userMessage,

@@ -160,9 +160,9 @@ export class PlanCreation {
    */
   private buildConversationHistory(messages: any[]): string {
     return messages.map(msg => {
-      if (msg.type === MessageType.HUMAN_MESSAGE) {
+      if (msg.type === MessageType.CUSTOMER) {
         return `User: ${msg.content}`;
-      } else if (msg.type === MessageType.AI_MESSAGE) {
+      } else if (msg.type === MessageType.BOT_AGENT) {
         return `Assistant: ${msg.content}`;
       }
       return null;
@@ -170,8 +170,8 @@ export class PlanCreation {
   }
 
   /**
-   * Determines if document retrieval should be used based on message content.
-   * Checks for question patterns and searches for relevant documents.
+   * Determines if document retrieval should be used based on LLM analysis.
+   * Uses AI to decide whether the message would benefit from document search.
    * @param userMessage - The user's message to analyze
    * @param organizationId - The ID of the organization
    * @param intentAnalysis - Optional intent analysis results
@@ -182,46 +182,63 @@ export class PlanCreation {
     organizationId: string,
     intentAnalysis?: IntentAnalysis
   ): Promise<boolean> {
-    // Keywords that suggest document retrieval
-    const docQAKeywords = [
-      /how (do|can|to)/i,
-      /what (is|are|does)/i,
-      /explain/i,
-      /documentation/i,
-      /guide/i,
-      /tutorial/i,
-      /help with/i,
-      /information about/i,
-      /tell me about/i
-    ];
-    
-    // Check if message matches document retrieval patterns
-    if (!docQAKeywords.some(pattern => pattern.test(userMessage))) {
+    try {
+      // Use LLM to determine if this message would benefit from document search
+      const { Hay } = await import("../hay.service");
+      Hay.init();
+
+      const systemPrompt = `You are a routing assistant. Determine if a user's message would benefit from searching through documentation and knowledge base articles.
+
+Messages that benefit from document search:
+- Questions about how to use features
+- Requests for specific information or explanations
+- Technical questions that might be in documentation
+- Questions about processes or procedures
+
+Messages that do NOT need document search:
+- General greetings
+- Simple confirmations
+- Customer service requests (billing, account issues)
+- Complaints that need human attention
+- Already specific and don't need additional information
+
+Respond with JSON: {"use_documents": true/false, "reasoning": "explanation"}`;
+
+      const response = await Hay.invokeWithSystemPrompt(
+        systemPrompt,
+        `User message: ${userMessage}`
+      );
+
+      const analysis = JSON.parse(response.content);
+      
+      if (analysis.use_documents) {
+        // Try a quick search to see if we actually have relevant documents
+        try {
+          if (!this.vectorStoreService.initialized) {
+            await this.vectorStoreService.initialize();
+          }
+          
+          const quickSearch = await this.vectorStoreService.search(
+            organizationId,
+            userMessage,
+            1
+          );
+          
+          // If we find highly relevant documents (similarity > 0.7), use docqa path
+          if (quickSearch.length > 0 && (quickSearch[0].similarity || 0) > 0.7) {
+            console.log(`[Orchestrator] High relevance document found (${quickSearch[0].similarity}), using docqa path`);
+            return true;
+          }
+        } catch (error) {
+          console.error(`[Orchestrator] Error checking for documents:`, error);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error(`[Orchestrator] Error in document retrieval decision:`, error);
       return false;
     }
-
-    // Try a quick search to see if we have relevant documents
-    try {
-      if (!this.vectorStoreService.initialized) {
-        await this.vectorStoreService.initialize();
-      }
-      
-      const quickSearch = await this.vectorStoreService.search(
-        organizationId,
-        userMessage,
-        1
-      );
-      
-      // If we find highly relevant documents (similarity > 0.7), use docqa path
-      if (quickSearch.length > 0 && (quickSearch[0].similarity || 0) > 0.7) {
-        console.log(`[Orchestrator] High relevance document found (${quickSearch[0].similarity}), using docqa path`);
-        return true;
-      }
-    } catch (error) {
-      console.error(`[Orchestrator] Error checking for documents:`, error);
-    }
-
-    return false;
   }
 
 }

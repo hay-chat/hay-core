@@ -49,7 +49,7 @@ export class AgentRouting {
     await this.conversationService.addMessage(conversationId, organizationId, {
       content:
         "I understand you'd like assistance. I'll make sure a human representative is notified to help you as soon as possible.",
-      type: MessageType.AI_MESSAGE,
+      type: MessageType.BOT_AGENT,
       sender: "system",
     });
 

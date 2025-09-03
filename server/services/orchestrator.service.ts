@@ -140,6 +140,9 @@ export class OrchestratorService {
         await this.messageProcessing.getUnprocessedUserMessages(conversationId, organizationId);
       
       if (unprocessedUserMessages.length === 0) {
+        console.log(`[Orchestrator] No unprocessed customer messages found - clearing processing lock`);
+        // Clear processing lock since there's nothing to process
+        await this.clearProcessingLock(conversationId, organizationId);
         return;
       }
 
@@ -258,68 +261,92 @@ export class OrchestratorService {
     organizationId: string,
     userMessage: string
   ): Promise<boolean> {
-    // Quick check for obvious closure intents
-    const immediateClosurePatterns = [
-      /^(bye|goodbye|tchau|até|see you|até logo|adeus)$/i,
-      /^(thanks|thank you|obrigad[oa]|valeu)[,.]?\s*(bye|goodbye|tchau)?$/i,
-      /^(no|não|nao)\s+(thanks|obrigad[oa]|need|preciso|quero).*$/i,
-      /^(problem|issue|problema)\s+(solved|resolved|resolvid[oa])$/i,
-    ];
-    
-    const normalized = userMessage.trim().toLowerCase();
-    
-    if (immediateClosurePatterns.some(pattern => pattern.test(normalized))) {
-      console.log(`[Orchestrator] Immediate closure intent detected: "${userMessage}"`);
+    try {
+      // Use LLM to detect closure intent
+      const { Hay } = await import("./hay.service");
+      Hay.init();
+
+      const systemPrompt = `You are a conversation closure detector. Determine if the user wants to end the conversation immediately.
+
+Examples of immediate closure intent:
+- "Bye", "Goodbye", "See you later"
+- "Thanks, that's all I needed"
+- "Problem solved, thanks"
+- "No thanks, nothing else"
+
+Examples that are NOT immediate closure:
+- General greetings like "Hi", "Good morning"
+- Questions or requests for help
+- Complaints or issues needing resolution
+- "Thank you" followed by more questions
+
+Respond with JSON: {"close_now": true/false, "positive_resolution": true/false, "reasoning": "explanation"}`;
+
+      const response = await Hay.invokeWithSystemPrompt(
+        systemPrompt,
+        `User message: ${userMessage}`
+      );
+
+      const analysis = JSON.parse(response.content);
       
-      // Determine if this is a positive resolution
-      const positivePatterns = [
-        /^(thanks|thank you|obrigad[oa]|valeu)/i,
-        /^(problem|issue|problema)\s+(solved|resolved|resolvid[oa])$/i,
-      ];
+      if (analysis.close_now) {
+        console.log(`[Orchestrator] LLM detected closure intent: "${userMessage}"`);
+        
+        const finalStatus = "resolved";
+        const reason = analysis.positive_resolution ? "customer_satisfied" : "user_indicated_completion";
+        
+        // Send a goodbye message before closing
+        await this.conversationService.addMessage(conversationId, organizationId, {
+          content: "Thank you for contacting us! Have a great day! 👋",
+          type: MessageType.BOT_AGENT,
+          sender: "assistant",
+          metadata: {
+            reason: "conversation_closure",
+            ai_reasoning: analysis.reasoning
+          }
+        });
+        
+        // Close the conversation
+        await this.conversationService.updateConversation(
+          conversationId,
+          organizationId,
+          {
+            status: finalStatus,
+            ended_at: getUTCNow(),
+            resolution_metadata: {
+              resolved: true,
+              confidence: 0.95,
+              reason
+            },
+          }
+        );
+        
+        // Generate title for closed conversation
+        await this.conversationManagement.generateTitle(conversationId, organizationId, true);
+        
+        return true; // Conversation was closed
+      }
       
-      const isPositive = positivePatterns.some(pattern => pattern.test(normalized));
-      const finalStatus = isPositive ? "resolved" : "resolved"; // Default to resolved for immediate closures
-      const reason = isPositive ? "customer_satisfied" : "user_indicated_completion";
-      
-      // Send a goodbye message before closing
-      await this.conversationService.addMessage(conversationId, organizationId, {
-        content: "Thank you for contacting us! Have a great day! 👋",
-        type: MessageType.AI_MESSAGE,
-        sender: "assistant",
-        metadata: {
-          reason: "conversation_closure"
-        }
-      });
-      
-      // Close the conversation
-      await this.conversationService.updateConversation(
+      // For non-obvious cases, still run detection but after response
+      await this.conversationManagement.detectResolution(
         conversationId,
         organizationId,
-        {
-          status: finalStatus,
-          ended_at: getUTCNow(),
-          resolution_metadata: {
-            resolved: true,
-            confidence: 0.95,
-            reason,
-          },
-        }
+        userMessage
       );
       
-      // Generate title for closed conversation
-      await this.conversationManagement.generateTitle(conversationId, organizationId, true);
+      return false; // Conversation continues
+    } catch (error) {
+      console.error("[Orchestrator] Error in closure intent detection:", error);
       
-      return true; // Conversation was closed
+      // Fallback to resolution detection
+      await this.conversationManagement.detectResolution(
+        conversationId,
+        organizationId,
+        userMessage
+      );
+      
+      return false;
     }
-    
-    // For non-obvious cases, still run detection but after response
-    await this.conversationManagement.detectResolution(
-      conversationId,
-      organizationId,
-      userMessage
-    );
-    
-    return false; // Conversation continues
   }
 
   async checkInactiveConversations(organizationId: string): Promise<void> {

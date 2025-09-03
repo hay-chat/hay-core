@@ -10,12 +10,12 @@ import {
 import { Conversation } from "./conversation.entity";
 
 export enum MessageType {
-  AI_MESSAGE = "AIMessage",
-  CHAT_MESSAGE = "ChatMessage",
-  FUNCTION_MESSAGE = "FunctionMessage",
-  HUMAN_MESSAGE = "HumanMessage",
-  TOOL_MESSAGE = "ToolMessage",
-  SYSTEM_MESSAGE = "SystemMessage"
+  CUSTOMER = "Customer",
+  SYSTEM = "System", 
+  HUMAN_AGENT = "HumanAgent",
+  BOT_AGENT = "BotAgent",
+  TOOL_CALL = "ToolCall",
+  TOOL_RESPONSE = "ToolResponse"
 }
 
 @Entity("messages")

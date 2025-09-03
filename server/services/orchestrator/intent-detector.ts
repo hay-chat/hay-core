@@ -71,95 +71,58 @@ Only include intents you're confident about. Confidence should be between 0 and 
       } catch (parseError) {
         // Fallback if AI doesn't return valid JSON
         console.warn("[IntentDetector] Failed to parse AI response, using fallback detection");
-        return this.fallbackDetection(userMessage);
+        return await this.fallbackDetection(userMessage);
       }
     } catch (error) {
       console.error("[IntentDetector] Error detecting intents:", error);
-      // Use rule-based fallback if AI fails
-      return this.fallbackDetection(userMessage);
+      // Use LLM-based fallback if AI fails
+      return await this.fallbackDetection(userMessage);
     }
   }
 
   /**
-   * Rule-based fallback intent detection.
-   * Uses pattern matching when AI analysis fails.
+   * LLM-based fallback intent detection.
+   * Uses a simpler LLM call when the main detection fails.
    * @param userMessage - The user's message to analyze
    * @returns Basic intent analysis
    */
-  private fallbackDetection(userMessage: string): IntentAnalysis {
-    const lowerMessage = userMessage.toLowerCase();
-    const detectedIntents: string[] = [];
-    let confidence = 0.7; // Default confidence for rule-based detection
+  private async fallbackDetection(userMessage: string): Promise<IntentAnalysis> {
+    try {
+      // Initialize Hay service
+      Hay.init();
 
-    // Check for human request patterns
-    if (this.detectsHumanRequest(lowerMessage)) {
-      detectedIntents.push("request_human");
-      confidence = 0.9;
+      // Simpler prompt for fallback
+      const systemPrompt = `You are a simple intent detector. Analyze the user's message and identify their intent.
+
+Common intents: question, greeting, farewell, complaint, billing, technical_support, request_human, general_help
+
+Respond with JSON: {"intent": "primary_intent", "confidence": 0.8}`;
+
+      const response = await Hay.invokeWithSystemPrompt(
+        systemPrompt,
+        `User message: ${userMessage}`
+      );
+
+      const analysis = JSON.parse(response.content);
+      
+      return {
+        detected_intents: [analysis.intent || "general_help"],
+        confidence: analysis.confidence || 0.5,
+        last_analyzed: new Date().toISOString(),
+        raw_analysis: "LLM fallback detection"
+      };
+    } catch (error) {
+      console.error("[IntentDetector] Fallback detection failed:", error);
+      // Ultimate fallback
+      return {
+        detected_intents: ["general_help"],
+        confidence: 0.3,
+        last_analyzed: new Date().toISOString(),
+        raw_analysis: "Ultimate fallback - general help"
+      };
     }
-
-    // Check for questions
-    if (/\?|how |what |when |where |why |who |which |can |could |would |should /i.test(userMessage)) {
-      detectedIntents.push("question");
-    }
-
-    // Check for greetings
-    if (/^(hi|hello|hey|good morning|good afternoon|good evening|greetings)/i.test(lowerMessage)) {
-      detectedIntents.push("greeting");
-    }
-
-    // Check for farewells
-    if (/(bye|goodbye|thanks|thank you|that's all|nothing else|see you|farewell)/i.test(lowerMessage)) {
-      detectedIntents.push("farewell");
-    }
-
-    // Check for complaints
-    if (/(not working|broken|issue|problem|error|failed|can't|won't|unable|frustrated|angry|disappointed)/i.test(lowerMessage)) {
-      detectedIntents.push("complaint");
-    }
-
-    // Check for billing
-    if (/(bill|invoice|payment|charge|refund|subscription|price|cost|fee)/i.test(lowerMessage)) {
-      detectedIntents.push("billing");
-    }
-
-    // Check for technical support
-    if (/(install|setup|configure|debug|fix|troubleshoot|technical|api|integration)/i.test(lowerMessage)) {
-      detectedIntents.push("technical_support");
-    }
-
-    // Default to general help if no specific intent detected
-    if (detectedIntents.length === 0) {
-      detectedIntents.push("general_help");
-      confidence = 0.5;
-    }
-
-    return {
-      detected_intents: detectedIntents,
-      confidence,
-      last_analyzed: new Date().toISOString(),
-      raw_analysis: "Fallback rule-based detection"
-    };
   }
 
-  /**
-   * Detects if the user is requesting human assistance.
-   * @param message - Lowercase message to check
-   * @returns True if human assistance is requested
-   */
-  private detectsHumanRequest(message: string): boolean {
-    const humanRequestPatterns = [
-      /\b(speak|talk|chat)\s+(to|with)\s+(a\s+)?(human|person|agent|representative|someone)/,
-      /\b(want|need|like|prefer)\s+(a\s+)?(human|person|agent|representative)/,
-      /transfer\s+me/,
-      /real\s+person/,
-      /live\s+(support|agent|chat)/,
-      /customer\s+(service|support)/,
-      /operator/,
-      /escalate/
-    ];
-    
-    return humanRequestPatterns.some(pattern => pattern.test(message));
-  }
 
   /**
    * Evaluates which playbooks match the user's message using AI.
@@ -185,7 +148,7 @@ Only include intents you're confident about. Confidence should be between 0 and 
       Hay.init();
 
       // Build the prompt for playbook matching
-      const systemPrompt = `You are a playbook matching system. Given a user's message and a list of available playbooks, determine which playbooks are relevant.
+      const systemPrompt = `You are a conservative playbook matching system. Given a user's message and a list of available playbooks, determine which playbooks are CLEARLY and SPECIFICALLY relevant.
 
 Available playbooks:
 ${playbooks.map(p => `- ID: ${p.id}
@@ -193,31 +156,39 @@ ${playbooks.map(p => `- ID: ${p.id}
   Trigger: ${p.trigger}
   Description: ${p.description || 'N/A'}`).join('\n')}
 
+IMPORTANT GUIDELINES:
+- Only match playbooks when there is CLEAR, SPECIFIC relevance to the user's intent
+- For generic greetings (hello, hi, good morning), return NO matches - let the AI handle these naturally
+- For simple questions without specific business context, return NO matches
+- Only match if the user's message directly relates to the playbook's trigger/purpose
+- Be conservative - when in doubt, return no matches
+
 Analyze the user's message and determine:
-1. Which playbook(s) best match the user's intent
+1. Which playbook(s) CLEARLY match the user's SPECIFIC intent (not general conversation)
 2. Your confidence level (0-1) for each match
 3. Brief reasoning for each match
 
 Consider:
-- The user's explicit request
-- Implicit needs based on context
-- Urgency or priority indicators
-- Emotional tone
+- The user's explicit request must closely match the playbook's purpose
+- There must be clear business context or specific need
+- Generic conversation should NOT trigger playbooks
 
 Respond with a JSON object:
 {
   "matches": [
     {
       "playbook_id": "uuid-here",
-      "confidence": 0.95,
-      "reasoning": "User explicitly asked for..."
+      "confidence": 0.85,
+      "reasoning": "User explicitly mentioned specific issue matching this playbook..."
     }
   ]
 }
 
-Only include playbooks with confidence > 0.3.
-Order by confidence (highest first).
-If no playbooks match well, return an empty matches array.`;
+STRICT CRITERIA:
+- Only include playbooks with confidence > 0.7 (high confidence only)
+- Order by confidence (highest first)
+- If the message is generic conversation, greeting, or unclear intent, return an empty matches array
+- Better to return NO match than a wrong match`;
 
       const userPrompt = conversationHistory 
         ? `Conversation context:\n${conversationHistory}\n\nLatest message: ${userMessage}`

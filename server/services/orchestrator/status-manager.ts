@@ -274,4 +274,43 @@ export class StatusManager {
       }
     });
   }
+
+  /**
+   * Updates orchestration status using legacy format for backward compatibility.
+   * @param conversationId - The conversation ID
+   * @param perception - The perception data
+   * @param retrieval - The retrieval data
+   */
+  async updateOrchestrationStatus(
+    conversationId: string,
+    organizationId: string,
+    perception: any,
+    retrieval: {
+      rag: any;
+      playbookAction: string;
+      selectedPlaybook?: any;
+      systemMessages: any[];
+    }
+  ): Promise<void> {
+    // This method provides compatibility with the old orchestration status format
+    // You may want to adapt this based on your actual needs
+    console.log(`[StatusManager] Legacy orchestration status update for conversation ${conversationId}`);
+    
+    await this.updateStatus(conversationId, organizationId, {
+      state: "processing",
+      intent_analysis: perception,
+      documents_used: retrieval.rag?.results?.map((r: any) => ({
+        document_id: r.id || "unknown",
+        title: r.title || "Unknown Document",
+        snippet: r.snippet || "",
+        relevance_score: r.sim || 0
+      })) || [],
+      current_playbook: retrieval.selectedPlaybook ? {
+        id: retrieval.selectedPlaybook.id,
+        title: retrieval.selectedPlaybook.title || "Unknown Playbook",
+        trigger: retrieval.playbookAction,
+        started_at: new Date().toISOString()
+      } : undefined
+    });
+  }
 }

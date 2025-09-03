@@ -141,7 +141,7 @@ export class EnderManagement {
       );
 
       const lastMessage = messages[0];
-      if (!lastMessage || lastMessage.type !== MessageType.AI_MESSAGE) {
+      if (!lastMessage || lastMessage.type !== MessageType.BOT_AGENT) {
         console.log(`[Orchestrator] Last message not from assistant, skipping reminder`);
         return;
       }
@@ -164,7 +164,7 @@ export class EnderManagement {
         organizationId,
         {
           content: reminderContent,
-          type: MessageType.AI_MESSAGE,
+          type: MessageType.BOT_AGENT,
           sender: "assistant",
           metadata: {
             is_reminder: true,
@@ -220,7 +220,7 @@ export class EnderManagement {
         msg.metadata?.is_reminder === true
       );
 
-      if (!hasReminder && lastMessage.type === MessageType.AI_MESSAGE) {
+      if (!hasReminder && lastMessage.type === MessageType.BOT_AGENT) {
         console.log(`[Orchestrator] Conversation ${conversationId} needs inactivity reminder (${timeSinceLastMessage}ms > ${reminderThreshold}ms)`);
         return true;
       }
