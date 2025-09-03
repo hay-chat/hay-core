@@ -40,6 +40,9 @@ export class LLMService {
     try {
       const messages = this.prepareMessages(message, systemPrompt);
 
+      // Debugging: Log detailed information about the LLM call
+      this.logLLMCallDebugInfo(messages, options);
+
       const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming =
         {
           model,
@@ -67,6 +70,9 @@ export class LLMService {
 
       const response = await this.openai.chat.completions.create(requestConfig);
       const content = response.choices[0]?.message?.content;
+
+      // Debugging: Log response information
+      this.logLLMResponseDebugInfo(response);
 
       if (!content) {
         throw new Error("No content received from OpenAI");
@@ -156,5 +162,121 @@ export class LLMService {
         content: message.content,
       };
     });
+  }
+
+  private logLLMCallDebugInfo(
+    messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    options: ChatOptions
+  ): void {
+    console.log("=== LLM CALL DEBUG INFO ===");
+    console.log(`Model: ${options.model || "gpt-4o"}`);
+    console.log(`Temperature: ${options.temperature || 0.7}`);
+    console.log(`Max tokens: ${options.max_tokens || 2000}`);
+    console.log(`Has JSON schema: ${!!options.jsonSchema}`);
+    console.log(`Stream: ${!!options.stream}`);
+    
+    // Message statistics
+    console.log(`\n--- MESSAGE STATISTICS ---`);
+    console.log(`Total messages: ${messages.length}`);
+    
+    const roleCount = messages.reduce((acc, msg) => {
+      acc[msg.role] = (acc[msg.role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`Messages by role:`, roleCount);
+    
+    // Character count analysis
+    let totalCharacters = 0;
+    const messageLengths: { role: string; length: number; preview: string }[] = [];
+    
+    messages.forEach((msg, index) => {
+      let content = "";
+      try {
+        if (typeof msg.content === "string") {
+          content = msg.content;
+        } else if (msg.content) {
+          content = JSON.stringify(msg.content);
+        }
+      } catch (e) {
+        content = "[Unable to serialize content]";
+      }
+      
+      const length = content.length;
+      totalCharacters += length;
+      
+      const preview = content.length > 100 ? content.substring(0, 100) + "..." : content;
+      messageLengths.push({
+        role: msg.role,
+        length,
+        preview
+      });
+    });
+    
+    console.log(`Total characters: ${totalCharacters}`);
+    console.log(`Average message length: ${Math.round(totalCharacters / messages.length)}`);
+    
+    // Token estimation (rough calculation: ~4 characters per token)
+    const estimatedTokens = Math.ceil(totalCharacters / 4);
+    console.log(`Estimated input tokens: ${estimatedTokens}`);
+    
+    // Show longest messages
+    const longestMessages = messageLengths
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 3);
+    console.log(`\n--- LONGEST MESSAGES ---`);
+    longestMessages.forEach((msg, index) => {
+      console.log(`${index + 1}. ${msg.role.toUpperCase()}: ${msg.length} chars`);
+      console.log(`   Preview: "${msg.preview}"`);
+    });
+    
+    // Show system messages separately (usually contain RAG context)
+    const systemMessages = messages.filter(msg => msg.role === "system");
+    if (systemMessages.length > 0) {
+      console.log(`\n--- SYSTEM MESSAGES ---`);
+      systemMessages.forEach((msg, index) => {
+        let content = "";
+        try {
+          if (typeof msg.content === "string") {
+            content = msg.content;
+          } else if (msg.content) {
+            content = JSON.stringify(msg.content);
+          }
+        } catch (e) {
+          content = "[Unable to serialize content]";
+        }
+        
+        console.log(`System ${index + 1}: ${content.length} chars`);
+        const preview = content.length > 200 ? content.substring(0, 200) + "..." : content;
+        console.log(`   Preview: "${preview}"`);
+      });
+    }
+    
+    console.log("=== END LLM CALL DEBUG INFO ===\n");
+  }
+
+  private logLLMResponseDebugInfo(response: OpenAI.Chat.Completions.ChatCompletion): void {
+    console.log("=== LLM RESPONSE DEBUG INFO ===");
+    console.log(`Model: ${response.model}`);
+    console.log(`Created: ${new Date(response.created * 1000).toISOString()}`);
+    console.log(`Finish reason: ${response.choices[0]?.finish_reason}`);
+    
+    if (response.usage) {
+      console.log(`\n--- TOKEN USAGE ---`);
+      console.log(`Prompt tokens: ${response.usage.prompt_tokens}`);
+      console.log(`Completion tokens: ${response.usage.completion_tokens}`);
+      console.log(`Total tokens: ${response.usage.total_tokens}`);
+      
+      // Calculate approximate cost (rough estimates for GPT-4o)
+      const inputCost = (response.usage.prompt_tokens / 1000) * 0.005; // $5 per 1M tokens
+      const outputCost = (response.usage.completion_tokens / 1000) * 0.015; // $15 per 1M tokens
+      const totalCost = inputCost + outputCost;
+      console.log(`Estimated cost: $${totalCost.toFixed(6)}`);
+    }
+    
+    const responseContent = response.choices[0]?.message?.content || "";
+    console.log(`Response length: ${responseContent.length} chars`);
+    console.log(`Response preview: "${responseContent.substring(0, 200)}${responseContent.length > 200 ? "..." : ""}"`);
+    
+    console.log("=== END LLM RESPONSE DEBUG INFO ===\n");
   }
 }

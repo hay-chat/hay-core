@@ -4,19 +4,28 @@ import { RagPack, PlaybookState } from "@server/orchestrator/types";
 export class SystemMessageService {
   static createRagSystemMessage(ragPack: RagPack): Partial<Message> {
     const documentsContext = ragPack.results
-      .map((result, index) => 
-        `Document ${index + 1} (similarity: ${result.sim.toFixed(3)}):\n${result.snippet}`
-      )
+      .map((result, index) => {
+        const title = result.title || `Document ${index + 1}`;
+        const source = result.source ? ` (Source: ${result.source})` : '';
+        const similarity = result.sim.toFixed(3);
+        
+        return `**${title}**${source} (Similarity: ${similarity})
+${result.content}`;
+      })
       .join('\n\n---\n\n');
 
-    const content = `These are relevant documents on which your answers should be based on:
+    const content = `You have access to the following relevant documents to help answer the user's question. Use this information to provide accurate, detailed, and contextual responses:
 
 ${documentsContext}
 
-Please use this information to provide accurate and contextual responses. If the answer cannot be found in these documents, please clearly indicate that.
+Guidelines:
+- Base your answers primarily on the information provided in these documents
+- If the answer cannot be found in these documents, clearly indicate that
+- You can reference specific documents by their titles when citing information
+- Provide comprehensive answers using the full context available
 
-Query used: "${ragPack.query}"
-Index version: ${ragPack.version}`;
+User Query: "${ragPack.query}"
+Document Index Version: ${ragPack.version}`;
 
     return {
       content,

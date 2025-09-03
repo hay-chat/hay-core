@@ -38,7 +38,9 @@ export class PlaybookHelpers {
       // TODO: Fallback to system playbooks
       // For now, return a default template
       if (kind === "welcome") {
-        return { prompt_template: "Hello! How can I help you today?" };
+        return { 
+          prompt_template: "Hi! I'm here to help you. What can I assist you with today?"
+        };
       } else if (kind === "ender") {
         return {
           prompt_template: "Is there anything else I can help you with?",

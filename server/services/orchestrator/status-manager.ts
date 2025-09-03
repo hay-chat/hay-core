@@ -300,9 +300,9 @@ export class StatusManager {
       state: "processing",
       intent_analysis: perception,
       documents_used: retrieval.rag?.results?.map((r: any) => ({
-        document_id: r.id || "unknown",
+        document_id: r.docId || "unknown",
         title: r.title || "Unknown Document",
-        snippet: r.snippet || "",
+        content_preview: r.content ? r.content.substring(0, 200) + "..." : "",
         relevance_score: r.sim || 0
       })) || [],
       current_playbook: retrieval.selectedPlaybook ? {

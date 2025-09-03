@@ -14,7 +14,10 @@ export class PerceptionLayer {
     this.playbookRepository = new PlaybookRepository();
   }
 
-  async perceive(message: Message, organizationId: string): Promise<Perception> {
+  async perceive(
+    message: Message,
+    organizationId: string
+  ): Promise<Perception> {
     console.log(`[PerceptionLayer] Perceiving message: ${message.content}`);
     const perceptionPrompt = `Analyze the following user message and determine:
 1. The intent (what the user wants to accomplish)
@@ -73,7 +76,10 @@ User message: "${message.content}"`;
       `[PerceptionLayer] LLM perception: ${JSON.stringify(llmPerception)}`
     );
 
-    const playbookCandidates = await this.findPlaybookCandidates(message, organizationId);
+    const playbookCandidates = await this.findPlaybookCandidates(
+      message,
+      organizationId
+    );
 
     console.log(
       `[PerceptionLayer] Playbook candidates: ${JSON.stringify(
@@ -93,7 +99,10 @@ User message: "${message.content}"`;
     organizationId: string
   ): Promise<Array<{ id: string; score: number; rationale?: string }>> {
     try {
-      const playbooks = await this.playbookRepository.findByStatus(organizationId, PlaybookStatus.ACTIVE);
+      const playbooks = await this.playbookRepository.findByStatus(
+        organizationId,
+        PlaybookStatus.ACTIVE
+      );
 
       if (playbooks.length === 0) {
         return [];
@@ -135,8 +144,6 @@ For each playbook, provide a relevance score and brief rationale.`;
         required: ["candidates"],
       };
 
-      console.log(`[findPlaybookCandidates]`, message.content, candidatePrompt);
-
       const result = await this.llmService.chat<{
         candidates: Array<{ id: string; score: number; rationale: string }>;
       }>({
@@ -145,10 +152,8 @@ For each playbook, provide a relevance score and brief rationale.`;
         systemPrompt: candidatePrompt,
       });
 
-      console.log(result);
-
       return result.candidates
-        .filter((c: { score: number }) => c.score > 0.1)
+        .filter((c: { score: number }) => c.score > 0.7)
         .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
         .slice(0, 5);
     } catch (error) {

@@ -87,6 +87,35 @@ export class ExecutionLayer {
       };
     }
   ): Promise<PlannerOutput> {
+    console.log("=== EXECUTION LAYER DEBUG INFO ===");
+    console.log(`Conversation ID: ${conversation.id}`);
+    console.log(`Organization ID: ${conversation.organization_id}`);
+    console.log(`Total messages in conversation: ${conversation.messages?.length || 0}`);
+    
+    // Log context information
+    console.log(`\n--- CONTEXT DEBUG ---`);
+    console.log(`Has perception: ${!!context.perception}`);
+    console.log(`Has retrieval: ${!!context.retrieval}`);
+    
+    if (context.retrieval) {
+      console.log(`Playbook action: ${context.retrieval.playbookAction}`);
+      console.log(`Has selected playbook: ${!!context.retrieval.selectedPlaybook}`);
+      console.log(`System messages count: ${context.retrieval.systemMessages?.length || 0}`);
+      console.log(`Has RAG results: ${!!context.retrieval.rag}`);
+      
+      if (context.retrieval.rag?.results) {
+        console.log(`RAG results count: ${context.retrieval.rag.results.length}`);
+      }
+    }
+    
+    // Log message types and distribution
+    const allMessages = conversation.messages as Message[] || [];
+    const messagesByType = allMessages.reduce((acc, msg) => {
+      acc[msg.type] = (acc[msg.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`Message types distribution:`, messagesByType);
+    
     const plannerSchema = {
       type: "object",
       properties: {
@@ -129,10 +158,28 @@ export class ExecutionLayer {
       required: ["step", "rationale"],
     };
 
-    return await this.llmService.chat<PlannerOutput>({
+    console.log("=== CALLING LLM SERVICE FOR PLANNER OUTPUT ===");
+    console.log("=== CONVERSATION MESSAGES BEING SENT TO LLM ===");
+    const conversationMessages = conversation.messages as Message[] || [];
+    conversationMessages.forEach((msg, index) => {
+      console.log(`Message ${index + 1}: ${msg.type} (${msg.content?.length || 0} chars)`);
+      if (msg.type === 'System') {
+        console.log(`   System message preview: "${(msg.content || '').substring(0, 100)}..."`);
+      }
+    });
+    console.log("=== END CONVERSATION MESSAGES ===");
+    
+    const result = await this.llmService.chat<PlannerOutput>({
       message: conversation.messages as Message[],
       jsonSchema: plannerSchema,
     });
+    
+    console.log(`=== PLANNER OUTPUT RESULT ===`);
+    console.log(`Step chosen: ${result.step}`);
+    console.log(`Rationale: ${result.rationale}`);
+    console.log("=== END EXECUTION LAYER DEBUG INFO ===\n");
+    
+    return result;
   }
 
   private async handleAsk(
@@ -301,9 +348,17 @@ export class ExecutionLayer {
     conversation: Conversation,
     systemMessages: Partial<Message>[]
   ): Promise<void> {
+    console.log("=== SAVING SYSTEM MESSAGES DEBUG ===");
+    console.log(`Number of system messages to save: ${systemMessages.length}`);
+    
     for (const systemMessage of systemMessages) {
+      console.log(`Saving system message: ${(systemMessage.content || '').length} chars`);
+      console.log(`   Preview: "${(systemMessage.content || '').substring(0, 150)}..."`);
       await this.messageService.saveSystemMessage(conversation, systemMessage);
     }
+    
+    console.log(`Conversation messages count after saving: ${conversation.messages?.length || 0}`);
+    console.log("=== END SAVING SYSTEM MESSAGES DEBUG ===");
   }
 
   async updateOrchestrationStatus(
@@ -320,8 +375,8 @@ export class ExecutionLayer {
       documents_used:
         retrieval.rag?.results?.map((r: any) => ({
           document_id: r.docId || "unknown",
-          title: "Document",
-          snippet: r.snippet || "",
+          title: r.title || "Document",
+          content_preview: r.content ? r.content.substring(0, 200) + "..." : "",
           relevance_score: r.sim || 0,
         })) || [],
       current_playbook: retrieval.selectedPlaybook

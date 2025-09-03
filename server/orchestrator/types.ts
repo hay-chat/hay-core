@@ -24,7 +24,9 @@ export interface RagPack {
     docId: string;
     chunkId: string;
     sim: number;
-    snippet: string;
+    content: string;      // Full document content instead of snippet
+    title?: string;       // Document title or filename
+    source?: string;      // Source of the document
   }>;
   version: string; // index/version for cache/invalidation
 }

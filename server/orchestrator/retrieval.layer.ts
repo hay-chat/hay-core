@@ -3,9 +3,15 @@ import { Message } from "@server/database/entities/message.entity";
 import { PlaybookRepository } from "@server/repositories/playbook.repository";
 import { LLMService } from "@server/services/orchestrator/llm.service";
 import { SystemMessageService } from "@server/services/orchestrator/system-message.service";
-import { RagPack, PlaybookState, ConversationContext } from "./types";
-import { PlaybookStatus, Playbook } from "@server/database/entities/playbook.entity";
-import { vectorStoreService, SearchResult } from "@server/services/vector-store.service";
+import { RagPack, PlaybookState, ConversationContext, Perception } from "./types";
+import {
+  PlaybookStatus,
+  Playbook,
+} from "@server/database/entities/playbook.entity";
+import {
+  vectorStoreService,
+  SearchResult,
+} from "@server/services/vector-store.service";
 
 export class RetrievalLayer {
   private playbookRepository: PlaybookRepository;
@@ -17,21 +23,28 @@ export class RetrievalLayer {
     this.llmService = new LLMService();
   }
 
-  async retrieve(humanMessages: Message[], conversation: Conversation): Promise<{
+  async retrieve(
+    humanMessages: Message[],
+    conversation: Conversation,
+    perception?: Perception
+  ): Promise<{
     rag: RagPack | null;
-    playbookAction: 'activate' | 'continue' | 'change' | 'none';
-    selectedPlaybook?: any;
+    playbookAction: "activate" | "continue" | "change" | "none";
+    selectedPlaybook?: Playbook;
     systemMessages: Partial<Message>[];
   }> {
     const systemMessages: Partial<Message>[] = [];
-    
+
     const rag = await this.performRAG(humanMessages, conversation);
     if (rag) {
       const ragSystemMessage = SystemMessageService.createRagSystemMessage(rag);
       systemMessages.push(ragSystemMessage);
     }
 
-    const playbookResult = await this.handlePlaybookMatching(conversation);
+    const playbookResult = await this.handlePlaybookMatching(
+      conversation,
+      perception
+    );
     if (playbookResult.systemMessage) {
       systemMessages.push(playbookResult.systemMessage);
     }
@@ -40,35 +53,64 @@ export class RetrievalLayer {
       rag,
       playbookAction: playbookResult.action,
       selectedPlaybook: playbookResult.playbook,
-      systemMessages
+      systemMessages,
     };
   }
 
-  private async performRAG(humanMessages: Message[], conversation: Conversation): Promise<RagPack | null> {
+  private async performRAG(
+    humanMessages: Message[],
+    conversation: Conversation
+  ): Promise<RagPack | null> {
     try {
       const query = this.constructRAGQuery(humanMessages);
+      console.log(`[RAG] Constructed query: "${query}"`);
+
       if (!query.trim()) {
+        console.log("[RAG] Empty query, skipping RAG");
         return null;
       }
 
       // Initialize vector store if not already done
       if (!vectorStoreService.initialized) {
+        console.log("[RAG] Initializing vector store...");
         await vectorStoreService.initialize();
       }
 
       // Perform vector similarity search
+      console.log(
+        `[RAG] Searching for documents in org: ${conversation.organization_id}`
+      );
       const searchResults = await vectorStoreService.search(
         conversation.organization_id,
         query,
         5 // Get top 5 most relevant chunks
       );
 
+      console.log(
+        `[RAG] Vector search returned ${searchResults?.length || 0} results`
+      );
+
       // Filter out test data and low relevance results
       const filteredResults = this.filterSearchResults(searchResults);
-      
+      console.log(
+        `[RAG] After filtering: ${filteredResults.length} results remain`
+      );
+
       if (filteredResults.length === 0) {
+        console.log("[RAG] No results after filtering, returning null");
         return null;
       }
+
+      // Log document titles and similarity scores
+      console.log("[RAG] Found relevant documents:");
+      filteredResults.forEach((result, index) => {
+        const title =
+          result.metadata?.title ||
+          result.metadata?.filename ||
+          `Document ${result.id}`;
+        const score = (result.similarity || 0).toFixed(3);
+        console.log(`  ${index + 1}. "${title}" (similarity: ${score})`);
+      });
 
       return {
         query,
@@ -76,9 +118,14 @@ export class RetrievalLayer {
           docId: result.metadata?.document_id || result.id,
           chunkId: result.id,
           sim: result.similarity || 0,
-          snippet: this.extractSnippet(result.content, query, 300)
+          content: this.limitDocumentSize(result.content), // Full document content with size limit
+          title:
+            result.metadata?.title ||
+            result.metadata?.filename ||
+            `Document ${result.id}`,
+          source: result.metadata?.source || "unknown",
         })),
-        version: "v1"
+        version: "v1",
       };
     } catch (error) {
       console.error("Error performing RAG:", error);
@@ -89,121 +136,169 @@ export class RetrievalLayer {
   private constructRAGQuery(humanMessages: Message[]): string {
     return humanMessages
       .slice(-3)
-      .map(msg => msg.content)
-      .join(' ')
+      .map((msg) => msg.content)
+      .join(" ")
       .trim();
   }
 
   private filterSearchResults(results: SearchResult[]): SearchResult[] {
-    if (!results) return [];
-    
-    return results.filter(result => {
-      const content = result.content?.toLowerCase() || '';
-      const metadata = result.metadata || {};
-      
-      // Filter out obvious test/example data patterns
-      const isFakeData = 
-        content.includes('@example.com') ||
-        content.includes('1-800-') ||
-        content.includes('support@example') ||
-        content.includes('test-') ||
-        content.includes('example.com') ||
-        metadata.source?.toLowerCase().includes('test') ||
-        metadata.source?.toLowerCase().includes('example');
-      
-      // Filter out results with very low similarity scores
-      const hasLowSimilarity = (result.similarity || 0) < 0.7;
-      
-      return !isFakeData && !hasLowSimilarity;
-    });
-  }
-
-  private extractSnippet(content: string, query: string, maxLength: number): string {
-    const queryWords = query.toLowerCase().split(/\s+/);
-    const contentLower = content.toLowerCase();
-    
-    let bestStart = 0;
-    let bestScore = 0;
-    const windowSize = Math.floor(maxLength / 2);
-    
-    for (let i = 0; i < content.length - windowSize; i += 50) {
-      const window = contentLower.slice(i, i + windowSize);
-      const score = queryWords.reduce((acc, word) => 
-        acc + (window.includes(word) ? 1 : 0), 0
-      );
-      
-      if (score > bestScore) {
-        bestScore = score;
-        bestStart = i;
-      }
+    if (!results) {
+      console.log("[RAG] No results to filter");
+      return [];
     }
-    
-    const snippet = content.slice(bestStart, bestStart + maxLength);
-    return bestStart > 0 ? '...' + snippet + '...' : snippet + '...';
+
+    console.log("[RAG] Filtering results...");
+    const filtered = results.filter((result) => {
+      const metadata = result.metadata || {};
+      const similarity = result.similarity || 0;
+
+      // Filter out results with very low similarity scores
+      const hasLowSimilarity = similarity < 0.4;
+
+      const shouldKeep = !hasLowSimilarity;
+
+      if (!shouldKeep) {
+        console.log(
+          `[RAG] Filtered out document: similarity=${similarity.toFixed(
+            3
+          )}, title="${metadata.title || metadata.filename || result.id}"`
+        );
+      }
+
+      return shouldKeep;
+    });
+
+    return filtered;
   }
 
-  private async handlePlaybookMatching(conversation: Conversation): Promise<{
-    action: 'activate' | 'continue' | 'change' | 'none';
+  private limitDocumentSize(content: string): string {
+    // Limit document size to prevent token overflow
+    // Rough estimate: 1 token ≈ 4 characters, so 8000 chars ≈ 2000 tokens per document
+    const MAX_DOCUMENT_SIZE = 8000; // characters
+
+    if (!content || content.length <= MAX_DOCUMENT_SIZE) {
+      return content || "";
+    }
+
+    // Truncate but try to end on a sentence boundary
+    let truncated = content.substring(0, MAX_DOCUMENT_SIZE);
+    const lastSentence = Math.max(
+      truncated.lastIndexOf("."),
+      truncated.lastIndexOf("!"),
+      truncated.lastIndexOf("?")
+    );
+
+    if (lastSentence > MAX_DOCUMENT_SIZE * 0.8) {
+      // If we found a sentence ending in the last 20% of the truncated text, use it
+      truncated = truncated.substring(0, lastSentence + 1);
+    }
+
+    return truncated + "\n\n[Document truncated for length]";
+  }
+
+  private async handlePlaybookMatching(
+    conversation: Conversation,
+    perception?: Perception
+  ): Promise<{
+    action: "activate" | "continue" | "change" | "none";
     playbook?: Playbook;
     systemMessage?: Partial<Message>;
   }> {
-    const currentContext = conversation.orchestration_status as ConversationContext | null;
+    const currentContext =
+      conversation.orchestration_status as ConversationContext | null;
     const currentPlaybook = currentContext?.activePlaybook;
 
     if (!currentPlaybook) {
-      return await this.activateNewPlaybook(conversation);
+      return await this.activateNewPlaybook(conversation, perception);
     }
 
-    const shouldContinue = await this.shouldContinuePlaybook(conversation, currentPlaybook);
+    const shouldContinue = await this.shouldContinuePlaybook(
+      conversation,
+      currentPlaybook
+    );
     if (shouldContinue) {
       // We need to fetch the full playbook data if we want to return it
-      const fullPlaybook = await this.playbookRepository.findById(currentPlaybook.id, conversation.organization_id);
+      const fullPlaybook = await this.playbookRepository.findById(
+        currentPlaybook.id,
+        conversation.organization_id
+      );
       return {
-        action: 'continue',
-        playbook: fullPlaybook || undefined
+        action: "continue",
+        playbook: fullPlaybook || undefined,
       };
     }
 
-    const newPlaybook = await this.findBetterPlaybook(conversation, currentPlaybook);
+    const newPlaybook = await this.findBetterPlaybook(
+      conversation,
+      currentPlaybook
+    );
     if (newPlaybook) {
-      const playbookData = await this.playbookRepository.findById(newPlaybook.id, conversation.organization_id);
-      const systemMessage = SystemMessageService.createPlaybookSystemMessage(playbookData);
-      
+      const playbookData = await this.playbookRepository.findById(
+        newPlaybook.id,
+        conversation.organization_id
+      );
+      const systemMessage =
+        SystemMessageService.createPlaybookSystemMessage(playbookData);
+
       return {
-        action: 'change',
+        action: "change",
         playbook: newPlaybook,
-        systemMessage
+        systemMessage,
       };
     }
 
-    return { action: 'continue' };
+    return { action: "continue" };
   }
 
-  private async activateNewPlaybook(conversation: Conversation): Promise<{
-    action: 'activate' | 'none';
+  private async activateNewPlaybook(
+    conversation: Conversation,
+    perception?: Perception
+  ): Promise<{
+    action: "activate" | "none";
     playbook?: Playbook;
     systemMessage?: Partial<Message>;
   }> {
+    // If we have perception data with playbook candidates, use those
+    if (
+      perception?.playbookCandidates &&
+      perception.playbookCandidates.length > 0
+    ) {
+      const bestCandidate = perception.playbookCandidates[0];
+      const playbook = await this.playbookRepository.findById(
+        bestCandidate.id,
+        conversation.organization_id
+      );
+
+      if (playbook) {
+        const systemMessage =
+          SystemMessageService.createPlaybookSystemMessage(playbook);
+        return {
+          action: "activate",
+          playbook,
+          systemMessage,
+        };
+      }
+    }
+
+    // Fallback to old behavior if no candidates or candidate not found
     const playbooks = await this.playbookRepository.findByStatus(
       conversation.organization_id,
       PlaybookStatus.ACTIVE
     );
 
     if (playbooks.length === 0) {
-      return { action: 'none' };
+      return { action: "none" };
     }
 
-    const bestPlaybook = playbooks[0];
-    const systemMessage = SystemMessageService.createPlaybookSystemMessage(bestPlaybook);
-
-    return {
-      action: 'activate',
-      playbook: bestPlaybook,
-      systemMessage
-    };
+    // Don't activate any playbook if we don't have good candidates
+    // This prevents random playbook activation
+    return { action: "none" };
   }
 
-  private async shouldContinuePlaybook(conversation: Conversation, currentPlaybook: PlaybookState): Promise<boolean> {
+  private async shouldContinuePlaybook(
+    conversation: Conversation,
+    currentPlaybook: PlaybookState
+  ): Promise<boolean> {
     const recentMessages = conversation.messages?.slice(-3) || [];
     if (recentMessages.length === 0) return true;
 
@@ -213,7 +308,7 @@ Current Playbook: ${currentPlaybook.id}
 Current Step: ${currentPlaybook.stepId}
 
 Recent messages:
-${recentMessages.map(m => `${m.sender}: ${m.content}`).join('\n')}
+${recentMessages.map((m) => `${m.sender}: ${m.content}`).join("\n")}
 
 Return true if we should continue, false if we should consider switching.`;
 
@@ -223,10 +318,10 @@ Return true if we should continue, false if we should consider switching.`;
         jsonSchema: {
           type: "object",
           properties: {
-            continue: { type: "boolean" }
+            continue: { type: "boolean" },
           },
-          required: ["continue"]
-        }
+          required: ["continue"],
+        },
       });
 
       return result.continue;
@@ -236,14 +331,19 @@ Return true if we should continue, false if we should consider switching.`;
     }
   }
 
-  private async findBetterPlaybook(conversation: Conversation, currentPlaybook: PlaybookState): Promise<Playbook | null> {
+  private async findBetterPlaybook(
+    conversation: Conversation,
+    currentPlaybook: PlaybookState
+  ): Promise<Playbook | null> {
     try {
       const allPlaybooks = await this.playbookRepository.findByStatus(
         conversation.organization_id,
         PlaybookStatus.ACTIVE
       );
-      
-      const alternativePlaybooks = allPlaybooks.filter(p => p.id !== currentPlaybook.id);
+
+      const alternativePlaybooks = allPlaybooks.filter(
+        (p) => p.id !== currentPlaybook.id
+      );
 
       if (alternativePlaybooks.length === 0) {
         return null;

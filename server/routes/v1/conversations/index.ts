@@ -14,6 +14,128 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { config } from "../../../config/env";
 
+/**
+ * Initializes a conversation with system messages and optional welcome message
+ * @param conversationId - The conversation ID to initialize
+ * @param organizationId - The organization ID
+ * @param customerId - Optional customer ID, if present, only system init is performed
+ * @param agentId - Optional agent ID to include agent-specific instructions
+ */
+async function initializeConversation(
+  conversationId: string, 
+  organizationId: string, 
+  customerId?: string,
+  agentId?: string
+): Promise<void> {
+  // Always set up system configuration first
+  await setupSystemMessages(conversationId, organizationId, agentId);
+
+  // Only send welcome message if there's no customer context (new conversation)
+  if (!customerId) {
+    await sendWelcomeMessage(conversationId, organizationId);
+  }
+}
+
+/**
+ * Sets up initial system messages for conversation context
+ */
+async function setupSystemMessages(
+  conversationId: string, 
+  organizationId: string,
+  agentId?: string
+): Promise<void> {
+  console.log(`[setupSystemMessages] Setting up system message for conversation ${conversationId}`);
+  console.log(`[setupSystemMessages] Organization: ${organizationId}`);
+  console.log(`[setupSystemMessages] Agent ID provided: ${agentId || 'NONE'}`);
+  
+  // Get agent configuration if provided
+  let agent = null;
+  if (agentId) {
+    console.log(`[setupSystemMessages] Fetching agent data for ID: ${agentId}`);
+    agent = await agentService.getAgent(organizationId, agentId);
+    console.log(`[setupSystemMessages] Agent found:`, agent ? {
+      id: agent.id,
+      name: agent.name,
+      hasInstructions: !!agent.instructions,
+      hasTone: !!agent.tone,
+      hasAvoid: !!agent.avoid
+    } : 'NULL');
+  }
+
+  // Build system message content
+  let systemContent = `You are a helpful AI assistant. You should provide accurate, helpful responses based on available context and documentation. Always be professional and courteous.
+
+Key behaviors:
+- Use available documentation and context to provide accurate answers
+- If you don't know something, clearly state that
+- Follow any active playbook instructions when provided
+- Be concise but thorough in your responses
+- Maintain conversation context throughout the interaction`;
+
+  // Add agent-specific instructions
+  if (agent?.instructions) {
+    systemContent += `\n\nAgent Instructions:\n${agent.instructions}`;
+  }
+
+  // Add tone guidelines
+  if (agent?.tone) {
+    systemContent += `\n\nTone Guidelines:\n${agent.tone}`;
+  }
+
+  // Add things to avoid
+  if (agent?.avoid) {
+    systemContent += `\n\nThings to Avoid:\n${agent.avoid}`;
+  }
+
+  // Create base system message for conversation initialization
+  const baseSystemMessage = {
+    content: systemContent,
+    type: MessageType.SYSTEM,
+    sender: "system" as const,
+    metadata: {
+      path: "initialization",
+      agent_id: agentId || null,
+      confidence: 1.0
+    }
+  };
+
+  console.log(`[setupSystemMessages] Final system message content (${systemContent.length} chars):`);
+  console.log(`[setupSystemMessages] Preview: "${systemContent.substring(0, 200)}..."`);
+
+  // Add the base system message
+  await conversationService.addMessage(
+    conversationId,
+    organizationId,
+    baseSystemMessage
+  );
+}
+
+/**
+ * Sends welcome message using active welcome playbook or fallback
+ */
+async function sendWelcomeMessage(
+  conversationId: string, 
+  organizationId: string
+): Promise<void> {
+  // Get welcome playbook or use fallback
+  const welcomePlaybook = await playbookService.getActivePlaybook(
+    "welcome",
+    organizationId
+  );
+  
+  const welcomeMessage = welcomePlaybook?.prompt_template || "Hello! How can I help you today?";
+
+  await conversationService.addMessage(
+    conversationId,
+    organizationId,
+    {
+      content: welcomeMessage,
+      type: MessageType.BOT_AGENT,
+      sender: "assistant",
+    }
+  );
+}
+
 const conversationService = new ConversationService();
 const playbookService = new PlaybookService();
 const agentService = new AgentService();
@@ -110,23 +232,8 @@ export const conversationsRouter = t.router({
         input
       );
 
-      // Add welcome message
-      const welcomePlaybook = await playbookService.getActivePlaybook(
-        "welcome",
-        ctx.organizationId!
-      );
-      const welcomeMessage =
-        welcomePlaybook?.prompt_template || "Hello! How can I help you today?";
-
-      await conversationService.addMessage(
-        conversation.id,
-        ctx.organizationId!,
-        {
-          content: welcomeMessage,
-          type: MessageType.BOT_AGENT,
-          sender: "assistant",
-        }
-      );
+      // Initialize conversation with system setup and conditional welcome message
+      await initializeConversation(conversation.id, ctx.organizationId!, input.customer_id, input.agentId);
 
       return conversation;
     }),

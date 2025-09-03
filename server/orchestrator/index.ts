@@ -87,15 +87,22 @@ export class Orchestrator {
         this.executionLayer.getAllHumanMessages(conversation);
       const retrieval = await this.retrievalLayer.retrieve(
         allHumanMessages,
-        conversation
+        conversation,
+        perception
       );
 
       // Save system messages from retrieval
       if (retrieval.systemMessages && retrieval.systemMessages.length > 0) {
+        console.log(`[Orchestrator] Saving ${retrieval.systemMessages.length} RAG system messages`);
         await this.executionLayer.saveSystemMessages(
           conversation,
           retrieval.systemMessages
         );
+        
+        // CRITICAL: Reload conversation to include the newly saved RAG system messages
+        console.log(`[Orchestrator] Reloading conversation to include RAG context`);
+        conversation = await this.executionLayer.loadConversation(conversationId);
+        console.log(`[Orchestrator] Conversation reloaded with ${conversation.messages?.length || 0} total messages`);
       }
 
       // Update orchestration status
