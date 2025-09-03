@@ -29,7 +29,6 @@ import {
   BookOpen,
   Puzzle,
   ListTodo,
-  TestTube,
 } from "lucide-vue-next";
 
 import {
@@ -97,24 +96,24 @@ const navMain = computed(() => [
     icon: FileText,
     isActive: isPathActive("/documents"),
   },
-  {
-    title: "Queue",
-    url: "/queue",
-    icon: ListTodo,
-    isActive: isPathActive("/queue"),
-  },
+  // {
+  //   title: "Queue",
+  //   url: "/queue",
+  //   icon: ListTodo,
+  //   isActive: isPathActive("/queue"),
+  // },
   {
     title: "Playbooks",
     url: "/playbooks",
     icon: BookOpen,
     isActive: isPathActive("/playbooks"),
   },
-  {
-    title: "Insights",
-    url: "/insights",
-    icon: BarChart,
-    isActive: isPathActive("/insights"),
-  },
+  // {
+  //   title: "Insights",
+  //   url: "/insights",
+  //   icon: BarChart,
+  //   isActive: isPathActive("/insights"),
+  // },
   {
     title: "Integrations",
     url: "#",

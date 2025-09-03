@@ -7,13 +7,9 @@
       <div class="text-xs text-muted-foreground">
         Press
         <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded"
-          >Cmd/Ctrl + Z</kbd
+          >/</kbd
         >
-        to undo,
-        <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded"
-          >Cmd/Ctrl + Y</kbd
-        >
-        to redo
+        to mention Actions or Documents
       </div>
     </div>
     <div
@@ -135,7 +131,7 @@ function showMenu(rect: DOMRect, items: any[]) {
       <div class="mcp-item ${
         activeIndex === 1 ? "active" : ""
       }" data-type="documents">
-        <div class="mcp-item-icon">📄</div>
+        <div class="mcp-item-icon"></div>
         <div class="mcp-item-content">
           <div class="mcp-item-name">Documents</div>
           <div class="mcp-item-meta">Reference a document</div>
@@ -175,7 +171,7 @@ function showMenu(rect: DOMRect, items: any[]) {
         <div class="mcp-item mcp-item-document ${
           i === activeIndex ? "active" : ""
         }" data-id="${doc.id}">
-          <div class="mcp-item-icon">📄</div>
+          <div class="mcp-item-icon"></div>
           <div class="mcp-item-content">
             <div class="mcp-item-name">${doc.name || "Untitled"}</div>
             <div class="mcp-item-meta">${metaInfo}</div>
@@ -339,7 +335,7 @@ function insertAction(tool: any) {
   span.contentEditable = "false";
   span.dataset.mcpTool = tool.id;
   span.dataset.plugin = tool.pluginName;
-  span.textContent = `⚡${tool.name}`;
+  span.innerHTML = `<span class="mcp-item-icon"></span>${tool.name}`;
 
   replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
 
@@ -369,7 +365,7 @@ function insertDocument(doc: any) {
   span.contentEditable = "false";
   span.dataset.documentId = doc.id;
   span.dataset.documentName = doc.name;
-  span.textContent = `📄${doc.name}`;
+  span.innerHTML = `<span class="mcp-item-icon"></span>${doc.name}`;
 
   replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
 
@@ -735,11 +731,13 @@ kbd {
 
 /* MCP Merge Field Styles */
 .mcp-merge-field {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
   border-radius: 0.375rem;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 0.875em;
   cursor: default;
   user-select: none;
@@ -751,7 +749,7 @@ kbd {
 .mcp-merge-field.mcp-action {
   background: rgb(147, 51, 234, 0.1);
   border: 1px solid rgb(147, 51, 234, 0.3);
-  color: rgb(147, 51, 234);
+  color: #9333ea;
 }
 
 .mcp-merge-field.mcp-action:hover {
@@ -763,7 +761,29 @@ kbd {
 .mcp-merge-field.mcp-document {
   background: rgb(245, 158, 11, 0.1);
   border: 1px solid rgb(245, 158, 11, 0.3);
-  color: rgb(217, 119, 6);
+  color: #d97706;
+}
+
+.mcp-item-icon {
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  height: 1em;
+  width: 1em;
+  color: transparent;
+}
+/* Action icons - applies to all action items regardless of parent */
+.mcp-item-action .mcp-item-icon,
+[data-type="actions"] .mcp-item-icon,
+.mcp-action .mcp-item-icon {
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.99999 14.0002C3.81076 14.0008 3.62522 13.9477 3.46495 13.8471C3.30467 13.7465 3.17623 13.6025 3.09454 13.4318C3.01286 13.2611 2.98129 13.0707 3.00349 12.8828C3.0257 12.6949 3.10077 12.5171 3.21999 12.3702L13.12 2.17016C13.1943 2.08444 13.2955 2.02652 13.407 2.0059C13.5185 1.98527 13.6337 2.00318 13.7337 2.05667C13.8337 2.11016 13.9126 2.19606 13.9573 2.30027C14.0021 2.40448 14.0101 2.52081 13.98 2.63016L12.06 8.65016C12.0034 8.80169 11.9844 8.96468 12.0046 9.12517C12.0248 9.28566 12.0837 9.43884 12.1761 9.57159C12.2685 9.70434 12.3918 9.81268 12.5353 9.88732C12.6788 9.96197 12.8382 10.0007 13 10.0002H20C20.1892 9.99952 20.3748 10.0526 20.535 10.1532C20.6953 10.2538 20.8238 10.3978 20.9054 10.5685C20.9871 10.7392 21.0187 10.9296 20.9965 11.1175C20.9743 11.3054 20.8992 11.4832 20.78 11.6302L10.88 21.8302C10.8057 21.9159 10.7045 21.9738 10.593 21.9944C10.4815 22.0151 10.3663 21.9972 10.2663 21.9437C10.1663 21.8902 10.0874 21.8043 10.0427 21.7001C9.99791 21.5958 9.98991 21.4795 10.02 21.3702L11.94 15.3502C11.9966 15.1986 12.0156 15.0356 11.9954 14.8752C11.9752 14.7147 11.9163 14.5615 11.8239 14.4287C11.7315 14.296 11.6082 14.1876 11.4647 14.113C11.3212 14.0384 11.1617 13.9996 11 14.0002H3.99999Z' fill='%239333EA'/%3E%3C/svg%3E%0A");
+}
+
+/* Document icons - applies to all document items regardless of parent */
+.mcp-item-document .mcp-item-icon,
+[data-type="documents"] .mcp-item-icon,
+.mcp-document .mcp-item-icon {
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 18V6C6 5.46957 6.19754 4.96086 6.54917 4.58579C6.90081 4.21071 7.37772 4 7.875 4H17.25C17.4489 4 17.6397 4.08429 17.7803 4.23431C17.921 4.38434 18 4.58783 18 4.8V19.2C18 19.4122 17.921 19.6157 17.7803 19.7657C17.6397 19.9157 17.4489 20 17.25 20H7.875C7.37772 20 6.90081 19.7893 6.54917 19.4142C6.19754 19.0391 6 18.5304 6 18ZM6 18C6 17.4696 6.19754 16.9609 6.54917 16.5858C6.90081 16.2107 7.37772 16 7.875 16H18' stroke='%23D97706' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='7' y='5' width='11' height='11' fill='%23D97706'/%3E%3C/svg%3E%0A");
 }
 
 .mcp-merge-field.mcp-document:hover {
@@ -793,6 +813,7 @@ kbd {
   border-radius: 0.375rem;
   transition: all 0.15s ease;
   margin-bottom: 0.125rem;
+  gap: 0.75rem;
 }
 
 .mcp-item:last-child {
@@ -804,17 +825,12 @@ kbd {
   background: hsl(var(--muted));
 }
 
-.mcp-item-icon {
-  font-size: 1.125rem;
-  margin-right: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-}
-
 .mcp-item-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.3;
 }
 
 .mcp-item-name {
@@ -838,8 +854,9 @@ kbd {
   background: rgb(147, 51, 234, 0.08);
 }
 
+/* Remove text color as icons use background images */
 .mcp-item-action .mcp-item-icon {
-  color: rgb(147, 51, 234);
+  color: transparent;
 }
 
 /* Document items (yellow/amber theme) */
@@ -851,7 +868,8 @@ kbd {
   background: rgb(245, 158, 11, 0.08);
 }
 
+/* Remove text color as icons use background images */
 .mcp-item-document .mcp-item-icon {
-  color: rgb(217, 119, 6);
+  color: transparent;
 }
 </style>
