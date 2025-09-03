@@ -1,104 +1,172 @@
-import type { OrchestrationPlan } from "./types";
+import type { OrchestrationPlan, IntentAnalysis } from "./types";
 import { PlaybookService } from "../playbook.service";
 import { VectorStoreService } from "../vector-store.service";
+import { PlaybookMatcher } from "./playbook-matcher";
+import { StatusManager } from "./status-manager";
+import { ConversationService } from "../conversation.service";
+import { MessageType } from "../../database/entities/message.entity";
 
 /**
  * Creates orchestration plans for conversation routing.
- * Determines whether to use playbooks, document retrieval, or human escalation.
+ * Uses dynamic playbook matching for every user message.
  */
 export class PlanCreation {
+  private playbookMatcher: PlaybookMatcher;
+  private statusManager: StatusManager;
+
   /**
    * Creates a new PlanCreation instance.
    * @param playbookService - Service for managing playbooks
    * @param vectorStoreService - Service for vector-based document retrieval
+   * @param conversationService - Service for conversation management
    */
   constructor(
     private playbookService: PlaybookService,
-    private vectorStoreService: VectorStoreService
-  ) {}
+    private vectorStoreService: VectorStoreService,
+    private conversationService?: ConversationService
+  ) {
+    this.playbookMatcher = new PlaybookMatcher(playbookService);
+    this.statusManager = new StatusManager(conversationService || {} as ConversationService);
+  }
 
   /**
    * Creates an orchestration plan based on user message and conversation context.
-   * Prioritizes human assistance requests, then document retrieval, then playbooks.
+   * Dynamically selects the best playbook for each message.
    * @param userMessage - The user's message
    * @param conversation - The current conversation object
    * @param organizationId - The ID of the organization
+   * @param messages - Array of conversation messages for context
    * @returns The orchestration plan determining execution path
    */
   async createPlan(
     userMessage: string,
     conversation: any,
-    organizationId: string
+    organizationId: string,
+    messages?: any[]
   ): Promise<OrchestrationPlan> {
-    // First check if user is requesting human assistance
-    if (this.isHumanAssistanceRequest(userMessage)) {
-      console.log(`[Orchestrator] Detected human assistance request, using human escalation playbook`);
-      
-      const humanEscalationPlaybook = await this.findHumanEscalationPlaybook(organizationId);
-      
-      if (humanEscalationPlaybook) {
+    console.log(`[Orchestrator] Creating plan for message: "${userMessage.substring(0, 50)}..."`);
+
+    // Update status to analyzing intent
+    if (this.conversationService) {
+      await this.statusManager.startIntentAnalysis(
+        conversation.id,
+        organizationId
+      );
+    }
+
+    // Build conversation history for context
+    const conversationHistory = messages ? this.buildConversationHistory(messages) : undefined;
+
+    // Use PlaybookMatcher to dynamically select the best playbook
+    const { playbook, intentAnalysis, switched, confidence, reasoning } = await this.playbookMatcher.selectPlaybook(
+      userMessage,
+      organizationId,
+      conversationHistory,
+      conversation.playbook_id
+    );
+
+    // Update conversation with intent analysis
+    if (this.conversationService) {
+      await this.statusManager.setIntentAnalysis(
+        conversation.id,
+        organizationId,
+        intentAnalysis
+      );
+
+      // If a playbook was selected, update the status with selection details
+      if (playbook) {
+        await this.statusManager.setCurrentPlaybook(
+          conversation.id,
+          organizationId,
+          {
+            id: playbook.id,
+            title: playbook.title,
+            trigger: playbook.trigger,
+            started_at: new Date().toISOString(),
+            selection_confidence: confidence,
+            selection_reasoning: reasoning
+          }
+        );
+      }
+    }
+
+    // If a playbook switch occurred, check if it's allowed
+    if (switched && conversation.playbook_id) {
+      const currentPlaybook = await this.playbookService.getPlaybook(
+        conversation.playbook_id,
+        organizationId
+      );
+
+      if (currentPlaybook && !this.playbookMatcher.shouldAllowSwitch(currentPlaybook, playbook)) {
+        console.log(`[Orchestrator] Playbook switch not allowed, continuing with current playbook`);
         return {
           path: "playbook",
           agentId: conversation.agent_id,
-          playbookId: humanEscalationPlaybook.id,
-          requiredFields: [],
+          playbookId: conversation.playbook_id,
+          requiredFields: currentPlaybook.required_fields || []
         };
       }
     }
-    
-    // Check if we should use document retrieval or playbook path
-    const useDocQA = await this.shouldUseDocumentRetrieval(userMessage, organizationId);
+
+    // Update conversation with new playbook if switched
+    if (switched && playbook && this.conversationService) {
+      await this.conversationService.updateConversation(
+        conversation.id,
+        organizationId,
+        { playbook_id: playbook.id }
+      );
+    }
+
+    // Check if we should use document retrieval based on intent
+    const useDocQA = await this.shouldUseDocumentRetrieval(
+      userMessage,
+      organizationId,
+      intentAnalysis
+    );
     
     if (useDocQA) {
+      console.log(`[Orchestrator] Using document retrieval path`);
       return {
         path: "docqa",
         agentId: conversation.agent_id,
-        requiredFields: [],
+        requiredFields: []
       };
     }
     
-    // Otherwise use playbook path
-    const playbookId = await this.selectPlaybook(conversation, organizationId);
-    
-    console.log(`[Orchestrator] Selected playbook path with playbook: ${playbookId || 'none'}`);
+    // Use the selected playbook
+    if (playbook) {
+      console.log(`[Orchestrator] Using playbook: ${playbook.title} (${playbook.trigger})`);
+      return {
+        path: "playbook",
+        agentId: conversation.agent_id,
+        playbookId: playbook.id,
+        requiredFields: playbook.required_fields || []
+      };
+    }
 
+    // Fallback to default if no playbook found
+    console.log(`[Orchestrator] No suitable playbook found, using default`);
     return {
       path: "playbook",
       agentId: conversation.agent_id,
-      playbookId: playbookId,
-      requiredFields: [],
+      requiredFields: []
     };
   }
 
   /**
-   * Detects if the user is requesting human assistance.
-   * Checks for patterns indicating desire to speak with a human.
-   * @param userMessage - The user's message to analyze
-   * @returns True if human assistance is requested
+   * Builds a formatted conversation history string from messages.
+   * @param messages - Array of conversation messages
+   * @returns Formatted conversation history string
    */
-  private isHumanAssistanceRequest(userMessage: string): boolean {
-    const humanRequestPatterns = [
-      /\b(speak|talk|chat)\s+(to|with)\s+(a\s+)?(human|person|agent|representative|someone)/i,
-      /\b(want|need|like)\s+(a\s+)?(human|person|agent|representative)/i,
-      /transfer\s+me/i,
-      /real\s+person/i,
-      /live\s+support/i,
-      /customer\s+service/i
-    ];
-    
-    return humanRequestPatterns.some(pattern => pattern.test(userMessage));
-  }
-
-  /**
-   * Finds the active human escalation playbook for the organization.
-   * @param organizationId - The ID of the organization
-   * @returns The human escalation playbook if found
-   */
-  private async findHumanEscalationPlaybook(organizationId: string): Promise<any> {
-    const playbooks = await this.playbookService.getPlaybooks(organizationId);
-    return playbooks.find(
-      p => p.trigger === 'human_escalation' && p.status === 'active'
-    );
+  private buildConversationHistory(messages: any[]): string {
+    return messages.map(msg => {
+      if (msg.type === MessageType.HUMAN_MESSAGE) {
+        return `User: ${msg.content}`;
+      } else if (msg.type === MessageType.AI_MESSAGE) {
+        return `Assistant: ${msg.content}`;
+      }
+      return null;
+    }).filter(Boolean).join('\n');
   }
 
   /**
@@ -106,9 +174,14 @@ export class PlanCreation {
    * Checks for question patterns and searches for relevant documents.
    * @param userMessage - The user's message to analyze
    * @param organizationId - The ID of the organization
+   * @param intentAnalysis - Optional intent analysis results
    * @returns True if document retrieval should be used
    */
-  private async shouldUseDocumentRetrieval(userMessage: string, organizationId: string): Promise<boolean> {
+  private async shouldUseDocumentRetrieval(
+    userMessage: string, 
+    organizationId: string,
+    intentAnalysis?: IntentAnalysis
+  ): Promise<boolean> {
     // Keywords that suggest document retrieval
     const docQAKeywords = [
       /how (do|can|to)/i,
@@ -151,29 +224,4 @@ export class PlanCreation {
     return false;
   }
 
-  /**
-   * Selects an appropriate playbook for the conversation.
-   * Uses existing playbook or falls back to welcome playbook.
-   * @param conversation - The current conversation object
-   * @param organizationId - The ID of the organization
-   * @returns The selected playbook ID if found
-   */
-  private async selectPlaybook(conversation: any, organizationId: string): Promise<string | undefined> {
-    // Check if conversation already has a playbook
-    let playbookId = conversation.playbook_id;
-    
-    // If no playbook assigned, try to find a default one
-    if (!playbookId) {
-      const playbooks = await this.playbookService.getPlaybooks(organizationId);
-      const welcomePlaybook = playbooks.find(
-        (p) => p.kind === "welcome" && p.status === "active"
-      );
-      
-      if (welcomePlaybook) {
-        playbookId = welcomePlaybook.id;
-      }
-    }
-
-    return playbookId;
-  }
 }

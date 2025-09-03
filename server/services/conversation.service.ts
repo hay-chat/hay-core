@@ -73,6 +73,8 @@ export class ConversationService {
       closed_at?: Date | null;
       context?: Record<string, any>;
       resolution_metadata?: { resolved: boolean; confidence: number; reason: string };
+      playbook_id?: string | null;
+      orchestration_status?: Record<string, any> | null;
     }
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved

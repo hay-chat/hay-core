@@ -19,12 +19,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await this.legacyRepository.save(conversation);
   }
 
-  override async findById(
-    id: string,
-    organizationId: string
-  ): Promise<Conversation | null> {
+  override async findById(id: string): Promise<Conversation | null> {
     return await this.legacyRepository.findOne({
-      where: { id, organization_id: organizationId },
+      where: { id },
       relations: ["messages"],
     });
   }
@@ -50,20 +47,16 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   override async update(
     id: string,
-    organizationId: string,
     data: Partial<Conversation>
   ): Promise<Conversation | null> {
-    const conversation = await this.findById(id, organizationId);
+    const conversation = await this.findById(id);
     if (!conversation) {
       return null;
     }
 
-    await this.legacyRepository.update(
-      { id, organization_id: organizationId },
-      data
-    );
+    await this.legacyRepository.update({ id }, data);
 
-    return await this.findById(id, organizationId);
+    return await this.findById(id);
   }
 
   override async delete(id: string, organizationId: string): Promise<boolean> {

@@ -85,6 +85,9 @@ export class Conversation {
   @JoinColumn()
   customer!: Customer | null;
 
+  @Column({ type: "jsonb", nullable: true })
+  orchestration_status!: Record<string, any> | null;
+
   @OneToMany(() => Message, message => message.conversation)
   messages!: Message[];
 

@@ -84,3 +84,70 @@ export interface ResolutionMetadata {
   /** Reason for the resolution status */
   reason: string;
 }
+
+/**
+ * Orchestration state types for conversation processing
+ */
+export type OrchestrationState = 
+  | "waiting_for_user" 
+  | "analyzing_intent" 
+  | "searching_documents" 
+  | "executing_playbook" 
+  | "cooldown"
+  | "processing"
+  | "error";
+
+/**
+ * Information about the currently active playbook
+ */
+export interface PlaybookStatus {
+  id: string;
+  title: string;
+  trigger: string;
+  started_at: string;
+  selection_confidence?: number;
+  selection_reasoning?: string;
+}
+
+/**
+ * Document retrieved and used in the response
+ */
+export interface DocumentUsed {
+  id?: string;
+  content: string;
+  relevance: number;
+  source?: string;
+}
+
+/**
+ * Results of intent analysis on user messages
+ */
+export interface IntentAnalysis {
+  detected_intents: string[];
+  confidence: number;
+  last_analyzed: string;
+  raw_analysis?: string;
+}
+
+/**
+ * Processing details for the conversation
+ */
+export interface ProcessingDetails {
+  locked_by?: string;
+  locked_until?: string;
+  cooldown_until?: string;
+  error?: string;
+}
+
+/**
+ * Complete orchestration status for a conversation
+ * Provides real-time visibility into AI processing
+ */
+export interface OrchestrationStatus {
+  state: OrchestrationState;
+  current_playbook?: PlaybookStatus;
+  documents_used?: DocumentUsed[];
+  intent_analysis?: IntentAnalysis;
+  processing_details?: ProcessingDetails;
+  last_updated: string;
+}

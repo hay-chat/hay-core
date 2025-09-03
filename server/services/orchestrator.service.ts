@@ -40,9 +40,9 @@ export class OrchestratorService {
   ) {
     // Initialize orchestrator modules
     this.agentRouting = new AgentRouting(agentService, conversationService);
-    this.planCreation = new PlanCreation(playbookService, vectorStoreService);
+    this.planCreation = new PlanCreation(playbookService, vectorStoreService, conversationService);
     this.documentRetrieval = new DocumentRetrieval(vectorStoreService);
-    this.playbookExecution = new PlaybookExecution(playbookService, vectorStoreService, agentService);
+    this.playbookExecution = new PlaybookExecution(playbookService, vectorStoreService, agentService, conversationService);
     this.conversationManagement = new ConversationManagement(conversationService);
     this.messageProcessing = new MessageProcessing(conversationService);
     this.playbookHelpers = new PlaybookHelpers(playbookService);
@@ -155,7 +155,8 @@ export class OrchestratorService {
       const plan = await this.planCreation.createPlan(
         combinedUserMessage,
         conversation,
-        organizationId
+        organizationId,
+        messages
       );
       console.log(`[Orchestrator] Plan created: path=${plan.path}, agentId=${plan.agentId}, playbookId=${plan.playbookId}`);
 

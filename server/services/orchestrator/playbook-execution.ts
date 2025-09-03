@@ -1,26 +1,36 @@
-import type { ExecutionResult, OrchestrationPlan } from "./types";
+import type { ExecutionResult, OrchestrationPlan, DocumentUsed, PlaybookStatus as PlaybookStatusType } from "./types";
 import { PlaybookService } from "../playbook.service";
 import { VectorStoreService } from "../vector-store.service";
 import { AgentService } from "../agent.service";
 import { Hay } from "../hay.service";
 import { MessageType } from "../../database/entities/message.entity";
+import { StatusManager } from "./status-manager";
+import { ConversationService } from "../conversation.service";
 
 /**
  * Handles the execution of playbooks and AI-driven conversation responses.
  * Integrates RAG (Retrieval-Augmented Generation) with conversation context.
  */
 export class PlaybookExecution {
+  private statusManager?: StatusManager;
+
   /**
    * Creates a new PlaybookExecution instance.
    * @param playbookService - Service for managing playbooks
    * @param vectorStoreService - Service for vector-based document retrieval
    * @param agentService - Service for managing agents
+   * @param conversationService - Optional service for conversation management
    */
   constructor(
     private playbookService: PlaybookService,
     private vectorStoreService: VectorStoreService,
-    private agentService: AgentService
-  ) {}
+    private agentService: AgentService,
+    private conversationService?: ConversationService
+  ) {
+    if (conversationService) {
+      this.statusManager = new StatusManager(conversationService);
+    }
+  }
 
   /**
    * Executes a playbook or default AI response based on the orchestration plan.
@@ -43,6 +53,19 @@ export class PlaybookExecution {
     const playbook = plan.playbookId
       ? await this.playbookService.getPlaybook(plan.playbookId, organizationId)
       : null;
+
+    // Update status with current playbook
+    if (this.statusManager && playbook) {
+      await this.statusManager.startPlaybookExecution(
+        conversation.id,
+        organizationId,
+        {
+          id: playbook.id,
+          title: playbook.title,
+          trigger: playbook.trigger
+        }
+      );
+    }
 
     // Fetch agent if available
     const agent = plan.agentId
@@ -67,7 +90,20 @@ export class PlaybookExecution {
     }
 
     // RAG: Search for relevant documents
-    const ragContext = await this.searchRelevantDocuments(organizationId, userPromptContent);
+    const { context: ragContext, documents } = await this.searchRelevantDocuments(
+      conversation.id, 
+      organizationId, 
+      userPromptContent
+    );
+    
+    // Update status with documents used
+    if (this.statusManager && documents.length > 0) {
+      await this.statusManager.setDocumentsUsed(
+        conversation.id,
+        organizationId,
+        documents
+      );
+    }
 
     // Construct the prompt
     const { systemPrompt, userPrompt } = this.constructPrompts(
@@ -136,13 +172,24 @@ export class PlaybookExecution {
   /**
    * Searches for relevant documents using vector similarity search.
    * Filters out test data and formats results for context injection.
+   * @param conversationId - The conversation ID
    * @param organizationId - The ID of the organization
    * @param userMessage - The user's query for document search
-   * @returns Formatted RAG context string with relevant documents
+   * @returns Object with formatted context and document list
    */
-  private async searchRelevantDocuments(organizationId: string, userMessage: string): Promise<string> {
+  private async searchRelevantDocuments(
+    conversationId: string,
+    organizationId: string, 
+    userMessage: string
+  ): Promise<{ context: string; documents: DocumentUsed[] }> {
     let ragContext = "";
+    const documents: DocumentUsed[] = [];
+    
     try {
+      // Update status to searching documents
+      if (this.statusManager) {
+        await this.statusManager.startDocumentSearch(conversationId, organizationId);
+      }
       console.log(`[Orchestrator] Searching for relevant documents for query: "${userMessage.substring(0, 100)}..."`);
       
       // Initialize vector store if not already initialized
@@ -172,6 +219,14 @@ export class PlaybookExecution {
             ragContext += `\n(Source: ${result.metadata.source})`;
           }
           ragContext += "\n";
+          
+          // Add to documents array for status tracking
+          documents.push({
+            id: result.id,
+            content: result.content.substring(0, 200), // First 200 chars for status
+            relevance: result.similarity || 0,
+            source: result.metadata?.source
+          });
         });
         
         console.log(`[Orchestrator] RAG context added: ${ragContext.length} characters`);
@@ -182,7 +237,8 @@ export class PlaybookExecution {
       console.error(`[Orchestrator] Error during RAG search:`, error);
       // Continue without RAG context if search fails
     }
-    return ragContext;
+    
+    return { context: ragContext, documents };
   }
 
   /**

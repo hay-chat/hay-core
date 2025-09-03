@@ -1,4 +1,11 @@
-import { BaseMessage, HumanMessage, AIMessage, SystemMessage, FunctionMessage, ToolMessage } from "@langchain/core/messages";
+import {
+  BaseMessage,
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+  FunctionMessage,
+  ToolMessage,
+} from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { ConversationService } from "./conversation.service";
 import { Message, MessageType } from "../database/entities/message.entity";
@@ -39,7 +46,7 @@ export class HayService {
       openAIApiKey: process.env.OPENAI_API_KEY,
       modelName: "gpt-4-turbo-preview",
       temperature: 0.5, // Lower temperature for more consistent, less creative responses
-      maxTokens: 2000
+      maxTokens: 2000,
     });
 
     Hay.conversationService = new ConversationService();
@@ -50,7 +57,7 @@ export class HayService {
     return {
       type: input.type,
       content: input.content,
-      usage_metadata: input.usage_metadata ?? undefined
+      usage_metadata: input.usage_metadata ?? undefined,
     };
   }
 
@@ -78,24 +85,29 @@ export class HayService {
 
     const aiResponse = await Hay.model.invoke(lcMessages);
 
-    const aiContent = typeof aiResponse.content === "string" 
-      ? aiResponse.content 
-      : JSON.stringify(aiResponse.content);
+    const aiContent =
+      typeof aiResponse.content === "string"
+        ? aiResponse.content
+        : JSON.stringify(aiResponse.content);
 
     const usage = aiResponse.usage_metadata || undefined;
 
-    const aiMessage = await Hay.conversationService.addMessage(conversationId, organizationId, {
-      content: aiContent,
-      type: MessageType.AI_MESSAGE,
-      usage_metadata: usage
-    });
+    const aiMessage = await Hay.conversationService.addMessage(
+      conversationId,
+      organizationId,
+      {
+        content: aiContent,
+        type: MessageType.AI_MESSAGE,
+        usage_metadata: usage,
+      }
+    );
 
     return {
       id: aiMessage.id,
       content: aiContent,
       usage_metadata: usage,
       type: MessageType.AI_MESSAGE,
-      created_at: aiMessage.created_at
+      created_at: aiMessage.created_at,
     };
   }
 
@@ -108,50 +120,47 @@ export class HayService {
       Hay.init();
     }
 
-    const existingMessages = await Hay.conversationService.getMessages(conversationId);
-    
-    const existingLcMessages = existingMessages.map(msg => 
+    const existingMessages = await Hay.conversationService.getMessages(
+      conversationId
+    );
+
+    const existingLcMessages = existingMessages.map((msg) =>
       Hay.toLangChainMessage({
         type: msg.type,
         content: msg.content,
-        usage_metadata: msg.usage_metadata || undefined
+        usage_metadata: msg.usage_metadata || undefined,
       })
     );
 
-    const newLcMessages = newMessages.map(m => Hay.toLangChainMessage(m));
+    const newLcMessages = newMessages.map((m) => Hay.toLangChainMessage(m));
 
     const allMessages = [...existingLcMessages, ...newLcMessages];
 
-    // Note: addMessages doesn't have organizationId parameter yet, skip for now
-    // await Hay.conversationService.addMessages(
-    //   conversationId,
-    //   newMessages.map(msg => ({
-    //     content: msg.content,
-    //     type: msg.type,
-    //     usage_metadata: msg.usage_metadata
-    //   }))
-    // );
-
     const aiResponse = await Hay.model.invoke(allMessages);
 
-    const aiContent = typeof aiResponse.content === "string" 
-      ? aiResponse.content 
-      : JSON.stringify(aiResponse.content);
+    const aiContent =
+      typeof aiResponse.content === "string"
+        ? aiResponse.content
+        : JSON.stringify(aiResponse.content);
 
     const usage = aiResponse.usage_metadata || undefined;
 
-    const aiMessage = await Hay.conversationService.addMessage(conversationId, organizationId, {
-      content: aiContent,
-      type: MessageType.AI_MESSAGE,
-      usage_metadata: usage
-    });
+    const aiMessage = await Hay.conversationService.addMessage(
+      conversationId,
+      organizationId,
+      {
+        content: aiContent,
+        type: MessageType.AI_MESSAGE,
+        usage_metadata: usage,
+      }
+    );
 
     return {
       id: aiMessage.id,
       content: aiContent,
       usage_metadata: usage,
       type: MessageType.AI_MESSAGE,
-      created_at: aiMessage.created_at
+      created_at: aiMessage.created_at,
     };
   }
 
@@ -165,23 +174,26 @@ export class HayService {
 
     const messages = [
       new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt)
+      new HumanMessage(userPrompt),
     ];
 
     const aiResponse = await Hay.model.invoke(messages);
 
-    const aiContent = typeof aiResponse.content === "string" 
-      ? aiResponse.content 
-      : JSON.stringify(aiResponse.content);
+    const aiContent =
+      typeof aiResponse.content === "string"
+        ? aiResponse.content
+        : JSON.stringify(aiResponse.content);
 
     return {
       content: aiContent,
       model: "gpt-4-turbo-preview",
-      usage_metadata: aiResponse.usage_metadata || undefined
+      usage_metadata: aiResponse.usage_metadata || undefined,
     };
   }
 
-  static async invoke(prompt: string): Promise<{ content: string; model?: string; usage_metadata?: any }> {
+  static async invoke(
+    prompt: string
+  ): Promise<{ content: string; model?: string; usage_metadata?: any }> {
     if (!Hay.initialized) {
       Hay.init();
     }
@@ -189,14 +201,15 @@ export class HayService {
     const messages = [new HumanMessage(prompt)];
     const aiResponse = await Hay.model.invoke(messages);
 
-    const aiContent = typeof aiResponse.content === "string" 
-      ? aiResponse.content 
-      : JSON.stringify(aiResponse.content);
+    const aiContent =
+      typeof aiResponse.content === "string"
+        ? aiResponse.content
+        : JSON.stringify(aiResponse.content);
 
     return {
       content: aiContent,
       model: "gpt-4-turbo-preview",
-      usage_metadata: aiResponse.usage_metadata || undefined
+      usage_metadata: aiResponse.usage_metadata || undefined,
     };
   }
 
@@ -216,21 +229,24 @@ export class HayService {
       await Hay.conversationService.addMessage(conversationId, organizationId, {
         content: toolOutput,
         type: MessageType.TOOL_MESSAGE,
-        usage_metadata: { tool_name: name }
+        usage_metadata: { tool_name: name },
       });
     }
 
     return toolOutput;
   }
 
-  private static async executeTool(name: string, args: Record<string, any>): Promise<string> {
+  private static async executeTool(
+    name: string,
+    args: Record<string, any>
+  ): Promise<string> {
     // Tool execution logic here
     // This is a placeholder implementation
     return `Executed tool: ${name} with args: ${JSON.stringify(args)}`;
   }
 
   private static toLangChainMessage(message: HayInputMessage): BaseMessage {
-    switch(message.type) {
+    switch (message.type) {
       case MessageType.HUMAN_MESSAGE:
         return new HumanMessage(message.content);
       case MessageType.AI_MESSAGE:
@@ -240,12 +256,12 @@ export class HayService {
       case MessageType.FUNCTION_MESSAGE:
         return new FunctionMessage({
           content: message.content,
-          name: message.usage_metadata?.function_name || "function"
+          name: message.usage_metadata?.function_name || "function",
         });
       case MessageType.TOOL_MESSAGE:
         return new ToolMessage({
           content: message.content,
-          tool_call_id: message.usage_metadata?.tool_call_id || "tool"
+          tool_call_id: message.usage_metadata?.tool_call_id || "tool",
         });
       case MessageType.CHAT_MESSAGE:
       default:
