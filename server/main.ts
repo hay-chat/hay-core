@@ -18,9 +18,9 @@ import "dotenv/config";
 
 async function startServer() {
   // Set server timezone to UTC for consistent timestamp handling
-  process.env.TZ = 'UTC';
+  process.env.TZ = "UTC";
   console.log(`🌍 Server timezone set to UTC`);
-  
+
   // Initialize database connection (optional)
   const dbConnected = await initializeDatabase();
   if (!dbConnected) {
@@ -46,12 +46,16 @@ async function startServer() {
   server.use(express.json({ limit: "50mb" }));
   server.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+  server.get("/", (req, res) => {
+    res.send("Welcome to Hay");
+  });
+
   // Plugin asset routes - serve public assets like widget scripts
   server.get(/^\/plugins\/assets\/([^/]+)\/(.*)$/, (req, res) => {
     // Set params manually for regex routes
     req.params = {
       pluginName: req.params[0],
-      assetPath: req.params[1]
+      assetPath: req.params[1],
     };
     pluginAssetService.serveAsset(req, res).catch((error) => {
       console.error("Asset serving error:", error);
@@ -79,7 +83,7 @@ async function startServer() {
     // Set params manually for regex routes
     req.params = {
       pluginName: req.params[0],
-      webhookPath: req.params[1]
+      webhookPath: req.params[1],
     };
     pluginRouteService.handleWebhook(req, res).catch((error) => {
       console.error("Webhook handling error:", error);
@@ -115,12 +119,12 @@ async function startServer() {
     websocketService.initialize(httpServer);
   }
 
-  httpServer.on('error', (error: any) => {
-    if (error.code === 'EADDRINUSE') {
+  httpServer.on("error", (error: any) => {
+    if (error.code === "EADDRINUSE") {
       console.error(`❌ Port ${config.server.port} is already in use.`);
       process.exit(1);
     }
-    console.error('Server error:', error);
+    console.error("Server error:", error);
     process.exit(1);
   });
 
