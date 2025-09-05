@@ -16,6 +16,8 @@ export interface Perception {
   intent: { label: Intent; score: number; rationale?: string };
   sentiment: { label: Sentiment; score: number };
   playbookCandidates: Array<{ id: string; score: number; rationale?: string }>;
+  agentCandidates: Array<{ id: string; score: number; rationale?: string }>;
+  suggestedAgent?: { id: string; score: number; rationale?: string };
 }
 
 export interface RagPack {

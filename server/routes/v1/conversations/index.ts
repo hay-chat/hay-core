@@ -48,11 +48,44 @@ async function setupSystemMessages(
   console.log(`[setupSystemMessages] Organization: ${organizationId}`);
   console.log(`[setupSystemMessages] Agent ID provided: ${agentId || 'NONE'}`);
   
-  // Get agent configuration if provided
+  let effectiveAgentId = agentId;
+  
+  // If no agent is provided, try to determine one based on the last user message
+  if (!agentId) {
+    console.log(`[setupSystemMessages] No agent provided, attempting to attribute based on triggers`);
+    
+    try {
+      // Get the last user message to analyze for agent attribution
+      const messages = await conversationService.getMessages(conversationId);
+      const lastUserMessage = messages
+        .filter(m => m.type === MessageType.CUSTOMER)
+        .slice(-1)[0];
+
+      if (lastUserMessage) {
+        console.log(`[setupSystemMessages] Analyzing message for agent attribution: "${lastUserMessage.content.substring(0, 100)}..."`);
+        
+        // Use perception layer to analyze and suggest an agent
+        const { PerceptionLayer } = await import('../../../orchestrator/perception.layer');
+        const perceptionLayer = new PerceptionLayer();
+        const perception = await perceptionLayer.perceive(lastUserMessage, organizationId);
+        
+        if (perception.suggestedAgent && perception.suggestedAgent.score > 0.7) {
+          effectiveAgentId = perception.suggestedAgent.id;
+          console.log(`[setupSystemMessages] Agent attributed based on triggers: ${effectiveAgentId} (score: ${perception.suggestedAgent.score})`);
+        } else {
+          console.log(`[setupSystemMessages] No suitable agent found or score too low`);
+        }
+      }
+    } catch (error) {
+      console.error(`[setupSystemMessages] Error during agent attribution:`, error);
+    }
+  }
+  
+  // Get agent configuration if we have one (either provided or attributed)
   let agent = null;
-  if (agentId) {
-    console.log(`[setupSystemMessages] Fetching agent data for ID: ${agentId}`);
-    agent = await agentService.getAgent(organizationId, agentId);
+  if (effectiveAgentId) {
+    console.log(`[setupSystemMessages] Fetching agent data for ID: ${effectiveAgentId}`);
+    agent = await agentService.getAgent(organizationId, effectiveAgentId);
     console.log(`[setupSystemMessages] Agent found:`, agent ? {
       id: agent.id,
       name: agent.name,
@@ -94,7 +127,8 @@ Key behaviors:
     sender: "system" as const,
     metadata: {
       path: "initialization",
-      agent_id: agentId || null,
+      agent_id: effectiveAgentId || null,
+      agent_attribution: effectiveAgentId !== agentId ? "trigger-based" : "provided",
       confidence: 1.0
     }
   };

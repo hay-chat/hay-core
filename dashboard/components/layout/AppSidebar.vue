@@ -44,22 +44,37 @@ import NavMain from "./NavMain.vue";
 import NavUser from "./NavUser.vue";
 
 import { useUserStore } from "@/stores/user";
+import { useAuthStore } from "@/stores/auth";
 
 const userStore = useUserStore();
+const authStore = useAuthStore();
 
 // Get current route
 const route = useRoute();
 
-// Get user data from store
-const user = computed(() => ({
-  name: userStore.user
-    ? `${userStore.user.firstName || ""} ${
-        userStore.user.lastName || ""
-      }`.trim() || "User"
-    : "User",
-  email: userStore.user?.email || "user@example.com",
-  avatar: "/avatars/user.jpg",
-}));
+// Get user data from store with validation
+const user = computed(() => {
+  // If authenticated but missing user data, trigger logout
+  if (authStore.isAuthenticated && authStore.isInitialized && !userStore.user?.id) {
+    console.log('[AppSidebar] Missing user data while authenticated, logging out');
+    authStore.logout();
+    return {
+      name: "User",
+      email: "user@example.com",
+      avatar: "/avatars/user.jpg",
+    };
+  }
+
+  return {
+    name: userStore.user
+      ? `${userStore.user.firstName || ""} ${
+          userStore.user.lastName || ""
+        }`.trim() || "User"
+      : "User",
+    email: userStore.user?.email || "user@example.com",
+    avatar: "/avatars/user.jpg",
+  };
+});
 
 // Helper function to check if a path is active
 const isPathActive = (path: string): boolean => {

@@ -27,6 +27,13 @@ export class AgentRepository {
     });
   }
 
+  async findEnabledByOrganization(organizationId: string): Promise<Agent[]> {
+    return await this.repository.find({
+      where: { organization_id: organizationId, enabled: true },
+      order: { created_at: "DESC" }
+    });
+  }
+
   async update(id: string, organizationId: string, data: Partial<Agent>): Promise<Agent | null> {
     const agent = await this.findById(id, organizationId);
     if (!agent) {

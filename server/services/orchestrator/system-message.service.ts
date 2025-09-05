@@ -22,6 +22,8 @@ Guidelines:
 - Base your answers primarily on the information provided in these documents
 - If the answer cannot be found in these documents, clearly indicate that
 - You can reference specific documents by their titles when citing information
+- When a source URL is available (starts with http:// or https://), include a link in your response using the format [article title or "Read more"](URL)
+- Only link to sources when they are relevant to the information you're presenting and when the tutorial or article contains additional useful information
 - Provide comprehensive answers using the full context available
 
 User Query: "${ragPack.query}"

@@ -2,16 +2,19 @@ import { Message } from "@server/database/entities/message.entity";
 import { LLMService } from "@server/services/orchestrator/llm.service";
 import { PlaybookRepository } from "@server/repositories/playbook.repository";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
-import { Intent, Sentiment, Perception } from "./types";
+import { AgentRepository } from "@server/repositories/agent.repository";
+import type { Intent, Sentiment, Perception } from "./types";
 
 export class PerceptionLayer {
   private llmService: LLMService;
   private playbookRepository: PlaybookRepository;
+  private agentRepository: AgentRepository;
 
   constructor() {
     console.log("PerceptionLayer initialized");
     this.llmService = new LLMService();
     this.playbookRepository = new PlaybookRepository();
+    this.agentRepository = new AgentRepository();
   }
 
   async perceive(
@@ -87,10 +90,26 @@ User message: "${message.content}"`;
       )}`
     );
 
+    const agentCandidates = await this.findAgentCandidates(
+      message,
+      organizationId
+    );
+
+    console.log(
+      `[PerceptionLayer] Agent candidates: ${JSON.stringify(
+        agentCandidates
+      )}`
+    );
+
+    // Select the top-scoring agent as the suggested agent
+    const suggestedAgent = agentCandidates.length > 0 ? agentCandidates[0] : undefined;
+
     return {
       intent: llmPerception.intent,
       sentiment: llmPerception.sentiment,
       playbookCandidates,
+      agentCandidates,
+      suggestedAgent,
     };
   }
 
@@ -158,6 +177,78 @@ For each playbook, provide a relevance score and brief rationale.`;
         .slice(0, 5);
     } catch (error) {
       console.error("Error finding playbook candidates:", error);
+      return [];
+    }
+  }
+
+  private async findAgentCandidates(
+    message: Message,
+    organizationId: string
+  ): Promise<Array<{ id: string; score: number; rationale?: string }>> {
+    try {
+      const agents = await this.agentRepository.findEnabledByOrganization(organizationId);
+
+      if (agents.length === 0) {
+        return [];
+      }
+
+      // Filter agents that have triggers defined
+      const agentsWithTriggers = agents.filter(agent => agent.trigger && agent.trigger.trim().length > 0);
+
+      if (agentsWithTriggers.length === 0) {
+        return [];
+      }
+
+      const candidatePrompt = `Given the user message below, score how relevant each agent is (0-1 scale).
+Consider the trigger phrases, descriptions, and overall context match.
+
+User message: "${message.content}"
+
+Available agents:
+${agentsWithTriggers
+  .map(
+    (a) =>
+      `- ID: ${a.id}, Name: "${a.name}", Trigger: "${
+        a.trigger
+      }", Description: "${a.description || "No description"}"`
+  )
+  .join("\n")}
+
+For each agent, provide a relevance score and brief rationale.`;
+
+      const candidateSchema = {
+        type: "object",
+        properties: {
+          candidates: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                score: { type: "number", minimum: 0, maximum: 1 },
+                rationale: { type: "string" },
+              },
+              required: ["id", "score", "rationale"],
+            },
+          },
+        },
+        required: ["candidates"],
+      };
+
+      const result = await this.llmService.chat<{
+        candidates: Array<{ id: string; score: number; rationale: string }>;
+      }>({
+        message: message.content,
+        jsonSchema: candidateSchema,
+        systemPrompt: candidatePrompt,
+      });
+
+      return result.candidates
+        .filter((c: { score: number }) => c.score > 0.7)
+        .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+        .slice(0, 5);
+    } catch (error) {
+      console.error("Error finding agent candidates:", error);
       return [];
     }
   }

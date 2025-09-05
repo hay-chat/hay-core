@@ -123,7 +123,7 @@ export class RetrievalLayer {
             result.metadata?.title ||
             result.metadata?.filename ||
             `Document ${result.id}`,
-          source: result.metadata?.source || "unknown",
+          source: result.metadata?.sourceUrl || result.metadata?.source || "unknown",
         })),
         version: "v1",
       };
