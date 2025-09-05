@@ -89,7 +89,6 @@
 
           <div v-else class="space-y-4">
             <!-- Messages -->
-            {{ messages }}
             <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
                 :variant="message.sender as 'customer' | 'agent' | 'system'"
@@ -261,10 +260,10 @@
                 variant="outline"
                 size="sm"
                 class="w-full justify-start"
-                @click="sendQuickMessage('How much does it cost?')"
+                @click="sendQuickMessage('I want to cancel my subscription')"
               >
                 <DollarSign class="h-4 w-4 mr-2" />
-                Pricing Question
+                Cancel Subscription
               </Button>
               <Button
                 variant="outline"

@@ -364,6 +364,7 @@ import {
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import Badge from "@/components/ui/Badge.vue";
 import DataPagination from "@/components/DataPagination.vue";
@@ -371,6 +372,9 @@ import MetricCard from "@/components/MetricCard.vue";
 
 // Router
 const router = useRouter();
+
+// Stores
+const appStore = useAppStore();
 
 // Reactive state
 const loading = ref(true);
@@ -568,7 +572,10 @@ const fetchConversations = async () => {
 };
 
 const refreshConversations = async () => {
-  await fetchConversations();
+  await Promise.all([
+    fetchConversations(),
+    appStore.refreshConversationsCount(),
+  ]);
 };
 
 const handlePageChange = async (page: number) => {
@@ -584,7 +591,10 @@ const handleItemsPerPageChange = async (itemsPerPage: number) => {
 
 // Lifecycle
 onMounted(async () => {
-  await fetchConversations();
+  await Promise.all([
+    fetchConversations(),
+    appStore.refreshConversationsCount(),
+  ]);
   // TODO: Fetch agents from API
   // TODO: Setup real-time updates via WebSocket
 });

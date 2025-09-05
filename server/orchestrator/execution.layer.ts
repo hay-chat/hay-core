@@ -46,6 +46,20 @@ export class ExecutionLayer {
         context
       );
 
+      // Debug the plannerOutput right before the switch
+      console.log("=== EXECUTION SWITCH DEBUG ===");
+      console.log(`plannerOutput type: ${typeof plannerOutput}`);
+      console.log(`plannerOutput:`, JSON.stringify(plannerOutput, null, 2));
+      console.log(`plannerOutput.step: "${plannerOutput.step}" (type: ${typeof plannerOutput.step})`);
+      console.log(`Valid steps: ASK, RESPOND, CALL_TOOL, HANDOFF, CLOSE`);
+      
+      if (plannerOutput.step === undefined || plannerOutput.step === null) {
+        console.error("❌ CRITICAL: plannerOutput.step is null/undefined!");
+        console.error("This indicates the LLM didn't return a valid step or parsing failed");
+        console.error("Full plannerOutput:", plannerOutput);
+      }
+      console.log("=== END EXECUTION SWITCH DEBUG ===");
+
       switch (plannerOutput.step) {
         case "ASK":
           return await this.handleAsk(plannerOutput);
@@ -159,6 +173,8 @@ export class ExecutionLayer {
     };
 
     console.log("=== CALLING LLM SERVICE FOR PLANNER OUTPUT ===");
+    console.log("JSON Schema being sent to LLM:");
+    console.log(JSON.stringify(plannerSchema, null, 2));
     console.log("=== CONVERSATION MESSAGES BEING SENT TO LLM ===");
     const conversationMessages = conversation.messages as Message[] || [];
     conversationMessages.forEach((msg, index) => {
@@ -175,8 +191,29 @@ export class ExecutionLayer {
     });
     
     console.log(`=== PLANNER OUTPUT RESULT ===`);
+    console.log(`Raw result type: ${typeof result}`);
+    console.log(`Raw result:`, JSON.stringify(result, null, 2));
     console.log(`Step chosen: ${result.step}`);
+    console.log(`Step type: ${typeof result.step}`);
     console.log(`Rationale: ${result.rationale}`);
+    
+    // Validate the result structure
+    if (result && typeof result === 'object') {
+      console.log(`Result object keys:`, Object.keys(result));
+      
+      if (!result.step) {
+        console.error("❌ CRITICAL: result.step is missing from LLM response!");
+        console.error("Expected one of: ASK, RESPOND, CALL_TOOL, HANDOFF, CLOSE");
+      }
+      
+      if (!result.rationale) {
+        console.warn("⚠️  WARNING: result.rationale is missing");
+      }
+    } else {
+      console.error("❌ CRITICAL: result is not an object or is null/undefined");
+      console.error(`Result value:`, result);
+    }
+    
     console.log("=== END EXECUTION LAYER DEBUG INFO ===\n");
     
     return result;

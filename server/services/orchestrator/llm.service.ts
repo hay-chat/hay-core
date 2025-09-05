@@ -79,7 +79,38 @@ export class LLMService {
       }
 
       if (jsonSchema) {
-        return JSON.parse(content) as T;
+        console.log("=== JSON SCHEMA RESPONSE PARSING DEBUG ===");
+        console.log(`Raw response content (${content.length} chars):`);
+        console.log(`"${content}"`);
+        console.log(`Content type: ${typeof content}`);
+        
+        try {
+          const parsed = JSON.parse(content);
+          console.log(`Successfully parsed JSON. Type: ${typeof parsed}`);
+          console.log(`Parsed object keys:`, Object.keys(parsed));
+          console.log(`Parsed object:`, JSON.stringify(parsed, null, 2));
+          
+          // Check for the specific step property that's causing issues
+          if (parsed && typeof parsed === 'object') {
+            console.log(`parsed.step value: "${parsed.step}" (type: ${typeof parsed.step})`);
+            console.log(`parsed.rationale: "${parsed.rationale}"`);
+            console.log(`parsed.userMessage: "${parsed.userMessage}"`);
+            
+            if (parsed.step === undefined) {
+              console.error("❌ CRITICAL: step property is undefined after parsing!");
+              console.error("This likely indicates a JSON structure mismatch or parsing issue");
+            }
+          }
+          
+          console.log("=== END JSON PARSING DEBUG ===");
+          return parsed as T;
+        } catch (parseError) {
+          console.error("❌ JSON PARSING ERROR:");
+          console.error(`Parse error: ${parseError}`);
+          console.error(`Content that failed to parse: "${content}"`);
+          console.error("=== END JSON PARSING DEBUG ===");
+          throw parseError;
+        }
       }
 
       console.log(messages, content);

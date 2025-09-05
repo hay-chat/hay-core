@@ -12,6 +12,8 @@ import {
   vectorStoreService,
   SearchResult,
 } from "@server/services/vector-store.service";
+import { pluginManagerService } from "@server/services/plugin-manager.service";
+import { analyzeInstructions, isInstructionsJson } from "@server/utils/instruction-formatter";
 
 export class RetrievalLayer {
   private playbookRepository: PlaybookRepository;
@@ -21,6 +23,107 @@ export class RetrievalLayer {
     console.log("RetrievalLayer initialized");
     this.playbookRepository = new PlaybookRepository();
     this.llmService = new LLMService();
+  }
+
+  /**
+   * Extract referenced actions from playbook instructions using the [action](name) format
+   * @param playbook - The playbook object containing instructions
+   */
+  private extractReferencedActions(playbook: any): string[] {
+    if (!playbook) {
+      return [];
+    }
+
+    const instructions = playbook.instructions || playbook.prompt_template;
+    if (!instructions) {
+      return [];
+    }
+
+    let referencedActions: string[] = [];
+    
+    if (isInstructionsJson(instructions)) {
+      // Use the existing analyzer for JSON instructions
+      const analysis = analyzeInstructions(instructions);
+      referencedActions = analysis.actions;
+    } else if (typeof instructions === 'string') {
+      // Parse string instructions for [action](name) patterns
+      const actionPattern = /\[action\]\(([^)]+)\)/g;
+      let match;
+      const actions: string[] = [];
+      
+      while ((match = actionPattern.exec(instructions)) !== null) {
+        actions.push(match[1]);
+      }
+      
+      referencedActions = actions;
+    }
+
+    console.log(`[RetrievalLayer] Extracted ${referencedActions.length} referenced actions from playbook '${playbook.title}': [${referencedActions.join(', ')}]`);
+    return referencedActions;
+  }
+
+  /**
+   * Get available tool schemas from all registered plugins, filtered by referenced actions
+   * @param referencedActions - Array of action names referenced in playbook instructions
+   */
+  private getReferencedToolSchemas(referencedActions: string[]): any[] {
+    if (!referencedActions || referencedActions.length === 0) {
+      console.log(`[RetrievalLayer] No referenced actions found, no tools will be available`);
+      return [];
+    }
+
+    const allPlugins = pluginManagerService.getAllPlugins();
+    const toolSchemas: any[] = [];
+    const foundActions: string[] = [];
+    
+    for (const plugin of allPlugins) {
+      const manifest = plugin.manifest as any;
+      if (manifest.capabilities?.mcp?.tools && Array.isArray(manifest.capabilities.mcp.tools)) {
+        // Filter tools to only include those referenced in the playbook
+        // Support both direct tool names (e.g., "create_ticket") and plugin-prefixed names (e.g., "hay-plugin-zendesk_create_ticket")
+        const referencedTools = manifest.capabilities.mcp.tools.filter((tool: any) => {
+          // Check direct tool name match
+          if (referencedActions.includes(tool.name)) {
+            return true;
+          }
+          
+          // Check plugin-prefixed name match (e.g., "hay-plugin-zendesk_create_ticket")
+          const pluginPrefixedName = `${plugin.manifest.id}_${tool.name}`;
+          return referencedActions.includes(pluginPrefixedName);
+        });
+        
+        if (referencedTools.length > 0) {
+          // Transform plugin tool schemas to the format expected by the system message
+          const pluginTools = referencedTools.map((tool: any) => {
+            // Track the action name that was actually referenced (could be prefixed or not)
+            const directMatch = referencedActions.find(action => action === tool.name);
+            const prefixedMatch = referencedActions.find(action => action === `${plugin.manifest.id}_${tool.name}`);
+            const matchedActionName = directMatch || prefixedMatch || tool.name;
+            
+            foundActions.push(matchedActionName);
+            return {
+              name: tool.name, // Keep the original tool name for execution
+              description: tool.description || tool.label || 'No description available',
+              parameters: tool.input_schema || {},
+              required: tool.input_schema?.required || []
+            };
+          });
+          
+          toolSchemas.push(...pluginTools);
+          
+          console.log(`[RetrievalLayer] Loaded ${pluginTools.length} referenced tools from plugin '${plugin.name}': [${referencedTools.map((t: { name: string }) => t.name).join(', ')}]`);
+        }
+      }
+    }
+    
+    // Log any referenced actions that weren't found
+    const notFound = referencedActions.filter(action => !foundActions.includes(action));
+    if (notFound.length > 0) {
+      console.warn(`[RetrievalLayer] Referenced actions not found in any plugin: [${notFound.join(', ')}]`);
+    }
+    
+    console.log(`[RetrievalLayer] Total referenced tools available: ${toolSchemas.length} (${foundActions.join(', ')})`);
+    return toolSchemas;
   }
 
   async retrieve(
@@ -237,8 +340,16 @@ export class RetrievalLayer {
         newPlaybook.id,
         conversation.organization_id
       );
+      
+      // Extract referenced actions from playbook instructions
+      const referencedActions = this.extractReferencedActions(playbookData);
+      const toolSchemas = this.getReferencedToolSchemas(referencedActions);
+      
+      console.log(`[RetrievalLayer] Creating playbook system message with ${toolSchemas.length} tool schemas`);
+      console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
+      
       const systemMessage =
-        SystemMessageService.createPlaybookSystemMessage(playbookData);
+        SystemMessageService.createPlaybookSystemMessage(playbookData, toolSchemas);
 
       return {
         action: "change",
@@ -270,8 +381,15 @@ export class RetrievalLayer {
       );
 
       if (playbook) {
+        // Extract referenced actions from playbook instructions
+        const referencedActions = this.extractReferencedActions(playbook);
+        const toolSchemas = this.getReferencedToolSchemas(referencedActions);
+        
+        console.log(`[RetrievalLayer] Activating new playbook with ${toolSchemas.length} tool schemas`);
+        console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
+        
         const systemMessage =
-          SystemMessageService.createPlaybookSystemMessage(playbook);
+          SystemMessageService.createPlaybookSystemMessage(playbook, toolSchemas);
         return {
           action: "activate",
           playbook,

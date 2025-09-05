@@ -21,295 +21,1480 @@
           "name": "list_tickets",
           "label": "List Tickets",
           "description": "List tickets in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of tickets per page (max 100)"
+              },
+              "sort_by": {
+                "type": "string",
+                "description": "Field to sort by"
+              },
+              "sort_order": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "description": "Sort order (asc or desc)"
+              }
+            }
+          }
         },
         {
           "name": "get_ticket",
           "label": "Get Ticket",
           "description": "Get a specific ticket by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Ticket ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_ticket",
           "label": "Create Ticket",
           "description": "Create a new ticket",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "subject": {
+                "type": "string",
+                "description": "Ticket subject"
+              },
+              "comment": {
+                "type": "string",
+                "description": "Ticket comment/description"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["urgent", "high", "normal", "low"],
+                "description": "Ticket priority"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["new", "open", "pending", "hold", "solved", "closed"],
+                "description": "Ticket status"
+              },
+              "requester_id": {
+                "type": "number",
+                "description": "User ID of the requester"
+              },
+              "assignee_id": {
+                "type": "number",
+                "description": "User ID of the assignee"
+              },
+              "group_id": {
+                "type": "number",
+                "description": "Group ID for the ticket"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["problem", "incident", "question", "task"],
+                "description": "Ticket type"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags for the ticket"
+              }
+            },
+            "required": ["subject", "comment"]
+          }
         },
         {
           "name": "update_ticket",
           "label": "Update Ticket",
           "description": "Update an existing ticket",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Ticket ID to update"
+              },
+              "subject": {
+                "type": "string",
+                "description": "Updated ticket subject"
+              },
+              "comment": {
+                "type": "string",
+                "description": "New comment to add"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["urgent", "high", "normal", "low"],
+                "description": "Updated ticket priority"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["new", "open", "pending", "hold", "solved", "closed"],
+                "description": "Updated ticket status"
+              },
+              "assignee_id": {
+                "type": "number",
+                "description": "User ID of the new assignee"
+              },
+              "group_id": {
+                "type": "number",
+                "description": "New group ID for the ticket"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["problem", "incident", "question", "task"],
+                "description": "Updated ticket type"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Updated tags for the ticket"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_ticket",
           "label": "Delete Ticket",
           "description": "Delete a ticket",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Ticket ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_users",
           "label": "List Users",
           "description": "List users in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of users per page (max 100)"
+              },
+              "role": {
+                "type": "string",
+                "enum": ["end-user", "agent", "admin"],
+                "description": "Filter users by role"
+              }
+            }
+          }
         },
         {
           "name": "get_user",
           "label": "Get User",
           "description": "Get a specific user by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "User ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_user",
           "label": "Create User",
           "description": "Create a new user",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "User's full name"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "User's email address"
+              },
+              "role": {
+                "type": "string",
+                "enum": ["end-user", "agent", "admin"],
+                "description": "User's role"
+              },
+              "phone": {
+                "type": "string",
+                "description": "User's phone number"
+              },
+              "organization_id": {
+                "type": "number",
+                "description": "ID of the user's organization"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags for the user"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes about the user"
+              }
+            },
+            "required": ["name", "email"]
+          }
         },
         {
           "name": "update_user",
           "label": "Update User",
           "description": "Update an existing user",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "User ID to update"
+              },
+              "name": {
+                "type": "string",
+                "description": "Updated user's name"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Updated email address"
+              },
+              "role": {
+                "type": "string",
+                "enum": ["end-user", "agent", "admin"],
+                "description": "Updated user's role"
+              },
+              "phone": {
+                "type": "string",
+                "description": "Updated phone number"
+              },
+              "organization_id": {
+                "type": "number",
+                "description": "Updated organization ID"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Updated tags for the user"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Updated notes about the user"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_user",
           "label": "Delete User",
           "description": "Delete a user",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "User ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_organizations",
           "label": "List Organizations",
           "description": "List organizations in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of organizations per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_organization",
           "label": "Get Organization",
           "description": "Get a specific organization by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Organization ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_organization",
           "label": "Create Organization",
           "description": "Create a new organization",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Organization name"
+              },
+              "domain_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Domain names for the organization"
+              },
+              "details": {
+                "type": "string",
+                "description": "Details about the organization"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes about the organization"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags for the organization"
+              }
+            },
+            "required": ["name"]
+          }
         },
         {
           "name": "update_organization",
           "label": "Update Organization",
           "description": "Update an existing organization",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Organization ID to update"
+              },
+              "name": {
+                "type": "string",
+                "description": "Updated organization name"
+              },
+              "domain_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Updated domain names"
+              },
+              "details": {
+                "type": "string",
+                "description": "Updated details"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Updated notes"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Updated tags"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_organization",
           "label": "Delete Organization",
           "description": "Delete an organization",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Organization ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_groups",
           "label": "List Groups",
           "description": "List agent groups in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of groups per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_group",
           "label": "Get Group",
           "description": "Get a specific group by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Group ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_group",
           "label": "Create Group",
           "description": "Create a new agent group",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Group name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Group description"
+              }
+            },
+            "required": ["name"]
+          }
         },
         {
           "name": "update_group",
           "label": "Update Group",
           "description": "Update an existing group",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Group ID to update"
+              },
+              "name": {
+                "type": "string",
+                "description": "Updated group name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Updated group description"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_group",
           "label": "Delete Group",
           "description": "Delete a group",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Group ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_macros",
           "label": "List Macros",
           "description": "List macros in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of macros per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_macro",
           "label": "Get Macro",
           "description": "Get a specific macro by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Macro ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_macro",
           "label": "Create Macro",
           "description": "Create a new macro",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Macro title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Macro description"
+              },
+              "actions": {
+                "type": "array",
+                "description": "Actions to perform when macro is applied",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["title", "actions"]
+          }
         },
         {
           "name": "update_macro",
           "label": "Update Macro",
           "description": "Update an existing macro",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Macro ID to update"
+              },
+              "title": {
+                "type": "string",
+                "description": "Updated macro title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Updated macro description"
+              },
+              "actions": {
+                "type": "array",
+                "description": "Updated actions",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_macro",
           "label": "Delete Macro",
           "description": "Delete a macro",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Macro ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_views",
           "label": "List Views",
           "description": "List views in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of views per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_view",
           "label": "Get View",
           "description": "Get a specific view by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "View ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_view",
           "label": "Create View",
           "description": "Create a new view",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "View title"
+              },
+              "description": {
+                "type": "string",
+                "description": "View description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Conditions for the view",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to filter on"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to filter on"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["title", "conditions"]
+          }
         },
         {
           "name": "update_view",
           "label": "Update View",
           "description": "Update an existing view",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "View ID to update"
+              },
+              "title": {
+                "type": "string",
+                "description": "Updated view title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Updated view description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Updated conditions",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to filter on"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to filter on"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_view",
           "label": "Delete View",
           "description": "Delete a view",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "View ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_triggers",
           "label": "List Triggers",
           "description": "List triggers in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of triggers per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_trigger",
           "label": "Get Trigger",
           "description": "Get a specific trigger by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Trigger ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_trigger",
           "label": "Create Trigger",
           "description": "Create a new trigger",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Trigger title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Trigger description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Conditions for the trigger",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "type": "array",
+                "description": "Actions to perform when trigger conditions are met",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["title", "conditions", "actions"]
+          }
         },
         {
           "name": "update_trigger",
           "label": "Update Trigger",
           "description": "Update an existing trigger",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Trigger ID to update"
+              },
+              "title": {
+                "type": "string",
+                "description": "Updated trigger title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Updated trigger description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Updated conditions",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "type": "array",
+                "description": "Updated actions",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_trigger",
           "label": "Delete Trigger",
           "description": "Delete a trigger",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Trigger ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_automations",
           "label": "List Automations",
           "description": "List automations in Zendesk",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of automations per page (max 100)"
+              }
+            }
+          }
         },
         {
           "name": "get_automation",
           "label": "Get Automation",
           "description": "Get a specific automation by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Automation ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_automation",
           "label": "Create Automation",
           "description": "Create a new automation",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Automation title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Automation description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Conditions for the automation",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "type": "array",
+                "description": "Actions to perform when automation conditions are met",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["title", "conditions", "actions"]
+          }
         },
         {
           "name": "update_automation",
           "label": "Update Automation",
           "description": "Update an existing automation",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Automation ID to update"
+              },
+              "title": {
+                "type": "string",
+                "description": "Updated automation title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Updated automation description"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Updated conditions",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  },
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Field to check"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "description": "Operator for comparison"
+                        },
+                        "value": {
+                          "description": "Value to compare against"
+                        }
+                      },
+                      "required": ["field", "operator", "value"]
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "type": "array",
+                "description": "Updated actions",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Field to modify"
+                    },
+                    "value": {
+                      "description": "Value to set"
+                    }
+                  },
+                  "required": ["field", "value"]
+                }
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_automation",
           "label": "Delete Automation",
           "description": "Delete an automation",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Automation ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "list_articles",
           "label": "List Articles",
           "description": "List Help Center articles",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of articles per page (max 100)"
+              },
+              "sort_by": {
+                "type": "string",
+                "description": "Field to sort by"
+              },
+              "sort_order": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "description": "Sort order (asc or desc)"
+              }
+            }
+          }
         },
         {
           "name": "get_article",
           "label": "Get Article",
           "description": "Get a specific Help Center article by ID",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Article ID"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "create_article",
           "label": "Create Article",
           "description": "Create a new Help Center article",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Article title"
+              },
+              "body": {
+                "type": "string",
+                "description": "Article body content (HTML)"
+              },
+              "section_id": {
+                "type": "number",
+                "description": "Section ID where the article will be created"
+              },
+              "locale": {
+                "type": "string",
+                "description": "Article locale (e.g., 'en-us')"
+              },
+              "draft": {
+                "type": "boolean",
+                "description": "Whether the article is a draft"
+              },
+              "permission_group_id": {
+                "type": "number",
+                "description": "Permission group ID for the article"
+              },
+              "user_segment_id": {
+                "type": "number",
+                "description": "User segment ID for the article"
+              },
+              "label_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Labels for the article"
+              }
+            },
+            "required": ["title", "body", "section_id"]
+          }
         },
         {
           "name": "update_article",
           "label": "Update Article",
           "description": "Update an existing Help Center article",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Article ID to update"
+              },
+              "title": {
+                "type": "string",
+                "description": "Updated article title"
+              },
+              "body": {
+                "type": "string",
+                "description": "Updated article body content (HTML)"
+              },
+              "locale": {
+                "type": "string",
+                "description": "Updated article locale (e.g., 'en-us')"
+              },
+              "draft": {
+                "type": "boolean",
+                "description": "Whether the article is a draft"
+              },
+              "permission_group_id": {
+                "type": "number",
+                "description": "Updated permission group ID"
+              },
+              "user_segment_id": {
+                "type": "number",
+                "description": "Updated user segment ID"
+              },
+              "label_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Updated labels"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "delete_article",
           "label": "Delete Article",
           "description": "Delete a Help Center article",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "description": "Article ID to delete"
+              }
+            },
+            "required": ["id"]
+          }
         },
         {
           "name": "search",
           "label": "Search",
           "description": "Search across Zendesk data",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Search query string"
+              },
+              "sort_by": {
+                "type": "string",
+                "description": "Field to sort by"
+              },
+              "sort_order": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "description": "Sort order (asc or desc)"
+              },
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of results per page (max 100)"
+              }
+            },
+            "required": ["query"]
+          }
         },
         {
           "name": "support_info",
           "label": "Support Info",
           "description": "Get information about Zendesk Support configuration",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          }
         },
         {
           "name": "get_talk_stats",
           "label": "Get Talk Stats",
           "description": "Get Zendesk Talk statistics",
-          "input_schema": "JSONSchemaRefOrInline"
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          }
         },
         {
-          "name": "get_chat_conversations",
-          "label": "Get Chat Conversations",
-          "description": "Get Zendesk Chat conversations",
-          "input_schema": "JSONSchemaRefOrInline"
+          "name": "list_chats",
+          "label": "List Chats",
+          "description": "List Zendesk Chat conversations",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number",
+                "description": "Page number for pagination"
+              },
+              "per_page": {
+                "type": "number",
+                "description": "Number of chats per page (max 100)"
+              }
+            }
+          }
         }
       ],
       "transport": "sse|websocket|http",

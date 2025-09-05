@@ -57,6 +57,8 @@ export class Message {
     tools?: string[];
     playbook_id?: string;
     confidence?: number;
+    referenced_actions?: string[];
+    referenced_documents?: string[];
   } | null;
 
   @CreateDateColumn()

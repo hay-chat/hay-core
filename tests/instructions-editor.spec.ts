@@ -92,7 +92,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     // Wait for the slash command menu to appear (with a reasonable timeout)
     let menuAppeared = false;
     try {
-      await page.waitForSelector(".mcp-menu", {
+      await page.waitForSelector(".mention-menu", {
         state: "visible",
         timeout: 3000,
       });
@@ -423,15 +423,15 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     let actionInserted = false;
     try {
-      await page.waitForSelector(".mcp-menu", {
+      await page.waitForSelector(".mention-menu", {
         state: "visible",
         timeout: 3000,
       });
       console.log("✅ Slash command menu appeared");
 
       // Check for actions or documents
-      const actionItems = page.locator(".mcp-item-action");
-      const documentItems = page.locator(".mcp-item-document");
+      const actionItems = page.locator(".mention-item-action");
+      const documentItems = page.locator(".mention-item-document");
       const actionCount = await actionItems.count();
       const documentCount = await documentItems.count();
 
@@ -549,5 +549,476 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
         }
       }
     }
+  });
+
+  test("should handle indentation workflow - a/enter/tab/b/enter/enter/c with proper v-model structure", async ({
+    page,
+  }) => {
+    await authenticate(page);
+    await page.goto("http://localhost:3000/playbooks/new");
+    await page.waitForLoadState("networkidle");
+
+    const instructionsEditor = page.locator(
+      '[data-testid="instructions-editor"]'
+    );
+    await expect(instructionsEditor).toBeVisible();
+
+    // Helper function to get v-model data
+    const getVModelData = async () => {
+      return await page.evaluate(() => {
+        const editorElement = document.querySelector(
+          '[data-testid="instructions-editor"]'
+        );
+        if (editorElement) {
+          const vueInstance = (editorElement as any).__vueParentComponent;
+          if (vueInstance && vueInstance.setupState) {
+            return (
+              vueInstance.setupState.instructions ||
+              (vueInstance.setupState.form &&
+                vueInstance.setupState.form.instructions)
+            );
+          }
+        }
+        return null;
+      });
+    };
+
+    // Helper function to get current DOM structure for debugging
+    const getDOMStructure = async () => {
+      return await page.evaluate(() => {
+        const items = Array.from(document.querySelectorAll('.instruction-item, .rich-instruction-input'));
+        return items.map((item, index) => ({
+          index,
+          text: item.textContent?.trim() || '',
+          classes: item.className,
+          level: item.getAttribute('data-level') || 'no-level',
+          hasIndentClass: item.classList.contains('indented') || item.classList.contains('indent-1') || item.classList.contains('ml-4') || item.classList.contains('pl-4')
+        }));
+      });
+    };
+
+    console.log("📝 Starting indentation workflow test");
+
+    // Step 1: Click anywhere on the empty editor to focus first line item
+    console.log("📝 Step 1: Focus on the editor");
+    const firstContentEditable = page
+      .locator(".instruction-content[contenteditable]")
+      .first();
+    await expect(firstContentEditable).toBeVisible();
+    await firstContentEditable.click();
+
+    // Step 2: Type "a"
+    console.log("📝 Step 2: Type 'a'");
+    await firstContentEditable.type("a");
+    await page.waitForTimeout(300);
+
+    let vModelData = await getVModelData();
+    console.log("📝 V-model after typing 'a':", vModelData);
+
+    // Verify first step has "a"
+    if (vModelData && vModelData.length > 0) {
+      expect(vModelData[0].instructions).toContain("a");
+      console.log("✅ First instruction contains 'a'");
+    }
+
+    // Step 3: Press Enter to create new step
+    console.log("📝 Step 3: Press Enter to create new step");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+
+    vModelData = await getVModelData();
+    console.log("📝 V-model after pressing Enter:", vModelData);
+
+    // Should have 2 instructions now
+    if (vModelData && vModelData.length >= 2) {
+      console.log(`✅ Now have ${vModelData.length} instructions after Enter`);
+    } else {
+      console.log(`❌ Expected 2+ instructions, got: ${vModelData?.length || 0}`);
+    }
+
+    // Step 4: Press Tab to indent current step
+    console.log("📝 Step 4: Press Tab to indent current (second) step");
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(300);
+
+    let domStructure = await getDOMStructure();
+    console.log("📝 DOM structure after Tab:", domStructure);
+
+    // Step 5: Type "b"
+    console.log("📝 Step 5: Type 'b'");
+    await page.keyboard.type("b");
+    await page.waitForTimeout(300);
+
+    vModelData = await getVModelData();
+    console.log("📝 V-model after typing 'b':", vModelData);
+
+    // Verify second step has "b" and is indented
+    if (vModelData && vModelData.length >= 2) {
+      expect(vModelData[1].instructions).toContain("b");
+      console.log("✅ Second instruction contains 'b'");
+      
+      // Check if indentation level is tracked in v-model
+      if (vModelData[1].hasOwnProperty('level') || vModelData[1].hasOwnProperty('indent')) {
+        console.log("📝 Second instruction indentation data:", {
+          level: vModelData[1].level,
+          indent: vModelData[1].indent
+        });
+      }
+    }
+
+    // Step 6: Press Enter to create new substep at same level
+    console.log("📝 Step 6: Press Enter to create new substep at same level");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+
+    vModelData = await getVModelData();
+    console.log("📝 V-model after second Enter:", vModelData);
+
+    // Should have 3 instructions now, third should be at same indent level as second
+    if (vModelData && vModelData.length >= 3) {
+      console.log(`✅ Now have ${vModelData.length} instructions after second Enter`);
+    }
+
+    domStructure = await getDOMStructure();
+    console.log("📝 DOM structure after second Enter:", domStructure);
+
+    // Step 7: Press Enter or Backspace to move third line from second level to first level
+    console.log("📝 Step 7: Press Enter or Backspace to outdent third step to first level");
+    // Try Enter first (some editors use double enter to outdent)
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    
+    domStructure = await getDOMStructure();
+    console.log("📝 DOM structure after third Enter:", domStructure);
+    
+    // If that didn't work, try Backspace to outdent
+    const thirdStepIndented = domStructure.length > 2 && domStructure[2].hasIndentClass;
+    if (thirdStepIndented) {
+      console.log("📝 Third step still indented, trying Backspace to outdent");
+      await page.keyboard.press("Backspace");
+      await page.waitForTimeout(300);
+    }
+
+    // Step 8: Type "c"
+    console.log("📝 Step 8: Type 'c'");
+    await page.keyboard.type("c");
+    await page.waitForTimeout(300);
+
+    vModelData = await getVModelData();
+    console.log("📝 Final v-model after typing 'c':", vModelData);
+
+    domStructure = await getDOMStructure();
+    console.log("📝 Final DOM structure:", domStructure);
+
+    // Final verification: Expected structure
+    console.log("📝 FINAL VERIFICATION: Checking expected structure");
+    
+    if (vModelData && vModelData.length >= 3) {
+      console.log("📝 Final v-model structure:");
+      vModelData.forEach((item, index) => {
+        console.log(`  ${index + 1}. "${item.instructions}" (level: ${item.level || item.indent || 'none'})`);
+      });
+
+      // Expected final structure:
+      // 1. a (level 0)
+      // 1.1. b (level 1) 
+      // 2. c (level 0)
+      
+      // Verify content
+      expect(vModelData[0].instructions).toContain("a");
+      expect(vModelData[1].instructions).toContain("b"); 
+      expect(vModelData[2].instructions).toContain("c");
+      console.log("✅ Content verification passed: a, b, c");
+
+      // Verify indentation structure
+      const firstLevel = vModelData[0].level || vModelData[0].indent || 0;
+      const secondLevel = vModelData[1].level || vModelData[1].indent || 0;
+      const thirdLevel = vModelData[2].level || vModelData[2].indent || 0;
+
+      console.log("📝 Indentation levels:", { firstLevel, secondLevel, thirdLevel });
+
+      // Expected: first=0, second=1, third=0
+      expect(Number(firstLevel)).toBe(0);
+      expect(Number(secondLevel)).toBe(1); 
+      expect(Number(thirdLevel)).toBe(0);
+      console.log("✅ Indentation verification passed: 0, 1, 0");
+
+      // Additional DOM verification
+      if (domStructure.length >= 3) {
+        const firstIndented = domStructure[0].hasIndentClass;
+        const secondIndented = domStructure[1].hasIndentClass;
+        const thirdIndented = domStructure[2].hasIndentClass;
+
+        console.log("📝 DOM indentation classes:", { firstIndented, secondIndented, thirdIndented });
+
+        // Expected: first=false, second=true, third=false
+        expect(firstIndented).toBe(false);
+        expect(secondIndented).toBe(true);
+        expect(thirdIndented).toBe(false);
+        console.log("✅ DOM indentation verification passed");
+      }
+
+      console.log("✅ INDENTATION WORKFLOW TEST PASSED");
+      console.log("✅ Final structure: 1. a, 1.1. b, 2. c");
+      
+    } else {
+      console.log("❌ INDENTATION WORKFLOW TEST FAILED");
+      console.log(`❌ Expected 3+ instructions, got: ${vModelData?.length || 0}`);
+      expect(vModelData?.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  test("should handle cursor positioning correctly on Enter and Delete operations", async ({
+    page,
+  }) => {
+    await authenticate(page);
+    await page.goto("http://localhost:3000/playbooks/new");
+    await page.waitForLoadState("networkidle");
+
+    const instructionsEditor = page.locator(
+      '[data-testid="instructions-editor"]'
+    );
+    await expect(instructionsEditor).toBeVisible();
+
+    // Helper function to get cursor position within a contenteditable element
+    const getCursorPosition = async (element) => {
+      return await element.evaluate((el) => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          
+          // Check if the element is focused and the range is within it
+          if (el === document.activeElement || el.contains(range.commonAncestorContainer) || range.commonAncestorContainer === el) {
+            const text = el.textContent || '';
+            
+            // For empty elements, check if we have a collapsed range at position 0
+            if (text.length === 0 && range.collapsed) {
+              return {
+                start: 0,
+                end: 0,
+                text: '',
+                isAtEnd: true,
+                isAtStart: true
+              };
+            }
+            
+            return {
+              start: range.startOffset,
+              end: range.endOffset,
+              text: text,
+              isAtEnd: range.startOffset === text.length,
+              isAtStart: range.startOffset === 0
+            };
+          }
+        }
+        
+        // Fallback: if element is focused but no range detected, assume cursor at start of empty element
+        if (el === document.activeElement && (!el.textContent || el.textContent.length === 0)) {
+          return {
+            start: 0,
+            end: 0,
+            text: '',
+            isAtEnd: true,
+            isAtStart: true
+          };
+        }
+        
+        return null;
+      });
+    };
+
+    // Helper function to get the currently focused element
+    const getFocusedElement = async () => {
+      return await page.evaluate(() => {
+        const focused = document.activeElement;
+        if (focused && focused.classList.contains('instruction-content')) {
+          return {
+            text: focused.textContent,
+            classList: Array.from(focused.classList),
+            dataTestId: focused.closest('[data-testid]')?.getAttribute('data-testid')
+          };
+        }
+        return null;
+      });
+    };
+
+    // Helper function to count instruction items
+    const getInstructionCount = async () => {
+      return await page.locator(".instruction-item-wrapper").count();
+    };
+
+    console.log("📝 Starting cursor positioning tests");
+
+    // Test 1: Enter key creates new line and positions cursor correctly
+    console.log("📝 Test 1: Enter key behavior");
+    
+    const firstContentEditable = page
+      .locator(".instruction-content[contenteditable]")
+      .first();
+    await expect(firstContentEditable).toBeVisible();
+    await firstContentEditable.click();
+
+    // Type some text in the first instruction
+    console.log("📝 Typing 'First instruction' in first line");
+    await firstContentEditable.type("First instruction");
+    await page.waitForTimeout(300);
+
+    let cursorPos = await getCursorPosition(firstContentEditable);
+    console.log("📝 Cursor position after typing:", cursorPos);
+    
+    // Verify cursor is at the end of the text
+    expect(cursorPos?.isAtEnd).toBe(true);
+    expect(cursorPos?.text).toContain("First instruction");
+
+    // Press Enter to create a new instruction
+    console.log("📝 Pressing Enter to create new instruction");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+
+    // Check that we have 2 instructions now
+    const instructionCount = await getInstructionCount();
+    console.log("📝 Instruction count after Enter:", instructionCount);
+    expect(instructionCount).toBe(2);
+
+    // Verify that the cursor moved to the new instruction
+    const focusedElement = await getFocusedElement();
+    console.log("📝 Currently focused element:", focusedElement);
+
+    // The new instruction should be focused and cursor should be at the beginning
+    const secondContentEditable = page
+      .locator(".instruction-content[contenteditable]")
+      .nth(1);
+    await expect(secondContentEditable).toBeFocused();
+
+    // Give a moment for the cursor to be properly positioned
+    await page.waitForTimeout(200);
+    
+    let secondCursorPos = await getCursorPosition(secondContentEditable);
+    console.log("📝 Cursor position in new instruction:", secondCursorPos);
+    
+    // Cursor should be at the start of the new (empty) instruction
+    expect(secondCursorPos?.isAtStart).toBe(true);
+    expect(secondCursorPos?.text?.trim()).toBe("");
+
+    // Type text in the second instruction
+    console.log("📝 Typing 'Second instruction' in second line");
+    await secondContentEditable.click(); // Ensure focus
+    await secondContentEditable.type("Second instruction");
+    await page.waitForTimeout(500); // Give more time for Vue to update
+    
+    // Check the actual content in the DOM
+    const actualContent = await secondContentEditable.textContent();
+    console.log("📝 Actual content in second instruction:", actualContent);
+
+    secondCursorPos = await getCursorPosition(secondContentEditable);
+    console.log("📝 Cursor position after typing in second line:", secondCursorPos);
+    expect(secondCursorPos?.isAtEnd).toBe(true);
+    expect(secondCursorPos?.text).toContain("Second instruction");
+
+    // Test 2: Delete behavior - delete the second instruction and check cursor positioning
+    console.log("📝 Test 2: Delete behavior");
+    
+    // Clear the second instruction completely
+    await secondContentEditable.selectText();
+    await page.keyboard.press("Delete");
+    await page.waitForTimeout(300);
+
+    // Check if the instruction was removed or just cleared
+    const instructionCountAfterDelete = await getInstructionCount();
+    console.log("📝 Instruction count after delete:", instructionCountAfterDelete);
+
+    if (instructionCountAfterDelete === 1) {
+      // If the instruction was removed, cursor should be at the end of the previous instruction
+      console.log("📝 Instruction was removed, checking cursor position in first instruction");
+      await expect(firstContentEditable).toBeFocused();
+      
+      const firstCursorPosAfterDelete = await getCursorPosition(firstContentEditable);
+      console.log("📝 Cursor position in first instruction after delete:", firstCursorPosAfterDelete);
+      
+      // Cursor should be at the end of the first instruction
+      expect(firstCursorPosAfterDelete?.isAtEnd).toBe(true);
+      expect(firstCursorPosAfterDelete?.text).toContain("First instruction");
+      
+    } else if (instructionCountAfterDelete === 2) {
+      // If the instruction was just cleared, cursor should remain in the second instruction
+      console.log("📝 Instruction was cleared but not removed, checking cursor position");
+      await expect(secondContentEditable).toBeFocused();
+      
+      const secondCursorPosAfterDelete = await getCursorPosition(secondContentEditable);
+      console.log("📝 Cursor position in second instruction after delete:", secondCursorPosAfterDelete);
+      
+      // Cursor should be at the start of the now-empty second instruction
+      expect(secondCursorPosAfterDelete?.isAtStart).toBe(true);
+      expect(secondCursorPosAfterDelete?.text?.trim()).toBe("");
+    }
+
+    // Test 3: Backspace behavior at beginning of line
+    console.log("📝 Test 3: Backspace at beginning of line behavior");
+    
+    // Ensure we have two instructions again
+    if (instructionCountAfterDelete === 1) {
+      console.log("📝 Creating second instruction again for backspace test");
+      await firstContentEditable.focus();
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(300);
+      
+      const newSecondContentEditable = page
+        .locator(".instruction-content[contenteditable]")
+        .nth(1);
+      await newSecondContentEditable.type("Second instruction again");
+      await page.waitForTimeout(300);
+    }
+
+    // Focus the second instruction and move cursor to the beginning
+    const currentSecondContentEditable = page
+      .locator(".instruction-content[contenteditable]")
+      .nth(1);
+    
+    await currentSecondContentEditable.focus();
+    
+    // Move cursor to the beginning of the second instruction
+    await page.keyboard.press("Home");
+    await page.waitForTimeout(200);
+    
+    let cursorAtBeginning = await getCursorPosition(currentSecondContentEditable);
+    console.log("📝 Cursor position at beginning of second line:", cursorAtBeginning);
+    expect(cursorAtBeginning?.isAtStart).toBe(true);
+
+    // Press Backspace to merge with previous line
+    console.log("📝 Pressing Backspace at beginning of second instruction");
+    await page.keyboard.press("Backspace");
+    await page.waitForTimeout(500);
+
+    // Check the result
+    const instructionCountAfterBackspace = await getInstructionCount();
+    console.log("📝 Instruction count after backspace:", instructionCountAfterBackspace);
+
+    if (instructionCountAfterBackspace === 1) {
+      // Lines were merged, cursor should be at the junction point
+      console.log("📝 Lines were merged, checking cursor position");
+      const mergedContentEditable = page
+        .locator(".instruction-content[contenteditable]")
+        .first();
+      
+      await expect(mergedContentEditable).toBeFocused();
+      
+      const mergedCursorPos = await getCursorPosition(mergedContentEditable);
+      console.log("📝 Cursor position after merge:", mergedCursorPos);
+      
+      // Cursor should be positioned between the original first instruction and the merged content
+      const expectedJunctionPosition = "First instruction".length;
+      expect(mergedCursorPos?.start).toBe(expectedJunctionPosition);
+      
+    } else {
+      // Second instruction was removed, cursor should be at end of first instruction
+      console.log("📝 Second instruction was removed, checking cursor in first instruction");
+      await expect(firstContentEditable).toBeFocused();
+      
+      const finalCursorPos = await getCursorPosition(firstContentEditable);
+      console.log("📝 Final cursor position:", finalCursorPos);
+      expect(finalCursorPos?.isAtEnd).toBe(true);
+    }
+
+    console.log("✅ Cursor positioning test completed");
   });
 });

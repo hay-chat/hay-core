@@ -108,12 +108,37 @@ export class PlanCreation {
       }
     }
 
-    // Update conversation with new playbook if switched
+    // Update conversation with new playbook if switched or first-time assignment
     if (switched && playbook && this.conversationService) {
       await this.conversationService.updateConversation(
         conversation.id,
         organizationId,
         { playbook_id: playbook.id }
+      );
+
+      // Create system message for playbook switch/assignment
+      await this.createPlaybookSystemMessage(
+        conversation.id,
+        organizationId,
+        playbook,
+        conversation.playbook_id // previous playbook ID (could be null for first assignment)
+      );
+    }
+
+    // Handle first-time playbook assignment when no switching occurred but playbook is selected
+    if (!switched && playbook && !conversation.playbook_id && this.conversationService) {
+      await this.conversationService.updateConversation(
+        conversation.id,
+        organizationId,
+        { playbook_id: playbook.id }
+      );
+
+      // Create system message for first-time playbook assignment
+      await this.createPlaybookSystemMessage(
+        conversation.id,
+        organizationId,
+        playbook,
+        undefined // no previous playbook
       );
     }
 
@@ -238,6 +263,99 @@ Respond with JSON: {"use_documents": true/false, "reasoning": "explanation"}`;
     } catch (error) {
       console.error(`[Orchestrator] Error in document retrieval decision:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Creates a system message when a playbook is switched or assigned for the first time.
+   * Only creates a message if switching to a different playbook to prevent duplicates.
+   * @param conversationId - The conversation ID
+   * @param organizationId - The organization ID
+   * @param playbook - The new playbook being assigned
+   * @param previousPlaybookId - The previous playbook ID (if any)
+   */
+  private async createPlaybookSystemMessage(
+    conversationId: string,
+    organizationId: string,
+    playbook: any,
+    previousPlaybookId?: string
+  ): Promise<void> {
+    if (!this.conversationService) {
+      return;
+    }
+
+    try {
+      // Check if we already have a system message for this specific playbook to prevent duplicates
+      const existingMessages = await this.conversationService.getMessages(conversationId);
+      const hasPlaybookMessage = existingMessages.some(
+        msg => msg.type === MessageType.SYSTEM && 
+               msg.metadata && 
+               typeof msg.metadata === 'object' && 
+               'reason' in msg.metadata && 
+               msg.metadata.reason === "playbook_assignment" &&
+               'playbook_id' in msg.metadata &&
+               msg.metadata.playbook_id === playbook.id
+      );
+
+      if (hasPlaybookMessage) {
+        console.log(`[PlanCreation] Playbook system message already exists for playbook ${playbook.id}, skipping duplicate`);
+        return;
+      }
+
+      // Create system message with playbook information
+      const systemMessageParts = [];
+      
+      // Add playbook activation message
+      if (previousPlaybookId) {
+        systemMessageParts.push(`📋 Switched to **${playbook.title}** playbook.`);
+      } else {
+        systemMessageParts.push(`📋 **${playbook.title}** playbook is now active.`);
+      }
+      
+      if (playbook.description) {
+        systemMessageParts.push(`\n📝 **About**: ${playbook.description}`);
+      }
+
+      // Add trigger information
+      if (playbook.trigger) {
+        systemMessageParts.push(`\n🎯 **Trigger**: ${playbook.trigger}`);
+      }
+
+      // Add instructions if available (show first 200 characters)
+      if (playbook.instructions) {
+        const instructionText = typeof playbook.instructions === 'object' 
+          ? playbook.instructions.text || JSON.stringify(playbook.instructions)
+          : playbook.instructions;
+        const truncatedInstructions = instructionText.length > 200 
+          ? `${instructionText.substring(0, 200)}...`
+          : instructionText;
+        systemMessageParts.push(`\n📖 **Instructions**: ${truncatedInstructions}`);
+      }
+
+      // Add required fields if any
+      if (playbook.required_fields && playbook.required_fields.length > 0) {
+        systemMessageParts.push(`\n✅ **Required Info**: ${playbook.required_fields.join(', ')}`);
+      }
+
+      const systemMessage = systemMessageParts.join('');
+
+      // Add the system message to the conversation
+      await this.conversationService.addMessage(conversationId, organizationId, {
+        content: systemMessage,
+        type: MessageType.SYSTEM,
+        sender: "system",
+        metadata: {
+          playbook_id: playbook.id,
+          playbook_title: playbook.title,
+          previous_playbook_id: previousPlaybookId,
+          reason: "playbook_assignment"
+        }
+      });
+
+      const actionText = previousPlaybookId ? "switched to" : "activated";
+      console.log(`[PlanCreation] ✅ Playbook ${playbook.title} (${playbook.id}) ${actionText} for conversation ${conversationId} with system message`);
+    } catch (error) {
+      console.error(`[PlanCreation] Error creating playbook system message:`, error);
     }
   }
 

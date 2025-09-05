@@ -1,14 +1,30 @@
 <template>
-  <div :class="['chat-message', `chat-message--${variant}`, { 'chat-message--inverted': inverted, 'chat-message--no-header': showHeader === false }]">
-    <div v-if="showHeader !== false" class="chat-message__avatar">
+  <div
+    :class="[
+      'chat-message',
+      `chat-message--${variant}`,
+      {
+        'chat-message--inverted': inverted,
+        'chat-message--no-header': showHeader === false,
+      },
+    ]"
+  >
+    <div
+      v-if="showHeader !== false && variant !== 'system'"
+      class="chat-message__avatar"
+    >
       <component :is="avatarIcon" class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
       <div v-if="showHeader !== false" class="chat-message__header">
-        <span v-if="senderName" class="chat-message__sender">{{
-          senderName
+        <span
+          v-if="senderName && variant !== 'system'"
+          class="chat-message__sender"
+          >{{ senderName }}</span
+        >
+        <span v-if="variant !== 'system'" class="chat-message__time">{{
+          formattedTime
         }}</span>
-        <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
             <Zap class="h-2 w-2 mr-1" />
@@ -154,7 +170,7 @@ const avatarIcon = computed(() => {
 });
 </script>
 
-<style scoped lang="postcss">
+<style scoped lang="scss">
 /* Base message container */
 .chat-message {
   @apply flex gap-3 max-w-2xl mb-4;
@@ -196,11 +212,13 @@ const avatarIcon = computed(() => {
   @apply mr-11 ml-0; /* Reverse for agent messages */
 }
 
-.chat-message--no-header.chat-message--inverted.chat-message--customer .chat-message__content {
+.chat-message--no-header.chat-message--inverted.chat-message--customer
+  .chat-message__content {
   @apply mr-11 ml-0; /* Reverse for inverted customer messages */
 }
 
-.chat-message--no-header.chat-message--inverted.chat-message--agent .chat-message__content {
+.chat-message--no-header.chat-message--inverted.chat-message--agent
+  .chat-message__content {
   @apply ml-11 mr-0; /* Normal for inverted agent messages */
 }
 
@@ -269,7 +287,8 @@ const avatarIcon = computed(() => {
 }
 
 .chat-message--system .chat-message__content {
-  @apply inline-flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full;
+  @apply inline-flex items-center gap-2 bg-blue-100/50 text-blue-800 p-3 rounded-md;
+  max-width: 50ch;
 }
 
 /* Header styles */

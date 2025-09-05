@@ -32,22 +32,11 @@ The database uses snake_case naming with TypeORM's SnakeNamingStrategy for autom
 ### Running the Application
 
 ```bash
-# Start backend only (from root)
+# Start both backend and frontend - Always use this for debugging
 npm run dev
 
-# Run frontend and backend separately:
-# Backend (port 3000) - includes port cleanup
-cd server && npm run dev
-
-# Frontend (port 5173) - includes port cleanup
-cd dashboard && npm run dev
-
-# Clean development (removes .nuxt cache)
-cd dashboard && npm run dev:clean
-
 # Kill ports if needed
-cd server && npm run kill-ports     # Kills ports 3000, 4000, 5000
-cd dashboard && npm run kill-ports  # Kills port 5173
+npm run kill-ports
 ```
 
 ### Database Management
@@ -124,10 +113,10 @@ const response = await Hay.conversations.create();
 
 ### API Communication
 
-- Frontend connects to backend via tRPC at `http://localhost:3000/v1`
+- Frontend connects to backend via tRPC at `http://localhost:3001/v1`
 - Authentication token passed as `Authorization: Bearer <token>` header
 - Organization ID passed as `x-organization-id` header
-- CORS configured for `http://localhost:5173` in development
+- CORS configured for `http://localhost:3000` in development
 
 ## Project Structure
 
@@ -177,3 +166,4 @@ Copy `.env.example` to `.env` and configure:
 3. Always check existing patterns in neighboring files before implementing new features
 4. Never commit secrets or API keys to the repository
 5. Follow existing code style and conventions in each part of the codebase
+- This is a new application under development. Avoid keeping old functions for backwads-compatibility, we don't need that now, you should aim at removing unused, redundant or unnecessary code if you find any. If you find any opportunities for future improvement, feel free to leave a comment in the code with a "TODO:"

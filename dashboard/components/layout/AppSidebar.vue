@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import {
   Home,
   MessageSquare,
@@ -45,9 +45,11 @@ import NavUser from "./NavUser.vue";
 
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
+import { useAppStore } from "@/stores/app";
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
+const appStore = useAppStore();
 
 // Get current route
 const route = useRoute();
@@ -84,6 +86,19 @@ const isPathActive = (path: string): boolean => {
   return route.path.startsWith(path);
 };
 
+// Get conversations count for badge
+const conversationsBadge = computed(() => {
+  const count = appStore.openConversationsCount;
+  return count > 0 ? count.toString() : undefined;
+});
+
+// Initialize conversation count on component mount
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    await appStore.getOpenConversationsCount();
+  }
+});
+
 // Make navMain reactive to route changes
 const navMain = computed(() => [
   {
@@ -96,7 +111,7 @@ const navMain = computed(() => [
     title: "Conversations",
     url: "/conversations",
     icon: MessageSquare,
-    badge: "3",
+    badge: conversationsBadge.value,
     isActive: isPathActive("/conversations"),
   },
   {
