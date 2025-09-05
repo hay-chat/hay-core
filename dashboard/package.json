@@ -13,12 +13,7 @@
     "postinstall": "nuxt prepare",
     "start": "cd .output && node server/index.mjs"
   },
-  "dependencies": {
-    "@editorjs/editorjs": "^2.30.8",
-    "@editorjs/list": "^2.0.8",
-    "editorjs-mention-tool": "^1.0.2",
-    "editorjs-undo": "^2.0.28"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.3",

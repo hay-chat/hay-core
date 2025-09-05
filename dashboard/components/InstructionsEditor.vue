@@ -14,26 +14,60 @@
     </div>
     <div
       :id="editorId"
-      class="min-h-[200px] border rounded-md bg-background"
+      data-testid="instructions-editor"
+      class="min-h-[200px] border rounded-md bg-background p-4 focus-within:border-primary"
       :class="{ 'border-red-500': error }"
-    ></div>
+      @slash-command="handleSlashCommand"
+    >
+    {{instructions}}
+      <div class="instructions-list" @keydown="handleKeyDown" @keyup="handleKeyUp">
+        <InstructionItem
+          v-for="(instruction, index) in instructions"
+          :key="instruction.id"
+          v-model="instructions[index]"
+          :level="0"
+          :index="index"
+          :mcp-tools="mcpTools"
+          :documents="documents"
+          @delete="deleteInstruction(index)"
+          @add-sibling="addSibling(index)"
+          @add-child="addChild(index)"
+          @move-up="moveUp(index)"
+          @move-down="moveDown(index)"
+          @indent="indent(index)"
+          @outdent="outdent(index)"
+          @slash-command="handleSlashCommand"
+          @close-slash-menu="hideMenu"
+        />
+      </div>
+      
+      <button
+        v-if="instructions.length === 0"
+        @click="addInstruction"
+        class="w-full text-left text-muted-foreground hover:text-foreground transition-colors py-2"
+      >
+        {{ placeholder || "Start typing your instructions..." }}
+      </button>
+    </div>
     <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
     <p v-if="hint" class="text-sm text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, watch, nextTick, toRaw, ref } from "vue";
-import EditorJS from "@editorjs/editorjs";
-// @ts-ignore - EditorJS list plugin has incomplete TypeScript definitions
-import List from "@editorjs/list";
-// @ts-ignore - EditorJS undo plugin has incomplete TypeScript definitions
-import Undo from "editorjs-undo";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { HayApi } from "@/utils/api";
-import MCPMergeField from "@/utils/MCPMergeField";
+import InstructionItem from "@/components/InstructionItem.vue";
+import { useComponentRegistry } from "@/composables/useComponentRegistry";
+
+interface InstructionData {
+  id: string;
+  instructions: string;
+  children?: InstructionData[];
+}
 
 interface Props {
-  modelValue: any;
+  modelValue: InstructionData[];
   label?: string;
   hint?: string;
   error?: string;
@@ -46,26 +80,58 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:modelValue": [value: any];
+  "update:modelValue": [value: InstructionData[]];
 }>();
 
-let editor: EditorJS | null = null;
-let undo: any = null;
-let isInternalUpdate = false;
 const editorId = `editor-${Math.random().toString(36).substr(2, 9)}`;
+const instructions = ref<InstructionData[]>([]);
 const mcpTools = ref<any[]>([]);
 const documents = ref<any[]>([]);
+const { getComponent } = useComponentRegistry();
 let menuEl: HTMLDivElement | null = null;
 let activeIndex = 0;
 let currentQuery = "";
 let commandMode: "select" | "actions" | "documents" = "select";
+let isInternalUpdate = false;
+let activeSlashContext: { slashIndex: number; textarea: HTMLElement } | null = null;
+
+// Global menu state - once we enter actions/documents mode, stay there until reset
+let isInSubMenu = false;
+let subMenuMode: "actions" | "documents" | null = null;
+
+// Generate unique ID
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Initialize instructions from modelValue
+const initializeInstructions = () => {
+  if (Array.isArray(props.modelValue) && props.modelValue.length > 0) {
+    instructions.value = JSON.parse(JSON.stringify(props.modelValue));
+  } else {
+    instructions.value = [{ id: generateId(), instructions: "" }];
+  }
+};
+
+// Convert to the target format
+const convertToTargetFormat = (): InstructionData[] => {
+  return instructions.value.filter(item => item.instructions.trim() || (item.children && item.children.length > 0));
+};
+
+// Emit changes
+const emitChange = () => {
+  if (isInternalUpdate) return;
+  const data = convertToTargetFormat();
+  isInternalUpdate = true;
+  emit("update:modelValue", data);
+  nextTick(() => {
+    isInternalUpdate = false;
+  });
+};
 
 // Fetch MCP tools from the API
 const fetchMCPTools = async () => {
   try {
     const tools = await HayApi.plugins.getMCPTools.query();
     mcpTools.value = tools;
-    console.log("Fetched MCP tools:", mcpTools.value);
   } catch (error) {
     console.error("Failed to fetch MCP tools:", error);
     mcpTools.value = [];
@@ -79,7 +145,6 @@ const fetchDocuments = async () => {
       pagination: { page: 1, limit: 100 },
     });
 
-    // Safely map documents with default values
     documents.value = (result.items || [])
       .map((doc: any) => ({
         id: doc.id || "",
@@ -87,16 +152,85 @@ const fetchDocuments = async () => {
         type: doc.type || "document",
         url: doc.url || "",
       }))
-      .filter((doc) => doc.id && doc.name); // Filter out invalid documents
-
-    console.log("Fetched documents:", documents.value);
+      .filter((doc) => doc.id && doc.name);
   } catch (error) {
     console.error("Failed to fetch documents:", error);
     documents.value = [];
   }
 };
 
-// Type-ahead helper functions
+// Instruction management functions
+const addInstruction = () => {
+  instructions.value.push({ id: generateId(), instructions: "" });
+  emitChange();
+};
+
+const deleteInstruction = (index: number) => {
+  instructions.value.splice(index, 1);
+  if (instructions.value.length === 0) {
+    addInstruction();
+  }
+  emitChange();
+};
+
+const addSibling = (index: number) => {
+  instructions.value.splice(index + 1, 0, { id: generateId(), instructions: "" });
+  emitChange();
+};
+
+const addChild = (index: number) => {
+  if (!instructions.value[index].children) {
+    instructions.value[index].children = [];
+  }
+  instructions.value[index].children!.push({ id: generateId(), instructions: "" });
+  emitChange();
+};
+
+const moveUp = (index: number) => {
+  if (index > 0) {
+    [instructions.value[index], instructions.value[index - 1]] = [
+      instructions.value[index - 1],
+      instructions.value[index],
+    ];
+    emitChange();
+  }
+};
+
+const moveDown = (index: number) => {
+  if (index < instructions.value.length - 1) {
+    [instructions.value[index], instructions.value[index + 1]] = [
+      instructions.value[index + 1],
+      instructions.value[index],
+    ];
+    emitChange();
+  }
+};
+
+const indent = (index: number) => {
+  if (index > 0) {
+    const instruction = instructions.value.splice(index, 1)[0];
+    if (!instructions.value[index - 1].children) {
+      instructions.value[index - 1].children = [];
+    }
+    instructions.value[index - 1].children!.push(instruction);
+    emitChange();
+  }
+};
+
+const outdent = (index: number) => {
+  // This would need more complex logic for nested items
+  // For now, just implemented at the top level
+};
+
+// Highlight matching text in bold
+function highlightMatch(text: string, query: string): string {
+  if (!query.trim()) return text;
+  
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.replace(regex, '<strong>$1</strong>');
+}
+
+// Slash command helpers
 function ensureMenu() {
   if (!menuEl) {
     menuEl = document.createElement("div");
@@ -107,6 +241,7 @@ function ensureMenu() {
 }
 
 function showMenu(rect: DOMRect, items: any[]) {
+  
   const el = ensureMenu();
   el.style.display = "block";
   el.style.position = "fixed";
@@ -117,7 +252,6 @@ function showMenu(rect: DOMRect, items: any[]) {
   let html = "";
 
   if (commandMode === "select") {
-    // Show type selection menu
     html = `
       <div class="mcp-item ${
         activeIndex === 0 ? "active" : ""
@@ -139,7 +273,6 @@ function showMenu(rect: DOMRect, items: any[]) {
       </div>
     `;
   } else if (commandMode === "actions") {
-    // Show actions (MCP tools)
     html = items
       .map(
         (tool, i) => `
@@ -148,15 +281,14 @@ function showMenu(rect: DOMRect, items: any[]) {
       }" data-id="${tool.id}">
         <div class="mcp-item-icon">⚡</div>
         <div class="mcp-item-content">
-          <div class="mcp-item-name">${tool.name}</div>
-          <div class="mcp-item-meta">${tool.label} - ${tool.pluginName}</div>
+          <div class="mcp-item-name">${highlightMatch(tool.name, currentQuery)}</div>
+          <div class="mcp-item-meta">${highlightMatch(tool.label, currentQuery)} - ${highlightMatch(tool.pluginName, currentQuery)}</div>
         </div>
       </div>
     `
       )
       .join("");
   } else if (commandMode === "documents") {
-    // Show documents
     html = items
       .map((doc, i) => {
         let metaInfo = doc.type || "document";
@@ -173,8 +305,8 @@ function showMenu(rect: DOMRect, items: any[]) {
         }" data-id="${doc.id}">
           <div class="mcp-item-icon"></div>
           <div class="mcp-item-content">
-            <div class="mcp-item-name">${doc.name || "Untitled"}</div>
-            <div class="mcp-item-meta">${metaInfo}</div>
+            <div class="mcp-item-name">${highlightMatch(doc.name || "Untitled", currentQuery)}</div>
+            <div class="mcp-item-meta">${highlightMatch(metaInfo, currentQuery)}</div>
           </div>
         </div>
       `;
@@ -202,117 +334,23 @@ function hideMenu() {
   activeIndex = 0;
   currentQuery = "";
   commandMode = "select";
-}
-
-function getCaretRect(): DOMRect | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0).cloneRange();
-  if (range.getClientRects().length) return range.getClientRects()[0];
-
-  const dummy = document.createElement("span");
-  dummy.appendChild(document.createTextNode("\u200b"));
-  range.insertNode(dummy);
-  const rect = dummy.getBoundingClientRect();
-  dummy.remove();
-  return rect;
-}
-
-function findSlashToken() {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-
-  const anchor = sel.anchorNode;
-  if (!anchor) return null;
-
-  // Handle both text nodes and element nodes
-  let textNode: Text | null = null;
-  let text = "";
-  let caretOffset = sel.anchorOffset;
-
-  if (anchor.nodeType === Node.TEXT_NODE) {
-    textNode = anchor as Text;
-    text = textNode.textContent || "";
-  } else if (anchor.nodeType === Node.ELEMENT_NODE) {
-    // If we're in an element, try to find the text node
-    const element = anchor as Element;
-    if (
-      element.childNodes.length > 0 &&
-      caretOffset < element.childNodes.length
-    ) {
-      const child = element.childNodes[caretOffset];
-      if (child.nodeType === Node.TEXT_NODE) {
-        textNode = child as Text;
-        text = textNode.textContent || "";
-        caretOffset = 0; // Reset offset for the text node
-      }
-    }
-  }
-
-  if (!textNode || !text) return null;
-
-  // Find the slash token
-  const left = text.lastIndexOf("/", caretOffset - 1);
-  if (left === -1) return null;
-
-  // Stop at whitespace or certain punctuation
-  const token = text.slice(left, caretOffset);
-  if (!token.startsWith("/")) return null;
-  if (/[\s\n\r]/.test(token)) return null;
-
-  return { node: textNode, start: left, end: caretOffset, token };
-}
-
-function replaceRangeWithSpan(
-  node: Text,
-  start: number,
-  end: number,
-  span: HTMLElement
-) {
-  const text = node.textContent || "";
-  const before = text.slice(0, start);
-  const after = text.slice(end);
-
-  const parent = node.parentNode!;
-
-  // Create text nodes
-  const beforeNode = before ? document.createTextNode(before) : null;
-  const afterNode = document.createTextNode(after || " "); // Always ensure there's at least a space after
-
-  // Insert nodes in order
-  if (beforeNode) {
-    parent.insertBefore(beforeNode, node);
-  }
-  parent.insertBefore(span, node);
-  parent.insertBefore(afterNode, node);
-  parent.removeChild(node);
-
-  // Place caret in the text node after the span
-  const range = document.createRange();
-  range.setStart(afterNode, after ? 0 : 1); // If we added a space, position after it
-  range.collapse(true);
-  const sel = window.getSelection();
-  sel?.removeAllRanges();
-  sel?.addRange(range);
+  activeSlashContext = null;
+  
+  // Reset global menu state
+  isInSubMenu = false;
+  subMenuMode = null;
+  console.log(`[DEBUG] Menu hidden and state reset`);
 }
 
 function handleItemSelection(item: any) {
   if (commandMode === "select") {
-    // Type selection - move to next mode
     const type = activeIndex === 0 ? "actions" : "documents";
     commandMode = type as "actions" | "documents";
     activeIndex = 0;
-
-    const ctx = findSlashToken();
-    if (!ctx) return;
-
-    const rect = getCaretRect();
-    if (rect) {
-      const items =
-        commandMode === "actions"
-          ? filterTools(currentQuery)
-          : filterDocuments(currentQuery);
-      showMenu(rect, items);
+    
+    if (activeSlashContext) {
+      const items = commandMode === "actions" ? filterTools(currentQuery) : filterDocuments(currentQuery);
+      showMenu(activeSlashContext.textarea.getBoundingClientRect(), items);
     }
   } else if (commandMode === "actions") {
     insertAction(item);
@@ -324,62 +362,38 @@ function handleItemSelection(item: any) {
 }
 
 function insertAction(tool: any) {
-  const ctx = findSlashToken();
-  if (!ctx) {
-    console.log("No slash token context found");
-    return;
-  }
-
-  const span = document.createElement("span");
-  span.className = "mcp-merge-field mcp-action";
-  span.contentEditable = "false";
-  span.dataset.mcpTool = tool.id;
-  span.dataset.plugin = tool.pluginName;
-  span.innerHTML = `<span class="mcp-item-icon"></span>${tool.name}`;
-
-  replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
-
-  // Force focus back to editor after insertion
-  const holder = document.getElementById(editorId);
-  if (holder) {
-    holder.focus();
-  }
-
-  // Trigger Editor.js save to capture the change
-  if (editor) {
-    setTimeout(() => {
-      editor?.save();
-    }, 100);
+  if (!activeSlashContext) return;
+  
+  // Find the corresponding RichInstructionInput component
+  const editorElement = activeSlashContext.textarea;
+  const richInputWrapper = editorElement.closest('.rich-instruction-input');
+  if (!richInputWrapper) return;
+  
+  const componentId = richInputWrapper.getAttribute('data-component-id');
+  if (!componentId) return;
+  
+  // Get the component instance from the registry
+  const componentInstance = getComponent(componentId);
+  if (componentInstance && componentInstance.insertReference) {
+    componentInstance.insertReference('action', tool);
   }
 }
 
 function insertDocument(doc: any) {
-  const ctx = findSlashToken();
-  if (!ctx) {
-    console.log("No slash token context found");
-    return;
-  }
-
-  const span = document.createElement("span");
-  span.className = "mcp-merge-field mcp-document";
-  span.contentEditable = "false";
-  span.dataset.documentId = doc.id;
-  span.dataset.documentName = doc.name;
-  span.innerHTML = `<span class="mcp-item-icon"></span>${doc.name}`;
-
-  replaceRangeWithSpan(ctx.node, ctx.start, ctx.end, span);
-
-  // Force focus back to editor after insertion
-  const holder = document.getElementById(editorId);
-  if (holder) {
-    holder.focus();
-  }
-
-  // Trigger Editor.js save to capture the change
-  if (editor) {
-    setTimeout(() => {
-      editor?.save();
-    }, 100);
+  if (!activeSlashContext) return;
+  
+  // Find the corresponding RichInstructionInput component
+  const editorElement = activeSlashContext.textarea;
+  const richInputWrapper = editorElement.closest('.rich-instruction-input');
+  if (!richInputWrapper) return;
+  
+  const componentId = richInputWrapper.getAttribute('data-component-id');
+  if (!componentId) return;
+  
+  // Get the component instance from the registry
+  const componentInstance = getComponent(componentId);
+  if (componentInstance && componentInstance.insertReference) {
+    componentInstance.insertReference('document', doc);
   }
 }
 
@@ -403,7 +417,59 @@ function filterDocuments(query: string) {
   });
 }
 
-function onKeyDown(e: KeyboardEvent) {
+// Handle slash command events from child components
+const handleSlashCommand = (data: { query: string; slashIndex: number; textarea: HTMLElement; mode?: string }) => {
+  const { query, slashIndex, textarea, mode } = data;
+  
+  console.log(`[DEBUG] Parent received: query="${query}", mode="${mode || 'undefined'}", isInSubMenu=${isInSubMenu}, subMenuMode=${subMenuMode}`);
+  
+  activeSlashContext = { slashIndex, textarea };
+  currentQuery = query;
+  activeIndex = 0;
+  
+  // Rule 1: If we receive a specific mode hint (/a or /d shortcut), switch to that mode
+  if (mode === "actions") {
+    commandMode = "actions";
+    isInSubMenu = true;
+    subMenuMode = "actions";
+    console.log(`[DEBUG] Switched to actions mode via shortcut`);
+  } else if (mode === "documents") {
+    commandMode = "documents";
+    isInSubMenu = true;
+    subMenuMode = "documents";
+    console.log(`[DEBUG] Switched to documents mode via shortcut`);
+  } 
+  // Rule 2: If we're already in a sub-menu, stay in that mode (filtering)
+  else if (isInSubMenu && subMenuMode) {
+    commandMode = subMenuMode;
+    console.log(`[DEBUG] Staying in ${subMenuMode} mode for filtering, query="${query}"`);
+  }
+  // Rule 3: Default to select mode only if we're not in a sub-menu
+  else {
+    commandMode = "select";
+    console.log(`[DEBUG] Using select mode (default)`);
+  }
+  
+  let items: any[] = [];
+  if (commandMode === "select") {
+    items = [{ type: "actions" }, { type: "documents" }];
+  } else if (commandMode === "actions") {
+    items = filterTools(currentQuery);
+  } else if (commandMode === "documents") {
+    items = filterDocuments(currentQuery);
+  }
+  
+  
+  if (items.length > 0 || commandMode !== "select") {
+    // Get textarea position for menu placement
+    const rect = textarea.getBoundingClientRect();
+    showMenu(rect, items);
+  }
+};
+
+// Keyboard event handlers
+function handleKeyDown(e: KeyboardEvent) {
+  // Handle slash commands when menu is open
   if (menuEl && menuEl.style.display === "block") {
     let items: any[] = [];
 
@@ -419,307 +485,119 @@ function onKeyDown(e: KeyboardEvent) {
 
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
       if (e.key === "ArrowDown") {
-        activeIndex = (activeIndex + 1) % maxIndex; // Wrap around
+        activeIndex = (activeIndex + 1) % maxIndex;
       } else {
-        activeIndex = activeIndex === 0 ? maxIndex - 1 : activeIndex - 1; // Wrap around
+        activeIndex = activeIndex === 0 ? maxIndex - 1 : activeIndex - 1;
       }
-
-      const rect = getCaretRect();
-      if (rect) showMenu(rect, items);
-      return false; // Extra prevention
+      
+      if (activeSlashContext) {
+        showMenu(activeSlashContext.textarea.getBoundingClientRect(), items);
+      }
+      return;
     }
 
     if (e.key === "Escape") {
       e.preventDefault();
-      e.stopPropagation();
       hideMenu();
-      return false;
+      return;
     }
 
     if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
-      e.stopPropagation();
       if (items.length > 0) {
         handleItemSelection(items[activeIndex]);
       }
-      return false;
+      return;
     }
   }
 }
 
-function onKeyUp() {
-  const ctx = findSlashToken();
-  if (!ctx) {
-    hideMenu();
-    return;
-  }
-
-  const fullToken = ctx.token.slice(1); // Remove '/'
-
-  // Check for shortcuts
-  if (fullToken.startsWith("a")) {
-    commandMode = "actions";
-    currentQuery = fullToken.slice(1); // Remove 'a'
-    activeIndex = 0;
-  } else if (fullToken.startsWith("d")) {
-    commandMode = "documents";
-    currentQuery = fullToken.slice(1); // Remove 'd'
-    activeIndex = 0;
-  } else {
-    // No shortcut, show type selection
-    if (commandMode === "select") {
-      currentQuery = fullToken;
-    } else {
-      // Already in a mode, update query
-      const newQuery = fullToken;
-      if (newQuery !== currentQuery) {
-        activeIndex = 0;
-      }
-      currentQuery = newQuery;
-    }
-  }
-
-  let items: any[] = [];
-  if (commandMode === "select") {
-    items = [{ type: "actions" }, { type: "documents" }];
-  } else if (commandMode === "actions") {
-    items = filterTools(currentQuery);
-  } else if (commandMode === "documents") {
-    items = filterDocuments(currentQuery);
-  }
-
-  if (commandMode !== "select" && items.length === 0) {
-    hideMenu();
-    return;
-  }
-
-  const rect = getCaretRect();
-  if (rect) showMenu(rect, items);
+function handleKeyUp() {
+  // This will be handled by individual instruction items
 }
 
-const initEditor = async () => {
-  try {
-    // Convert proxy to plain object if needed
-    const initialData = props.modelValue
-      ? JSON.parse(JSON.stringify(toRaw(props.modelValue)))
-      : { blocks: [] };
-
-    editor = new EditorJS({
-      holder: editorId,
-      placeholder: props.placeholder,
-      minHeight: 200,
-      hideToolbar: true, // Hide the block settings toolbar
-      tools: {
-        list: {
-          class: List as any,
-          inlineToolbar: false, // Disable inline toolbar for list
-          config: {
-            defaultStyle: "ordered",
-          },
-        },
-        mcpMergeField: {
-          class: MCPMergeField,
-        },
-      },
-      inlineToolbar: false, // Disable inline toolbar completely
-      defaultBlock: "list",
-      data: initialData,
-      onChange: async () => {
-        if (isInternalUpdate) return;
-
-        try {
-          const outputData = await editor?.save();
-          isInternalUpdate = true;
-          emit("update:modelValue", outputData);
-          setTimeout(() => {
-            isInternalUpdate = false;
-          }, 0);
-        } catch (error) {
-          console.error("Error saving editor data:", error);
-        }
-      },
-    });
-
-    await editor.isReady;
-
-    // Store the merge field instance for programmatic use
-    // The inline toolbar tools aren't directly accessible in Editor.js API
-    // We'll rely on the programmatic insertion via DOM manipulation
-
-    // Initialize undo/redo after editor is ready
-    try {
-      undo = new Undo({ editor });
-      undo.initialize();
-    } catch (undoError) {
-      console.warn("Undo plugin initialization failed:", undoError);
-      undo = null;
+// Initialize the editor
+const initEditor = () => {
+  initializeInstructions();
+  
+  // Add global click listener to hide menu
+  document.addEventListener("click", (e) => {
+    if (menuEl && e.target instanceof Node && !menuEl.contains(e.target)) {
+      hideMenu();
     }
-
-    // Add event listeners for type-ahead
-    const holder = document.getElementById(editorId);
-    if (holder) {
-      // Use capture phase to ensure we get events before Editor.js processes them
-      holder.addEventListener("keyup", onKeyUp, true);
-      holder.addEventListener("keydown", onKeyDown, true);
-
-      // Also listen for input events to catch any text changes
-      holder.addEventListener("input", onKeyUp, true);
-    }
-
-    // Add global click listener to hide menu
-    document.addEventListener("click", (e) => {
-      if (menuEl && e.target instanceof Node && !menuEl.contains(e.target)) {
-        hideMenu();
-      }
-    });
-  } catch (error) {
-    console.error("Error initializing editor:", error);
-  }
+  });
 };
 
+// Lifecycle hooks
 onMounted(async () => {
-  // Fetch MCP tools and documents first
   await Promise.all([fetchMCPTools(), fetchDocuments()]);
-
-  // Then initialize the editor after ensuring data is loaded
   await nextTick();
   initEditor();
 });
 
-onBeforeUnmount(() => {
-  // Remove event listeners (matching the capture phase used in setup)
-  const holder = document.getElementById(editorId);
-  if (holder) {
-    holder.removeEventListener("keyup", onKeyUp, true);
-    holder.removeEventListener("keydown", onKeyDown, true);
-    holder.removeEventListener("input", onKeyUp, true);
-  }
-
-  // Clean up menu
-  if (menuEl) {
-    menuEl.remove();
-    menuEl = null;
-  }
-
-  // Destroy undo if it exists and has a destroy method
-  if (undo && typeof undo.destroy === "function") {
-    try {
-      undo.destroy();
-    } catch (error) {
-      console.warn("Error destroying undo:", error);
-    }
-    undo = null;
-  }
-
-  // Destroy editor if it exists
-  if (editor && typeof editor.destroy === "function") {
-    try {
-      editor.destroy();
-    } catch (error) {
-      console.warn("Error destroying editor:", error);
-    }
-    editor = null;
-  }
-});
-
+// Watch for changes in modelValue
 watch(
   () => props.modelValue,
-  async (newValue) => {
-    if (!editor || !editor.render || isInternalUpdate) return;
-
-    try {
-      const currentData = await editor.save();
-      const newData = newValue ? toRaw(newValue) : { blocks: [] };
-
-      // Only update if data actually changed
-      if (JSON.stringify(currentData) !== JSON.stringify(newData)) {
-        // Convert proxy to plain object before rendering
-        const plainData = JSON.parse(JSON.stringify(newData));
-        await editor.render(plainData);
-      }
-    } catch (error) {
-      console.error("Error updating editor:", error);
+  (newValue) => {
+    if (isInternalUpdate) return;
+    if (Array.isArray(newValue)) {
+      instructions.value = JSON.parse(JSON.stringify(newValue));
     }
+  },
+  { deep: true }
+);
+
+// Watch for changes in instructions and emit
+watch(
+  instructions,
+  () => {
+    emitChange();
   },
   { deep: true }
 );
 </script>
 
 <style>
-.codex-editor {
-  padding: 1rem;
+/* Custom editor styles */
+.instructions-list {
+  outline: none;
 }
 
-.ce-block__content {
-  max-width: 100%;
+.instruction-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
 }
 
-.ce-toolbar__actions {
-  right: 1rem;
-}
-
-.cdx-list {
-  padding-left: 1.5rem;
-}
-
-.cdx-list__item {
+.instruction-content {
+  flex: 1;
+  min-height: 1.5rem;
   padding: 0.25rem 0;
-  line-height: 1.6;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
-.ce-paragraph {
-  line-height: 1.6;
+.instruction-content:focus {
+  outline: 1px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-.codex-editor--empty
-  .ce-block:first-child
-  .ce-paragraph[data-placeholder]:empty::before {
+.instruction-number {
+  font-weight: 500;
   color: hsl(var(--muted-foreground));
-  opacity: 0.5;
-}
-
-.codex-editor__redactor {
-  padding-bottom: 2rem !important;
-}
-
-/* Hide all Editor.js toolbars and buttons */
-.ce-toolbar {
-  display: none !important;
-}
-
-.ce-inline-toolbar {
-  display: none !important;
-}
-
-.ce-toolbox {
-  display: none !important;
-}
-
-.ce-settings {
-  display: none !important;
-}
-
-/* Hide paragraph tool from the toolbox */
-.ce-toolbox__button[data-tool="paragraph"] {
-  display: none !important;
-}
-
-/* Hide unordered list button in the list settings */
-.cdx-list-settings .cdx-list-settings__button:first-child {
-  display: none !important;
-}
-
-/* Always show numbers for ordered lists */
-.cdx-list--ordered {
-  list-style: decimal !important;
-}
-
-.cdx-list--ordered .cdx-list__item {
-  display: list-item !important;
+  min-width: 1.5rem;
+  text-align: right;
+  padding-top: 0.25rem;
+  user-select: none;
 }
 
 /* Keyboard shortcut badge styling */

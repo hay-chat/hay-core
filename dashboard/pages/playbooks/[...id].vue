@@ -20,7 +20,7 @@
 
     <Card v-else-if="!isEditMode || playbook">
       <CardContent class="p-6">
-        <form @submit.prevent="handleSubmit" class="space-y-6">
+        <form @submit.prevent="handleSubmit" data-testid="playbook-form" class="space-y-6">
           <!-- Title Field -->
           <div class="space-y-2">
             <label for="title" class="text-sm font-medium">

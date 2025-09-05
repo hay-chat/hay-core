@@ -98,6 +98,7 @@
   },
   "devDependencies": {
     "@nuxt/devtools": "latest",
+    "@playwright/test": "^1.55.0",
     "@types/bcrypt": "^5.0.2",
     "@types/cheerio": "^1.0.0",
     "@types/cors": "^2.8.19",
