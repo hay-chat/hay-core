@@ -6,6 +6,7 @@ import { Hay } from "../hay.service";
 import { MessageType } from "../../database/entities/message.entity";
 import { StatusManager } from "./status-manager";
 import { ConversationService } from "../conversation.service";
+import { ContextLayer } from "./context-layer";
 
 /**
  * Handles the execution of playbooks and AI-driven conversation responses.
@@ -13,6 +14,7 @@ import { ConversationService } from "../conversation.service";
  */
 export class PlaybookExecution {
   private statusManager?: StatusManager;
+  private contextLayer?: ContextLayer;
 
   /**
    * Creates a new PlaybookExecution instance.
@@ -29,6 +31,11 @@ export class PlaybookExecution {
   ) {
     if (conversationService) {
       this.statusManager = new StatusManager(conversationService);
+      this.contextLayer = new ContextLayer(
+        conversationService,
+        agentService,
+        playbookService
+      );
     }
   }
 
@@ -89,8 +96,8 @@ export class PlaybookExecution {
       };
     }
 
-    // RAG: Search for relevant documents
-    const { context: ragContext, documents } = await this.searchRelevantDocuments(
+    // Search for relevant documents
+    const { documents } = await this.searchRelevantDocuments(
       conversation.id, 
       organizationId, 
       userPromptContent
@@ -105,14 +112,29 @@ export class PlaybookExecution {
       );
     }
 
-    // Construct the prompt
+    // Use Context Layer to add document context if documents were found
+    if (this.contextLayer && documents.length > 0) {
+      await this.contextLayer.addDocuments(
+        conversation.id,
+        organizationId,
+        documents.map(doc => ({
+          id: doc.id,
+          content: doc.content,
+          title: `Document (${doc.relevance.toFixed(2)})`,
+          source: doc.source,
+          similarity: doc.relevance
+        })),
+        userPromptContent
+      );
+    }
+
+    // Construct the prompt (no longer needs ragContext - Context Layer handles it)
     const { systemPrompt, userPrompt } = this.constructPrompts(
       playbook,
       agent,
       userPromptContent,
       conversationHistory,
-      messages,
-      ragContext
+      messages
     );
 
     try {
@@ -171,18 +193,17 @@ export class PlaybookExecution {
 
   /**
    * Searches for relevant documents using vector similarity search.
-   * Filters out test data and formats results for context injection.
+   * Filters out test data and returns documents for Context Layer processing.
    * @param conversationId - The conversation ID
    * @param organizationId - The ID of the organization
    * @param userMessage - The user's query for document search
-   * @returns Object with formatted context and document list
+   * @returns Object with documents for status tracking
    */
   private async searchRelevantDocuments(
     conversationId: string,
     organizationId: string, 
     userMessage: string
-  ): Promise<{ context: string; documents: DocumentUsed[] }> {
-    let ragContext = "";
+  ): Promise<{ documents: DocumentUsed[] }> {
     const documents: DocumentUsed[] = [];
     
     try {
@@ -210,17 +231,8 @@ export class PlaybookExecution {
       if (filteredSearchResults && filteredSearchResults.length > 0) {
         console.log(`[Orchestrator] Found ${filteredSearchResults.length} relevant documents (filtered from ${searchResults?.length || 0})`);
         
-        // Format the retrieved documents as context
-        ragContext = "\n\n## Relevant Information from Knowledge Base:\n";
-        filteredSearchResults.forEach((result, index) => {
-          ragContext += `\n[Document ${index + 1}] (Relevance: ${(result.similarity || 0).toFixed(2)}):\n`;
-          ragContext += result.content;
-          if (result.metadata?.source) {
-            ragContext += `\n(Source: ${result.metadata.source})`;
-          }
-          ragContext += "\n";
-          
-          // Add to documents array for status tracking
+        // Add to documents array for status tracking
+        filteredSearchResults.forEach((result) => {
           documents.push({
             id: result.id,
             content: result.content.substring(0, 200), // First 200 chars for status
@@ -229,16 +241,16 @@ export class PlaybookExecution {
           });
         });
         
-        console.log(`[Orchestrator] RAG context added: ${ragContext.length} characters`);
+        console.log(`[Orchestrator] Found ${documents.length} relevant documents`);
       } else {
         console.log(`[Orchestrator] No relevant documents found in knowledge base`);
       }
     } catch (error) {
-      console.error(`[Orchestrator] Error during RAG search:`, error);
-      // Continue without RAG context if search fails
+      console.error(`[Orchestrator] Error during document search:`, error);
+      // Continue without documents if search fails
     }
     
-    return { context: ragContext, documents };
+    return { documents };
   }
 
   /**
@@ -270,13 +282,13 @@ export class PlaybookExecution {
 
   /**
    * Constructs system and user prompts for AI generation.
-   * Combines playbook instructions, agent settings, RAG context, and anti-hallucination guidelines.
+   * Combines playbook instructions, agent settings, and anti-hallucination guidelines.
+   * Document context is now handled by Context Layer system messages.
    * @param playbook - The playbook containing instructions (if any)
    * @param agent - The agent with tone, avoid, and trigger settings
    * @param userPromptContent - The user's message content
    * @param conversationHistory - Formatted conversation history
    * @param messages - Array of conversation messages
-   * @param ragContext - Retrieved document context from vector search
    * @returns Object containing system and user prompts
    */
   private constructPrompts(
@@ -284,8 +296,7 @@ export class PlaybookExecution {
     agent: any,
     userPromptContent: string,
     conversationHistory: string,
-    messages: any[],
-    ragContext: string
+    messages: any[]
   ): { systemPrompt: string; userPrompt: string } {
     let systemPrompt = "";
     let userPrompt = userPromptContent;
@@ -339,12 +350,6 @@ export class PlaybookExecution {
 
     // Add conversation flow instructions
     systemPrompt += this.getConversationFlowInstructions(userPromptContent, messages);
-
-    // Add RAG context to system prompt if available
-    if (ragContext) {
-      systemPrompt += ragContext;
-      systemPrompt += "\n\nIMPORTANT: Use ONLY the above information from the knowledge base when answering questions. If the information needed is not available above, you MUST say you don't have that information rather than making something up.";
-    }
 
     // Add strict anti-hallucination instructions
     systemPrompt += this.getAntiHallucinationInstructions();

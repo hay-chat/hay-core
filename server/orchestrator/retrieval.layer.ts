@@ -14,15 +14,32 @@ import {
 } from "@server/services/vector-store.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { analyzeInstructions, isInstructionsJson } from "@server/utils/instruction-formatter";
+import { ContextLayer } from "@server/services/orchestrator/context-layer";
+import { ConversationService } from "@server/services/conversation.service";
+import { AgentService } from "@server/services/agent.service";
+import { PlaybookService } from "@server/services/playbook.service";
 
 export class RetrievalLayer {
   private playbookRepository: PlaybookRepository;
   private llmService: LLMService;
+  private contextLayer?: ContextLayer;
 
-  constructor() {
+  constructor(
+    conversationService?: ConversationService,
+    agentService?: AgentService,
+    playbookService?: PlaybookService
+  ) {
     console.log("RetrievalLayer initialized");
     this.playbookRepository = new PlaybookRepository();
     this.llmService = new LLMService();
+    
+    if (conversationService && agentService && playbookService) {
+      this.contextLayer = new ContextLayer(
+        conversationService,
+        agentService,
+        playbookService
+      );
+    }
   }
 
   /**
@@ -129,7 +146,8 @@ export class RetrievalLayer {
   async retrieve(
     humanMessages: Message[],
     conversation: Conversation,
-    perception?: Perception
+    perception?: Perception,
+    conversationId?: string
   ): Promise<{
     rag: RagPack | null;
     playbookAction: "activate" | "continue" | "change" | "none";
@@ -138,17 +156,21 @@ export class RetrievalLayer {
   }> {
     const systemMessages: Partial<Message>[] = [];
 
-    const rag = await this.performRAG(humanMessages, conversation);
-    if (rag) {
+    // Handle RAG with Context Layer if available
+    const rag = await this.performRAG(humanMessages, conversation, conversationId);
+    if (rag && !this.contextLayer) {
+      // Only create old-style system message if Context Layer is not available
       const ragSystemMessage = SystemMessageService.createRagSystemMessage(rag);
       systemMessages.push(ragSystemMessage);
     }
 
     const playbookResult = await this.handlePlaybookMatching(
       conversation,
-      perception
+      perception,
+      conversationId
     );
-    if (playbookResult.systemMessage) {
+    if (playbookResult.systemMessage && !this.contextLayer) {
+      // Only create old-style system message if Context Layer is not available
       systemMessages.push(playbookResult.systemMessage);
     }
 
@@ -162,7 +184,8 @@ export class RetrievalLayer {
 
   private async performRAG(
     humanMessages: Message[],
-    conversation: Conversation
+    conversation: Conversation,
+    conversationId?: string
   ): Promise<RagPack | null> {
     try {
       const query = this.constructRAGQuery(humanMessages);
@@ -214,6 +237,22 @@ export class RetrievalLayer {
         const score = (result.similarity || 0).toFixed(3);
         console.log(`  ${index + 1}. "${title}" (similarity: ${score})`);
       });
+
+      // Use Context Layer to add document context if available
+      if (this.contextLayer && conversationId) {
+        await this.contextLayer.addDocuments(
+          conversationId,
+          conversation.organization_id,
+          filteredResults.map(result => ({
+            id: result.id,
+            content: this.limitDocumentSize(result.content),
+            title: result.metadata?.title || result.metadata?.filename || `Document ${result.id}`,
+            source: result.metadata?.sourceUrl || result.metadata?.source,
+            similarity: result.similarity
+          })),
+          query
+        );
+      }
 
       return {
         query,
@@ -301,7 +340,8 @@ export class RetrievalLayer {
 
   private async handlePlaybookMatching(
     conversation: Conversation,
-    perception?: Perception
+    perception?: Perception,
+    conversationId?: string
   ): Promise<{
     action: "activate" | "continue" | "change" | "none";
     playbook?: Playbook;
@@ -312,7 +352,7 @@ export class RetrievalLayer {
     const currentPlaybook = currentContext?.activePlaybook;
 
     if (!currentPlaybook) {
-      return await this.activateNewPlaybook(conversation, perception);
+      return await this.activateNewPlaybook(conversation, perception, conversationId);
     }
 
     const shouldContinue = await this.shouldContinuePlaybook(
@@ -341,21 +381,37 @@ export class RetrievalLayer {
         conversation.organization_id
       );
       
-      // Extract referenced actions from playbook instructions
-      const referencedActions = this.extractReferencedActions(playbookData);
-      const toolSchemas = this.getReferencedToolSchemas(referencedActions);
-      
-      console.log(`[RetrievalLayer] Creating playbook system message with ${toolSchemas.length} tool schemas`);
-      console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
-      
-      const systemMessage =
-        SystemMessageService.createPlaybookSystemMessage(playbookData, toolSchemas);
+      // Use Context Layer to add playbook and tool context if available
+      if (this.contextLayer && conversationId && playbookData) {
+        // Add playbook context through Context Layer
+        await this.contextLayer.addPlaybook(
+          conversationId,
+          conversation.organization_id,
+          playbookData.id,
+          this.getReferencedToolSchemas(this.extractReferencedActions(playbookData))
+        );
+        
+        return {
+          action: "change",
+          playbook: newPlaybook,
+          systemMessage: undefined, // Context Layer handles the system message
+        };
+      } else {
+        // Fallback to old system message creation
+        const referencedActions = this.extractReferencedActions(playbookData);
+        const toolSchemas = this.getReferencedToolSchemas(referencedActions);
+        
+        console.log(`[RetrievalLayer] Creating playbook system message with ${toolSchemas.length} tool schemas`);
+        console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
+        
+        const systemMessage = SystemMessageService.createPlaybookSystemMessage(playbookData, toolSchemas);
 
-      return {
-        action: "change",
-        playbook: newPlaybook,
-        systemMessage,
-      };
+        return {
+          action: "change",
+          playbook: newPlaybook,
+          systemMessage,
+        };
+      }
     }
 
     return { action: "continue" };
@@ -363,7 +419,8 @@ export class RetrievalLayer {
 
   private async activateNewPlaybook(
     conversation: Conversation,
-    perception?: Perception
+    perception?: Perception,
+    conversationId?: string
   ): Promise<{
     action: "activate" | "none";
     playbook?: Playbook;
@@ -381,20 +438,36 @@ export class RetrievalLayer {
       );
 
       if (playbook) {
-        // Extract referenced actions from playbook instructions
-        const referencedActions = this.extractReferencedActions(playbook);
-        const toolSchemas = this.getReferencedToolSchemas(referencedActions);
-        
-        console.log(`[RetrievalLayer] Activating new playbook with ${toolSchemas.length} tool schemas`);
-        console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
-        
-        const systemMessage =
-          SystemMessageService.createPlaybookSystemMessage(playbook, toolSchemas);
-        return {
-          action: "activate",
-          playbook,
-          systemMessage,
-        };
+        // Use Context Layer to add playbook and tool context if available
+        if (this.contextLayer && conversationId) {
+          // Add playbook context through Context Layer
+          await this.contextLayer.addPlaybook(
+            conversationId,
+            conversation.organization_id,
+            playbook.id,
+            this.getReferencedToolSchemas(this.extractReferencedActions(playbook))
+          );
+          
+          return {
+            action: "activate",
+            playbook,
+            systemMessage: undefined, // Context Layer handles the system message
+          };
+        } else {
+          // Fallback to old system message creation
+          const referencedActions = this.extractReferencedActions(playbook);
+          const toolSchemas = this.getReferencedToolSchemas(referencedActions);
+          
+          console.log(`[RetrievalLayer] Activating new playbook with ${toolSchemas.length} tool schemas`);
+          console.log(`[RetrievalLayer] Tool schemas:`, toolSchemas);
+          
+          const systemMessage = SystemMessageService.createPlaybookSystemMessage(playbook, toolSchemas);
+          return {
+            action: "activate",
+            playbook,
+            systemMessage,
+          };
+        }
       }
     }
 

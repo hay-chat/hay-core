@@ -103,6 +103,19 @@ export class MessageService {
     };
   }
 
+  createSystemMessage(
+    content: string,
+    metadata: any = {}
+  ): Partial<Message> {
+    return {
+      content,
+      type: MessageType.SYSTEM,
+      sender: "system",
+      metadata,
+      usage_metadata: null
+    };
+  }
+
   getLastHumanMessage(conversation: Conversation): Message | undefined {
     return conversation.messages
       .filter((message) => message.type === MessageType.CUSTOMER)

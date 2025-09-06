@@ -140,6 +140,17 @@ export interface ProcessingDetails {
 }
 
 /**
+ * Context tracking for avoiding duplicate system messages
+ */
+export interface ContextTracking {
+  agents: string[];        // IDs of agents with system messages
+  playbooks: string[];     // IDs of playbooks with system messages
+  documents: string[];     // IDs of documents with system messages
+  tools: string[];         // IDs of tools with system messages
+  last_context_update: string;
+}
+
+/**
  * Complete orchestration status for a conversation
  * Provides real-time visibility into AI processing
  */
@@ -149,5 +160,6 @@ export interface OrchestrationStatus {
   documents_used?: DocumentUsed[];
   intent_analysis?: IntentAnalysis;
   processing_details?: ProcessingDetails;
+  context_tracking?: ContextTracking;
   last_updated: string;
 }

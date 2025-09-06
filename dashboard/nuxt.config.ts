@@ -40,21 +40,16 @@ export default defineNuxtConfig({
       },
 
       // Only include dashboard files - no server files at all
-      include: [
-        "./**/*.ts",
-        "./**/*.vue",
-        "./**/*.js",
-        "./**/*.mjs"
-      ],
+      include: ["./**/*.ts", "./**/*.vue", "./**/*.js", "./**/*.mjs"],
       exclude: [
         "node_modules",
         ".nuxt",
         ".output",
         "dist",
-        "../server/**/*",  // Exclude ALL server files
+        "../server/**/*", // Exclude ALL server files
         "../plugins/**/*", // Exclude plugins
         "**/*.spec.ts",
-        "**/*.test.ts"
+        "**/*.test.ts",
       ],
     },
   },
@@ -160,6 +155,9 @@ export default defineNuxtConfig({
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "description", content: "Hay platform dashboard application" },
+      ],
+      link: [
+        { rel: "stylesheet", href: "https://use.typekit.net/ztc8xao.css" },
       ],
     },
   },

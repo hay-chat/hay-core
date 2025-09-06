@@ -1,28 +1,52 @@
 import type { ExecutionResult } from "./types";
 import { VectorStoreService } from "../vector-store.service";
 import { Hay } from "../hay.service";
+import { ContextLayer } from "./context-layer";
+import { ConversationService } from "../conversation.service";
+import { AgentService } from "../agent.service";
+import { PlaybookService } from "../playbook.service";
 
 /**
  * Handles document retrieval and question answering using vector search.
  * Retrieves relevant documents and generates AI responses based on them.
  */
 export class DocumentRetrieval {
+  private contextLayer?: ContextLayer;
+
   /**
    * Creates a new DocumentRetrieval instance.
    * @param vectorStoreService - Service for vector-based document search
+   * @param conversationService - Optional service for conversation management
+   * @param agentService - Optional service for agent management
+   * @param playbookService - Optional service for playbook management
    */
-  constructor(private vectorStoreService: VectorStoreService) {}
+  constructor(
+    private vectorStoreService: VectorStoreService,
+    conversationService?: ConversationService,
+    agentService?: AgentService,
+    playbookService?: PlaybookService
+  ) {
+    if (conversationService && agentService && playbookService) {
+      this.contextLayer = new ContextLayer(
+        conversationService,
+        agentService,
+        playbookService
+      );
+    }
+  }
 
   /**
    * Executes document retrieval and generates an answer based on found documents.
    * Filters out test data and formats results with citations.
    * @param query - The user's query to answer
    * @param organizationId - The ID of the organization
+   * @param conversationId - Optional conversation ID for context tracking
    * @returns Execution result with generated answer and metadata
    */
   async execute(
     query: string,
-    organizationId: string
+    organizationId: string,
+    conversationId?: string
   ): Promise<ExecutionResult> {
     try {
       // Search for relevant documents
@@ -45,6 +69,22 @@ export class DocumentRetrieval {
             confidence: 0,
           },
         };
+      }
+
+      // Use Context Layer to add document context if conversation ID is provided
+      if (this.contextLayer && conversationId) {
+        await this.contextLayer.addDocuments(
+          conversationId,
+          organizationId,
+          filteredResults.map(result => ({
+            id: result.id,
+            content: result.content,
+            title: result.title || `Document`,
+            source: result.metadata?.source,
+            similarity: result.similarity
+          })),
+          query
+        );
       }
 
       // Format results with citations

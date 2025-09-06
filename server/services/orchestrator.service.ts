@@ -38,10 +38,10 @@ export class OrchestratorService {
     private agentService: AgentService,
     private vectorStoreService: VectorStoreService
   ) {
-    // Initialize orchestrator modules
-    this.agentRouting = new AgentRouting(agentService, conversationService);
-    this.planCreation = new PlanCreation(playbookService, vectorStoreService, conversationService);
-    this.documentRetrieval = new DocumentRetrieval(vectorStoreService);
+    // Initialize orchestrator modules with Context Layer support
+    this.agentRouting = new AgentRouting(agentService, conversationService, playbookService);
+    this.planCreation = new PlanCreation(playbookService, vectorStoreService, conversationService, agentService);
+    this.documentRetrieval = new DocumentRetrieval(vectorStoreService, conversationService, agentService, playbookService);
     this.playbookExecution = new PlaybookExecution(playbookService, vectorStoreService, agentService, conversationService);
     this.conversationManagement = new ConversationManagement(conversationService);
     this.messageProcessing = new MessageProcessing(conversationService);

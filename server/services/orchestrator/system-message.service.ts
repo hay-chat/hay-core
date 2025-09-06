@@ -153,12 +153,6 @@ ${
         });
         content += `\n${actionDetails.join("\n\n")}`;
       }
-
-      content += `\n\nWhen calling a tool, respond with ONLY a JSON object in this format:
-      {
-        "tool_name": "tool_name_here",
-        "arguments": { /* tool arguments here */ }
-      }`;
     }
 
     // Add referenced documents if any exist
