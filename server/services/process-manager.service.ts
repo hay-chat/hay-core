@@ -82,11 +82,18 @@ export class ProcessManagerService {
         instance
       );
 
+      // Get the actual folder name for this plugin
+      const folderName = await pluginManagerService.getPluginFolderName(plugin.pluginId);
+      if (!folderName) {
+        throw new Error(`Could not find folder for plugin ${plugin.pluginId}`);
+      }
+
       // Parse command and args
       const pluginPath = path.join(
         process.cwd(),
+        "..",
         "plugins",
-        plugin.name.replace("hay-plugin-", "")
+        folderName
       );
 
       let childProcess: ChildProcess;

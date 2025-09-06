@@ -346,6 +346,68 @@ export class PluginManagerService {
     const manifest = plugin.manifest as HayPluginManifest;
     return manifest.capabilities?.mcp?.startCommand;
   }
+
+  /**
+   * Get the actual folder name for a plugin by scanning the filesystem
+   */
+  async getPluginFolderName(pluginId: string): Promise<string | null> {
+    try {
+      const entries = await fs.readdir(this.pluginsDir, {
+        withFileTypes: true,
+      });
+
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name !== "base") {
+          const pluginPath = path.join(this.pluginsDir, entry.name);
+          
+          // Check for manifest.json first
+          const jsonManifestPath = path.join(pluginPath, "manifest.json");
+          const jsonExists = await fs
+            .access(jsonManifestPath)
+            .then(() => true)
+            .catch(() => false);
+
+          let manifest: HayPluginManifest | null = null;
+
+          if (jsonExists) {
+            try {
+              const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
+              manifest = JSON.parse(manifestContent);
+            } catch (error) {
+              // Skip this folder if manifest is invalid
+              continue;
+            }
+          } else {
+            // Fallback to TypeScript manifest
+            const tsManifestPath = path.join(pluginPath, "manifest.ts");
+            const tsExists = await fs
+              .access(tsManifestPath)
+              .then(() => true)
+              .catch(() => false);
+
+            if (tsExists) {
+              try {
+                const manifestModule = await import(tsManifestPath);
+                manifest = manifestModule.manifest || manifestModule.default;
+              } catch (error) {
+                // Skip this folder if manifest is invalid
+                continue;
+              }
+            }
+          }
+
+          if (manifest && manifest.id === pluginId) {
+            return entry.name;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Failed to find folder for plugin ${pluginId}:`, error);
+      return null;
+    }
+  }
 }
 
 export const pluginManagerService = new PluginManagerService();

@@ -18,6 +18,23 @@ export enum MessageType {
   TOOL_RESPONSE = "ToolResponse"
 }
 
+export enum MessageSentiment {
+  POSITIVE = "positive",
+  NEUTRAL = "neutral",
+  NEGATIVE = "negative"
+}
+
+export enum MessageIntent {
+  GREET = "greet",
+  QUESTION = "question",
+  REQUEST = "request",
+  HANDOFF = "handoff",
+  CLOSE_SATISFIED = "close_satisfied",
+  CLOSE_UNSATISFIED = "close_unsatisfied",
+  OTHER = "other",
+  UNKNOWN = "unknown"
+}
+
 @Entity("messages")
 export class Message {
   @PrimaryGeneratedColumn("uuid")
@@ -61,9 +78,41 @@ export class Message {
     referenced_documents?: string[];
   } | null;
 
+  @Column({
+    type: "enum",
+    enum: MessageSentiment,
+    nullable: true
+  })
+  sentiment!: MessageSentiment | null;
+
+  @Column({
+    type: "enum",
+    enum: MessageIntent,
+    nullable: true
+  })
+  intent!: MessageIntent | null;
+
   @CreateDateColumn()
   created_at!: Date;
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  async saveIntent(intent: MessageIntent): Promise<Message | null> {
+    const { MessageRepository } = await import('../../repositories/message.repository');
+    const messageRepository = new MessageRepository();
+    return messageRepository.update(this.id, { intent });
+  }
+
+  async saveSentiment(sentiment: MessageSentiment): Promise<Message | null> {
+    const { MessageRepository } = await import('../../repositories/message.repository');
+    const messageRepository = new MessageRepository();
+    return messageRepository.update(this.id, { sentiment });
+  }
+
+  async savePerception(perception: { intent: MessageIntent; sentiment: MessageSentiment }): Promise<Message | null> {
+    const { MessageRepository } = await import('../../repositories/message.repository');
+    const messageRepository = new MessageRepository();
+    return messageRepository.update(this.id, { intent: perception.intent, sentiment: perception.sentiment });
+  }
 }

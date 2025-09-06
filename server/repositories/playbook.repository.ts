@@ -20,7 +20,7 @@ export class PlaybookRepository {
   async findById(id: string, organizationId: string): Promise<Playbook | null> {
     return await this.repository.findOne({
       where: { id, organization_id: organizationId },
-      relations: ["agents"]
+      relations: ["agents"],
     });
   }
 
@@ -28,50 +28,61 @@ export class PlaybookRepository {
     return await this.repository.find({
       where: { organization_id: organizationId },
       relations: ["agents"],
-      order: { created_at: "DESC" }
+      order: { created_at: "DESC" },
     });
   }
 
-  async findByStatus(organizationId: string, status: PlaybookStatus): Promise<Playbook[]> {
+  async findByStatus(
+    organizationId: string,
+    status: PlaybookStatus
+  ): Promise<Playbook[]> {
     return await this.repository.find({
       where: { organization_id: organizationId, status },
       relations: ["agents"],
-      order: { created_at: "DESC" }
+      order: { created_at: "DESC" },
     });
   }
 
-  async update(id: string, organizationId: string, data: Partial<Playbook>): Promise<Playbook | null> {
+  async update(
+    id: string,
+    organizationId: string,
+    data: Partial<Playbook>
+  ): Promise<Playbook | null> {
     const playbook = await this.findById(id, organizationId);
     if (!playbook) {
       return null;
     }
-    
+
     if (data.agents !== undefined) {
       playbook.agents = data.agents;
       await this.repository.save(playbook);
       delete data.agents;
     }
-    
+
     if (Object.keys(data).length > 0) {
       await this.repository.update(
         { id, organization_id: organizationId },
         data
       );
     }
-    
+
     return await this.findById(id, organizationId);
   }
 
   async delete(id: string, organizationId: string): Promise<boolean> {
     const result = await this.repository.delete({
       id,
-      organization_id: organizationId
+      organization_id: organizationId,
     });
-    
+
     return result.affected !== 0;
   }
 
-  async assignAgents(playbookId: string, agentIds: string[], organizationId: string): Promise<Playbook | null> {
+  async assignAgents(
+    playbookId: string,
+    agentIds: string[],
+    organizationId: string
+  ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId, organizationId);
     if (!playbook) {
       return null;
@@ -81,8 +92,8 @@ export class PlaybookRepository {
       const agents = await this.agentRepository.find({
         where: {
           id: In(agentIds),
-          organization_id: organizationId
-        }
+          organization_id: organizationId,
+        },
       });
       playbook.agents = agents;
     } else {
@@ -92,13 +103,17 @@ export class PlaybookRepository {
     return await this.repository.save(playbook);
   }
 
-  async addAgent(playbookId: string, agentId: string, organizationId: string): Promise<Playbook | null> {
+  async addAgent(
+    playbookId: string,
+    agentId: string,
+    organizationId: string
+  ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId, organizationId);
     if (!playbook) {
       return null;
     }
 
-    const agentExists = playbook.agents.some(agent => agent.id === agentId);
+    const agentExists = playbook.agents.some((agent) => agent.id === agentId);
     if (!agentExists) {
       playbook.agents.push({ id: agentId } as any);
       await this.repository.save(playbook);
@@ -107,15 +122,21 @@ export class PlaybookRepository {
     return await this.findById(playbookId, organizationId);
   }
 
-  async removeAgent(playbookId: string, agentId: string, organizationId: string): Promise<Playbook | null> {
+  async removeAgent(
+    playbookId: string,
+    agentId: string,
+    organizationId: string
+  ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId, organizationId);
     if (!playbook) {
       return null;
     }
 
-    playbook.agents = playbook.agents.filter(agent => agent.id !== agentId);
+    playbook.agents = playbook.agents.filter((agent) => agent.id !== agentId);
     await this.repository.save(playbook);
 
     return await this.findById(playbookId, organizationId);
   }
 }
+
+export const playbookRepository = new PlaybookRepository();

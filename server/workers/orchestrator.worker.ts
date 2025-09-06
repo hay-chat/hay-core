@@ -15,7 +15,9 @@ export class OrchestratorWorker {
 
     // Only initialize if database is connected
     if (!AppDataSource.isInitialized) {
-      console.warn("Database not initialized, skipping orchestrator initialization");
+      console.warn(
+        "Database not initialized, skipping orchestrator initialization"
+      );
       return;
     }
 
@@ -36,7 +38,7 @@ export class OrchestratorWorker {
     }
 
     console.log(`Starting orchestrator worker with ${intervalMs}ms interval`);
-    
+
     this.intervalId = setInterval(async () => {
       if (!this.isProcessing) {
         await this.tick();
@@ -106,7 +108,6 @@ export class OrchestratorWorker {
       console.error("[Worker] Inactivity check error:", error);
     }
   }
-
 }
 
 // Export singleton instance

@@ -21,29 +21,35 @@ export class MessageRepository {
 
   async findById(id: string): Promise<Message | null> {
     return await this.repository.findOne({
-      where: { id }
+      where: { id },
     });
   }
 
   async findByConversation(conversationId: string): Promise<Message[]> {
     return await this.repository.find({
       where: { conversation_id: conversationId },
-      order: { created_at: "ASC" }
+      order: { created_at: "ASC" },
     });
   }
 
-  async findByType(conversationId: string, type: MessageType): Promise<Message[]> {
+  async findByType(
+    conversationId: string,
+    type: MessageType
+  ): Promise<Message[]> {
     return await this.repository.find({
       where: { conversation_id: conversationId, type },
-      order: { created_at: "ASC" }
+      order: { created_at: "ASC" },
     });
   }
 
-  async getLastMessages(conversationId: string, limit: number = 10): Promise<Message[]> {
+  async getLastMessages(
+    conversationId: string,
+    limit: number = 10
+  ): Promise<Message[]> {
     return await this.repository.find({
       where: { conversation_id: conversationId },
       order: { created_at: "DESC" },
-      take: limit
+      take: limit,
     });
   }
 
@@ -59,8 +65,10 @@ export class MessageRepository {
 
   async deleteByConversation(conversationId: string): Promise<boolean> {
     const result = await this.repository.delete({
-      conversation_id: conversationId
+      conversation_id: conversationId,
     });
     return result.affected !== 0;
   }
 }
+
+export const messageRepository = new MessageRepository();

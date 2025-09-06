@@ -16,18 +16,22 @@ export class ConversationService {
     this.customerService = new CustomerService();
   }
 
-  async createConversation(organizationId: string, data: {
-    title?: string;
-    agentId?: string | null;
-    playbook_id?: string | null;
-    metadata?: Record<string, any>;
-    status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
-    customer_id?: string | null;
-  }): Promise<Conversation> {
+  async createConversation(
+    organizationId: string,
+    data: {
+      title?: string;
+      agentId?: string | null;
+      playbook_id?: string | null;
+      metadata?: Record<string, any>;
+      status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
+      customer_id?: string | null;
+    }
+  ): Promise<Conversation> {
     // If no customer_id is provided, create an anonymous customer
     let customerId = data.customer_id;
     if (!customerId) {
-      const anonymousCustomer = await this.customerService.createAnonymousCustomer(organizationId);
+      const anonymousCustomer =
+        await this.customerService.createAnonymousCustomer(organizationId);
       customerId = anonymousCustomer.id;
     }
 
@@ -40,7 +44,7 @@ export class ConversationService {
       context: {},
       metadata: data.metadata || {},
       needs_processing: data.status === "open" || data.status === "processing",
-      customer_id: customerId
+      customer_id: customerId,
     });
   }
 
@@ -48,12 +52,24 @@ export class ConversationService {
     return await this.conversationRepository.findByOrganization(organizationId);
   }
 
-  async getConversationsByAgent(organizationId: string, agentId: string): Promise<Conversation[]> {
-    return await this.conversationRepository.findByAgent(agentId, organizationId);
+  async getConversationsByAgent(
+    organizationId: string,
+    agentId: string
+  ): Promise<Conversation[]> {
+    return await this.conversationRepository.findByAgent(
+      agentId,
+      organizationId
+    );
   }
 
-  async getConversation(conversationId: string, organizationId: string): Promise<Conversation | null> {
-    return await this.conversationRepository.findById(conversationId, organizationId);
+  async getConversation(
+    conversationId: string,
+    organizationId: string
+  ): Promise<Conversation | null> {
+    return await this.conversationRepository.findById(
+      conversationId,
+      organizationId
+    );
   }
 
   async updateConversation(
@@ -72,61 +88,73 @@ export class ConversationService {
       ended_at?: Date;
       closed_at?: Date | null;
       context?: Record<string, any>;
-      resolution_metadata?: { resolved: boolean; confidence: number; reason: string };
+      resolution_metadata?: {
+        resolved: boolean;
+        confidence: number;
+        reason: string;
+      };
       playbook_id?: string | null;
       orchestration_status?: Record<string, any> | null;
     }
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved
     const updateData = { ...data };
-    if (data.status === 'closed' || data.status === 'resolved') {
+    if (data.status === "closed" || data.status === "resolved") {
       updateData.closed_at = getUTCNow();
     }
-    return await this.conversationRepository.update(conversationId, organizationId, updateData);
+    return await this.conversationRepository.update(
+      conversationId,
+      organizationId,
+      updateData
+    );
   }
 
-  async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {
-    return await this.conversationRepository.delete(conversationId, organizationId);
+  async deleteConversation(
+    organizationId: string,
+    conversationId: string
+  ): Promise<boolean> {
+    return await this.conversationRepository.delete(
+      conversationId,
+      organizationId
+    );
   }
 
-  async addMessage(conversationId: string, organizationId: string, data: {
-    content: string;
-    type: MessageType;
-    sender?: string;
-    usage_metadata?: Record<string, any>;
-    metadata?: Record<string, any>;
-  }): Promise<Message> {
-    // Update last_user_message_at if it's a user message
-    if (data.type === MessageType.CUSTOMER) {
-      const now = getUTCNow();
-      await this.conversationRepository.update(conversationId, organizationId, {
-        last_user_message_at: now,
-        // Don't set cooldown here - let the orchestrator manage it
-      });
+  async addMessage(
+    conversationId: string,
+    organizationId: string,
+    data: {
+      content: string;
+      type: MessageType;
+      sender?: string;
+      usage_metadata?: Record<string, any>;
+      metadata?: Record<string, any>;
     }
-
+  ): Promise<Message> {
     return await this.messageRepository.create({
       conversation_id: conversationId,
       content: data.content,
       type: data.type,
       sender: data.sender || null,
       usage_metadata: data.usage_metadata || null,
-      metadata: data.metadata || null
+      metadata: data.metadata || null,
     });
   }
 
-  async addMessages(conversationId: string, messages: Array<{
-    content: string;
-    type: MessageType;
-    usage_metadata?: Record<string, any>;
-  }>): Promise<Message[]> {
-    const messagesToCreate = messages.map(msg => ({
+  async addMessages(
+    conversationId: string,
+    messages: Array<{
+      content: string;
+      type: MessageType;
+      usage_metadata?: Record<string, any>;
+    }>
+  ): Promise<Message[]> {
+    const messagesToCreate = messages.map((msg) => ({
       conversation_id: conversationId,
       content: msg.content,
       type: msg.type,
-      usage_metadata: msg.usage_metadata || null
+      usage_metadata: msg.usage_metadata || null,
     }));
-    
+
     return await this.messageRepository.createBulk(messagesToCreate);
   }
 
@@ -134,8 +162,15 @@ export class ConversationService {
     return await this.messageRepository.findByConversation(conversationId);
   }
 
-  async getLastMessages(conversationId: string, organizationId: string, limit: number = 10): Promise<Message[]> {
-    const messages = await this.messageRepository.getLastMessages(conversationId, limit);
+  async getLastMessages(
+    conversationId: string,
+    organizationId: string,
+    limit: number = 10
+  ): Promise<Message[]> {
+    const messages = await this.messageRepository.getLastMessages(
+      conversationId,
+      limit
+    );
     return messages.reverse();
   }
 }

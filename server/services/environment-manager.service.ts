@@ -14,6 +14,8 @@ export class EnvironmentManagerService {
     const manifest = instance.plugin.manifest as HayPluginManifest;
     const permittedEnvVars = manifest.permissions?.env || [];
     
+    console.log(`[Environment] Plugin ${instance.plugin.name} permitted env vars:`, permittedEnvVars);
+    
     // Start with a clean environment
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: process.env.NODE_ENV || "production",
@@ -58,6 +60,8 @@ export class EnvironmentManagerService {
       }
     }
 
+    console.log(`[Environment] Final env vars for ${instance.plugin.name}:`, Object.keys(env).filter(key => !['NODE_ENV', 'PATH', 'HOME', 'USER'].includes(key)));
+    
     return env;
   }
 

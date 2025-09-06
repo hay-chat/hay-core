@@ -3,6 +3,7 @@ import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
+import { Message, MessageType } from "@server/database/entities/message.entity";
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   constructor() {
@@ -17,12 +18,15 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await this.repository.save(conversation);
   }
 
-  override async findById(id: string, organizationId?: string): Promise<Conversation | null> {
+  override async findById(
+    id: string,
+    organizationId?: string
+  ): Promise<Conversation | null> {
     const whereCondition: { id: string; organization_id?: string } = { id };
     if (organizationId) {
       whereCondition.organization_id = organizationId;
     }
-    
+
     return await this.repository.findOne({
       where: whereCondition,
       relations: ["messages"],
@@ -102,7 +106,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
         {
           openStatus: "open",
-          processingStatus: "processing", 
+          processingStatus: "processing",
           fiveMinutesAgo,
         }
       );
@@ -112,7 +116,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
       return await queryBuilder.getMany();
     } catch (error) {
-      console.error("[ConversationRepository] Error getting available conversations:", error);
+      console.error(
+        "[ConversationRepository] Error getting available conversations:",
+        error
+      );
       return [];
     }
   }
@@ -323,6 +330,65 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await this.repository.find({
       where: { status: "open" },
       order: { created_at: "DESC" },
+    });
+  }
+
+  async getPublicMessages(conversationId: string): Promise<Message[]> {
+    const messageRepository = AppDataSource.getRepository(Message);
+    return await messageRepository.find({
+      where: {
+        conversation_id: conversationId,
+        type: MessageType.CUSTOMER
+      },
+      order: { created_at: "ASC" },
+    });
+  }
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    const messageRepository = AppDataSource.getRepository(Message);
+    return await messageRepository.find({
+      where: {
+        conversation_id: conversationId,
+      },
+      order: { created_at: "ASC" },
+    });
+  }
+
+  async getLastHumanMessage(conversationId: string): Promise<Message | null> {
+    const conversation = await this.repository.findOne({
+      where: { id: conversationId },
+      relations: ["messages"],
+    });
+
+    if (!conversation?.messages) return null;
+
+    return (
+      conversation.messages
+        .filter((msg) => msg.type === MessageType.CUSTOMER)
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0] ||
+      null
+    );
+  }
+
+  async getSystemMessages(conversationId: string): Promise<Message[]> {
+    const messageRepository = AppDataSource.getRepository(Message);
+    return await messageRepository.find({
+      where: {
+        conversation_id: conversationId,
+        type: MessageType.SYSTEM
+      },
+      order: { created_at: "ASC" },
+    });
+  }
+
+  async getBotMessages(conversationId: string): Promise<Message[]> {
+    const messageRepository = AppDataSource.getRepository(Message);
+    return await messageRepository.find({
+      where: {
+        conversation_id: conversationId,
+        type: MessageType.BOT_AGENT
+      },
+      order: { created_at: "ASC" },
     });
   }
 }

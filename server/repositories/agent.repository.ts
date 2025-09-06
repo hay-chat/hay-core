@@ -16,44 +16,47 @@ export class AgentRepository {
 
   async findById(id: string, organizationId: string): Promise<Agent | null> {
     return await this.repository.findOne({
-      where: { id, organization_id: organizationId }
+      where: { id, organization_id: organizationId },
     });
   }
 
   async findByOrganization(organizationId: string): Promise<Agent[]> {
     return await this.repository.find({
       where: { organization_id: organizationId },
-      order: { created_at: "DESC" }
+      order: { created_at: "DESC" },
     });
   }
 
   async findEnabledByOrganization(organizationId: string): Promise<Agent[]> {
     return await this.repository.find({
       where: { organization_id: organizationId, enabled: true },
-      order: { created_at: "DESC" }
+      order: { created_at: "DESC" },
     });
   }
 
-  async update(id: string, organizationId: string, data: Partial<Agent>): Promise<Agent | null> {
+  async update(
+    id: string,
+    organizationId: string,
+    data: Partial<Agent>
+  ): Promise<Agent | null> {
     const agent = await this.findById(id, organizationId);
     if (!agent) {
       return null;
     }
-    
-    await this.repository.update(
-      { id, organization_id: organizationId },
-      data
-    );
-    
+
+    await this.repository.update({ id, organization_id: organizationId }, data);
+
     return await this.findById(id, organizationId);
   }
 
   async delete(id: string, organizationId: string): Promise<boolean> {
     const result = await this.repository.delete({
       id,
-      organization_id: organizationId
+      organization_id: organizationId,
     });
-    
+
     return result.affected !== 0;
   }
 }
+
+export const agentRepository = new AgentRepository();
