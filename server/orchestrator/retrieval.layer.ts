@@ -27,35 +27,24 @@ export class RetrievalLayer {
       return null;
     }
 
-    // Get last few customer messages for context
-    const customerMessages = messages
-      .filter((msg) => msg.type === "Customer")
-      .slice(-3);
-
-    if (customerMessages.length === 0) {
-      return null;
-    }
-
-    const conversationContext = customerMessages
-      .map((msg) => msg.content)
-      .join(" ");
+    const conversationContext = messages.map((msg) => msg.content).join(" ");
 
     const candidatePrompt = `Given the conversation context below, score how relevant each playbook is (0-1 scale).
-Consider the trigger phrases, descriptions, and overall context match.
+      Consider the trigger phrases, descriptions, and overall context match.
 
-Conversation context: "${conversationContext}"
+      Conversation context: "${conversationContext}"
 
-Available playbooks:
-${playbooks
-  .map(
-    (p) =>
-      `- ID: ${p.id}, Title: "${p.title}", Trigger: "${
-        p.trigger
-      }", Description: "${p.description || "No description"}"`
-  )
-  .join("\n")}
+      Available playbooks:
+      ${playbooks
+        .map(
+          (p) =>
+            `- ID: ${p.id}, Title: "${p.title}", Trigger: "${
+              p.trigger
+            }", Description: "${p.description || "No description"}"`
+        )
+        .join("\n")}
 
-For each playbook, provide a relevance score and brief rationale.`;
+      For each playbook, provide a relevance score and brief rationale.`;
 
     const candidateSchema = {
       type: "object",

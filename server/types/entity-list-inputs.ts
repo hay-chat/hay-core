@@ -58,13 +58,7 @@ export const conversationListInputSchema = baseListInputSchema.extend({
   sorting: z
     .object({
       orderBy: z
-        .enum([
-          "created_at",
-          "updated_at",
-          "title",
-          "status",
-          "last_user_message_at",
-        ])
+        .enum(["created_at", "updated_at", "title", "status"])
         .default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })

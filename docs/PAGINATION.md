@@ -188,7 +188,7 @@ All list endpoints return a consistent response structure:
 
 **Search Fields:** `["title"]`
 
-**Sort Fields:** `["created_at", "updated_at", "title", "status", "last_user_message_at"]`
+**Sort Fields:** `["created_at", "updated_at", "title", "status"]`
 
 ### Agents
 

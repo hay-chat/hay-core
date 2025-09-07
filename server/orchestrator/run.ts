@@ -32,11 +32,8 @@ export const runConversation = async (conversationId: string) => {
     }
 
     // 00.3. Check if last customer message is older than last processed at
-    if (
-      lastCustomerMessage?.created_at &&
-      lastCustomerMessage.created_at > conversation.last_processed_at!
-    ) {
-      throw new Error("Last customer message is older than last processed at");
+    if (!conversation.needs_processing) {
+      throw new Error("Conversation does not need processing");
     }
 
     if (!lastCustomerMessage) {
@@ -116,18 +113,20 @@ export const runConversation = async (conversationId: string) => {
 
     if (executionResult) {
       await conversation.addMessage({
-        content: executionResult.content,
-        type: MessageType.BOT_AGENT,
-        metadata: executionResult.metadata,
+        content: executionResult.userMessage || "",
+        type:
+          executionResult.step === "CALL_TOOL"
+            ? MessageType.TOOL_CALL
+            : MessageType.BOT_AGENT,
       });
     }
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
-    // console.log(
-    //   `Error running conversation ${conversationId}:`,
-    //   error instanceof Error ? error.message : "Unknown error"
-    // );
+    console.log(
+      `Error running conversation ${conversationId}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
   } finally {
     await conversation.unlock();
   }

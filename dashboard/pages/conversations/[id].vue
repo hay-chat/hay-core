@@ -110,20 +110,20 @@
             <!-- Messages -->
             <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
-                :variant="message.sender as 'customer' | 'agent' | 'system'"
+                :variant="message.type as 'Customer' | 'BotAgent' | 'HumanAgent' | 'System' | 'ToolCall' | 'ToolResponse'"
                 :content="message.content"
                 :timestamp="message.timestamp"
                 :sender-name="
-                  message.sender === 'customer'
+                  message.type === 'Customer'
                     ? 'Customer'
                     : message.agentName || 'AI Assistant'
                 "
                 :show-header="shouldShowHeader(index)"
                 :attachments="'attachments' in message ? (message as any).attachments : undefined"
-                :metadata="message.sender === 'agent' ? {
+                :metadata="(message.type === 'BotAgent' || message.type === 'HumanAgent') ? {
                   isPlaybook: message.isPlaybook,
                   needsApproval: supervisionMode && message.needsApproval,
-                  action: message.sender === 'system' ? (message as any).action : undefined
+                  action: message.type === 'System' ? (message as any).action : undefined
                 } : undefined"
                 @approve="
                   message.needsApproval ? approveMessage(message.id) : undefined

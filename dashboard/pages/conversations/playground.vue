@@ -91,7 +91,7 @@
             <!-- Messages -->
             <div v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
-                :variant="message.sender as 'customer' | 'agent' | 'system'"
+                :variant="message.type as 'Customer' | 'BotAgent' | 'System' | 'HumanAgent' | 'ToolCall' | 'ToolResponse'"
                 :content="message.content"
                 :timestamp="message.timestamp"
                 :sender-name="
@@ -155,42 +155,6 @@
       <!-- Right Side: Context Panel -->
       <div class="w-80 border-l bg-muted/30">
         <div class="p-6 space-y-6">
-          <!-- Test Information -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base">Test Information</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div class="flex items-center space-x-3">
-                <div
-                  class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
-                >
-                  <FlaskConical class="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div class="font-medium">Test Session</div>
-                  <div class="text-sm text-muted-foreground">
-                    ID: {{ conversation?.id?.slice(0, 8) }}
-                  </div>
-                </div>
-              </div>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Customer Type:</span>
-                  <span>Anonymous Test</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Messages:</span>
-                  <span>{{ messages.length }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Started:</span>
-                  <span>{{ formatDate(conversation?.created_at) }}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <!-- Orchestrator Status -->
           <Card>
             <CardHeader>
@@ -217,8 +181,12 @@
                 <span>{{ lastOrchestratorCheck || "Never" }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Processing Count:</span>
-                <span>{{ processingCount }}</span>
+                <span class="text-muted-foreground">Messages:</span>
+                <span>{{ messages.length }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-muted-foreground">Needs Processing:</span>
+                <span>{{ conversation?.needs_processing }}</span>
               </div>
               <div
                 v-if="conversation?.playbook_id"
@@ -622,8 +590,7 @@ const pollConversation = async () => {
 
 const startPolling = () => {
   stopPolling();
-  // Poll every 2 seconds
-  pollingInterval = setInterval(pollConversation, 2000);
+  pollingInterval = setInterval(pollConversation, 1000);
 };
 
 const stopPolling = () => {

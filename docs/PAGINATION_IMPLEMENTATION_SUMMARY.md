@@ -124,13 +124,13 @@ const result = await trpc.v1.documents.list.query({
 
 ## 📊 Entity Support Status
 
-| Entity        | Status          | Filters                                       | Search Fields                      | Sort Fields                                                 |
-| ------------- | --------------- | --------------------------------------------- | ---------------------------------- | ----------------------------------------------------------- |
-| Documents     | ✅ Complete     | type, status, visibility, agentId, playbookId | title, content                     | created_at, updated_at, title, type, status                 |
-| Conversations | ✅ Complete     | status, agentId, playbookId, hasMessages      | title                              | created_at, updated_at, title, status, last_user_message_at |
-| Agents        | ✅ Schema Ready | enabled, hasPlaybooks                         | name, description                  | created_at, updated_at, name, enabled                       |
-| Playbooks     | ✅ Schema Ready | status, agentIds                              | name, description, prompt_template | created_at, updated_at, name, status                        |
-| Messages      | ✅ Schema Ready | conversationId, type, sender                  | content                            | created_at, updated_at, type                                |
+| Entity        | Status          | Filters                                       | Search Fields                      | Sort Fields                                 |
+| ------------- | --------------- | --------------------------------------------- | ---------------------------------- | ------------------------------------------- |
+| Documents     | ✅ Complete     | type, status, visibility, agentId, playbookId | title, content                     | created_at, updated_at, title, type, status |
+| Conversations | ✅ Complete     | status, agentId, playbookId, hasMessages      | title                              | created_at, updated_at, title, status       |
+| Agents        | ✅ Schema Ready | enabled, hasPlaybooks                         | name, description                  | created_at, updated_at, name, enabled       |
+| Playbooks     | ✅ Schema Ready | status, agentIds                              | name, description, prompt_template | created_at, updated_at, name, status        |
+| Messages      | ✅ Schema Ready | conversationId, type, sender                  | content                            | created_at, updated_at, type                |
 
 ## 🔄 Migration Guide
 

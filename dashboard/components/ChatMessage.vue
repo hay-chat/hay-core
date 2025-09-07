@@ -10,7 +10,7 @@
     ]"
   >
     <div
-      v-if="showHeader !== false && variant !== 'system'"
+      v-if="showHeader !== false && variant !== 'System'"
       class="chat-message__avatar"
     >
       <component :is="avatarIcon" class="chat-message__avatar-icon" />
@@ -18,11 +18,11 @@
     <div class="chat-message__content">
       <div v-if="showHeader !== false" class="chat-message__header">
         <span
-          v-if="senderName && variant !== 'system'"
+          v-if="senderName && variant !== 'System'"
           class="chat-message__sender"
           >{{ senderName }}</span
         >
-        <span v-if="variant !== 'system'" class="chat-message__time">{{
+        <span v-if="variant !== 'System'" class="chat-message__time">{{
           formattedTime
         }}</span>
         <div v-if="metadata?.isPlaybook" class="chat-message__playbook-badge">
@@ -66,7 +66,7 @@
           </Button>
         </div>
         <div
-          v-else-if="metadata && variant === 'agent'"
+          v-else-if="metadata && variant === 'BotAgent'"
           class="chat-message__metadata"
         >
           <div v-if="metadata.tool" class="chat-message__tool">
@@ -119,7 +119,13 @@ interface Metadata {
 }
 
 interface Props {
-  variant: "customer" | "agent" | "system";
+  variant:
+    | "Customer"
+    | "BotAgent"
+    | "System"
+    | "HumanAgent"
+    | "ToolCall"
+    | "ToolResponse";
   content: string;
   timestamp: string | Date;
   senderName?: string;
@@ -146,8 +152,8 @@ const formattedTime = computed(() => {
 });
 
 const avatarIcon = computed(() => {
-  if (props.variant === "customer") return User;
-  if (props.variant === "agent") return Bot;
+  if (props.variant === "Customer") return User;
+  if (props.variant === "BotAgent" || props.variant === "HumanAgent") return Bot;
 
   // System message icons
   const action = props.metadata?.action;
@@ -177,24 +183,25 @@ const avatarIcon = computed(() => {
 }
 
 /* Variant-specific positioning */
-.chat-message--customer {
+.chat-message--Customer {
   @apply mr-auto;
 }
 
-.chat-message--agent {
+.chat-message--BotAgent,
+.chat-message--HumanAgent {
   @apply ml-auto flex-row-reverse;
 }
 
 /* Inverted mode (for playground where user is the customer) */
-.chat-message--inverted.chat-message--customer {
+.chat-message--inverted.chat-message--Customer {
   @apply ml-auto flex-row-reverse mr-0;
 }
 
-.chat-message--inverted.chat-message--agent {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent {
   @apply mr-auto flex-row ml-0;
 }
 
-.chat-message--system {
+.chat-message--System {
   @apply justify-center mx-auto my-4;
 }
 
@@ -204,42 +211,42 @@ const avatarIcon = computed(() => {
 }
 
 /* No header state - add left padding to align with messages that have avatars */
-.chat-message--no-header:not(.chat-message--system) .chat-message__content {
+.chat-message--no-header:not(.chat-message--System) .chat-message__content {
   @apply ml-11; /* 8 (avatar width) + 3 (gap) = 11 */
 }
 
-.chat-message--no-header.chat-message--agent .chat-message__content {
+.chat-message--no-header.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
   @apply mr-11 ml-0; /* Reverse for agent messages */
 }
 
-.chat-message--no-header.chat-message--inverted.chat-message--customer
+.chat-message--no-header.chat-message--inverted.chat-message--Customer
   .chat-message__content {
   @apply mr-11 ml-0; /* Reverse for inverted customer messages */
 }
 
-.chat-message--no-header.chat-message--inverted.chat-message--agent
+.chat-message--no-header.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent
   .chat-message__content {
   @apply ml-11 mr-0; /* Normal for inverted agent messages */
 }
 
-.chat-message--customer .chat-message__avatar {
+.chat-message--Customer .chat-message__avatar {
   @apply bg-primary/10;
 }
 
-.chat-message--agent .chat-message__avatar {
+.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar {
   @apply bg-blue-100;
 }
 
 /* Inverted avatar colors */
-.chat-message--inverted.chat-message--customer .chat-message__avatar {
+.chat-message--inverted.chat-message--Customer .chat-message__avatar {
   @apply bg-blue-100;
 }
 
-.chat-message--inverted.chat-message--agent .chat-message__avatar {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar {
   @apply bg-primary/10;
 }
 
-.chat-message--system .chat-message__avatar {
+.chat-message--System .chat-message__avatar {
   @apply w-5 h-5 bg-transparent;
 }
 
@@ -247,24 +254,24 @@ const avatarIcon = computed(() => {
   @apply w-4 h-4;
 }
 
-.chat-message--customer .chat-message__avatar-icon {
+.chat-message--Customer .chat-message__avatar-icon {
   @apply text-primary;
 }
 
-.chat-message--agent .chat-message__avatar-icon {
+.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar-icon {
   @apply text-blue-600;
 }
 
 /* Inverted avatar icon colors */
-.chat-message--inverted.chat-message--customer .chat-message__avatar-icon {
+.chat-message--inverted.chat-message--Customer .chat-message__avatar-icon {
   @apply text-blue-600;
 }
 
-.chat-message--inverted.chat-message--agent .chat-message__avatar-icon {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar-icon {
   @apply text-primary;
 }
 
-.chat-message--system .chat-message__avatar-icon {
+.chat-message--System .chat-message__avatar-icon {
   @apply w-3 h-3 text-muted-foreground;
 }
 
@@ -273,20 +280,20 @@ const avatarIcon = computed(() => {
   @apply flex-1 min-w-0;
 }
 
-.chat-message--agent .chat-message__content {
+.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
   @apply text-right;
 }
 
 /* Inverted content alignment */
-.chat-message--inverted.chat-message--customer .chat-message__content {
+.chat-message--inverted.chat-message--Customer .chat-message__content {
   @apply text-right;
 }
 
-.chat-message--inverted.chat-message--agent .chat-message__content {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
   @apply text-left;
 }
 
-.chat-message--system .chat-message__content {
+.chat-message--System .chat-message__content {
   @apply inline-flex items-center gap-2 bg-blue-100/50 text-blue-800 p-3 rounded-md;
   max-width: 50ch;
 }
@@ -296,20 +303,20 @@ const avatarIcon = computed(() => {
   @apply flex items-center gap-2 mb-1;
 }
 
-.chat-message--agent .chat-message__header {
+.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__header {
   @apply justify-end;
 }
 
 /* Inverted header alignment */
-.chat-message--inverted.chat-message--customer .chat-message__header {
+.chat-message--inverted.chat-message--Customer .chat-message__header {
   @apply justify-end;
 }
 
-.chat-message--inverted.chat-message--agent .chat-message__header {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__header {
   @apply justify-start;
 }
 
-.chat-message--system .chat-message__header {
+.chat-message--System .chat-message__header {
   @apply mb-0;
 }
 
@@ -326,20 +333,20 @@ const avatarIcon = computed(() => {
   @apply p-3 rounded-lg inline-block text-left;
 }
 
-.chat-message--customer .chat-message__bubble {
+.chat-message--Customer .chat-message__bubble {
   @apply bg-muted;
 }
 
-.chat-message--agent .chat-message__bubble {
+.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__bubble {
   @apply bg-primary text-primary-foreground;
 }
 
 /* Inverted bubble colors */
-.chat-message--inverted.chat-message--customer .chat-message__bubble {
+.chat-message--inverted.chat-message--Customer .chat-message__bubble {
   @apply bg-primary text-primary-foreground;
 }
 
-.chat-message--inverted.chat-message--agent .chat-message__bubble {
+.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__bubble {
   @apply bg-muted text-foreground;
 }
 
@@ -348,7 +355,7 @@ const avatarIcon = computed(() => {
   color: initial !important;
 }
 
-.chat-message--system .chat-message__bubble {
+.chat-message--System .chat-message__bubble {
   @apply p-0 bg-transparent inline;
 }
 
@@ -357,7 +364,7 @@ const avatarIcon = computed(() => {
   @apply text-sm;
 }
 
-.chat-message--system .chat-message__text {
+.chat-message--System .chat-message__text {
   @apply text-xs text-muted-foreground inline;
 }
 

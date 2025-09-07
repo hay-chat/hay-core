@@ -6,12 +6,14 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
-  JoinColumn
+  JoinColumn,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
+import { MessageType } from "./message.entity";
+import { analyzeInstructions } from "../../utils/instruction-formatter";
 
 @Entity("conversations")
 export class Conversation {
@@ -21,10 +23,10 @@ export class Conversation {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
-  @Column({ 
+  @Column({
     type: "enum",
     enum: ["open", "processing", "pending-human", "resolved", "closed"],
-    default: "open"
+    default: "open",
   })
   status!: "open" | "processing" | "pending-human" | "resolved" | "closed";
 
@@ -41,7 +43,11 @@ export class Conversation {
   context!: Record<string, any> | null;
 
   @Column({ type: "jsonb", nullable: true })
-  resolution_metadata!: { resolved: boolean; confidence: number; reason: string } | null;
+  resolution_metadata!: {
+    resolved: boolean;
+    confidence: number;
+    reason: string;
+  } | null;
 
   @Column({ type: "uuid", nullable: true })
   agent_id!: string | null;
@@ -78,7 +84,10 @@ export class Conversation {
   @Column({ type: "uuid", nullable: true })
   customer_id!: string | null;
 
-  @ManyToOne(() => Customer, customer => customer.conversations, { onDelete: "SET NULL", nullable: true })
+  @ManyToOne(() => Customer, (customer) => customer.conversations, {
+    onDelete: "SET NULL",
+    nullable: true,
+  })
   @JoinColumn()
   customer!: Customer | null;
 
@@ -88,7 +97,7 @@ export class Conversation {
   @Column({ type: "uuid", array: true, nullable: true })
   document_ids!: string[] | null;
 
-  @OneToMany(() => Message, message => message.conversation)
+  @OneToMany(() => Message, (message) => message.conversation)
   messages!: Message[];
 
   @CreateDateColumn()
@@ -98,22 +107,28 @@ export class Conversation {
   updated_at!: Date;
 
   async getLastCustomerMessage(): Promise<Message | null> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     return conversationRepository.getLastHumanMessage(this.id);
   }
 
   async lock(): Promise<void> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     const lockDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
     const lockUntil = new Date(Date.now() + lockDuration);
     await conversationRepository.update(this.id, this.organization_id, {
       processing_locked_until: lockUntil,
-      processing_locked_by: 'orchestrator-v2',
+      processing_locked_by: "orchestrator-v2",
     });
   }
 
   async unlock(): Promise<void> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     await conversationRepository.update(this.id, this.organization_id, {
       processing_locked_until: null,
       processing_locked_by: null,
@@ -125,15 +140,121 @@ export class Conversation {
   }
 
   async updatePlaybook(playbookId: string): Promise<void> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
+    });
+    const { playbookRepository } = await import(
+      "../../repositories/playbook.repository"
+    );
+    const playbook = await playbookRepository.findById(playbookId);
+    if (!playbook) {
+      return;
+    }
+
+    const analysis = analyzeInstructions(playbook.instructions);
+    const instructionText = analysis.formattedText;
+    const referencedActions = analysis.actions;
+
+    // Get tool schemas from plugin manager service
+    const toolSchemas: any[] = [];
+    try {
+      const { pluginManagerService } = await import(
+        "../../services/plugin-manager.service"
+      );
+      const allPlugins = pluginManagerService.getAllPlugins();
+
+      // Extract tool schemas from all plugins
+      for (const plugin of allPlugins) {
+        const manifest = plugin.manifest as any;
+        if (manifest?.capabilities?.mcp?.tools) {
+          toolSchemas.push(...manifest.capabilities.mcp.tools);
+        }
+      }
+    } catch (error) {
+      console.warn("Could not fetch tool schemas:", error);
+    }
+
+    let content = "";
+    content += `From this message forward you should be following this playbook:
+
+        **Playbook: ${playbook.title}**
+        ${playbook.description ? `\nDescription: ${playbook.description}` : ""}
+
+        **Instructions:**
+        ${instructionText}
+
+        **Required Fields:**
+        ${
+          playbook.required_fields?.length
+            ? playbook.required_fields.join(", ")
+            : "None"
+        }
+
+        **Trigger:** ${playbook.trigger}`;
+
+    // Add referenced actions with tool schemas if available
+    if (referencedActions.length > 0 && toolSchemas && toolSchemas.length > 0) {
+      content += `\n\n**Referenced Actions:**
+The following tools are available for you to use. You MUST return only valid JSON when calling tools, with no additional text:`;
+
+      const actionDetails = referencedActions.map((actionName) => {
+        let toolSchema = toolSchemas.find(
+          (schema) => schema.name === actionName
+        );
+
+        if (!toolSchema && actionName.includes("_")) {
+          const parts = actionName.split("_");
+          if (parts.length >= 2) {
+            const toolName = parts[parts.length - 1];
+            toolSchema = toolSchemas.find((schema) => schema.name === toolName);
+
+            if (!toolSchema) {
+              const toolNameSuffix = parts.slice(1).join("_");
+              toolSchema = toolSchemas.find(
+                (schema) => schema.name === toolNameSuffix
+              );
+            }
+          }
+        }
+
+        if (toolSchema) {
+          const requiredFields =
+            toolSchema.required && toolSchema.required.length > 0
+              ? ` (Required: ${toolSchema.required.join(", ")})`
+              : "";
+          return `- **${actionName}**: ${
+            toolSchema.description
+          }${requiredFields}\n  Input Schema: ${JSON.stringify(
+            toolSchema.parameters || {},
+            null,
+            2
+          )}`;
+        } else {
+          return `- **${actionName}**: Action not found in available tools`;
+        }
+      });
+
+      content += `\n${actionDetails.join("\n\n")}`;
+    } else if (referencedActions.length > 0) {
+      // Fallback to simple list if no tool schemas provided
+      content += `\n\n**Referenced Actions:**\n`;
+      content += referencedActions.map((action) => `- ${action}`).join("\n");
+    }
+
+    await this.addMessage({
+      content,
+      type: "System",
     });
     this.playbook_id = playbookId;
   }
 
   async addDocument(documentId: string): Promise<void> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     const currentDocIds = this.document_ids || [];
     if (!currentDocIds.includes(documentId)) {
       const updatedDocIds = [...currentDocIds, documentId];
@@ -145,12 +266,16 @@ export class Conversation {
   }
 
   async getPublicMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     return conversationRepository.getPublicMessages(this.id);
   }
 
   async getMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     return conversationRepository.getMessages(this.id);
   }
 
@@ -159,61 +284,72 @@ export class Conversation {
     type: string;
     metadata?: Record<string, any>;
   }): Promise<Message> {
-    const { messageRepository } = await import('../../repositories/message.repository');
+    const { messageRepository } = await import(
+      "../../repositories/message.repository"
+    );
     return messageRepository.create({
       conversation_id: this.id,
       content: messageData.content,
-      type: messageData.type as any,
+      type: messageData.type as MessageType,
       metadata: messageData.metadata,
     });
   }
 
   async getSystemMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     return conversationRepository.getSystemMessages(this.id);
   }
 
   async getBotMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
     return conversationRepository.getBotMessages(this.id);
   }
 
   async addInitialSystemMessage(): Promise<Message> {
     const systemContent = `You are a helpful AI assistant. You should provide accurate, helpful responses based on available context and documentation. Always be professional and courteous.
 
-Key behaviors:
-- Use available documentation and context to provide accurate answers
-- If you don't know something, clearly state that
-- Follow any active playbook instructions when provided
-- Be concise but thorough in your responses
-- Maintain conversation context throughout the interaction`;
+    Key behaviors:
+    - Use available documentation and context to provide accurate answers
+    - If you don't know something, clearly state that
+    - Follow any active playbook instructions when provided
+    - Be concise but thorough in your responses
+    - Maintain conversation context throughout the interaction
+    - Use available tools to provide accurate answers
+    - You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool
+    - You're not a human, the only way you can interact with any type of system is by calling tools, do not provide information about external actions to the user unless you have a tool call response`;
 
     return this.addMessage({
       content: systemContent,
-      type: 'System'
+      type: "System",
     });
   }
 
   async addInitialBotMessage(): Promise<Message> {
     return this.addMessage({
-      content: 'Hello! How can I help you today?',
-      type: 'BotAgent'
+      content: "Hello! How can I help you today?",
+      type: "BotAgent",
     });
   }
 
   async setProcessed(processed: boolean): Promise<void> {
-    const { conversationRepository } = await import('../../repositories/conversation.repository');
-    
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
+
     if (processed) {
       // When marking as processed, set both last_processed_at and needs_processing
-      const { getUTCNow } = await import('../../utils/date.utils');
+      const { getUTCNow } = await import("../../utils/date.utils");
       const now = getUTCNow();
-      
+
       await conversationRepository.updateById(this.id, {
         last_processed_at: now,
         needs_processing: false,
       });
-      
+
       // Update local instance
       this.last_processed_at = now;
       this.needs_processing = false;
@@ -222,7 +358,7 @@ Key behaviors:
       await conversationRepository.updateById(this.id, {
         needs_processing: true,
       });
-      
+
       // Update local instance
       this.needs_processing = true;
     }

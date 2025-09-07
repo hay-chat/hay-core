@@ -84,7 +84,6 @@ export class ConversationService {
       cooldown_until?: Date | null;
       processing_locked_until?: Date | null;
       processing_locked_by?: string | null;
-      last_user_message_at?: Date;
       ended_at?: Date;
       closed_at?: Date | null;
       context?: Record<string, any>;

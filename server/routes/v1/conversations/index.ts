@@ -210,11 +210,14 @@ export const conversationsRouter = t.router({
         });
       }
 
-      const message = await conversationService.addMessage(
-        input.conversationId,
-        ctx.organizationId!,
-        input.message
-      );
+      if (input.message.type === MessageType.CUSTOMER) {
+        conversation.setProcessed(false);
+      }
+
+      const message = await conversation.addMessage({
+        content: input.message.content,
+        type: input.message.type,
+      });
 
       // Check for resolution detection if it's a user message
       if (input.message.type === MessageType.CUSTOMER) {
@@ -328,9 +331,8 @@ export const conversationsRouter = t.router({
           ctx.organizationId!,
           {
             status: "open",
-            // needs_processing: true,
+            needs_processing: true,
             // cooldown_until: cooldownUntil,
-            last_user_message_at: new Date(),
           }
         );
       }

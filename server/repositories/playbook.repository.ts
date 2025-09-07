@@ -2,6 +2,8 @@ import { Repository, In } from "typeorm";
 import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
+import { messageRepository } from "./message.repository";
+import { MessageType } from "../database/entities/message.entity";
 
 export class PlaybookRepository {
   private repository: Repository<Playbook>;
@@ -17,9 +19,14 @@ export class PlaybookRepository {
     return await this.repository.save(playbook);
   }
 
-  async findById(id: string, organizationId: string): Promise<Playbook | null> {
+  async findById(id: string, organizationId?: string): Promise<Playbook | null> {
+    const where: { id: string; organization_id?: string } = { id };
+    if (organizationId) {
+      where.organization_id = organizationId;
+    }
+    
     return await this.repository.findOne({
-      where: { id, organization_id: organizationId },
+      where,
       relations: ["agents"],
     });
   }
@@ -57,6 +64,24 @@ export class PlaybookRepository {
       playbook.agents = data.agents;
       await this.repository.save(playbook);
       delete data.agents;
+    }
+
+    if (data.instructions !== undefined) {
+      const instructionsContent = typeof data.instructions === 'string' 
+        ? data.instructions 
+        : JSON.stringify(data.instructions);
+      
+      if (instructionsContent && instructionsContent.trim()) {
+        await messageRepository.create({
+          conversation_id: id, 
+          content: instructionsContent,
+          type: MessageType.SYSTEM,
+          metadata: {
+            playbook_id: id,
+            path: "playbook"
+          }
+        });
+      }
     }
 
     if (Object.keys(data).length > 0) {
@@ -115,8 +140,13 @@ export class PlaybookRepository {
 
     const agentExists = playbook.agents.some((agent) => agent.id === agentId);
     if (!agentExists) {
-      playbook.agents.push({ id: agentId } as any);
-      await this.repository.save(playbook);
+      const agent = await this.agentRepository.findOne({
+        where: { id: agentId, organization_id: organizationId }
+      });
+      if (agent) {
+        playbook.agents.push(agent);
+        await this.repository.save(playbook);
+      }
     }
 
     return await this.findById(playbookId, organizationId);

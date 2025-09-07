@@ -6,7 +6,7 @@
       class="flex items-center justify-center h-screen"
     >
       <div class="text-center">
-        <Spinner />
+        <Loading />
         <p class="text-muted-foreground">Loading...</p>
       </div>
     </div>

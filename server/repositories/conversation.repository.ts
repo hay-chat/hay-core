@@ -22,15 +22,21 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     id: string,
     organizationId?: string
   ): Promise<Conversation | null> {
-    const whereCondition: { id: string; organization_id?: string } = { id };
+    const queryBuilder = this.repository.createQueryBuilder("conversation");
+
+    queryBuilder.where("conversation.id = :id", { id });
+
     if (organizationId) {
-      whereCondition.organization_id = organizationId;
+      queryBuilder.andWhere("conversation.organization_id = :organizationId", {
+        organizationId,
+      });
     }
 
-    return await this.repository.findOne({
-      where: whereCondition,
-      relations: ["messages"],
-    });
+    queryBuilder
+      .leftJoinAndSelect("conversation.messages", "messages")
+      .orderBy("messages.created_at", "ASC");
+
+    return await queryBuilder.getOne();
   }
 
   async findByAgent(
@@ -338,7 +344,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
-        type: MessageType.CUSTOMER
+        type: MessageType.CUSTOMER,
       },
       order: { created_at: "ASC" },
     });
@@ -375,7 +381,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
-        type: MessageType.SYSTEM
+        type: MessageType.SYSTEM,
       },
       order: { created_at: "ASC" },
     });
@@ -386,7 +392,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
-        type: MessageType.BOT_AGENT
+        type: MessageType.BOT_AGENT,
       },
       order: { created_at: "ASC" },
     });
