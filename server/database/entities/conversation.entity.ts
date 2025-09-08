@@ -252,7 +252,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     await this.addMessage({
       content,
-      type: "System",
+      type: "Playbook",
     });
     this.playbook_id = playbookId;
   }

@@ -15,7 +15,9 @@ export enum MessageType {
   HUMAN_AGENT = "HumanAgent",
   BOT_AGENT = "BotAgent",
   TOOL_CALL = "ToolCall",
-  TOOL_RESPONSE = "ToolResponse"
+  TOOL_RESPONSE = "ToolResponse",
+  DOCUMENT = "Document",
+  PLAYBOOK = "Playbook"
 }
 
 export enum MessageSentiment {

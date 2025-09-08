@@ -1,6 +1,6 @@
 import { Message } from "@server/database/entities/message.entity";
 import { Playbook } from "@server/database/entities/playbook.entity";
-import { LLMService } from "../services/orchestrator/llm.service";
+import { LLMService } from "../services/core/llm.service";
 import { vectorStoreService } from "@server/services/vector-store.service";
 
 interface Document {

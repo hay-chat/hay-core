@@ -6,9 +6,7 @@ import { Hay } from "../../../services/hay.service";
 import type { HayInputMessage } from "../../../services/hay.service";
 import { TRPCError } from "@trpc/server";
 import { PlaybookService } from "../../../services/playbook.service";
-import { OrchestratorService } from "../../../services/orchestrator.service";
-import { AgentService } from "../../../services/agent.service";
-import { VectorStoreService } from "../../../services/vector-store.service";
+import { generateConversationTitle, detectResolution } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
@@ -16,15 +14,7 @@ import { config } from "../../../config/env";
 
 const conversationService = new ConversationService();
 const playbookService = new PlaybookService();
-const agentService = new AgentService();
-const vectorStoreService = new VectorStoreService();
 const conversationRepository = new ConversationRepository();
-const orchestratorService = new OrchestratorService(
-  conversationService,
-  playbookService,
-  agentService,
-  vectorStoreService
-);
 
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
@@ -136,7 +126,7 @@ export const conversationsRouter = t.router({
 
       // Generate title when conversation is closed or resolved
       if (input.data.status === "closed" || input.data.status === "resolved") {
-        await orchestratorService.generateConversationTitle(
+        await generateConversationTitle(
           input.id,
           ctx.organizationId!,
           false
@@ -221,7 +211,7 @@ export const conversationsRouter = t.router({
 
       // Check for resolution detection if it's a user message
       if (input.message.type === MessageType.CUSTOMER) {
-        await orchestratorService.detectResolution(
+        await detectResolution(
           input.conversationId,
           ctx.organizationId!,
           input.message.content

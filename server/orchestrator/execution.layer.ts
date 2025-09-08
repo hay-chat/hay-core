@@ -1,5 +1,5 @@
 import { Message } from "@server/database/entities/message.entity";
-import { LLMService } from "../services/orchestrator/llm.service";
+import { LLMService } from "../services/core/llm.service";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";

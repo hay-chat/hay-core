@@ -6,7 +6,7 @@ import { ExecutionLayer } from "./execution.layer";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
-import { ToolExecutionService } from "@server/services/orchestrator/tool-execution.service";
+import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { ConversationContext } from "./types";
 

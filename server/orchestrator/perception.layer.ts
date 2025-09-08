@@ -4,7 +4,7 @@ import {
   MessageSentiment,
 } from "@server/database/entities/message.entity";
 import { Agent } from "@server/database/entities/agent.entity";
-import { LLMService } from "../services/orchestrator/llm.service";
+import { LLMService } from "../services/core/llm.service";
 
 export interface Perception {
   intent: { label: MessageIntent; score: number; rationale?: string };
