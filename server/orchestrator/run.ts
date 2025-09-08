@@ -6,6 +6,9 @@ import { ExecutionLayer } from "./execution.layer";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
+import { ToolExecutionService } from "@server/services/orchestrator/tool-execution.service";
+import { Conversation } from "@server/database/entities/conversation.entity";
+import { ConversationContext } from "./types";
 
 export const runConversation = async (conversationId: string) => {
   const conversation = await conversationRepository.findById(conversationId);
@@ -103,31 +106,118 @@ export const runConversation = async (conversationId: string) => {
       }
     }
 
-    // 03. Execution
-    const executionLayer = new ExecutionLayer();
-    const allMessages = await conversation.getMessages();
-    const executionResult = await executionLayer.execute(
-      conversation,
-      allMessages
-    );
-
-    if (executionResult) {
-      await conversation.addMessage({
-        content: executionResult.userMessage || "",
-        type:
-          executionResult.step === "CALL_TOOL"
-            ? MessageType.TOOL_CALL
-            : MessageType.BOT_AGENT,
+    // 03. Initialize orchestration context if needed
+    if (!conversation.orchestration_status) {
+      const initialContext: ConversationContext = {
+        version: "v1",
+        lastTurn: 0,
+        toolLog: [],
+      };
+      await conversationRepository.updateById(conversation.id, {
+        orchestration_status: initialContext,
       });
+      conversation.orchestration_status = initialContext;
     }
+
+    // 04. Execution - Handle iterative execution with tool calls
+    await handleExecutionLoop(conversation);
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
-    console.log(
-      `Error running conversation ${conversationId}:`,
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    // console.log(
+    //   `Error running conversation ${conversationId}:`,
+    //   error instanceof Error ? error.message : "Unknown error"
+    // );
   } finally {
     await conversation.unlock();
   }
 };
+
+/**
+ * Handle iterative execution loop with tool calls
+ * This allows the LLM to call tools, analyze results, and continue the conversation
+ */
+async function handleExecutionLoop(conversation: Conversation) {
+  const executionLayer = new ExecutionLayer();
+  const toolExecutionService = new ToolExecutionService();
+  const maxIterations = 2; // Prevent infinite loops
+  let iterations = 0;
+
+  while (iterations < maxIterations) {
+    iterations++;
+    console.log(`[Orchestrator] Execution iteration ${iterations}`);
+
+    // Get current messages and execute
+    const allMessages = await conversation.getMessages();
+    const executionResult = await executionLayer.execute(allMessages);
+
+    if (!executionResult) {
+      console.log("[Orchestrator] No execution result, ending loop");
+      break;
+    }
+
+    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
+      // Add tool call message
+      await conversation.addMessage({
+        content: `Calling tool in the background: ${executionResult.tool.name}`,
+        type: MessageType.TOOL_CALL,
+      });
+
+      // Execute the tool
+      const toolMessage = {
+        type: MessageType.TOOL_CALL,
+        metadata: {
+          tool_call: {
+            tool_name: executionResult.tool.name,
+            arguments: executionResult.tool.args,
+          },
+        },
+      };
+
+      const toolResult = await toolExecutionService.handleToolExecution(
+        conversation,
+        toolMessage
+      );
+
+      if (toolResult.success) {
+        // Add tool response message
+        await conversation.addMessage({
+          content: `${JSON.stringify(toolResult.result)}`,
+          type: MessageType.TOOL_RESPONSE,
+        });
+        console.log(
+          "[Orchestrator] Tool executed successfully, continuing execution loop..."
+        );
+        // Continue the loop to let LLM analyze the result
+      } else {
+        // Add error message
+        await conversation.addMessage({
+          content: `Tool execution failed: ${toolResult.error}`,
+          type: MessageType.TOOL_RESPONSE,
+        });
+        console.log(
+          "[Orchestrator] Tool execution failed, continuing execution loop..."
+        );
+        // Continue the loop to let LLM handle the error
+      }
+    } else {
+      // Regular response (not a tool call) - end the loop
+      await conversation.addMessage({
+        content: executionResult.userMessage || "",
+        type: MessageType.BOT_AGENT,
+      });
+      console.log(
+        "[Orchestrator] Added bot response " +
+          executionResult.userMessage +
+          ", ending execution loop"
+      );
+      break;
+    }
+  }
+
+  if (iterations >= maxIterations) {
+    console.warn(
+      "[Orchestrator] Reached maximum execution iterations, ending loop"
+    );
+  }
+}

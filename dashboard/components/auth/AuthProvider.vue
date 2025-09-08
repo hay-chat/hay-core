@@ -3,12 +3,10 @@
     <!-- Show loading state while initializing auth -->
     <div
       v-if="!authStore.isInitialized"
-      class="flex items-center justify-center h-screen"
+      class="flex items-center justify-center h-screen gap-2 flex-col"
     >
-      <div class="text-center">
-        <Loading />
-        <p class="text-muted-foreground">Loading...</p>
-      </div>
+      <Loading />
+      <p class="font-secondary">Loading...</p>
     </div>
 
     <!-- Show content once auth is initialized -->

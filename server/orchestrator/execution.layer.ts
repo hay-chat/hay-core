@@ -1,5 +1,4 @@
-import { Conversation } from "@server/database/entities/conversation.entity";
-import { Message, MessageType } from "@server/database/entities/message.entity";
+import { Message } from "@server/database/entities/message.entity";
 import { LLMService } from "../services/orchestrator/llm.service";
 
 export interface ExecutionResult {
@@ -69,10 +68,7 @@ export class ExecutionLayer {
     };
   }
 
-  async execute(
-    conversation: Conversation,
-    messages: Message[]
-  ): Promise<ExecutionResult | null> {
+  async execute(messages: Message[]): Promise<ExecutionResult | null> {
     try {
       // Create the prompt for generating a response
       const responsePrompt = `
@@ -84,20 +80,14 @@ export class ExecutionLayer {
           CLOSE - To close the conversation`;
 
       const response = await this.llmService.invoke({
-        history: this.prepareMessages(messages),
+        history: messages, // Pass Message[] directly instead of converting to string
         prompt: responsePrompt,
         jsonSchema: this.plannerSchema,
       });
 
       const result = JSON.parse(response) as ExecutionResult;
 
-      switch (result.step) {
-        case "CALL_TOOL":
-          // TODO: Call the tool
-          return result;
-        default:
-          return result;
-      }
+      return result;
     } catch (error) {
       console.error("[ExecutionLayer] Error generating response:", error);
       return {
@@ -106,24 +96,5 @@ export class ExecutionLayer {
           "I apologize, but I encountered an error while processing your request. Please try again.",
       };
     }
-  }
-
-  private prepareMessages(messages: Message[]): string {
-    return messages
-      .map((msg) => {
-        const typeToRole = {
-          [MessageType.CUSTOMER]: "user",
-          [MessageType.BOT_AGENT]: "assistant",
-          [MessageType.SYSTEM]: "system",
-          [MessageType.HUMAN_AGENT]: "assistant",
-          [MessageType.TOOL_CALL]: "assistant",
-          [MessageType.TOOL_RESPONSE]: "system",
-        };
-        return {
-          role: typeToRole[msg.type],
-          content: msg.content,
-        };
-      })
-      .join("\n");
   }
 }

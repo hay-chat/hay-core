@@ -381,7 +381,10 @@ const findMcpFieldAtCursor = (
   while (node && node !== editor) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node as Element;
-      if (element.classList && element.classList.contains("mention-merge-field")) {
+      if (
+        element.classList &&
+        element.classList.contains("mention-merge-field")
+      ) {
         return element;
       }
     }
@@ -435,7 +438,10 @@ const mapVisualToMarkdownPosition = (
       markdownOffset += textLength;
     } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
       const element = currentNode as Element;
-      if (element.classList && element.classList.contains("mention-merge-field")) {
+      if (
+        element.classList &&
+        element.classList.contains("mention-merge-field")
+      ) {
         const visualText = element.textContent || "";
         const visualLength = visualText.length;
 
@@ -517,46 +523,3 @@ const findNextEditor = (currentElement: HTMLElement): HTMLElement | null => {
   return null;
 };
 </script>
-
-<style scoped>
-.instruction-item-wrapper {
-  width: 100%;
-}
-
-.instruction-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.6;
-}
-
-.instruction-content {
-  flex: 1;
-  min-height: 1.5rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid transparent;
-  outline: none;
-  background: transparent;
-  resize: none;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  border-radius: 4px;
-  transition: border-color 0.2s ease;
-}
-
-.instruction-number {
-  font-weight: 500;
-  color: hsl(var(--muted-foreground));
-  min-width: 1.5rem;
-  text-align: right;
-  padding-top: 0.375rem;
-  user-select: none;
-  font-size: 0.875rem;
-}
-
-.children {
-  margin-left: 1rem;
-}
-</style>

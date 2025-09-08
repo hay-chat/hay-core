@@ -2,25 +2,38 @@
   <div class="container mx-auto max-w-4xl py-8">
     <div class="mb-8 flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold mb-2">{{ isEditMode ? 'Edit' : 'Create New' }} Playbook</h1>
+        <h1 class="text-3xl font-bold mb-2">
+          {{ isEditMode ? "Edit" : "Create New" }} Playbook
+        </h1>
         <p class="text-muted-foreground">
-          {{ isEditMode ? 'Update your playbook configuration' : 'Define automated conversation flows for your agents' }}
+          {{
+            isEditMode
+              ? "Update your playbook configuration"
+              : "Define automated conversation flows for your agents"
+          }}
         </p>
       </div>
-      <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
+      <Button
+        v-if="isEditMode"
+        variant="ghost"
+        @click="() => router.push('/playbooks')"
+      >
         <ArrowLeft class="h-4 w-4 mr-2" />
         Back to list
       </Button>
     </div>
 
     <div v-if="loading" class="text-center py-12">
-      <Loader2 class="h-8 w-8 animate-spin mx-auto mb-4" />
-      <p class="text-muted-foreground">Loading playbook...</p>
+      <Loading label="Loading playbook..." />
     </div>
 
     <Card v-else-if="!isEditMode || playbook">
       <CardContent class="p-6">
-        <form @submit.prevent="handleSubmit" data-testid="playbook-form" class="space-y-6">
+        <form
+          @submit.prevent="handleSubmit"
+          data-testid="playbook-form"
+          class="space-y-6"
+        >
           <!-- Title Field -->
           <div class="space-y-2">
             <label for="title" class="text-sm font-medium">
@@ -96,16 +109,24 @@
 
           <!-- Agent Selection -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">{{ isEditMode ? 'Assigned' : 'Assign' }} Agents</label>
-            <div v-if="loadingAgents" class="p-4 text-center text-muted-foreground">
+            <label class="text-sm font-medium"
+              >{{ isEditMode ? "Assigned" : "Assign" }} Agents</label
+            >
+            <div
+              v-if="loadingAgents"
+              class="p-4 text-center text-muted-foreground"
+            >
               Loading agents...
             </div>
-            <div v-else-if="agents.length === 0" class="p-4 text-center text-muted-foreground">
+            <div
+              v-else-if="agents.length === 0"
+              class="p-4 text-center text-muted-foreground"
+            >
               No agents available. Create agents first.
             </div>
             <div v-else class="space-y-2 border rounded-md p-4">
-              <div 
-                v-for="agent in agents" 
+              <div
+                v-for="agent in agents"
                 :key="agent.id"
                 class="flex items-center space-x-3"
               >
@@ -116,12 +137,12 @@
                   v-model="form.agentIds"
                   class="h-4 w-4 rounded border-gray-300"
                 />
-                <label 
-                  :for="`agent-${agent.id}`"
-                  class="flex-1 cursor-pointer"
-                >
+                <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
                   <div class="font-medium">{{ agent.name }}</div>
-                  <div v-if="agent.description" class="text-sm text-muted-foreground">
+                  <div
+                    v-if="agent.description"
+                    class="text-sm text-muted-foreground"
+                  >
                     {{ agent.description }}
                   </div>
                 </label>
@@ -130,7 +151,10 @@
           </div>
 
           <!-- Metadata (only in edit mode) -->
-          <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-muted-foreground">
+          <div
+            v-if="isEditMode && playbook"
+            class="space-y-2 text-sm text-muted-foreground"
+          >
             <div>Created: {{ formatDate(playbook.created_at) }}</div>
             <div>Last updated: {{ formatDate(playbook.updated_at) }}</div>
           </div>
@@ -147,8 +171,11 @@
               <Trash2 class="h-4 w-4 mr-2" />
               Delete Playbook
             </Button>
-            
-            <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
+
+            <div
+              :class="isEditMode ? '' : 'w-full'"
+              class="flex justify-end space-x-4"
+            >
               <Button
                 type="button"
                 variant="outline"
@@ -157,11 +184,23 @@
               >
                 Cancel
               </Button>
-              <Button type="submit" :disabled="isSubmitting || !form.title || !form.trigger">
-                <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-                {{ isSubmitting 
-                  ? (isEditMode ? 'Saving...' : 'Creating...') 
-                  : (isEditMode ? 'Save Changes' : 'Create Playbook') }}
+              <Button
+                type="submit"
+                :disabled="isSubmitting || !form.title || !form.trigger"
+              >
+                <Loader2
+                  v-if="isSubmitting"
+                  class="mr-2 h-4 w-4 animate-spin"
+                />
+                {{
+                  isSubmitting
+                    ? isEditMode
+                      ? "Saving..."
+                      : "Creating..."
+                    : isEditMode
+                    ? "Save Changes"
+                    : "Create Playbook"
+                }}
               </Button>
             </div>
           </div>
@@ -169,8 +208,8 @@
       </CardContent>
     </Card>
 
-    <div v-else class="text-center py-12">
-      <p class="text-red-500">Playbook not found</p>
+    <div v-else-if="isEditMode && !loading" class="text-center py-12">
+      <Error label="Playbook not found" />
     </div>
 
     <!-- Delete Confirmation Dialog -->
@@ -187,12 +226,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { Loader2, ArrowLeft, Trash2 } from 'lucide-vue-next';
-import type { PlaybookStatus } from '~/types/playbook';
-import { useToast } from '~/composables/useToast';
-import { HayApi } from '@/utils/api';
+import { ref, onMounted, computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
+import type { PlaybookStatus } from "~/types/playbook";
+import { useToast } from "~/composables/useToast";
+import { HayApi } from "@/utils/api";
 
 const router = useRouter();
 const route = useRoute();
@@ -201,25 +240,25 @@ const toast = useToast();
 // Determine if we're in edit mode based on route
 const isEditMode = computed(() => {
   const id = route.params.id;
-  return Array.isArray(id) ? id[0] !== 'new' : id !== 'new';
+  return Array.isArray(id) ? id[0] !== "new" : id !== "new";
 });
 
 const playbookId = computed(() => {
   const id = route.params.id;
   if (Array.isArray(id)) {
-    return id[0] === 'new' ? null : id[0];
+    return id[0] === "new" ? null : id[0];
   }
-  return id === 'new' ? null : id;
+  return id === "new" ? null : id;
 });
 
 // Form state
 const form = ref({
-  title: '',
-  trigger: '',
-  description: '',
+  title: "",
+  trigger: "",
+  description: "",
   instructions: null as any,
-  status: 'draft' as PlaybookStatus,
-  agentIds: [] as string[]
+  status: "draft" as PlaybookStatus,
+  agentIds: [] as string[],
 });
 
 // UI state
@@ -232,12 +271,12 @@ const errors = ref<Record<string, string>>({});
 
 // Format date
 const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(new Date(date));
 };
 
@@ -248,38 +287,39 @@ onMounted(async () => {
     loadingAgents.value = true;
     const agentsResponse = await HayApi.agents.list.query();
     agents.value = agentsResponse || [];
-    
+
     // Load playbook if in edit mode
     if (isEditMode.value && playbookId.value) {
       loading.value = true;
-      const playbookResponse = await HayApi.playbooks.get.query({ id: playbookId.value });
-      
+      const playbookResponse = await HayApi.playbooks.get.query({
+        id: playbookId.value,
+      });
+
       if (!playbookResponse) {
-        toast.error('Playbook not found');
-        await router.push('/playbooks');
+        toast.error("Playbook not found");
+        await router.push("/playbooks");
         return;
       }
-      
+
       playbook.value = playbookResponse;
-      
+
       // Populate form
       form.value = {
         title: playbookResponse.title,
         trigger: playbookResponse.trigger,
-        description: playbookResponse.description || '',
+        description: playbookResponse.description || "",
         instructions: playbookResponse.instructions || null,
         status: playbookResponse.status,
-        agentIds: playbookResponse.agents?.map((a: any) => a.id) || []
+        agentIds: playbookResponse.agents?.map((a: any) => a.id) || [],
       };
     }
-    
   } catch (error) {
-    console.error('Failed to load data:', error);
+    console.error("Failed to load data:", error);
     if (isEditMode.value) {
-      toast.error('Failed to load playbook');
-      await router.push('/playbooks');
+      toast.error("Failed to load playbook");
+      await router.push("/playbooks");
     } else {
-      toast.error('Failed to load agents');
+      toast.error("Failed to load agents");
     }
   } finally {
     loading.value = false;
@@ -290,27 +330,27 @@ onMounted(async () => {
 // Validate form
 const validateForm = () => {
   errors.value = {};
-  
+
   if (!form.value.title || form.value.title.trim().length === 0) {
-    errors.value.title = 'Playbook title is required';
+    errors.value.title = "Playbook title is required";
     return false;
   }
-  
+
   if (form.value.title.length > 255) {
-    errors.value.title = 'Playbook title must be less than 255 characters';
+    errors.value.title = "Playbook title must be less than 255 characters";
     return false;
   }
-  
+
   if (!form.value.trigger || form.value.trigger.trim().length === 0) {
-    errors.value.trigger = 'Trigger is required';
+    errors.value.trigger = "Trigger is required";
     return false;
   }
-  
+
   if (form.value.trigger.length > 255) {
-    errors.value.trigger = 'Trigger must be less than 255 characters';
+    errors.value.trigger = "Trigger must be less than 255 characters";
     return false;
   }
-  
+
   return true;
 };
 
@@ -322,37 +362,42 @@ const handleSubmit = async () => {
 
   try {
     isSubmitting.value = true;
-    
+
     const payload = {
       title: form.value.title,
       trigger: form.value.trigger,
       description: form.value.description || undefined,
       instructions: form.value.instructions || null,
       status: form.value.status,
-      agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined
+      agentIds:
+        form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
     };
-    
+
     if (isEditMode.value && playbookId.value) {
       // Update existing playbook
       await HayApi.playbooks.update.mutate({
         id: playbookId.value,
-        data: payload
+        data: payload,
       });
-      toast.success('Playbook updated successfully');
+      toast.success("Playbook updated successfully");
     } else {
       // Create new playbook
       const response = await HayApi.playbooks.create.mutate(payload);
-      toast.success('Playbook created successfully');
-      
+      toast.success("Playbook created successfully");
+
       // Navigate to the edit page after creation
       await router.push(`/playbooks/${response.id}`);
       return;
     }
 
-    await router.push('/playbooks');
+    await router.push("/playbooks");
   } catch (error) {
-    console.error('Failed to save playbook:', error);
-    toast.error(`Failed to ${isEditMode.value ? 'update' : 'create'} playbook. Please try again.`);
+    console.error("Failed to save playbook:", error);
+    toast.error(
+      `Failed to ${
+        isEditMode.value ? "update" : "create"
+      } playbook. Please try again.`
+    );
   } finally {
     isSubmitting.value = false;
   }
@@ -360,8 +405,8 @@ const handleSubmit = async () => {
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
-const deleteDialogTitle = ref('Delete Playbook');
-const deleteDialogDescription = ref('');
+const deleteDialogTitle = ref("Delete Playbook");
+const deleteDialogDescription = ref("");
 
 // Handle delete
 const handleDelete = () => {
@@ -372,18 +417,18 @@ const handleDelete = () => {
 
 const confirmDelete = async () => {
   if (!playbookId.value) return;
-  
+
   try {
     isSubmitting.value = true;
-    
+
     await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
-    toast.success('Playbook deleted successfully');
+    toast.success("Playbook deleted successfully");
 
-    await router.push('/playbooks');
+    await router.push("/playbooks");
   } catch (error) {
-    console.error('Failed to delete playbook:', error);
-    toast.error('Failed to delete playbook. Please try again.');
+    console.error("Failed to delete playbook:", error);
+    toast.error("Failed to delete playbook. Please try again.");
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
@@ -392,26 +437,28 @@ const confirmDelete = async () => {
 
 // Handle cancel
 const handleCancel = () => {
-  router.push('/playbooks');
+  router.push("/playbooks");
 };
 
 // Set page meta
 definePageMeta({
-  layout: 'default',
+  layout: "default",
 });
 
 // Head management
 useHead({
-  title: computed(() => `${isEditMode.value ? 'Edit' : 'Create'} Playbook - Hay Dashboard`),
+  title: computed(
+    () => `${isEditMode.value ? "Edit" : "Create"} Playbook - Hay Dashboard`
+  ),
   meta: [
     {
-      name: 'description',
-      content: computed(() => 
-        isEditMode.value 
-          ? 'Edit your automated conversation playbook' 
-          : 'Create a new automated conversation playbook'
-      )
-    }
-  ]
+      name: "description",
+      content: computed(() =>
+        isEditMode.value
+          ? "Edit your automated conversation playbook"
+          : "Create a new automated conversation playbook"
+      ),
+    },
+  ],
 });
 </script>

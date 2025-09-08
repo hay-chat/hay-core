@@ -160,7 +160,7 @@ async function startServer() {
           try {
             await processManagerService.startPlugin(
               instance.organizationId,
-              instance.pluginId
+              instance.plugin.pluginId
             );
           } catch (error) {
             console.error(

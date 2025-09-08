@@ -1,35 +1,51 @@
 <template>
-  <svg
-    width="278"
-    height="253"
-    viewBox="0 0 278 253"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    class="loading-icon"
-  >
-    <path
-      d="M267.358 244.185C267.358 244.185 73.8552 253 0 253C13.6652 202.001 95.5 229.114 113.738 234.001C162 228.124 191 216.001 200.888 228.124C215 217.001 270.5 206.5 267.358 244.185Z"
-      fill="#FF5E33"
-      class="peak-base"
-    />
-    <path
-      d="M267.358 244.184C267.358 244.184 232.855 239.5 159 239.5L200.888 150.153C305.764 -86.3931 276.221 129.584 267.358 244.184Z"
-      fill="#FF5E33"
-      class="peak-3"
-    />
-    <path
-      d="M200.888 150.154C200.888 203.5 204 214.5 204 242H87.5L113.738 156.03C166.914 -30.5621 200.888 -70.2314 200.888 150.154Z"
-      fill="#FF5E33"
-      class="peak-2"
-    />
-    <path
-      d="M113.738 234C113.738 234 73.8552 253 0 253C60.5611 32.6151 100.443 -104.024 113.738 156.03V234Z"
-      fill="#FF5E33"
-      class="peak-1"
-    />
-  </svg>
+  <div class="flex justify-center items-center flex-col m-auto p-4 gap-4">
+    <svg
+      width="278"
+      height="253"
+      viewBox="0 0 278 253"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      class="loading-icon m-auto"
+    >
+      <path
+        d="M267.358 244.185C267.358 244.185 73.8552 253 0 253C13.6652 202.001 95.5 229.114 113.738 234.001C162 228.124 191 216.001 200.888 228.124C215 217.001 270.5 206.5 267.358 244.185Z"
+        fill="#FF5E33"
+        class="peak-base"
+      />
+      <path
+        d="M267.358 244.184C267.358 244.184 232.855 239.5 159 239.5L200.888 150.153C305.764 -86.3931 276.221 129.584 267.358 244.184Z"
+        fill="#FF5E33"
+        class="peak-3"
+      />
+      <path
+        d="M200.888 150.154C200.888 203.5 204 214.5 204 242H87.5L113.738 156.03C166.914 -30.5621 200.888 -70.2314 200.888 150.154Z"
+        fill="#FF5E33"
+        class="peak-2"
+      />
+      <path
+        d="M113.738 234C113.738 234 73.8552 253 0 253C60.5611 32.6151 100.443 -104.024 113.738 156.03V234Z"
+        fill="#FF5E33"
+        class="peak-1"
+      />
+    </svg>
+    <p
+      class="font-secondary font-bold text-lg text-muted-foreground"
+      v-if="label"
+    >
+      {{ label }}
+    </p>
+  </div>
 </template>
 
+<script setup lang="ts">
+defineProps({
+  label: {
+    type: String,
+    default: "Loading...",
+  },
+});
+</script>
 <style scoped>
 .loading-icon {
   height: 2em;

@@ -108,8 +108,8 @@ ${
           );
 
           // If not found and action name looks like a plugin-prefixed name, try to extract the tool name
-          if (!toolSchema && actionName.includes("_")) {
-            const parts = actionName.split("_");
+          if (!toolSchema && actionName.includes(":")) {
+            const parts = actionName.split(":");
             if (parts.length >= 2) {
               // Try matching with just the last part (tool name)
               const toolName = parts[parts.length - 1];
@@ -117,9 +117,9 @@ ${
                 (schema) => schema.name === toolName
               );
 
-              // If still not found, try matching with everything after the first underscore
+              // If still not found, try matching with everything after the first colon
               if (!toolSchema) {
-                const toolNameSuffix = parts.slice(1).join("_");
+                const toolNameSuffix = parts.slice(1).join(":");
                 toolSchema = toolSchemas.find(
                   (schema) => schema.name === toolNameSuffix
                 );

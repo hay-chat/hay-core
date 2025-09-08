@@ -329,7 +329,7 @@ export const getMCPTools = authenticatedProcedure
       // Extract tools from this plugin
       for (const tool of manifest.capabilities.mcp.tools) {
         mcpTools.push({
-          id: `${plugin.pluginId}_${tool.name}`,
+          id: `${plugin.pluginId}:${tool.name}`,
           name: tool.name,
           label: tool.label || tool.name,
           description: tool.description || '',

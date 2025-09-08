@@ -2,8 +2,6 @@ import { Repository, In } from "typeorm";
 import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
-import { messageRepository } from "./message.repository";
-import { MessageType } from "../database/entities/message.entity";
 
 export class PlaybookRepository {
   private repository: Repository<Playbook>;
@@ -66,23 +64,8 @@ export class PlaybookRepository {
       delete data.agents;
     }
 
-    if (data.instructions !== undefined) {
-      const instructionsContent = typeof data.instructions === 'string' 
-        ? data.instructions 
-        : JSON.stringify(data.instructions);
-      
-      if (instructionsContent && instructionsContent.trim()) {
-        await messageRepository.create({
-          conversation_id: id, 
-          content: instructionsContent,
-          type: MessageType.SYSTEM,
-          metadata: {
-            playbook_id: id,
-            path: "playbook"
-          }
-        });
-      }
-    }
+    // Note: Messages are created when a playbook is assigned to a conversation,
+    // not when the playbook itself is updated. See conversation.entity.ts updatePlaybook method.
 
     if (Object.keys(data).length > 0) {
       await this.repository.update(

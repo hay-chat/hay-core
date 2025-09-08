@@ -563,14 +563,14 @@ The following tools are available for you to use. You MUST return only valid JSO
           (schema) => schema.name === actionName
         );
 
-        if (!toolSchema && actionName.includes("_")) {
-          const parts = actionName.split("_");
+        if (!toolSchema && actionName.includes(":")) {
+          const parts = actionName.split(":");
           if (parts.length >= 2) {
             const toolName = parts[parts.length - 1];
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              const toolNameSuffix = parts.slice(1).join("_");
+              const toolNameSuffix = parts.slice(1).join(":");
               toolSchema = toolSchemas.find(
                 (schema) => schema.name === toolNameSuffix
               );

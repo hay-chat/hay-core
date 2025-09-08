@@ -37,45 +37,62 @@
           'chat-message__bubble',
           {
             'chat-message__bubble--needs-approval': metadata?.needsApproval,
+            'chat-message__bubble--collapsed':
+              isCollapsibleVariant && isSystemCollapsed,
+            'chat-message__bubble--expanded':
+              isCollapsibleVariant && !isSystemCollapsed && isSystemExpandable,
           },
         ]"
       >
-        <div class="chat-message__text" v-html="markdownToHtml(content)"></div>
-        <div v-if="attachments?.length" class="chat-message__attachments">
-          <div
-            v-for="attachment in attachments"
-            :key="attachment.id"
-            class="chat-message__attachment"
-          >
-            <Paperclip class="chat-message__attachment-icon" />
-            <span>{{ attachment.name }}</span>
-          </div>
-        </div>
-        <div v-if="metadata?.needsApproval" class="chat-message__actions">
-          <Button size="sm" variant="outline" @click="$emit('approve')">
-            <Check class="h-3 w-3 mr-1" />
-            Approve
-          </Button>
-          <Button size="sm" variant="outline" @click="$emit('edit')">
-            <Edit class="h-3 w-3 mr-1" />
-            Edit
-          </Button>
-          <Button size="sm" variant="destructive" @click="$emit('reject')">
-            <X class="h-3 w-3 mr-1" />
-            Reject
-          </Button>
-        </div>
         <div
-          v-else-if="metadata && variant === 'BotAgent'"
-          class="chat-message__metadata"
+          class="chat-message__text"
+          ref="systemMessageRef"
+          v-html="markdownToHtml(content)"
+        ></div>
+      </div>
+      <div
+        v-if="isCollapsibleVariant && isSystemExpandable"
+        @click="toggleSystemExpanded"
+        class="chat-message__expand-button"
+      >
+        <ChevronDown v-if="isSystemCollapsed" class="h-3 w-3" />
+        <ChevronUp v-else class="h-3 w-3" />
+        {{ isSystemCollapsed ? "Expand" : "Collapse" }}
+      </div>
+      <div v-if="attachments?.length" class="chat-message__attachments">
+        <div
+          v-for="attachment in attachments"
+          :key="attachment.id"
+          class="chat-message__attachment"
         >
-          <div v-if="metadata.tool" class="chat-message__tool">
-            <Wrench class="chat-message__tool-icon" />
-            <span>Used: {{ metadata.tool }}</span>
-          </div>
-          <div v-if="metadata.confidence" class="chat-message__confidence">
-            Confidence: {{ (metadata.confidence * 100).toFixed(0) }}%
-          </div>
+          <Paperclip class="chat-message__attachment-icon" />
+          <span>{{ attachment.name }}</span>
+        </div>
+      </div>
+      <div v-if="metadata?.needsApproval" class="chat-message__actions">
+        <Button size="sm" variant="outline" @click="$emit('approve')">
+          <Check class="h-3 w-3 mr-1" />
+          Approve
+        </Button>
+        <Button size="sm" variant="outline" @click="$emit('edit')">
+          <Edit class="h-3 w-3 mr-1" />
+          Edit
+        </Button>
+        <Button size="sm" variant="destructive" @click="$emit('reject')">
+          <X class="h-3 w-3 mr-1" />
+          Reject
+        </Button>
+      </div>
+      <div
+        v-else-if="metadata && variant === 'BotAgent'"
+        class="chat-message__metadata"
+      >
+        <div v-if="metadata.tool" class="chat-message__tool">
+          <Wrench class="chat-message__tool-icon" />
+          <span>Used: {{ metadata.tool }}</span>
+        </div>
+        <div v-if="metadata.confidence" class="chat-message__confidence">
+          Confidence: {{ (metadata.confidence * 100).toFixed(0) }}%
         </div>
       </div>
     </div>
@@ -83,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, onMounted, nextTick, watch } from "vue";
 import {
   User,
   Bot,
@@ -100,6 +117,8 @@ import {
   UserPlus,
   UserMinus,
   ArrowRightLeft,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-vue-next";
 import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
@@ -142,6 +161,49 @@ const emit = defineEmits<{
   reject: [];
 }>();
 
+// System message collapse/expand logic
+const systemMessageRef = ref<HTMLElement | null>(null);
+const isSystemExpandable = ref(false);
+const isSystemCollapsed = ref(false);
+const isCollapsibleVariant = computed(() =>
+  ["System", "ToolCall", "ToolResponse"].includes(props.variant)
+);
+
+const checkSystemMessageHeight = async () => {
+  if (isCollapsibleVariant && systemMessageRef.value) {
+    await nextTick();
+    const element = systemMessageRef.value;
+
+    // Use offsetHeight which gives the actual rendered height
+    const height = element.offsetHeight;
+    // Convert 10rem to pixels (assuming 1rem = 16px)
+    const tenRemInPixels = 10 * 16;
+
+    isSystemExpandable.value = height > tenRemInPixels;
+    if (isSystemExpandable.value) {
+      isSystemCollapsed.value = true;
+    }
+  }
+};
+
+const toggleSystemExpanded = () => {
+  isSystemCollapsed.value = !isSystemCollapsed.value;
+};
+
+onMounted(() => {
+  checkSystemMessageHeight();
+});
+
+// Also check when content changes
+watch(
+  () => props.content,
+  () => {
+    if (isCollapsibleVariant) {
+      nextTick(() => checkSystemMessageHeight());
+    }
+  }
+);
+
 const formattedTime = computed(() => {
   const date = new Date(props.timestamp);
   return date.toLocaleTimeString("en-US", {
@@ -153,7 +215,8 @@ const formattedTime = computed(() => {
 
 const avatarIcon = computed(() => {
   if (props.variant === "Customer") return User;
-  if (props.variant === "BotAgent" || props.variant === "HumanAgent") return Bot;
+  if (props.variant === "BotAgent" || props.variant === "HumanAgent")
+    return Bot;
 
   // System message icons
   const action = props.metadata?.action;
@@ -176,267 +239,130 @@ const avatarIcon = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
 /* Base message container */
 .chat-message {
-  @apply flex gap-3 max-w-2xl mb-4;
+  display: flex;
+  font-size: 0.875rem;
+  justify-content: flex-start;
+  flex-direction: row-reverse;
+  gap: 0.5rem;
 }
 
-/* Variant-specific positioning */
 .chat-message--Customer {
-  @apply mr-auto;
+  flex-direction: row;
 }
 
-.chat-message--BotAgent,
-.chat-message--HumanAgent {
-  @apply ml-auto flex-row-reverse;
-}
-
-/* Inverted mode (for playground where user is the customer) */
-.chat-message--inverted.chat-message--Customer {
-  @apply ml-auto flex-row-reverse mr-0;
-}
-
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent {
-  @apply mr-auto flex-row ml-0;
-}
-
-.chat-message--System {
-  @apply justify-center mx-auto my-4;
-}
-
-/* Avatar styles */
-.chat-message__avatar {
-  @apply w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0;
-}
-
-/* No header state - add left padding to align with messages that have avatars */
-.chat-message--no-header:not(.chat-message--System) .chat-message__content {
-  @apply ml-11; /* 8 (avatar width) + 3 (gap) = 11 */
-}
-
-.chat-message--no-header.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
-  @apply mr-11 ml-0; /* Reverse for agent messages */
-}
-
-.chat-message--no-header.chat-message--inverted.chat-message--Customer
-  .chat-message__content {
-  @apply mr-11 ml-0; /* Reverse for inverted customer messages */
-}
-
-.chat-message--no-header.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent
-  .chat-message__content {
-  @apply ml-11 mr-0; /* Normal for inverted agent messages */
-}
-
-.chat-message--Customer .chat-message__avatar {
-  @apply bg-primary/10;
-}
-
-.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar {
-  @apply bg-blue-100;
-}
-
-/* Inverted avatar colors */
-.chat-message--inverted.chat-message--Customer .chat-message__avatar {
-  @apply bg-blue-100;
-}
-
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar {
-  @apply bg-primary/10;
-}
-
-.chat-message--System .chat-message__avatar {
-  @apply w-5 h-5 bg-transparent;
-}
-
-.chat-message__avatar-icon {
-  @apply w-4 h-4;
-}
-
-.chat-message--Customer .chat-message__avatar-icon {
-  @apply text-primary;
-}
-
-.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar-icon {
-  @apply text-blue-600;
-}
-
-/* Inverted avatar icon colors */
-.chat-message--inverted.chat-message--Customer .chat-message__avatar-icon {
-  @apply text-blue-600;
-}
-
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__avatar-icon {
-  @apply text-primary;
-}
-
-.chat-message--System .chat-message__avatar-icon {
-  @apply w-3 h-3 text-muted-foreground;
-}
-
-/* Content container */
-.chat-message__content {
-  @apply flex-1 min-w-0;
-}
-
-.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
-  @apply text-right;
-}
-
-/* Inverted content alignment */
-.chat-message--inverted.chat-message--Customer .chat-message__content {
-  @apply text-right;
-}
-
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__content {
-  @apply text-left;
-}
-
-.chat-message--System .chat-message__content {
-  @apply inline-flex items-center gap-2 bg-blue-100/50 text-blue-800 p-3 rounded-md;
-  max-width: 50ch;
-}
-
-/* Header styles */
 .chat-message__header {
-  @apply flex items-center gap-2 mb-1;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-direction: inherit;
 }
 
-.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__header {
-  @apply justify-end;
+.chat-message--Customer .chat-message__header {
+  justify-content: flex-start;
 }
 
-/* Inverted header alignment */
-.chat-message--inverted.chat-message--Customer .chat-message__header {
-  @apply justify-end;
+.chat-message--no-header,
+.chat-message--System {
+  margin-inline: 2.5rem;
 }
 
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__header {
-  @apply justify-start;
+.chat-message__content {
+  position: relative;
+  max-width: 60ch;
 }
 
-.chat-message--System .chat-message__header {
-  @apply mb-0;
-}
-
-.chat-message__sender {
-  @apply text-sm font-medium;
-}
-
-.chat-message__time {
-  @apply text-xs text-muted-foreground;
-}
-
-/* Message bubble */
 .chat-message__bubble {
-  @apply p-3 rounded-lg inline-block text-left;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: hsl(var(--primary));
+  color: white;
+  padding: 1rem;
+}
+
+.chat-message__bubble--collapsed {
+  max-height: 10rem;
+  overflow: hidden;
+  position: relative;
+  &::after {
+    content: "";
+    height: 4rem;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to bottom, transparent, #ecf3fe 90%);
+  }
+}
+
+.chat-message__bubble--expanded {
+  max-height: none;
+  overflow: visible;
+}
+
+.chat-message__bubble--expanded::after {
+  display: none;
+}
+
+.chat-message__expand-button {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.chat-message--System,
+.chat-message--ToolCall,
+.chat-message--ToolResponse {
+  .chat-message__bubble {
+    background-color: #ecf3fe;
+    color: hsl(var(--foreground));
+  }
+}
+
+.chat-message--ToolCall,
+.chat-message--ToolResponse {
+  .chat-message__bubble {
+    font-family: monospace;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+  }
 }
 
 .chat-message--Customer .chat-message__bubble {
-  @apply bg-muted;
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--foreground));
 }
 
-.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__bubble {
-  @apply bg-primary text-primary-foreground;
+.chat-message__avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: hsl(var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 1rem;
+
+  svg {
+    height: 1em;
+    width: 1em;
+  }
 }
 
-/* Inverted bubble colors */
-.chat-message--inverted.chat-message--Customer .chat-message__bubble {
-  @apply bg-primary text-primary-foreground;
+.chat-message__sender {
+  font-weight: bold;
+  margin-right: 0.5rem;
 }
 
-.chat-message--inverted.chat-message--BotAgent, .chat-message--HumanAgent .chat-message__bubble {
-  @apply bg-muted text-foreground;
-}
-
-.chat-message__bubble--needs-approval {
-  @apply bg-orange-50 border border-orange-200 !important;
-  color: initial !important;
-}
-
-.chat-message--System .chat-message__bubble {
-  @apply p-0 bg-transparent inline;
-}
-
-/* Message text */
-.chat-message__text {
-  @apply text-sm;
-}
-
-.chat-message--System .chat-message__text {
-  @apply text-xs text-muted-foreground inline;
-}
-
-/* Markdown content styles */
-.chat-message__text :deep(ol) {
-  @apply list-decimal pl-8 my-2;
-}
-
-.chat-message__text :deep(ul) {
-  @apply list-disc pl-8 my-2;
-}
-
-.chat-message__text :deep(ol ol),
-.chat-message__text :deep(ol ul),
-.chat-message__text :deep(ul ol),
-.chat-message__text :deep(ul ul) {
-  @apply my-1 pl-4;
-}
-
-.chat-message__text :deep(li) {
-  @apply my-1;
-}
-
-.chat-message__text :deep(p) {
-  @apply my-2;
-}
-
-.chat-message__text :deep(p:first-child) {
-  @apply mt-0;
-}
-
-.chat-message__text :deep(p:last-child) {
-  @apply mb-0;
-}
-
-/* Attachments */
-.chat-message__attachments {
-  @apply mt-2 flex flex-col gap-1;
-}
-
-.chat-message__attachment {
-  @apply flex items-center gap-2 text-xs text-muted-foreground;
-}
-
-.chat-message__attachment-icon {
-  @apply w-3 h-3;
-}
-
-/* Action buttons */
-.chat-message__actions {
-  @apply mt-3 flex gap-2;
-}
-
-/* Metadata */
-.chat-message__metadata {
-  @apply mt-2 pt-2 border-t border-primary-foreground/20;
-}
-
-.chat-message__tool {
-  @apply flex items-center gap-2 text-xs opacity-80;
-}
-
-.chat-message__tool-icon {
-  @apply w-3 h-3;
-}
-
-.chat-message__confidence {
-  @apply text-xs opacity-80 mt-1;
-}
-
-/* Playbook badge container */
-.chat-message__playbook-badge {
-  @apply inline-flex items-center gap-1;
+.chat-message__time {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
 }
 </style>

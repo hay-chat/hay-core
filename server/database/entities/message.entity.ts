@@ -76,6 +76,10 @@ export class Message {
     confidence?: number;
     referenced_actions?: string[];
     referenced_documents?: string[];
+    tool_call?: {
+      tool_name: string;
+      arguments: Record<string, any>;
+    };
   } | null;
 
   @Column({

@@ -108,7 +108,7 @@
             </div>
 
             <!-- Messages -->
-            <div v-for="(message, index) in messages" :key="message.id">
+            <template v-for="(message, index) in messages" :key="message.id">
               <ChatMessage
                 :variant="message.type as 'Customer' | 'BotAgent' | 'HumanAgent' | 'System' | 'ToolCall' | 'ToolResponse'"
                 :content="message.content"
@@ -120,10 +120,11 @@
                 "
                 :show-header="shouldShowHeader(index)"
                 :attachments="'attachments' in message ? (message as any).attachments : undefined"
-                :metadata="(message.type === 'BotAgent' || message.type === 'HumanAgent') ? {
+                :metadata="message.type === 'System' ? {
+                  action: (message as any).action
+                } : (message.type === 'BotAgent' || message.type === 'HumanAgent') ? {
                   isPlaybook: message.isPlaybook,
-                  needsApproval: supervisionMode && message.needsApproval,
-                  action: message.type === 'System' ? (message as any).action : undefined
+                  needsApproval: supervisionMode && message.needsApproval
                 } : undefined"
                 @approve="
                   message.needsApproval ? approveMessage(message.id) : undefined
@@ -135,7 +136,7 @@
                   message.needsApproval ? rejectMessage(message.id) : undefined
                 "
               />
-            </div>
+            </template>
 
             <!-- Typing indicator -->
             <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
@@ -391,11 +392,11 @@ const relatedArticles = ref<any[]>([]);
 const shouldShowHeader = (index: number): boolean => {
   // Always show header for first message
   if (index === 0) return true;
-  
+
   // Check if previous message has same sender type
   const currentMessage = messages.value[index];
   const previousMessage = messages.value[index - 1];
-  
+
   return currentMessage.sender !== previousMessage.sender;
 };
 

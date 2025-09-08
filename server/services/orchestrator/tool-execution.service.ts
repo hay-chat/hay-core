@@ -4,9 +4,8 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { ConversationContext } from "@server/orchestrator/types";
 import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
+import { processManagerService } from "@server/services/process-manager.service";
 import { v4 as uuidv4 } from "uuid";
-import { spawn } from "child_process";
-import path from "path";
 
 export class ToolExecutionService {
   private conversationRepository: ConversationRepository;
@@ -22,7 +21,7 @@ export class ToolExecutionService {
     toolMessage: Partial<Message>
   ): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
-      const toolCall = (toolMessage.metadata as any)?.tool_call;
+      const toolCall = toolMessage.metadata?.tool_call;
       if (!toolCall) {
         console.warn("Tool call message missing tool_call metadata");
         return {
@@ -64,7 +63,7 @@ export class ToolExecutionService {
         const startTime = Date.now();
         try {
           console.log(`[ToolExecutionService] Executing tool call:`, toolCall);
-          const result = await this.executeToolCall(toolCall);
+          const result = await this.executeToolCall(conversation, toolCall);
           console.log(`[ToolExecutionService] Tool call result:`, result);
 
           toolLogEntry.ok = true;
@@ -119,55 +118,87 @@ export class ToolExecutionService {
     }
   }
 
-  private async executeToolCall(toolCall: any): Promise<any> {
+  private async executeToolCall(
+    conversation: Conversation,
+    toolCall: any
+  ): Promise<any> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
     console.log(`[ToolExecution] Executing MCP tool: ${fullToolName}`);
+    console.log(
+      `[ToolExecution] Tool arguments:`,
+      JSON.stringify(toolArgs, null, 2)
+    );
 
     // Parse the tool name to extract plugin and tool parts
-    // Expected format: "hay-plugin-{pluginName}_{toolName}"
-    let pluginId: string;
-    let actualToolName: string;
-    
-    if (fullToolName.startsWith('hay-plugin-')) {
-      const parts = fullToolName.split('_');
-      if (parts.length >= 2) {
-        // Find the last underscore to split plugin from tool
-        const lastUnderscoreIndex = fullToolName.lastIndexOf('_');
-        pluginId = fullToolName.substring(0, lastUnderscoreIndex);
-        actualToolName = fullToolName.substring(lastUnderscoreIndex + 1);
-      } else {
-        throw new Error(`Invalid tool name format: ${fullToolName}. Expected format: hay-plugin-{pluginName}_{toolName}`);
-      }
-    } else {
-      throw new Error(`Tool name must start with 'hay-plugin-': ${fullToolName}`);
+    // Expected format: "{pluginId}:{toolName}"
+    const colonIndex = fullToolName.lastIndexOf(":");
+    if (colonIndex === -1) {
+      throw new Error(
+        `Invalid tool name format: ${fullToolName}. Expected format: {pluginId}:{toolName}`
+      );
     }
 
-    console.log(`[ToolExecution] Parsed plugin ID: ${pluginId}, tool name: ${actualToolName}`);
+    const pluginId = fullToolName.substring(0, colonIndex);
+    const actualToolName = fullToolName.substring(colonIndex + 1);
+
+    console.log(
+      `[ToolExecution] Parsed plugin ID: ${pluginId}, tool name: ${actualToolName}`
+    );
 
     // Find the plugin that contains this tool
     const allPlugins = pluginManagerService.getAllPlugins();
+    console.log(
+      `[ToolExecution] Available plugins:`,
+      allPlugins.map((p) => ({ id: p.pluginId, name: p.name }))
+    );
+
     let matchingPlugin = null;
     let toolSchema = null;
 
     for (const plugin of allPlugins) {
+      console.log(
+        `[ToolExecution] Checking plugin: ${plugin.pluginId} (${plugin.name})`
+      );
       if (plugin.pluginId === pluginId) {
+        console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
         const manifest = plugin.manifest as any;
         if (manifest.capabilities?.mcp?.tools) {
+          console.log(
+            `[ToolExecution] Available tools in plugin:`,
+            manifest.capabilities.mcp.tools.map((t: any) => t.name)
+          );
           const tool = manifest.capabilities.mcp.tools.find(
             (t: any) => t.name === actualToolName
           );
           if (tool) {
             matchingPlugin = plugin;
             toolSchema = tool;
+            console.log(`[ToolExecution] Found matching tool:`, tool.name);
             break;
+          } else {
+            console.log(
+              `[ToolExecution] Tool '${actualToolName}' not found in this plugin`
+            );
           }
+        } else {
+          console.log(`[ToolExecution] Plugin has no MCP tools defined`);
         }
       }
     }
 
     if (!matchingPlugin || !toolSchema) {
-      throw new Error(`Tool '${actualToolName}' not found in plugin '${pluginId}'. Available plugins: ${allPlugins.map(p => p.pluginId).join(', ')}`);
+      const availableTools = allPlugins.flatMap(
+        (p) =>
+          p.manifest?.capabilities?.mcp?.tools?.map(
+            (t: any) => `${p.pluginId}:${t.name}`
+          ) || []
+      );
+      throw new Error(
+        `Tool '${actualToolName}' not found in plugin '${pluginId}'. Available tools: ${availableTools.join(
+          ", "
+        )}`
+      );
     }
 
     console.log(
@@ -208,10 +239,15 @@ export class ToolExecutionService {
       );
     }
 
-    // Execute the MCP tool via stdio
+    console.log(`[ToolExecution] Plugin start command: ${startCommand}`);
+
+    // Get organization ID from the conversation parameter passed to the parent method
+    const organizationId = conversation.organization_id;
+
+    // Execute the MCP tool via the running process
     return await this.executeMCPTool(
-      matchingPlugin,
-      startCommand,
+      organizationId,
+      matchingPlugin.pluginId,
       actualToolName,
       toolArgs
     );
@@ -269,114 +305,74 @@ export class ToolExecutionService {
   }
 
   private async executeMCPTool(
-    plugin: any,
-    startCommand: string,
+    organizationId: string,
+    pluginId: string,
     toolName: string,
     toolArgs: any
   ): Promise<any> {
-    return new Promise((resolve, reject) => {
+    console.log(`[ToolExecution] Executing MCP tool: ${pluginId}:${toolName}`);
+    console.log(`[ToolExecution] Organization ID: ${organizationId}`);
+    console.log(
+      `[ToolExecution] Tool arguments:`,
+      JSON.stringify(toolArgs, null, 2)
+    );
+
+    // Check if the plugin process is running
+    if (!processManagerService.isRunning(organizationId, pluginId)) {
       console.log(
-        `[ToolExecution] Starting MCP server for plugin '${plugin.name}'`
+        `[ToolExecution] Plugin process not running, attempting to start...`
       );
+      try {
+        await processManagerService.startPlugin(organizationId, pluginId);
+        console.log(`[ToolExecution] Plugin process started successfully`);
+      } catch (error) {
+        console.error(`[ToolExecution] Failed to start plugin process:`, error);
+        throw new Error(
+          `Plugin process not available: ${(error as Error).message}`
+        );
+      }
+    }
 
-      // Parse the start command
-      const [command, ...args] = startCommand.split(" ");
-      const pluginPath = path.join(
-        process.cwd(),
-        "..",
-        "plugins",
-        plugin.pluginId.replace("hay-plugin-", "")
+    // Prepare MCP request
+    const mcpRequest = {
+      jsonrpc: "2.0",
+      id: uuidv4(),
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: toolArgs,
+      },
+    };
+
+    console.log(
+      `[ToolExecution] Sending MCP request to running process:`,
+      JSON.stringify(mcpRequest, null, 2)
+    );
+
+    try {
+      // Use the process manager to send the request to the running MCP process
+      const result = await processManagerService.sendToPlugin(
+        organizationId,
+        pluginId,
+        "mcp_call",
+        mcpRequest
       );
-
-      // Spawn the MCP server process
-      const mcpProcess = spawn(command, args, {
-        cwd: pluginPath,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-
-      let stdout = "";
-      let stderr = "";
-
-      mcpProcess.stdout?.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      mcpProcess.stderr?.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      // Send MCP tool call request via stdin
-      const mcpRequest = {
-        jsonrpc: "2.0",
-        id: uuidv4(),
-        method: "tools/call",
-        params: {
-          name: toolName,
-          arguments: toolArgs,
-        },
-      };
 
       console.log(
-        `[ToolExecution] Sending MCP request:`,
-        JSON.stringify(mcpRequest, null, 2)
+        `[ToolExecution] MCP response received:`,
+        JSON.stringify(result, null, 2)
       );
 
-      mcpProcess.stdin?.write(JSON.stringify(mcpRequest) + "\n");
-      mcpProcess.stdin?.end();
+      if (result.error) {
+        throw new Error(
+          `MCP tool error: ${result.error.message || result.error}`
+        );
+      }
 
-      mcpProcess.on("close", (code) => {
-        console.log(`[ToolExecution] MCP process exited with code ${code}`);
-
-        if (code !== 0) {
-          console.error(`[ToolExecution] MCP stderr:`, stderr);
-          reject(
-            new Error(`MCP tool execution failed with code ${code}: ${stderr}`)
-          );
-          return;
-        }
-
-        try {
-          // Parse the MCP response from stdout
-          const lines = stdout.trim().split("\n");
-          const lastLine = lines[lines.length - 1];
-          const response = JSON.parse(lastLine);
-
-          console.log(
-            `[ToolExecution] MCP response:`,
-            JSON.stringify(response, null, 2)
-          );
-
-          if (response.error) {
-            reject(
-              new Error(
-                `MCP tool error: ${response.error.message || "Unknown error"}`
-              )
-            );
-            return;
-          }
-
-          resolve(response.result || response);
-        } catch (parseError) {
-          console.error(
-            `[ToolExecution] Failed to parse MCP response:`,
-            stdout
-          );
-          reject(new Error(`Failed to parse MCP response: ${parseError}`));
-        }
-      });
-
-      mcpProcess.on("error", (error) => {
-        console.error(`[ToolExecution] MCP process error:`, error);
-        reject(new Error(`Failed to start MCP process: ${error.message}`));
-      });
-
-      // Set a timeout for tool execution
-      setTimeout(() => {
-        if (!mcpProcess.killed) {
-          mcpProcess.kill();
-          reject(new Error("MCP tool execution timed out after 30 seconds"));
-        }
-      }, 30000);
-    });
+      return result.result || result;
+    } catch (error) {
+      console.error(`[ToolExecution] MCP tool execution failed:`, error);
+      throw error;
+    }
   }
 }

@@ -27,15 +27,15 @@ export class LLMService {
     this.openai = new OpenAI({
       apiKey: config.openai.apiKey,
     });
-    
+
     // Create logs directory if it doesn't exist
     const logsDir = path.join(process.cwd(), "logs");
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
-    
+
     // Create log file path with current date
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     this.logFilePath = path.join(logsDir, `llm-${today}.log`);
   }
 
@@ -170,21 +170,22 @@ export class LLMService {
   private writeToLog(message: string): void {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${message}\n`;
-    
+
     try {
-      fs.appendFileSync(this.logFilePath, logEntry, 'utf8');
+      fs.appendFileSync(this.logFilePath, logEntry, "utf8");
     } catch (error) {
       console.error(`Failed to write to log file: ${error}`);
     }
   }
-
 
   private logLLMResponseDebugInfo(
     response: OpenAI.Chat.Completions.ChatCompletion
   ): void {
     this.writeToLog("=== LLM RESPONSE DEBUG INFO ===");
     this.writeToLog(`Model: ${response.model}`);
-    this.writeToLog(`Created: ${new Date(response.created * 1000).toISOString()}`);
+    this.writeToLog(
+      `Created: ${new Date(response.created * 1000).toISOString()}`
+    );
     this.writeToLog(`Finish reason: ${response.choices[0]?.finish_reason}`);
 
     if (response.usage) {

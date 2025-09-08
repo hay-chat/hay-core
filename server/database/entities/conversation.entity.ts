@@ -178,7 +178,9 @@ export class Conversation {
     }
 
     let content = "";
-    content += `From this message forward you should be following this playbook:
+    content += `<!-- playbook=${playbookId} -->
+        
+        From this message forward you should be following this playbook:
 
         **Playbook: ${playbook.title}**
         ${playbook.description ? `\nDescription: ${playbook.description}` : ""}
@@ -205,14 +207,14 @@ The following tools are available for you to use. You MUST return only valid JSO
           (schema) => schema.name === actionName
         );
 
-        if (!toolSchema && actionName.includes("_")) {
-          const parts = actionName.split("_");
+        if (!toolSchema && actionName.includes(":")) {
+          const parts = actionName.split(":");
           if (parts.length >= 2) {
             const toolName = parts[parts.length - 1];
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              const toolNameSuffix = parts.slice(1).join("_");
+              const toolNameSuffix = parts.slice(1).join(":");
               toolSchema = toolSchemas.find(
                 (schema) => schema.name === toolNameSuffix
               );
@@ -221,14 +223,18 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
 
         if (toolSchema) {
+          // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
+          const inputSchema =
+            toolSchema.input_schema || toolSchema.parameters || {};
           const requiredFields =
-            toolSchema.required && toolSchema.required.length > 0
-              ? ` (Required: ${toolSchema.required.join(", ")})`
+            inputSchema.required && inputSchema.required.length > 0
+              ? ` (Required: ${inputSchema.required.join(", ")})`
               : "";
+
           return `- **${actionName}**: ${
             toolSchema.description
           }${requiredFields}\n  Input Schema: ${JSON.stringify(
-            toolSchema.parameters || {},
+            inputSchema,
             null,
             2
           )}`;

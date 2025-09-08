@@ -2,6 +2,7 @@ import { Repository, type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { AppDataSource } from "@server/database/data-source";
+import { pluginRegistryRepository } from "./plugin-registry.repository";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   protected override repository: Repository<PluginInstance>;
@@ -15,8 +16,14 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     organizationId: string,
     pluginId: string
   ): Promise<PluginInstance | null> {
+    // First, resolve the string plugin ID to a UUID by looking up the plugin registry
+    const pluginRegistry = await pluginRegistryRepository.findByPluginId(pluginId);
+    if (!pluginRegistry) {
+      return null;
+    }
+
     return this.repository.findOne({
-      where: { organizationId, pluginId },
+      where: { organizationId, pluginId: pluginRegistry.id },
       relations: ["plugin"],
     });
   }

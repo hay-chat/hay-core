@@ -353,16 +353,16 @@ export class ProcessManagerService {
     // Parse the command to check if it needs shell execution
     const [cmd] = command.split(" ");
     
-    // For npm/npx/node commands or complex shell commands, use exec
-    // exec properly handles shell scripts and complex commands
+    // For npm/npx/node commands or complex shell commands, we need IPC support
+    // Use spawn with shell execution and IPC for MCP server communication
     if (cmd === "npm" || cmd === "npx" || cmd === "node" || command.includes("&&") || command.includes("||")) {
-      const childProcess = exec(command, {
+      // Use spawn with shell for complex commands but enable IPC
+      const childProcess = spawn("sh", ["-c", command], {
         cwd,
-        env: { ...process.env, ...env }, // Merge environments to preserve PATH
+        env: { ...process.env, ...env },
+        stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
       });
       
-      // exec returns a ChildProcess with PID
-      // The PID should be available immediately after exec
       if (childProcess.pid) {
         console.log(`Started process with PID: ${childProcess.pid}`);
       }
@@ -382,7 +382,7 @@ export class ProcessManagerService {
       const childProcess = spawn(cmd, args, {
         cwd,
         env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
       });
       
       if (childProcess.pid) {
@@ -423,7 +423,7 @@ export class ProcessManagerService {
   }
 
   /**
-   * Send message to plugin process
+   * Send JSON-RPC message to MCP plugin process via stdin/stdout
    */
   async sendToPlugin(
     organizationId: string,
@@ -438,34 +438,62 @@ export class ProcessManagerService {
       throw new Error(`Plugin process not running for ${processKey}`);
     }
 
+    // For MCP communication, we expect the payload to be a JSON-RPC request
+    const request = payload; // The payload should already be the JSON-RPC request
+
     return new Promise((resolve, reject) => {
-      const messageId = `${Date.now()}-${Math.random()}`;
       const timeout = setTimeout(() => {
-        reject(new Error(`Plugin message timeout for ${action}`));
+        reject(new Error(`MCP request timeout for ${request.method}`));
       }, 30000); // 30 second timeout
 
-      // Set up one-time response handler
-      const responseHandler = (message: any) => {
-        if (message.responseId === messageId) {
-          clearTimeout(timeout);
-          processInfo.process.off("message", responseHandler);
-          
-          if (message.error) {
-            reject(new Error(message.error));
-          } else {
-            resolve(message.result);
+      let responseBuffer = "";
+      
+      // Set up one-time response handler for stdout
+      const responseHandler = (data: Buffer) => {
+        responseBuffer += data.toString();
+        
+        // Try to parse complete JSON-RPC responses
+        const lines = responseBuffer.split('\n');
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i].trim();
+          if (line) {
+            try {
+              const response = JSON.parse(line);
+              // Check if this is the response to our request
+              if (response.id === request.id) {
+                clearTimeout(timeout);
+                processInfo.process.stdout?.off("data", responseHandler);
+                
+                if (response.error) {
+                  reject(new Error(`MCP Error: ${response.error.message || response.error}`));
+                } else {
+                  resolve(response);
+                }
+                return;
+              }
+            } catch (parseError) {
+              console.warn(`Failed to parse MCP response line: ${line}`, parseError);
+            }
           }
         }
+        
+        // Keep the incomplete line for next data chunk
+        responseBuffer = lines[lines.length - 1];
       };
 
-      processInfo.process.on("message", responseHandler);
+      // Listen for stdout data (MCP responses)
+      processInfo.process.stdout?.on("data", responseHandler);
 
-      // Send the message
-      processInfo.process.send({
-        id: messageId,
-        action,
-        payload,
-      });
+      // Send JSON-RPC request to stdin
+      const requestLine = JSON.stringify(request) + '\n';
+      console.log(`[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`);
+      
+      if (processInfo.process.stdin) {
+        processInfo.process.stdin.write(requestLine);
+      } else {
+        clearTimeout(timeout);
+        reject(new Error("Process stdin not available"));
+      }
     });
   }
 
