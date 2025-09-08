@@ -14,6 +14,7 @@ import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
 import { MessageType } from "./message.entity";
 import { analyzeInstructions } from "../../utils/instruction-formatter";
+import { documentRepository } from "@server/repositories/document.repository";
 
 @Entity("conversations")
 export class Conversation {
@@ -268,6 +269,13 @@ The following tools are available for you to use. You MUST return only valid JSO
         document_ids: updatedDocIds,
       });
       this.document_ids = updatedDocIds;
+
+      const document = await documentRepository.findById(documentId);
+
+      await this.addMessage({
+        content: `# ${document?.title} added to conversation \n ${document?.content}`,
+        type: "Document",
+      });
     }
   }
 

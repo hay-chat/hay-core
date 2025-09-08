@@ -25,10 +25,7 @@ export class ProcessManagerService {
   /**
    * Start a plugin process for an organization
    */
-  async startPlugin(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async startPlugin(organizationId: string, pluginId: string): Promise<void> {
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       organizationId,
       pluginId
@@ -43,16 +40,20 @@ export class ProcessManagerService {
     }
 
     const processKey = this.getProcessKey(organizationId, pluginId);
-    
+
     // Check if already running
     if (this.processes.has(processKey)) {
       console.log(`Plugin already running for ${processKey}`);
       return;
     }
 
-    const plugin = await pluginManagerService.getPlugin(instance.plugin.pluginId);
+    const plugin = await pluginManagerService.getPlugin(
+      instance.plugin.pluginId
+    );
     if (!plugin) {
-      throw new Error(`Plugin ${instance.plugin.pluginId} not found in registry`);
+      throw new Error(
+        `Plugin ${instance.plugin.pluginId} not found in registry`
+      );
     }
 
     // Ensure plugin is installed and built
@@ -65,9 +66,11 @@ export class ProcessManagerService {
 
     const startCommand = pluginManagerService.getStartCommand(plugin.pluginId);
     if (!startCommand) {
-      // Some plugins (like chat-connectors) don't need a separate process
+      // Some plugins (like channels) don't need a separate process
       // They just serve assets and handle webhooks
-      console.log(`ℹ️  Plugin ${plugin.name} doesn't require a separate process`);
+      console.log(
+        `ℹ️  Plugin ${plugin.name} doesn't require a separate process`
+      );
       await pluginInstanceRepository.updateStatus(instance.id, "running");
       return;
     }
@@ -83,29 +86,26 @@ export class ProcessManagerService {
       );
 
       // Get the actual folder name for this plugin
-      const folderName = await pluginManagerService.getPluginFolderName(plugin.pluginId);
+      const folderName = await pluginManagerService.getPluginFolderName(
+        plugin.pluginId
+      );
       if (!folderName) {
         throw new Error(`Could not find folder for plugin ${plugin.pluginId}`);
       }
 
       // Parse command and args
-      const pluginPath = path.join(
-        process.cwd(),
-        "..",
-        "plugins",
-        folderName
-      );
+      const pluginPath = path.join(process.cwd(), "..", "plugins", folderName);
 
       let childProcess: ChildProcess;
-      
+
       // Check if command contains shell operators or needs special handling
       if (startCommand.includes("&&") || startCommand.includes("||")) {
         // For complex shell commands, execute them properly
         // Handle commands like "cd directory && npm run start"
-        const commands = startCommand.split("&&").map(cmd => cmd.trim());
+        const commands = startCommand.split("&&").map((cmd) => cmd.trim());
         let finalCwd = pluginPath;
         let finalCommand = startCommand;
-        
+
         // Check if first command is a cd command
         if (commands[0].startsWith("cd ")) {
           const targetDir = commands[0].substring(3).trim();
@@ -113,7 +113,7 @@ export class ProcessManagerService {
           // Remove the cd command and join the rest
           finalCommand = commands.slice(1).join(" && ").trim();
         }
-        
+
         // If there's still a command to run after handling cd
         if (finalCommand) {
           // Use cross-platform execution
@@ -140,10 +140,7 @@ export class ProcessManagerService {
       // Update process ID and status
       // Note: exec might not have PID immediately, but we can still track the process
       const pid = childProcess.pid || "managed";
-      await pluginInstanceRepository.updateProcessId(
-        instance.id,
-        String(pid)
-      );
+      await pluginInstanceRepository.updateProcessId(instance.id, String(pid));
       await pluginInstanceRepository.updateStatus(instance.id, "running");
 
       // Set up event handlers
@@ -165,10 +162,7 @@ export class ProcessManagerService {
   /**
    * Stop a plugin process
    */
-  async stopPlugin(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async stopPlugin(organizationId: string, pluginId: string): Promise<void> {
     const processKey = this.getProcessKey(organizationId, pluginId);
     const processInfo = this.processes.get(processKey);
 
@@ -214,16 +208,15 @@ export class ProcessManagerService {
       null
     );
 
-    console.log(`🛑 Stopped plugin ${processInfo.pluginName} for org ${organizationId}`);
+    console.log(
+      `🛑 Stopped plugin ${processInfo.pluginName} for org ${organizationId}`
+    );
   }
 
   /**
    * Restart a plugin process
    */
-  async restartPlugin(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async restartPlugin(organizationId: string, pluginId: string): Promise<void> {
     await this.stopPlugin(organizationId, pluginId);
     await this.startPlugin(organizationId, pluginId);
   }
@@ -235,7 +228,8 @@ export class ProcessManagerService {
     processKey: string,
     processInfo: ProcessInfo
   ): void {
-    const { process, pluginInstanceId, pluginName, organizationId } = processInfo;
+    const { process, pluginInstanceId, pluginName, organizationId } =
+      processInfo;
 
     // Handle stdout
     process.stdout?.on("data", (data) => {
@@ -244,7 +238,9 @@ export class ProcessManagerService {
 
     // Handle stderr
     process.stderr?.on("data", (data) => {
-      console.error(`[${pluginName}:${organizationId}] ERROR: ${data.toString()}`);
+      console.error(
+        `[${pluginName}:${organizationId}] ERROR: ${data.toString()}`
+      );
     });
 
     // Handle IPC messages
@@ -260,7 +256,10 @@ export class ProcessManagerService {
 
       this.processes.delete(processKey);
 
-      if (code !== 0 && processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS) {
+      if (
+        code !== 0 &&
+        processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS
+      ) {
         // Schedule restart
         await this.scheduleRestart(processKey, processInfo);
       } else {
@@ -280,7 +279,7 @@ export class ProcessManagerService {
         `Error in plugin ${pluginName} for org ${organizationId}:`,
         error
       );
-      
+
       await pluginInstanceRepository.updateStatus(
         pluginInstanceId,
         "error",
@@ -321,18 +320,18 @@ export class ProcessManagerService {
     processInfo: ProcessInfo
   ): Promise<void> {
     processInfo.restartAttempts++;
-    
+
     await pluginInstanceRepository.incrementRestartCount(
       processInfo.pluginInstanceId
     );
-    
+
     console.log(
       `Scheduling restart for ${processInfo.pluginName} (attempt ${processInfo.restartAttempts}/${this.MAX_RESTART_ATTEMPTS})`
     );
 
     const timer = setTimeout(async () => {
       this.restartTimers.delete(processKey);
-      
+
       try {
         const [organizationId, pluginId] = processKey.split(":");
         await this.startPlugin(organizationId, pluginId);
@@ -347,26 +346,36 @@ export class ProcessManagerService {
   /**
    * Cross-platform command spawning helper
    */
-  private spawnCommand(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
+  private spawnCommand(
+    command: string,
+    cwd: string,
+    env: NodeJS.ProcessEnv
+  ): ChildProcess {
     console.log(`Executing command: ${command} in ${cwd}`);
-    
+
     // Parse the command to check if it needs shell execution
     const [cmd] = command.split(" ");
-    
+
     // For npm/npx/node commands or complex shell commands, we need IPC support
     // Use spawn with shell execution and IPC for MCP server communication
-    if (cmd === "npm" || cmd === "npx" || cmd === "node" || command.includes("&&") || command.includes("||")) {
+    if (
+      cmd === "npm" ||
+      cmd === "npx" ||
+      cmd === "node" ||
+      command.includes("&&") ||
+      command.includes("||")
+    ) {
       // Use spawn with shell for complex commands but enable IPC
       const childProcess = spawn("sh", ["-c", command], {
         cwd,
         env: { ...process.env, ...env },
         stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
       });
-      
+
       if (childProcess.pid) {
         console.log(`Started process with PID: ${childProcess.pid}`);
       }
-      
+
       // Pipe outputs for visibility
       if (childProcess.stdout) {
         childProcess.stdout.pipe(process.stdout);
@@ -374,7 +383,7 @@ export class ProcessManagerService {
       if (childProcess.stderr) {
         childProcess.stderr.pipe(process.stderr);
       }
-      
+
       return childProcess;
     } else {
       // For simple commands, use spawn which gives us better control
@@ -384,11 +393,11 @@ export class ProcessManagerService {
         env: { ...process.env, ...env },
         stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
       });
-      
+
       if (childProcess.pid) {
         console.log(`Started process with PID: ${childProcess.pid}`);
       }
-      
+
       // Pipe outputs
       if (childProcess.stdout) {
         childProcess.stdout.pipe(process.stdout);
@@ -396,7 +405,7 @@ export class ProcessManagerService {
       if (childProcess.stderr) {
         childProcess.stderr.pipe(process.stderr);
       }
-      
+
       return childProcess;
     }
   }
@@ -447,13 +456,13 @@ export class ProcessManagerService {
       }, 30000); // 30 second timeout
 
       let responseBuffer = "";
-      
+
       // Set up one-time response handler for stdout
       const responseHandler = (data: Buffer) => {
         responseBuffer += data.toString();
-        
+
         // Try to parse complete JSON-RPC responses
-        const lines = responseBuffer.split('\n');
+        const lines = responseBuffer.split("\n");
         for (let i = 0; i < lines.length - 1; i++) {
           const line = lines[i].trim();
           if (line) {
@@ -463,20 +472,27 @@ export class ProcessManagerService {
               if (response.id === request.id) {
                 clearTimeout(timeout);
                 processInfo.process.stdout?.off("data", responseHandler);
-                
+
                 if (response.error) {
-                  reject(new Error(`MCP Error: ${response.error.message || response.error}`));
+                  reject(
+                    new Error(
+                      `MCP Error: ${response.error.message || response.error}`
+                    )
+                  );
                 } else {
                   resolve(response);
                 }
                 return;
               }
             } catch (parseError) {
-              console.warn(`Failed to parse MCP response line: ${line}`, parseError);
+              console.warn(
+                `Failed to parse MCP response line: ${line}`,
+                parseError
+              );
             }
           }
         }
-        
+
         // Keep the incomplete line for next data chunk
         responseBuffer = lines[lines.length - 1];
       };
@@ -485,9 +501,11 @@ export class ProcessManagerService {
       processInfo.process.stdout?.on("data", responseHandler);
 
       // Send JSON-RPC request to stdin
-      const requestLine = JSON.stringify(request) + '\n';
-      console.log(`[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`);
-      
+      const requestLine = JSON.stringify(request) + "\n";
+      console.log(
+        `[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`
+      );
+
       if (processInfo.process.stdin) {
         processInfo.process.stdin.write(requestLine);
       } else {
@@ -502,7 +520,7 @@ export class ProcessManagerService {
    */
   async stopAll(): Promise<void> {
     console.log("Stopping all plugin processes...");
-    
+
     const promises = Array.from(this.processes.entries()).map(
       async ([processKey]) => {
         const [organizationId, pluginId] = processKey.split(":");

@@ -98,6 +98,8 @@ export const runConversation = async (conversationId: string) => {
       conversation.organization_id
     );
 
+    console.log("[Orchestrator] Retrieved documents:", retrievedDocuments);
+
     if (retrievedDocuments.length > 0) {
       for (const document of retrievedDocuments) {
         if (!conversation.document_ids?.includes(document.id)) {

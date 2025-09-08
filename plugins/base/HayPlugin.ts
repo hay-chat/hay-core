@@ -1,4 +1,4 @@
-import type { HayPluginManifest } from './types';
+import type { HayPluginManifest } from "./types";
 
 export interface PluginContext {
   organizationId: string;
@@ -8,7 +8,7 @@ export interface PluginContext {
 }
 
 export interface PluginMessage {
-  type: 'health' | 'error' | 'log' | 'metric' | 'custom';
+  type: "health" | "error" | "log" | "metric" | "custom";
   payload?: any;
   timestamp?: Date;
 }
@@ -35,11 +35,20 @@ export abstract class HayPlugin {
     return this.manifest.version;
   }
 
-  getTypes(): Array<"mcp-connector" | "retriever" | "playbook" | "document_importer" | "chat-connector"> {
+  getTypes(): Array<
+    "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel"
+  > {
     return this.manifest.type;
   }
 
-  hasCapability(capability: "mcp-connector" | "retriever" | "playbook" | "document_importer" | "chat-connector"): boolean {
+  hasCapability(
+    capability:
+      | "mcp-connector"
+      | "retriever"
+      | "playbook"
+      | "document_importer"
+      | "channel"
+  ): boolean {
     return this.manifest.type.includes(capability);
   }
 
@@ -48,10 +57,10 @@ export abstract class HayPlugin {
    */
   async initialize(context: PluginContext): Promise<void> {
     this.context = context;
-    
+
     // Start health check
     this.startHealthCheck();
-    
+
     // Call lifecycle hook
     await this.onInitialize(context.config);
   }
@@ -65,7 +74,7 @@ export abstract class HayPlugin {
       return result;
     } catch (error) {
       this.sendMessage({
-        type: 'error',
+        type: "error",
         payload: {
           action,
           error: error instanceof Error ? error.message : String(error),
@@ -83,7 +92,7 @@ export abstract class HayPlugin {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
     }
-    
+
     // Call lifecycle hook
     await this.onShutdown();
   }
@@ -118,9 +127,13 @@ export abstract class HayPlugin {
   /**
    * Log a message
    */
-  protected log(level: 'info' | 'warn' | 'error', message: string, data?: any): void {
+  protected log(
+    level: "info" | "warn" | "error",
+    message: string,
+    data?: any
+  ): void {
     this.sendMessage({
-      type: 'log',
+      type: "log",
       payload: {
         level,
         message,
@@ -132,9 +145,13 @@ export abstract class HayPlugin {
   /**
    * Report a metric
    */
-  protected reportMetric(name: string, value: number, tags?: Record<string, string>): void {
+  protected reportMetric(
+    name: string,
+    value: number,
+    tags?: Record<string, string>
+  ): void {
     this.sendMessage({
-      type: 'metric',
+      type: "metric",
       payload: {
         name,
         value,
@@ -148,21 +165,21 @@ export abstract class HayPlugin {
    */
   private startHealthCheck(): void {
     const interval = 30000; // 30 seconds
-    
+
     this.healthCheckInterval = setInterval(async () => {
       try {
-        const isHealthy = this.onHealthCheck 
+        const isHealthy = this.onHealthCheck
           ? await this.onHealthCheck()
           : true;
-        
+
         this.sendMessage({
-          type: 'health',
+          type: "health",
           payload: { healthy: isHealthy },
         });
       } catch (error) {
         this.sendMessage({
-          type: 'health',
-          payload: { 
+          type: "health",
+          payload: {
             healthy: false,
             error: error instanceof Error ? error.message : String(error),
           },
@@ -176,23 +193,23 @@ export abstract class HayPlugin {
    */
   private setupProcessHandlers(): void {
     // Handle graceful shutdown
-    process.on('SIGTERM', async () => {
-      console.log('Received SIGTERM, shutting down gracefully...');
+    process.on("SIGTERM", async () => {
+      console.log("Received SIGTERM, shutting down gracefully...");
       await this.shutdown();
       process.exit(0);
     });
 
-    process.on('SIGINT', async () => {
-      console.log('Received SIGINT, shutting down gracefully...');
+    process.on("SIGINT", async () => {
+      console.log("Received SIGINT, shutting down gracefully...");
       await this.shutdown();
       process.exit(0);
     });
 
     // Handle uncaught errors
-    process.on('uncaughtException', (error) => {
-      console.error('Uncaught exception:', error);
+    process.on("uncaughtException", (error) => {
+      console.error("Uncaught exception:", error);
       this.sendMessage({
-        type: 'error',
+        type: "error",
         payload: {
           error: error.message,
           stack: error.stack,
@@ -201,12 +218,12 @@ export abstract class HayPlugin {
       process.exit(1);
     });
 
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    process.on("unhandledRejection", (reason, promise) => {
+      console.error("Unhandled rejection at:", promise, "reason:", reason);
       this.sendMessage({
-        type: 'error',
+        type: "error",
         payload: {
-          error: 'Unhandled promise rejection',
+          error: "Unhandled promise rejection",
           reason: String(reason),
         },
       });
@@ -231,7 +248,10 @@ export abstract class HayPlugin {
   /**
    * Get config value
    */
-  protected getConfigValue<T = any>(key: string, defaultValue?: T): T | undefined {
+  protected getConfigValue<T = any>(
+    key: string,
+    defaultValue?: T
+  ): T | undefined {
     return this.context?.config[key] ?? defaultValue;
   }
 

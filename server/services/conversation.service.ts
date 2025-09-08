@@ -66,10 +66,11 @@ export class ConversationService {
     conversationId: string,
     organizationId: string
   ): Promise<Conversation | null> {
-    return await this.conversationRepository.findById(
-      conversationId,
-      organizationId
-    );
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== organizationId) {
+      return null;
+    }
+    return conversation;
   }
 
   async updateConversation(

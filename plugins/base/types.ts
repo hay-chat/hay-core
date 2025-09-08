@@ -4,11 +4,7 @@ export interface HayPluginManifest {
   description: string;
   version: string;
   type: Array<
-    | "mcp-connector"
-    | "retriever"
-    | "playbook"
-    | "document_importer"
-    | "chat-connector"
+    "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel"
   >;
   entry: string;
   capabilities?: {

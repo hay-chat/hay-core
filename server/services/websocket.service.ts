@@ -177,7 +177,10 @@ export class WebSocketService {
     // Get or create conversation
     let conversation;
     if (conversationId) {
-      conversation = await conversationRepository.findById(conversationId, client.organizationId);
+      conversation = await conversationRepository.findById(conversationId);
+      if (!conversation || conversation.organization_id !== client.organizationId) {
+        return;
+      }
     }
 
     if (!conversation && client.organizationId) {
@@ -303,7 +306,10 @@ export class WebSocketService {
     const { conversationId } = message;
     
     // Load conversation with messages
-    const conversation = await conversationRepository.findById(conversationId, client.organizationId);
+    const conversation = await conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== client.organizationId) {
+      return;
+    }
 
     const messages = conversation?.messages || [];
     

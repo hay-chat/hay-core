@@ -3,7 +3,15 @@
   "title": "Hay Plugin Manifest",
   "description": "Schema for Hay plugin manifest files",
   "type": "object",
-  "required": ["id", "name", "version", "description", "author", "type", "entry"],
+  "required": [
+    "id",
+    "name",
+    "version",
+    "description",
+    "author",
+    "type",
+    "entry"
+  ],
   "properties": {
     "id": {
       "type": "string",
@@ -31,7 +39,14 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["chat-connector", "mcp-connector", "retriever", "playbook", "workflow", "analytics"]
+        "enum": [
+          "channel",
+          "mcp-connector",
+          "retriever",
+          "playbook",
+          "workflow",
+          "analytics"
+        ]
       },
       "description": "Plugin type(s) for categorization and functionality"
     },
@@ -109,10 +124,7 @@
                     "description": "Description of what the tool does"
                   },
                   "input_schema": {
-                    "oneOf": [
-                      { "type": "string" },
-                      { "type": "object" }
-                    ],
+                    "oneOf": [{ "type": "string" }, { "type": "object" }],
                     "description": "JSON Schema for tool input parameters"
                   }
                 }

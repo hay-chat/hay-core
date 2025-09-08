@@ -6,12 +6,22 @@ import type { PaginatedResponse } from "../types/list-input";
 import { createPaginatedResponse } from "../types/list-input";
 
 export abstract class BaseRepository<T extends ObjectLiteral> {
-  protected repository: Repository<T>;
+  protected repository!: Repository<T>;
   protected entityClass: new () => T;
 
   constructor(entityClass: new () => T) {
     this.entityClass = entityClass;
-    this.repository = AppDataSource.getRepository(entityClass);
+    // Lazy initialization - repository will be created when first accessed
+  }
+
+  protected getRepository(): Repository<T> {
+    if (!this.repository) {
+      if (!AppDataSource?.isInitialized) {
+        throw new Error(`Database not initialized. Cannot access ${this.entityClass.name} repository.`);
+      }
+      this.repository = AppDataSource.getRepository(this.entityClass);
+    }
+    return this.repository;
   }
 
   /**
@@ -22,7 +32,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     organizationId: string,
     baseWhere?: Record<string, any>
   ): Promise<PaginatedResponse<T>> {
-    const queryBuilder = this.repository.createQueryBuilder("entity");
+    const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
     // Base organization filter
     queryBuilder.where("entity.organizationId = :organizationId", {
@@ -196,13 +206,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    * Standard CRUD operations
    */
   async create(data: Partial<T>): Promise<T> {
-    const entity = this.repository.create(data as any);
-    return await this.repository.save(entity as any);
+    const entity = this.getRepository().create(data as any);
+    return await this.getRepository().save(entity as any);
   }
 
-  async findById(id: string, organizationId: string): Promise<T | null> {
-    return await this.repository.findOne({
-      where: { id, organizationId } as any,
+  async findById(id: string): Promise<T | null> {
+    return await this.getRepository().findOne({
+      where: { id } as any,
     });
   }
 
@@ -211,7 +221,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     organizationId: string,
     data: Partial<T>
   ): Promise<T | null> {
-    const result = await this.repository.update(
+    const result = await this.getRepository().update(
       { id, organizationId } as any,
       data
     );
@@ -220,11 +230,11 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
       return null;
     }
 
-    return await this.findById(id, organizationId);
+    return await this.findById(id);
   }
 
   async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.repository.delete({
+    const result = await this.getRepository().delete({
       id,
       organizationId,
     } as any);
@@ -239,7 +249,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     organizationId: string,
     options?: FindManyOptions<T>
   ): Promise<T[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { organizationId } as any,
       ...options,
     });

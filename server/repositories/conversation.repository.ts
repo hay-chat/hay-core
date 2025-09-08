@@ -6,31 +6,34 @@ import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 
 export class ConversationRepository extends BaseRepository<Conversation> {
+  private messageRepository!: Repository<Message>;
+
   constructor() {
     super(Conversation);
+  }
+
+  private getMessageRepository(): Repository<Message> {
+    if (!this.messageRepository) {
+      if (!AppDataSource?.isInitialized) {
+        throw new Error(`Database not initialized. Cannot access Message repository.`);
+      }
+      this.messageRepository = AppDataSource.getRepository(Message);
+    }
+    return this.messageRepository;
   }
 
   /**
    * Override base methods to handle organization_id field naming
    */
   override async create(data: Partial<Conversation>): Promise<Conversation> {
-    const conversation = this.repository.create(data);
-    return await this.repository.save(conversation);
+    const conversation = this.getRepository().create(data);
+    return await this.getRepository().save(conversation);
   }
 
-  override async findById(
-    id: string,
-    organizationId?: string
-  ): Promise<Conversation | null> {
-    const queryBuilder = this.repository.createQueryBuilder("conversation");
+  override async findById(id: string): Promise<Conversation | null> {
+    const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id", { id });
-
-    if (organizationId) {
-      queryBuilder.andWhere("conversation.organization_id = :organizationId", {
-        organizationId,
-      });
-    }
 
     queryBuilder
       .leftJoinAndSelect("conversation.messages", "messages")
@@ -43,7 +46,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     agentId: string,
     organizationId: string
   ): Promise<Conversation[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { agent_id: agentId, organization_id: organizationId },
       order: { created_at: "DESC" },
     });
@@ -52,7 +55,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   override async findByOrganization(
     organizationId: string
   ): Promise<Conversation[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
     });
@@ -65,12 +68,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   ): Promise<Conversation | null> {
     // For single conversation updates, organizationId is optional for security
     // but we still validate it exists if provided
-    const conversation = await this.findById(id, organizationId);
-    if (!conversation) {
+    const conversation = await this.findById(id);
+    if (!conversation || conversation.organization_id !== organizationId) {
       return null;
     }
 
-    await this.repository.update({ id }, data);
+    await this.getRepository().update({ id }, data);
 
     return await this.findById(id);
   }
@@ -85,7 +88,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.repository.update({ id }, data);
+    await this.getRepository().update({ id }, data);
 
     return await this.findById(id);
   }
@@ -95,7 +98,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    * Includes both open conversations and stuck processing conversations (past lock expiry)
    */
   async getAvailableForProcessing(): Promise<Conversation[]> {
-    if (!this.repository) {
+    if (!this.getRepository()) {
       console.error("[ConversationRepository] Repository not initialized");
       return [];
     }
@@ -103,7 +106,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     try {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-      const queryBuilder = this.repository.createQueryBuilder("conversation");
+      const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
       // Only select conversations that are truly available for processing
       queryBuilder.where(
@@ -131,7 +134,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   override async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.repository.delete({
+    const result = await this.getRepository().delete({
       id,
       organization_id: organizationId,
     });
@@ -147,7 +150,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     organizationId: string,
     baseWhere?: Record<string, any>
   ) {
-    const queryBuilder = this.repository.createQueryBuilder("entity");
+    const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
     // Use organization_id instead of organizationId for conversations
     queryBuilder.where("entity.organization_id = :organizationId", {
@@ -314,7 +317,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async findReadyForProcessing(): Promise<Conversation[]> {
-    const query = this.repository
+    const query = this.getRepository()
       .createQueryBuilder("conversation")
       .where("conversation.needs_processing = :needsProcessing", {
         needsProcessing: true,
@@ -333,14 +336,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async findAllOpenConversations(): Promise<Conversation[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { status: "open" },
       order: { created_at: "DESC" },
     });
   }
 
   async getPublicMessages(conversationId: string): Promise<Message[]> {
-    const messageRepository = AppDataSource.getRepository(Message);
+    const messageRepository = this.getMessageRepository();
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
@@ -351,7 +354,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
-    const messageRepository = AppDataSource.getRepository(Message);
+    const messageRepository = this.getMessageRepository();
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
@@ -361,7 +364,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async getLastHumanMessage(conversationId: string): Promise<Message | null> {
-    const conversation = await this.repository.findOne({
+    const conversation = await this.getRepository().findOne({
       where: { id: conversationId },
       relations: ["messages"],
     });
@@ -377,7 +380,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async getSystemMessages(conversationId: string): Promise<Message[]> {
-    const messageRepository = AppDataSource.getRepository(Message);
+    const messageRepository = this.getMessageRepository();
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
@@ -388,7 +391,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async getBotMessages(conversationId: string): Promise<Message[]> {
-    const messageRepository = AppDataSource.getRepository(Message);
+    const messageRepository = this.getMessageRepository();
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,

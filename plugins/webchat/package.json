@@ -1,7 +1,7 @@
 {
   "name": "@hay/plugin-webchat",
   "version": "1.0.0",
-  "description": "Webchat connector plugin for Hay",
+  "description": "Webchannel plugin for Hay",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && npm run copy-assets",

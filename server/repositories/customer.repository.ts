@@ -4,27 +4,33 @@ import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 
 export class CustomerRepository extends BaseRepository<Customer> {
-  private legacyRepository: Repository<Customer>;
+  private legacyRepository!: Repository<Customer>;
 
   constructor() {
     super(Customer);
-    this.legacyRepository = AppDataSource.getRepository(Customer);
+  }
+
+  private getLegacyRepository(): Repository<Customer> {
+    if (!this.legacyRepository) {
+      if (!AppDataSource?.isInitialized) {
+        throw new Error(`Database not initialized. Cannot access Customer repository.`);
+      }
+      this.legacyRepository = AppDataSource.getRepository(Customer);
+    }
+    return this.legacyRepository;
   }
 
   /**
    * Override base methods to handle snake_case field naming
    */
   override async create(data: Partial<Customer>): Promise<Customer> {
-    const customer = this.legacyRepository.create(data);
-    return await this.legacyRepository.save(customer);
+    const customer = this.getLegacyRepository().create(data);
+    return await this.getLegacyRepository().save(customer);
   }
 
-  override async findById(
-    id: string,
-    organizationId: string
-  ): Promise<Customer | null> {
-    return await this.legacyRepository.findOne({
-      where: { id, organization_id: organizationId },
+  override async findById(id: string): Promise<Customer | null> {
+    return await this.getLegacyRepository().findOne({
+      where: { id },
       relations: ["conversations"],
     });
   }
@@ -33,7 +39,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
     externalId: string,
     organizationId: string
   ): Promise<Customer | null> {
-    return await this.legacyRepository.findOne({
+    return await this.getLegacyRepository().findOne({
       where: { external_id: externalId, organization_id: organizationId },
     });
   }
@@ -42,7 +48,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
     email: string,
     organizationId: string
   ): Promise<Customer | null> {
-    return await this.legacyRepository.findOne({
+    return await this.getLegacyRepository().findOne({
       where: { email, organization_id: organizationId },
     });
   }
@@ -50,7 +56,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   override async findByOrganization(
     organizationId: string
   ): Promise<Customer[]> {
-    return await this.legacyRepository.find({
+    return await this.getLegacyRepository().find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
     });
@@ -61,21 +67,21 @@ export class CustomerRepository extends BaseRepository<Customer> {
     organizationId: string,
     data: Partial<Customer>
   ): Promise<Customer | null> {
-    const customer = await this.findById(id, organizationId);
-    if (!customer) {
+    const customer = await this.findById(id);
+    if (!customer || customer.organization_id !== organizationId) {
       return null;
     }
 
-    await this.legacyRepository.update(
+    await this.getLegacyRepository().update(
       { id, organization_id: organizationId },
       data
     );
 
-    return await this.findById(id, organizationId);
+    return await this.findById(id);
   }
 
   override async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.legacyRepository.delete({
+    const result = await this.getLegacyRepository().delete({
       id,
       organization_id: organizationId,
     });
@@ -91,7 +97,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
     organizationId: string,
     baseWhere?: Record<string, any>
   ) {
-    const queryBuilder = this.legacyRepository.createQueryBuilder("entity");
+    const queryBuilder = this.getLegacyRepository().createQueryBuilder("entity");
 
     // Use organization_id instead of organizationId
     queryBuilder.where("entity.organization_id = :organizationId", {
@@ -162,7 +168,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Customer>,
     filters?: Record<string, any>,
-    organizationId?: string
+    _organizationId?: string
   ): void {
     if (!filters) return;
 
@@ -257,15 +263,17 @@ export class CustomerRepository extends BaseRepository<Customer> {
     targetCustomerId: string,
     organizationId: string
   ): Promise<Customer | null> {
-    const sourceCustomer = await this.findById(sourceCustomerId, organizationId);
-    const targetCustomer = await this.findById(targetCustomerId, organizationId);
+    const sourceCustomer = await this.findById(sourceCustomerId);
+    const targetCustomer = await this.findById(targetCustomerId);
 
-    if (!sourceCustomer || !targetCustomer) {
+    if (!sourceCustomer || !targetCustomer || 
+        sourceCustomer.organization_id !== organizationId || 
+        targetCustomer.organization_id !== organizationId) {
       return null;
     }
 
     // Update all conversations to point to the target customer
-    await this.legacyRepository.query(
+    await this.getLegacyRepository().query(
       `UPDATE conversations SET customer_id = $1 WHERE customer_id = $2 AND organization_id = $3`,
       [targetCustomerId, sourceCustomerId, organizationId]
     );
@@ -287,6 +295,6 @@ export class CustomerRepository extends BaseRepository<Customer> {
     // Delete the source customer
     await this.delete(sourceCustomerId, organizationId);
 
-    return await this.findById(targetCustomerId, organizationId);
+    return await this.findById(targetCustomerId);
   }
 }

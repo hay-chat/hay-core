@@ -3,30 +3,40 @@ import { Message, MessageType } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
 
 export class MessageRepository {
-  private repository: Repository<Message>;
+  private repository!: Repository<Message>;
 
   constructor() {
-    this.repository = AppDataSource.getRepository(Message);
+    // Lazy initialization
+  }
+
+  private getRepository(): Repository<Message> {
+    if (!this.repository) {
+      if (!AppDataSource?.isInitialized) {
+        throw new Error(`Database not initialized. Cannot access Message repository.`);
+      }
+      this.repository = AppDataSource.getRepository(Message);
+    }
+    return this.repository;
   }
 
   async create(data: Partial<Message>): Promise<Message> {
-    const message = this.repository.create(data);
-    return await this.repository.save(message);
+    const message = this.getRepository().create(data);
+    return await this.getRepository().save(message);
   }
 
   async createBulk(messages: Partial<Message>[]): Promise<Message[]> {
-    const messageEntities = this.repository.create(messages);
-    return await this.repository.save(messageEntities);
+    const messageEntities = this.getRepository().create(messages);
+    return await this.getRepository().save(messageEntities);
   }
 
   async findById(id: string): Promise<Message | null> {
-    return await this.repository.findOne({
+    return await this.getRepository().findOne({
       where: { id },
     });
   }
 
   async findByConversation(conversationId: string): Promise<Message[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { conversation_id: conversationId },
       order: { created_at: "ASC" },
     });
@@ -36,7 +46,7 @@ export class MessageRepository {
     conversationId: string,
     type: MessageType
   ): Promise<Message[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { conversation_id: conversationId, type },
       order: { created_at: "ASC" },
     });
@@ -46,7 +56,7 @@ export class MessageRepository {
     conversationId: string,
     limit: number = 10
   ): Promise<Message[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { conversation_id: conversationId },
       order: { created_at: "DESC" },
       take: limit,
@@ -54,17 +64,17 @@ export class MessageRepository {
   }
 
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
-    await this.repository.update(id, data);
+    await this.getRepository().update(id, data);
     return await this.findById(id);
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.repository.delete(id);
+    const result = await this.getRepository().delete(id);
     return result.affected !== 0;
   }
 
   async deleteByConversation(conversationId: string): Promise<boolean> {
-    const result = await this.repository.delete({
+    const result = await this.getRepository().delete({
       conversation_id: conversationId,
     });
     return result.affected !== 0;

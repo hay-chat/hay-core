@@ -32,7 +32,7 @@
         subtitleColor="green"
       />
       <MetricCard
-        title="Chat Connectors"
+        title="Channels"
         :metric="stats.chatConnectors"
         subtitle="Communication channels"
         :icon="MessageSquare"
@@ -114,15 +114,29 @@
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
               <div
-                :class="[
-                  'w-12 h-12 rounded-lg flex items-center justify-center',
-                  getPluginIconBg(plugin.type),
-                ]"
+                class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden"
               >
-                <component
-                  :is="getPluginIcon(plugin.type)"
-                  class="h-6 w-6 text-white"
+                <img
+                  :src="getPluginThumbnail(plugin.id)"
+                  :alt="`${
+                    plugin.name || getPluginDisplayName(plugin.id)
+                  } thumbnail`"
+                  class="w-full h-full object-cover"
+                  @error="handleThumbnailError($event, plugin.type)"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
                 />
+                <div
+                  :class="[
+                    'w-12 h-12 rounded-lg flex items-center justify-center',
+                    getPluginIconBg(plugin.type),
+                  ]"
+                  style="display: none"
+                >
+                  <component
+                    :is="getPluginIcon(plugin.type)"
+                    class="h-6 w-6 text-white"
+                  />
+                </div>
               </div>
               <div>
                 <CardTitle class="text-lg">{{
@@ -163,11 +177,8 @@
               </div>
             </div>
 
-            <!-- Features for Chat Connectors -->
-            <div
-              v-if="plugin.type.includes('chat-connector')"
-              class="space-y-2"
-            >
+            <!-- Features for channels -->
+            <div v-if="plugin.type.includes('channel')" class="space-y-2">
               <div class="text-sm font-medium">Features:</div>
               <div class="flex flex-wrap gap-1">
                 <Badge
@@ -274,8 +285,7 @@ const stats = computed(() => {
   return {
     total: pluginList.length,
     enabled: pluginList.filter((p) => p.enabled).length,
-    chatConnectors: pluginList.filter((p) => p.type.includes("chat-connector"))
-      .length,
+    chatConnectors: pluginList.filter((p) => p.type.includes("channel")).length,
     mcpConnectors: pluginList.filter((p) => p.type.includes("mcp-connector"))
       .length,
   };
@@ -284,7 +294,7 @@ const stats = computed(() => {
 // Categories
 const categories = [
   { id: "all", name: "All Plugins", icon: Globe },
-  { id: "chat-connector", name: "Chat Connectors", icon: MessageSquare },
+  { id: "channel", name: "Channels", icon: MessageSquare },
   { id: "mcp-connector", name: "MCP Connectors", icon: Cpu },
   { id: "document_importer", name: "Document Importers", icon: FileText },
   { id: "retriever", name: "Retrievers", icon: Database },
@@ -316,7 +326,7 @@ const filteredPlugins = computed(() => {
 
 // Methods
 const getPluginIcon = (types: string[]) => {
-  if (types.includes("chat-connector")) return MessageSquare;
+  if (types.includes("channel")) return MessageSquare;
   if (types.includes("mcp-connector")) return Cpu;
   if (types.includes("document_importer")) return FileText;
   if (types.includes("retriever")) return Database;
@@ -325,7 +335,7 @@ const getPluginIcon = (types: string[]) => {
 };
 
 const getPluginIconBg = (types: string[]) => {
-  if (types.includes("chat-connector")) return "bg-blue-600";
+  if (types.includes("channel")) return "bg-blue-600";
   if (types.includes("mcp-connector")) return "bg-purple-600";
   if (types.includes("document_importer")) return "bg-green-600";
   if (types.includes("retriever")) return "bg-orange-600";
@@ -349,6 +359,23 @@ const formatPluginType = (type: string) => {
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+};
+
+const getPluginThumbnail = (pluginId: string) => {
+  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix)
+  const pluginName = pluginId.replace("hay-plugin-", "");
+  return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
+};
+
+const handleThumbnailError = (event: Event, pluginType: string[]) => {
+  // Hide the image and show the fallback icon
+  const imgElement = event.target as HTMLImageElement;
+  const fallbackElement = imgElement.nextElementSibling as HTMLElement;
+
+  imgElement.style.display = "none";
+  if (fallbackElement) {
+    fallbackElement.style.display = "flex";
+  }
 };
 
 const fetchPlugins = async () => {

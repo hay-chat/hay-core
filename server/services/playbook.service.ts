@@ -25,7 +25,8 @@ export class PlaybookService {
     const agents: Agent[] = [];
     if (agentIds && agentIds.length > 0) {
       for (const agentId of agentIds) {
-        const agent = await this.agentRepository.findById(agentId, organizationId);
+        const agent = await this.agentRepository.findById(agentId);
+        if (!agent || agent.organization_id !== organizationId) continue;
         if (agent) {
           agents.push(agent);
         }
@@ -48,7 +49,11 @@ export class PlaybookService {
   }
 
   async getPlaybook(organizationId: string, playbookId: string): Promise<Playbook | null> {
-    return await this.playbookRepository.findById(playbookId, organizationId);
+    const playbook = await this.playbookRepository.findById(playbookId);
+    if (!playbook || playbook.organization_id !== organizationId) {
+      return null;
+    }
+    return playbook;
   }
 
   async updatePlaybook(
@@ -69,7 +74,8 @@ export class PlaybookService {
     if (agentIds !== undefined) {
       agents = [];
       for (const agentId of agentIds) {
-        const agent = await this.agentRepository.findById(agentId, organizationId);
+        const agent = await this.agentRepository.findById(agentId);
+        if (!agent || agent.organization_id !== organizationId) continue;
         if (agent) {
           agents.push(agent);
         }
@@ -87,8 +93,8 @@ export class PlaybookService {
   }
 
   async addAgentToPlaybook(organizationId: string, playbookId: string, agentId: string): Promise<Playbook | null> {
-    const agent = await this.agentRepository.findById(agentId, organizationId);
-    if (!agent) {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent || agent.organization_id !== organizationId) {
       throw new Error("Agent not found");
     }
 

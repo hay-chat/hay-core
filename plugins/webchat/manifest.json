@@ -5,7 +5,7 @@
   "description": "A customizable web chat widget for your website with real-time messaging",
   "version": "1.0.0",
   "author": "Hay",
-  "type": ["chat-connector"],
+  "type": ["channel"],
   "entry": "./dist/index.js",
   "enabled": true,
   "category": "chat",

@@ -1,15 +1,12 @@
 import { Repository, type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
-import { AppDataSource } from "@server/database/data-source";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
-  protected override repository: Repository<PluginInstance>;
-
   constructor() {
     super(PluginInstance);
-    this.repository = AppDataSource.getRepository(PluginInstance);
+    // Repository will be lazily initialized by BaseRepository
   }
 
   async findByOrgAndPlugin(
@@ -22,14 +19,14 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       return null;
     }
 
-    return this.repository.findOne({
+    return this.getRepository().findOne({
       where: { organizationId, pluginId: pluginRegistry.id },
       relations: ["plugin"],
     });
   }
 
   override async findByOrganization(organizationId: string): Promise<PluginInstance[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       where: { organizationId },
       relations: ["plugin"],
       order: { createdAt: "ASC" },
@@ -37,20 +34,20 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   async findAll(options?: FindManyOptions<PluginInstance>): Promise<PluginInstance[]> {
-    return this.repository.find(options);
+    return this.getRepository().find(options);
   }
 
   async findEnabledByOrganization(
     organizationId: string
   ): Promise<PluginInstance[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       where: { organizationId, enabled: true },
       relations: ["plugin"],
     });
   }
 
   async findRunningInstances(): Promise<PluginInstance[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       where: { running: true },
       relations: ["plugin", "organization"],
     });
@@ -75,11 +72,11 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       updates.lastError = error;
     }
 
-    await this.repository.update(id, updates);
+    await this.getRepository().update(id, updates);
   }
 
   async updateProcessId(id: string, processId: string | null): Promise<void> {
-    await this.repository.update(id, {
+    await this.getRepository().update(id, {
       processId: processId || undefined,
     });
   }
@@ -88,15 +85,15 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     id: string,
     config: Record<string, any>
   ): Promise<void> {
-    await this.repository.update(id, { config });
+    await this.getRepository().update(id, { config });
   }
 
   async incrementRestartCount(id: string): Promise<void> {
-    await this.repository.increment({ id }, "restartCount", 1);
+    await this.getRepository().increment({ id }, "restartCount", 1);
   }
 
   async updateHealthCheck(id: string): Promise<void> {
-    await this.repository.update(id, {
+    await this.getRepository().update(id, {
       lastHealthCheck: new Date(),
     });
   }
@@ -109,18 +106,18 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     const existing = await this.findByOrgAndPlugin(organizationId, pluginId);
     
     if (existing) {
-      await this.repository.update(existing.id, {
+      await this.getRepository().update(existing.id, {
         ...data,
         updatedAt: new Date(),
       });
-      return (await this.findById(existing.id, organizationId))!;
+      return (await this.findById(existing.id))!;
     } else {
-      const entity = this.repository.create({
+      const entity = this.getRepository().create({
         ...data,
         organizationId,
         pluginId,
       } as PluginInstance);
-      return await this.repository.save(entity);
+      return await this.getRepository().save(entity);
     }
   }
 

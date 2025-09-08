@@ -28,7 +28,11 @@ export class AgentService {
   }
 
   async getAgent(organizationId: string, agentId: string): Promise<Agent | null> {
-    return await this.agentRepository.findById(agentId, organizationId);
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent || agent.organization_id !== organizationId) {
+      return null;
+    }
+    return agent;
   }
 
   async updateAgent(

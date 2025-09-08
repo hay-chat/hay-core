@@ -55,6 +55,71 @@ export class PluginAssetService {
   }
 
   /**
+   * Serve a plugin thumbnail
+   */
+  async serveThumbnail(req: Request, res: Response): Promise<void> {
+    const { pluginName } = req.params;
+    const cacheKey = `${pluginName}/thumbnail.jpg`;
+
+    // Check cache first
+    if (this.assetCache.has(cacheKey)) {
+      const cached = this.assetCache.get(cacheKey)!;
+      
+      // Check if-none-match header for etag
+      if (req.headers['if-none-match'] === cached.etag) {
+        res.status(304).end();
+        return;
+      }
+
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.setHeader('Last-Modified', cached.lastModified.toUTCString());
+      res.send(cached.content);
+      return;
+    }
+
+    // Build path to plugin thumbnail (go up one level from server directory)
+    const pluginDir = path.join(process.cwd(), '..', 'plugins', pluginName);
+    const thumbnailPath = path.join(pluginDir, 'thumbnail.jpg');
+
+    try {
+      const content = await fs.readFile(thumbnailPath);
+      const etag = this.generateETag(content);
+      const lastModified = new Date();
+
+      // Cache the thumbnail
+      this.assetCache.set(cacheKey, {
+        content,
+        contentType: 'image/jpeg',
+        etag,
+        lastModified,
+      });
+
+      // Set cache timeout (24 hours for thumbnails)
+      setTimeout(() => {
+        this.assetCache.delete(cacheKey);
+      }, 24 * 60 * 60 * 1000);
+
+      // Check if-none-match header for etag
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.setHeader('Last-Modified', lastModified.toUTCString());
+      res.send(content);
+    } catch (error) {
+      // If thumbnail doesn't exist, return 404
+      console.warn(`Thumbnail not found for plugin ${pluginName}:`, error);
+      res.status(404).json({ error: 'Thumbnail not found' });
+    }
+  }
+
+  /**
    * Serve a plugin asset
    */
   async serveAsset(req: Request, res: Response): Promise<void> {

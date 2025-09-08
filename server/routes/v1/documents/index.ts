@@ -51,11 +51,11 @@ export const documentsRouter = t.router({
 
       const documents =
         documentIds.length > 0
-          ? await Promise.all(
+          ? (await Promise.all(
               documentIds.map((id) =>
-                documentRepository.findById(id, ctx.organizationId!)
+                documentRepository.findById(id)
               )
-            )
+            )).filter((doc) => doc && doc.organizationId === ctx.organizationId)
           : [];
 
       // Map results with document details
@@ -166,11 +166,8 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(
-        input.id,
-        ctx.organizationId!
-      );
-      if (!document) {
+      const document = await documentRepository.findById(input.id);
+      if (!document || document.organizationId !== ctx.organizationId) {
         throw new Error("Document not found");
       }
 
@@ -251,11 +248,8 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(
-        input.id,
-        ctx.organizationId!
-      );
-      if (!document) {
+      const document = await documentRepository.findById(input.id);
+      if (!document || document.organizationId !== ctx.organizationId) {
         throw new Error("Document not found");
       }
 
@@ -299,11 +293,8 @@ export const documentsRouter = t.router({
 
       // If documentId is provided, regenerate for single document
       if (input.documentId) {
-        const document = await documentRepository.findById(
-          input.documentId,
-          ctx.organizationId!
-        );
-        if (!document) {
+        const document = await documentRepository.findById(input.documentId);
+        if (!document || document.organizationId !== ctx.organizationId) {
           throw new Error("Document not found");
         }
 
@@ -450,9 +441,9 @@ export const documentsRouter = t.router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const job = await jobRepository.findById(input.jobId, ctx.organizationId!);
+      const job = await jobRepository.findById(input.jobId);
       
-      if (!job) {
+      if (!job || job.organizationId !== ctx.organizationId) {
         throw new Error("Job not found");
       }
 
@@ -528,12 +519,9 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find the document
-      const document = await documentRepository.findById(
-        input.documentId,
-        ctx.organizationId!
-      );
+      const document = await documentRepository.findById(input.documentId);
 
-      if (!document) {
+      if (!document || document.organizationId !== ctx.organizationId) {
         throw new Error("Document not found");
       }
 

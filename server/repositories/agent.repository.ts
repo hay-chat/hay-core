@@ -3,32 +3,42 @@ import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
 
 export class AgentRepository {
-  private repository: Repository<Agent>;
+  private repository!: Repository<Agent>;
 
   constructor() {
-    this.repository = AppDataSource.getRepository(Agent);
+    // Lazy initialization
+  }
+
+  private getRepository(): Repository<Agent> {
+    if (!this.repository) {
+      if (!AppDataSource?.isInitialized) {
+        throw new Error(`Database not initialized. Cannot access Agent repository.`);
+      }
+      this.repository = AppDataSource.getRepository(Agent);
+    }
+    return this.repository;
   }
 
   async create(data: Partial<Agent>): Promise<Agent> {
-    const agent = this.repository.create(data);
-    return await this.repository.save(agent);
+    const agent = this.getRepository().create(data);
+    return await this.getRepository().save(agent);
   }
 
-  async findById(id: string, organizationId: string): Promise<Agent | null> {
-    return await this.repository.findOne({
-      where: { id, organization_id: organizationId },
+  async findById(id: string): Promise<Agent | null> {
+    return await this.getRepository().findOne({
+      where: { id },
     });
   }
 
   async findByOrganization(organizationId: string): Promise<Agent[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
     });
   }
 
   async findEnabledByOrganization(organizationId: string): Promise<Agent[]> {
-    return await this.repository.find({
+    return await this.getRepository().find({
       where: { organization_id: organizationId, enabled: true },
       order: { created_at: "DESC" },
     });
@@ -39,18 +49,18 @@ export class AgentRepository {
     organizationId: string,
     data: Partial<Agent>
   ): Promise<Agent | null> {
-    const agent = await this.findById(id, organizationId);
-    if (!agent) {
+    const agent = await this.findById(id);
+    if (!agent || agent.organization_id !== organizationId) {
       return null;
     }
 
-    await this.repository.update({ id, organization_id: organizationId }, data);
+    await this.getRepository().update({ id, organization_id: organizationId }, data);
 
-    return await this.findById(id, organizationId);
+    return await this.findById(id);
   }
 
   async delete(id: string, organizationId: string): Promise<boolean> {
-    const result = await this.repository.delete({
+    const result = await this.getRepository().delete({
       id,
       organization_id: organizationId,
     });

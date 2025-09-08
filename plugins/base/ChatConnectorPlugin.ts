@@ -1,9 +1,9 @@
-import { HayPlugin, PluginContext, PluginMessage } from './HayPlugin';
-import type { HayPluginManifest } from './types';
+import { HayPlugin, PluginContext, PluginMessage } from "./HayPlugin";
+import type { HayPluginManifest } from "./types";
 
 export interface CustomerIdentifier {
   externalId: string;
-  type: 'email' | 'phone' | 'username' | 'id' | 'anonymous';
+  type: "email" | "phone" | "username" | "id" | "anonymous";
   platform: string;
   metadata?: Record<string, any>;
 }
@@ -15,7 +15,7 @@ export interface IncomingMessage {
   customer?: CustomerIdentifier;
   text?: string;
   attachments?: Array<{
-    type: 'image' | 'video' | 'audio' | 'document';
+    type: "image" | "video" | "audio" | "document";
     url: string;
     name?: string;
     size?: number;
@@ -28,13 +28,13 @@ export interface OutgoingMessage {
   conversationId: string;
   text?: string;
   attachments?: Array<{
-    type: 'image' | 'video' | 'audio' | 'document';
+    type: "image" | "video" | "audio" | "document";
     url: string;
     name?: string;
   }>;
   buttons?: Array<{
     text: string;
-    type: 'url' | 'postback' | 'call';
+    type: "url" | "postback" | "call";
     value: string;
   }>;
   quickReplies?: string[];
@@ -67,8 +67,8 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   protected customerMap: Map<string, CustomerIdentifier> = new Map();
 
   constructor(manifest: HayPluginManifest) {
-    if (!manifest.type.includes('chat-connector')) {
-      throw new Error('Plugin must have chat-connector type');
+    if (!manifest.type.includes("channel")) {
+      throw new Error("Plugin must have channel type");
     }
     super(manifest);
   }
@@ -81,12 +81,16 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   /**
    * Send outgoing message to external platform
    */
-  protected abstract sendOutgoingMessage(message: OutgoingMessage): Promise<void>;
+  protected abstract sendOutgoingMessage(
+    message: OutgoingMessage
+  ): Promise<void>;
 
   /**
    * Handle webhook requests from external platform
    */
-  protected abstract handleWebhook(request: WebhookRequest): Promise<WebhookResponse>;
+  protected abstract handleWebhook(
+    request: WebhookRequest
+  ): Promise<WebhookResponse>;
 
   /**
    * Get public assets to serve (widget scripts, stylesheets, etc.)
@@ -103,7 +107,7 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
    * Verify webhook signature if required
    */
   protected async verifyWebhookSignature(
-    request: WebhookRequest, 
+    request: WebhookRequest,
     secret: string
   ): Promise<boolean> {
     return true;
@@ -115,7 +119,7 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   protected async initializeRealtime(): Promise<void> {
     const realtimeConfig = this.manifest.capabilities?.chat_connector?.realtime;
     if (realtimeConfig) {
-      this.log('info', `Initializing ${realtimeConfig.type} connection`);
+      this.log("info", `Initializing ${realtimeConfig.type} connection`);
     }
   }
 
@@ -136,9 +140,11 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   /**
    * Identify or create customer
    */
-  protected async identifyCustomer(identifier: CustomerIdentifier): Promise<string> {
+  protected async identifyCustomer(
+    identifier: CustomerIdentifier
+  ): Promise<string> {
     const customerKey = `${identifier.platform}:${identifier.externalId}`;
-    
+
     // Check if we already have this customer mapped
     const existing = this.customerMap.get(customerKey);
     if (existing) {
@@ -150,9 +156,9 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
 
     // Notify the system about the customer
     super.sendMessage({
-      type: 'custom',
+      type: "custom",
       payload: {
-        action: 'customer_identified',
+        action: "customer_identified",
         data: identifier,
       },
     });
@@ -179,9 +185,9 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
    */
   protected async forwardToHay(message: IncomingMessage): Promise<void> {
     super.sendMessage({
-      type: 'custom',
+      type: "custom",
       payload: {
-        action: 'incoming_message',
+        action: "incoming_message",
         data: message,
       },
     });
@@ -193,11 +199,11 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   async handleOutgoingMessage(message: OutgoingMessage): Promise<void> {
     try {
       await this.sendOutgoingMessage(message);
-      this.reportMetric('messages_sent', 1, {
+      this.reportMetric("messages_sent", 1, {
         platform: this.getName(),
       });
     } catch (error) {
-      this.log('error', 'Failed to send message', { error, message });
+      this.log("error", "Failed to send message", { error, message });
       throw error;
     }
   }
@@ -208,16 +214,16 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   async processWebhook(request: WebhookRequest): Promise<WebhookResponse> {
     try {
       const response = await this.handleWebhook(request);
-      this.reportMetric('webhooks_processed', 1, {
+      this.reportMetric("webhooks_processed", 1, {
         platform: this.getName(),
         status: String(response.status),
       });
       return response;
     } catch (error) {
-      this.log('error', 'Webhook processing failed', { error, request });
+      this.log("error", "Webhook processing failed", { error, request });
       return {
         status: 500,
-        body: { error: 'Internal server error' },
+        body: { error: "Internal server error" },
       };
     }
   }
@@ -226,19 +232,19 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
    * Lifecycle implementation
    */
   protected async onInitialize(config?: Record<string, any>): Promise<void> {
-    this.log('info', 'Initializing chat connector', { config });
+    this.log("info", "Initializing channel", { config });
     await this.initializeRealtime();
   }
 
   protected async onExecute(action: string, payload?: any): Promise<any> {
     switch (action) {
-      case 'send_message':
+      case "send_message":
         return this.handleOutgoingMessage(payload);
-      case 'process_webhook':
+      case "process_webhook":
         return this.processWebhook(payload);
-      case 'get_assets':
+      case "get_assets":
         return this.getPublicAssets();
-      case 'get_configuration':
+      case "get_configuration":
         return this.renderConfiguration();
       default:
         throw new Error(`Unknown action: ${action}`);
@@ -246,7 +252,7 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
   }
 
   protected async onShutdown(): Promise<void> {
-    this.log('info', 'Shutting down chat connector');
+    this.log("info", "Shutting down channel");
     this.conversationMap.clear();
   }
 
@@ -254,7 +260,7 @@ export abstract class ChatConnectorPlugin extends HayPlugin {
    * Helper method to generate embed script
    */
   protected generateEmbedScript(config: Record<string, any>): string {
-    const baseUrl = this.getEnvVar('BASE_URL', 'http://localhost:3000');
+    const baseUrl = this.getEnvVar("BASE_URL", "http://localhost:3000");
     const instanceId = this.context?.instanceId;
     const organizationId = this.context?.organizationId;
 

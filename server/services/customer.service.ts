@@ -66,7 +66,11 @@ export class CustomerService {
     customerId: string,
     organizationId: string
   ): Promise<Customer | null> {
-    return await this.customerRepository.findById(customerId, organizationId);
+    const customer = await this.customerRepository.findById(customerId);
+    if (!customer || customer.organization_id !== organizationId) {
+      return null;
+    }
+    return customer;
   }
 
   /**

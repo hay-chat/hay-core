@@ -1,35 +1,32 @@
 import { Repository } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
-import { AppDataSource } from "@server/database/data-source";
 
 export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
-  protected override repository: Repository<PluginRegistry>;
-
   constructor() {
     super(PluginRegistry);
-    this.repository = AppDataSource.getRepository(PluginRegistry);
+    // Repository will be lazily initialized by BaseRepository
   }
 
   async findByPluginId(pluginId: string): Promise<PluginRegistry | null> {
-    return this.repository.findOne({ where: { pluginId } });
+    return this.getRepository().findOne({ where: { pluginId } });
   }
 
   async getAllPlugins(): Promise<PluginRegistry[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       order: { name: "ASC" },
     });
   }
 
   async getInstalledPlugins(): Promise<PluginRegistry[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       where: { installed: true },
       order: { name: "ASC" },
     });
   }
 
   async getBuiltPlugins(): Promise<PluginRegistry[]> {
-    return this.repository.find({
+    return this.getRepository().find({
       where: { built: true },
       order: { name: "ASC" },
     });
@@ -40,7 +37,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     installed: boolean,
     error?: string
   ): Promise<void> {
-    await this.repository.update(id, {
+    await this.getRepository().update(id, {
       installed,
       installedAt: installed ? new Date() : undefined,
       lastInstallError: error,
@@ -52,7 +49,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     built: boolean,
     error?: string
   ): Promise<void> {
-    await this.repository.update(id, {
+    await this.getRepository().update(id, {
       built,
       builtAt: built ? new Date() : undefined,
       lastBuildError: error,
@@ -60,21 +57,21 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   }
 
   async updateChecksum(id: string, checksum: string): Promise<void> {
-    await this.repository.update(id, { checksum });
+    await this.getRepository().update(id, { checksum });
   }
 
   async upsertPlugin(plugin: Partial<PluginRegistry>): Promise<PluginRegistry> {
     const existing = await this.findByPluginId(plugin.pluginId!);
     
     if (existing) {
-      await this.repository.update(existing.id, {
+      await this.getRepository().update(existing.id, {
         ...plugin,
         updatedAt: new Date(),
       });
-      return (await this.repository.findOne({ where: { id: existing.id } }))!;
+      return (await this.getRepository().findOne({ where: { id: existing.id } }))!;
     } else {
-      const entity = this.repository.create(plugin as PluginRegistry);
-      return await this.repository.save(entity);
+      const entity = this.getRepository().create(plugin as PluginRegistry);
+      return await this.getRepository().save(entity);
     }
   }
 }

@@ -62,8 +62,12 @@
                 />
               </div>
               <div>
-                <CardTitle>{{ plugin.name || getPluginDisplayName(plugin.id) }}</CardTitle>
-                <CardDescription>{{ plugin.description || `Version ${plugin.version}` }}</CardDescription>
+                <CardTitle>{{
+                  plugin.name || getPluginDisplayName(plugin.id)
+                }}</CardTitle>
+                <CardDescription>{{
+                  plugin.description || `Version ${plugin.version}`
+                }}</CardDescription>
               </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -80,8 +84,8 @@
         </CardHeader>
       </Card>
 
-      <!-- Embed Code for Chat Connectors -->
-      <Card v-if="plugin.type.includes('chat-connector') && enabled">
+      <!-- Embed Code for channels -->
+      <Card v-if="plugin.type.includes('channel') && enabled">
         <CardHeader>
           <CardTitle>Installation</CardTitle>
           <CardDescription>
@@ -123,7 +127,8 @@
         <CardHeader>
           <CardTitle>Configuration</CardTitle>
           <CardDescription>
-            Configure your {{ plugin.name || getPluginDisplayName(plugin.id) }} settings
+            Configure your
+            {{ plugin.name || getPluginDisplayName(plugin.id) }} settings
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -155,7 +160,10 @@
                   :id="key"
                   v-model="formData[key]"
                   :type="field.encrypted ? 'password' : 'text'"
-                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+                  :placeholder="
+                    field.placeholder ||
+                    'Enter ' + (field.label || key).toLowerCase()
+                  "
                   :required="field.required"
                 />
               </template>
@@ -220,7 +228,10 @@
                 <Textarea
                   :id="key"
                   v-model="formData[key]"
-                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+                  :placeholder="
+                    field.placeholder ||
+                    'Enter ' + (field.label || key).toLowerCase()
+                  "
                   :rows="4"
                   :required="field.required"
                 />
@@ -241,7 +252,10 @@
                   :id="key"
                   v-model.number="formData[key]"
                   type="number"
-                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+                  :placeholder="
+                    field.placeholder ||
+                    'Enter ' + (field.label || key).toLowerCase()
+                  "
                   :required="field.required"
                 />
               </template>
@@ -265,7 +279,8 @@
         <CardHeader>
           <CardTitle>Connection Test</CardTitle>
           <CardDescription>
-            Test your {{ plugin.name || getPluginDisplayName(plugin.id) }} connection
+            Test your
+            {{ plugin.name || getPluginDisplayName(plugin.id) }} connection
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -351,9 +366,9 @@ const configSchema = ref<Record<string, any>>({});
 const formData = ref<Record<string, any>>({});
 const templateHtml = ref<string | null>(null);
 
-// Embed code for chat connectors
+// Embed code for channels
 const embedCode = computed(() => {
-  if (!plugin.value?.type.includes("chat-connector")) return "";
+  if (!plugin.value?.type.includes("channel")) return "";
 
   const orgId = organizationStore.current?.id;
   const baseUrl = window.location.origin.replace("5173", "3000");
@@ -375,7 +390,7 @@ const embedCode = computed(() => {
 
 // Methods
 const getPluginIcon = (types: string[]) => {
-  if (types.includes("chat-connector")) return MessageSquare;
+  if (types.includes("channel")) return MessageSquare;
   if (types.includes("mcp-connector")) return Cpu;
   if (types.includes("document_importer")) return FileText;
   if (types.includes("retriever")) return Database;
@@ -383,7 +398,7 @@ const getPluginIcon = (types: string[]) => {
 };
 
 const getPluginIconBg = (types: string[]) => {
-  if (types.includes("chat-connector")) return "bg-blue-600";
+  if (types.includes("channel")) return "bg-blue-600";
   if (types.includes("mcp-connector")) return "bg-purple-600";
   if (types.includes("document_importer")) return "bg-green-600";
   if (types.includes("retriever")) return "bg-orange-600";

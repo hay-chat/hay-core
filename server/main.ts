@@ -6,13 +6,6 @@ import { config } from "@server/config/env";
 import { appRouter } from "@server/routes";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
-import { orchestratorWorker } from "@server/workers/orchestrator.worker";
-import { pluginManagerService } from "@server/services/plugin-manager.service";
-import { processManagerService } from "@server/services/process-manager.service";
-import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
-import { pluginAssetService } from "@server/services/plugin-asset.service";
-import { pluginRouteService } from "@server/services/plugin-route.service";
-import { websocketService } from "@server/services/websocket.service";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -26,6 +19,15 @@ async function startServer() {
   if (!dbConnected) {
     console.warn("⚠️  Starting server without database connection");
   }
+
+  // Import services after database initialization to avoid circular dependency issues
+  const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
+  const { pluginManagerService } = await import("@server/services/plugin-manager.service");
+  const { processManagerService } = await import("@server/services/process-manager.service");
+  const { pluginInstanceRepository } = await import("@server/repositories/plugin-instance.repository");
+  const { pluginAssetService } = await import("@server/services/plugin-asset.service");
+  const { pluginRouteService } = await import("@server/services/plugin-route.service");
+  const { websocketService } = await import("@server/services/websocket.service");
 
   const server = express();
 
@@ -48,6 +50,14 @@ async function startServer() {
 
   server.get("/", (req, res) => {
     res.send("Welcome to Hay");
+  });
+
+  // Plugin thumbnail route - serve thumbnail.jpg files
+  server.get("/plugins/thumbnails/:pluginName", (req, res) => {
+    pluginAssetService.serveThumbnail(req, res).catch((error) => {
+      console.error("Thumbnail serving error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    });
   });
 
   // Plugin asset routes - serve public assets like widget scripts
