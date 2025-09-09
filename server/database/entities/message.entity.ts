@@ -5,25 +5,25 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  JoinColumn
+  JoinColumn,
 } from "typeorm";
 import { Conversation } from "./conversation.entity";
 
 export enum MessageType {
   CUSTOMER = "Customer",
-  SYSTEM = "System", 
+  SYSTEM = "System",
   HUMAN_AGENT = "HumanAgent",
   BOT_AGENT = "BotAgent",
   TOOL_CALL = "ToolCall",
   TOOL_RESPONSE = "ToolResponse",
   DOCUMENT = "Document",
-  PLAYBOOK = "Playbook"
+  PLAYBOOK = "Playbook",
 }
 
 export enum MessageSentiment {
   POSITIVE = "positive",
   NEUTRAL = "neutral",
-  NEGATIVE = "negative"
+  NEGATIVE = "negative",
 }
 
 export enum MessageIntent {
@@ -34,7 +34,14 @@ export enum MessageIntent {
   CLOSE_SATISFIED = "close_satisfied",
   CLOSE_UNSATISFIED = "close_unsatisfied",
   OTHER = "other",
-  UNKNOWN = "unknown"
+  UNKNOWN = "unknown",
+}
+
+export enum MessageStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  EDITED = "edited",
 }
 
 @Entity("messages")
@@ -45,7 +52,9 @@ export class Message {
   @Column({ type: "uuid" })
   conversation_id!: string;
 
-  @ManyToOne(() => Conversation, conversation => conversation.messages, { onDelete: "CASCADE" })
+  @ManyToOne(() => Conversation, (conversation) => conversation.messages, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn()
   conversation!: Conversation;
 
@@ -54,7 +63,7 @@ export class Message {
 
   @Column({
     type: "enum",
-    enum: MessageType
+    enum: MessageType,
   })
   type!: MessageType;
 
@@ -71,30 +80,33 @@ export class Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
-    plan?: string;
-    path?: "docqa" | "playbook";
-    tools?: string[];
-    playbook_id?: string;
     confidence?: number;
-    referenced_actions?: string[];
-    referenced_documents?: string[];
+    toolStatus?: string;
+    toolName?: string;
+    toolArgs?: Record<string, any>;
+    toolResult?: Record<string, any>;
     tool_call?: {
       tool_name: string;
       arguments: Record<string, any>;
     };
+    isPlaybook?: boolean;
+    playbookId?: string;
+    playbookTitle?: string;
+    documentId?: string;
+    documentTitle?: string;
   } | null;
 
   @Column({
     type: "enum",
     enum: MessageSentiment,
-    nullable: true
+    nullable: true,
   })
   sentiment!: MessageSentiment | null;
 
   @Column({
     type: "enum",
     enum: MessageIntent,
-    nullable: true
+    nullable: true,
   })
   intent!: MessageIntent | null;
 
@@ -104,21 +116,49 @@ export class Message {
   @UpdateDateColumn()
   updated_at!: Date;
 
+  @Column({ type: "jsonb", nullable: true })
+  attachments!: Array<{
+    id: string;
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }>;
+
+  @Column({
+    type: "enum",
+    enum: MessageStatus,
+    default: MessageStatus.APPROVED,
+  })
+  status!: MessageStatus;
+
   async saveIntent(intent: MessageIntent): Promise<Message | null> {
-    const { MessageRepository } = await import('../../repositories/message.repository');
+    const { MessageRepository } = await import(
+      "../../repositories/message.repository"
+    );
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, { intent });
   }
 
   async saveSentiment(sentiment: MessageSentiment): Promise<Message | null> {
-    const { MessageRepository } = await import('../../repositories/message.repository');
+    const { MessageRepository } = await import(
+      "../../repositories/message.repository"
+    );
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, { sentiment });
   }
 
-  async savePerception(perception: { intent: MessageIntent; sentiment: MessageSentiment }): Promise<Message | null> {
-    const { MessageRepository } = await import('../../repositories/message.repository');
+  async savePerception(perception: {
+    intent: MessageIntent;
+    sentiment: MessageSentiment;
+  }): Promise<Message | null> {
+    const { MessageRepository } = await import(
+      "../../repositories/message.repository"
+    );
     const messageRepository = new MessageRepository();
-    return messageRepository.update(this.id, { intent: perception.intent, sentiment: perception.sentiment });
+    return messageRepository.update(this.id, {
+      intent: perception.intent,
+      sentiment: perception.sentiment,
+    });
   }
 }

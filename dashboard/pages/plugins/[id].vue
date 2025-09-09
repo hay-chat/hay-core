@@ -309,7 +309,7 @@
 
           <div
             v-if="plugin.healthCheck.details"
-            class="bg-muted rounded-lg p-4"
+            class="bg-background-tertiary rounded-lg p-4"
           >
             <pre class="text-xs">{{
               JSON.stringify(plugin.healthCheck.details, null, 2)

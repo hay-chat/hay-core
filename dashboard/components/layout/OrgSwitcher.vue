@@ -28,7 +28,7 @@
         class="gap-2 p-2"
       >
         <div
-          class="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted"
+          class="flex aspect-square size-8 items-center justify-center rounded-lg bg-background-tertiary"
         >
           <Building2 class="size-4" />
         </div>
@@ -39,7 +39,7 @@
       <DropdownMenuSeparator />
       <DropdownMenuItem class="gap-2 p-2">
         <div
-          class="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted"
+          class="flex aspect-square size-8 items-center justify-center rounded-lg bg-background-tertiary"
         >
           <Plus class="size-4" />
         </div>

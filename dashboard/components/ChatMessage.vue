@@ -2,30 +2,32 @@
   <div
     :class="[
       'chat-message',
-      `chat-message--${variant}`,
+      `chat-message--${message.type}`,
       {
         'chat-message--inverted': inverted,
-        'chat-message--no-header': showHeader === false,
+        'chat-message--has-error': message.metadata?.toolStatus === 'ERROR',
       },
+      '',
     ]"
   >
-    <div
-      v-if="showHeader !== false && variant !== 'System'"
-      class="chat-message__avatar"
-    >
+    <div v-if="message.type !== 'System'" class="chat-message__avatar">
       <component :is="avatarIcon" class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
-      <div v-if="showHeader !== false" class="chat-message__header">
-        <span
-          v-if="senderName && variant !== 'System'"
-          class="chat-message__sender"
-          >{{ senderName }}</span
+      <div
+        class="chat-message__header"
+        v-if="
+          message.type == 'BotAgent' ||
+          message.type == 'HumanAgent' ||
+          message.type == 'Customer'
+        "
+      >
+        <span class="chat-message__sender">{{ message.sender }}</span>
+        <span class="chat-message__time">{{ formattedTime }}</span>
+        <div
+          v-if="message.metadata?.isPlaybook"
+          class="chat-message__playbook-badge"
         >
-        <span v-if="variant !== 'System'" class="chat-message__time">{{
-          formattedTime
-        }}</span>
-        <div v-if="metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
             <Zap class="h-2 w-2 mr-1" />
             Playbook
@@ -36,7 +38,8 @@
         :class="[
           'chat-message__bubble',
           {
-            'chat-message__bubble--needs-approval': metadata?.needsApproval,
+            'chat-message__bubble--needs-approval':
+              message.status === MessageStatus.PENDING,
             'chat-message__bubble--collapsed':
               isCollapsibleVariant && isSystemCollapsed,
             'chat-message__bubble--expanded':
@@ -44,10 +47,65 @@
           },
         ]"
       >
+        <div v-if="message.type === 'Playbook'">
+          <div class="chat-message__document-title font-bold">
+            <ListVideo class="mr-2 h-4 w-4 inline" /> Agent is now following a
+            playbook
+          </div>
+          <a
+            class="chat-message__document-title text-xs opacity-70 mt-2"
+            :href="`/playbooks/${message.metadata?.playbookId}`"
+          >
+            {{ message.metadata?.playbookTitle }}
+          </a>
+        </div>
+        <div v-else-if="message.type === 'Document'">
+          <div class="chat-message__document-title font-bold">
+            <FileSearch class="mr-2 h-4 w-4 inline" /> Agent is using a document
+            to provide the answer
+          </div>
+          <a
+            class="chat-message__document-title text-xs opacity-70 mt-2"
+            :href="`/documents/${message.metadata?.documentId}`"
+          >
+            {{ message.metadata?.documentTitle }}
+          </a>
+        </div>
         <div
+          v-else-if="message.type === 'ToolCall' && message.metadata?.toolName"
+        >
+          <div class="chat-message__tool-call-title font-bold">
+            <Zap class="mr-2 h-4 w-4 inline" />
+            Running action <{{ message.metadata?.toolName }}>
+          </div>
+        </div>
+        <div v-else-if="message.type === 'ToolResponse'">
+          <div class="chat-message__tool-response-title font-bold">
+            <Zap class="mr-2 h-4 w-4 inline" /><template
+              v-if="message.metadata?.toolStatus === 'ERROR'"
+              >Action failed</template
+            >
+            <template v-else>Action responded</template> <{{
+              message.metadata?.toolName
+            }}>
+          </div>
+        </div>
+        <div v-else-if="message.type === 'System'">
+          <div class="chat-message__system-title font-bold">
+            <BrainCircuit class="mr-2 h-4 w-4 inline" /> Agent is following
+            system instructions
+          </div>
+          <div
+            class="chat-message__system-content chat-message__text"
+            ref="systemMessageRef"
+            v-html="markdownToHtml(message.content)"
+          ></div>
+        </div>
+        <div
+          v-else
           class="chat-message__text"
           ref="systemMessageRef"
-          v-html="markdownToHtml(content)"
+          v-html="markdownToHtml(message.content)"
         ></div>
       </div>
       <div
@@ -59,9 +117,9 @@
         <ChevronUp v-else class="h-3 w-3" />
         {{ isSystemCollapsed ? "Expand" : "Collapse" }}
       </div>
-      <div v-if="attachments?.length" class="chat-message__attachments">
+      <div v-if="message.attachments?.length" class="chat-message__attachments">
         <div
-          v-for="attachment in attachments"
+          v-for="attachment in message.attachments"
           :key="attachment.id"
           class="chat-message__attachment"
         >
@@ -69,7 +127,10 @@
           <span>{{ attachment.name }}</span>
         </div>
       </div>
-      <div v-if="metadata?.needsApproval" class="chat-message__actions">
+      <div
+        v-if="message.status === MessageStatus.PENDING"
+        class="chat-message__actions"
+      >
         <Button size="sm" variant="outline" @click="$emit('approve')">
           <Check class="h-3 w-3 mr-1" />
           Approve
@@ -84,15 +145,14 @@
         </Button>
       </div>
       <div
-        v-else-if="metadata && variant === 'BotAgent'"
+        v-else-if="message.metadata && message.type === 'BotAgent'"
         class="chat-message__metadata"
       >
-        <div v-if="metadata.tool" class="chat-message__tool">
-          <Wrench class="chat-message__tool-icon" />
-          <span>Used: {{ metadata.tool }}</span>
-        </div>
-        <div v-if="metadata.confidence" class="chat-message__confidence">
-          Confidence: {{ (metadata.confidence * 100).toFixed(0) }}%
+        <div
+          v-if="message.metadata.confidence"
+          class="chat-message__confidence"
+        >
+          Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
         </div>
       </div>
     </div>
@@ -107,7 +167,6 @@ import {
   Info,
   Paperclip,
   Wrench,
-  Zap,
   Check,
   Edit,
   X,
@@ -119,10 +178,20 @@ import {
   ArrowRightLeft,
   ChevronDown,
   ChevronUp,
+  FileSearch,
+  ListVideo,
+  Frown,
+  Smile,
+  Laugh,
+  Meh,
+  Zap,
+  BrainCircuit,
 } from "lucide-vue-next";
 import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
+
 interface Attachment {
   id: string;
   name: string;
@@ -138,20 +207,8 @@ interface Metadata {
 }
 
 interface Props {
-  variant:
-    | "Customer"
-    | "BotAgent"
-    | "System"
-    | "HumanAgent"
-    | "ToolCall"
-    | "ToolResponse";
-  content: string;
-  timestamp: string | Date;
-  senderName?: string;
-  attachments?: Attachment[];
-  metadata?: Metadata;
+  message: Message;
   inverted?: boolean;
-  showHeader?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -166,7 +223,9 @@ const systemMessageRef = ref<HTMLElement | null>(null);
 const isSystemExpandable = ref(false);
 const isSystemCollapsed = ref(false);
 const isCollapsibleVariant = computed(() =>
-  ["System", "ToolCall", "ToolResponse"].includes(props.variant)
+  ["System", "ToolCall", "ToolResponse", "Document", "Playbook"].includes(
+    props.message.type
+  )
 );
 
 const checkSystemMessageHeight = async () => {
@@ -196,7 +255,7 @@ onMounted(() => {
 
 // Also check when content changes
 watch(
-  () => props.content,
+  () => props.message.content,
   () => {
     if (isCollapsibleVariant) {
       nextTick(() => checkSystemMessageHeight());
@@ -205,7 +264,7 @@ watch(
 );
 
 const formattedTime = computed(() => {
-  const date = new Date(props.timestamp);
+  const date = new Date(props.message.created_at);
   return date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -214,43 +273,47 @@ const formattedTime = computed(() => {
 });
 
 const avatarIcon = computed(() => {
-  if (props.variant === "Customer") return User;
-  if (props.variant === "BotAgent" || props.variant === "HumanAgent")
-    return Bot;
-
-  // System message icons
-  const action = props.metadata?.action;
-  switch (action) {
-    case "call_started":
-      return PhoneCall;
-    case "call_ended":
-      return PhoneOff;
-    case "joined":
-      return UserPlus;
-    case "left":
-      return UserMinus;
-    case "transferred":
-      return ArrowRightLeft;
-    case "escalated":
-      return Users;
-    default:
-      return Info;
+  if (props.message.type === "Customer") {
+    const sentimentIcon = {
+      positive: Laugh,
+      negative: Frown,
+      neutral: Smile,
+    };
+    return sentimentIcon[props.message.sentiment as MessageSentiment] || User;
   }
+
+  if (props.message.type === "BotAgent" || props.message.type === "HumanAgent")
+    return Bot;
 });
 </script>
 
 <style lang="scss">
 /* Base message container */
+
 .chat-message {
   display: flex;
   font-size: 0.875rem;
   justify-content: flex-start;
   flex-direction: row-reverse;
   gap: 0.5rem;
+  --bubble-bg: var(--color-blue-700);
+  --bubble-fg: var(--color-white);
+}
+
+.chat-message__system-content {
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .chat-message--Customer {
   flex-direction: row;
+}
+
+.chat-message--inverted {
+  flex-direction: row;
+}
+.chat-message--inverted.chat-message--Customer {
+  flex-direction: row-reverse;
 }
 
 .chat-message__header {
@@ -275,11 +338,11 @@ const avatarIcon = computed(() => {
 }
 
 .chat-message__bubble {
-  border-radius: var(--radius);
+  border-radius: var(--border-radius-md);
   overflow: hidden;
-  background-color: hsl(var(--primary));
-  color: white;
-  padding: 1rem;
+  background-color: var(--bubble-bg);
+  color: var(--bubble-fg);
+  padding: 0.5rem 1rem;
 }
 
 .chat-message__bubble--collapsed {
@@ -293,7 +356,7 @@ const avatarIcon = computed(() => {
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(to bottom, transparent, #ecf3fe 90%);
+    background: linear-gradient(to bottom, transparent, var(--bubble-bg));
   }
 }
 
@@ -316,44 +379,64 @@ const avatarIcon = computed(() => {
   justify-content: center;
   gap: 0.5rem;
 }
-.chat-message--System,
-.chat-message--ToolCall,
-.chat-message--ToolResponse {
-  .chat-message__bubble {
-    background-color: #ecf3fe;
-    color: hsl(var(--foreground));
-  }
+
+/* Theme Variations */
+.chat-message--Customer {
+  --bubble-bg: var(--color-neutral-100);
+  --bubble-fg: var(--color-neutral);
+}
+
+.chat-message--System {
+  --bubble-bg: #ecf3fe;
+  --bubble-fg: var(--foreground);
+}
+
+.chat-message--Document {
+  --bubble-bg: var(--color-document-100);
+  --bubble-fg: var(--color-document-600);
+}
+
+.chat-message--Playbook {
+  --bubble-bg: var(--color-green-100);
+  --bubble-fg: var(--color-green-700);
 }
 
 .chat-message--ToolCall,
 .chat-message--ToolResponse {
-  .chat-message__bubble {
-    font-family: monospace;
-    font-size: 0.75rem;
-    white-space: pre-wrap;
-  }
+  --bubble-bg: var(--color-purple-50);
+  --bubble-fg: var(--color-purple-700);
 }
 
-.chat-message--Customer .chat-message__bubble {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--foreground));
+.chat-message--ToolResponse.chat-message--has-error {
+  --bubble-bg: var(--color-red-50);
+  --bubble-fg: var(--color-red-700);
 }
 
+/* Avatar */
 .chat-message__avatar {
-  width: 2rem;
-  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  max-width: 2rem;
+  max-height: 2rem;
   border-radius: 50%;
-  background-color: hsl(var(--secondary));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: hsl(var(--muted-foreground));
   font-size: 1rem;
 
   svg {
     height: 1em;
     width: 1em;
   }
+}
+
+.chat-message--Customer .chat-message__avatar {
+  background-color: var(--bubble-bg);
+  color: var(--bubble-fg);
+}
+
+.chat-message--BotAgent .chat-message__avatar {
+  @apply bg-blue-100 text-blue-600;
 }
 
 .chat-message__sender {
@@ -363,6 +446,6 @@ const avatarIcon = computed(() => {
 
 .chat-message__time {
   font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
 }
 </style>

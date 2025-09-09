@@ -88,7 +88,7 @@
           <InstructionsEditor
             v-model="form.instructions"
             label="Instructions"
-            placeholder="Enter step 1..."
+            :loading="loadingInstructions"
             hint="Create numbered step-by-step instructions that agents will follow when executing this playbook"
             :error="errors.instructions"
           />
@@ -236,6 +236,7 @@ import { HayApi } from "@/utils/api";
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const loadingInstructions = ref(false);
 
 // Determine if we're in edit mode based on route
 const isEditMode = computed(() => {
@@ -291,6 +292,7 @@ onMounted(async () => {
     // Load playbook if in edit mode
     if (isEditMode.value && playbookId.value) {
       loading.value = true;
+      loadingInstructions.value = true;
       const playbookResponse = await HayApi.playbooks.get.query({
         id: playbookId.value,
       });
@@ -312,6 +314,8 @@ onMounted(async () => {
         status: playbookResponse.status,
         agentIds: playbookResponse.agents?.map((a: any) => a.id) || [],
       };
+
+      loadingInstructions.value = false;
     }
   } catch (error) {
     console.error("Failed to load data:", error);

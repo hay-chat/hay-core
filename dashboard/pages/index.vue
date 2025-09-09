@@ -76,7 +76,7 @@
         </CardHeader>
         <CardContent>
           <div
-            class="h-80 flex items-center justify-center bg-muted/50 rounded-lg"
+            class="h-80 flex items-center justify-center bg-background-secondary rounded-lg"
           >
             <!-- TODO: Implement Chart.js component -->
             <div class="text-center text-muted-foreground">
@@ -158,7 +158,7 @@
             <div
               v-for="agent in topAgents"
               :key="agent.id"
-              class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+              class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors"
             >
               <div class="flex items-center space-x-3">
                 <div
@@ -215,12 +215,12 @@
             <div
               v-for="conversation in recentConversations"
               :key="conversation.id"
-              class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
               @click="viewConversation(conversation.id)"
             >
               <div class="flex items-center space-x-3">
                 <div
-                  class="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+                  class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                 >
                   <User class="h-4 w-4 text-muted-foreground" />
                 </div>

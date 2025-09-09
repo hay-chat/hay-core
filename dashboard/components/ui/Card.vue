@@ -1,10 +1,7 @@
 <template>
   <div
     :class="
-      cn(
-        'rounded-lg border bg-card text-card-foreground shadow-sm',
-        $props.class
-      )
+      cn('rounded-lg border bg-background text-neutral shadow-sm', $props.class)
     "
   >
     <slot />

@@ -89,20 +89,12 @@
 
           <div v-else class="space-y-4">
             <!-- Messages -->
-            <div v-for="(message, index) in messages" :key="message.id">
-              <ChatMessage
-                :variant="message.type as 'Customer' | 'BotAgent' | 'System' | 'HumanAgent' | 'ToolCall' | 'ToolResponse'"
-                :content="message.content"
-                :timestamp="message.timestamp"
-                :sender-name="
-                  message.sender === 'customer'
-                    ? 'You (Test Customer)'
-                    : 'AI Assistant'
-                "
-                :show-header="shouldShowHeader(index)"
-                :inverted="true"
-              />
-            </div>
+            <ChatMessage
+              v-for="(message, index) in messages"
+              :key="message.id"
+              :message="message"
+              :inverted="true"
+            />
 
             <!-- Typing indicator -->
             <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
@@ -112,17 +104,17 @@
                 <Bot class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
-                <div class="bg-muted p-3 rounded-lg">
+                <div class="bg-background-tertiary p-3 rounded-lg">
                   <div class="flex space-x-1">
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                     ></div>
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
                     ></div>
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.2s"
                     ></div>
                   </div>
@@ -153,7 +145,7 @@
       </div>
 
       <!-- Right Side: Context Panel -->
-      <div class="w-80 border-l bg-muted/30">
+      <div class="w-80 border-l bg-background-tertiary">
         <div class="p-6 space-y-6">
           <!-- Orchestrator Status -->
           <Card>

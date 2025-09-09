@@ -56,7 +56,7 @@
             v-for="item in userMenuItems"
             :key="item.name"
             :to="item.href"
-            class="flex items-center px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            class="flex items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
             role="menuitem"
             tabindex="-1"
             @click="dropdownOpen = false"
@@ -81,7 +81,7 @@
           </div>
           <div class="py-1">
             <button
-              class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
               @click="
                 showOrgSwitcher = true;
                 dropdownOpen = false;
@@ -100,7 +100,7 @@
         <!-- Sign Out -->
         <div class="border-t border-border py-1">
           <button
-            class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
             role="menuitem"
             tabindex="-1"
             @click="handleSignOut"

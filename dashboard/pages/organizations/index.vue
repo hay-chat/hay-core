@@ -63,7 +63,7 @@
         class="hover:shadow-md transition-shadow cursor-pointer"
         @click="viewOrganization(org.id)"
       >
-        <CardHeader class="pb-3">
+        <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
               <div
@@ -193,10 +193,10 @@
       <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
-            <div class="h-12 w-12 bg-muted rounded-lg"></div>
+            <div class="h-12 w-12 bg-background-tertiary rounded-lg"></div>
             <div class="flex-1 space-y-2">
-              <div class="h-4 bg-muted rounded w-3/4"></div>
-              <div class="h-3 bg-muted rounded w-1/2"></div>
+              <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+              <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
             </div>
           </div>
         </CardHeader>
@@ -204,12 +204,12 @@
           <div class="space-y-3">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
-                <div class="h-3 bg-muted rounded w-1/2"></div>
-                <div class="h-4 bg-muted rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
               </div>
               <div class="space-y-1">
-                <div class="h-3 bg-muted rounded w-1/2"></div>
-                <div class="h-4 bg-muted rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
               </div>
             </div>
           </div>

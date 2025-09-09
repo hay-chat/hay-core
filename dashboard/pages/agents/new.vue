@@ -56,7 +56,7 @@
               v-if="index < steps.length - 1"
               :class="[
                 'absolute top-4 left-4 h-0.5 w-full',
-                currentStep > index ? 'bg-primary' : 'bg-muted',
+                currentStep > index ? 'bg-primary' : 'bg-background-tertiary',
               ]"
             />
           </li>
@@ -182,7 +182,7 @@
           <div class="grid gap-4 md:grid-cols-2">
             <Card
               :class="[
-                'cursor-pointer transition-colors hover:bg-muted/50',
+                'cursor-pointer transition-colors hover:bg-background-secondary',
                 agentForm.knowledgeSources.includes('zendesk')
                   ? 'ring-2 ring-primary'
                   : '',
@@ -211,7 +211,7 @@
 
             <Card
               :class="[
-                'cursor-pointer transition-colors hover:bg-muted/50',
+                'cursor-pointer transition-colors hover:bg-background-secondary',
                 agentForm.knowledgeSources.includes('website')
                   ? 'ring-2 ring-primary'
                   : '',
@@ -238,7 +238,7 @@
 
             <Card
               :class="[
-                'cursor-pointer transition-colors hover:bg-muted/50',
+                'cursor-pointer transition-colors hover:bg-background-secondary',
                 agentForm.knowledgeSources.includes('documents')
                   ? 'ring-2 ring-primary'
                   : '',
@@ -267,7 +267,7 @@
 
             <Card
               :class="[
-                'cursor-pointer transition-colors hover:bg-muted/50',
+                'cursor-pointer transition-colors hover:bg-background-secondary',
                 agentForm.knowledgeSources.includes('tickets')
                   ? 'ring-2 ring-primary'
                   : '',
@@ -356,7 +356,7 @@
                 v-for="tone in toneOptions"
                 :key="tone.id"
                 :class="[
-                  'cursor-pointer transition-colors hover:bg-muted/50',
+                  'cursor-pointer transition-colors hover:bg-background-secondary',
                   agentForm.tone === tone.id ? 'ring-2 ring-primary' : '',
                 ]"
                 @click="agentForm.tone = tone.id"
@@ -454,7 +454,7 @@
 
         <!-- Step 4: Review & Create -->
         <div v-if="currentStep === 3" class="space-y-6">
-          <div class="bg-muted/50 rounded-lg p-6">
+          <div class="bg-background-secondary rounded-lg p-6">
             <h3 class="font-medium text-foreground mb-4">
               Agent Configuration Summary
             </h3>
@@ -522,7 +522,7 @@
               <div class="space-y-3">
                 <div class="flex space-x-3">
                   <div
-                    class="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+                    class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                   >
                     <User class="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -538,7 +538,7 @@
                   >
                     <Bot class="h-4 w-4 text-primary" />
                   </div>
-                  <div class="flex-1 bg-muted/50 rounded-lg p-3">
+                  <div class="flex-1 bg-background-secondary rounded-lg p-3">
                     <p class="text-sm text-foreground">
                       Hello! I'd be happy to help you with your account setup.
                       To get started, could you please let me know what specific

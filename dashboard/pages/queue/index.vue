@@ -143,7 +143,7 @@
 
         <div v-else class="overflow-x-auto">
           <table class="w-full">
-            <thead class="border-b bg-muted/50">
+            <thead class="border-b bg-background-secondary">
               <tr>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
@@ -191,13 +191,14 @@
               <tr
                 v-for="job in jobs"
                 :key="job.id"
-                class="hover:bg-muted/50 transition-colors"
+                class="hover:bg-background-secondary transition-colors"
               >
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <code class="text-xs bg-muted px-2 py-1 rounded">{{
-                      job.id.slice(0, 8)
-                    }}</code>
+                    <code
+                      class="text-xs bg-background-tertiary px-2 py-1 rounded"
+                      >{{ job.id.slice(0, 8) }}</code
+                    >
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
@@ -216,7 +217,9 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div v-if="job.status === 'processing'" class="w-24">
                     <div class="flex items-center">
-                      <div class="flex-1 bg-muted rounded-full h-2 mr-2">
+                      <div
+                        class="flex-1 bg-background-tertiary rounded-full h-2 mr-2"
+                      >
                         <div
                           class="bg-primary rounded-full h-2 transition-all duration-300"
                           :style="{ width: `${job.progress || 0}%` }"
@@ -320,7 +323,7 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm font-medium text-muted-foreground">ID</p>
-              <code class="text-xs bg-muted px-2 py-1 rounded">{{
+              <code class="text-xs bg-background-tertiary px-2 py-1 rounded">{{
                 selectedJob.id
               }}</code>
             </div>
@@ -368,16 +371,18 @@
 
           <div v-if="selectedJob.payload" class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Payload</p>
-            <pre class="bg-muted p-3 rounded text-xs overflow-x-auto">{{
-              JSON.stringify(selectedJob.payload, null, 2)
-            }}</pre>
+            <pre
+              class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto"
+              >{{ JSON.stringify(selectedJob.payload, null, 2) }}</pre
+            >
           </div>
 
           <div v-if="selectedJob.result" class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Result</p>
-            <pre class="bg-muted p-3 rounded text-xs overflow-x-auto">{{
-              JSON.stringify(selectedJob.result, null, 2)
-            }}</pre>
+            <pre
+              class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto"
+              >{{ JSON.stringify(selectedJob.result, null, 2) }}</pre
+            >
           </div>
 
           <div v-if="selectedJob.error" class="space-y-2">
@@ -391,7 +396,9 @@
 
           <div v-if="selectedJob.metadata?.logs" class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Logs</p>
-            <div class="bg-muted p-3 rounded max-h-48 overflow-y-auto">
+            <div
+              class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto"
+            >
               <p
                 v-for="(log, index) in selectedJob.metadata.logs"
                 :key="index"
@@ -421,7 +428,10 @@ import {
   X,
   XCircle,
 } from "lucide-vue-next";
-import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/websocket";
+import {
+  createAuthenticatedWebSocket,
+  parseWebSocketMessage,
+} from "@/utils/websocket";
 
 // State
 const loading = ref(false);
@@ -554,7 +564,7 @@ const setupWebSocket = () => {
   const connect = () => {
     // Try to establish WebSocket connection
     ws = createAuthenticatedWebSocket();
-    
+
     if (!ws) {
       // Fall back to polling if WebSocket fails to create
       startPolling();
@@ -562,7 +572,7 @@ const setupWebSocket = () => {
     }
 
     ws.onopen = () => {
-      console.log('WebSocket connected for queue updates');
+      console.log("WebSocket connected for queue updates");
       // Stop polling if it was running
       if (pollInterval) {
         clearInterval(pollInterval);
@@ -574,7 +584,7 @@ const setupWebSocket = () => {
       const message = parseWebSocketMessage(event.data);
       if (message) {
         // Handle different message types for queue updates
-        if (message.type === 'queue_update' || message.type === 'job_update') {
+        if (message.type === "queue_update" || message.type === "job_update") {
           fetchStats();
           if (
             ["", "pending", "queued", "processing", "retrying"].includes(
@@ -588,10 +598,10 @@ const setupWebSocket = () => {
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected, falling back to polling');
+      console.log("WebSocket disconnected, falling back to polling");
       // Fall back to polling and try to reconnect
       startPolling();
-      
+
       // Try to reconnect after 5 seconds
       if (!reconnectTimeout) {
         reconnectTimeout = setTimeout(() => {
@@ -602,7 +612,7 @@ const setupWebSocket = () => {
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error("WebSocket error:", error);
       ws?.close();
     };
   };

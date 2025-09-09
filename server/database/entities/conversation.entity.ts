@@ -14,7 +14,7 @@ import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
 import { MessageType } from "./message.entity";
 import { analyzeInstructions } from "../../utils/instruction-formatter";
-import { documentRepository } from "@server/repositories/document.repository";
+import { documentRepository } from "../../repositories/document.repository";
 
 @Entity("conversations")
 export class Conversation {
@@ -98,6 +98,9 @@ export class Conversation {
   @Column({ type: "uuid", array: true, nullable: true })
   document_ids!: string[] | null;
 
+  @Column({ type: "text", array: true, nullable: true })
+  enabled_tools!: string[] | null;
+
   @OneToMany(() => Message, (message) => message.conversation)
   messages!: Message[];
 
@@ -136,17 +139,41 @@ export class Conversation {
     });
   }
 
-  updateAgent(agentId: string): void {
+  async updateAgent(agentId: string): Promise<void> {
+    const { agentRepository } = await import(
+      "../../repositories/agent.repository"
+    );
+
+    const { conversationRepository } = await import(
+      "../../repositories/conversation.repository"
+    );
+
+    const agent = await agentRepository.findById(agentId);
     this.agent_id = agentId;
+
+    let content = "";
+
+    content += `You are the agent: ${agent?.name}`;
+    content += `\nYour tone should be: ${agent?.tone}`;
+    content += `\nYou should avoid: ${agent?.avoid}`;
+    content += `\nHere are some general instructions: ${agent?.instructions}`;
+
+    await this.addMessage({
+      content,
+      type: "System",
+    });
+
+    await conversationRepository.update(this.id, this.organization_id, {
+      agent_id: agentId,
+    });
   }
 
   async updatePlaybook(playbookId: string): Promise<void> {
     const { conversationRepository } = await import(
       "../../repositories/conversation.repository"
     );
-    await conversationRepository.update(this.id, this.organization_id, {
-      playbook_id: playbookId,
-    });
+    // Initialize enabled tools array
+    const enabledToolIds: string[] = [];
     const { playbookRepository } = await import(
       "../../repositories/playbook.repository"
     );
@@ -179,9 +206,7 @@ export class Conversation {
     }
 
     let content = "";
-    content += `<!-- playbook=${playbookId} -->
-        
-        From this message forward you should be following this playbook:
+    content += `From this message forward you should be following this playbook:
 
         **Playbook: ${playbook.title}**
         ${playbook.description ? `\nDescription: ${playbook.description}` : ""}
@@ -224,6 +249,11 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
 
         if (toolSchema) {
+          // Add tool ID to enabled_tools list
+          if (!enabledToolIds.includes(toolSchema.name)) {
+            enabledToolIds.push(toolSchema.name);
+          }
+
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
           const inputSchema =
             toolSchema.input_schema || toolSchema.parameters || {};
@@ -254,17 +284,32 @@ The following tools are available for you to use. You MUST return only valid JSO
     await this.addMessage({
       content,
       type: "Playbook",
+      metadata: {
+        playbookId: playbookId,
+        playbookTitle: playbook.title,
+      },
     });
+
+    // Update conversation with playbook_id and enabled_tools
+    await conversationRepository.update(this.id, this.organization_id, {
+      playbook_id: playbookId,
+      enabled_tools: enabledToolIds.length > 0 ? enabledToolIds : null,
+    });
+
     this.playbook_id = playbookId;
+    this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
   }
 
   async addDocument(documentId: string): Promise<void> {
     const { conversationRepository } = await import(
       "../../repositories/conversation.repository"
     );
-    const currentDocIds = this.document_ids || [];
-    if (!currentDocIds.includes(documentId)) {
-      const updatedDocIds = [...currentDocIds, documentId];
+
+    if (!this.document_ids?.includes(documentId)) {
+      console.log("Adding document to conversation", documentId);
+      console.log("Current document ids", this.document_ids);
+      const updatedDocIds = [...(this.document_ids || []), documentId];
+      console.log("Updated document ids", updatedDocIds);
       await conversationRepository.update(this.id, this.organization_id, {
         document_ids: updatedDocIds,
       });
@@ -275,6 +320,10 @@ The following tools are available for you to use. You MUST return only valid JSO
       await this.addMessage({
         content: `# ${document?.title} added to conversation \n ${document?.content}`,
         type: "Document",
+        metadata: {
+          documentId: document?.id,
+          documentTitle: document?.title,
+        },
       });
     }
   }

@@ -1,10 +1,10 @@
 /**
  * Vector Store Service
- * 
+ *
  * This service provides vector embedding storage and similarity search using pgvector and LangChain.
  * It's designed as a plain TypeScript service that uses the shared DataSource.
  * If this codebase uses NestJS, this can be easily converted to an @Injectable() provider.
- * 
+ *
  * @module services/vector-store
  */
 
@@ -22,6 +22,7 @@ export interface VectorChunk {
 
 export interface SearchResult {
   id: string;
+  documentId: string;
   content: string;
   metadata?: Record<string, any>;
   similarity?: number;
@@ -37,7 +38,8 @@ export class VectorStoreService {
     // Initialize OpenAI embeddings
     this.embeddings = new OpenAIEmbeddings({
       openAIApiKey: config.openai.apiKey,
-      modelName: config.openai.models.embedding.model || "text-embedding-3-small",
+      modelName:
+        config.openai.models.embedding.model || "text-embedding-3-small",
       dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
     });
 
@@ -75,13 +77,13 @@ export class VectorStoreService {
         tableName: "embeddings",
       }
     );
-    
+
     this._initialized = true;
   }
 
   /**
    * Add text chunks to the vector store
-   * 
+   *
    * @param orgId - Organization ID for multi-tenancy
    * @param docId - Optional document ID for linking embeddings to documents
    * @param chunks - Array of text chunks with optional metadata
@@ -97,9 +99,9 @@ export class VectorStoreService {
     }
 
     // Embed all chunks
-    const texts = chunks.map(chunk => chunk.content);
+    const texts = chunks.map((chunk) => chunk.content);
     const vectors = await this.embeddings.embedDocuments(texts);
-    
+
     // Insert directly using raw SQL to handle our custom columns properly
     const insertQuery = `
       INSERT INTO embeddings (
@@ -114,16 +116,16 @@ export class VectorStoreService {
     `;
 
     const ids: string[] = [];
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const result = await AppDataSource.query(insertQuery, [
         orgId,
         docId,
         chunks[i].content,
         chunks[i].metadata || {},
-        `[${vectors[i].join(',')}]`
+        `[${vectors[i].join(",")}]`,
       ]);
-      
+
       ids.push(result[0].id);
     }
 
@@ -132,7 +134,7 @@ export class VectorStoreService {
 
   /**
    * Search for similar content filtered by organization
-   * 
+   *
    * @param orgId - Organization ID to filter results
    * @param query - Search query text
    * @param k - Number of results to return (default: 10)
@@ -149,7 +151,7 @@ export class VectorStoreService {
 
     // First, embed the query
     const queryVector = await this.embeddings.embedQuery(query);
-    
+
     // Use raw SQL for organization-scoped similarity search
     // This ensures proper multi-tenancy filtering
     // Cast the embedding column to vector type for the comparison
@@ -166,13 +168,16 @@ export class VectorStoreService {
     `;
 
     const results = await AppDataSource.query(searchQuery, [
-      `[${queryVector.join(',')}]`,
+      `[${queryVector.join(",")}]`,
       orgId,
-      k
+      k,
     ]);
+
+    // console.log("🚨 [VectorStoreService] ROW Search results", results);
 
     return results.map((row: any) => ({
       id: row.id,
+      documentId: row.metadata.documentId,
       content: row.content,
       metadata: row.metadata,
       similarity: row.similarity,
@@ -181,7 +186,7 @@ export class VectorStoreService {
 
   /**
    * Delete embeddings by document ID
-   * 
+   *
    * @param orgId - Organization ID for additional security
    * @param docId - Document ID whose embeddings should be deleted
    * @returns Number of deleted embeddings
@@ -191,14 +196,14 @@ export class VectorStoreService {
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
       [orgId, docId]
     );
-    
+
     return result[1]; // Returns affected row count
   }
 
   /**
    * Delete embeddings by organization ID
    * Use with caution - this deletes all embeddings for an organization
-   * 
+   *
    * @param orgId - Organization ID whose embeddings should be deleted
    * @returns Number of deleted embeddings
    */
@@ -207,13 +212,13 @@ export class VectorStoreService {
       `DELETE FROM embeddings WHERE "organization_id" = $1`,
       [orgId]
     );
-    
+
     return result[1]; // Returns affected row count
   }
 
   /**
    * Get embedding statistics for an organization
-   * 
+   *
    * @param orgId - Organization ID
    * @returns Statistics object
    */
@@ -222,22 +227,26 @@ export class VectorStoreService {
     totalDocuments: number;
     avgEmbeddingsPerDocument: number;
   }> {
-    const stats = await AppDataSource.query(`
+    const stats = await AppDataSource.query(
+      `
       SELECT 
         COUNT(*)::int as "totalEmbeddings",
         COUNT(DISTINCT "document_id")::int as "totalDocuments"
       FROM embeddings
       WHERE "organization_id" = $1
-    `, [orgId]);
+    `,
+      [orgId]
+    );
 
     const result = stats[0];
-    
+
     return {
       totalEmbeddings: result.totalEmbeddings || 0,
       totalDocuments: result.totalDocuments || 0,
-      avgEmbeddingsPerDocument: result.totalDocuments > 0 
-        ? Math.round(result.totalEmbeddings / result.totalDocuments)
-        : 0,
+      avgEmbeddingsPerDocument:
+        result.totalDocuments > 0
+          ? Math.round(result.totalEmbeddings / result.totalDocuments)
+          : 0,
     };
   }
 }

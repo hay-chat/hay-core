@@ -5,9 +5,6 @@ import { vectorStoreService } from "@server/services/vector-store.service";
 
 interface Document {
   id: string;
-  content: string;
-  title?: string;
-  source?: string;
   similarity?: number;
 }
 
@@ -15,7 +12,6 @@ export class RetrievalLayer {
   private llmService: LLMService;
 
   constructor() {
-    // console.log("RetrievalLayer initialized");
     this.llmService = new LLMService();
   }
 
@@ -126,19 +122,11 @@ export class RetrievalLayer {
         (result) => (result.similarity || 0) > 0.4
       );
 
-      console.log(
-        `[RetrievalLayer] After filtering: ${filteredResults.length} results remain`
-      );
+      console.log("[RetrievalLayer] Filtered results", filteredResults);
+      console.log("[RetrievalLayer] Search results", searchResults);
 
       return filteredResults.map((result) => ({
-        id: result.metadata?.document_id || result.id,
-        content: this.limitDocumentSize(result.content),
-        title:
-          result.metadata?.title ||
-          result.metadata?.filename ||
-          `Document ${result.id}`,
-        source:
-          result.metadata?.sourceUrl || result.metadata?.source || "unknown",
+        id: result.documentId,
         similarity: result.similarity || 0,
       }));
     } catch (error) {

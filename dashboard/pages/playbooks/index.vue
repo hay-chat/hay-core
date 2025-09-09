@@ -199,7 +199,9 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
               <span class="text-muted-foreground">Agents:</span>
-              <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
+              <span class="font-medium">{{
+                playbook.agents?.length || 0
+              }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-muted-foreground">Created:</span>
@@ -233,7 +235,7 @@
               <tr
                 v-for="playbook in paginatedPlaybooks"
                 :key="playbook.id"
-                class="border-b hover:bg-muted/50 cursor-pointer"
+                class="border-b hover:bg-background-secondary cursor-pointer"
                 @click="editPlaybook(playbook.id)"
               >
                 <td class="py-3 px-4">
@@ -244,7 +246,9 @@
                     </div>
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm">{{ playbook.agents?.length || 0 }} agents</td>
+                <td class="py-3 px-4 text-sm">
+                  {{ playbook.agents?.length || 0 }} agents
+                </td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status)">
                     {{ playbook.status }}
@@ -335,11 +339,11 @@ const Badge = ({ variant = "default", ...props }) =>
     ...props,
   });
 
-import { useRouter } from 'vue-router';
-import { useToast } from '~/composables/useToast';
-import type { Playbook } from '~/types/playbook';
-import { HayApi } from '@/utils/api';
-import DataPagination from '@/components/DataPagination.vue';
+import { useRouter } from "vue-router";
+import { useToast } from "~/composables/useToast";
+import type { Playbook } from "~/types/playbook";
+import { HayApi } from "@/utils/api";
+import DataPagination from "@/components/DataPagination.vue";
 
 const toast = useToast();
 const router = useRouter();
@@ -359,9 +363,9 @@ const playbooks = ref<any[]>([]);
 // Stats computed from playbooks
 const stats = computed(() => {
   const total = playbooks.value.length;
-  const active = playbooks.value.filter(p => p.status === 'active').length;
-  const draft = playbooks.value.filter(p => p.status === 'draft').length;
-  
+  const active = playbooks.value.filter((p) => p.status === "active").length;
+  const draft = playbooks.value.filter((p) => p.status === "draft").length;
+
   return {
     total,
     active,
@@ -377,12 +381,14 @@ const filteredPlaybooks = computed(() => {
     const matchesSearch =
       !searchQuery.value ||
       playbook.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (playbook.description && playbook.description
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase())) ||
-      (playbook.trigger && playbook.trigger
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase()));
+      (playbook.description &&
+        playbook.description
+          .toLowerCase()
+          .includes(searchQuery.value.toLowerCase())) ||
+      (playbook.trigger &&
+        playbook.trigger
+          .toLowerCase()
+          .includes(searchQuery.value.toLowerCase()));
 
     const matchesStatus =
       !selectedStatus.value || playbook.status === selectedStatus.value;
@@ -399,7 +405,7 @@ const paginatedPlaybooks = computed(() => {
 });
 
 // Total pages
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(filteredPlaybooks.value.length / pageSize.value)
 );
 
@@ -451,13 +457,13 @@ const duplicatePlaybook = (id: string) => {
 // Delete dialog state
 const showDeleteDialog = ref(false);
 const playbookToDelete = ref<any>(null);
-const deleteDialogTitle = ref('Delete Playbook');
-const deleteDialogDescription = ref('');
+const deleteDialogTitle = ref("Delete Playbook");
+const deleteDialogDescription = ref("");
 
 const deletePlaybook = (id: string) => {
-  const playbook = playbooks.value.find(p => p.id === id);
+  const playbook = playbooks.value.find((p) => p.id === id);
   if (!playbook) return;
-  
+
   playbookToDelete.value = playbook;
   deleteDialogDescription.value = `Are you sure you want to delete "${playbook.title}"? This action cannot be undone.`;
   showDeleteDialog.value = true;
@@ -465,17 +471,19 @@ const deletePlaybook = (id: string) => {
 
 const confirmDelete = async () => {
   if (!playbookToDelete.value) return;
-  
+
   try {
     await HayApi.playbooks.delete.mutate({ id: playbookToDelete.value.id });
-    
+
     // Remove from local list
-    playbooks.value = playbooks.value.filter(p => p.id !== playbookToDelete.value!.id);
-    
-    toast.success('Playbook deleted successfully');
+    playbooks.value = playbooks.value.filter(
+      (p) => p.id !== playbookToDelete.value!.id
+    );
+
+    toast.success("Playbook deleted successfully");
   } catch (error) {
-    console.error('Failed to delete playbook:', error);
-    toast.error('Failed to delete playbook');
+    console.error("Failed to delete playbook:", error);
+    toast.error("Failed to delete playbook");
   } finally {
     playbookToDelete.value = null;
     showDeleteDialog.value = false;
@@ -494,8 +502,8 @@ const fetchPlaybooks = async () => {
     const response = await HayApi.playbooks.list.query();
     playbooks.value = response || [];
   } catch (error) {
-    console.error('Failed to fetch playbooks:', error);
-    toast.error('Failed to load playbooks');
+    console.error("Failed to fetch playbooks:", error);
+    toast.error("Failed to load playbooks");
   } finally {
     loading.value = false;
   }

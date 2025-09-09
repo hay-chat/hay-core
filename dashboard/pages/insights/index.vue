@@ -21,7 +21,9 @@
     </div>
 
     <!-- Filters -->
-    <div class="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg">
+    <div
+      class="flex items-center space-x-4 p-4 bg-background-secondary rounded-lg"
+    >
       <div class="flex items-center space-x-2">
         <Filter class="h-4 w-4 text-muted-foreground" />
         <span class="text-sm font-medium">Filters:</span>

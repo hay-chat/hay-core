@@ -65,7 +65,10 @@
     </div>
 
     <!-- Bulk Actions -->
-    <div v-if="selectedAgents.length > 0" class="bg-muted p-4 rounded-lg">
+    <div
+      v-if="selectedAgents.length > 0"
+      class="bg-background-tertiary p-4 rounded-lg"
+    >
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
           {{ selectedAgents.length }} agent{{
@@ -103,7 +106,7 @@
           selectedAgents.includes(agent.id) ? 'ring-2 ring-primary' : '',
         ]"
       >
-        <CardHeader class="pb-3">
+        <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
               <Checkbox
@@ -180,7 +183,7 @@
                 {{ agent.status }}
               </div>
               <span
-                class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded"
+                class="text-xs text-muted-foreground bg-background-tertiary px-2 py-1 rounded"
               >
                 {{ agent.type }}
               </span>
@@ -289,10 +292,10 @@
       <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
-            <div class="h-12 w-12 bg-muted rounded-lg"></div>
+            <div class="h-12 w-12 bg-background-tertiary rounded-lg"></div>
             <div class="flex-1 space-y-2">
-              <div class="h-4 bg-muted rounded w-3/4"></div>
-              <div class="h-3 bg-muted rounded w-1/2"></div>
+              <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+              <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
             </div>
           </div>
         </CardHeader>
@@ -300,12 +303,12 @@
           <div class="space-y-3">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
-                <div class="h-3 bg-muted rounded w-1/2"></div>
-                <div class="h-4 bg-muted rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
               </div>
               <div class="space-y-1">
-                <div class="h-3 bg-muted rounded w-1/2"></div>
-                <div class="h-4 bg-muted rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
               </div>
             </div>
           </div>

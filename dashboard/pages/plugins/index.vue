@@ -38,7 +38,7 @@
             :class="[
               selectedCategory === category.id
                 ? 'bg-primary/10 text-primary'
-                : 'bg-muted text-muted-foreground',
+                : 'bg-background-tertiary text-muted-foreground',
               'ml-2 rounded-full px-2 py-0.5 text-xs font-medium',
             ]"
           >
@@ -98,7 +98,7 @@
                 'p-3 rounded-lg',
                 plugin.available
                   ? 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground',
+                  : 'bg-background-tertiary text-muted-foreground',
               ]"
             >
               <component :is="getPluginIcon(plugin.type)" class="h-6 w-6" />
@@ -235,20 +235,26 @@
       <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-4">
-            <div class="p-3 rounded-lg bg-muted">
-              <div class="h-6 w-6 bg-muted-foreground/20 rounded"></div>
+            <div class="p-3 rounded-lg bg-background-tertiary">
+              <div
+                class="h-6 w-6 bg-background-tertiary-foreground/20 rounded"
+              ></div>
             </div>
             <div class="flex-1 space-y-2">
-              <div class="h-5 bg-muted-foreground/20 rounded w-3/4"></div>
-              <div class="h-4 bg-muted-foreground/20 rounded w-full"></div>
+              <div
+                class="h-5 bg-background-tertiary-foreground/20 rounded w-3/4"
+              ></div>
+              <div
+                class="h-4 bg-background-tertiary-foreground/20 rounded w-full"
+              ></div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div class="space-y-3">
-            <div class="h-4 bg-muted-foreground/20 rounded"></div>
-            <div class="h-4 bg-muted-foreground/20 rounded"></div>
-            <div class="h-4 bg-muted-foreground/20 rounded"></div>
+            <div class="h-4 bg-background-tertiary-foreground/20 rounded"></div>
+            <div class="h-4 bg-background-tertiary-foreground/20 rounded"></div>
+            <div class="h-4 bg-background-tertiary-foreground/20 rounded"></div>
           </div>
         </CardContent>
       </Card>

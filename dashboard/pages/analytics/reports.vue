@@ -234,9 +234,9 @@
                 v-for="viz in visualizationTypes"
                 :key="viz.id"
                 :class="[
-                  'p-4 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50',
+                  'p-4 border rounded-lg cursor-pointer transition-colors hover:bg-background-secondary',
                   reportConfig.visualizations.includes(viz.id)
-                    ? 'ring-2 ring-primary bg-muted/50'
+                    ? 'ring-2 ring-primary bg-background-secondary'
                     : '',
                 ]"
                 @click="toggleVisualization(viz.id)"
@@ -267,7 +267,7 @@
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
-              <div class="p-4 border rounded-lg bg-muted/50">
+              <div class="p-4 border rounded-lg bg-background-secondary">
                 <h3 class="font-medium mb-2">
                   {{ reportConfig.name || "Untitled Report" }}
                 </h3>
@@ -363,7 +363,7 @@
               <div
                 v-for="report in recentReports"
                 :key="report.id"
-                class="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                class="p-3 border rounded-lg hover:bg-background-secondary cursor-pointer"
                 @click="viewReport(report.id)"
               >
                 <div class="font-medium text-sm">{{ report.name }}</div>

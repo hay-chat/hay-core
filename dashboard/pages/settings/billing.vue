@@ -115,7 +115,7 @@
                     {{ formatNumber(currentPlan.conversations) }}</span
                   >
                 </div>
-                <div class="w-full bg-muted rounded-full h-2">
+                <div class="w-full bg-background-tertiary rounded-full h-2">
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
@@ -149,7 +149,7 @@
                 </div>
                 <div
                   v-if="currentPlan.agents !== -1"
-                  class="w-full bg-muted rounded-full h-2"
+                  class="w-full bg-background-tertiary rounded-full h-2"
                 >
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
@@ -171,7 +171,7 @@
                     {{ formatBytes(currentPlan.storage) }}</span
                   >
                 </div>
-                <div class="w-full bg-muted rounded-full h-2">
+                <div class="w-full bg-background-tertiary rounded-full h-2">
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
@@ -192,7 +192,7 @@
                     {{ formatNumber(currentPlan.apiCalls) }}</span
                   >
                 </div>
-                <div class="w-full bg-muted rounded-full h-2">
+                <div class="w-full bg-background-tertiary rounded-full h-2">
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
@@ -316,7 +316,7 @@
               <tr
                 v-for="invoice in invoices"
                 :key="invoice.id"
-                class="border-b hover:bg-muted/50"
+                class="border-b hover:bg-background-secondary"
               >
                 <td class="py-3 px-4">
                   <div class="font-medium">{{ invoice.number }}</div>

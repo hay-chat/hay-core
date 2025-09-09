@@ -118,33 +118,14 @@
               >
                 <img
                   :src="getPluginThumbnail(plugin.id)"
-                  :alt="`${
-                    plugin.name || getPluginDisplayName(plugin.id)
-                  } thumbnail`"
+                  :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
                   @error="handleThumbnailError($event, plugin.type)"
                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
                 />
-                <div
-                  :class="[
-                    'w-12 h-12 rounded-lg flex items-center justify-center',
-                    getPluginIconBg(plugin.type),
-                  ]"
-                  style="display: none"
-                >
-                  <component
-                    :is="getPluginIcon(plugin.type)"
-                    class="h-6 w-6 text-white"
-                  />
-                </div>
               </div>
               <div>
-                <CardTitle class="text-lg">{{
-                  plugin.name || getPluginDisplayName(plugin.id)
-                }}</CardTitle>
-                <CardDescription>{{
-                  plugin.description || "No description available"
-                }}</CardDescription>
+                <CardTitle class="text-lg">{{ plugin.name }}</CardTitle>
               </div>
             </div>
           </div>
@@ -324,41 +305,36 @@ const filteredPlugins = computed(() => {
   return filtered;
 });
 
-// Methods
-const getPluginIcon = (types: string[]) => {
-  if (types.includes("channel")) return MessageSquare;
-  if (types.includes("mcp-connector")) return Cpu;
-  if (types.includes("document_importer")) return FileText;
-  if (types.includes("retriever")) return Database;
-  if (types.includes("playbook")) return Zap;
-  return Package;
-};
-
-const getPluginIconBg = (types: string[]) => {
-  if (types.includes("channel")) return "bg-blue-600";
-  if (types.includes("mcp-connector")) return "bg-purple-600";
-  if (types.includes("document_importer")) return "bg-green-600";
-  if (types.includes("retriever")) return "bg-orange-600";
-  if (types.includes("playbook")) return "bg-pink-600";
-  return "bg-gray-600";
-};
-
-const getPluginDisplayName = (name: string) => {
-  // Remove "hay-plugin-" prefix and capitalize
-  return name
-    .replace("hay-plugin-", "")
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+const pluginTypes = {
+  channel: {
+    label: "Channel",
+    icon: MessageSquare,
+    bg: "bg-blue-600",
+  },
+  "mcp-connector": {
+    label: "MCP Connector",
+    icon: Cpu,
+    bg: "bg-purple-600",
+  },
+  document_importer: {
+    label: "Document Importer",
+    icon: FileText,
+    bg: "bg-green-600",
+  },
+  retriever: {
+    label: "Retriever",
+    icon: Database,
+    bg: "bg-orange-600",
+  },
+  playbook: {
+    label: "Playbook",
+    icon: Zap,
+    bg: "bg-pink-600",
+  },
 };
 
 const formatPluginType = (type: string) => {
-  return type
-    .replace(/-/g, " ")
-    .replace(/_/g, " ")
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return pluginTypes[type as keyof typeof pluginTypes].label;
 };
 
 const getPluginThumbnail = (pluginId: string) => {

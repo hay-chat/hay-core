@@ -375,7 +375,9 @@
                   Created {{ formatDate(key.createdAt) }} • Last used
                   {{ formatDate(key.lastUsed) }}
                 </div>
-                <div class="font-mono text-xs bg-muted px-2 py-1 rounded mt-1">
+                <div
+                  class="font-mono text-xs bg-background-tertiary px-2 py-1 rounded mt-1"
+                >
                   {{ key.maskedKey }}
                 </div>
               </div>

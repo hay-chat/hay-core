@@ -71,7 +71,10 @@
     </div>
 
     <!-- Bulk Actions -->
-    <div v-if="selectedDocuments.length > 0" class="bg-muted p-4 rounded-lg">
+    <div
+      v-if="selectedDocuments.length > 0"
+      class="bg-background-tertiary p-4 rounded-lg"
+    >
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
           {{ selectedDocuments.length }} document{{
@@ -124,7 +127,9 @@
             v-for="document in filteredDocuments"
             :key="document.id"
             :class="
-              selectedDocuments.includes(document.id) ? 'bg-muted/50' : ''
+              selectedDocuments.includes(document.id)
+                ? 'bg-background-secondary'
+                : ''
             "
           >
             <TableCell>
@@ -149,7 +154,7 @@
             </TableCell>
             <TableCell>
               <span
-                class="inline-flex items-center px-2 py-1 rounded-md bg-muted text-xs"
+                class="inline-flex items-center px-2 py-1 rounded-md bg-background-tertiary text-xs"
               >
                 {{ document.type ? document.type.toUpperCase() : "DOC" }}
               </span>
@@ -331,11 +336,19 @@
     <!-- Loading State -->
     <div v-if="loading" class="space-y-4">
       <div v-for="i in 5" :key="i" class="animate-pulse">
-        <div class="bg-muted rounded-lg p-4 flex items-center space-x-4">
-          <div class="h-10 w-10 bg-muted-foreground/20 rounded"></div>
+        <div
+          class="bg-background-tertiary rounded-lg p-4 flex items-center space-x-4"
+        >
+          <div
+            class="h-10 w-10 bg-background-tertiary-foreground/20 rounded"
+          ></div>
           <div class="flex-1 space-y-2">
-            <div class="h-4 bg-muted-foreground/20 rounded w-1/4"></div>
-            <div class="h-3 bg-muted-foreground/20 rounded w-1/2"></div>
+            <div
+              class="h-4 bg-background-tertiary-foreground/20 rounded w-1/4"
+            ></div>
+            <div
+              class="h-3 bg-background-tertiary-foreground/20 rounded w-1/2"
+            ></div>
           </div>
         </div>
       </div>

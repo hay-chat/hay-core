@@ -42,7 +42,6 @@ export const runConversation = async (conversationId: string) => {
     if (!lastCustomerMessage) {
       throw new Error("Last customer message not found");
     }
-    console.log("[Orchestrator] Last message:", lastCustomerMessage.content);
     // 01. Perception layer
     const perceptionLayer = new PerceptionLayer();
 
@@ -98,10 +97,9 @@ export const runConversation = async (conversationId: string) => {
       conversation.organization_id
     );
 
-    console.log("[Orchestrator] Retrieved documents:", retrievedDocuments);
-
     if (retrievedDocuments.length > 0) {
       for (const document of retrievedDocuments) {
+        console.log("[Orchestrator] Adding document to conversation", document);
         if (!conversation.document_ids?.includes(document.id)) {
           await conversation.addDocument(document.id);
         }
@@ -126,10 +124,6 @@ export const runConversation = async (conversationId: string) => {
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
-    // console.log(
-    //   `Error running conversation ${conversationId}:`,
-    //   error instanceof Error ? error.message : "Unknown error"
-    // );
   } finally {
     await conversation.unlock();
   }
@@ -142,7 +136,7 @@ export const runConversation = async (conversationId: string) => {
 async function handleExecutionLoop(conversation: Conversation) {
   const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
-  const maxIterations = 2; // Prevent infinite loops
+  const maxIterations = 5; // Prevent infinite loops
   let iterations = 0;
 
   while (iterations < maxIterations) {
@@ -150,8 +144,7 @@ async function handleExecutionLoop(conversation: Conversation) {
     console.log(`[Orchestrator] Execution iteration ${iterations}`);
 
     // Get current messages and execute
-    const allMessages = await conversation.getMessages();
-    const executionResult = await executionLayer.execute(allMessages);
+    const executionResult = await executionLayer.execute(conversation);
 
     if (!executionResult) {
       console.log("[Orchestrator] No execution result, ending loop");
@@ -163,6 +156,11 @@ async function handleExecutionLoop(conversation: Conversation) {
       await conversation.addMessage({
         content: `Calling tool in the background: ${executionResult.tool.name}`,
         type: MessageType.TOOL_CALL,
+        metadata: {
+          toolName: executionResult.tool.name,
+          toolArgs: executionResult.tool.args,
+          toolStatus: "CALLING",
+        },
       });
 
       // Execute the tool
@@ -186,16 +184,23 @@ async function handleExecutionLoop(conversation: Conversation) {
         await conversation.addMessage({
           content: `${JSON.stringify(toolResult.result)}`,
           type: MessageType.TOOL_RESPONSE,
+          metadata: {
+            toolName: executionResult.tool.name,
+            toolResult: JSON.stringify(toolResult.result),
+            toolStatus: "SUCCESS",
+          },
         });
-        console.log(
-          "[Orchestrator] Tool executed successfully, continuing execution loop..."
-        );
+
         // Continue the loop to let LLM analyze the result
       } else {
         // Add error message
         await conversation.addMessage({
           content: `Tool execution failed: ${toolResult.error}`,
           type: MessageType.TOOL_RESPONSE,
+          metadata: {
+            toolName: executionResult.tool.name,
+            toolStatus: "ERROR",
+          },
         });
         console.log(
           "[Orchestrator] Tool execution failed, continuing execution loop..."
@@ -204,16 +209,23 @@ async function handleExecutionLoop(conversation: Conversation) {
       }
     } else {
       // Regular response (not a tool call) - end the loop
-      await conversation.addMessage({
-        content: executionResult.userMessage || "",
-        type: MessageType.BOT_AGENT,
-      });
-      console.log(
-        "[Orchestrator] Added bot response " +
-          executionResult.userMessage +
-          ", ending execution loop"
-      );
-      break;
+      if (executionResult.userMessage) {
+        await conversation.addMessage({
+          content: executionResult.userMessage,
+          type: MessageType.BOT_AGENT,
+        });
+        console.log(
+          "[Orchestrator] Added bot response " +
+            executionResult.userMessage +
+            ", ending execution loop"
+        );
+
+        break;
+      } else {
+        // Retry the loop
+        console.log("[Orchestrator] No user message, retrying execution loop");
+        continue;
+      }
     }
   }
 

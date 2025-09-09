@@ -24,7 +24,7 @@
               'flex items-center justify-center w-8 h-8 rounded-full',
               currentStep >= index + 1
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground',
+                : 'bg-background-tertiary text-muted-foreground',
             ]"
           >
             {{ index + 1 }}
@@ -63,7 +63,7 @@
             :class="{ 'border-primary bg-primary/5': importType === 'upload' }"
           >
             <div class="flex items-start gap-4">
-              <div class="p-3 bg-muted rounded-lg">
+              <div class="p-3 bg-background-tertiary rounded-lg">
                 <Upload class="h-6 w-6 text-muted-foreground" />
               </div>
               <div class="flex-1">
@@ -91,7 +91,7 @@
             :class="{ 'border-primary bg-primary/5': importType === 'web' }"
           >
             <div class="flex items-start gap-4">
-              <div class="p-3 bg-muted rounded-lg">
+              <div class="p-3 bg-background-tertiary rounded-lg">
                 <Globe class="h-6 w-6 text-muted-foreground" />
               </div>
               <div class="flex-1">
@@ -121,7 +121,7 @@
               }"
             >
               <div class="flex items-start gap-4">
-                <div class="p-3 bg-muted rounded-lg">
+                <div class="p-3 bg-background-tertiary rounded-lg">
                   <Package class="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1">
@@ -200,7 +200,7 @@
           <div
             v-for="(file, index) in selectedFiles"
             :key="index"
-            class="flex items-center gap-3 p-3 bg-muted rounded-lg"
+            class="flex items-center gap-3 p-3 bg-background-tertiary rounded-lg"
           >
             <component
               :is="getFileIcon(file.type)"
@@ -390,7 +390,7 @@
         <div v-else class="space-y-4">
           <!-- Select/Deselect All -->
           <div
-            class="flex items-center justify-between p-3 bg-muted rounded-lg"
+            class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg"
           >
             <div class="flex items-center space-x-2">
               <Checkbox
@@ -418,7 +418,7 @@
             <div
               v-for="(page, index) in discoveredPages"
               :key="index"
-              class="flex items-start gap-3 p-3 hover:bg-muted/50 rounded-lg transition-colors"
+              class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
             >
               <Checkbox v-model="page.selected" class="mt-1" />
               <div class="flex-1 min-w-0">
@@ -713,7 +713,7 @@
       <CardContent>
         <!-- Web Import Progress -->
         <div v-if="importType === 'web' && webImportJob" class="space-y-4">
-          <div class="p-4 bg-muted rounded-lg">
+          <div class="p-4 bg-background-tertiary rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium">Import Status</span>
               <Badge

@@ -6,7 +6,8 @@
       </label>
       <div class="text-xs text-muted-foreground">
         Press
-        <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded"
+        <kbd
+          class="px-1.5 py-0.5 text-xs font-semibold bg-background-tertiary rounded"
           >/</kbd
         >
         to mention Actions or Documents
@@ -52,9 +53,11 @@
         v-if="instructions.length === 0"
         @click="addInstruction"
         class="w-full text-left text-muted-foreground hover:text-foreground transition-colors py-2"
-      >
-        {{ placeholder || "Start typing your instructions..." }}
-      </button>
+      ></button>
+
+      <div class="instructions-editor__loading" v-if="loading">
+        <Loading />
+      </div>
     </div>
     <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
     <p v-if="hint" class="text-sm text-muted-foreground">{{ hint }}</p>
@@ -94,6 +97,7 @@ const editorId = `editor-${Math.random().toString(36).substring(2, 11)}`;
 const instructions = ref<InstructionData[]>([]);
 const mcpTools = ref<any[]>([]);
 const documents = ref<any[]>([]);
+const loading = ref(true);
 const { getComponent } = useComponentRegistry();
 let menuEl: HTMLDivElement | null = null;
 let activeIndex = 0;
@@ -156,6 +160,7 @@ const initializeInstructions = () => {
   } else {
     instructions.value = [{ id: generateId(), instructions: "", level: 0 }];
   }
+  loading.value = false;
 };
 
 // Convert to the target format
@@ -829,14 +834,14 @@ watch(
 /* Custom editor styles */
 .instructions-editor-container {
   min-height: 200px;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--color-border);
   border-radius: 0.375rem;
-  background-color: hsl(var(--background));
+  background-color: var(--color-background);
   padding: 1rem;
 }
 
 .instructions-editor-container:focus-within {
-  outline: 2px solid hsl(var(--primary));
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -875,7 +880,7 @@ watch(
 
 .instruction-content:empty::after {
   content: attr(data-placeholder);
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
   pointer-events: none;
 }
 
@@ -904,7 +909,7 @@ watch(
 
 .instruction-number {
   font-weight: 500;
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
   min-width: 1.5rem;
   text-align: right;
   padding-top: 0.25rem;
@@ -913,13 +918,13 @@ watch(
 }
 
 .instruction-item:has(.focused) .instruction-number {
-  color: hsl(var(--primary));
-  text-shadow: 0 2px 8px hsl(var(--primary) / 0.18);
+  color: var(--color-primary);
+  text-shadow: 0 2px 8px var(--color-primary / 0.18);
 }
 
 kbd {
-  background-color: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
+  background-color: var(--color-muted);
+  border: 1px solid var(--color-border);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
 }
 
@@ -940,25 +945,25 @@ kbd {
 }
 
 .mention-merge-field.mention-action {
-  background: rgb(147, 51, 234, 0.1);
-  border: 1px solid rgb(147, 51, 234, 0.3);
-  color: #9333ea;
+  background: var(--color-purple-100);
+  border: 1px solid var(--color-purple-300);
+  color: var(--color-purple-600);
 }
 
 .mention-merge-field.mention-action:hover {
-  background: rgb(147, 51, 234, 0.15);
-  border-color: rgb(147, 51, 234, 0.5);
+  background: var(--color-purple-100);
+  border-color: var(--color-purple-300);
 }
 
 .mention-merge-field.mention-document {
-  background: rgb(245, 158, 11, 0.1);
-  border: 1px solid rgb(245, 158, 11, 0.3);
-  color: #d97706;
+  background: var(--color-document-100);
+  border: 1px solid var(--color-document-300);
+  color: var(--color-document-600);
 }
 
 .mention-merge-field.mention-document:hover {
-  background: rgb(245, 158, 11, 0.15);
-  border-color: rgb(245, 158, 11, 0.5);
+  background: var(--color-document-100);
+  border-color: var(--color-document-500);
 }
 
 /* Base icon styles */
@@ -990,8 +995,8 @@ kbd {
   max-width: 520px;
   max-height: 360px;
   overflow-y: auto;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 0.625rem;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1);
   padding: 0.375rem;
@@ -1015,7 +1020,7 @@ kbd {
 
 .mention-item:hover,
 .mention-item.active {
-  background: hsl(var(--muted));
+  background: var(--color-muted);
 }
 
 .mention-item-content {
@@ -1028,20 +1033,20 @@ kbd {
 
 .mention-item-name {
   font-weight: 500;
-  color: hsl(var(--foreground));
+  color: var(--color-foreground);
   font-size: 0.875rem;
   margin-bottom: 0.125rem;
 }
 
 .mention-item-meta {
   font-size: 0.875rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
 }
 
 /* Action and Document themed menu items */
 .mention-item-action.active,
 .mention-item-action:hover {
-  background: rgb(147, 51, 234, var(--active-hover, 0.08));
+  background: var(--color-action-100);
 }
 
 .mention-item-action.active {
@@ -1050,7 +1055,7 @@ kbd {
 
 .mention-item-document.active,
 .mention-item-document:hover {
-  background: rgb(245, 158, 11, var(--active-hover, 0.08));
+  background: var(--color-document-100);
 }
 
 .mention-item-document.active {
@@ -1066,12 +1071,12 @@ kbd {
 
 .mention-no-results .mention-item-icon {
   font-size: 0.875rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
 }
 
 .mention-no-results .mention-item-name,
 .mention-no-results .mention-item-meta {
-  color: hsl(var(--muted-foreground));
+  color: var(--color-neutral-muted);
 }
 
 .mention-no-results .mention-item-name {

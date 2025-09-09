@@ -32,14 +32,7 @@ export class PluginManagerService {
 
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
-    console.log(
-      "📦 Plugin registry loaded:",
-      Array.from(this.registry.entries()).map(([id, p]) => ({
-        pluginId: id,
-        dbId: p.id,
-        name: p.name,
-      }))
-    );
+    console.log("📦 Plugin registry loaded:");
   }
 
   /**
@@ -156,9 +149,6 @@ export class PluginManagerService {
       });
 
       this.registry.set(manifest.id, plugin);
-      console.log(
-        `✅ Registered plugin: ${manifest.name} v${manifest.version}`
-      );
     } catch (error) {
       console.error(`Failed to register plugin at ${pluginPath}:`, error);
     }
@@ -359,7 +349,7 @@ export class PluginManagerService {
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "base") {
           const pluginPath = path.join(this.pluginsDir, entry.name);
-          
+
           // Check for manifest.json first
           const jsonManifestPath = path.join(pluginPath, "manifest.json");
           const jsonExists = await fs
@@ -371,7 +361,10 @@ export class PluginManagerService {
 
           if (jsonExists) {
             try {
-              const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
+              const manifestContent = await fs.readFile(
+                jsonManifestPath,
+                "utf-8"
+              );
               manifest = JSON.parse(manifestContent);
             } catch (error) {
               // Skip this folder if manifest is invalid

@@ -216,7 +216,7 @@
                       {{ organization.apiLimit.toLocaleString() }}</span
                     >
                   </div>
-                  <div class="mt-2 bg-muted rounded-full h-2">
+                  <div class="mt-2 bg-background-tertiary rounded-full h-2">
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
@@ -236,7 +236,7 @@
                       {{ organization.storageLimit }}GB</span
                     >
                   </div>
-                  <div class="mt-2 bg-muted rounded-full h-2">
+                  <div class="mt-2 bg-background-tertiary rounded-full h-2">
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
@@ -258,7 +258,7 @@
                       {{ organization.agentLimit }}</span
                     >
                   </div>
-                  <div class="mt-2 bg-muted rounded-full h-2">
+                  <div class="mt-2 bg-background-tertiary rounded-full h-2">
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
@@ -447,7 +447,7 @@
                   </Button>
                 </div>
               </div>
-              <div class="bg-muted p-3 rounded font-mono text-sm">
+              <div class="bg-background-tertiary p-3 rounded font-mono text-sm">
                 {{ organization.apiKey }}
               </div>
             </div>
@@ -461,11 +461,19 @@
   <div v-else-if="loading" class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
-        <div class="h-16 w-16 bg-muted rounded-lg animate-pulse"></div>
+        <div
+          class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse"
+        ></div>
         <div class="flex-1 space-y-2">
-          <div class="h-6 bg-muted rounded w-1/3 animate-pulse"></div>
-          <div class="h-4 bg-muted rounded w-2/3 animate-pulse"></div>
-          <div class="h-3 bg-muted rounded w-1/2 animate-pulse"></div>
+          <div
+            class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse"
+          ></div>
+          <div
+            class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse"
+          ></div>
+          <div
+            class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse"
+          ></div>
         </div>
       </div>
     </div>

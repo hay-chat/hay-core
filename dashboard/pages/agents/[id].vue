@@ -45,9 +45,7 @@
       </div>
 
       <div>
-        <label for="tone" class="block text-sm font-medium mb-2"
-          >Tone</label
-        >
+        <label for="tone" class="block text-sm font-medium mb-2">Tone</label>
         <textarea
           id="tone"
           v-model="form.tone"
@@ -111,9 +109,9 @@
     </form>
 
     <div v-else-if="loading" class="space-y-4">
-      <div class="h-10 bg-muted rounded animate-pulse"></div>
-      <div class="h-24 bg-muted rounded animate-pulse"></div>
-      <div class="h-32 bg-muted rounded animate-pulse"></div>
+      <div class="h-10 bg-background-tertiary rounded animate-pulse"></div>
+      <div class="h-24 bg-background-tertiary rounded animate-pulse"></div>
+      <div class="h-32 bg-background-tertiary rounded animate-pulse"></div>
     </div>
 
     <div v-else class="text-center py-12">

@@ -2,7 +2,7 @@
   <div
     :class="
       cn(
-        'relative h-4 w-full overflow-hidden rounded-full bg-secondary',
+        'relative h-4 w-full overflow-hidden rounded-full bg-background-secondary',
         $props.class
       )
     "

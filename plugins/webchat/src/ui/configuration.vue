@@ -140,7 +140,7 @@
           <!-- Preview Section -->
           <div class="space-y-4">
             <h3 class="text-lg font-semibold">Widget Preview</h3>
-            <div class="border rounded-lg p-4 bg-muted/20">
+            <div class="border rounded-lg p-4 bg-background-tertiary/20">
               <div class="flex justify-center">
                 <WidgetPreview 
                   :config="formData"

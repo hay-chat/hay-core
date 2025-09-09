@@ -155,7 +155,7 @@
             </CardHeader>
             <CardContent>
               <div
-                class="h-80 flex items-center justify-center bg-muted/50 rounded-lg"
+                class="h-80 flex items-center justify-center bg-background-secondary rounded-lg"
               >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-12 w-12 mx-auto mb-2" />
@@ -179,11 +179,11 @@
                 <div
                   v-for="conversation in recentConversations"
                   :key="conversation.id"
-                  class="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  class="flex items-start space-x-3 p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
                   @click="viewConversation(conversation.id)"
                 >
                   <div
-                    class="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+                    class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                   >
                     <User class="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -240,7 +240,7 @@
             :key="playbook.id"
             class="hover:shadow-md transition-shadow"
           >
-            <CardHeader class="pb-3">
+            <CardHeader>
               <div class="flex items-start justify-between">
                 <div class="flex-1">
                   <CardTitle class="text-lg">{{ playbook.name }}</CardTitle>
@@ -336,13 +336,13 @@
               <div
                 v-for="conversation in filteredConversations"
                 :key="conversation.id"
-                class="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                class="p-4 hover:bg-background-secondary transition-colors cursor-pointer"
                 @click="viewConversation(conversation.id)"
               >
                 <div class="flex items-center justify-between">
                   <div class="flex items-center space-x-3">
                     <div
-                      class="h-10 w-10 rounded-full bg-muted flex items-center justify-center"
+                      class="h-10 w-10 rounded-full bg-background-tertiary flex items-center justify-center"
                     >
                       <User class="h-5 w-5 text-muted-foreground" />
                     </div>
@@ -412,7 +412,7 @@
             </CardHeader>
             <CardContent>
               <div
-                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
               >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
@@ -428,7 +428,7 @@
             </CardHeader>
             <CardContent>
               <div
-                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
               >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
@@ -444,7 +444,7 @@
             </CardHeader>
             <CardContent>
               <div
-                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
               >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
@@ -460,7 +460,7 @@
             </CardHeader>
             <CardContent>
               <div
-                class="h-64 flex items-center justify-center bg-muted/50 rounded-lg"
+                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
               >
                 <div class="text-center text-muted-foreground">
                   <Star class="h-8 w-8 mx-auto mb-2" />
@@ -593,11 +593,19 @@
   <div v-else-if="loading" class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
-        <div class="h-16 w-16 bg-muted rounded-lg animate-pulse"></div>
+        <div
+          class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse"
+        ></div>
         <div class="flex-1 space-y-2">
-          <div class="h-6 bg-muted rounded w-1/3 animate-pulse"></div>
-          <div class="h-4 bg-muted rounded w-2/3 animate-pulse"></div>
-          <div class="h-3 bg-muted rounded w-1/2 animate-pulse"></div>
+          <div
+            class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse"
+          ></div>
+          <div
+            class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse"
+          ></div>
+          <div
+            class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse"
+          ></div>
         </div>
       </div>
     </div>

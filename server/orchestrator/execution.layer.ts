@@ -1,5 +1,5 @@
-import { Message } from "@server/database/entities/message.entity";
 import { LLMService } from "../services/core/llm.service";
+import { Conversation } from "@server/database/entities/conversation.entity";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -68,16 +68,24 @@ export class ExecutionLayer {
     };
   }
 
-  async execute(messages: Message[]): Promise<ExecutionResult | null> {
+  async execute(conversation: Conversation): Promise<ExecutionResult | null> {
     try {
+      const messages = await conversation.getMessages();
       // Create the prompt for generating a response
-      const responsePrompt = `
+      let responsePrompt = `
         Please provide a helpful response or next step to the customer's last message that can be:
           ASK - To gather more information
           RESPOND - To provide a helpful response
-          CALL_TOOL - To call a tool to get more information/Handle an action in the playbook. You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool.
           HANDOFF - To handoff the conversation to a human agent
           CLOSE - To close the conversation`;
+
+      if (conversation.enabled_tools && conversation.enabled_tools.length > 0) {
+        responsePrompt += `
+            CALL_TOOL - To call a tool to get more information/Handle an action in the playbook. You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool. Available tools: ${conversation.enabled_tools?.join(
+              ", "
+            )}.
+          `;
+      }
 
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string

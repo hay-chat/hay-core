@@ -75,7 +75,7 @@
           ref="messagesContainer"
           class="flex-1 overflow-y-auto p-6 space-y-4"
         >
-          <div v-if="messagesLoading" class="space-y-4">
+          <div v-if="loading" class="space-y-4">
             <div v-for="i in 5" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
                 <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
@@ -87,7 +87,10 @@
             </div>
           </div>
 
-          <div v-else-if="messages.length === 0" class="text-center py-12">
+          <div
+            v-else-if="conversation?.messages?.length === 0"
+            class="text-center py-12"
+          >
             <MessageSquare
               class="h-12 w-12 text-muted-foreground mx-auto mb-4"
             />
@@ -100,7 +103,7 @@
             <!-- Conversation Start -->
             <div class="text-center">
               <div
-                class="inline-flex items-center px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground"
+                class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-muted-foreground"
               >
                 <Clock class="h-3 w-3 mr-1" />
                 Conversation started {{ formatDate(conversation?.created_at) }}
@@ -108,24 +111,12 @@
             </div>
 
             <!-- Messages -->
-            <template v-for="(message, index) in messages" :key="message.id">
+            <template
+              v-for="(message, index) in conversation?.messages"
+              :key="message.id"
+            >
               <ChatMessage
-                :variant="message.type as 'Customer' | 'BotAgent' | 'HumanAgent' | 'System' | 'ToolCall' | 'ToolResponse'"
-                :content="message.content"
-                :timestamp="message.timestamp"
-                :sender-name="
-                  message.type === 'Customer'
-                    ? 'Customer'
-                    : message.agentName || 'AI Assistant'
-                "
-                :show-header="shouldShowHeader(index)"
-                :attachments="'attachments' in message ? (message as any).attachments : undefined"
-                :metadata="message.type === 'System' ? {
-                  action: (message as any).action
-                } : (message.type === 'BotAgent' || message.type === 'HumanAgent') ? {
-                  isPlaybook: message.isPlaybook,
-                  needsApproval: supervisionMode && message.needsApproval
-                } : undefined"
+                :message="message"
                 @approve="
                   message.needsApproval ? approveMessage(message.id) : undefined
                 "
@@ -146,17 +137,17 @@
                 <User class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
-                <div class="bg-muted p-3 rounded-lg">
+                <div class="bg-background-tertiary p-3 rounded-lg">
                   <div class="flex space-x-1">
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                     ></div>
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
                     ></div>
                     <div
-                      class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.2s"
                     ></div>
                   </div>
@@ -198,7 +189,7 @@
       </div>
 
       <!-- Right Side: Context Panel -->
-      <div class="w-80 border-l bg-muted/30">
+      <div class="w-80 border-l bg-background-tertiary">
         <div class="p-6 space-y-6">
           <!-- Customer Information -->
           <Card>
@@ -254,7 +245,7 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Messages:</span>
-                <span>{{ messages.length }}</span>
+                <span>{{ conversation?.messages?.length }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Created:</span>
@@ -283,7 +274,7 @@
                 <div
                   v-for="prevConv in previousConversations"
                   :key="prevConv.id"
-                  class="p-3 border rounded-md hover:bg-muted/50 cursor-pointer"
+                  class="p-3 border rounded-md hover:bg-background-secondary cursor-pointer"
                   @click="viewConversation(prevConv.id)"
                 >
                   <div class="text-sm font-medium">{{ prevConv.subject }}</div>
@@ -330,7 +321,7 @@
                 <div
                   v-for="article in relatedArticles"
                   :key="article.id"
-                  class="p-2 border rounded text-sm hover:bg-muted/50 cursor-pointer"
+                  class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
                 >
                   <div class="font-medium">{{ article.title }}</div>
                   <div class="text-xs text-muted-foreground">
@@ -374,7 +365,6 @@ const conversationId = route.params["id"] as string;
 
 // Reactive state
 const loading = ref(true);
-const messagesLoading = ref(true);
 const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
@@ -383,22 +373,9 @@ const messagesContainer = ref<HTMLElement>();
 
 // Data from API
 const conversation = ref<any>(null);
-const messages = ref<any[]>([]);
 
 const previousConversations = ref<any[]>([]);
 const relatedArticles = ref<any[]>([]);
-
-// Methods
-const shouldShowHeader = (index: number): boolean => {
-  // Always show header for first message
-  if (index === 0) return true;
-
-  // Check if previous message has same sender type
-  const currentMessage = messages.value[index];
-  const previousMessage = messages.value[index - 1];
-
-  return currentMessage.sender !== previousMessage.sender;
-};
 
 const goBack = () => {
   navigateTo("/conversations");
@@ -506,7 +483,7 @@ const sendMessage = async () => {
     });
 
     // Add message to local list
-    messages.value.push({
+    conversation.value.messages.push({
       id: result.id,
       sender: "customer",
       content: newMessage.value,
@@ -518,7 +495,7 @@ const sendMessage = async () => {
     scrollToBottom();
 
     // Refresh messages after a short delay to get any AI response
-    setTimeout(() => fetchMessages(), 2000);
+    setTimeout(() => fetchConversation(), 2000);
   } catch (error) {
     console.error("Failed to send message:", error);
   }
@@ -527,10 +504,10 @@ const sendMessage = async () => {
 const approveMessage = (messageId: string) => {
   // TODO: Approve agent message
   console.log("Approve message:", messageId);
-  const message = messages.value.find((m) => m.id === messageId);
-  if (message) {
-    message.needsApproval = false;
-  }
+  // const message = conversation.value.messages.find((m) => m.id === messageId);
+  // if (message) {
+  //   message.needsApproval = false;
+  // }
 };
 
 const editMessage = (messageId: string) => {
@@ -575,66 +552,10 @@ const fetchConversation = async () => {
   }
 };
 
-// Fetch messages
-const fetchMessages = async () => {
-  try {
-    messagesLoading.value = true;
-    const result = await HayApi.conversations.getMessages.query({
-      conversationId,
-      limit: 100,
-    });
-
-    console.log("Fetched messages:", result); // Debug log
-
-    // Transform messages to match the component format
-    messages.value = result.map((msg: any) => {
-      // Determine the sender based on message type
-      let sender = "system";
-      if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
-        sender = "agent";
-      } else if (msg.type === "HumanMessage" || msg.type === "HUMAN_MESSAGE") {
-        sender = "customer";
-      } else if (
-        msg.type === "SystemMessage" ||
-        msg.type === "SYSTEM_MESSAGE"
-      ) {
-        sender = "system";
-      } else if (msg.sender) {
-        // Use sender field if available
-        sender =
-          msg.sender === "assistant"
-            ? "agent"
-            : msg.sender === "user"
-            ? "customer"
-            : msg.sender;
-      }
-
-      return {
-        id: msg.id,
-        content: msg.content,
-        timestamp: msg.created_at,
-        type: msg.type,
-        sender,
-        agentName: sender === "agent" ? "AI Assistant" : undefined,
-        isPlaybook: msg.metadata?.playbook_id ? true : false,
-        metadata: msg.metadata,
-      };
-    });
-
-    console.log("Transformed messages:", messages.value); // Debug log
-
-    nextTick(() => scrollToBottom());
-  } catch (error) {
-    console.error("Failed to fetch messages:", error);
-  } finally {
-    messagesLoading.value = false;
-  }
-};
-
 // Lifecycle
 onMounted(async () => {
   // Fetch conversation and messages in parallel
-  await Promise.all([fetchConversation(), fetchMessages()]);
+  await Promise.all([fetchConversation()]);
 
   // TODO: Setup WebSocket connection for real-time updates
 });

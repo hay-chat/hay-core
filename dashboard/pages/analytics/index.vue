@@ -176,7 +176,7 @@
                 <span>{{ bucket.range }}</span>
                 <span class="font-medium">{{ bucket.percentage }}%</span>
               </div>
-              <div class="w-full bg-muted rounded-full h-2">
+              <div class="w-full bg-background-tertiary rounded-full h-2">
                 <div
                   class="bg-primary h-2 rounded-full transition-all duration-300"
                   :style="{ width: `${bucket.percentage}%` }"
@@ -250,7 +250,7 @@
               <tr
                 v-for="agent in agentPerformance"
                 :key="agent.id"
-                class="border-b hover:bg-muted/50"
+                class="border-b hover:bg-background-secondary"
               >
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-3">
@@ -278,7 +278,9 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="font-medium">{{ agent.resolutionRate }}%</div>
-                  <div class="w-full bg-muted rounded-full h-1 mt-1">
+                  <div
+                    class="w-full bg-background-tertiary rounded-full h-1 mt-1"
+                  >
                     <div
                       class="bg-green-500 h-1 rounded-full"
                       :style="{ width: `${agent.resolutionRate}%` }"

@@ -9,10 +9,7 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button
-          size="sm"
-          @click="openPlayground"
-        >
+        <Button size="sm" @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
           Conversation Playground
         </Button>
@@ -144,7 +141,7 @@
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-12">
-      <AlertTriangle class="h-12 w-12 text-red-500 mx-auto mb-4" />
+      <Error />
       <h3 class="text-lg font-medium mb-2">Error Loading Conversations</h3>
       <p class="text-muted-foreground mb-4">{{ error }}</p>
       <Button @click="fetchConversations" variant="outline">
@@ -169,10 +166,7 @@
             : "Click 'New Conversation' to start your first conversation."
         }}
       </p>
-      <Button
-        v-if="!searchQuery"
-        @click="openPlayground"
-      >
+      <Button v-if="!searchQuery" @click="openPlayground">
         <Plus class="h-4 w-4 mr-2" />
         Start Playground
       </Button>
@@ -196,9 +190,7 @@
                   />
                 </th>
                 <th class="text-left py-3 px-4 font-medium">Customer</th>
-                <th class="text-left py-3 px-4 font-medium">Agent</th>
                 <th class="text-left py-3 px-4 font-medium">Status</th>
-                <th class="text-left py-3 px-4 font-medium">Last Message</th>
                 <th class="text-left py-3 px-4 font-medium">Duration</th>
                 <th class="text-left py-3 px-4 font-medium">Satisfaction</th>
                 <th class="text-left py-3 px-4 font-medium">Updated</th>
@@ -209,7 +201,7 @@
               <tr
                 v-for="conversation in paginatedConversations"
                 :key="conversation.id"
-                class="border-b hover:bg-muted/50 cursor-pointer"
+                class="border-b hover:bg-background-secondary cursor-pointer"
                 @click="!bulkMode && viewConversation(conversation.id)"
               >
                 <td v-if="bulkMode" class="py-3 px-4" @click.stop>
@@ -222,11 +214,6 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-3">
-                    <div
-                      class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
-                    >
-                      <User class="h-4 w-4 text-primary" />
-                    </div>
                     <div>
                       <div class="font-medium">
                         {{ conversation.title || "Untitled Conversation" }}
@@ -238,18 +225,6 @@
                   </div>
                 </td>
                 <td class="py-3 px-4">
-                  <div class="flex items-center space-x-2">
-                    <div
-                      class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center"
-                    >
-                      <Bot class="h-3 w-3 text-blue-600" />
-                    </div>
-                    <span class="text-sm">{{
-                      conversation.agent?.name || "AI Assistant"
-                    }}</span>
-                  </div>
-                </td>
-                <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(conversation?.status)">
                     <component
                       :is="getStatusIcon(conversation?.status)"
@@ -258,18 +233,14 @@
                     {{ formatStatus(conversation?.status) }}
                   </Badge>
                 </td>
-                <td class="py-3 px-4 max-w-xs">
-                  <div class="truncate text-sm">
-                    {{
-                      conversation.metadata?.lastMessage || "No messages yet"
-                    }}
-                  </div>
-                  <div class="text-xs text-muted-foreground">
-                    {{ conversation.metadata?.lastSender || "-" }}
-                  </div>
-                </td>
+
                 <td class="py-3 px-4 text-sm">
-                  {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
+                  {{
+                    formatDuration(
+                      conversation.created_at,
+                      conversation.ended_at || new Date()
+                    )
+                  }}
                 </td>
                 <td class="py-3 px-4">
                   <div
@@ -505,8 +476,6 @@ const formatStatus = (status: string) => {
   };
   return labels[status as keyof typeof labels] || status;
 };
-
-
 
 const toggleBulkMode = () => {
   bulkMode.value = !bulkMode.value;
