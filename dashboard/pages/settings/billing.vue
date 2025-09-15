@@ -378,10 +378,7 @@
           <div class="text-center">
             <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
             <p class="text-sm text-muted-foreground">
-              Usage chart will be rendered here
-            </p>
-            <p class="text-xs text-muted-foreground">
-              TODO: Integrate Chart.js/vue-chartjs for usage analytics
+              Usage analytics will be displayed here
             </p>
           </div>
         </div>

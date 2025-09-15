@@ -115,11 +115,9 @@
             </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
-            <TableHead>Source</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Modified</TableHead>
-            <TableHead>Last Crawled</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead class="text-right"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -160,33 +158,10 @@
               </span>
             </TableCell>
             <TableCell>
-              <div v-if="document.sourceUrl" class="flex items-center gap-1">
-                <Globe class="h-3 w-3 text-muted-foreground" />
-                <a
-                  :href="document.sourceUrl"
-                  target="_blank"
-                  class="text-xs text-blue-600 hover:underline truncate max-w-[150px]"
-                  :title="document.sourceUrl"
-                >
-                  {{ getHostname(document.sourceUrl) }}
-                </a>
-              </div>
-              <Badge
-                v-else-if="document.importMethod === 'upload'"
-                variant="outline"
-              >
-                <Upload class="h-3 w-3 mr-1" />
-                Upload
-              </Badge>
-              <Badge v-else variant="outline">{{
-                document.importMethod || "Unknown"
-              }}</Badge>
-            </TableCell>
-            <TableCell>
               <div
                 :class="[
                   'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                  document.status === 'active'
+                  document.status === 'published'
                     ? 'bg-green-100 text-green-800'
                     : document.status === 'processing'
                     ? 'bg-blue-100 text-blue-800'
@@ -198,7 +173,7 @@
                 <div
                   :class="[
                     'w-2 h-2 rounded-full mr-2',
-                    document.status === 'active'
+                    document.status === 'published'
                       ? 'bg-green-600'
                       : document.status === 'processing'
                       ? 'bg-blue-600 animate-pulse'
@@ -211,12 +186,6 @@
               </div>
             </TableCell>
             <TableCell>{{ formatDate(document.updatedAt) }}</TableCell>
-            <TableCell>
-              <span v-if="document.lastCrawledAt" class="text-sm">
-                {{ formatDate(document.lastCrawledAt) }}
-              </span>
-              <span v-else class="text-muted-foreground text-sm">-</span>
-            </TableCell>
             <TableCell class="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

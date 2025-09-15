@@ -1,7 +1,7 @@
 {
   "$schema": "../base/plugin-manifest.schema.json",
   "id": "hay-plugin-magento",
-  "name": "Magento Integration",
+  "name": "Magento",
   "description": "Connect your Magento 2 e-commerce store to manage products, orders, customers, inventory, and analyze sales performance through Magento's REST API",
   "version": "1.0.0",
   "author": "Hay",
@@ -12,7 +12,17 @@
   "icon": "magento",
   "marketplace": {
     "featured": true,
-    "tags": ["ecommerce", "magento", "products", "orders", "customers", "inventory", "analytics", "revenue", "store-management"]
+    "tags": [
+      "ecommerce",
+      "magento",
+      "products",
+      "orders",
+      "customers",
+      "inventory",
+      "analytics",
+      "revenue",
+      "store-management"
+    ]
   },
   "capabilities": {
     "mcp": {
@@ -94,7 +104,17 @@
                 "type": "string",
                 "description": "Condition type (eq, like, gt, lt, etc.)",
                 "default": "eq",
-                "enum": ["eq", "like", "gt", "lt", "gteq", "lteq", "neq", "in", "nin"]
+                "enum": [
+                  "eq",
+                  "like",
+                  "gt",
+                  "lt",
+                  "gteq",
+                  "lteq",
+                  "neq",
+                  "in",
+                  "nin"
+                ]
               },
               "page_size": {
                 "type": "number",

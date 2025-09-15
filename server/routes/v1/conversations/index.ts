@@ -64,6 +64,22 @@ export const conversationsRouter = t.router({
     conversationRepository
   ),
 
+  dailyStats: authenticatedProcedure
+    .input(z.object({ 
+      days: z.number().optional().default(30),
+      startDate: z.string().datetime().optional(),
+      endDate: z.string().datetime().optional()
+    }))
+    .query(async ({ ctx, input }) => {
+      const stats = await conversationService.getDailyConversationStats(
+        ctx.organizationId!,
+        input.days,
+        input.startDate ? new Date(input.startDate) : undefined,
+        input.endDate ? new Date(input.endDate) : undefined
+      );
+      return stats;
+    }),
+
   listByAgent: authenticatedProcedure
     .input(z.object({ agentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

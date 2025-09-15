@@ -159,8 +159,7 @@
               >
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-12 w-12 mx-auto mb-2" />
-                  <p>Performance chart will be rendered here</p>
-                  <p class="text-sm">Using Chart.js or vue-chartjs</p>
+                  <p>Agent performance metrics will be displayed here</p>
                 </div>
               </div>
             </CardContent>

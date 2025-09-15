@@ -1,7 +1,7 @@
 {
   "$schema": "../base/plugin-manifest.schema.json",
   "id": "hay-plugin-zendesk",
-  "name": "Zendesk Integration",
+  "name": "Zendesk",
   "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
   "version": "1.2.0",
   "author": "Hay",

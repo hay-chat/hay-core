@@ -400,6 +400,75 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       order: { created_at: "ASC" },
     });
   }
+
+  async getDailyStats(
+    organizationId: string,
+    days: number = 30,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<Array<{ date: string; count: number; label: string }>> {
+    const end = endDate || new Date();
+    const start = startDate || new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    
+    // Adjust dates to start and end of day in UTC
+    const startOfDay = new Date(start);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(end);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const query = `
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as count
+      FROM conversations 
+      WHERE organization_id = $1 
+        AND created_at >= $2 
+        AND created_at <= $3
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at) ASC
+    `;
+
+    const rawResults = await this.getRepository().query(query, [
+      organizationId, 
+      startOfDay.toISOString(), 
+      endOfDay.toISOString()
+    ]);
+
+    // Create a map of date -> count for existing data
+    const dataMap = new Map<string, number>();
+    rawResults.forEach((row: any) => {
+      const dateStr = row.date instanceof Date 
+        ? row.date.toISOString().split('T')[0] 
+        : row.date.split(' ')[0]; // Handle different date formats from DB
+      dataMap.set(dateStr, parseInt(row.count, 10));
+    });
+
+    // Generate all dates in range and fill missing dates with 0
+    const result: Array<{ date: string; count: number; label: string }> = [];
+    const currentDate = new Date(startOfDay);
+    
+    while (currentDate <= endOfDay) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const count = dataMap.get(dateStr) || 0;
+      
+      // Format label as "MMM DD"
+      const label = currentDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      result.push({
+        date: dateStr,
+        count,
+        label
+      });
+      
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+    }
+
+    return result;
+  }
 }
 
 export const conversationRepository = new ConversationRepository();

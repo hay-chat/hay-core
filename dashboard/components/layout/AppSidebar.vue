@@ -92,10 +92,11 @@ const conversationsBadge = computed(() => {
   return count > 0 ? count.toString() : undefined;
 });
 
-// Initialize conversation count on component mount
+// Initialize data on component mount
 onMounted(async () => {
   if (authStore.isAuthenticated) {
     await appStore.getOpenConversationsCount();
+    await appStore.getPlugins(); // Load plugins for sidebar
   }
 });
 
@@ -155,6 +156,12 @@ const navMain = computed(() => [
         url: "/integrations/marketplace",
         isActive: route.path === "/integrations/marketplace",
       },
+      // Add enabled plugins dynamically
+      ...appStore.enabledPlugins.map((plugin) => ({
+        title: plugin.name,
+        url: `/integrations/plugins/${plugin.id}`,
+        isActive: route.path === `/integrations/plugins/${plugin.id}`,
+      })),
     ],
   },
   {

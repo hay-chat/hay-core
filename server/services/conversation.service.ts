@@ -173,4 +173,18 @@ export class ConversationService {
     );
     return messages.reverse();
   }
+
+  async getDailyConversationStats(
+    organizationId: string,
+    days: number = 30,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<Array<{ date: string; count: number; label: string }>> {
+    return await this.conversationRepository.getDailyStats(
+      organizationId,
+      days,
+      startDate,
+      endDate
+    );
+  }
 }

@@ -120,7 +120,7 @@
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
-                  @error="handleThumbnailError($event, plugin.type)"
+                  @error="handleThumbnailError($event)"
                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
                 />
               </div>
@@ -247,7 +247,7 @@ import {
   Zap,
   Database,
 } from "lucide-vue-next";
-import { Hay } from "@/utils/api";
+import { useAppStore } from "@/stores/app";
 
 // Reactive state
 const loading = ref(true);
@@ -255,19 +255,24 @@ const searchQuery = ref("");
 const selectedCategory = ref("all");
 const enablingPlugin = ref<string | null>(null);
 const disablingPlugin = ref<string | null>(null);
-const plugins = ref<any[]>([]);
+
+// Use app store for plugins
+const appStore = useAppStore();
 
 // Router
 const router = useRouter();
 
-// Stats computed from plugins
+// Get available (non-enabled) plugins for marketplace
+const availablePlugins = computed(() => appStore.availablePlugins);
+
+// Stats computed from all plugins (including enabled ones for stats display)
 const stats = computed(() => {
-  const pluginList = plugins.value || [];
+  const allPlugins = appStore.plugins;
   return {
-    total: pluginList.length,
-    enabled: pluginList.filter((p) => p.enabled).length,
-    chatConnectors: pluginList.filter((p) => p.type.includes("channel")).length,
-    mcpConnectors: pluginList.filter((p) => p.type.includes("mcp-connector"))
+    total: allPlugins.length,
+    enabled: appStore.enabledPlugins.length,
+    chatConnectors: allPlugins.filter((p) => p.type.includes("channel")).length,
+    mcpConnectors: allPlugins.filter((p) => p.type.includes("mcp-connector"))
       .length,
   };
 });
@@ -282,9 +287,9 @@ const categories = [
   { id: "playbook", name: "Playbooks", icon: Zap },
 ];
 
-// Computed filtered plugins
+// Computed filtered plugins (only show available/non-enabled plugins)
 const filteredPlugins = computed(() => {
-  let filtered = plugins.value || [];
+  let filtered = availablePlugins.value || [];
 
   // Filter by category
   if (selectedCategory.value !== "all") {
@@ -343,7 +348,7 @@ const getPluginThumbnail = (pluginId: string) => {
   return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
 };
 
-const handleThumbnailError = (event: Event, pluginType: string[]) => {
+const handleThumbnailError = (event: Event) => {
   // Hide the image and show the fallback icon
   const imgElement = event.target as HTMLImageElement;
   const fallbackElement = imgElement.nextElementSibling as HTMLElement;
@@ -357,12 +362,10 @@ const handleThumbnailError = (event: Event, pluginType: string[]) => {
 const fetchPlugins = async () => {
   loading.value = true;
   try {
-    const response = await Hay.plugins.getAll.query();
-    console.log("🔍 [DEBUG] Fetched plugins:", response);
-    plugins.value = response;
+    await appStore.fetchPlugins();
+    console.log("🔍 [DEBUG] Fetched plugins:", appStore.plugins);
   } catch (error) {
     console.error("Failed to fetch plugins:", error);
-    plugins.value = [];
   } finally {
     loading.value = false;
   }
@@ -378,8 +381,7 @@ const enablePlugin = async (pluginId: string) => {
   const toast = useToast();
 
   try {
-    await Hay.plugins.enable.mutate({ pluginId });
-    await fetchPlugins();
+    await appStore.enablePlugin(pluginId);
 
     // Show success toast
     toast.success(
@@ -387,7 +389,7 @@ const enablePlugin = async (pluginId: string) => {
     );
 
     // Navigate to settings if plugin has configuration
-    const plugin = plugins.value.find((p) => p.id === pluginId);
+    const plugin = appStore.getPluginById(pluginId);
     if (plugin?.hasConfiguration) {
       navigateToSettings(pluginId);
     }
@@ -412,8 +414,7 @@ const disablePlugin = async (pluginId: string) => {
   const toast = useToast();
 
   try {
-    await Hay.plugins.disable.mutate({ pluginId });
-    await fetchPlugins();
+    await appStore.disablePlugin(pluginId);
 
     // Show success toast
     toast.success(

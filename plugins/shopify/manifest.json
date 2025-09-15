@@ -1,7 +1,7 @@
 {
   "$schema": "../base/plugin-manifest.schema.json",
   "id": "hay-plugin-shopify",
-  "name": "Shopify Integration",
+  "name": "Shopify",
   "description": "Connect your Shopify store to manage products, orders, customers, and e-commerce operations through Shopify's GraphQL Admin API",
   "version": "1.0.0",
   "author": "Hay",
@@ -12,7 +12,15 @@
   "icon": "shopify",
   "marketplace": {
     "featured": true,
-    "tags": ["ecommerce", "shopify", "products", "orders", "customers", "inventory", "store-management"]
+    "tags": [
+      "ecommerce",
+      "shopify",
+      "products",
+      "orders",
+      "customers",
+      "inventory",
+      "store-management"
+    ]
   },
   "capabilities": {
     "mcp": {

@@ -1,7 +1,7 @@
 {
   "$schema": "../base/plugin-manifest.schema.json",
   "id": "hay-plugin-woocommerce",
-  "name": "WooCommerce Integration",
+  "name": "WooCommerce",
   "description": "Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows",
   "version": "1.0.0",
   "author": "Hay",
@@ -12,7 +12,14 @@
   "icon": "woocommerce",
   "marketplace": {
     "featured": true,
-    "tags": ["ecommerce", "woocommerce", "products", "orders", "customers", "store-management"]
+    "tags": [
+      "ecommerce",
+      "woocommerce",
+      "products",
+      "orders",
+      "customers",
+      "store-management"
+    ]
   },
   "capabilities": {
     "mcp": {
@@ -215,7 +222,15 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed"],
+                "enum": [
+                  "pending",
+                  "processing",
+                  "on-hold",
+                  "completed",
+                  "cancelled",
+                  "refunded",
+                  "failed"
+                ],
                 "description": "Filter orders by status"
               },
               "customer": {
@@ -257,7 +272,15 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed"],
+                "enum": [
+                  "pending",
+                  "processing",
+                  "on-hold",
+                  "completed",
+                  "cancelled",
+                  "refunded",
+                  "failed"
+                ],
                 "description": "Order status"
               },
               "line_items": {
@@ -351,7 +374,15 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed"],
+                "enum": [
+                  "pending",
+                  "processing",
+                  "on-hold",
+                  "completed",
+                  "cancelled",
+                  "refunded",
+                  "failed"
+                ],
                 "description": "Updated order status"
               },
               "customer_note": {
@@ -383,7 +414,16 @@
               },
               "role": {
                 "type": "string",
-                "enum": ["all", "administrator", "editor", "author", "contributor", "subscriber", "customer", "shop_manager"],
+                "enum": [
+                  "all",
+                  "administrator",
+                  "editor",
+                  "author",
+                  "contributor",
+                  "subscriber",
+                  "customer",
+                  "shop_manager"
+                ],
                 "description": "Filter customers by role"
               }
             }
@@ -692,7 +732,11 @@
     }
   },
   "permissions": {
-    "env": ["WORDPRESS_SITE_URL", "WOOCOMMERCE_CONSUMER_KEY", "WOOCOMMERCE_CONSUMER_SECRET"],
+    "env": [
+      "WORDPRESS_SITE_URL",
+      "WOOCOMMERCE_CONSUMER_KEY",
+      "WOOCOMMERCE_CONSUMER_SECRET"
+    ],
     "scopes": ["org:<orgId>:mcp:invoke"]
   },
   "configSchema": {

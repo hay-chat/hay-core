@@ -22,61 +22,33 @@
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Total Playbooks</span>
-          <Book class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.total }}</div>
-          <p class="text-xs text-muted-foreground">
-            +{{ stats.newThisMonth }} this month
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Active</span>
-          <Play class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.active }}</div>
-          <p class="text-xs text-muted-foreground">
-            {{ Math.round((stats.active / stats.total) * 100) }}% of total
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Avg Success Rate</span>
-          <Target class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.avgSuccessRate }}%</div>
-          <p class="text-xs text-green-600">+2.1% from last month</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
-          <span class="text-sm font-medium">Total Triggers</span>
-          <Zap class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ stats.totalTriggers }}</div>
-          <p class="text-xs text-muted-foreground">Last 30 days</p>
-        </CardContent>
-      </Card>
+      <MetricCard
+        title="Total Playbooks"
+        :metric="stats.total"
+        :subtitle="`+${stats.newThisMonth} this month`"
+        :icon="Book"
+      />
+      <MetricCard
+        title="Active"
+        :metric="stats.active"
+        :subtitle="`${
+          stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
+        }% of total`"
+        :icon="Play"
+      />
+      <MetricCard
+        title="Avg Success Rate"
+        :metric="`${stats.avgSuccessRate}%`"
+        subtitle="+2.1% from last month"
+        subtitle-color="green"
+        :icon="Target"
+      />
+      <MetricCard
+        title="Total Triggers"
+        :metric="stats.totalTriggers"
+        subtitle="Last 30 days"
+        :icon="Zap"
+      />
     </div>
 
     <!-- Filters and Search -->
@@ -344,6 +316,7 @@ import { useToast } from "~/composables/useToast";
 import type { Playbook } from "~/types/playbook";
 import { HayApi } from "@/utils/api";
 import DataPagination from "@/components/DataPagination.vue";
+import MetricCard from "@/components/MetricCard.vue";
 
 const toast = useToast();
 const router = useRouter();
