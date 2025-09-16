@@ -142,10 +142,7 @@
                   :is="getFileIcon(document.type)"
                   class="h-4 w-4 min-w-4 text-muted-foreground"
                 />
-                <div
-                  class="truncate max-w-[150px]"
-                  :title="document.title || document.name"
-                >
+                <div class="truncate" :title="document.title || document.name">
                   {{ document.title || document.name }}
                 </div>
               </div>

@@ -16,8 +16,8 @@ export default <Partial<Config>>{
   theme: {
     extend: {
       colors: {
-        border: { DEFAULT: "var(--color-neutral-200)" },
-        input: { DEFAULT: "var(--color-neutral-200)" },
+        border: { DEFAULT: "var(--color-neutral-300)" },
+        input: { DEFAULT: "var(--color-neutral-300)" },
         ring: { DEFAULT: "var(--color-primary)" },
         background: {
           DEFAULT: "var(--color-neutral-0)",
