@@ -433,6 +433,7 @@ export class ProcessManagerService {
 
   /**
    * Send JSON-RPC message to MCP plugin process via stdin/stdout
+   * Automatically starts the plugin if not running
    */
   async sendToPlugin(
     organizationId: string,
@@ -440,6 +441,10 @@ export class ProcessManagerService {
     action: string,
     payload?: any
   ): Promise<any> {
+    // Ensure plugin is running before sending message
+    const { pluginInstanceManagerService } = await import("./plugin-instance-manager.service");
+    await pluginInstanceManagerService.ensureInstanceRunning(organizationId, pluginId);
+
     const processKey = this.getProcessKey(organizationId, pluginId);
     const processInfo = this.processes.get(processKey);
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { processManagerService } from './process-manager.service';
+import { pluginInstanceManagerService } from './plugin-instance-manager.service';
 import { pluginRegistryRepository } from '../repositories/plugin-registry.repository';
 import { pluginInstanceRepository } from '../repositories/plugin-instance.repository';
 import { environmentManagerService } from './environment-manager.service';
@@ -108,6 +109,12 @@ export class PluginRouteService {
         body: req.body,
         query: req.query as Record<string, string>,
       };
+
+      // Update activity timestamp when webhook is called
+      await pluginInstanceManagerService.updateActivityTimestamp(
+        organizationId,
+        plugin.id
+      );
 
       const response = await processManagerService.sendToPlugin(
         organizationId,

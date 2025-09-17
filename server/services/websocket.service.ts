@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { processManagerService } from './process-manager.service';
+import { pluginInstanceManagerService } from './plugin-instance-manager.service';
 import { pluginInstanceRepository } from '../repositories/plugin-instance.repository';
 import { conversationRepository, ConversationRepository } from '../repositories/conversation.repository';
 import { CustomerIdentifier } from '../../plugins/base';
@@ -223,6 +224,12 @@ export class WebSocketService {
 
         // Notify plugin of connection
         try {
+          // Update activity timestamp when WebSocket connects
+          await pluginInstanceManagerService.updateActivityTimestamp(
+            client.organizationId,
+            client.pluginId
+          );
+
           await processManagerService.sendToPlugin(
             client.organizationId,
             client.pluginId,
@@ -256,6 +263,12 @@ export class WebSocketService {
 
     // Forward to plugin
     try {
+      // Update activity timestamp when message is sent
+      await pluginInstanceManagerService.updateActivityTimestamp(
+        client.organizationId,
+        client.pluginId
+      );
+
       await processManagerService.sendToPlugin(
         client.organizationId,
         client.pluginId,

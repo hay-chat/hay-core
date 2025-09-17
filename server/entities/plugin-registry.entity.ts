@@ -46,6 +46,9 @@ export class PluginRegistry {
   @Column({ type: "varchar", length: 64, nullable: true })
   checksum?: string;
 
+  @Column({ type: "integer", default: 10 })
+  maxConcurrentInstances!: number;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;
 

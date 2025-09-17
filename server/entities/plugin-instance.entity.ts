@@ -52,4 +52,10 @@ export class PluginInstance extends OrganizationScopedEntity {
 
   @Column({ type: "varchar", length: 50, default: "stopped" })
   status!: "stopped" | "starting" | "running" | "stopping" | "error";
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastActivityAt?: Date;
+
+  @Column({ type: "integer", default: 0 })
+  priority!: number;
 }

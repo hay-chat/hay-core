@@ -24,6 +24,7 @@ async function startServer() {
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
   const { processManagerService } = await import("@server/services/process-manager.service");
+  const { pluginInstanceManagerService } = await import("@server/services/plugin-instance-manager.service");
   const { pluginInstanceRepository } = await import("@server/repositories/plugin-instance.repository");
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
   const { pluginRouteService } = await import("@server/services/plugin-route.service");
@@ -160,27 +161,13 @@ async function startServer() {
         pluginRouteService.startCleanup();
         console.log("🔌 Plugin route service started");
 
-        // Start enabled plugins for all organizations
-        const enabledInstances = await pluginInstanceRepository.findAll({
-          where: { enabled: true },
-          relations: ["plugin"],
-        });
+        // Start plugin instance lifecycle management
+        pluginInstanceManagerService.startCleanup();
+        console.log("🔌 Plugin instance lifecycle manager started");
 
-        for (const instance of enabledInstances) {
-          try {
-            await processManagerService.startPlugin(
-              instance.organizationId,
-              instance.plugin.pluginId
-            );
-          } catch (error) {
-            console.error(
-              `Failed to start plugin ${instance.plugin.name} for org ${instance.organizationId}:`,
-              error
-            );
-          }
-        }
-
-        console.log(`🔌 Started ${enabledInstances.length} plugin instances`);
+        // Note: Plugins will now be started on-demand when needed
+        // This improves scalability and resource usage
+        console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
       } catch (error) {
         console.error("Failed to initialize plugin system:", error);
       }
@@ -191,6 +178,7 @@ async function startServer() {
   process.on("SIGTERM", async () => {
     console.log("SIGTERM received, shutting down gracefully");
     orchestratorWorker.stop();
+    pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
@@ -199,6 +187,7 @@ async function startServer() {
   process.on("SIGINT", async () => {
     console.log("SIGINT received, shutting down gracefully");
     orchestratorWorker.stop();
+    pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
