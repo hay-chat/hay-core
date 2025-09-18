@@ -862,14 +862,33 @@ const discoveryProgress = ref<{
   total: number;
   currentUrl?: string;
 } | null>(null);
-type DocumentType = "article" | "guide" | "faq" | "tutorial" | "reference" | "policy";
-type DocumentStatus = "published" | "draft" | "under_review";
-type DocumentVisibility = "private" | "internal" | "public";
+// Import from server types (these would normally come from generated tRPC types)
+enum DocumentationType {
+  ARTICLE = "article",
+  GUIDE = "guide",
+  FAQ = "faq",
+  TUTORIAL = "tutorial",
+  REFERENCE = "reference",
+  POLICY = "policy",
+}
+
+enum DocumentationStatus {
+  DRAFT = "draft",
+  PUBLISHED = "published",
+  ARCHIVED = "archived",
+  UNDER_REVIEW = "under_review",
+}
+
+enum DocumentVisibility {
+  PUBLIC = "public",
+  PRIVATE = "private",
+  INTERNAL = "internal",
+}
 
 const webMetadata = ref({
-  type: "article" as DocumentType,
-  status: "published" as DocumentStatus,
-  visibility: "private" as DocumentVisibility,
+  type: DocumentationType.ARTICLE,
+  status: DocumentationStatus.PUBLISHED,
+  visibility: DocumentVisibility.PRIVATE,
   tags: [] as string[],
   categories: [] as string[],
   tagsString: "",
@@ -958,12 +977,13 @@ const discoverPages = async () => {
 
         // Update progress based on job status
         if (jobStatus.progress) {
+          const progress = jobStatus.progress as any;
           discoveryProgress.value = {
-            found: jobStatus.progress.pagesFound || 0,
-            processed: jobStatus.progress.pagesProcessed || 0,
-            total: jobStatus.progress.totalEstimated || 0,
-            status: jobStatus.progress.status || "discovering",
-            currentUrl: jobStatus.progress.currentUrl,
+            found: progress.pagesFound || 0,
+            processed: progress.pagesProcessed || 0,
+            total: progress.totalEstimated || 0,
+            status: progress.status || "discovering",
+            currentUrl: progress.currentUrl,
           };
         }
 
@@ -973,7 +993,7 @@ const discoverPages = async () => {
 
           // Extract discovered pages from job result
           if (jobStatus.result?.pages) {
-            discoveredPages.value = jobStatus.result.pages.map((page: DiscoveredPage) => ({
+            discoveredPages.value = (jobStatus.result.pages as any[]).map((page: DiscoveredPage) => ({
               ...page,
               selected: page.selected !== false, // Default to true unless explicitly false
             }));
@@ -1016,7 +1036,7 @@ const discoverPages = async () => {
     }, 5000); // Poll every 5 seconds
 
     // Store interval ID for cleanup if needed
-    (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval =
+    (window as Window & { __discoveryPollInterval?: any }).__discoveryPollInterval =
       pollInterval;
   } catch (error) {
     console.error("Failed to start page discovery:", error);
@@ -1060,7 +1080,7 @@ const startWebImport = async () => {
     pollJobStatus(response.jobId);
   } catch (error) {
     console.error("Failed to start web import:", error);
-    webImportJob.value = { status: "failed" };
+    webImportJob.value = { id: "", status: "failed" };
     isProcessing.value = false;
   }
 };
@@ -1204,8 +1224,8 @@ const startUpload = async () => {
           fileName: file.name,
           organizationId: organizationId,
           type: mapCategoryToDocumentType(file.category || ""),
-          status: (file.isActive ? "published" : "draft") as DocumentStatus,
-          visibility: "private" as DocumentVisibility,
+          status: file.isActive ? DocumentationStatus.PUBLISHED : DocumentationStatus.DRAFT,
+          visibility: DocumentVisibility.PRIVATE,
         };
 
         file.uploadStatus = "processing";
@@ -1268,17 +1288,17 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 // Map UI category to server DocumentationType enum
-const mapCategoryToDocumentType = (category: string): DocumentType => {
-  const mapping: Record<string, DocumentType> = {
-    product: "guide",
-    api: "reference",
-    faq: "faq",
-    legal: "policy",
-    training: "tutorial",
-    technical: "reference",
-    other: "article",
+const mapCategoryToDocumentType = (category: string): DocumentationType => {
+  const mapping: Record<string, DocumentationType> = {
+    product: DocumentationType.GUIDE,
+    api: DocumentationType.REFERENCE,
+    faq: DocumentationType.FAQ,
+    legal: DocumentationType.POLICY,
+    training: DocumentationType.TUTORIAL,
+    technical: DocumentationType.REFERENCE,
+    other: DocumentationType.ARTICLE,
   };
-  return mapping[category] || "article";
+  return mapping[category] || DocumentationType.ARTICLE;
 };
 
 const getDiscoveryStatusText = () => {

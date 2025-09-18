@@ -241,10 +241,10 @@
                   @click="viewConversation(prevConv.id)"
                 >
                   <div class="text-sm font-medium">
-                    {{ prevConv.subject }}
+                    {{ prevConv.subject || prevConv.title }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ formatDate(prevConv.createdAt) }} • {{ prevConv.status }}
+                    {{ formatDate(prevConv.createdAt || prevConv.date) }} • {{ prevConv.status || 'Unknown' }}
                   </div>
                 </div>
               </div>
@@ -292,7 +292,7 @@
                     {{ article.title }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ article.category }}
+                    {{ article.category || 'General' }}
                   </div>
                 </div>
               </div>
@@ -326,13 +326,18 @@ import {
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
 
+import { MessageType } from "~/types/message";
+
 interface Message {
   id: string;
-  type: string;
+  type: MessageType | string;
   content: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
   needsApproval?: boolean;
   created_at: string;
+  conversation_id: string;
+  updated_at: string;
+  status: string;
 }
 
 interface Agent {
@@ -355,6 +360,9 @@ interface PreviousConversation {
   id: string;
   title: string;
   date: string;
+  subject?: string;
+  createdAt?: string;
+  status?: string;
 }
 
 interface RelatedArticle {
@@ -362,6 +370,7 @@ interface RelatedArticle {
   title: string;
   url: string;
   snippet: string;
+  category?: string;
 }
 
 // Get conversation ID from route
@@ -376,8 +385,8 @@ const isTyping = ref(false);
 const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
 
-// Data from API
-const conversation = ref<ConversationData | null>(null);
+// Data from API - Use any to handle multiple possible response formats
+const conversation = ref<any>(null);
 
 const previousConversations = ref<PreviousConversation[]>([]);
 const relatedArticles = ref<RelatedArticle[]>([]);
@@ -480,13 +489,17 @@ const sendMessage = async () => {
     });
 
     // Add message to local list
-    conversation.value.messages.push({
-      id: result.id,
-      sender: "customer",
-      content: newMessage.value,
-      timestamp: new Date(),
-      type: "HumanMessage",
-    });
+    if (conversation.value && conversation.value.messages) {
+      conversation.value.messages.push({
+        id: result.id,
+        content: newMessage.value,
+        type: MessageType.CUSTOMER,
+        created_at: new Date().toISOString(),
+        conversation_id: conversationId,
+        updated_at: new Date().toISOString(),
+        status: "pending",
+      });
+    }
 
     newMessage.value = "";
     scrollToBottom();

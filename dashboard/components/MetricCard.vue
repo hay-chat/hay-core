@@ -10,7 +10,7 @@
       <div class="text-2xl font-bold">
         {{ formattedMetric }}
       </div>
-      <p v-if="subtitle" class="text-xs text-muted-foreground">
+      <p v-if="subtitle" class="text-xs text-muted-foreground flex gap-1">
         <span :class="subtitleClass">{{ subtitle }}</span>
         <span v-if="subtitleSuffix"> {{ subtitleSuffix }}</span>
       </p>

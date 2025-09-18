@@ -193,6 +193,12 @@ import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
 import type { PlaybookStatus, InstructionItem, Agent, Playbook } from "~/types/playbook";
+
+type InstructionData = {
+  id: string;
+  level: number;
+  instructions: string;
+};
 import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
 
@@ -220,7 +226,7 @@ const form = ref({
   title: "",
   trigger: "",
   description: "",
-  instructions: null as InstructionItem[] | string | null,
+  instructions: [] as InstructionData[],
   status: "draft" as PlaybookStatus,
   agentIds: [] as string[],
 });
@@ -230,7 +236,18 @@ const loading = ref(false);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
-const playbook = ref<Playbook | null>(null);
+const playbook = ref<Playbook | {
+  id: string;
+  title: string;
+  trigger: string;
+  description?: string | null;
+  instructions?: string | { id: string; level: number; instructions: string; }[] | null;
+  status: PlaybookStatus;
+  organization_id: string | null;
+  agents?: Agent[];
+  created_at: string;
+  updated_at: string;
+} | null>(null);
 const errors = ref<Record<string, string>>({});
 
 // Format date
@@ -273,7 +290,9 @@ onMounted(async () => {
         title: playbookResponse.title,
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
-        instructions: playbookResponse.instructions || null,
+        instructions: Array.isArray(playbookResponse.instructions)
+          ? playbookResponse.instructions as InstructionData[]
+          : [],
         status: playbookResponse.status,
         agentIds: playbookResponse.agents?.map((a) => a.id) || [],
       };
@@ -334,7 +353,7 @@ const handleSubmit = async () => {
       title: form.value.title,
       trigger: form.value.trigger,
       description: form.value.description || undefined,
-      instructions: form.value.instructions || null,
+      instructions: form.value.instructions.length > 0 ? form.value.instructions : null,
       status: form.value.status,
       agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
     };

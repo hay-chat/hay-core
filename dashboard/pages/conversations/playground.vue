@@ -285,9 +285,9 @@ interface PlaybookData {
   name: string;
 }
 
-const conversation = ref<ConversationData | null>(null);
-const messages = ref<MessageData[]>([]);
-const playbooks = ref<PlaybookData[]>([]);
+const conversation = ref<any>(null);
+const messages = ref<any[]>([]);
+const playbooks = ref<any[]>([]);
 
 // Orchestrator status
 const orchestratorStatus = ref("idle");
@@ -319,7 +319,7 @@ const exitPlayground = () => {
 
 // Status helpers
 const getStatusVariant = (
-  status: string,
+  status?: string,
 ): "default" | "secondary" | "destructive" | "outline" | undefined => {
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
@@ -328,10 +328,10 @@ const getStatusVariant = (
     resolved: "secondary",
     closed: "secondary",
   };
-  return variants[status] || "default";
+  return status ? variants[status] || "default" : "default";
 };
 
-const getStatusIcon = (status: string) => {
+const getStatusIcon = (status?: string) => {
   const icons = {
     open: Circle,
     processing: Activity,
@@ -339,10 +339,10 @@ const getStatusIcon = (status: string) => {
     resolved: CheckCircle,
     closed: XCircle,
   };
-  return icons[status as keyof typeof icons] || Circle;
+  return status ? icons[status as keyof typeof icons] || Circle : Circle;
 };
 
-const formatStatus = (status: string) => {
+const formatStatus = (status?: string) => {
   const labels = {
     open: "Open",
     processing: "Processing",
@@ -350,7 +350,7 @@ const formatStatus = (status: string) => {
     resolved: "Resolved",
     closed: "Closed",
   };
-  return labels[status as keyof typeof labels] || status;
+  return status ? labels[status as keyof typeof labels] || status : "Unknown";
 };
 
 const _formatDate = (date: Date | string | undefined) => {
@@ -516,7 +516,7 @@ const pollConversation = async () => {
     const allMessages = response.messages || [];
 
     // Transform messages to match the component format
-    const transformedMessages = allMessages.map((msg: MessageData) => {
+    const transformedMessages = allMessages.map((msg: any) => {
       let sender = "system";
       if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
         sender = "agent";

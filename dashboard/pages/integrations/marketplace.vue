@@ -368,7 +368,7 @@ const enablePlugin = async (pluginId: string) => {
 
     // Show error toast with details
     // TRPCError messages are in error.message for client errors
-    const errorMessage = error?.message || error?.data?.message || "Failed to enable plugin";
+    const errorMessage = (error as any)?.message || (error as any)?.data?.message || "Failed to enable plugin";
 
     // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
@@ -391,7 +391,7 @@ const disablePlugin = async (pluginId: string) => {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details
-    const errorMessage = error?.message || error?.data?.message || "Failed to disable plugin";
+    const errorMessage = (error as any)?.message || (error as any)?.data?.message || "Failed to disable plugin";
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {

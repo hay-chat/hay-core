@@ -307,17 +307,23 @@ interface Agent {
   id: string;
   name: string;
   enabled: boolean;
-  createdAt: string;
+  created_at: string;
+  description?: string | null;
+  organization?: any;
+  playbooks?: any[];
+  updated_at: string;
 }
 
 interface Conversation {
   id: string;
   title?: string;
   status: string;
-  agentId: string;
-  createdAt: string;
-  updatedAt: string;
+  agent_id?: string;
+  created_at: string;
+  updated_at: string;
   messages?: Array<{ content: string }>;
+  organization?: any;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface ConversationStat {
@@ -340,7 +346,7 @@ const metrics = computed(() => {
   return {
     activeAgents,
     newAgentsThisWeek: agents.value.filter((a) => {
-      const createdAt = new Date(a.createdAt);
+      const createdAt = new Date(a.created_at);
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       return createdAt > weekAgo;
     }).length,
@@ -394,8 +400,10 @@ const topAgents = computed(() => {
   const agentConversationCounts = new Map<string, number>();
 
   conversations.value.forEach((conv) => {
-    const count = agentConversationCounts.get(conv.agentId) || 0;
-    agentConversationCounts.set(conv.agentId, count + 1);
+    if (conv.agent_id) {
+      const count = agentConversationCounts.get(conv.agent_id) || 0;
+      agentConversationCounts.set(conv.agent_id, count + 1);
+    }
   });
 
   // Map agents with their conversation counts
@@ -432,7 +440,7 @@ const recentConversations = computed(() => {
         customerName: conv.title || "New Conversation",
         lastMessage: lastMessage ? lastMessage.content.substring(0, 50) + "..." : "No messages yet",
         status: conv.status || "active",
-        updatedAt: new Date(conv.updatedAt || conv.createdAt),
+        updatedAt: new Date(conv.updated_at || conv.created_at),
       };
     });
 });
@@ -628,16 +636,16 @@ const fetchDashboardData = async () => {
       }),
     ]);
 
-    agents.value = (agentsData as Agent[]) || [];
+    agents.value = (agentsData as any) || [];
     conversations.value =
-      (conversationsData as { items?: Conversation[] })?.items ||
-      (conversationsData as Conversation[]) ||
+      (conversationsData as any)?.items ||
+      (conversationsData as any) ||
       [];
 
     // Handle the nested data structure from the API response
     const statsData =
-      (conversationStatsData as { result?: { data?: ConversationStat[] } })?.result?.data ||
-      (conversationStatsData as ConversationStat[]) ||
+      (conversationStatsData as any)?.result?.data ||
+      (conversationStatsData as any) ||
       [];
 
     // Process the data to add numeric indices for proper chart rendering

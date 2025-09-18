@@ -322,6 +322,7 @@ interface Conversation {
   id: string;
   title?: string;
   status: string;
+  agent_id?: string;
   created_at: string;
   updated_at: string;
   ended_at?: string;
@@ -484,7 +485,7 @@ const fetchConversations = async () => {
       sorting: { orderBy: "created_at", orderDirection: "desc" },
     });
 
-    conversations.value = response.items;
+    conversations.value = response.items as any;
     totalConversations.value = response.pagination.total;
   } catch (err) {
     console.error("Failed to fetch conversations:", err);

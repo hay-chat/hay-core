@@ -537,18 +537,24 @@ const searchDocuments = async () => {
     });
 
     // Map search results to document format
-    searchResults.value = (results || []).map((doc: SearchResult) => ({
+    searchResults.value = (results || []).map((doc: any) => ({
+      id: doc.id,
+      title: doc.title,
+      content: doc.content,
+      type: doc.type,
+      status: doc.status,
+      similarity: doc.similarity || 0,
+    }));
+
+    // Also update the main documents list with search results
+    documents.value = searchResults.value.map((doc: any) => ({
       id: doc.id,
       name: doc.title,
+      title: doc.title,
       description: doc.content,
       type: doc.type,
       status: doc.status,
       similarity: doc.similarity,
-    }));
-
-    // Also update the main documents list with search results
-    documents.value = searchResults.value.map((doc: SearchResult) => ({
-      ...doc,
       category: "search-result",
       fileSize: 0,
       createdAt: new Date(),
@@ -748,11 +754,11 @@ const performSingleDelete = async () => {
 
   try {
     const result = await HayApi.documents.delete.mutate({
-      id: documentToDelete.value.id,
+      id: documentToDelete.value!.id,
     });
 
     if (result.success) {
-      const index = documents.value.findIndex((d) => d.id === documentToDelete.value.id);
+      const index = documents.value.findIndex((d) => d.id === documentToDelete.value!.id);
       if (index > -1) {
         documents.value.splice(index, 1);
       }

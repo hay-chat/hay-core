@@ -729,7 +729,7 @@ const regenerateApiKey = async () => {
 
 const copyApiKey = async () => {
   try {
-    await navigator.clipboard.writeText(organization.value.apiKey);
+    await navigator.clipboard.writeText(organization.value?.apiKey || "");
     // TODO: Show success notification
     console.log("API key copied to clipboard");
   } catch (error) {
