@@ -84,7 +84,7 @@
       </Card>
 
       <!-- Embed Code for channels -->
-      <Card v-if="plugin.type.includes('channel') && enabled">
+      <Card v-if="plugin && (Array.isArray(plugin.type) ? plugin.type.includes('channel') : plugin.type === 'channel') && enabled">
         <CardHeader>
           <CardTitle>Installation</CardTitle>
           <CardDescription>
@@ -401,12 +401,12 @@ import {
   Lock,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
-import { useOrganizationStore } from "@/stores/organization";
+import { useUserStore } from "@/stores/user";
 
 // Route and router
 const route = useRoute();
 const router = useRouter();
-const organizationStore = useOrganizationStore();
+const userStore = useUserStore();
 
 // Plugin ID from route
 const pluginId = computed(() => route.params.pluginId as string);
@@ -420,6 +420,7 @@ const saving = ref(false);
 const testing = ref(false);
 const copied = ref(false);
 const testResult = ref<{ success: boolean; message?: string } | null>(null);
+const instanceId = ref<string | null>(null);
 
 // Configuration
 const hasConfiguration = ref(false);
@@ -434,24 +435,27 @@ const originalFormData = ref<Record<string, any>>({});
 
 // Embed code for channels
 const embedCode = computed(() => {
-  if (!plugin.value?.type.includes("channel")) return "";
+  // Check if plugin is loaded and has embedSnippet
+  if (!plugin.value) return "";
 
-  const orgId = organizationStore.current?.id;
-  const baseUrl = window.location.origin.replace("5173", "3000");
+  const embedSnippet = plugin.value.manifest?.capabilities?.chat_connector?.embedSnippet;
+  if (!embedSnippet) return "";
 
-  // Build the embed code without template literals to avoid script tag issues
-  const scriptTag = [
-    "<script>",
-    "  (function() {",
-    '    var script = document.createElement("script");',
-    `    script.src = "${baseUrl}/plugins/embed/${orgId}/${plugin.value.name}";`,
-    "    script.async = true;",
-    "    document.body.appendChild(script);",
-    "  })();",
-    "</scr" + "ipt>",
-  ].join("\n");
+  // Check if we have all required data
+  if (!userStore.activeOrganizationId || !plugin.value?.id || !instanceId.value) {
+    return ""; // Will retry when data loads
+  }
 
-  return scriptTag;
+  const baseUrl = window.location.origin.replace("5173", "3001");
+
+  // Replace placeholders in the embed snippet
+  let snippet = embedSnippet
+    .replace(/{{ORGANIZATION_ID}}/g, userStore.activeOrganizationId)
+    .replace(/{{INSTANCE_ID}}/g, instanceId.value)
+    .replace(/{{PLUGIN_ID}}/g, plugin.value.id)
+    .replace(/{{BASE_URL}}/g, baseUrl);
+
+  return snippet;
 });
 
 // Methods
@@ -512,6 +516,7 @@ const fetchPlugin = async () => {
       pluginId: pluginId.value,
     });
     enabled.value = configData.enabled;
+    instanceId.value = 'instanceId' in configData ? configData.instanceId : null;
     formData.value = { ...configData.configuration };
     originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
 

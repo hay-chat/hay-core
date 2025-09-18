@@ -40,7 +40,8 @@
         "fileUpload": true,
         "typing": true,
         "readReceipts": true
-      }
+      },
+      "embedSnippet": "<script>\n  window.HayChat = window.HayChat || {};\n  window.HayChat.config = {\n    organizationId: '{{ORGANIZATION_ID}}',\n    instanceId: '{{INSTANCE_ID}}',\n    pluginId: '{{PLUGIN_ID}}',\n    baseUrl: '{{BASE_URL}}'\n  };\n</script>\n<script src=\"{{BASE_URL}}/plugins/assets/{{PLUGIN_ID}}/widget.js\" async></script>\n<link rel=\"stylesheet\" href=\"{{BASE_URL}}/plugins/assets/{{PLUGIN_ID}}/widget.css\">"
     }
   },
   "config": {

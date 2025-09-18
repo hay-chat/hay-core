@@ -53,6 +53,7 @@ export interface HayPluginManifest {
         typing?: boolean;
         readReceipts?: boolean;
       };
+      embedSnippet?: string; // HTML/JS snippet for embedding the plugin with {{PLACEHOLDERS}}
     };
   };
   permissions?: {

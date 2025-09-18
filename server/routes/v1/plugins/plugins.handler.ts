@@ -284,6 +284,7 @@ export const getPluginConfiguration = authenticatedProcedure
       return {
         configuration: defaultConfig,
         enabled: false,
+        instanceId: null,
       };
     }
 
@@ -305,6 +306,7 @@ export const getPluginConfiguration = authenticatedProcedure
     return {
       configuration: maskedConfig,
       enabled: instance.enabled,
+      instanceId: instance.id,
     };
   });
 

@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { PublicAsset } from "../../plugins/base";
 import type { HayPluginManifest } from "../../plugins/base/types";
 
@@ -215,50 +214,6 @@ export class PluginAssetService {
       console.error(`Failed to serve asset ${assetPath} for plugin ${pluginName}:`, error);
       res.status(500).json({ error: "Failed to load asset" });
     }
-  }
-
-  /**
-   * Generate embed script for a plugin instance
-   */
-  async generateEmbedScript(organizationId: string, pluginId: string): Promise<string> {
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-
-    if (!instance) {
-      throw new Error("Plugin instance not found");
-    }
-
-    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
-    const config = instance.config || {};
-
-    const script = `
-(function() {
-  window.HayChat = window.HayChat || {};
-  window.HayChat.config = {
-    organizationId: '${organizationId}',
-    instanceId: '${instance.id}',
-    pluginName: '${instance.plugin.name}',
-    baseUrl: '${baseUrl}',
-    ...${JSON.stringify(config)}
-  };
-
-  const script = document.createElement('script');
-  script.src = '${baseUrl}/plugins/assets/${instance.plugin.name}/widget.js';
-  script.async = true;
-  script.onload = function() {
-    if (window.HayChat && window.HayChat.init) {
-      window.HayChat.init(window.HayChat.config);
-    }
-  };
-  document.head.appendChild(script);
-
-  const style = document.createElement('link');
-  style.rel = 'stylesheet';
-  style.href = '${baseUrl}/plugins/assets/${instance.plugin.name}/widget.css';
-  document.head.appendChild(style);
-})();
-    `.trim();
-
-    return script;
   }
 
   /**

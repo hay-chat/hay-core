@@ -78,20 +78,6 @@ async function startServer() {
     });
   });
 
-  // Plugin embed script route - generate embed code for websites
-  server.get("/plugins/embed/:organizationId/:pluginId", async (req, res) => {
-    try {
-      const script = await pluginAssetService.generateEmbedScript(
-        req.params.organizationId,
-        req.params.pluginId,
-      );
-      res.setHeader("Content-Type", "application/javascript");
-      res.send(script);
-    } catch (error) {
-      console.error("Embed script error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
 
   // Plugin webhook routes - handle incoming webhooks from external services
   server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
