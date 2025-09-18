@@ -686,20 +686,20 @@
               <div class="flex justify-between text-sm">
                 <span>Progress</span>
                 <span
-                  >{{ webImportProgress.processedPages }}/{{
-                    webImportProgress.totalPages
+                  >{{ webImportProgress?.processedPages }}/{{
+                    webImportProgress?.totalPages
                   }}
                   pages</span
                 >
               </div>
               <Progress
                 :value="
-                  (webImportProgress.processedPages / Math.max(webImportProgress.totalPages, 1)) *
+                  ((webImportProgress?.processedPages || 0) / Math.max(webImportProgress?.totalPages || 1, 1)) *
                   100
                 "
                 class="h-2"
               />
-              <p v-if="webImportProgress.currentUrl" class="text-xs text-muted-foreground truncate">
+              <p v-if="webImportProgress?.currentUrl" class="text-xs text-muted-foreground truncate">
                 Processing: {{ webImportProgress.currentUrl }}
               </p>
             </div>

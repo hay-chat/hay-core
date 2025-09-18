@@ -435,7 +435,8 @@ const fetchPlaybooks = async () => {
   try {
     loading.value = true;
     const response = await HayApi.playbooks.list.query();
-    playbooks.value = response || [];
+    // Type assertion to ensure compatibility
+    playbooks.value = (response || []) as Playbook[];
   } catch (error) {
     console.error("Failed to fetch playbooks:", error);
     toast.error("Failed to load playbooks");

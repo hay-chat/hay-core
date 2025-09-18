@@ -30,13 +30,29 @@ interface InstructionData {
   level?: number;
 }
 
+interface MCPTool {
+  id: string;
+  name: string;
+  label: string;
+  pluginName: string;
+  description?: string;
+}
+
+interface DocumentItem {
+  id: string;
+  name: string;
+  type: string;
+  url?: string;
+  title?: string;
+}
+
 interface Props {
   modelValue: InstructionData;
   level: number;
   index: number;
   hierarchicalNumber: string;
-  mcpTools: unknown[];
-  documents: unknown[];
+  mcpTools: MCPTool[];
+  documents: DocumentItem[];
 }
 
 const props = defineProps<Props>();
@@ -79,7 +95,12 @@ const localInstructions = computed({
 // No child management needed - flat structure
 
 // Handle slash command from RichInstructionInput
-const handleSlashCommand = (data: unknown) => {
+const handleSlashCommand = (data: {
+  query: string;
+  slashIndex: number;
+  textarea: HTMLElement;
+  mode?: string;
+}) => {
   emit("slash-command", data);
 };
 

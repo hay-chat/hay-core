@@ -221,10 +221,10 @@
                   <span v-else class="text-sm text-muted-foreground">-</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                  {{ formatDate(job.createdAt) }}
+                  {{ formatDate(job.created_at) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                  {{ formatDuration(job.duration) }}
+                  {{ formatDuration((job as any).duration) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                   <div class="flex items-center space-x-2">
@@ -237,7 +237,7 @@
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="job.status === 'failed' && job.attempts < job.maxAttempts"
+                      v-if="job.status === 'failed' && job.attempts && job.max_attempts && job.attempts < job.max_attempts"
                       variant="ghost"
                       size="sm"
                       title="Retry Job"
@@ -325,24 +325,24 @@
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Attempts</p>
-              <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.maxAttempts }}</p>
+              <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.max_attempts }}</p>
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Created</p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.createdAt, true) }}
+                {{ formatDate(selectedJob.created_at, true) }}
               </p>
             </div>
-            <div v-if="selectedJob.startedAt">
+            <div v-if="selectedJob.started_at">
               <p class="text-sm font-medium text-muted-foreground">Started</p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.startedAt, true) }}
+                {{ formatDate(selectedJob.started_at, true) }}
               </p>
             </div>
-            <div v-if="selectedJob.completedAt">
+            <div v-if="selectedJob.completed_at">
               <p class="text-sm font-medium text-muted-foreground">Completed</p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.completedAt, true) }}
+                {{ formatDate(selectedJob.completed_at, true) }}
               </p>
             </div>
           </div>
@@ -370,11 +370,11 @@
             </div>
           </div>
 
-          <div v-if="selectedJob.metadata?.logs" class="space-y-2">
+          <div v-if="(selectedJob as any).metadata?.logs" class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Logs</p>
             <div class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto">
               <p
-                v-for="(log, index) in selectedJob.metadata.logs"
+                v-for="(log, index) in (selectedJob as any).metadata.logs"
                 :key="index"
                 class="text-xs font-mono"
               >

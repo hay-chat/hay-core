@@ -454,7 +454,9 @@ function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string
     } else {
       html = items
         .map(
-          (tool, i) => `
+          (item, i) => {
+            const tool = item as MCPTool;
+            return `
         <div class="mention-item mention-item-action ${
           i === activeIndex ? "active" : ""
         }" data-id="${tool.id}">
@@ -467,7 +469,8 @@ function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string
             )} - ${highlightMatch(tool.pluginName, currentQuery)}</div>
           </div>
         </div>
-      `,
+      `;
+          },
         )
         .join("");
     }
@@ -484,7 +487,8 @@ function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string
       `;
     } else {
       html = items
-        .map((doc, i) => {
+        .map((item, i) => {
+          const doc = item as DocumentItem;
           let metaInfo = doc.type || "document";
           if (doc.url) {
             try {
@@ -552,10 +556,10 @@ function handleItemSelection(item: MCPTool | DocumentItem | { type: string }) {
       showMenu(activeSlashContext.textarea.getBoundingClientRect(), items);
     }
   } else if (commandMode === "actions") {
-    insertAction(item);
+    insertAction(item as MCPTool);
     hideMenu();
   } else if (commandMode === "documents") {
-    insertDocument(item);
+    insertDocument(item as DocumentItem);
     hideMenu();
   }
 }

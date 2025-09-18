@@ -582,13 +582,15 @@ const confirmDelete = async () => {
 const performSingleDelete = async () => {
   if (!agentToDelete.value) return;
 
+  const agentId = agentToDelete.value.id;
+
   try {
     const result = await HayApi.agents.delete.mutate({
-      id: agentToDelete.value.id,
+      id: agentId,
     });
 
     if (result.success) {
-      const index = agents.value.findIndex((a) => a.id === agentToDelete.value.id);
+      const index = agents.value.findIndex((a) => a.id === agentId);
       if (index > -1) {
         agents.value.splice(index, 1);
       }

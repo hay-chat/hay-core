@@ -387,8 +387,9 @@ const goBack = () => {
 };
 
 const getStatusVariant = (
-  status: string,
+  status: string | undefined,
 ): "default" | "secondary" | "destructive" | "outline" | undefined => {
+  if (!status) return "outline";
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
@@ -399,7 +400,8 @@ const getStatusVariant = (
   return variants[status] || "default";
 };
 
-const getStatusIcon = (status: string) => {
+const getStatusIcon = (status: string | undefined) => {
+  if (!status) return Circle;
   const icons = {
     open: Circle,
     "pending-human": AlertTriangle,
@@ -411,7 +413,8 @@ const getStatusIcon = (status: string) => {
   return icons[status as keyof typeof icons] || Circle;
 };
 
-const formatStatus = (status: string) => {
+const formatStatus = (status: string | undefined) => {
+  if (!status) return "Unknown";
   const labels = {
     open: "Open",
     "pending-human": "Pending Human",
