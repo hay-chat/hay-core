@@ -5,11 +5,12 @@
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Custom Reports</h1>
         <p class="text-muted-foreground">
-          Build and schedule custom analytics reports
-        </p>
+Build and schedule custom analytics reports
+</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" @click="viewScheduledReports">
+        <Button variant="outline"
+size="sm" @click="viewScheduledReports">
           <Calendar class="h-4 w-4 mr-2" />
           Scheduled Reports
         </Button>
@@ -28,9 +29,7 @@
         <Card>
           <CardHeader>
             <CardTitle>Report Configuration</CardTitle>
-            <CardDescription
-              >Set up your custom report parameters</CardDescription
-            >
+            <CardDescription> Set up your custom report parameters </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
@@ -90,19 +89,14 @@
         <Card>
           <CardHeader>
             <CardTitle>Metrics Selection</CardTitle>
-            <CardDescription
-              >Choose the metrics to include in your report</CardDescription
-            >
+            <CardDescription> Choose the metrics to include in your report </CardDescription>
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
-              <div
-                v-for="category in metricCategories"
-                :key="category.name"
-                class="space-y-3"
-              >
+              <div v-for="category in metricCategories" :key="category.name" class="space-y-3">
                 <h3 class="font-medium flex items-center space-x-2">
-                  <component :is="category.icon" class="h-4 w-4" />
+                  <component :is="category.icon"
+class="h-4 w-4" />
                   <span>{{ category.name }}</span>
                 </h3>
                 <div class="grid gap-2 md:grid-cols-2">
@@ -116,7 +110,8 @@
                       :checked="reportConfig.metrics.includes(metric.id)"
                       @update:checked="toggleMetric(metric.id)"
                     />
-                    <Label :for="metric.id" class="text-sm">
+                    <Label :for="metric.id"
+class="text-sm">
                       {{ metric.name }}
                     </Label>
                   </div>
@@ -130,9 +125,7 @@
         <Card>
           <CardHeader>
             <CardTitle>Grouping & Filters</CardTitle>
-            <CardDescription
-              >Configure how to group and filter your data</CardDescription
-            >
+            <CardDescription> Configure how to group and filter your data </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
@@ -148,9 +141,8 @@
                     :checked="reportConfig.groupBy.includes(group.id)"
                     @update:checked="toggleGroupBy(group.id)"
                   />
-                  <Label :for="group.id" class="text-sm">{{
-                    group.name
-                  }}</Label>
+                  <Label :for="group.id"
+class="text-sm">{{ group.name }}</Label>
                 </div>
               </div>
             </div>
@@ -178,11 +170,7 @@
                   class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
                 >
                   <option value="">All Agents</option>
-                  <option
-                    v-for="agent in agents"
-                    :key="agent.id"
-                    :value="agent.id"
-                  >
+                  <option v-for="agent in agents" :key="agent.id" :value="agent.id">
                     {{ agent.name }}
                   </option>
                 </select>
@@ -242,11 +230,10 @@
                 @click="toggleVisualization(viz.id)"
               >
                 <div class="text-center">
-                  <component
-                    :is="viz.icon"
-                    class="h-8 w-8 mx-auto text-primary mb-2"
-                  />
-                  <h3 class="font-medium text-sm">{{ viz.name }}</h3>
+                  <component :is="viz.icon" class="h-8 w-8 mx-auto text-primary mb-2" />
+                  <h3 class="font-medium text-sm">
+                    {{ viz.name }}
+                  </h3>
                   <p class="text-xs text-muted-foreground">
                     {{ viz.description }}
                   </p>
@@ -286,18 +273,12 @@
                     <strong>Group By:</strong>
                     {{ reportConfig.groupBy.join(", ") || "None" }}
                   </div>
-                  <div>
-                    <strong>Date Range:</strong> {{ reportConfig.dateRange }}
-                  </div>
+                  <div><strong>Date Range:</strong> {{ reportConfig.dateRange }}</div>
                 </div>
               </div>
 
               <div class="space-y-2">
-                <Button
-                  class="w-full"
-                  :disabled="!canGenerate"
-                  @click="generateReport"
-                >
+                <Button class="w-full" :disabled="!canGenerate" @click="generateReport">
                   <FileText class="h-4 w-4 mr-2" />
                   Generate Report
                 </Button>
@@ -340,7 +321,8 @@
                 class="w-full justify-start"
                 @click="loadTemplate(template)"
               >
-                <component :is="template.icon" class="h-4 w-4 mr-2" />
+                <component :is="template.icon"
+class="h-4 w-4 mr-2" />
                 {{ template.name }}
               </Button>
             </div>
@@ -353,32 +335,29 @@
             <CardTitle>Recent Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            <div
-              v-if="recentReports.length === 0"
-              class="text-sm text-muted-foreground"
-            >
+            <div v-if="recentReports.length === 0" class="text-sm text-muted-foreground">
               No recent reports
             </div>
-            <div v-else class="space-y-3">
+            <div v-else
+class="space-y-3">
               <div
                 v-for="report in recentReports"
                 :key="report.id"
                 class="p-3 border rounded-lg hover:bg-background-secondary cursor-pointer"
                 @click="viewReport(report.id)"
               >
-                <div class="font-medium text-sm">{{ report.name }}</div>
+                <div class="font-medium text-sm">
+                  {{ report.name }}
+                </div>
                 <div class="text-xs text-muted-foreground">
                   Generated {{ formatDate(report.createdAt) }}
                 </div>
                 <div class="flex items-center justify-between mt-2">
-                  <Badge variant="outline" class="text-xs">{{
-                    report.format
-                  }}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    @click.stop="downloadReport(report.id)"
-                  >
+                  <Badge variant="outline"
+class="text-xs">
+                    {{ report.format }}
+                  </Badge>
+                  <Button variant="ghost" size="sm" @click.stop="downloadReport(report.id)">
                     <Download class="h-3 w-3" />
                   </Button>
                 </div>
@@ -415,12 +394,12 @@ const Badge = ({ variant = "default", ...props }) =>
       variant === "outline"
         ? "border border-gray-300 text-gray-700"
         : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : "bg-gray-100 text-gray-800"
+          ? "bg-blue-100 text-blue-800"
+          : variant === "destructive"
+            ? "bg-red-100 text-red-800"
+            : variant === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
@@ -546,12 +525,7 @@ const quickTemplates = [
     config: {
       name: "Weekly Performance Summary",
       type: "summary",
-      metrics: [
-        "total_conversations",
-        "resolution_rate",
-        "response_time",
-        "customer_satisfaction",
-      ],
+      metrics: ["total_conversations", "resolution_rate", "response_time", "customer_satisfaction"],
       groupBy: ["agent", "channel"],
       dateRange: "7d",
       visualizations: ["metrics", "bar_chart"],
@@ -564,12 +538,7 @@ const quickTemplates = [
     config: {
       name: "Agent Performance Report",
       type: "performance",
-      metrics: [
-        "total_conversations",
-        "resolution_rate",
-        "response_time",
-        "agent_utilization",
-      ],
+      metrics: ["total_conversations", "resolution_rate", "response_time", "agent_utilization"],
       groupBy: ["agent"],
       dateRange: "30d",
       visualizations: ["table", "bar_chart"],
@@ -582,11 +551,7 @@ const quickTemplates = [
     config: {
       name: "Monthly Trends Analysis",
       type: "trends",
-      metrics: [
-        "total_conversations",
-        "resolution_rate",
-        "customer_satisfaction",
-      ],
+      metrics: ["total_conversations", "resolution_rate", "customer_satisfaction"],
       groupBy: ["time"],
       dateRange: "90d",
       visualizations: ["line_chart", "metrics"],

@@ -9,11 +9,9 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw
-            class="mr-2 h-4 w-4"
-            :class="{ 'animate-spin': loading }"
-          />
+        <Button variant="outline"
+:disabled="loading" @click="refreshData">
+          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
         <Button @click="createOrganization">
@@ -66,16 +64,16 @@
         <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
-              <div
-                class="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center"
-              >
+              <div class="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Building2 class="h-6 w-6 text-primary" />
               </div>
               <div class="flex-1">
-                <CardTitle class="text-lg">{{ org.name }}</CardTitle>
-                <CardDescription class="mt-1">{{
-                  org.description || "No description"
-                }}</CardDescription>
+                <CardTitle class="text-lg">
+                  {{ org.name }}
+                </CardTitle>
+                <CardDescription class="mt-1">
+                  {{ org.description || "No description" }}
+                </CardDescription>
               </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -85,8 +83,8 @@
                   org.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : org.status === 'inactive'
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-red-100 text-red-800',
+                      ? 'bg-gray-100 text-gray-800'
+                      : 'bg-red-100 text-red-800',
                 ]"
               >
                 {{ org.status }}
@@ -108,11 +106,15 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p class="text-muted-foreground">Members</p>
-                <p class="font-medium">{{ org.memberCount }}</p>
+                <p class="font-medium">
+                  {{ org.memberCount }}
+                </p>
               </div>
               <div>
                 <p class="text-muted-foreground">Agents</p>
-                <p class="font-medium">{{ org.agentCount }}</p>
+                <p class="font-medium">
+                  {{ org.agentCount }}
+                </p>
               </div>
             </div>
 
@@ -154,17 +156,10 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else-if="!loading && filteredOrganizations.length === 0"
-      class="text-center py-12"
-    >
+    <div v-else-if="!loading && filteredOrganizations.length === 0" class="text-center py-12">
       <Building2 class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{
-          searchQuery || statusFilter
-            ? "No organizations found"
-            : "No organizations yet"
-        }}
+        {{ searchQuery || statusFilter ? "No organizations found" : "No organizations yet" }}
       </h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
@@ -174,29 +169,23 @@
         }}
       </p>
       <div class="mt-6">
-        <Button
-          @click="
-            searchQuery || statusFilter ? clearFilters() : createOrganization()
-          "
-        >
-          {{
-            searchQuery || statusFilter
-              ? "Clear Filters"
-              : "Create Organization"
-          }}
+        <Button @click="searchQuery || statusFilter ? clearFilters() : createOrganization()">
+          {{ searchQuery || statusFilter ? "Clear Filters" : "Create Organization" }}
         </Button>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <Card v-for="i in 6" :key="i" class="animate-pulse">
+    <div v-if="loading"
+class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <Card v-for="i in 6"
+:key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
-            <div class="h-12 w-12 bg-background-tertiary rounded-lg"></div>
+            <div class="h-12 w-12 bg-background-tertiary rounded-lg" />
             <div class="flex-1 space-y-2">
-              <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
-              <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+              <div class="h-4 bg-background-tertiary rounded w-3/4" />
+              <div class="h-3 bg-background-tertiary rounded w-1/2" />
             </div>
           </div>
         </CardHeader>
@@ -204,12 +193,12 @@
           <div class="space-y-3">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
-                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
-                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2" />
+                <div class="h-4 bg-background-tertiary rounded w-3/4" />
               </div>
               <div class="space-y-1">
-                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
-                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2" />
+                <div class="h-4 bg-background-tertiary rounded w-3/4" />
               </div>
             </div>
           </div>
@@ -223,14 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  Building2,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings,
-  MoreVertical,
-} from "lucide-vue-next";
+import { Building2, Plus, RefreshCw, Search, Settings, MoreVertical } from "lucide-vue-next";
 
 // TODO: Import organization store/composable
 // TODO: Import router for navigation
@@ -304,8 +286,7 @@ const filteredOrganizations = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
       (org) =>
-        org.name.toLowerCase().includes(query) ||
-        org.description?.toLowerCase().includes(query)
+        org.name.toLowerCase().includes(query) || org.description?.toLowerCase().includes(query),
     );
   }
 

@@ -14,15 +14,8 @@ export interface ChunkOptions {
  * @param options Chunking options
  * @returns Array of text chunks
  */
-export function splitTextIntoChunks(
-  text: string,
-  options: ChunkOptions = {}
-): string[] {
-  const {
-    chunkSize = 1000,
-    chunkOverlap = 200,
-    separator = /(?<=[.!?])\s+/
-  } = options;
+export function splitTextIntoChunks(text: string, options: ChunkOptions = {}): string[] {
+  const { chunkSize = 1000, chunkOverlap = 200, separator = /(?<=[.!?])\s+/ } = options;
 
   // First, try to split by sentences
   const sentences = text.split(separator);
@@ -35,24 +28,33 @@ export function splitTextIntoChunks(
       // Split long sentence by words
       const words = sentence.split(/\s+/);
       let wordChunk = "";
-      
+
       for (const word of words) {
         if ((wordChunk + " " + word).length > chunkSize && wordChunk) {
           chunks.push(wordChunk.trim());
           // Add overlap from the end of previous chunk
-          wordChunk = wordChunk.split(/\s+/).slice(-Math.floor(chunkOverlap / 10)).join(" ") + " " + word;
+          wordChunk =
+            wordChunk
+              .split(/\s+/)
+              .slice(-Math.floor(chunkOverlap / 10))
+              .join(" ") +
+            " " +
+            word;
         } else {
           wordChunk += (wordChunk ? " " : "") + word;
         }
       }
-      
+
       if (wordChunk) {
         currentChunk = wordChunk.trim();
       }
     } else if ((currentChunk + " " + sentence).length > chunkSize && currentChunk) {
       chunks.push(currentChunk.trim());
       // Add overlap from the end of previous chunk
-      const overlapText = currentChunk.split(/\s+/).slice(-Math.floor(chunkOverlap / 10)).join(" ");
+      const overlapText = currentChunk
+        .split(/\s+/)
+        .slice(-Math.floor(chunkOverlap / 10))
+        .join(" ");
       currentChunk = overlapText + " " + sentence;
     } else {
       currentChunk += (currentChunk ? " " : "") + sentence;
@@ -63,7 +65,7 @@ export function splitTextIntoChunks(
     chunks.push(currentChunk.trim());
   }
 
-  return chunks.filter(chunk => chunk.length > 0);
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
 /**
@@ -76,7 +78,7 @@ export function splitTextIntoChunks(
 export function createChunkMetadata(
   chunkIndex: number,
   totalChunks: number,
-  documentMetadata: Record<string, any> = {}
+  documentMetadata: Record<string, any> = {},
 ): Record<string, any> {
   return {
     ...documentMetadata,

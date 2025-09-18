@@ -53,22 +53,21 @@ export class LLMService {
     try {
       const preparedMessages = this.prepareMessages(history || "", prompt);
 
-      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming =
-        {
-          model,
-          messages: preparedMessages,
-          temperature,
-          max_tokens,
-          ...(jsonSchema && {
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: "structured_response",
-                schema: jsonSchema as Record<string, unknown>,
-              },
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+        model,
+        messages: preparedMessages,
+        temperature,
+        max_tokens,
+        ...(jsonSchema && {
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "structured_response",
+              schema: jsonSchema as Record<string, unknown>,
             },
-          }),
-        };
+          },
+        }),
+      };
 
       if (stream) {
         const streamResponse = await this.openai.chat.completions.create({
@@ -110,7 +109,7 @@ export class LLMService {
 
   private prepareMessages(
     history: string | Message[],
-    systemPrompt?: string
+    systemPrompt?: string,
   ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
@@ -128,7 +127,7 @@ export class LLMService {
   }
 
   private async *streamToAsyncIterable(
-    stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
+    stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
   ): AsyncIterable<string> {
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
@@ -139,7 +138,7 @@ export class LLMService {
   }
 
   private serializeMessages(
-    messages: Message[]
+    messages: Message[],
   ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
     return messages.map((message) => {
       let role: "system" | "user" | "assistant";
@@ -178,14 +177,10 @@ export class LLMService {
     }
   }
 
-  private logLLMResponseDebugInfo(
-    response: OpenAI.Chat.Completions.ChatCompletion
-  ): void {
+  private logLLMResponseDebugInfo(response: OpenAI.Chat.Completions.ChatCompletion): void {
     this.writeToLog("=== LLM RESPONSE DEBUG INFO ===");
     this.writeToLog(`Model: ${response.model}`);
-    this.writeToLog(
-      `Created: ${new Date(response.created * 1000).toISOString()}`
-    );
+    this.writeToLog(`Created: ${new Date(response.created * 1000).toISOString()}`);
     this.writeToLog(`Finish reason: ${response.choices[0]?.finish_reason}`);
 
     if (response.usage) {
@@ -206,7 +201,7 @@ export class LLMService {
     this.writeToLog(
       `Response preview: "${responseContent.substring(0, 200)}${
         responseContent.length > 200 ? "..." : ""
-      }"`
+      }"`,
     );
 
     this.writeToLog("=== END LLM RESPONSE DEBUG INFO ===");

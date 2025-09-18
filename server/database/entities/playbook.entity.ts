@@ -7,7 +7,7 @@ import {
   ManyToOne,
   ManyToMany,
   JoinColumn,
-  JoinTable
+  JoinTable,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { Agent } from "./agent.entity";
@@ -15,13 +15,13 @@ import { Agent } from "./agent.entity";
 export enum PlaybookStatus {
   DRAFT = "draft",
   ACTIVE = "active",
-  ARCHIVED = "archived"
+  ARCHIVED = "archived",
 }
 
 export enum PlaybookKind {
   WELCOME = "welcome",
   ENDER = "ender",
-  CUSTOM = "custom"
+  CUSTOM = "custom",
 }
 
 @Entity("playbooks")
@@ -44,7 +44,7 @@ export class Playbook {
   @Column({
     type: "enum",
     enum: PlaybookKind,
-    default: PlaybookKind.CUSTOM
+    default: PlaybookKind.CUSTOM,
   })
   kind!: PlaybookKind;
 
@@ -60,7 +60,7 @@ export class Playbook {
   @Column({
     type: "enum",
     enum: PlaybookStatus,
-    default: PlaybookStatus.DRAFT
+    default: PlaybookStatus.DRAFT,
   })
   status!: PlaybookStatus;
 
@@ -71,17 +71,17 @@ export class Playbook {
   @JoinColumn()
   organization!: Organization;
 
-  @ManyToMany(() => Agent, agent => agent.playbooks)
+  @ManyToMany(() => Agent, (agent) => agent.playbooks)
   @JoinTable({
     name: "playbook_agents",
     joinColumn: {
       name: "playbook_id",
-      referencedColumnName: "id"
+      referencedColumnName: "id",
     },
     inverseJoinColumn: {
       name: "agent_id",
-      referencedColumnName: "id"
-    }
+      referencedColumnName: "id",
+    },
   })
   agents!: Agent[];
 

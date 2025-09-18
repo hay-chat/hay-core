@@ -26,22 +26,22 @@ export class Embedding {
     transformer: {
       to: (value: number[] | null): string | null => {
         if (!value || !Array.isArray(value)) return null;
-        return `[${value.join(',')}]`;
+        return `[${value.join(",")}]`;
       },
       from: (value: string | null): number[] | null => {
         if (!value) return null;
         if (Array.isArray(value)) return value;
-        
+
         // Handle pgvector format
-        if (typeof value === 'string') {
-          const cleaned = value.replace(/[\[\]]/g, '');
+        if (typeof value === "string") {
+          const cleaned = value.replace(/[\[\]]/g, "");
           if (!cleaned) return null;
-          return cleaned.split(',').map(v => parseFloat(v.trim()));
+          return cleaned.split(",").map((v) => parseFloat(v.trim()));
         }
-        
+
         return null;
-      }
-    }
+      },
+    },
   })
   embedding?: number[] | null;
 

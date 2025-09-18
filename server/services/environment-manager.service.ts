@@ -9,13 +9,16 @@ export class EnvironmentManagerService {
    */
   async prepareEnvironment(
     organizationId: string,
-    instance: PluginInstance
+    instance: PluginInstance,
   ): Promise<NodeJS.ProcessEnv> {
     const manifest = instance.plugin.manifest as HayPluginManifest;
     const permittedEnvVars = manifest.permissions?.env || [];
-    
-    console.log(`[Environment] Plugin ${instance.plugin.name} permitted env vars:`, permittedEnvVars);
-    
+
+    console.log(
+      `[Environment] Plugin ${instance.plugin.name} permitted env vars:`,
+      permittedEnvVars,
+    );
+
     // Start with a clean environment
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: process.env.NODE_ENV || "production",
@@ -30,17 +33,12 @@ export class EnvironmentManagerService {
     };
 
     // Decrypt config values
-    const decryptedConfig = instance.config
-      ? decryptConfig(instance.config)
-      : {};
+    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
 
     // Apply permitted environment variables
     for (const varName of permittedEnvVars) {
       // Check if it's defined in the config schema
-      const configKey = this.findConfigKeyForEnvVar(
-        varName,
-        manifest.configSchema
-      );
+      const configKey = this.findConfigKeyForEnvVar(varName, manifest.configSchema);
 
       if (configKey && decryptedConfig[configKey] !== undefined) {
         // Use value from database config (priority)
@@ -60,8 +58,11 @@ export class EnvironmentManagerService {
       }
     }
 
-    console.log(`[Environment] Final env vars for ${instance.plugin.name}:`, Object.keys(env).filter(key => !['NODE_ENV', 'PATH', 'HOME', 'USER'].includes(key)));
-    
+    console.log(
+      `[Environment] Final env vars for ${instance.plugin.name}:`,
+      Object.keys(env).filter((key) => !["NODE_ENV", "PATH", "HOME", "USER"].includes(key)),
+    );
+
     return env;
   }
 
@@ -70,7 +71,7 @@ export class EnvironmentManagerService {
    */
   private findConfigKeyForEnvVar(
     envVar: string,
-    configSchema?: Record<string, any>
+    configSchema?: Record<string, any>,
   ): string | undefined {
     if (!configSchema) return undefined;
 
@@ -88,7 +89,7 @@ export class EnvironmentManagerService {
    */
   validateEnvironment(
     env: NodeJS.ProcessEnv,
-    manifest: HayPluginManifest
+    manifest: HayPluginManifest,
   ): { valid: boolean; missing: string[] } {
     const missing: string[] = [];
 
@@ -112,10 +113,7 @@ export class EnvironmentManagerService {
    * Sanitize environment variables for logging
    * Masks sensitive values
    */
-  sanitizeForLogging(
-    env: NodeJS.ProcessEnv,
-    manifest: HayPluginManifest
-  ): Record<string, string> {
+  sanitizeForLogging(env: NodeJS.ProcessEnv, manifest: HayPluginManifest): Record<string, string> {
     const sanitized: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(env)) {
@@ -123,7 +121,7 @@ export class EnvironmentManagerService {
 
       // Check if this env var is marked as encrypted in config schema
       const isEncrypted = Object.values(manifest.configSchema || {}).some(
-        (schema: any) => schema.env === key && schema.encrypted
+        (schema: any) => schema.env === key && schema.encrypted,
       );
 
       if (isEncrypted) {
@@ -148,9 +146,7 @@ export class EnvironmentManagerService {
   /**
    * Create isolated environment for plugin sandbox
    */
-  createSandboxEnvironment(
-    baseEnv: NodeJS.ProcessEnv
-  ): NodeJS.ProcessEnv {
+  createSandboxEnvironment(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     // Create a copy to avoid modifying the original
     const sandboxEnv = { ...baseEnv };
 

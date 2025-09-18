@@ -2,6 +2,8 @@ import { Repository, type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
+import { encryptConfig, decryptConfig } from "@server/lib/auth/utils/encryption";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   constructor() {
@@ -11,7 +13,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
 
   async findByOrgAndPlugin(
     organizationId: string,
-    pluginId: string
+    pluginId: string,
   ): Promise<PluginInstance | null> {
     // First, resolve the string plugin ID to a UUID by looking up the plugin registry
     const pluginRegistry = await pluginRegistryRepository.findByPluginId(pluginId);
@@ -37,9 +39,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     return this.getRepository().find(options);
   }
 
-  async findEnabledByOrganization(
-    organizationId: string
-  ): Promise<PluginInstance[]> {
+  async findEnabledByOrganization(organizationId: string): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { organizationId, enabled: true },
       relations: ["plugin"],
@@ -53,13 +53,9 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
-  async updateStatus(
-    id: string,
-    status: PluginInstance["status"],
-    error?: string
-  ): Promise<void> {
+  async updateStatus(id: string, status: PluginInstance["status"], error?: string): Promise<void> {
     const updates: Partial<PluginInstance> = { status };
-    
+
     if (status === "running") {
       updates.running = true;
       updates.lastStartedAt = new Date();
@@ -81,11 +77,24 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
-  async updateConfig(
-    id: string,
-    config: Record<string, any>
-  ): Promise<void> {
-    await this.getRepository().update(id, { config });
+  async updateConfig(id: string, config: Record<string, any>): Promise<void> {
+    // Get the plugin instance with its registry to access the manifest
+    const instance = await this.getRepository().findOne({
+      where: { id },
+      relations: ["plugin"],
+    });
+
+    if (!instance) {
+      throw new Error(`Plugin instance ${id} not found`);
+    }
+
+    const manifest = instance.plugin.manifest as HayPluginManifest;
+    const configSchema = manifest.configSchema || {};
+
+    // Encrypt sensitive fields before storing
+    const encryptedConfig = encryptConfig(config, configSchema);
+
+    await this.getRepository().update(id, { config: encryptedConfig });
   }
 
   async incrementRestartCount(id: string): Promise<void> {
@@ -101,10 +110,26 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async upsertInstance(
     organizationId: string,
     pluginId: string,
-    data: Partial<PluginInstance>
+    data: Partial<PluginInstance>,
   ): Promise<PluginInstance> {
-    const existing = await this.findByOrgAndPlugin(organizationId, pluginId);
-    
+    // First, resolve the string plugin ID to a UUID by looking up the plugin registry
+    const pluginRegistry = await pluginRegistryRepository.findByPluginId(pluginId);
+    if (!pluginRegistry) {
+      throw new Error(`Plugin ${pluginId} not found in registry`);
+    }
+
+    // If config is provided, encrypt sensitive fields
+    if (data.config) {
+      const manifest = pluginRegistry.manifest as HayPluginManifest;
+      const configSchema = manifest.configSchema || {};
+      data.config = encryptConfig(data.config, configSchema);
+    }
+
+    const existing = await this.getRepository().findOne({
+      where: { organizationId, pluginId: pluginRegistry.id },
+      relations: ["plugin"],
+    });
+
     if (existing) {
       await this.getRepository().update(existing.id, {
         ...data,
@@ -115,7 +140,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       const entity = this.getRepository().create({
         ...data,
         organizationId,
-        pluginId,
+        pluginId: pluginRegistry.id,
       } as PluginInstance);
       return await this.getRepository().save(entity);
     }
@@ -124,18 +149,27 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async enablePlugin(
     organizationId: string,
     pluginId: string,
-    config?: Record<string, any>
+    config?: Record<string, any>,
   ): Promise<PluginInstance> {
+    // Get the plugin registry to access the manifest
+    const pluginRegistry = await pluginRegistryRepository.findByPluginId(pluginId);
+    if (!pluginRegistry) {
+      throw new Error(`Plugin ${pluginId} not found in registry`);
+    }
+
+    const manifest = pluginRegistry.manifest as HayPluginManifest;
+    const configSchema = manifest.configSchema || {};
+
+    // Encrypt sensitive fields before storing
+    const encryptedConfig = config ? encryptConfig(config, configSchema) : undefined;
+
     return this.upsertInstance(organizationId, pluginId, {
       enabled: true,
-      config,
+      config: encryptedConfig,
     });
   }
 
-  async disablePlugin(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async disablePlugin(organizationId: string, pluginId: string): Promise<void> {
     const instance = await this.findByOrgAndPlugin(organizationId, pluginId);
     if (instance) {
       await this.update(instance.id, organizationId, {

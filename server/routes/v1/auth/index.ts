@@ -12,16 +12,8 @@ import {
   hashApiKey,
   generateSessionId,
 } from "@server/lib/auth/utils/hashing";
-import {
-  generateTokens,
-  verifyRefreshToken,
-  refreshAccessToken,
-} from "@server/lib/auth/utils/jwt";
-import {
-  protectedProcedure,
-  publicProcedure,
-  adminProcedure,
-} from "@server/trpc/middleware/auth";
+import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
+import { protectedProcedure, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
 import type { ApiKeyResponse } from "@server/types/auth.types";
 
 const loginSchema = z.object({
@@ -52,7 +44,7 @@ const createApiKeySchema = z.object({
       z.object({
         resource: z.string(),
         actions: z.array(z.string()),
-      })
+      }),
     )
     .optional(),
 });
@@ -77,7 +69,7 @@ export const authRouter = t.router({
       // Prevent timing attacks by using a valid dummy hash
       await verifyPassword(
         password,
-        "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$SOWWcWsDNrEh+WTm3Hh5F3hH5KPLz9JRDYbAj2BJUn4"
+        "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$SOWWcWsDNrEh+WTm3Hh5F3hH5KPLz9JRDYbAj2BJUn4",
       );
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -111,12 +103,16 @@ export const authRouter = t.router({
     const tokens = generateTokens(user, sessionId);
 
     // Prepare organization data
-    const organizations = user.organization ? [{
-      id: user.organization.id,
-      name: user.organization.name,
-      slug: user.organization.slug,
-      role: user.role,
-    }] : [];
+    const organizations = user.organization
+      ? [
+          {
+            id: user.organization.id,
+            name: user.organization.name,
+            slug: user.organization.slug,
+            role: user.role,
+          },
+        ]
+      : [];
 
     return {
       user: {
@@ -128,174 +124,171 @@ export const authRouter = t.router({
     };
   }),
 
-  register: publicProcedure
-    .input(registerSchema)
-    .mutation(async ({ input }) => {
-      const {
-        email,
-        password,
-        firstName,
-        lastName,
-        organizationName,
-        organizationSlug,
-      } = input;
+  register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
+    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
-      // Use a transaction for atomicity
-      return await AppDataSource.transaction(async (manager) => {
-        const userRepository = manager.getRepository(User);
-        const organizationRepository = manager.getRepository(Organization);
+    // Use a transaction for atomicity
+    return await AppDataSource.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+      const organizationRepository = manager.getRepository(Organization);
 
-        // Check if user already exists
-        const existingUser = await userRepository.findOne({
-          where: { email: email.toLowerCase() },
-        });
-
-        if (existingUser) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "User already exists",
-          });
-        }
-
-        let organization: Organization | null = null;
-
-        // Create organization if name provided
-        if (organizationName) {
-          const orgSlug =
-            organizationSlug ||
-            organizationName
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)+/g, "");
-
-          // Check if slug already exists
-          const existingOrg = await organizationRepository.findOne({
-            where: { slug: orgSlug },
-          });
-
-          if (existingOrg) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: "Organization slug already exists",
-            });
-          }
-
-          organization = organizationRepository.create({
-            name: organizationName,
-            slug: orgSlug,
-            isActive: true,
-            plan: "free",
-            limits: {
-              maxUsers: 5,
-              maxDocuments: 100,
-              maxApiKeys: 10,
-              maxJobs: 50,
-              maxStorageGb: 1,
-            },
-          });
-
-          await organizationRepository.save(organization);
-        }
-
-        // Hash password
-        const hashedPassword = await hashPassword(password, "argon2");
-
-        // Create new user
-        const user = userRepository.create({
-          email: email.toLowerCase(),
-          password: hashedPassword,
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
-          isActive: true,
-          organizationId: organization?.id,
-          role: organization ? "owner" : "member", // Owner if creating org, otherwise member
-        });
-
-        await userRepository.save(user);
-
-        // Generate tokens
-        const sessionId = generateSessionId();
-        const tokens = generateTokens(user, sessionId);
-
-        // Prepare organization data
-        const organizations = organization ? [{
-          id: organization.id,
-          name: organization.name,
-          slug: organization.slug,
-          role: user.role,
-        }] : [];
-
-        return {
-          user: {
-            ...user.toJSON(),
-            organizations,
-            activeOrganizationId: user.organizationId,
-          },
-          ...tokens,
-        };
+      // Check if user already exists
+      const existingUser = await userRepository.findOne({
+        where: { email: email.toLowerCase() },
       });
-    }),
 
-  refreshToken: publicProcedure
-    .input(refreshTokenSchema)
-    .mutation(async ({ input }) => {
-      try {
-        const payload = verifyRefreshToken(input.refreshToken);
-
-        // Find user
-        const userRepository = AppDataSource.getRepository(User);
-        const user = await userRepository.findOne({
-          where: { id: payload.userId },
-        });
-
-        if (!user || !user.isActive) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid refresh token",
-          });
-        }
-
-        // Generate new access token
-        const accessToken = await refreshAccessToken(input.refreshToken);
-
-        return {
-          accessToken,
-          expiresIn: 900, // 15 minutes
-        };
-      } catch (error) {
+      if (existingUser) {
         throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid or expired refresh token",
+          code: "CONFLICT",
+          message: "User already exists",
         });
       }
-    }),
+
+      let organization: Organization | null = null;
+
+      // Create organization if name provided
+      if (organizationName) {
+        const orgSlug =
+          organizationSlug ||
+          organizationName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)+/g, "");
+
+        // Check if slug already exists
+        const existingOrg = await organizationRepository.findOne({
+          where: { slug: orgSlug },
+        });
+
+        if (existingOrg) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Organization slug already exists",
+          });
+        }
+
+        organization = organizationRepository.create({
+          name: organizationName,
+          slug: orgSlug,
+          isActive: true,
+          plan: "free",
+          limits: {
+            maxUsers: 5,
+            maxDocuments: 100,
+            maxApiKeys: 10,
+            maxJobs: 50,
+            maxStorageGb: 1,
+          },
+        });
+
+        await organizationRepository.save(organization);
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(password, "argon2");
+
+      // Create new user
+      const user = userRepository.create({
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        isActive: true,
+        organizationId: organization?.id,
+        role: organization ? "owner" : "member", // Owner if creating org, otherwise member
+      });
+
+      await userRepository.save(user);
+
+      // Generate tokens
+      const sessionId = generateSessionId();
+      const tokens = generateTokens(user, sessionId);
+
+      // Prepare organization data
+      const organizations = organization
+        ? [
+            {
+              id: organization.id,
+              name: organization.name,
+              slug: organization.slug,
+              role: user.role,
+            },
+          ]
+        : [];
+
+      return {
+        user: {
+          ...user.toJSON(),
+          organizations,
+          activeOrganizationId: user.organizationId,
+        },
+        ...tokens,
+      };
+    });
+  }),
+
+  refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input }) => {
+    try {
+      const payload = verifyRefreshToken(input.refreshToken);
+
+      // Find user
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: payload.userId },
+      });
+
+      if (!user || !user.isActive) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid refresh token",
+        });
+      }
+
+      // Generate new access token
+      const accessToken = await refreshAccessToken(input.refreshToken);
+
+      return {
+        accessToken,
+        expiresIn: 900, // 15 minutes
+      };
+    } catch (error) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Invalid or expired refresh token",
+      });
+    }
+  }),
 
   // Protected endpoints
   me: protectedProcedure.query(async ({ ctx }) => {
     const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
-    
+
     // Fetch user with organization data
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: userEntity.id },
       relations: ["organization"],
     });
-    
+
     if (!user) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "User not found",
       });
     }
-    
+
     // Prepare organization data
-    const organizations = user.organization ? [{
-      id: user.organization.id,
-      name: user.organization.name,
-      slug: user.organization.slug,
-      role: user.role,
-    }] : [];
-    
+    const organizations = user.organization
+      ? [
+          {
+            id: user.organization.id,
+            name: user.organization.name,
+            slug: user.organization.slug,
+            role: user.role,
+          },
+        ]
+      : [];
+
     return {
       id: user.id,
       email: user.email,
@@ -321,7 +314,7 @@ export const authRouter = t.router({
       z.object({
         currentPassword: z.string(),
         newPassword: z.string().min(8),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
@@ -337,10 +330,7 @@ export const authRouter = t.router({
       }
 
       // Verify current password
-      const isValidPassword = await verifyPassword(
-        input.currentPassword,
-        user.password
-      );
+      const isValidPassword = await verifyPassword(input.currentPassword, user.password);
       if (!isValidPassword) {
         throw new TRPCError({
           code: "UNAUTHORIZED",

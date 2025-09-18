@@ -1,6 +1,6 @@
 export class VectorType {
   sqlType: string;
-  
+
   constructor(private dimensions?: number) {
     this.sqlType = this.dimensions ? `vector(${this.dimensions})` : "vector";
   }

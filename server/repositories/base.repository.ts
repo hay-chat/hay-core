@@ -17,7 +17,9 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   protected getRepository(): Repository<T> {
     if (!this.repository) {
       if (!AppDataSource?.isInitialized) {
-        throw new Error(`Database not initialized. Cannot access ${this.entityClass.name} repository.`);
+        throw new Error(
+          `Database not initialized. Cannot access ${this.entityClass.name} repository.`,
+        );
       }
       this.repository = AppDataSource.getRepository(this.entityClass);
     }
@@ -30,7 +32,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   async paginateQuery(
     listParams: ListParams,
     organizationId: string,
-    baseWhere?: Record<string, any>
+    baseWhere?: Record<string, any>,
   ): Promise<PaginatedResponse<T>> {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
@@ -67,9 +69,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     const total = await queryBuilder.getCount();
 
     // Apply pagination
-    queryBuilder
-      .skip(listParams.pagination.offset)
-      .take(listParams.pagination.limit);
+    queryBuilder.skip(listParams.pagination.offset).take(listParams.pagination.limit);
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
@@ -84,7 +84,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
       items,
       listParams.pagination.page,
       listParams.pagination.limit,
-      total
+      total,
     );
   }
 
@@ -94,7 +94,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   protected applyFilters(
     queryBuilder: SelectQueryBuilder<T>,
     filters?: Record<string, any>,
-    organizationId?: string
+    organizationId?: string,
   ): void {
     // Base implementation - override in child classes for entity-specific filters
     if (!filters) return;
@@ -119,13 +119,9 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   protected applySearch(
     queryBuilder: SelectQueryBuilder<T>,
-    search?: { query?: string; searchFields?: string[] }
+    search?: { query?: string; searchFields?: string[] },
   ): void {
-    if (
-      !search?.query ||
-      !search.searchFields ||
-      search.searchFields.length === 0
-    ) {
+    if (!search?.query || !search.searchFields || search.searchFields.length === 0) {
       return;
     }
 
@@ -136,10 +132,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     if (searchConditions) {
       queryBuilder.andWhere(
         `(${searchConditions})`,
-        search.searchFields.reduce((params, _, index) => {
-          params[`searchQuery${index}`] = `%${search.query}%`;
-          return params;
-        }, {} as Record<string, any>)
+        search.searchFields.reduce(
+          (params, _, index) => {
+            params[`searchQuery${index}`] = `%${search.query}%`;
+            return params;
+          },
+          {} as Record<string, any>,
+        ),
       );
     }
   }
@@ -149,7 +148,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   protected applyDateRange(
     queryBuilder: SelectQueryBuilder<T>,
-    dateRange?: { from?: string; to?: string }
+    dateRange?: { from?: string; to?: string },
   ): void {
     if (!dateRange) return;
 
@@ -171,7 +170,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   protected applySorting(
     queryBuilder: SelectQueryBuilder<T>,
-    sorting: { orderBy?: string; orderDirection: "asc" | "desc" }
+    sorting: { orderBy?: string; orderDirection: "asc" | "desc" },
   ): void {
     // Default to created_at if no orderBy specified
     const orderBy = sorting.orderBy || "created_at";
@@ -183,10 +182,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   /**
    * Apply includes/relations - should be overridden by child classes
    */
-  protected applyIncludes(
-    queryBuilder: SelectQueryBuilder<T>,
-    include?: string[]
-  ): void {
+  protected applyIncludes(queryBuilder: SelectQueryBuilder<T>, include?: string[]): void {
     if (!include || include.length === 0) return;
 
     // Base implementation - child classes should override for specific relations
@@ -195,9 +191,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
         queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
       } catch (error) {
         // Silently ignore invalid relations
-        console.warn(
-          `Invalid relation '${relation}' for entity ${this.entityClass.name}`
-        );
+        console.warn(`Invalid relation '${relation}' for entity ${this.entityClass.name}`);
       }
     });
   }
@@ -216,15 +210,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     });
   }
 
-  async update(
-    id: string,
-    organizationId: string,
-    data: Partial<T>
-  ): Promise<T | null> {
-    const result = await this.getRepository().update(
-      { id, organizationId } as any,
-      data
-    );
+  async update(id: string, organizationId: string, data: Partial<T>): Promise<T | null> {
+    const result = await this.getRepository().update({ id, organizationId } as any, data);
 
     if (result.affected === 0) {
       return null;
@@ -245,10 +232,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   /**
    * Find all entities for an organization (without pagination)
    */
-  async findByOrganization(
-    organizationId: string,
-    options?: FindManyOptions<T>
-  ): Promise<T[]> {
+  async findByOrganization(organizationId: string, options?: FindManyOptions<T>): Promise<T[]> {
     return await this.getRepository().find({
       where: { organizationId } as any,
       ...options,

@@ -37,11 +37,7 @@ export class JobRepository {
     });
   }
 
-  async update(
-    id: string,
-    organizationId: string,
-    updates: Partial<Job>
-  ): Promise<Job | null> {
+  async update(id: string, organizationId: string, updates: Partial<Job>): Promise<Job | null> {
     const job = await this.findById(id);
     if (!job || job.organizationId !== organizationId) return null;
 

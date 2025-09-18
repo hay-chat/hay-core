@@ -74,7 +74,7 @@ export interface PaginatedResponse<T> {
 export function createPaginationMetadata(
   page: number,
   limit: number,
-  total: number
+  total: number,
 ): PaginationMetadata {
   const totalPages = Math.ceil(total / limit);
   return {
@@ -97,7 +97,7 @@ export function createPaginatedResponse<T>(
   items: T[],
   page: number,
   limit: number,
-  total: number
+  total: number,
 ): PaginatedResponse<T> {
   return {
     items,

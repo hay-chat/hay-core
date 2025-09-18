@@ -1,9 +1,6 @@
 import { t } from "../init";
 import type { BaseListInput } from "../../types/list-input";
-import {
-  createPaginatedResponse,
-  calculateOffset,
-} from "../../types/list-input";
+import { createPaginatedResponse, calculateOffset } from "../../types/list-input";
 import { TRPCError } from "@trpc/server";
 
 // Middleware to parse and validate pagination input
@@ -101,12 +98,12 @@ export interface ListParams {
 export function createPaginatedResponseFromContext<T>(
   items: T[],
   total: number,
-  listParams: ListParams
+  listParams: ListParams,
 ): ReturnType<typeof createPaginatedResponse<T>> {
   return createPaginatedResponse(
     items,
     listParams.pagination.page,
     listParams.pagination.limit,
-    total
+    total,
   );
 }

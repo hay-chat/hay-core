@@ -1,36 +1,36 @@
-import { Entity, Column, Index, OneToMany, ManyToMany, JoinTable } from 'typeorm';
-import { BaseEntity } from './base.entity';
-import { User } from './user.entity';
-import { Document } from './document.entity';
-import { ApiKey } from './apikey.entity';
-import { Job } from './job.entity';
+import { Entity, Column, Index, OneToMany, ManyToMany, JoinTable } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { User } from "./user.entity";
+import { Document } from "./document.entity";
+import { ApiKey } from "./apikey.entity";
+import { Job } from "./job.entity";
 
-@Entity('organizations')
-@Index('idx_organizations_slug', ['slug'])
-@Index('idx_organizations_is_active', ['isActive'])
+@Entity("organizations")
+@Index("idx_organizations_slug", ["slug"])
+@Index("idx_organizations_is_active", ["isActive"])
 export class Organization extends BaseEntity {
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: "varchar", length: 255 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: "varchar", length: 255, unique: true })
   slug!: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({ type: "varchar", length: 500, nullable: true })
   description?: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: "boolean", default: true })
   isActive!: boolean;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true })
   logo?: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true })
   website?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   settings?: Record<string, any>;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   limits?: {
     maxUsers?: number;
     maxDocuments?: number;
@@ -39,13 +39,13 @@ export class Organization extends BaseEntity {
     maxStorageGb?: number;
   };
 
-  @Column({ type: 'varchar', length: 50, default: 'free' })
-  plan!: 'free' | 'starter' | 'professional' | 'enterprise';
+  @Column({ type: "varchar", length: 50, default: "free" })
+  plan!: "free" | "starter" | "professional" | "enterprise";
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   trialEndsAt?: Date;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true })
   billingEmail?: string;
 
   // Relationships
@@ -65,8 +65,8 @@ export class Organization extends BaseEntity {
   generateSlug(name: string): string {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
   }
 
   canAddUser(currentUserCount: number): boolean {

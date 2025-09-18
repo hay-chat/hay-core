@@ -50,16 +50,25 @@
         <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-4">
-              <div
-                :class="[
-                  'w-12 h-12 rounded-lg flex items-center justify-center',
-                  getPluginIconBg(plugin.type),
-                ]"
-              >
-                <component
-                  :is="getPluginIcon(plugin.type)"
-                  class="h-6 w-6 text-white"
+              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden">
+                <img
+                  :src="getPluginThumbnail(plugin.id)"
+                  :alt="`${plugin.name} thumbnail`"
+                  class="w-full h-full object-cover"
+                  @error="handleThumbnailError($event)"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
                 />
+                <div
+                  :class="[
+                    'w-full h-full rounded-lg items-center justify-center hidden',
+                    getPluginIconBg(plugin.type),
+                  ]"
+                >
+                  <component
+                    :is="getPluginIcon(plugin.type)"
+                    class="h-6 w-6 text-white"
+                  />
+                </div>
               </div>
               <div>
                 <CardTitle>{{
@@ -69,16 +78,6 @@
                   plugin.description || `Version ${plugin.version}`
                 }}</CardDescription>
               </div>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Badge :variant="enabled ? 'success' : 'default'">
-                {{ enabled ? "Enabled" : "Disabled" }}
-              </Badge>
-              <Switch
-                v-model="enabled"
-                @update:modelValue="togglePlugin"
-                :disabled="toggling"
-              />
             </div>
           </div>
         </CardHeader>
@@ -149,6 +148,7 @@
               <template v-if="field.type === 'string' && !field.options">
                 <Label :for="key" :required="field.required">
                   {{ field.label || key }}
+                  <Lock v-if="field.encrypted" class="inline-block h-3 w-3 ml-1 text-muted-foreground" />
                 </Label>
                 <p
                   v-if="field.description"
@@ -156,16 +156,76 @@
                 >
                   {{ field.description }}
                 </p>
-                <Input
-                  :id="key"
-                  v-model="formData[key]"
-                  :type="field.encrypted ? 'password' : 'text'"
-                  :placeholder="
-                    field.placeholder ||
-                    'Enter ' + (field.label || key).toLowerCase()
-                  "
-                  :required="field.required"
-                />
+
+                <!-- Encrypted field with edit mode -->
+                <div v-if="field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])" class="space-y-2">
+                  <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
+                    <Input
+                      :id="key"
+                      value="••••••••"
+                      type="password"
+                      disabled
+                      class="flex-1 bg-muted"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      @click="() => {
+                        editingEncryptedFields.add(key);
+                        formData[key] = ''; // Clear the masked value
+                        editingEncryptedFields = new Set(editingEncryptedFields);
+                      }"
+                    >
+                      <Edit3 class="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+
+                  <div v-else class="flex items-center space-x-2">
+                    <Input
+                      :id="key"
+                      v-model="formData[key]"
+                      type="password"
+                      :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
+                      :required="field.required"
+                      class="flex-1"
+                      autofocus
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      @click="() => {
+                        editingEncryptedFields.delete(key);
+                        formData[key] = originalFormData[key]; // Restore masked value
+                        editingEncryptedFields = new Set(editingEncryptedFields);
+                      }"
+                    >
+                      <X class="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    This value is encrypted and stored securely. Click edit to update it.
+                  </p>
+                </div>
+
+                <!-- Regular input or new encrypted field -->
+                <div v-else>
+                  <Input
+                    :id="key"
+                    v-model="formData[key]"
+                    :type="field.encrypted ? 'password' : 'text'"
+                    :placeholder="
+                      field.placeholder ||
+                      'Enter ' + (field.label || key).toLowerCase()
+                    "
+                    :required="field.required"
+                  />
+                  <p v-if="field.encrypted" class="text-xs text-muted-foreground mt-1">
+                    This value will be encrypted and stored securely.
+                  </p>
+                </div>
               </template>
 
               <!-- Select -->
@@ -336,6 +396,9 @@ import {
   FileText,
   Database,
   Package,
+  Edit3,
+  X,
+  Lock,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useOrganizationStore } from "@/stores/organization";
@@ -353,7 +416,6 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const plugin = ref<any>(null);
 const enabled = ref(false);
-const toggling = ref(false);
 const saving = ref(false);
 const testing = ref(false);
 const copied = ref(false);
@@ -365,6 +427,10 @@ const hasCustomTemplate = ref(false);
 const configSchema = ref<Record<string, any>>({});
 const formData = ref<Record<string, any>>({});
 const templateHtml = ref<string | null>(null);
+// Track which encrypted fields are being edited
+const editingEncryptedFields = ref<Set<string>>(new Set());
+// Track original values to detect changes
+const originalFormData = ref<Record<string, any>>({});
 
 // Embed code for channels
 const embedCode = computed(() => {
@@ -413,6 +479,23 @@ const getPluginDisplayName = (name: string) => {
     .join(" ");
 };
 
+const getPluginThumbnail = (pluginId: string) => {
+  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix)
+  const pluginName = pluginId.replace("hay-plugin-", "");
+  return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
+};
+
+const handleThumbnailError = (event: Event) => {
+  // Hide the image and show the fallback icon
+  const imgElement = event.target as HTMLImageElement;
+  const fallbackElement = imgElement.nextElementSibling as HTMLElement;
+
+  imgElement.style.display = "none";
+  if (fallbackElement) {
+    fallbackElement.style.display = "flex";
+  }
+};
+
 const fetchPlugin = async () => {
   loading.value = true;
   error.value = null;
@@ -430,6 +513,7 @@ const fetchPlugin = async () => {
     });
     enabled.value = configData.enabled;
     formData.value = { ...configData.configuration };
+    originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
 
     // Set config schema from manifest
     if (pluginData.manifest?.configSchema) {
@@ -471,38 +555,49 @@ const fetchPlugin = async () => {
   }
 };
 
-const togglePlugin = async (value: boolean) => {
-  toggling.value = true;
-  try {
-    if (value) {
-      await Hay.plugins.enable.mutate({
-        pluginId: pluginId.value,
-        configuration: formData.value,
-      });
-    } else {
-      await Hay.plugins.disable.mutate({ pluginId: pluginId.value });
-    }
-    enabled.value = value;
-  } catch (err) {
-    console.error("Failed to toggle plugin:", err);
-    enabled.value = !value; // Revert
-  } finally {
-    toggling.value = false;
-  }
-};
-
 const saveConfiguration = async () => {
   saving.value = true;
   const toast = useToast();
 
   try {
+    // Build configuration to send to server
+    const cleanedConfig: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(formData.value)) {
+      const field = configSchema.value[key];
+
+      // Handle encrypted fields
+      if (field?.encrypted && originalFormData.value[key] && /^\*+$/.test(originalFormData.value[key])) {
+        // This is an existing encrypted field
+        if (editingEncryptedFields.value.has(key) && value && value !== '') {
+          // User edited this field, send the new value
+          cleanedConfig[key] = value;
+        } else if (!editingEncryptedFields.value.has(key)) {
+          // User didn't edit this field, send masked value to preserve existing
+          cleanedConfig[key] = originalFormData.value[key];
+        } else {
+          // User clicked edit but didn't enter a value, preserve existing
+          cleanedConfig[key] = originalFormData.value[key];
+        }
+      } else {
+        // Regular field or new encrypted field
+        cleanedConfig[key] = value;
+      }
+    }
+
     await Hay.plugins.configure.mutate({
       pluginId: pluginId.value,
-      configuration: formData.value,
+      configuration: cleanedConfig,
     });
+
+    // Clear editing state for encrypted fields
+    editingEncryptedFields.value.clear();
 
     // Show success toast
     toast.success("Configuration saved successfully");
+
+    // Reload plugin data to refresh the UI
+    await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
 
@@ -521,6 +616,9 @@ const resetForm = async () => {
     pluginId: pluginId.value,
   });
   formData.value = { ...configData.configuration };
+  originalFormData.value = { ...configData.configuration };
+  // Clear any editing state for encrypted fields
+  editingEncryptedFields.value.clear();
 };
 
 const testConnection = async () => {

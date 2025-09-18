@@ -30,9 +30,8 @@
       />
     </svg>
     <p
-      class="font-secondary font-bold text-lg text-muted-foreground"
-      v-if="label"
-    >
+v-if="label" class="font-secondary font-bold text-lg text-muted-foreground"
+>
       {{ label }}
     </p>
   </div>
@@ -64,8 +63,7 @@ defineProps({
 .peak-1,
 .peak-2,
 .peak-3 {
-  animation: pulse 600ms infinite cubic-bezier(0.4, 0, 0.2, 1) forwards
-    alternate;
+  animation: pulse 600ms infinite cubic-bezier(0.4, 0, 0.2, 1) forwards alternate;
   transform-origin: bottom;
   --interval: 120ms;
 }

@@ -32,11 +32,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     });
   }
 
-  async updateInstallStatus(
-    id: string,
-    installed: boolean,
-    error?: string
-  ): Promise<void> {
+  async updateInstallStatus(id: string, installed: boolean, error?: string): Promise<void> {
     await this.getRepository().update(id, {
       installed,
       installedAt: installed ? new Date() : undefined,
@@ -44,11 +40,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     });
   }
 
-  async updateBuildStatus(
-    id: string,
-    built: boolean,
-    error?: string
-  ): Promise<void> {
+  async updateBuildStatus(id: string, built: boolean, error?: string): Promise<void> {
     await this.getRepository().update(id, {
       built,
       builtAt: built ? new Date() : undefined,
@@ -62,7 +54,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
 
   async upsertPlugin(plugin: Partial<PluginRegistry>): Promise<PluginRegistry> {
     const existing = await this.findByPluginId(plugin.pluginId!);
-    
+
     if (existing) {
       await this.getRepository().update(existing.id, {
         ...plugin,

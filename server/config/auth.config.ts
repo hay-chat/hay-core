@@ -1,11 +1,11 @@
-import { config } from './env';
+import { config } from "./env";
 
 export const authConfig = {
   jwt: {
     secret: config.jwt.secret,
-    expiresIn: '15m',
+    expiresIn: "15m",
     refreshExpiresIn: config.jwt.refreshExpiresIn,
-    algorithm: 'HS256' as const,
+    algorithm: "HS256" as const,
   },
   bcrypt: {
     saltRounds: 12,
@@ -18,13 +18,13 @@ export const authConfig = {
   },
   apiKey: {
     length: 32,
-    prefix: 'hay_',
+    prefix: "hay_",
   },
   session: {
     maxAge: 1000 * 60 * 60 * 24 * 7,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-    sameSite: 'strict' as const,
+    sameSite: "strict" as const,
   },
   rateLimit: {
     login: {

@@ -5,11 +5,12 @@
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Billing</h1>
         <p class="text-muted-foreground">
-          Manage your subscription, usage, and payment methods
-        </p>
+Manage your subscription, usage, and payment methods
+</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="downloadInvoice">
+        <Button variant="outline"
+@click="downloadInvoice">
           <Download class="h-4 w-4 mr-2" />
           Download Invoice
         </Button>
@@ -24,31 +25,22 @@
     <Card>
       <CardHeader>
         <CardTitle>Current Plan</CardTitle>
-        <CardDescription
-          >Your active subscription and billing details</CardDescription
-        >
+        <CardDescription> Your active subscription and billing details </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-6 lg:grid-cols-2">
           <!-- Plan Details -->
           <div class="space-y-4">
-            <div
-              class="flex items-center justify-between p-4 border rounded-lg"
-            >
+            <div class="flex items-center justify-between p-4 border rounded-lg">
               <div>
-                <h3 class="font-semibold text-lg">{{ currentPlan.name }}</h3>
+                <h3 class="font-semibold text-lg">
+                  {{ currentPlan.name }}
+                </h3>
                 <p class="text-muted-foreground">
                   {{ currentPlan.description }}
                 </p>
-                <div
-                  class="flex items-center space-x-4 mt-2 text-sm text-muted-foreground"
-                >
-                  <span
-                    >{{
-                      formatNumber(currentPlan.conversations)
-                    }}
-                    conversations/month</span
-                  >
+                <div class="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
+                  <span>{{ formatNumber(currentPlan.conversations) }} conversations/month</span>
                   <span>{{ formatNumber(currentPlan.agents) }} agents</span>
                   <span>{{ currentPlan.support }} support</span>
                 </div>
@@ -58,11 +50,7 @@
                 <div class="text-sm text-muted-foreground">
                   {{ currentPlan.period }}
                 </div>
-                <Badge
-                  v-if="currentPlan.discount"
-                  variant="success"
-                  class="mt-1"
-                >
+                <Badge v-if="currentPlan.discount" variant="success" class="mt-1">
                   {{ currentPlan.discount }}% off
                 </Badge>
               </div>
@@ -75,9 +63,7 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Next Billing Date:</span>
-                <span class="font-medium">{{
-                  formatDate(currentPlan.nextBillingDate)
-                }}</span>
+                <span class="font-medium">{{ formatDate(currentPlan.nextBillingDate) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Auto-Renewal:</span>
@@ -91,11 +77,13 @@
             </div>
 
             <div class="flex space-x-2">
-              <Button variant="outline" @click="changePlan">
+              <Button variant="outline"
+@click="changePlan">
                 <ArrowUpCircle class="h-4 w-4 mr-2" />
                 Change Plan
               </Button>
-              <Button variant="outline" @click="cancelSubscription">
+              <Button variant="outline"
+@click="cancelSubscription">
                 <XCircle class="h-4 w-4 mr-2" />
                 Cancel Subscription
               </Button>
@@ -121,17 +109,13 @@
                     :style="{
                       width: `${Math.min(
                         (usage.conversations / currentPlan.conversations) * 100,
-                        100
+                        100,
                       )}%`,
                     }"
-                  ></div>
+                  />
                 </div>
                 <div class="text-xs text-muted-foreground">
-                  {{
-                    Math.round(
-                      (usage.conversations / currentPlan.conversations) * 100
-                    )
-                  }}% used
+                  {{ Math.round((usage.conversations / currentPlan.conversations) * 100) }}% used
                 </div>
               </div>
 
@@ -140,11 +124,7 @@
                   <span>Active Agents</span>
                   <span class="font-medium"
                     >{{ usage.agents }} /
-                    {{
-                      currentPlan.agents === -1
-                        ? "Unlimited"
-                        : currentPlan.agents
-                    }}</span
+                    {{ currentPlan.agents === -1 ? "Unlimited" : currentPlan.agents }}</span
                   >
                 </div>
                 <div
@@ -154,12 +134,9 @@
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
-                      width: `${Math.min(
-                        (usage.agents / currentPlan.agents) * 100,
-                        100
-                      )}%`,
+                      width: `${Math.min((usage.agents / currentPlan.agents) * 100, 100)}%`,
                     }"
-                  ></div>
+                  />
                 </div>
               </div>
 
@@ -167,20 +144,16 @@
                 <div class="flex justify-between text-sm">
                   <span>Storage Used</span>
                   <span class="font-medium"
-                    >{{ formatBytes(usage.storage) }} /
-                    {{ formatBytes(currentPlan.storage) }}</span
+                    >{{ formatBytes(usage.storage) }} / {{ formatBytes(currentPlan.storage) }}</span
                   >
                 </div>
                 <div class="w-full bg-background-tertiary rounded-full h-2">
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
-                      width: `${Math.min(
-                        (usage.storage / currentPlan.storage) * 100,
-                        100
-                      )}%`,
+                      width: `${Math.min((usage.storage / currentPlan.storage) * 100, 100)}%`,
                     }"
-                  ></div>
+                  />
                 </div>
               </div>
 
@@ -196,18 +169,16 @@
                   <div
                     class="bg-primary h-2 rounded-full transition-all duration-300"
                     :style="{
-                      width: `${Math.min(
-                        (usage.apiCalls / currentPlan.apiCalls) * 100,
-                        100
-                      )}%`,
+                      width: `${Math.min((usage.apiCalls / currentPlan.apiCalls) * 100, 100)}%`,
                     }"
-                  ></div>
+                  />
                 </div>
               </div>
             </div>
 
             <!-- Usage Alerts -->
-            <div v-if="usageAlerts.length > 0" class="space-y-2">
+            <div v-if="usageAlerts.length > 0"
+class="space-y-2">
               <div
                 v-for="alert in usageAlerts"
                 :key="alert.type"
@@ -218,7 +189,9 @@
                   <div class="font-medium text-yellow-800">
                     {{ alert.title }}
                   </div>
-                  <div class="text-yellow-700">{{ alert.description }}</div>
+                  <div class="text-yellow-700">
+                    {{ alert.description }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -234,51 +207,43 @@
         <CardDescription>Manage your payment information</CardDescription>
       </CardHeader>
       <CardContent>
-        <div
-          v-if="paymentMethod"
-          class="flex items-center justify-between p-4 border rounded-lg"
-        >
+        <div v-if="paymentMethod" class="flex items-center justify-between p-4 border rounded-lg">
           <div class="flex items-center space-x-4">
-            <div
-              class="w-12 h-8 bg-gray-200 rounded flex items-center justify-center"
-            >
+            <div class="w-12 h-8 bg-gray-200 rounded flex items-center justify-center">
               <CreditCard class="h-4 w-4 text-gray-600" />
             </div>
             <div>
               <div class="font-medium">
-                **** **** **** {{ paymentMethod.last4 }}
-              </div>
+**** **** **** {{ paymentMethod.last4 }}
+</div>
               <div class="text-sm text-muted-foreground">
-                {{ paymentMethod.brand }} • Expires
-                {{ paymentMethod.expMonth }}/{{ paymentMethod.expYear }}
+                {{ paymentMethod.brand }} • Expires {{ paymentMethod.expMonth }}/{{
+                  paymentMethod.expYear
+                }}
               </div>
             </div>
           </div>
           <div class="flex items-center space-x-2">
-            <Badge
-              :variant="
-                paymentMethod.status === 'valid' ? 'success' : 'destructive'
-              "
-            >
+            <Badge :variant="paymentMethod.status === 'valid' ? 'success' : 'destructive'">
               {{ paymentMethod.status }}
             </Badge>
-            <Button variant="outline" size="sm" @click="updatePaymentMethod">
-              Update
-            </Button>
-            <Button variant="ghost" size="sm" @click="removePaymentMethod">
+            <Button variant="outline"
+size="sm" @click="updatePaymentMethod"
+>
+Update
+</Button>
+            <Button variant="ghost"
+size="sm" @click="removePaymentMethod">
               <Trash2 class="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <div
-          v-else
-          class="text-center py-8 border-2 border-dashed border-muted rounded-lg"
-        >
+        <div v-else class="text-center py-8 border-2 border-dashed border-muted rounded-lg">
           <CreditCard class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
           <p class="text-sm text-muted-foreground mb-4">
-            No payment method on file
-          </p>
+No payment method on file
+</p>
           <Button @click="addPaymentMethod">
             <Plus class="h-4 w-4 mr-2" />
             Add Payment Method
@@ -295,9 +260,11 @@
             <CardTitle>Billing History</CardTitle>
             <CardDescription>Your past invoices and payments</CardDescription>
           </div>
-          <Button variant="outline" size="sm" @click="viewAllInvoices">
-            View All
-          </Button>
+          <Button variant="outline"
+size="sm" @click="viewAllInvoices"
+>
+View All
+</Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -319,7 +286,9 @@
                 class="border-b hover:bg-background-secondary"
               >
                 <td class="py-3 px-4">
-                  <div class="font-medium">{{ invoice.number }}</div>
+                  <div class="font-medium">
+                    {{ invoice.number }}
+                  </div>
                   <div class="text-sm text-muted-foreground">
                     {{ invoice.description }}
                   </div>
@@ -329,8 +298,8 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="font-medium">
-                    ${{ invoice.amount.toFixed(2) }}
-                  </div>
+${{ invoice.amount.toFixed(2) }}
+</div>
                   <div class="text-sm text-muted-foreground">
                     {{ invoice.currency.toUpperCase() }}
                   </div>
@@ -342,18 +311,10 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      @click="downloadInvoice(invoice.id)"
-                    >
+                    <Button variant="ghost" size="sm" @click="downloadInvoice(invoice.id)">
                       <Download class="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      @click="viewInvoice(invoice.id)"
-                    >
+                    <Button variant="ghost" size="sm" @click="viewInvoice(invoice.id)">
                       <Eye class="h-4 w-4" />
                     </Button>
                   </div>
@@ -378,8 +339,8 @@
           <div class="text-center">
             <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
             <p class="text-sm text-muted-foreground">
-              Usage analytics will be displayed here
-            </p>
+Usage analytics will be displayed here
+</p>
           </div>
         </div>
       </CardContent>
@@ -399,7 +360,9 @@
             class="flex items-center justify-between p-4 border rounded-lg"
           >
             <div>
-              <div class="font-medium">{{ change.title }}</div>
+              <div class="font-medium">
+                {{ change.title }}
+              </div>
               <div class="text-sm text-muted-foreground">
                 {{ change.description }}
               </div>
@@ -408,14 +371,14 @@
               </div>
             </div>
             <div class="flex items-center space-x-2">
-              <Badge variant="outline">{{ change.type }}</Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="cancelChange(change.id)"
-              >
-                Cancel
-              </Button>
+              <Badge variant="outline">
+                {{ change.type }}
+              </Badge>
+              <Button variant="ghost"
+size="sm" @click="cancelChange(change.id)"
+>
+Cancel
+</Button>
             </div>
           </div>
         </div>
@@ -444,12 +407,12 @@ const Badge = ({ variant = "default", ...props }) =>
       variant === "outline"
         ? "border border-gray-300 text-gray-700"
         : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : "bg-gray-100 text-gray-800"
+          ? "bg-blue-100 text-blue-800"
+          : variant === "destructive"
+            ? "bg-red-100 text-red-800"
+            : variant === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });

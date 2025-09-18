@@ -28,28 +28,18 @@ export const useUserStore = defineStore("user", {
   }),
   getters: {
     activeOrganization: (state) => {
-      return (
-        state.organizations.find(
-          (org) => org.id === state.activeOrganizationId
-        ) || null
-      );
+      return state.organizations.find((org) => org.id === state.activeOrganizationId) || null;
     },
     userRole: (state) => {
-      const activeOrg = state.organizations.find(
-        (org) => org.id === state.activeOrganizationId
-      );
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role || state.user?.role || "member";
     },
     isOwner: (state) => {
-      const activeOrg = state.organizations.find(
-        (org) => org.id === state.activeOrganizationId
-      );
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role === "owner";
     },
     isAdmin: (state) => {
-      const activeOrg = state.organizations.find(
-        (org) => org.id === state.activeOrganizationId
-      );
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role === "owner" || activeOrg?.role === "admin";
     },
   },

@@ -1,12 +1,12 @@
-import path from 'path';
-import fs from 'fs/promises';
-import { pluginRegistryRepository } from '../repositories/plugin-registry.repository';
-import { pluginInstanceRepository } from '../repositories/plugin-instance.repository';
+import path from "path";
+import fs from "fs/promises";
+import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 
 interface UITemplate {
   name: string;
   content: string;
-  type: 'vue' | 'html' | 'json';
+  type: "vue" | "html" | "json";
 }
 
 interface ConfigField {
@@ -32,7 +32,7 @@ export class PluginUIService {
    */
   async getConfigurationTemplate(pluginId: string): Promise<string | null> {
     const cacheKey = `${pluginId}:configuration`;
-    
+
     // Check cache first
     if (this.templateCache.has(cacheKey)) {
       return this.templateCache.get(cacheKey)!.content;
@@ -44,20 +44,24 @@ export class PluginUIService {
     }
 
     const manifest = plugin.manifest as any;
-    
+
     // Check if plugin has custom configuration UI
     if (manifest.ui?.configuration) {
-      const pluginDir = path.join(process.cwd(), 'plugins', plugin.pluginId.replace('hay-plugin-', ''));
+      const pluginDir = path.join(
+        process.cwd(),
+        "plugins",
+        plugin.pluginId.replace("hay-plugin-", ""),
+      );
       const templatePath = path.join(pluginDir, manifest.ui.configuration);
-      
+
       try {
-        const content = await fs.readFile(templatePath, 'utf-8');
+        const content = await fs.readFile(templatePath, "utf-8");
         const template: UITemplate = {
-          name: 'configuration',
+          name: "configuration",
           content,
-          type: 'vue',
+          type: "vue",
         };
-        
+
         this.templateCache.set(cacheKey, template);
         return content;
       } catch (error) {
@@ -69,15 +73,15 @@ export class PluginUIService {
     if (manifest.configSchema) {
       const generatedTemplate = this.generateConfigurationTemplate(
         manifest.configSchema,
-        plugin.name
+        plugin.name,
       );
-      
+
       const template: UITemplate = {
-        name: 'configuration',
+        name: "configuration",
         content: generatedTemplate,
-        type: 'vue',
+        type: "vue",
       };
-      
+
       this.templateCache.set(cacheKey, template);
       return generatedTemplate;
     }
@@ -90,11 +94,13 @@ export class PluginUIService {
    */
   private generateConfigurationTemplate(
     configSchema: Record<string, ConfigField>,
-    pluginName: string
+    pluginName: string,
   ): string {
-    const fields = Object.entries(configSchema).map(([key, field]) => {
-      return this.generateFormField(key, field);
-    }).join('\n\n    ');
+    const fields = Object.entries(configSchema)
+      .map(([key, field]) => {
+        return this.generateFormField(key, field);
+      })
+      .join("\n\n    ");
 
     return `
 <template>
@@ -214,12 +220,14 @@ const saveConfiguration = async () => {
    */
   private generateFormField(key: string, field: ConfigField): string {
     const label = field.label || key;
-    const description = field.description ? `<p class="text-sm text-muted-foreground">${field.description}</p>` : '';
-    const required = field.required ? 'required' : '';
+    const description = field.description
+      ? `<p class="text-sm text-muted-foreground">${field.description}</p>`
+      : "";
+    const required = field.required ? "required" : "";
     const errorDisplay = `<p v-if="errors.${key}" class="text-sm text-destructive mt-1">{{ errors.${key} }}</p>`;
 
     switch (field.type) {
-      case 'select':
+      case "select":
         if (field.options) {
           return `
     <div class="space-y-2">
@@ -230,9 +238,9 @@ const saveConfiguration = async () => {
           <SelectValue placeholder="Select ${label.toLowerCase()}" />
         </SelectTrigger>
         <SelectContent>
-          ${field.options.map(opt => 
-            `<SelectItem value="${opt.value}">${opt.label}</SelectItem>`
-          ).join('\n          ')}
+          ${field.options
+            .map((opt) => `<SelectItem value="${opt.value}">${opt.label}</SelectItem>`)
+            .join("\n          ")}
         </SelectContent>
       </Select>
       ${errorDisplay}
@@ -240,7 +248,7 @@ const saveConfiguration = async () => {
         }
         return this.generateTextField(key, field);
 
-      case 'boolean':
+      case "boolean":
         return `
     <div class="flex items-center justify-between space-x-2">
       <div class="space-y-0.5">
@@ -250,7 +258,7 @@ const saveConfiguration = async () => {
       <Switch id="${key}" v-model="formData.${key}" />
     </div>`;
 
-      case 'textarea':
+      case "textarea":
         return `
     <div class="space-y-2">
       <Label for="${key}" ${required}>${label}</Label>
@@ -264,7 +272,7 @@ const saveConfiguration = async () => {
       ${errorDisplay}
     </div>`;
 
-      case 'number':
+      case "number":
         return `
     <div class="space-y-2">
       <Label for="${key}" ${required}>${label}</Label>
@@ -274,8 +282,8 @@ const saveConfiguration = async () => {
         v-model.number="formData.${key}"
         type="number"
         placeholder="Enter ${label.toLowerCase()}"
-        ${field.validation?.min !== undefined ? `min="${field.validation.min}"` : ''}
-        ${field.validation?.max !== undefined ? `max="${field.validation.max}"` : ''}
+        ${field.validation?.min !== undefined ? `min="${field.validation.min}"` : ""}
+        ${field.validation?.max !== undefined ? `max="${field.validation.max}"` : ""}
       />
       ${errorDisplay}
     </div>`;
@@ -290,10 +298,12 @@ const saveConfiguration = async () => {
    */
   private generateTextField(key: string, field: ConfigField): string {
     const label = field.label || key;
-    const description = field.description ? `<p class="text-sm text-muted-foreground">${field.description}</p>` : '';
-    const required = field.required ? 'required' : '';
+    const description = field.description
+      ? `<p class="text-sm text-muted-foreground">${field.description}</p>`
+      : "";
+    const required = field.required ? "required" : "";
     const errorDisplay = `<p v-if="errors.${key}" class="text-sm text-destructive mt-1">{{ errors.${key} }}</p>`;
-    const type = field.type === 'password' ? 'password' : 'text';
+    const type = field.type === "password" ? "password" : "text";
 
     return `
     <div class="space-y-2">
@@ -322,13 +332,17 @@ const saveConfiguration = async () => {
     const templates: Record<string, UITemplate> = {};
 
     if (manifest.ui?.templates) {
-      const pluginDir = path.join(process.cwd(), 'plugins', plugin.pluginId.replace('hay-plugin-', ''));
-      
+      const pluginDir = path.join(
+        process.cwd(),
+        "plugins",
+        plugin.pluginId.replace("hay-plugin-", ""),
+      );
+
       for (const [name, filePath] of Object.entries(manifest.ui.templates)) {
         try {
           const fullPath = path.join(pluginDir, filePath as string);
-          const content = await fs.readFile(fullPath, 'utf-8');
-          
+          const content = await fs.readFile(fullPath, "utf-8");
+
           templates[name] = {
             name,
             content,
@@ -346,11 +360,11 @@ const saveConfiguration = async () => {
   /**
    * Detect template type from file extension
    */
-  private detectTemplateType(filePath: string): 'vue' | 'html' | 'json' {
-    if (filePath.endsWith('.vue')) return 'vue';
-    if (filePath.endsWith('.html')) return 'html';
-    if (filePath.endsWith('.json')) return 'json';
-    return 'html';
+  private detectTemplateType(filePath: string): "vue" | "html" | "json" {
+    if (filePath.endsWith(".vue")) return "vue";
+    if (filePath.endsWith(".html")) return "html";
+    if (filePath.endsWith(".json")) return "json";
+    return "html";
   }
 
   /**

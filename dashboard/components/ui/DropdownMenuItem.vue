@@ -4,7 +4,7 @@
       :class="[
         'relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
         active ? 'bg-accent text-accent-foreground' : '',
-        $attrs['class']
+        $attrs['class'],
       ]"
       v-bind="$attrs"
       @click="$emit('click')"
@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { MenuItem } from '@headlessui/vue';
+import { MenuItem } from "@headlessui/vue";
 
 defineEmits<{
   click: [];

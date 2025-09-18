@@ -74,10 +74,10 @@ export class AddEmbeddingsTable1735428900000 implements MigrationInterface {
     // Drop indexes
     await queryRunner.query(`DROP INDEX IF EXISTS embeddings_embedding_hnsw`);
     await queryRunner.query(`DROP INDEX IF EXISTS embeddings_org_id_idx`);
-    
+
     // Drop table
     await queryRunner.query(`DROP TABLE IF EXISTS embeddings`);
-    
+
     // Note: We don't drop extensions as they might be used by other tables
   }
 }

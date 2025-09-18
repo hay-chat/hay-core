@@ -16,19 +16,19 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
-  'update:modelValue': [value: string];
+  "update:modelValue": [value: string];
 }>();
 
 const textareaAttrs = computed(() => {
   const attrs: Record<string, any> = {
-    value: props.modelValue || '',
+    value: props.modelValue || "",
     rows: props.rows || 4,
-    disabled: props.disabled || false
+    disabled: props.disabled || false,
   };
-  
-  if (props.id) attrs['id'] = props.id;
-  if (props.placeholder) attrs['placeholder'] = props.placeholder;
-  
+
+  if (props.id) attrs["id"] = props.id;
+  if (props.placeholder) attrs["placeholder"] = props.placeholder;
+
   return attrs;
 });
 </script>

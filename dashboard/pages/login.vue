@@ -3,10 +3,10 @@
     <div class="space-y-6">
       <!-- Header -->
       <div class="text-center">
-        <CardTitle class="text-2xl">Welcome back</CardTitle>
+        <CardTitle class="text-2xl"> Welcome back </CardTitle>
         <CardDescription class="mt-2">
-          Sign in to your account to continue
-        </CardDescription>
+Sign in to your account to continue
+</CardDescription>
       </div>
 
       <!-- Social Login -->
@@ -42,7 +42,8 @@
       </div> -->
 
       <!-- Login Form -->
-      <form class="space-y-4" @submit.prevent="handleSubmit">
+      <form class="space-y-4"
+@submit.prevent="handleSubmit">
         <FormField
           id="email"
           v-model="form.email"
@@ -69,10 +70,10 @@
         <!-- Remember me and Forgot password -->
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <Checkbox id="remember" v-model:checked="form.rememberMe" />
-            <Label for="remember" class="text-sm text-gray-700 cursor-pointer">
-              Remember me
-            </Label>
+            <Checkbox id="remember"
+v-model:checked="form.rememberMe" />
+            <Label for="remember"
+class="text-sm text-gray-700 cursor-pointer"> Remember me </Label>
           </div>
           <NuxtLink
             to="/forgot-password"
@@ -83,27 +84,20 @@
         </div>
 
         <!-- Submit Button -->
-        <Button
-          type="submit"
-          size="lg"
-          class="w-full"
-          :disabled="loading || !isFormValid"
-        >
-          <div v-if="loading" class="flex items-center space-x-2">
-            <div
-              class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
-            ></div>
+        <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
+          <div v-if="loading"
+class="flex items-center space-x-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             <span>Signing in...</span>
           </div>
           <span v-else>Sign in</span>
         </Button>
 
         <!-- Error Message -->
-        <div
-          v-if="error"
-          class="p-3 rounded-md bg-red-50 border border-red-200"
-        >
-          <p class="text-sm text-red-800">{{ error }}</p>
+        <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <p class="text-sm text-red-800">
+            {{ error }}
+          </p>
         </div>
       </form>
 
@@ -111,10 +105,7 @@
       <div class="text-center">
         <p class="text-sm text-gray-600">
           Don't have an account?
-          <NuxtLink
-            to="/signup"
-            class="font-medium text-primary hover:text-primary/80"
-          >
+          <NuxtLink to="/signup" class="font-medium text-primary hover:text-primary/80">
             Sign up
           </NuxtLink>
         </p>
@@ -161,11 +152,7 @@ const loading = computed(() => authStore.isLoading);
 
 const isFormValid = computed(() => {
   return (
-    form.email &&
-    form.password &&
-    validateEmail(form.email) &&
-    !errors.email &&
-    !errors.password
+    form.email && form.password && validateEmail(form.email) && !errors.email && !errors.password
   );
 });
 
@@ -213,17 +200,14 @@ const handleSubmit = async () => {
   } catch (err: any) {
     // Handle different types of authentication errors
     if (err.message.includes("Invalid credentials")) {
-      error.value =
-        "Invalid email or password. Please check your credentials and try again.";
+      error.value = "Invalid email or password. Please check your credentials and try again.";
     } else if (err.message.includes("locked")) {
       error.value =
         "Your account has been temporarily locked due to multiple failed login attempts. Please try again later.";
     } else if (err.message.includes("suspended")) {
-      error.value =
-        "Your account has been suspended. Please contact support for assistance.";
+      error.value = "Your account has been suspended. Please contact support for assistance.";
     } else {
-      error.value =
-        "Unable to sign in. Please check your internet connection and try again.";
+      error.value = "Unable to sign in. Please check your internet connection and try again.";
     }
     console.error("Login error:", err);
   }
@@ -232,8 +216,6 @@ const handleSubmit = async () => {
 // SEO
 useHead({
   title: "Sign In - Hay Dashboard",
-  meta: [
-    { name: "description", content: "Sign in to your Hay dashboard account" },
-  ],
+  meta: [{ name: "description", content: "Sign in to your Hay dashboard account" }],
 });
 </script>

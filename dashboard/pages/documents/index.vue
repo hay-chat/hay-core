@@ -9,11 +9,9 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw
-            class="mr-2 h-4 w-4"
-            :class="{ 'animate-spin': loading }"
-          />
+        <Button variant="outline"
+:disabled="loading" @click="refreshData">
+          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
         <NuxtLink to="/documents/import">
@@ -40,7 +38,7 @@
           />
         </div>
       </div>
-      <Button @click="searchDocuments" :disabled="!searchQuery || searching">
+      <Button :disabled="!searchQuery || searching" @click="searchDocuments">
         {{ searching ? "Searching..." : "Search" }}
       </Button>
       <div class="flex gap-2">
@@ -71,27 +69,25 @@
     </div>
 
     <!-- Bulk Actions -->
-    <div
-      v-if="selectedDocuments.length > 0"
-      class="bg-background-tertiary p-4 rounded-lg"
-    >
+    <div v-if="selectedDocuments.length > 0" class="bg-background-tertiary p-4 rounded-lg">
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
-          {{ selectedDocuments.length }} document{{
-            selectedDocuments.length === 1 ? "" : "s"
-          }}
+          {{ selectedDocuments.length }} document{{ selectedDocuments.length === 1 ? "" : "s" }}
           selected
         </p>
         <div class="flex space-x-2">
-          <Button variant="outline" size="sm" @click="bulkArchive">
+          <Button variant="outline"
+size="sm" @click="bulkArchive">
             <Archive class="mr-2 h-4 w-4" />
             Archive
           </Button>
-          <Button variant="outline" size="sm" @click="bulkDownload">
+          <Button variant="outline"
+size="sm" @click="bulkDownload">
             <Download class="mr-2 h-4 w-4" />
             Download
           </Button>
-          <Button variant="destructive" size="sm" @click="bulkDelete">
+          <Button variant="destructive"
+size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             Delete
           </Button>
@@ -100,35 +96,25 @@
     </div>
 
     <!-- Documents Table -->
-    <div
-      v-if="!loading && filteredDocuments.length > 0"
-      class="bg-background rounded-lg border"
-    >
+    <div v-if="!loading && filteredDocuments.length > 0" class="bg-background rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead class="w-12">
-              <Checkbox
-                :checked="allSelected"
-                @update:checked="toggleAllSelection"
-              />
+              <Checkbox :checked="allSelected" @update:checked="toggleAllSelection" />
             </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Modified</TableHead>
-            <TableHead class="text-right"></TableHead>
+            <TableHead class="text-right" />
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow
             v-for="document in filteredDocuments"
             :key="document.id"
-            :class="
-              selectedDocuments.includes(document.id)
-                ? 'bg-background-secondary'
-                : ''
-            "
+            :class="selectedDocuments.includes(document.id) ? 'bg-background-secondary' : ''"
           >
             <TableCell>
               <Checkbox
@@ -142,7 +128,8 @@
                   :is="getFileIcon(document.type)"
                   class="h-4 w-4 min-w-4 text-muted-foreground"
                 />
-                <div class="truncate" :title="document.title || document.name">
+                <div class="truncate"
+:title="document.title || document.name">
                   {{ document.title || document.name }}
                 </div>
               </div>
@@ -161,10 +148,10 @@
                   document.status === 'published'
                     ? 'bg-green-100 text-green-800'
                     : document.status === 'processing'
-                    ? 'bg-blue-100 text-blue-800'
-                    : document.status === 'archived'
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-red-100 text-red-800',
+                      ? 'bg-blue-100 text-blue-800'
+                      : document.status === 'archived'
+                        ? 'bg-gray-100 text-gray-800'
+                        : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -173,20 +160,21 @@
                     document.status === 'published'
                       ? 'bg-green-600'
                       : document.status === 'processing'
-                      ? 'bg-blue-600 animate-pulse'
-                      : document.status === 'archived'
-                      ? 'bg-gray-600'
-                      : 'bg-red-600',
+                        ? 'bg-blue-600 animate-pulse'
+                        : document.status === 'archived'
+                          ? 'bg-gray-600'
+                          : 'bg-red-600',
                   ]"
-                ></div>
+                />
                 {{ document.status }}
               </div>
             </TableCell>
             <TableCell>{{ formatDate(document.updatedAt) }}</TableCell>
             <TableCell class="text-right">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost"
+size="sm" class="h-8 w-8 p-0">
                     <MoreVertical class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -213,9 +201,7 @@
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="archiveDocument(document)">
                     <Archive class="mr-2 h-4 w-4" />
-                    {{
-                      document.status === "archived" ? "Unarchive" : "Archive"
-                    }}
+                    {{ document.status === "archived" ? "Unarchive" : "Archive" }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="text-destructive"
@@ -233,17 +219,10 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else-if="!loading && filteredDocuments.length === 0"
-      class="text-center py-12"
-    >
+    <div v-else-if="!loading && filteredDocuments.length === 0" class="text-center py-12">
       <FileText class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{
-          searchQuery || typeFilter || statusFilter
-            ? "No documents found"
-            : "No documents yet"
-        }}
+        {{ searchQuery || typeFilter || statusFilter ? "No documents found" : "No documents yet" }}
       </h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
@@ -253,13 +232,11 @@
         }}
       </p>
       <div class="mt-6">
-        <Button
-          v-if="searchQuery || typeFilter || statusFilter"
-          @click="clearFilters()"
-        >
+        <Button v-if="searchQuery || typeFilter || statusFilter" @click="clearFilters()">
           Clear Filters
         </Button>
-        <NuxtLink v-else to="/documents/import">
+        <NuxtLink v-else
+to="/documents/import">
           <Button>Import Document</Button>
         </NuxtLink>
       </div>
@@ -280,12 +257,16 @@
     <ToastContainer />
 
     <!-- Search Results -->
-    <div v-if="searchResults.length > 0" class="space-y-4">
+    <div v-if="searchResults.length > 0"
+class="space-y-4">
       <h3 class="text-lg font-semibold">Search Results</h3>
       <div class="grid gap-4">
-        <Card v-for="result in searchResults" :key="result.id">
+        <Card v-for="result in searchResults"
+:key="result.id">
           <CardHeader>
-            <CardTitle class="text-base">{{ result.title }}</CardTitle>
+            <CardTitle class="text-base">
+              {{ result.title }}
+            </CardTitle>
             <CardDescription>
               Similarity: {{ (result.similarity * 100).toFixed(2) }}%
 
@@ -293,28 +274,24 @@
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p class="text-sm text-muted-foreground">{{ result.content }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ result.content }}
+            </p>
           </CardContent>
         </Card>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="space-y-4">
-      <div v-for="i in 5" :key="i" class="animate-pulse">
-        <div
-          class="bg-background-tertiary rounded-lg p-4 flex items-center space-x-4"
-        >
-          <div
-            class="h-10 w-10 bg-background-tertiary-foreground/20 rounded"
-          ></div>
+    <div v-if="loading"
+class="space-y-4">
+      <div v-for="i in 5"
+:key="i" class="animate-pulse">
+        <div class="bg-background-tertiary rounded-lg p-4 flex items-center space-x-4">
+          <div class="h-10 w-10 bg-background-tertiary-foreground/20 rounded" />
           <div class="flex-1 space-y-2">
-            <div
-              class="h-4 bg-background-tertiary-foreground/20 rounded w-1/4"
-            ></div>
-            <div
-              class="h-3 bg-background-tertiary-foreground/20 rounded w-1/2"
-            ></div>
+            <div class="h-4 bg-background-tertiary-foreground/20 rounded w-1/4" />
+            <div class="h-3 bg-background-tertiary-foreground/20 rounded w-1/2" />
           </div>
         </div>
       </div>
@@ -342,11 +319,7 @@
         <div class="space-y-4">
           <div>
             <Label for="title">Title</Label>
-            <Input
-              id="title"
-              v-model="uploadForm.title"
-              placeholder="Enter document title"
-            />
+            <Input id="title" v-model="uploadForm.title" placeholder="Enter document title" />
           </div>
 
           <div>
@@ -364,21 +337,23 @@
             <div class="mt-2">
               <input
                 type="file"
-                @change="handleFileUpload"
                 accept=".txt,.md,.pdf"
                 class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                @change="handleFileUpload"
               />
               <p class="text-xs text-muted-foreground mt-2">
-                Supported formats: .txt, .md, .pdf
-              </p>
+Supported formats: .txt, .md, .pdf
+</p>
             </div>
           </div>
 
           <div class="flex justify-end space-x-2">
-            <Button variant="outline" @click="showUploadDialog = false">
-              Cancel
-            </Button>
-            <Button @click="uploadDocument" :disabled="uploading">
+            <Button variant="outline"
+@click="showUploadDialog = false"
+>
+Cancel
+</Button>
+            <Button :disabled="uploading" @click="uploadDocument">
               {{ uploading ? "Uploading..." : "Upload" }}
             </Button>
           </div>
@@ -427,9 +402,7 @@ const pageSize = ref(10);
 const totalDocuments = ref(0);
 
 // Computed total pages
-const totalPages = computed(() =>
-  Math.ceil(totalDocuments.value / pageSize.value)
-);
+const totalPages = computed(() => Math.ceil(totalDocuments.value / pageSize.value));
 const showUploadDialog = ref(false);
 const uploading = ref(false);
 const showDeleteDialog = ref(false);
@@ -456,8 +429,7 @@ const filteredDocuments = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
       (doc) =>
-        doc.name.toLowerCase().includes(query) ||
-        doc.description?.toLowerCase().includes(query)
+        doc.name.toLowerCase().includes(query) || doc.description?.toLowerCase().includes(query),
     );
   }
 
@@ -475,9 +447,7 @@ const filteredDocuments = computed(() => {
 const allSelected = computed(() => {
   return (
     filteredDocuments.value.length > 0 &&
-    filteredDocuments.value.every((doc) =>
-      selectedDocuments.value.includes(doc.id)
-    )
+    filteredDocuments.value.every((doc) => selectedDocuments.value.includes(doc.id))
   );
 });
 
@@ -606,22 +576,17 @@ onMounted(() => {
 // Helper function to detect file type from MIME type or extension
 const detectFileType = (mimeType: string, extension: string): string => {
   if (mimeType.includes("pdf") || extension === "pdf") return "pdf";
-  if (mimeType.includes("word") || extension === "docx" || extension === "doc")
-    return "doc";
+  if (mimeType.includes("word") || extension === "docx" || extension === "doc") return "doc";
   if (mimeType.includes("text/plain") || extension === "txt") return "txt";
   if (mimeType.includes("markdown") || extension === "md") return "md";
-  if (mimeType.includes("html") || extension === "html" || extension === "htm")
-    return "html";
+  if (mimeType.includes("html") || extension === "html" || extension === "htm") return "html";
   if (mimeType.includes("json") || extension === "json") return "json";
   if (mimeType.includes("csv") || extension === "csv") return "csv";
   return "file";
 };
 
 // Helper function to map document status
-const mapDocumentStatus = (
-  documentStatus: string,
-  processingStatus?: string
-): string => {
+const mapDocumentStatus = (documentStatus: string, processingStatus?: string): string => {
   if (processingStatus === "processing" || processingStatus === "queued") {
     return "processing";
   }
@@ -693,9 +658,7 @@ const recrawlDocument = async (document: any) => {
     });
 
     toast.success(
-      `Update started for ${
-        document.title || document.name
-      }. Check the job queue for progress.`
+      `Update started for ${document.title || document.name}. Check the job queue for progress.`,
     );
 
     // Optionally redirect to job queue
@@ -711,9 +674,7 @@ const archiveDocument = async (document: any) => {
     // TODO: Archive/unarchive via API
     document.status = document.status === "archived" ? "active" : "archived";
     toast.success(
-      `Document ${
-        document.status === "archived" ? "archived" : "unarchived"
-      } successfully`
+      `Document ${document.status === "archived" ? "archived" : "unarchived"} successfully`,
     );
   } catch (error) {
     console.error("Error archiving document:", error);
@@ -786,9 +747,7 @@ const performSingleDelete = async () => {
     });
 
     if (result.success) {
-      const index = documents.value.findIndex(
-        (d) => d.id === documentToDelete.value.id
-      );
+      const index = documents.value.findIndex((d) => d.id === documentToDelete.value.id);
       if (index > -1) {
         documents.value.splice(index, 1);
       }
@@ -809,11 +768,7 @@ const performBulkDelete = async () => {
   const totalCount = selectedDocuments.value.length;
 
   // Show initial progress toast with no auto-dismiss
-  const progressToastId = toast.info(
-    `Deleting documents... 0/${totalCount}`,
-    undefined,
-    0
-  );
+  const progressToastId = toast.info(`Deleting documents... 0/${totalCount}`, undefined, 0);
 
   try {
     let deletedCount = 0;
@@ -829,10 +784,7 @@ const performBulkDelete = async () => {
           deletedCount++;
 
           // Update progress toast
-          toast.update(
-            progressToastId,
-            `Deleting documents... ${deletedCount}/${totalCount}`
-          );
+          toast.update(progressToastId, `Deleting documents... ${deletedCount}/${totalCount}`);
         }
       } catch (error) {
         errors.push(documentId);
@@ -840,30 +792,23 @@ const performBulkDelete = async () => {
         console.error(`Error deleting document ${documentId}:`, error);
 
         // Update progress toast even for errors
-        toast.update(
-          progressToastId,
-          `Deleting documents... ${deletedCount}/${totalCount}`
-        );
+        toast.update(progressToastId, `Deleting documents... ${deletedCount}/${totalCount}`);
       }
     }
 
     // Remove the progress toast
     toast.remove(progressToastId);
 
-    documents.value = documents.value.filter(
-      (doc) => !successfulDeletes.includes(doc.id)
-    );
+    documents.value = documents.value.filter((doc) => !successfulDeletes.includes(doc.id));
 
     selectedDocuments.value = [];
 
     if (errors.length > 0) {
       toast.warning(
-        `Successfully deleted ${successfulDeletes.length} document(s). Failed to delete ${errors.length} document(s).`
+        `Successfully deleted ${successfulDeletes.length} document(s). Failed to delete ${errors.length} document(s).`,
       );
     } else {
-      toast.success(
-        `Successfully deleted ${successfulDeletes.length} document(s)`
-      );
+      toast.success(`Successfully deleted ${successfulDeletes.length} document(s)`);
     }
   } catch (error) {
     console.error("Error deleting documents:", error);
@@ -882,10 +827,7 @@ const handleFileUpload = async (event: Event) => {
   reader.onload = (e) => {
     const arrayBuffer = e.target?.result as ArrayBuffer;
     const base64 = btoa(
-      new Uint8Array(arrayBuffer).reduce(
-        (data, byte) => data + String.fromCharCode(byte),
-        ""
-      )
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
     );
 
     uploadForm.value.fileBuffer = base64;
@@ -910,8 +852,6 @@ onMounted(async () => {
 // SEO
 useHead({
   title: "Documents - Hay Dashboard",
-  meta: [
-    { name: "description", content: "Manage your knowledge base documents" },
-  ],
+  meta: [{ name: "description", content: "Manage your knowledge base documents" }],
 });
 </script>

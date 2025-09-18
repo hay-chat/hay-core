@@ -1,12 +1,15 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
-import { processManagerService } from './process-manager.service';
-import { pluginInstanceManagerService } from './plugin-instance-manager.service';
-import { pluginInstanceRepository } from '../repositories/plugin-instance.repository';
-import { conversationRepository, ConversationRepository } from '../repositories/conversation.repository';
-import { CustomerIdentifier } from '../../plugins/base';
-import jwt from 'jsonwebtoken';
-import { config } from '../config/env';
+import { WebSocketServer, WebSocket } from "ws";
+import { Server } from "http";
+import { processManagerService } from "./process-manager.service";
+import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
+import {
+  conversationRepository,
+  ConversationRepository,
+} from "../repositories/conversation.repository";
+import { CustomerIdentifier } from "../../plugins/base";
+import jwt from "jsonwebtoken";
+import { config } from "../config/env";
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -28,25 +31,25 @@ export class WebSocketService {
    * Can run on the same HTTP server or on a separate port
    */
   initialize(serverOrPort: Server | number): void {
-    if (typeof serverOrPort === 'number') {
+    if (typeof serverOrPort === "number") {
       // Standalone WebSocket server on a separate port
-      this.wss = new WebSocketServer({ 
+      this.wss = new WebSocketServer({
         port: serverOrPort,
-        path: '/ws',
+        path: "/ws",
         clientTracking: true,
       });
       console.log(`🔌 WebSocket server initialized on standalone port ${serverOrPort}`);
     } else {
       // WebSocket server attached to existing HTTP server
-      this.wss = new WebSocketServer({ 
+      this.wss = new WebSocketServer({
         server: serverOrPort,
-        path: '/ws',
+        path: "/ws",
         clientTracking: true,
       });
-      console.log('🔌 WebSocket server initialized');
+      console.log("🔌 WebSocket server initialized");
     }
 
-    this.wss.on('connection', (ws, req) => {
+    this.wss.on("connection", (ws, req) => {
       this.handleConnection(ws, req);
     });
   }
@@ -57,17 +60,17 @@ export class WebSocketService {
   private handleConnection(ws: WebSocket, req: any): void {
     const clientId = this.generateClientId();
     const url = new URL(req.url!, `http://${req.headers.host}`);
-    const token = url.searchParams.get('token');
-    const organizationId = url.searchParams.get('org');
+    const token = url.searchParams.get("token");
+    const organizationId = url.searchParams.get("org");
 
     // Create client object
     const client: WebSocketClient = {
       ws,
-      organizationId: organizationId || '',
-      customerId: '',
+      organizationId: organizationId || "",
+      customerId: "",
       authenticated: false,
       metadata: {
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
         ip: req.socket.remoteAddress,
       },
     };
@@ -80,24 +83,26 @@ export class WebSocketService {
     }
 
     // Set up event handlers
-    ws.on('message', (data) => {
+    ws.on("message", (data) => {
       this.handleMessage(clientId, data.toString());
     });
 
-    ws.on('close', () => {
+    ws.on("close", () => {
       this.handleDisconnect(clientId);
     });
 
-    ws.on('error', (error) => {
+    ws.on("error", (error) => {
       console.error(`WebSocket error for client ${clientId}:`, error);
       this.handleDisconnect(clientId);
     });
 
     // Send welcome message
-    ws.send(JSON.stringify({
-      type: 'connected',
-      clientId,
-    }));
+    ws.send(
+      JSON.stringify({
+        type: "connected",
+        clientId,
+      }),
+    );
   }
 
   /**
@@ -113,7 +118,7 @@ export class WebSocketService {
       client.authenticated = true;
       return true;
     } catch (error) {
-      console.error('WebSocket authentication failed:', error);
+      console.error("WebSocket authentication failed:", error);
       return false;
     }
   }
@@ -129,23 +134,23 @@ export class WebSocketService {
       const message = JSON.parse(data);
 
       switch (message.type) {
-        case 'identify':
+        case "identify":
           await this.handleIdentify(clientId, message);
           break;
 
-        case 'message':
+        case "message":
           await this.handleChatMessage(clientId, message);
           break;
 
-        case 'typing':
+        case "typing":
           await this.handleTypingIndicator(clientId, message);
           break;
 
-        case 'load_history':
+        case "load_history":
           await this.handleLoadHistory(clientId, message);
           break;
 
-        case 'subscribe':
+        case "subscribe":
           await this.handleSubscribe(clientId, message);
           break;
 
@@ -154,10 +159,12 @@ export class WebSocketService {
       }
     } catch (error) {
       console.error(`Failed to handle message from ${clientId}:`, error);
-      client.ws.send(JSON.stringify({
-        type: 'error',
-        error: 'Invalid message format',
-      }));
+      client.ws.send(
+        JSON.stringify({
+          type: "error",
+          error: "Invalid message format",
+        }),
+      );
     }
   }
 
@@ -189,9 +196,9 @@ export class WebSocketService {
       conversation = await conversationRepository.create({
         organization_id: client.organizationId,
         customer_id: customerId,
-        status: 'open',
+        status: "open",
         metadata: {
-          source: 'webchat',
+          source: "webchat",
           ...metadata,
         },
       });
@@ -212,14 +219,14 @@ export class WebSocketService {
           organizationId: client.organizationId,
           enabled: true,
         },
-        relations: ['plugin'],
+        relations: ["plugin"],
       });
-      
+
       const pluginInstance = pluginInstances.find(
-        instance => instance.plugin.name === 'hay-plugin-webchat'
+        (instance) => instance.plugin.name === "hay-plugin-webchat",
       );
 
-      if (pluginInstance && pluginInstance.plugin.name === 'hay-plugin-webchat') {
+      if (pluginInstance && pluginInstance.plugin.name === "hay-plugin-webchat") {
         client.pluginId = pluginInstance.pluginId;
 
         // Notify plugin of connection
@@ -227,31 +234,33 @@ export class WebSocketService {
           // Update activity timestamp when WebSocket connects
           await pluginInstanceManagerService.updateActivityTimestamp(
             client.organizationId,
-            client.pluginId
+            client.pluginId,
           );
 
           await processManagerService.sendToPlugin(
             client.organizationId,
             client.pluginId,
-            'websocket_connected',
+            "websocket_connected",
             {
               conversationId: conversation.id,
               customerId,
               metadata,
-            }
+            },
           );
         } catch (error) {
-          console.error('Failed to notify plugin of WebSocket connection:', error);
+          console.error("Failed to notify plugin of WebSocket connection:", error);
         }
       }
     }
 
     // Send identification confirmation
-    client.ws.send(JSON.stringify({
-      type: 'identified',
-      conversationId: client.conversationId,
-      customerId: client.customerId,
-    }));
+    client.ws.send(
+      JSON.stringify({
+        type: "identified",
+        conversationId: client.conversationId,
+        customerId: client.customerId,
+      }),
+    );
   }
 
   /**
@@ -266,27 +275,29 @@ export class WebSocketService {
       // Update activity timestamp when message is sent
       await pluginInstanceManagerService.updateActivityTimestamp(
         client.organizationId,
-        client.pluginId
+        client.pluginId,
       );
 
       await processManagerService.sendToPlugin(
         client.organizationId,
         client.pluginId,
-        'websocket_message',
+        "websocket_message",
         {
           conversationId: client.conversationId,
           customerId: client.customerId,
           text: message.text,
           attachments: message.attachments,
           timestamp: message.timestamp,
-        }
+        },
       );
     } catch (error) {
-      console.error('Failed to forward message to plugin:', error);
-      client.ws.send(JSON.stringify({
-        type: 'error',
-        error: 'Failed to send message',
-      }));
+      console.error("Failed to forward message to plugin:", error);
+      client.ws.send(
+        JSON.stringify({
+          type: "error",
+          error: "Failed to send message",
+        }),
+      );
     }
   }
 
@@ -301,11 +312,11 @@ export class WebSocketService {
     this.broadcastToConversation(
       client.conversationId,
       {
-        type: 'typing',
+        type: "typing",
         userId: client.customerId,
         isTyping: message.isTyping,
       },
-      clientId
+      clientId,
     );
   }
 
@@ -317,7 +328,7 @@ export class WebSocketService {
     if (!client) return;
 
     const { conversationId } = message;
-    
+
     // Load conversation with messages
     const conversation = await conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== client.organizationId) {
@@ -325,16 +336,18 @@ export class WebSocketService {
     }
 
     const messages = conversation?.messages || [];
-    
-    client.ws.send(JSON.stringify({
-      type: 'history',
-      messages: messages.map((msg: any) => ({
-        text: msg.content,
-        sender: msg.role === 'user' ? 'user' : 'agent',
-        timestamp: msg.created_at,
-        metadata: msg.metadata,
-      })),
-    }));
+
+    client.ws.send(
+      JSON.stringify({
+        type: "history",
+        messages: messages.map((msg: any) => ({
+          text: msg.content,
+          sender: msg.role === "user" ? "user" : "agent",
+          timestamp: msg.created_at,
+          metadata: msg.metadata,
+        })),
+      }),
+    );
   }
 
   /**
@@ -345,13 +358,13 @@ export class WebSocketService {
     if (!client) return;
 
     const { conversationId } = message;
-    
+
     // Add to conversation subscribers
     if (!this.conversationClients.has(conversationId)) {
       this.conversationClients.set(conversationId, new Set());
     }
     this.conversationClients.get(conversationId)!.add(clientId);
-    
+
     client.conversationId = conversationId;
   }
 
@@ -374,17 +387,14 @@ export class WebSocketService {
 
       // Notify plugin of disconnection
       if (client.pluginId && client.organizationId) {
-        processManagerService.sendToPlugin(
-          client.organizationId,
-          client.pluginId,
-          'websocket_disconnected',
-          {
+        processManagerService
+          .sendToPlugin(client.organizationId, client.pluginId, "websocket_disconnected", {
             conversationId: client.conversationId,
             customerId: client.customerId,
-          }
-        ).catch(error => {
-          console.error('Failed to notify plugin of WebSocket disconnection:', error);
-        });
+          })
+          .catch((error) => {
+            console.error("Failed to notify plugin of WebSocket disconnection:", error);
+          });
       }
     }
 
@@ -425,11 +435,7 @@ export class WebSocketService {
   /**
    * Broadcast to conversation except sender
    */
-  broadcastToConversation(
-    conversationId: string, 
-    message: any, 
-    excludeClientId?: string
-  ): number {
+  broadcastToConversation(conversationId: string, message: any, excludeClientId?: string): number {
     const clientIds = this.conversationClients.get(conversationId);
     if (!clientIds) return 0;
 
@@ -448,7 +454,7 @@ export class WebSocketService {
    */
   sendPluginMessage(organizationId: string, conversationId: string, message: any): void {
     this.sendToConversation(conversationId, {
-      type: 'message',
+      type: "message",
       data: message,
     });
   }
@@ -480,7 +486,7 @@ export class WebSocketService {
   shutdown(): void {
     // Close all client connections
     for (const [clientId, client] of this.clients) {
-      client.ws.close(1000, 'Server shutting down');
+      client.ws.close(1000, "Server shutting down");
     }
 
     // Clear maps

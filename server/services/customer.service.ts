@@ -20,13 +20,13 @@ export class CustomerService {
       name?: string | null;
       notes?: string | null;
       external_metadata?: Record<string, any> | null;
-    }
+    },
   ): Promise<Customer> {
     // Check if customer with external_id already exists
     if (data.external_id) {
       const existingCustomer = await this.customerRepository.findByExternalId(
         data.external_id,
-        organizationId
+        organizationId,
       );
       if (existingCustomer) {
         throw new Error(`Customer with external_id ${data.external_id} already exists`);
@@ -62,10 +62,7 @@ export class CustomerService {
   /**
    * Get a customer by ID
    */
-  async getCustomer(
-    customerId: string,
-    organizationId: string
-  ): Promise<Customer | null> {
+  async getCustomer(customerId: string, organizationId: string): Promise<Customer | null> {
     const customer = await this.customerRepository.findById(customerId);
     if (!customer || customer.organization_id !== organizationId) {
       return null;
@@ -78,21 +75,15 @@ export class CustomerService {
    */
   async getCustomerByExternalId(
     externalId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Customer | null> {
-    return await this.customerRepository.findByExternalId(
-      externalId,
-      organizationId
-    );
+    return await this.customerRepository.findByExternalId(externalId, organizationId);
   }
 
   /**
    * Get a customer by email
    */
-  async getCustomerByEmail(
-    email: string,
-    organizationId: string
-  ): Promise<Customer | null> {
+  async getCustomerByEmail(email: string, organizationId: string): Promise<Customer | null> {
     return await this.customerRepository.findByEmail(email, organizationId);
   }
 
@@ -116,33 +107,26 @@ export class CustomerService {
       name?: string | null;
       notes?: string | null;
       external_metadata?: Record<string, any> | null;
-    }
+    },
   ): Promise<Customer | null> {
     // Check if updating external_id to one that already exists
     if (data.external_id !== undefined) {
       const existingCustomer = await this.customerRepository.findByExternalId(
         data.external_id!,
-        organizationId
+        organizationId,
       );
       if (existingCustomer && existingCustomer.id !== customerId) {
         throw new Error(`Customer with external_id ${data.external_id} already exists`);
       }
     }
 
-    return await this.customerRepository.update(
-      customerId,
-      organizationId,
-      data
-    );
+    return await this.customerRepository.update(customerId, organizationId, data);
   }
 
   /**
    * Delete a customer
    */
-  async deleteCustomer(
-    customerId: string,
-    organizationId: string
-  ): Promise<boolean> {
+  async deleteCustomer(customerId: string, organizationId: string): Promise<boolean> {
     return await this.customerRepository.delete(customerId, organizationId);
   }
 
@@ -153,12 +137,12 @@ export class CustomerService {
   async mergeCustomers(
     sourceCustomerId: string,
     targetCustomerId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Customer | null> {
     return await this.customerRepository.mergeCustomers(
       sourceCustomerId,
       targetCustomerId,
-      organizationId
+      organizationId,
     );
   }
 
@@ -175,27 +159,23 @@ export class CustomerService {
       name?: string | null;
       notes?: string | null;
       external_metadata?: Record<string, any> | null;
-    }
+    },
   ): Promise<Customer> {
     // Try to find by external_id first
     if (data.external_id) {
       const existingCustomer = await this.customerRepository.findByExternalId(
         data.external_id,
-        organizationId
+        organizationId,
       );
       if (existingCustomer) {
         // Update with any new data provided
-        const updatedCustomer = await this.updateCustomer(
-          existingCustomer.id,
-          organizationId,
-          {
-            email: data.email || existingCustomer.email,
-            phone: data.phone || existingCustomer.phone,
-            name: data.name || existingCustomer.name,
-            notes: data.notes || existingCustomer.notes,
-            external_metadata: data.external_metadata || existingCustomer.external_metadata,
-          }
-        );
+        const updatedCustomer = await this.updateCustomer(existingCustomer.id, organizationId, {
+          email: data.email || existingCustomer.email,
+          phone: data.phone || existingCustomer.phone,
+          name: data.name || existingCustomer.name,
+          notes: data.notes || existingCustomer.notes,
+          external_metadata: data.external_metadata || existingCustomer.external_metadata,
+        });
         return updatedCustomer!;
       }
     }
@@ -204,21 +184,17 @@ export class CustomerService {
     if (data.email) {
       const existingCustomer = await this.customerRepository.findByEmail(
         data.email,
-        organizationId
+        organizationId,
       );
       if (existingCustomer) {
         // Update with any new data provided
-        const updatedCustomer = await this.updateCustomer(
-          existingCustomer.id,
-          organizationId,
-          {
-            external_id: data.external_id || existingCustomer.external_id,
-            phone: data.phone || existingCustomer.phone,
-            name: data.name || existingCustomer.name,
-            notes: data.notes || existingCustomer.notes,
-            external_metadata: data.external_metadata || existingCustomer.external_metadata,
-          }
-        );
+        const updatedCustomer = await this.updateCustomer(existingCustomer.id, organizationId, {
+          external_id: data.external_id || existingCustomer.external_id,
+          phone: data.phone || existingCustomer.phone,
+          name: data.name || existingCustomer.name,
+          notes: data.notes || existingCustomer.notes,
+          external_metadata: data.external_metadata || existingCustomer.external_metadata,
+        });
         return updatedCustomer!;
       }
     }

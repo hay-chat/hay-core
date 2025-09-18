@@ -82,7 +82,7 @@ export class ExecutionLayer {
       if (conversation.enabled_tools && conversation.enabled_tools.length > 0) {
         responsePrompt += `
             CALL_TOOL - To call a tool to get more information/Handle an action in the playbook. You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool. Available tools: ${conversation.enabled_tools?.join(
-              ", "
+              ", ",
             )}.
           `;
       }

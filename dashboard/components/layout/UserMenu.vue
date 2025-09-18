@@ -12,9 +12,7 @@
       >
         <span class="absolute -inset-1.5" />
         <span class="sr-only">Open user menu</span>
-        <div
-          class="h-8 w-8 rounded-full bg-primary flex items-center justify-center"
-        >
+        <div class="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
           <span class="text-sm font-medium text-white">
             {{ userInitials }}
           </span>
@@ -61,11 +59,7 @@
             tabindex="-1"
             @click="dropdownOpen = false"
           >
-            <component
-              :is="item.icon"
-              class="mr-3 h-4 w-4"
-              aria-hidden="true"
-            />
+            <component :is="item.icon" class="mr-3 h-4 w-4" aria-hidden="true" />
             {{ item.name }}
           </NuxtLink>
         </div>
@@ -73,9 +67,7 @@
         <!-- Organization Switcher -->
         <div class="border-t border-border">
           <div class="px-4 py-2">
-            <p
-              class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
-            >
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Organization
             </p>
           </div>
@@ -87,12 +79,16 @@
                 dropdownOpen = false;
               "
             >
-              <Building2 class="mr-3 h-4 w-4" aria-hidden="true" />
+              <Building2 class="mr-3 h-4 w-4"
+aria-hidden="true" />
               <div class="flex-1 text-left">
-                <p class="font-medium">{{ currentOrganization.name }}</p>
+                <p class="font-medium">
+                  {{ currentOrganization.name }}
+                </p>
                 <p class="text-xs text-muted-foreground">Switch organization</p>
               </div>
-              <ChevronDown class="h-4 w-4" aria-hidden="true" />
+              <ChevronDown class="h-4 w-4"
+aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -105,7 +101,8 @@
             tabindex="-1"
             @click="handleSignOut"
           >
-            <LogOut class="mr-3 h-4 w-4" aria-hidden="true" />
+            <LogOut class="mr-3 h-4 w-4"
+aria-hidden="true" />
             Sign out
           </button>
         </div>
@@ -185,17 +182,10 @@ const handleSignOut = async () => {
 // Close dropdown when clicking outside
 const handleClickOutside = (event: Event) => {
   const target = event.target as HTMLElement;
-  const dropdown = document.querySelector(
-    '[aria-labelledby="user-menu-button"]'
-  );
+  const dropdown = document.querySelector('[aria-labelledby="user-menu-button"]');
   const button = document.getElementById("user-menu-button");
 
-  if (
-    dropdown &&
-    button &&
-    !dropdown.contains(target) &&
-    !button.contains(target)
-  ) {
+  if (dropdown && button && !dropdown.contains(target) && !button.contains(target)) {
     dropdownOpen.value = false;
   }
 };

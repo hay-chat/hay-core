@@ -8,18 +8,21 @@ export class AgentService {
     this.agentRepository = new AgentRepository();
   }
 
-  async createAgent(organizationId: string, data: {
-    name: string;
-    description?: string;
-    enabled?: boolean;
-    instructions?: string;
-    tone?: string;
-    avoid?: string;
-    trigger?: string;
-  }): Promise<Agent> {
+  async createAgent(
+    organizationId: string,
+    data: {
+      name: string;
+      description?: string;
+      enabled?: boolean;
+      instructions?: string;
+      tone?: string;
+      avoid?: string;
+      trigger?: string;
+    },
+  ): Promise<Agent> {
     return await this.agentRepository.create({
       ...data,
-      organization_id: organizationId
+      organization_id: organizationId,
     });
   }
 
@@ -46,7 +49,7 @@ export class AgentService {
       tone?: string;
       avoid?: string;
       trigger?: string;
-    }
+    },
   ): Promise<Agent | null> {
     return await this.agentRepository.update(agentId, organizationId, data);
   }

@@ -164,24 +164,17 @@ export default <Partial<Config>>{
       // Function to generate CSS variables for any theme property
       const generateCssVars = (
         themeKey: string,
-        themeValue: Record<string, string | string[] | Record<string, string>>
+        themeValue: Record<string, string | string[] | Record<string, string>>,
       ) => {
         Object.entries(themeValue).forEach(([key, value]) => {
           if (typeof value === "string") {
-            const varName =
-              key === "DEFAULT" ? `--${themeKey}` : `--${themeKey}-${key}`;
+            const varName = key === "DEFAULT" ? `--${themeKey}` : `--${themeKey}-${key}`;
             cssVars[varName] = value;
-          } else if (
-            typeof value === "object" &&
-            value !== null &&
-            !Array.isArray(value)
-          ) {
+          } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
             Object.entries(value).forEach(([shade, shadeValue]) => {
               if (typeof shadeValue === "string") {
                 const varName =
-                  shade === "DEFAULT"
-                    ? `--${themeKey}-${key}`
-                    : `--${themeKey}-${key}-${shade}`;
+                  shade === "DEFAULT" ? `--${themeKey}-${key}` : `--${themeKey}-${key}-${shade}`;
                 cssVars[varName] = shadeValue;
               }
             });
@@ -193,10 +186,7 @@ export default <Partial<Config>>{
       };
 
       // Generate CSS variables for colors
-      const colors = theme("colors") as Record<
-        string,
-        string | Record<string, string>
-      >;
+      const colors = theme("colors") as Record<string, string | Record<string, string>>;
       generateCssVars("color", colors);
 
       // Generate CSS variables for other theme properties

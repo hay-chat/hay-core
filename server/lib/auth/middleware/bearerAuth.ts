@@ -1,10 +1,6 @@
 import { User } from "@server/entities/user.entity";
 import { AuthUser } from "@server/lib/auth/AuthUser";
-import {
-  extractTokenFromHeader,
-  verifyToken,
-  isTokenExpired,
-} from "@server/lib/auth/utils/jwt";
+import { extractTokenFromHeader, verifyToken, isTokenExpired } from "@server/lib/auth/utils/jwt";
 import type { JWTPayload } from "@server/types/auth.types";
 import { AppDataSource } from "@server/database/data-source";
 
@@ -12,9 +8,7 @@ import { AppDataSource } from "@server/database/data-source";
  * Authenticate a user using Bearer Token (JWT)
  * Returns the authenticated user from the JWT payload
  */
-export async function authenticateBearerAuth(
-  authHeader?: string
-): Promise<AuthUser | null> {
+export async function authenticateBearerAuth(authHeader?: string): Promise<AuthUser | null> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }
@@ -72,9 +66,7 @@ export async function authenticateBearerAuth(
  * Validate a JWT token without fetching the full user
  * Used for quick authorization checks
  */
-export async function validateBearerToken(
-  authHeader?: string
-): Promise<JWTPayload | null> {
+export async function validateBearerToken(authHeader?: string): Promise<JWTPayload | null> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }

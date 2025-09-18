@@ -6,7 +6,8 @@
     >
       <div class="flex items-center justify-between px-6 py-4">
         <div class="flex items-center space-x-4">
-          <Button variant="ghost" @click="goBack">
+          <Button variant="ghost"
+@click="goBack">
             <ArrowLeft class="h-4 w-4 mr-2" />
             Back to Conversations
           </Button>
@@ -21,23 +22,20 @@
         </div>
         <div class="flex items-center space-x-2">
           <Badge :variant="getStatusVariant(conversation?.status)">
-            <component
-              :is="getStatusIcon(conversation?.status)"
-              class="h-3 w-3 mr-1"
-            />
+            <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
             {{ formatStatus(conversation?.status) }}
           </Badge>
           <Badge
             v-if="
-              conversation?.cooldown_until &&
-              new Date(conversation.cooldown_until) > new Date()
+              conversation?.cooldown_until && new Date(conversation.cooldown_until) > new Date()
             "
             variant="destructive"
           >
             <Clock class="h-3 w-3 mr-1" />
             Cooldown {{ formatCountdown(conversation.cooldown_until) }}
           </Badge>
-          <Button variant="outline" size="sm" @click="exportConversation">
+          <Button variant="outline"
+size="sm" @click="exportConversation">
             <Download class="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -52,10 +50,7 @@
             {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
           </Button>
           <Button
-            v-if="
-              conversation?.status === 'open' ||
-              conversation?.status === 'pending-human'
-            "
+            v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
             size="sm"
             @click="takeOverConversation"
           >
@@ -71,35 +66,30 @@
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
-        <div
-          ref="messagesContainer"
-          class="flex-1 overflow-y-auto p-6 space-y-4"
-        >
-          <div v-if="loading" class="space-y-4">
-            <div v-for="i in 5" :key="i" class="animate-pulse">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+          <div v-if="loading"
+class="space-y-4">
+            <div v-for="i in 5"
+:key="i" class="animate-pulse">
               <div class="flex space-x-3">
-                <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
+                <div class="w-8 h-8 bg-gray-200 rounded-full" />
                 <div class="flex-1">
-                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
-                  <div class="h-10 bg-gray-200 rounded w-3/4"></div>
+                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2" />
+                  <div class="h-10 bg-gray-200 rounded w-3/4" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div
-            v-else-if="conversation?.messages?.length === 0"
-            class="text-center py-12"
-          >
-            <MessageSquare
-              class="h-12 w-12 text-muted-foreground mx-auto mb-4"
-            />
+          <div v-else-if="conversation?.messages?.length === 0" class="text-center py-12">
+            <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p class="text-muted-foreground">
-              No messages in this conversation yet
-            </p>
+No messages in this conversation yet
+</p>
           </div>
 
-          <div v-else class="space-y-4">
+          <div v-else
+class="space-y-4">
             <!-- Conversation Start -->
             <div class="text-center">
               <div
@@ -111,29 +101,19 @@
             </div>
 
             <!-- Messages -->
-            <template
-              v-for="(message, index) in conversation?.messages"
-              :key="message.id"
-            >
+            <template v-for="(message, index) in conversation?.messages" :key="message.id">
               <ChatMessage
                 :message="message"
-                @approve="
-                  message.needsApproval ? approveMessage(message.id) : undefined
-                "
-                @edit="
-                  message.needsApproval ? editMessage(message.id) : undefined
-                "
-                @reject="
-                  message.needsApproval ? rejectMessage(message.id) : undefined
-                "
+                @approve="message.needsApproval ? approveMessage(message.id) : undefined"
+                @edit="message.needsApproval ? editMessage(message.id) : undefined"
+                @reject="message.needsApproval ? rejectMessage(message.id) : undefined"
               />
             </template>
 
             <!-- Typing indicator -->
-            <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
-              <div
-                class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
-              >
+            <div v-if="isTyping"
+class="flex space-x-3 max-w-2xl">
+              <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <User class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
@@ -141,15 +121,15 @@
                   <div class="flex space-x-1">
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
-                    ></div>
+                    />
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
-                    ></div>
+                    />
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.2s"
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
@@ -158,7 +138,8 @@
         </div>
 
         <!-- Human Takeover Panel -->
-        <div v-if="humanTakeover" class="border-t bg-yellow-50 p-4">
+        <div v-if="humanTakeover"
+class="border-t bg-yellow-50 p-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <AlertTriangle class="h-4 w-4 text-yellow-600" />
@@ -166,14 +147,17 @@
                 >You are now handling this conversation</span
               >
             </div>
-            <Button variant="outline" size="sm" @click="endTakeover">
-              End Takeover
-            </Button>
+            <Button variant="outline"
+size="sm" @click="endTakeover"
+>
+End Takeover
+</Button>
           </div>
         </div>
 
         <!-- Message Input (when human takeover is active) -->
-        <div v-if="humanTakeover" class="border-t p-4">
+        <div v-if="humanTakeover"
+class="border-t p-4">
           <div class="flex space-x-3">
             <Input
               v-model="newMessage"
@@ -181,7 +165,8 @@
               class="flex-1"
               @keyup.enter="sendMessage"
             />
-            <Button :disabled="!newMessage.trim()" @click="sendMessage">
+            <Button :disabled="!newMessage.trim()"
+@click="sendMessage">
               <Send class="h-4 w-4" />
             </Button>
           </div>
@@ -194,13 +179,11 @@
           <!-- Customer Information -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Customer Information</CardTitle>
+              <CardTitle class="text-base"> Customer Information </CardTitle>
             </CardHeader>
             <CardContent class="space-y-3">
               <div class="flex items-center space-x-3">
-                <div
-                  class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
-                >
+                <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                   <User class="h-5 w-5 text-primary" />
                 </div>
                 <div>
@@ -213,9 +196,7 @@
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Conversation ID:</span>
-                  <span class="font-mono text-xs">{{
-                    conversation?.id?.slice(0, 8)
-                  }}</span>
+                  <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Status:</span>
@@ -232,7 +213,7 @@
           <!-- Conversation Details -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Conversation Details</CardTitle>
+              <CardTitle class="text-base"> Conversation Details </CardTitle>
             </CardHeader>
             <CardContent class="space-y-3 text-sm">
               <div class="flex justify-between">
@@ -261,23 +242,23 @@
           <!-- Previous Conversations -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Previous Conversations</CardTitle>
+              <CardTitle class="text-base"> Previous Conversations </CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                v-if="previousConversations.length === 0"
-                class="text-sm text-muted-foreground"
-              >
+              <div v-if="previousConversations.length === 0" class="text-sm text-muted-foreground">
                 No previous conversations
               </div>
-              <div v-else class="space-y-3">
+              <div v-else
+class="space-y-3">
                 <div
                   v-for="prevConv in previousConversations"
                   :key="prevConv.id"
                   class="p-3 border rounded-md hover:bg-background-secondary cursor-pointer"
                   @click="viewConversation(prevConv.id)"
                 >
-                  <div class="text-sm font-medium">{{ prevConv.subject }}</div>
+                  <div class="text-sm font-medium">
+                    {{ prevConv.subject }}
+                  </div>
                   <div class="text-xs text-muted-foreground">
                     {{ formatDate(prevConv.createdAt) }} • {{ prevConv.status }}
                   </div>
@@ -289,22 +270,26 @@
           <!-- Available Actions -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Quick Actions</CardTitle>
+              <CardTitle class="text-base"> Quick Actions </CardTitle>
             </CardHeader>
             <CardContent class="space-y-2">
-              <Button variant="outline" size="sm" class="w-full justify-start">
+              <Button variant="outline"
+size="sm" class="w-full justify-start">
                 <Ticket class="h-4 w-4 mr-2" />
                 Create Support Ticket
               </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
+              <Button variant="outline"
+size="sm" class="w-full justify-start">
                 <Mail class="h-4 w-4 mr-2" />
                 Send Email
               </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
+              <Button variant="outline"
+size="sm" class="w-full justify-start">
                 <Phone class="h-4 w-4 mr-2" />
                 Schedule Call
               </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
+              <Button variant="outline"
+size="sm" class="w-full justify-start">
                 <Star class="h-4 w-4 mr-2" />
                 Request Feedback
               </Button>
@@ -314,7 +299,7 @@
           <!-- Knowledge Base Articles -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Related Articles</CardTitle>
+              <CardTitle class="text-base"> Related Articles </CardTitle>
             </CardHeader>
             <CardContent>
               <div class="space-y-2">
@@ -323,7 +308,9 @@
                   :key="article.id"
                   class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
                 >
-                  <div class="font-medium">{{ article.title }}</div>
+                  <div class="font-medium">
+                    {{ article.title }}
+                  </div>
                   <div class="text-xs text-muted-foreground">
                     {{ article.category }}
                   </div>
@@ -382,12 +369,9 @@ const goBack = () => {
 };
 
 const getStatusVariant = (
-  status: string
+  status: string,
 ): "default" | "secondary" | "destructive" | "outline" | undefined => {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
     resolved: "secondary",
@@ -573,8 +557,6 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(
-    () => `${conversation.value?.title || "Conversation"} - Hay Dashboard`
-  ),
+  title: computed(() => `${conversation.value?.title || "Conversation"} - Hay Dashboard`),
 });
 </script>

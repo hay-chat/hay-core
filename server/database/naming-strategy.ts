@@ -3,7 +3,7 @@ import type { NamingStrategyInterface } from "typeorm";
 
 // Helper function to convert camelCase to snake_case
 function snakeCase(str: string): string {
-  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).replace(/^_/, '');
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`).replace(/^_/, "");
 }
 
 export class SnakeNamingStrategy extends DefaultNamingStrategy implements NamingStrategyInterface {
@@ -11,7 +11,11 @@ export class SnakeNamingStrategy extends DefaultNamingStrategy implements Naming
     return userSpecifiedName ? userSpecifiedName : snakeCase(targetName);
   }
 
-  override columnName(propertyName: string, customName: string | undefined, embeddedPrefixes: string[]): string {
+  override columnName(
+    propertyName: string,
+    customName: string | undefined,
+    embeddedPrefixes: string[],
+  ): string {
     return snakeCase(embeddedPrefixes.concat(customName ? customName : propertyName).join("_"));
   }
 
@@ -27,15 +31,29 @@ export class SnakeNamingStrategy extends DefaultNamingStrategy implements Naming
     return snakeCase(relationName + "_" + referencedColumnName);
   }
 
-  override joinTableName(firstTableName: string, secondTableName: string, firstPropertyName: string, secondPropertyName: string): string {
-    return snakeCase(firstTableName + "_" + firstPropertyName.replace(/\./gi, "_") + "_" + secondTableName);
+  override joinTableName(
+    firstTableName: string,
+    secondTableName: string,
+    firstPropertyName: string,
+    secondPropertyName: string,
+  ): string {
+    return snakeCase(
+      firstTableName + "_" + firstPropertyName.replace(/\./gi, "_") + "_" + secondTableName,
+    );
   }
 
-  override joinTableColumnName(tableName: string, propertyName: string, columnName?: string): string {
+  override joinTableColumnName(
+    tableName: string,
+    propertyName: string,
+    columnName?: string,
+  ): string {
     return snakeCase(tableName + "_" + (columnName ? columnName : propertyName));
   }
 
-  classTableInheritanceParentColumnName(parentTableName: string, parentTableIdPropertyName: string): string {
+  classTableInheritanceParentColumnName(
+    parentTableName: string,
+    parentTableIdPropertyName: string,
+  ): string {
     return snakeCase(parentTableName + "_" + parentTableIdPropertyName);
   }
 

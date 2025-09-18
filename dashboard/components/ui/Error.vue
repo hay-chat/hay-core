@@ -14,9 +14,8 @@
       />
     </svg>
     <p
-      class="font-secondary font-bold text-lg text-muted-foreground"
-      v-if="label"
-    >
+v-if="label" class="font-secondary font-bold text-lg text-muted-foreground"
+>
       {{ label }}
     </p>
   </div>

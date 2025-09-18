@@ -111,16 +111,12 @@ export class Conversation {
   updated_at!: Date;
 
   async getLastCustomerMessage(): Promise<Message | null> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     return conversationRepository.getLastHumanMessage(this.id);
   }
 
   async lock(): Promise<void> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     const lockDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
     const lockUntil = new Date(Date.now() + lockDuration);
     await conversationRepository.update(this.id, this.organization_id, {
@@ -130,9 +126,7 @@ export class Conversation {
   }
 
   async unlock(): Promise<void> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     await conversationRepository.update(this.id, this.organization_id, {
       processing_locked_until: null,
       processing_locked_by: null,
@@ -140,13 +134,9 @@ export class Conversation {
   }
 
   async updateAgent(agentId: string): Promise<void> {
-    const { agentRepository } = await import(
-      "../../repositories/agent.repository"
-    );
+    const { agentRepository } = await import("../../repositories/agent.repository");
 
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     const agent = await agentRepository.findById(agentId);
     this.agent_id = agentId;
@@ -169,14 +159,10 @@ export class Conversation {
   }
 
   async updatePlaybook(playbookId: string): Promise<void> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     // Initialize enabled tools array
     const enabledToolIds: string[] = [];
-    const { playbookRepository } = await import(
-      "../../repositories/playbook.repository"
-    );
+    const { playbookRepository } = await import("../../repositories/playbook.repository");
     const playbook = await playbookRepository.findById(playbookId);
     if (!playbook) {
       return;
@@ -189,9 +175,7 @@ export class Conversation {
     // Get tool schemas from plugin manager service
     const toolSchemas: any[] = [];
     try {
-      const { pluginManagerService } = await import(
-        "../../services/plugin-manager.service"
-      );
+      const { pluginManagerService } = await import("../../services/plugin-manager.service");
       const allPlugins = pluginManagerService.getAllPlugins();
 
       // Extract tool schemas from all plugins
@@ -215,11 +199,7 @@ export class Conversation {
         ${instructionText}
 
         **Required Fields:**
-        ${
-          playbook.required_fields?.length
-            ? playbook.required_fields.join(", ")
-            : "None"
-        }
+        ${playbook.required_fields?.length ? playbook.required_fields.join(", ") : "None"}
 
         **Trigger:** ${playbook.trigger}`;
 
@@ -229,9 +209,7 @@ export class Conversation {
 The following tools are available for you to use. You MUST return only valid JSON when calling tools, with no additional text:`;
 
       const actionDetails = referencedActions.map((actionName) => {
-        let toolSchema = toolSchemas.find(
-          (schema) => schema.name === actionName
-        );
+        let toolSchema = toolSchemas.find((schema) => schema.name === actionName);
 
         if (!toolSchema && actionName.includes(":")) {
           const parts = actionName.split(":");
@@ -241,9 +219,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
             if (!toolSchema) {
               const toolNameSuffix = parts.slice(1).join(":");
-              toolSchema = toolSchemas.find(
-                (schema) => schema.name === toolNameSuffix
-              );
+              toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
             }
           }
         }
@@ -255,8 +231,7 @@ The following tools are available for you to use. You MUST return only valid JSO
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
-          const inputSchema =
-            toolSchema.input_schema || toolSchema.parameters || {};
+          const inputSchema = toolSchema.input_schema || toolSchema.parameters || {};
           const requiredFields =
             inputSchema.required && inputSchema.required.length > 0
               ? ` (Required: ${inputSchema.required.join(", ")})`
@@ -264,11 +239,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
           return `- **${actionName}**: ${
             toolSchema.description
-          }${requiredFields}\n  Input Schema: ${JSON.stringify(
-            inputSchema,
-            null,
-            2
-          )}`;
+          }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
         } else {
           return `- **${actionName}**: Action not found in available tools`;
         }
@@ -301,9 +272,7 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async addDocument(documentId: string): Promise<void> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     if (!this.document_ids?.includes(documentId)) {
       console.log("Adding document to conversation", documentId);
@@ -329,16 +298,12 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async getPublicMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     return conversationRepository.getPublicMessages(this.id);
   }
 
   async getMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     return conversationRepository.getMessages(this.id);
   }
 
@@ -347,9 +312,7 @@ The following tools are available for you to use. You MUST return only valid JSO
     type: string;
     metadata?: Record<string, any>;
   }): Promise<Message> {
-    const { messageRepository } = await import(
-      "../../repositories/message.repository"
-    );
+    const { messageRepository } = await import("../../repositories/message.repository");
     return messageRepository.create({
       conversation_id: this.id,
       content: messageData.content,
@@ -359,16 +322,12 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async getSystemMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     return conversationRepository.getSystemMessages(this.id);
   }
 
   async getBotMessages(): Promise<Message[]> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
     return conversationRepository.getBotMessages(this.id);
   }
 
@@ -399,9 +358,7 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async setProcessed(processed: boolean): Promise<void> {
-    const { conversationRepository } = await import(
-      "../../repositories/conversation.repository"
-    );
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     if (processed) {
       // When marking as processed, set both last_processed_at and needs_processing

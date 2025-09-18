@@ -1,11 +1,11 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddFallbackPlaybooks1756584135154 implements MigrationInterface {
-    name = 'AddFallbackPlaybooks1756584135154'
+  name = "AddFallbackPlaybooks1756584135154";
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Insert fallback system playbooks for handling unknown requests and human escalation
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Insert fallback system playbooks for handling unknown requests and human escalation
+    await queryRunner.query(`
             INSERT INTO playbooks (id, title, trigger, description, kind, prompt_template, instructions, required_fields, status, is_system, created_at, updated_at, organization_id)
             VALUES 
             (
@@ -54,14 +54,14 @@ export class AddFallbackPlaybooks1756584135154 implements MigrationInterface {
                 NULL
             )
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove the fallback playbooks
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove the fallback playbooks
+    await queryRunner.query(`
             DELETE FROM playbooks 
             WHERE trigger IN ('unknown_request', 'human_escalation', 'no_info')
             AND is_system = true
         `);
-    }
+  }
 }

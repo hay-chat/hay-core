@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 pt-2">
+  <div class="p-6 card-content">
     <slot />
   </div>
 </template>

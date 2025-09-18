@@ -55,7 +55,7 @@ export class ApiKey extends BaseEntity {
     return this.scopes.some(
       (scope) =>
         scope.resource === resource &&
-        (scope.actions.includes(action) || scope.actions.includes("*"))
+        (scope.actions.includes(action) || scope.actions.includes("*")),
     );
   }
 }

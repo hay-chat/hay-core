@@ -3,9 +3,8 @@
     <!-- Page Header -->
     <div>
       <div class="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <NuxtLink to="/documents" class="hover:text-foreground"
-          >Documents</NuxtLink
-        >
+        <NuxtLink
+to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
         <ChevronRight class="h-4 w-4" />
         <span>Import</span>
       </div>
@@ -17,7 +16,8 @@
 
     <!-- Import Steps Progress -->
     <div class="flex items-center justify-between mb-8">
-      <template v-for="(step, index) in steps" :key="index">
+      <template v-for="(step, index) in steps"
+:key="index">
         <div class="flex items-center gap-2">
           <div
             :class="[
@@ -29,20 +29,13 @@
           >
             {{ index + 1 }}
           </div>
-          <span
-            :class="
-              currentStep >= index + 1
-                ? 'text-foreground'
-                : 'text-muted-foreground'
-            "
-          >
+          <span :class="currentStep >= index + 1 ? 'text-foreground' : 'text-muted-foreground'">
             {{ step }}
           </span>
         </div>
-        <div
-          v-if="index < steps.length - 1"
-          class="flex-1 mx-4 h-px bg-border"
-        ></div>
+        <div v-if="index < steps.length - 1"
+class="flex-1 mx-4 h-px bg-border"
+/>
       </template>
     </div>
 
@@ -58,9 +51,9 @@
         <div class="grid gap-4">
           <!-- Upload Files Option -->
           <div
-            @click="selectImportType('upload')"
             class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
             :class="{ 'border-primary bg-primary/5': importType === 'upload' }"
+            @click="selectImportType('upload')"
           >
             <div class="flex items-start gap-4">
               <div class="p-3 bg-background-tertiary rounded-lg">
@@ -73,10 +66,9 @@
                 </p>
                 <div class="flex flex-wrap gap-2">
                   <Badge
-                    variant="outline"
-                    v-for="format in uploadFormats"
-                    :key="format"
-                  >
+v-for="format in uploadFormats" variant="outline"
+:key="format"
+>
                     {{ format }}
                   </Badge>
                 </div>
@@ -86,9 +78,9 @@
 
           <!-- Import from Website Option -->
           <div
-            @click="selectImportType('web')"
             class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
             :class="{ 'border-primary bg-primary/5': importType === 'web' }"
+            @click="selectImportType('web')"
           >
             <div class="flex items-start gap-4">
               <div class="p-3 bg-background-tertiary rounded-lg">
@@ -100,9 +92,9 @@
                   Crawl and import documentation from any website
                 </p>
                 <div class="flex flex-wrap gap-2">
-                  <Badge variant="outline">HTML</Badge>
-                  <Badge variant="outline">Auto-crawl</Badge>
-                  <Badge variant="outline">Sitemap</Badge>
+                  <Badge variant="outline"> HTML </Badge>
+                  <Badge variant="outline"> Auto-crawl </Badge>
+                  <Badge variant="outline"> Sitemap </Badge>
                 </div>
               </div>
             </div>
@@ -113,29 +105,30 @@
             <div
               v-for="plugin in pluginImporters"
               :key="plugin.id"
-              @click="selectImportType(`plugin:${plugin.id}`)"
               class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
               :class="{
-                'border-primary bg-primary/5':
-                  importType === `plugin:${plugin.id}`,
+                'border-primary bg-primary/5': importType === `plugin:${plugin.id}`,
               }"
+              @click="selectImportType(`plugin:${plugin.id}`)"
             >
               <div class="flex items-start gap-4">
                 <div class="p-3 bg-background-tertiary rounded-lg">
                   <Package class="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div class="flex-1">
-                  <h3 class="font-semibold mb-1">{{ plugin.name }}</h3>
+                  <h3 class="font-semibold mb-1">
+                    {{ plugin.name }}
+                  </h3>
                   <p class="text-sm text-muted-foreground mb-2">
                     {{ plugin.description }}
                   </p>
                   <div class="flex items-center gap-2">
-                    <Badge variant="secondary">Plugin</Badge>
+                    <Badge variant="secondary"> Plugin </Badge>
                     <template v-if="plugin.supportedFormats">
                       <Badge
-                        variant="outline"
                         v-for="format in plugin.supportedFormats"
                         :key="format"
+                        variant="outline"
                       >
                         {{ format }}
                       </Badge>
@@ -148,7 +141,7 @@
         </div>
 
         <div class="mt-6 flex justify-end">
-          <Button @click="proceedToNextStep" :disabled="!importType">
+          <Button :disabled="!importType" @click="proceedToNextStep">
             Next
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -161,8 +154,8 @@
       <CardHeader>
         <CardTitle>Select Files</CardTitle>
         <CardDescription>
-          Choose one or more documents to upload. Supported formats: PDF, TXT,
-          MD, DOC, DOCX, HTML, JSON, CSV
+          Choose one or more documents to upload. Supported formats: PDF, TXT, MD, DOC, DOCX, HTML,
+          JSON, CSV
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -177,11 +170,7 @@
         >
           <Upload class="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold mb-2">
-            {{
-              isDragging
-                ? "Drop files here"
-                : "Click to upload or drag and drop"
-            }}
+            {{ isDragging ? "Drop files here" : "Click to upload or drag and drop" }}
           </h3>
           <p class="text-sm text-muted-foreground mb-4">
             Support for multiple files up to 10MB each
@@ -193,10 +182,11 @@
         </div>
 
         <!-- Selected Files List -->
-        <div v-if="selectedFiles.length > 0" class="mt-6 space-y-2">
+        <div v-if="selectedFiles.length > 0"
+class="mt-6 space-y-2">
           <h4 class="font-medium mb-2">
-            Selected Files ({{ selectedFiles.length }})
-          </h4>
+Selected Files ({{ selectedFiles.length }})
+</h4>
           <div
             v-for="(file, index) in selectedFiles"
             :key="index"
@@ -207,27 +197,32 @@
               class="h-5 w-5 text-muted-foreground flex-shrink-0"
             />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate">{{ file.name }}</p>
+              <p class="text-sm font-medium truncate">
+                {{ file.name }}
+              </p>
               <p class="text-xs text-muted-foreground">
                 {{ formatFileSize(file.size) }}
               </p>
             </div>
-            <Badge variant="outline">{{ getFileExtension(file.name) }}</Badge>
-            <Button variant="ghost" size="sm" @click="removeFile(index)">
+            <Badge variant="outline">
+              {{ getFileExtension(file.name) }}
+            </Badge>
+            <Button variant="ghost"
+size="sm" @click="removeFile(index)">
               <X class="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 1">
+          <Button variant="outline"
+@click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
           <Button
-            @click="proceedToNextStep"
-            :disabled="selectedFiles.length === 0"
-          >
+:disabled="selectedFiles.length === 0" @click="proceedToNextStep"
+>
             Next: Add Details
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -255,8 +250,7 @@
               class="mt-2"
             />
             <p class="text-xs text-muted-foreground mt-2">
-              We'll crawl this website and import all documentation pages
-              automatically.
+              We'll crawl this website and import all documentation pages automatically.
             </p>
           </div>
 
@@ -274,14 +268,14 @@
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 1">
+          <Button variant="outline"
+@click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
           <Button
-            @click="discoverPages"
-            :disabled="!isValidUrl(websiteUrl) || isDiscovering"
-          >
+:disabled="!isValidUrl(websiteUrl) || isDiscovering" @click="discoverPages"
+>
             {{ isDiscovering ? "Discovering..." : "Discover Pages" }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -292,9 +286,9 @@
     <!-- Step 3: Page Discovery/Selection (for Web Import) -->
     <Card v-if="currentStep === 3 && importType === 'web'">
       <CardHeader>
-        <CardTitle>{{
-          isDiscovering ? "Discovering Pages" : "Select Pages to Import"
-        }}</CardTitle>
+        <CardTitle>
+          {{ isDiscovering ? "Discovering Pages" : "Select Pages to Import" }}
+        </CardTitle>
         <CardDescription>
           {{
             isDiscovering
@@ -305,19 +299,18 @@
       </CardHeader>
       <CardContent>
         <!-- Loading State -->
-        <div v-if="isDiscovering" class="space-y-6 py-8">
+        <div v-if="isDiscovering"
+class="space-y-6 py-8">
           <div class="flex flex-col items-center justify-center">
             <div class="relative">
               <!-- Pulsing background circle -->
-              <div
-                class="absolute inset-0 w-20 h-20 bg-primary/20 rounded-full animate-pulse"
-              ></div>
+              <div class="absolute inset-0 w-20 h-20 bg-primary/20 rounded-full animate-pulse" />
               <!-- Static outer ring -->
-              <div class="w-20 h-20 border-4 border-muted rounded-full"></div>
+              <div class="w-20 h-20 border-4 border-muted rounded-full" />
               <!-- Spinning ring -->
               <div
                 class="absolute top-0 left-0 w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"
-              ></div>
+              />
               <!-- Globe icon with subtle bounce -->
               <Globe
                 class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-primary animate-pulse"
@@ -325,7 +318,9 @@
             </div>
 
             <div class="mt-6 text-center space-y-2">
-              <p class="text-lg font-medium">{{ getDiscoveryStatusText() }}</p>
+              <p class="text-lg font-medium">
+                {{ getDiscoveryStatusText() }}
+              </p>
 
               <!-- Total URLs found (main info) -->
               <p class="text-base font-medium text-foreground">
@@ -352,9 +347,7 @@
               <Progress
                 :value="
                   discoveryProgress
-                    ? (discoveryProgress.processed /
-                        Math.max(discoveryProgress.total, 1)) *
-                      100
+                    ? (discoveryProgress.processed / Math.max(discoveryProgress.total, 1)) * 100
                     : 0
                 "
                 class="h-2"
@@ -373,37 +366,32 @@
                 <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
                   <li>Stay on this page while we discover all documentation</li>
                   <li>This process typically takes 1-3 minutes</li>
-                  <li>
-                    We're checking for sitemaps and crawling internal links
-                  </li>
+                  <li>We're checking for sitemaps and crawling internal links</li>
                 </ul>
               </AlertDescription>
             </Alert>
 
-            <Button variant="outline" @click="cancelDiscovery" class="mt-4">
+            <Button variant="outline"
+@click="cancelDiscovery" class="mt-4">
               Cancel Discovery
             </Button>
           </div>
         </div>
 
         <!-- Page Selection (shown after discovery) -->
-        <div v-else class="space-y-4">
+        <div v-else
+class="space-y-4">
           <!-- Select/Deselect All -->
-          <div
-            class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg"
-          >
+          <div class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg">
             <div class="flex items-center space-x-2">
               <Checkbox
                 :checked="discoveredPages.every((p) => p.selected)"
                 @update:checked="
-                  (checked) =>
-                    discoveredPages.forEach((p) => (p.selected = checked))
+                  (checked) => discoveredPages.forEach((p) => (p.selected = checked))
                 "
               />
               <Label class="text-sm font-medium">
-                Select All ({{
-                  discoveredPages.filter((p) => p.selected).length
-                }}
+                Select All ({{ discoveredPages.filter((p) => p.selected).length }}
                 selected)
               </Label>
             </div>
@@ -420,7 +408,8 @@
               :key="index"
               class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
             >
-              <Checkbox v-model="page.selected" class="mt-1" />
+              <Checkbox v-model="page.selected"
+class="mt-1" />
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate">
                   {{ page.title || "Untitled Page" }}
@@ -428,18 +417,11 @@
                 <p class="text-xs text-muted-foreground truncate">
                   {{ page.url }}
                 </p>
-                <p
-                  v-if="page.description"
-                  class="text-xs text-muted-foreground mt-1 line-clamp-2"
-                >
+                <p v-if="page.description" class="text-xs text-muted-foreground mt-1 line-clamp-2">
                   {{ page.description }}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="() => openExternalLink(page.url)"
-              >
+              <Button variant="ghost" size="sm" @click="() => openExternalLink(page.url)">
                 <ExternalLink class="h-3 w-3" />
               </Button>
             </div>
@@ -448,22 +430,22 @@
           <Alert>
             <AlertTitle>Tip</AlertTitle>
             <AlertDescription>
-              Review the pages carefully. You can deselect any pages that aren't
-              relevant documentation.
+              Review the pages carefully. You can deselect any pages that aren't relevant
+              documentation.
             </AlertDescription>
           </Alert>
         </div>
         <!-- End of page selection div -->
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 2">
+          <Button variant="outline"
+@click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
           <Button
-            @click="currentStep = 4"
-            :disabled="!discoveredPages.some((p) => p.selected)"
-          >
+:disabled="!discoveredPages.some((p) => p.selected)" @click="currentStep = 4"
+>
             Next: Add Metadata
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -477,8 +459,8 @@
         <CardTitle>Document Metadata</CardTitle>
         <CardDescription>
           Configure how these
-          {{ discoveredPages.filter((p) => p.selected).length }} pages will be
-          stored in your knowledge base.
+          {{ discoveredPages.filter((p) => p.selected).length }} pages will be stored in your
+          knowledge base.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -540,8 +522,8 @@
               "
             />
             <p class="text-xs text-muted-foreground mt-1">
-              e.g., documentation, api, reference
-            </p>
+e.g., documentation, api, reference
+</p>
           </div>
 
           <div>
@@ -552,9 +534,7 @@
               placeholder="Enter categories separated by commas"
               class="mt-2"
               @input="
-                webMetadata.categories = (
-                  $event.target as HTMLInputElement
-                ).value
+                webMetadata.categories = ($event.target as HTMLInputElement).value
                   .split(',')
                   .map((c) => c.trim())
                   .filter((c) => c)
@@ -566,10 +546,7 @@
           <div class="border-t pt-4">
             <h4 class="text-sm font-medium mb-2">Selected Pages Summary</h4>
             <div class="text-sm text-muted-foreground space-y-1">
-              <p>
-                • {{ discoveredPages.filter((p) => p.selected).length }} pages
-                will be imported
-              </p>
+              <p>• {{ discoveredPages.filter((p) => p.selected).length }} pages will be imported</p>
               <p>• Each page will be converted to markdown format</p>
               <p>• Content will be chunked and vectorized for AI search</p>
             </div>
@@ -577,7 +554,8 @@
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 3">
+          <Button variant="outline"
+@click="currentStep = 3">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -594,8 +572,7 @@
       <CardHeader>
         <CardTitle>Document Details</CardTitle>
         <CardDescription>
-          Provide metadata for your documents to help with organization and
-          searchability.
+          Provide metadata for your documents to help with organization and searchability.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -607,12 +584,11 @@
             class="p-4 border rounded-lg space-y-4"
           >
             <div class="flex items-center gap-3 mb-4">
-              <component
-                :is="getFileIcon(file.type)"
-                class="h-5 w-5 text-muted-foreground"
-              />
+              <component :is="getFileIcon(file.type)" class="h-5 w-5 text-muted-foreground" />
               <span class="font-medium">{{ file.name }}</span>
-              <Badge variant="outline">{{ getFileExtension(file.name) }}</Badge>
+              <Badge variant="outline">
+                {{ getFileExtension(file.name) }}
+              </Badge>
             </div>
 
             <div class="grid gap-4">
@@ -647,10 +623,10 @@
                 <Label :for="`description-${index}`">Description</Label>
                 <Textarea
                   :id="`description-${index}`"
-                  :modelValue="file.description || ''"
-                  @update:modelValue="file.description = $event"
+                  :model-value="file.description || ''"
                   placeholder="Brief description of the document's contents"
                   :rows="2"
+                  @update:model-value="file.description = $event"
                 />
               </div>
 
@@ -667,8 +643,10 @@
               </div>
 
               <div class="flex items-center space-x-2">
-                <Checkbox :id="`active-${index}`" v-model="file.isActive" />
-                <Label :for="`active-${index}`" class="text-sm font-normal">
+                <Checkbox :id="`active-${index}`"
+v-model="file.isActive" />
+                <Label :for="`active-${index}`"
+class="text-sm font-normal">
                   Make this document immediately available to AI agents
                 </Label>
               </div>
@@ -677,7 +655,8 @@
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 2">
+          <Button variant="outline"
+@click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -697,11 +676,9 @@
       "
     >
       <CardHeader>
-        <CardTitle>{{
-          importType === "web"
-            ? "Importing from Website"
-            : "Uploading Documents"
-        }}</CardTitle>
+        <CardTitle>
+          {{ importType === "web" ? "Importing from Website" : "Uploading Documents" }}
+        </CardTitle>
         <CardDescription>
           {{
             importType === "web"
@@ -712,7 +689,8 @@
       </CardHeader>
       <CardContent>
         <!-- Web Import Progress -->
-        <div v-if="importType === 'web' && webImportJob" class="space-y-4">
+        <div v-if="importType === 'web' && webImportJob"
+class="space-y-4">
           <div class="p-4 bg-background-tertiary rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium">Import Status</span>
@@ -724,24 +702,20 @@
                 <CheckCircle class="mr-1 h-3 w-3" />
                 Completed
               </Badge>
-              <Badge
-                v-else-if="webImportJob.status === 'processing'"
-                variant="secondary"
-              >
+              <Badge v-else-if="webImportJob.status === 'processing'" variant="secondary">
                 <Loader2 class="mr-1 h-3 w-3 animate-spin" />
                 Processing
               </Badge>
-              <Badge
-                v-else-if="webImportJob.status === 'failed'"
-                variant="destructive"
-              >
+              <Badge v-else-if="webImportJob.status === 'failed'" variant="destructive">
                 <AlertCircle class="mr-1 h-3 w-3" />
                 Failed
               </Badge>
-              <Badge v-else variant="outline"> Queued </Badge>
+              <Badge
+v-else variant="outline"> Queued </Badge>
             </div>
 
-            <div v-if="webImportProgress" class="space-y-2">
+            <div v-if="webImportProgress"
+class="space-y-2">
               <div class="flex justify-between text-sm">
                 <span>Progress</span>
                 <span
@@ -753,16 +727,12 @@
               </div>
               <Progress
                 :value="
-                  (webImportProgress.processedPages /
-                    Math.max(webImportProgress.totalPages, 1)) *
+                  (webImportProgress.processedPages / Math.max(webImportProgress.totalPages, 1)) *
                   100
                 "
                 class="h-2"
               />
-              <p
-                v-if="webImportProgress.currentUrl"
-                class="text-xs text-muted-foreground truncate"
-              >
+              <p v-if="webImportProgress.currentUrl" class="text-xs text-muted-foreground truncate">
                 Processing: {{ webImportProgress.currentUrl }}
               </p>
             </div>
@@ -770,34 +740,23 @@
         </div>
 
         <!-- Upload Progress -->
-        <div v-else class="space-y-4">
+        <div v-else
+class="space-y-4">
           <!-- Overall Progress -->
           <div class="mb-6">
             <div class="flex justify-between text-sm mb-2">
               <span>Overall Progress</span>
               <span>{{ uploadedCount }}/{{ selectedFiles.length }} files</span>
             </div>
-            <Progress
-              :value="(uploadedCount / selectedFiles.length) * 100"
-              class="h-2"
-            />
+            <Progress :value="(uploadedCount / selectedFiles.length) * 100" class="h-2" />
           </div>
 
           <!-- Individual File Progress -->
-          <div
-            v-for="(file, index) in selectedFiles"
-            :key="index"
-            class="p-4 border rounded-lg"
-          >
+          <div v-for="(file, index) in selectedFiles" :key="index" class="p-4 border rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
-                <component
-                  :is="getFileIcon(file.type)"
-                  class="h-4 w-4 text-muted-foreground"
-                />
-                <span class="text-sm font-medium">{{
-                  file.documentName || file.name
-                }}</span>
+                <component :is="getFileIcon(file.type)" class="h-4 w-4 text-muted-foreground" />
+                <span class="text-sm font-medium">{{ file.documentName || file.name }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <Badge
@@ -808,28 +767,20 @@
                   <CheckCircle class="mr-1 h-3 w-3" />
                   Completed
                 </Badge>
-                <Badge
-                  v-else-if="file.uploadStatus === 'uploading'"
-                  variant="secondary"
-                >
+                <Badge v-else-if="file.uploadStatus === 'uploading'" variant="secondary">
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
                   Uploading
                 </Badge>
-                <Badge
-                  v-else-if="file.uploadStatus === 'processing'"
-                  variant="secondary"
-                >
+                <Badge v-else-if="file.uploadStatus === 'processing'" variant="secondary">
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
                   Processing
                 </Badge>
-                <Badge
-                  v-else-if="file.uploadStatus === 'error'"
-                  variant="destructive"
-                >
+                <Badge v-else-if="file.uploadStatus === 'error'" variant="destructive">
                   <AlertCircle class="mr-1 h-3 w-3" />
                   Error
                 </Badge>
-                <Badge v-else variant="outline"> Pending </Badge>
+                <Badge
+v-else variant="outline"> Pending </Badge>
               </div>
             </div>
 
@@ -838,10 +789,10 @@
                 file.uploadStatus === 'completed'
                   ? 100
                   : file.uploadStatus === 'processing'
-                  ? 50
-                  : file.uploadStatus === 'uploading'
-                  ? 25
-                  : 0
+                    ? 50
+                    : file.uploadStatus === 'uploading'
+                      ? 25
+                      : 0
               "
               class="h-1"
             />
@@ -856,14 +807,10 @@
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button
-            variant="outline"
-            @click="resetImport"
-            :disabled="isProcessing"
-          >
+          <Button variant="outline" @click="resetImport" :disabled="isProcessing">
             Import More Documents
           </Button>
-          <Button @click="router.push('/documents')" :disabled="isProcessing">
+          <Button :disabled="isProcessing" @click="router.push('/documents')">
             <CheckCircle class="mr-2 h-4 w-4" />
             View Documents
           </Button>
@@ -938,13 +885,7 @@ const webMetadata = ref({
 // Computed steps based on import type
 const steps = computed(() => {
   if (importType.value === "web") {
-    return [
-      "Select Source",
-      "Enter URL",
-      "Select Pages",
-      "Add Metadata",
-      "Processing",
-    ];
+    return ["Select Source", "Enter URL", "Select Pages", "Add Metadata", "Processing"];
   } else if (importType.value === "upload") {
     return ["Select Source", "Select Files", "Add Details", "Upload"];
   } else {
@@ -952,16 +893,7 @@ const steps = computed(() => {
   }
 });
 
-const uploadFormats = [
-  "PDF",
-  "TXT",
-  "MD",
-  "DOC",
-  "DOCX",
-  "HTML",
-  "JSON",
-  "CSV",
-];
+const uploadFormats = ["PDF", "TXT", "MD", "DOC", "DOCX", "HTML", "JSON", "CSV"];
 
 // Load available importers
 onMounted(async () => {
@@ -1168,8 +1100,7 @@ const getFileIcon = (type: string) => {
   const mimeType = type.toLowerCase();
   if (mimeType.includes("pdf") || mimeType.includes("doc")) return FileText;
   if (mimeType.includes("json")) return FileJson;
-  if (mimeType.includes("text") || mimeType.includes("markdown"))
-    return FileCode;
+  if (mimeType.includes("text") || mimeType.includes("markdown")) return FileCode;
   return File;
 };
 
@@ -1218,16 +1149,7 @@ const addFiles = (files: File[]) => {
     }
 
     // Check file type
-    const validTypes = [
-      "pdf",
-      "txt",
-      "md",
-      "doc",
-      "docx",
-      "html",
-      "json",
-      "csv",
-    ];
+    const validTypes = ["pdf", "txt", "md", "doc", "docx", "html", "json", "csv"];
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (!extension || !validTypes.includes(extension)) {
       console.error(`File ${file.name} has unsupported format`);
@@ -1300,22 +1222,17 @@ const startUpload = async () => {
       } catch (fileError) {
         console.error(`Upload error for ${file.name}:`, fileError);
         file.uploadStatus = "error";
-        file.errorMessage =
-          fileError instanceof Error ? fileError.message : "Upload failed";
+        file.errorMessage = fileError instanceof Error ? fileError.message : "Upload failed";
       }
     }
 
     // Check if all files uploaded successfully
-    const allSuccess = selectedFiles.value.every(
-      (f) => f.uploadStatus === "completed"
-    );
+    const allSuccess = selectedFiles.value.every((f) => f.uploadStatus === "completed");
 
     if (allSuccess) {
       console.log(`Successfully uploaded ${uploadedCount.value} document(s)`);
     } else {
-      const failedCount = selectedFiles.value.filter(
-        (f) => f.uploadStatus === "error"
-      ).length;
+      const failedCount = selectedFiles.value.filter((f) => f.uploadStatus === "error").length;
 
       if (failedCount > 0) {
         console.log(`${uploadedCount.value} succeeded, ${failedCount} failed`);
@@ -1326,13 +1243,9 @@ const startUpload = async () => {
 
     // Mark all pending files as error
     for (const file of selectedFiles.value) {
-      if (
-        file.uploadStatus === "uploading" ||
-        file.uploadStatus === "pending"
-      ) {
+      if (file.uploadStatus === "uploading" || file.uploadStatus === "pending") {
         file.uploadStatus = "error";
-        file.errorMessage =
-          error instanceof Error ? error.message : "Upload failed";
+        file.errorMessage = error instanceof Error ? error.message : "Upload failed";
       }
     }
   } finally {
@@ -1356,20 +1269,18 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 // Map UI category to server DocumentationType enum
 const mapCategoryToDocumentType = (
-  category: string
+  category: string,
 ): "article" | "guide" | "faq" | "tutorial" | "reference" | "policy" => {
-  const mapping: Record<
-    string,
-    "article" | "guide" | "faq" | "tutorial" | "reference" | "policy"
-  > = {
-    product: "guide",
-    api: "reference",
-    faq: "faq",
-    legal: "policy",
-    training: "tutorial",
-    technical: "reference",
-    other: "article",
-  };
+  const mapping: Record<string, "article" | "guide" | "faq" | "tutorial" | "reference" | "policy"> =
+    {
+      product: "guide",
+      api: "reference",
+      faq: "faq",
+      legal: "policy",
+      training: "tutorial",
+      technical: "reference",
+      other: "article",
+    };
   return mapping[category] || "article";
 };
 
@@ -1387,11 +1298,10 @@ const getDiscoveryStatusText = () => {
   // Cycle through messages based on progress
   const index = Math.min(
     Math.floor(
-      (discoveryProgress.value.processed /
-        Math.max(discoveryProgress.value.total, 1)) *
-        messages.length
+      (discoveryProgress.value.processed / Math.max(discoveryProgress.value.total, 1)) *
+        messages.length,
     ),
-    messages.length - 1
+    messages.length - 1,
   );
 
   return messages[index];
@@ -1416,8 +1326,6 @@ const resetImport = () => {
 // SEO
 useHead({
   title: "Import Documents - Hay Dashboard",
-  meta: [
-    { name: "description", content: "Import documents to your knowledge base" },
-  ],
+  meta: [{ name: "description", content: "Import documents to your knowledge base" }],
 });
 </script>

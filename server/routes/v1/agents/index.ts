@@ -12,7 +12,7 @@ const createAgentSchema = z.object({
   instructions: z.string().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
-  trigger: z.string().optional()
+  trigger: z.string().optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -22,39 +22,34 @@ const updateAgentSchema = z.object({
   instructions: z.string().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
-  trigger: z.string().optional()
+  trigger: z.string().optional(),
 });
 
 export const agentsRouter = t.router({
-  list: authenticatedProcedure
-    .query(async ({ ctx }) => {
-      const agents = await agentService.getAgents(ctx.organizationId!);
-      return agents;
-    }),
+  list: authenticatedProcedure.query(async ({ ctx }) => {
+    const agents = await agentService.getAgents(ctx.organizationId!);
+    return agents;
+  }),
 
-  create: authenticatedProcedure
-    .input(createAgentSchema)
-    .mutation(async ({ ctx, input }) => {
-      const agent = await agentService.createAgent(ctx.organizationId!, input);
-      return agent;
-    }),
+  create: authenticatedProcedure.input(createAgentSchema).mutation(async ({ ctx, input }) => {
+    const agent = await agentService.createAgent(ctx.organizationId!, input);
+    return agent;
+  }),
 
   update: authenticatedProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      data: updateAgentSchema
-    }))
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        data: updateAgentSchema,
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
-      const agent = await agentService.updateAgent(
-        ctx.organizationId!,
-        input.id,
-        input.data
-      );
+      const agent = await agentService.updateAgent(ctx.organizationId!, input.id, input.data);
 
       if (!agent) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Agent not found"
+          message: "Agent not found",
         });
       }
 
@@ -62,25 +57,24 @@ export const agentsRouter = t.router({
     }),
 
   delete: authenticatedProcedure
-    .input(z.object({
-      id: z.string().uuid()
-    }))
+    .input(
+      z.object({
+        id: z.string().uuid(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
-      const deleted = await agentService.deleteAgent(
-        ctx.organizationId!,
-        input.id
-      );
+      const deleted = await agentService.deleteAgent(ctx.organizationId!, input.id);
 
       if (!deleted) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Agent not found or already deleted"
+          message: "Agent not found or already deleted",
         });
       }
 
       return {
         success: true,
-        message: "Agent deleted successfully"
+        message: "Agent deleted successfully",
       };
-    })
+    }),
 });

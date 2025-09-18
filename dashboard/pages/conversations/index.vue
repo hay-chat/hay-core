@@ -5,19 +5,22 @@
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Conversations</h1>
         <p class="text-muted-foreground">
-          Monitor and manage all customer conversations
-        </p>
+Monitor and manage all customer conversations
+</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button size="sm" @click="openPlayground">
+        <Button size="sm"
+@click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
           Conversation Playground
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline"
+size="sm">
           <Download class="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="outline" size="sm" @click="refreshConversations">
+        <Button variant="outline"
+size="sm" @click="refreshConversations">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -63,9 +66,7 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="relative">
-          <Search
-            class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-          />
+          <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             v-model="searchQuery"
             placeholder="Search conversations..."
@@ -73,10 +74,7 @@
           />
         </div>
 
-        <select
-          v-model="selectedStatus"
-          class="px-3 py-2 text-sm border border-input rounded-md"
-        >
+        <select v-model="selectedStatus" class="px-3 py-2 text-sm border border-input rounded-md">
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="resolved">Resolved</option>
@@ -84,12 +82,10 @@
           <option value="closed">Closed</option>
         </select>
 
-        <select
-          v-model="selectedAgent"
-          class="px-3 py-2 text-sm border border-input rounded-md"
-        >
+        <select v-model="selectedAgent" class="px-3 py-2 text-sm border border-input rounded-md">
           <option value="">All Agents</option>
-          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+          <option v-for="agent in agents"
+:key="agent.id" :value="agent.id">
             {{ agent.name }}
           </option>
         </select>
@@ -106,15 +102,12 @@
       </div>
 
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" @click="toggleBulkMode">
+        <Button variant="outline"
+size="sm" @click="toggleBulkMode">
           <CheckSquare class="h-4 w-4 mr-2" />
           {{ bulkMode ? "Exit" : "Select" }}
         </Button>
-        <Button
-          v-if="selectedConversations.length > 0"
-          variant="outline"
-          size="sm"
-        >
+        <Button v-if="selectedConversations.length > 0" variant="outline" size="sm">
           <Archive class="h-4 w-4 mr-2" />
           Archive ({{ selectedConversations.length }})
         </Button>
@@ -122,17 +115,19 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="space-y-4">
-      <div v-for="i in 5" :key="i" class="animate-pulse">
+    <div v-if="loading"
+class="space-y-4">
+      <div v-for="i in 5"
+:key="i" class="animate-pulse">
         <Card>
           <CardContent class="p-4">
             <div class="flex items-center space-x-4">
-              <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
+              <div class="w-10 h-10 bg-gray-200 rounded-full" />
               <div class="flex-1">
-                <div class="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+                <div class="h-4 bg-gray-200 rounded w-1/3 mb-2" />
+                <div class="h-3 bg-gray-200 rounded w-2/3" />
               </div>
-              <div class="h-3 bg-gray-200 rounded w-16"></div>
+              <div class="h-3 bg-gray-200 rounded w-16" />
             </div>
           </CardContent>
         </Card>
@@ -140,21 +135,21 @@
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center py-12">
+    <div v-else-if="error"
+class="text-center py-12">
       <Error />
       <h3 class="text-lg font-medium mb-2">Error Loading Conversations</h3>
-      <p class="text-muted-foreground mb-4">{{ error }}</p>
-      <Button @click="fetchConversations" variant="outline">
+      <p class="text-muted-foreground mb-4">
+        {{ error }}
+      </p>
+      <Button variant="outline" @click="fetchConversations">
         <RefreshCcw class="h-4 w-4 mr-2" />
         Try Again
       </Button>
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else-if="filteredConversations.length === 0"
-      class="text-center py-12"
-    >
+    <div v-else-if="filteredConversations.length === 0" class="text-center py-12">
       <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No conversations found" : "No conversations yet" }}
@@ -166,7 +161,8 @@
             : "Click 'New Conversation' to start your first conversation."
         }}
       </p>
-      <Button v-if="!searchQuery" @click="openPlayground">
+      <Button v-if="!searchQuery"
+@click="openPlayground">
         <Plus class="h-4 w-4 mr-2" />
         Start Playground
       </Button>
@@ -179,12 +175,12 @@
           <table class="w-full">
             <thead class="border-b">
               <tr>
-                <th v-if="bulkMode" class="text-left py-3 px-4 w-12">
+                <th v-if="bulkMode"
+class="text-left py-3 px-4 w-12">
                   <Checkbox
                     :checked="
                       selectedConversations.length > 0 &&
-                      selectedConversations.length ===
-                        paginatedConversations.length
+                      selectedConversations.length === paginatedConversations.length
                     "
                     @update:checked="toggleSelectAll"
                   />
@@ -204,12 +200,11 @@
                 class="border-b hover:bg-background-secondary cursor-pointer"
                 @click="!bulkMode && viewConversation(conversation.id)"
               >
-                <td v-if="bulkMode" class="py-3 px-4" @click.stop>
+                <td v-if="bulkMode"
+class="py-3 px-4" @click.stop>
                   <Checkbox
                     :checked="selectedConversations.includes(conversation.id)"
-                    @update:checked="
-                      toggleConversationSelection(conversation.id)
-                    "
+                    @update:checked="toggleConversationSelection(conversation.id)"
                   />
                 </td>
                 <td class="py-3 px-4">
@@ -226,21 +221,13 @@
                 </td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(conversation?.status)">
-                    <component
-                      :is="getStatusIcon(conversation?.status)"
-                      class="h-3 w-3 mr-1"
-                    />
+                    <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
                     {{ formatStatus(conversation?.status) }}
                   </Badge>
                 </td>
 
                 <td class="py-3 px-4 text-sm">
-                  {{
-                    formatDuration(
-                      conversation.created_at,
-                      conversation.ended_at || new Date()
-                    )
-                  }}
+                  {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
                 </td>
                 <td class="py-3 px-4">
                   <div
@@ -248,30 +235,23 @@
                     class="flex items-center space-x-1"
                   >
                     <Star class="h-4 w-4 text-yellow-500 fill-current" />
-                    <span class="text-sm"
-                      >{{ conversation.metadata.satisfaction }}/5</span
-                    >
+                    <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                   </div>
-                  <span v-else class="text-xs text-muted-foreground"
-                    >Not rated</span
-                  >
+                  <span v-else
+class="text-xs text-muted-foreground">Not rated</span>
                 </td>
                 <td class="py-3 px-4 text-sm text-muted-foreground">
                   {{ formatRelativeTime(conversation.updated_at) }}
                 </td>
-                <td class="py-3 px-4" @click.stop>
+                <td class="py-3 px-4"
+@click.stop>
                   <div class="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      @click="viewConversation(conversation.id)"
-                    >
+                    <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
                       v-if="
-                        conversation.status === 'open' ||
-                        conversation.status === 'pending-human'
+                        conversation.status === 'open' || conversation.status === 'pending-human'
                       "
                       variant="ghost"
                       size="sm"
@@ -279,11 +259,7 @@
                     >
                       <UserCheck class="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      @click="showMoreActions(conversation.id)"
-                    >
+                    <Button variant="ghost" size="sm" @click="showMoreActions(conversation.id)">
                       <MoreHorizontal class="h-4 w-4" />
                     </Button>
                   </div>
@@ -365,19 +341,15 @@ const conversations = ref<any[]>([]);
 const totalConversations = ref(0);
 
 // Computed total pages
-const totalPages = computed(() =>
-  Math.ceil(totalConversations.value / pageSize.value)
-);
+const totalPages = computed(() => Math.ceil(totalConversations.value / pageSize.value));
 
 // Computed stats based on real conversations
 const stats = computed(() => {
   const total = totalConversations.value;
   const active = conversations.value.filter(
-    (c) => c.status === "open" || c.status === "processing"
+    (c) => c.status === "open" || c.status === "processing",
   ).length;
-  const resolved = conversations.value.filter(
-    (c) => c.status === "resolved"
-  ).length;
+  const resolved = conversations.value.filter((c) => c.status === "resolved").length;
   const today = conversations.value.filter((c) => {
     const created = new Date(c.created_at);
     const now = new Date();
@@ -388,8 +360,7 @@ const stats = computed(() => {
   const avgResponseTime = 4.2;
 
   // Calculate satisfaction rate (mock for now)
-  const satisfactionRate =
-    resolved > 0 ? Math.round((resolved / total) * 100) : 0;
+  const satisfactionRate = resolved > 0 ? Math.round((resolved / total) * 100) : 0;
 
   return {
     total,
@@ -413,16 +384,12 @@ const filteredConversations = computed(() => {
   return conversations.value.filter((conversation) => {
     const matchesSearch =
       !searchQuery.value ||
-      conversation.title
-        ?.toLowerCase()
-        .includes(searchQuery.value.toLowerCase()) ||
+      conversation.title?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       conversation.id.toLowerCase().includes(searchQuery.value.toLowerCase());
 
-    const matchesStatus =
-      !selectedStatus.value || conversation.status === selectedStatus.value;
+    const matchesStatus = !selectedStatus.value || conversation.status === selectedStatus.value;
 
-    const matchesAgent =
-      !selectedAgent.value || conversation.agent_id === selectedAgent.value;
+    const matchesAgent = !selectedAgent.value || conversation.agent_id === selectedAgent.value;
 
     // TODO: Implement timeframe filtering
     const matchesTimeframe = true;
@@ -437,13 +404,8 @@ const paginatedConversations = computed(() => {
 });
 
 // Methods
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
+const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
     resolved: "secondary",
@@ -541,10 +503,7 @@ const fetchConversations = async () => {
 };
 
 const refreshConversations = async () => {
-  await Promise.all([
-    fetchConversations(),
-    appStore.refreshConversationsCount(),
-  ]);
+  await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
 };
 
 const handlePageChange = async (page: number) => {
@@ -560,10 +519,7 @@ const handleItemsPerPageChange = async (itemsPerPage: number) => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchConversations(),
-    appStore.refreshConversationsCount(),
-  ]);
+  await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
   // TODO: Fetch agents from API
   // TODO: Setup real-time updates via WebSocket
 });

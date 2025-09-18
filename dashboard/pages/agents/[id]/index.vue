@@ -1,10 +1,9 @@
 <template>
-  <div v-if="agent" class="space-y-8">
+  <div v-if="agent"
+class="space-y-8">
     <!-- Agent Header -->
     <div class="bg-background border rounded-lg p-6">
-      <div
-        class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
-      >
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div class="flex items-start space-x-4">
           <div
             class="h-16 w-16 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
@@ -22,10 +21,10 @@
                   agent.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : agent.status === 'inactive'
-                    ? 'bg-gray-100 text-gray-800'
-                    : agent.status === 'training'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-red-100 text-red-800',
+                      ? 'bg-gray-100 text-gray-800'
+                      : agent.status === 'training'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -34,19 +33,19 @@
                     agent.status === 'active'
                       ? 'bg-green-600'
                       : agent.status === 'inactive'
-                      ? 'bg-gray-600'
-                      : agent.status === 'training'
-                      ? 'bg-blue-600'
-                      : 'bg-red-600',
+                        ? 'bg-gray-600'
+                        : agent.status === 'training'
+                          ? 'bg-blue-600'
+                          : 'bg-red-600',
                   ]"
-                ></div>
+                />
                 {{ agent.status }}
               </div>
             </div>
-            <p class="mt-2 text-muted-foreground">{{ agent.description }}</p>
-            <div
-              class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground"
-            >
+            <p class="mt-2 text-muted-foreground">
+              {{ agent.description }}
+            </p>
+            <div class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground">
               <span>{{ agent.type }} agent</span>
               <span>•</span>
               <span>Created {{ formatDate(agent.createdAt) }}</span>
@@ -56,15 +55,12 @@
           </div>
         </div>
         <div class="flex space-x-3">
-          <Button
-            variant="outline"
-            :disabled="statusLoading"
-            @click="toggleAgentStatus"
-          >
+          <Button variant="outline" :disabled="statusLoading" @click="toggleAgentStatus">
             <Power class="mr-2 h-4 w-4" />
             {{ agent.status === "active" ? "Disable" : "Enable" }}
           </Button>
-          <Button variant="outline" @click="editAgent">
+          <Button variant="outline"
+@click="editAgent">
             <Settings class="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -90,7 +86,8 @@
           ]"
           @click="activeTab = tab.id"
         >
-          <component :is="tab.icon" class="mr-2 h-4 w-4 inline" />
+          <component :is="tab.icon"
+class="mr-2 h-4 w-4 inline" />
           {{ tab.name }}
         </button>
       </nav>
@@ -99,7 +96,8 @@
     <!-- Tab Content -->
     <div class="space-y-6">
       <!-- Overview Tab -->
-      <div v-if="activeTab === 'overview'" class="space-y-6">
+      <div v-if="activeTab === 'overview'"
+class="space-y-6">
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
@@ -148,15 +146,12 @@
           <Card class="lg:col-span-4">
             <CardHeader>
               <CardTitle>Performance Trends</CardTitle>
-              <CardDescription
-                >Resolution rate and response time over the last 30
-                days</CardDescription
-              >
+              <CardDescription>
+                Resolution rate and response time over the last 30 days
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div
-                class="h-80 flex items-center justify-center bg-background-secondary rounded-lg"
-              >
+              <div class="h-80 flex items-center justify-center bg-background-secondary rounded-lg">
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-12 w-12 mx-auto mb-2" />
                   <p>Agent performance metrics will be displayed here</p>
@@ -169,9 +164,7 @@
           <Card class="lg:col-span-3">
             <CardHeader>
               <CardTitle>Recent Conversations</CardTitle>
-              <CardDescription
-                >Latest interactions handled by this agent</CardDescription
-              >
+              <CardDescription> Latest interactions handled by this agent </CardDescription>
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
@@ -200,8 +193,8 @@
                           conversation.status === 'resolved'
                             ? 'bg-green-100 text-green-800'
                             : conversation.status === 'active'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-red-100 text-red-800',
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800',
                         ]"
                       >
                         {{ conversation.status }}
@@ -219,13 +212,14 @@
       </div>
 
       <!-- Playbooks Tab -->
-      <div v-if="activeTab === 'playbooks'" class="space-y-6">
+      <div v-if="activeTab === 'playbooks'"
+class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">Agent Playbooks</h3>
             <p class="text-sm text-muted-foreground">
-              Automated workflows and response patterns
-            </p>
+Automated workflows and response patterns
+</p>
           </div>
           <Button @click="createPlaybook">
             <Plus class="mr-2 h-4 w-4" />
@@ -242,10 +236,12 @@
             <CardHeader>
               <div class="flex items-start justify-between">
                 <div class="flex-1">
-                  <CardTitle class="text-lg">{{ playbook.name }}</CardTitle>
-                  <CardDescription class="mt-1">{{
-                    playbook.description
-                  }}</CardDescription>
+                  <CardTitle class="text-lg">
+                    {{ playbook.name }}
+                  </CardTitle>
+                  <CardDescription class="mt-1">
+                    {{ playbook.description }}
+                  </CardDescription>
                 </div>
                 <div
                   :class="[
@@ -263,7 +259,9 @@
               <div class="space-y-3">
                 <div class="text-sm">
                   <p class="text-muted-foreground">Trigger:</p>
-                  <p class="font-medium">{{ playbook.trigger }}</p>
+                  <p class="font-medium">
+                    {{ playbook.trigger }}
+                  </p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -302,18 +300,20 @@
       </div>
 
       <!-- Conversations Tab -->
-      <div v-if="activeTab === 'conversations'" class="space-y-6">
+      <div v-if="activeTab === 'conversations'"
+class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">
-              All Conversations
-            </h3>
+All Conversations
+</h3>
             <p class="text-sm text-muted-foreground">
               Complete conversation history for this agent
             </p>
           </div>
           <div class="flex space-x-2">
-            <Button variant="outline" @click="exportConversations">
+            <Button variant="outline"
+@click="exportConversations">
               <Download class="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -361,10 +361,10 @@
                         conversation.status === 'resolved'
                           ? 'bg-green-100 text-green-800'
                           : conversation.status === 'active'
-                          ? 'bg-blue-100 text-blue-800'
-                          : conversation.status === 'escalated'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800',
+                            ? 'bg-blue-100 text-blue-800'
+                            : conversation.status === 'escalated'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800',
                       ]"
                     >
                       {{ conversation.status }}
@@ -381,11 +381,12 @@
       </div>
 
       <!-- Analytics Tab -->
-      <div v-if="activeTab === 'analytics'" class="space-y-6">
+      <div v-if="activeTab === 'analytics'"
+class="space-y-6">
         <div>
           <h3 class="text-lg font-medium text-foreground">
-            Performance Analytics
-          </h3>
+Performance Analytics
+</h3>
           <p class="text-sm text-muted-foreground">
             Detailed insights into agent performance and trends
           </p>
@@ -410,9 +411,7 @@
               <CardTitle>Response Time Trends</CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
-              >
+              <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Response time chart</p>
@@ -426,9 +425,7 @@
               <CardTitle>Resolution Rate by Day</CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
-              >
+              <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Resolution rate chart</p>
@@ -442,9 +439,7 @@
               <CardTitle>Conversation Volume</CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
-              >
+              <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
                 <div class="text-center text-muted-foreground">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Volume chart</p>
@@ -458,9 +453,7 @@
               <CardTitle>Customer Satisfaction</CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                class="h-64 flex items-center justify-center bg-background-secondary rounded-lg"
-              >
+              <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
                 <div class="text-center text-muted-foreground">
                   <Star class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Satisfaction chart</p>
@@ -472,7 +465,8 @@
       </div>
 
       <!-- Settings Tab -->
-      <div v-if="activeTab === 'settings'" class="space-y-6">
+      <div v-if="activeTab === 'settings'"
+class="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Agent Configuration</CardTitle>
@@ -480,21 +474,22 @@
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
-              <Label htmlFor="agentName">Agent Name</Label>
-              <Input id="agentName" v-model="agentSettings.name" />
+              <Label html-for="agentName">Agent Name</Label>
+              <Input id="agentName"
+v-model="agentSettings.name" />
             </div>
             <div>
-              <Label htmlFor="agentDescription">Description</Label>
+              <Label html-for="agentDescription">Description</Label>
               <textarea
                 id="agentDescription"
                 v-model="agentSettings.description"
                 rows="3"
                 class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              ></textarea>
+              />
             </div>
             <div class="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="agentType">Agent Type</Label>
+                <Label html-for="agentType">Agent Type</Label>
                 <select
                   id="agentType"
                   v-model="agentSettings.type"
@@ -507,7 +502,7 @@
                 </select>
               </div>
               <div>
-                <Label htmlFor="language">Language</Label>
+                <Label html-for="language">Language</Label>
                 <select
                   id="language"
                   v-model="agentSettings.language"
@@ -521,7 +516,7 @@
               </div>
             </div>
             <div class="flex justify-end">
-              <Button @click="saveAgentSettings">Save Changes</Button>
+              <Button @click="saveAgentSettings"> Save Changes </Button>
             </div>
           </CardContent>
         </Card>
@@ -536,8 +531,8 @@
               <div>
                 <p class="font-medium">Auto-escalation</p>
                 <p class="text-sm text-muted-foreground">
-                  Automatically escalate complex queries
-                </p>
+Automatically escalate complex queries
+</p>
               </div>
               <Checkbox v-model:checked="agentSettings.autoEscalation" />
             </div>
@@ -545,8 +540,8 @@
               <div>
                 <p class="font-medium">Learning Mode</p>
                 <p class="text-sm text-muted-foreground">
-                  Continue learning from conversations
-                </p>
+Continue learning from conversations
+</p>
               </div>
               <Checkbox v-model:checked="agentSettings.learningMode" />
             </div>
@@ -554,8 +549,8 @@
               <div>
                 <p class="font-medium">Real-time Analytics</p>
                 <p class="text-sm text-muted-foreground">
-                  Enable real-time performance tracking
-                </p>
+Enable real-time performance tracking
+</p>
               </div>
               <Checkbox v-model:checked="agentSettings.realTimeAnalytics" />
             </div>
@@ -565,10 +560,8 @@
         <!-- Danger Zone -->
         <Card>
           <CardHeader>
-            <CardTitle class="text-red-600">Danger Zone</CardTitle>
-            <CardDescription
-              >Irreversible actions for this agent</CardDescription
-            >
+            <CardTitle class="text-red-600"> Danger Zone </CardTitle>
+            <CardDescription> Irreversible actions for this agent </CardDescription>
           </CardHeader>
           <CardContent>
             <div class="flex items-center justify-between">
@@ -578,9 +571,11 @@
                   Permanently delete this agent and all its data
                 </p>
               </div>
-              <Button variant="destructive" @click="deleteAgent">
-                Delete Agent
-              </Button>
+              <Button variant="destructive"
+@click="deleteAgent"
+>
+Delete Agent
+</Button>
             </div>
           </CardContent>
         </Card>
@@ -589,34 +584,27 @@
   </div>
 
   <!-- Loading State -->
-  <div v-else-if="loading" class="space-y-8">
+  <div v-else-if="loading"
+class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
-        <div
-          class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse"
-        ></div>
+        <div class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse" />
         <div class="flex-1 space-y-2">
-          <div
-            class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse"
-          ></div>
-          <div
-            class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse"
-          ></div>
-          <div
-            class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse"
-          ></div>
+          <div class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse" />
+          <div class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse" />
+          <div class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse" />
         </div>
       </div>
     </div>
   </div>
 
   <!-- Error State -->
-  <div v-else class="text-center py-12">
+  <div v-else
+class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">Agent not found</h3>
     <p class="mt-2 text-sm text-muted-foreground">
-      The agent you're looking for doesn't exist or you don't have permission to
-      view it.
+      The agent you're looking for doesn't exist or you don't have permission to view it.
     </p>
     <div class="mt-6">
       <Button @click="router.push('/agents')"> Back to Agents </Button>
@@ -775,9 +763,7 @@ const conversations = ref<Conversation[]>([
 const recentConversations = computed(() => conversations.value.slice(0, 5));
 const filteredConversations = computed(() => {
   if (!conversationFilter.value) return conversations.value;
-  return conversations.value.filter(
-    (c) => c.status === conversationFilter.value
-  );
+  return conversations.value.filter((c) => c.status === conversationFilter.value);
 });
 
 // Methods
@@ -820,8 +806,7 @@ const loadAgent = async () => {
     agent.value = {
       id: agentId,
       name: "Customer Support Bot",
-      description:
-        "Handles general customer inquiries and support tickets with high accuracy",
+      description: "Handles general customer inquiries and support tickets with high accuracy",
       status: "active",
       type: "customer-support",
       conversationCount: 1234,
@@ -855,8 +840,7 @@ const toggleAgentStatus = async () => {
 
     // Update local state
     if (agent.value) {
-      agent.value.status =
-        agent.value.status === "active" ? "inactive" : "active";
+      agent.value.status = agent.value.status === "active" ? "inactive" : "active";
     }
 
     // TODO: Show success notification
@@ -946,9 +930,7 @@ onMounted(async () => {
 // SEO
 useHead({
   title: computed(() =>
-    agent.value
-      ? `${agent.value.name} - Hay Dashboard`
-      : "Agent - Hay Dashboard"
+    agent.value ? `${agent.value.name} - Hay Dashboard` : "Agent - Hay Dashboard",
   ),
   meta: [
     {

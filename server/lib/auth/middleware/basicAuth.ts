@@ -17,9 +17,7 @@ export interface BasicAuthResult {
  * Authenticate a user using Basic Authentication (email:password)
  * Returns both the authenticated user and JWT tokens
  */
-export async function authenticateBasicAuth(
-  authHeader?: string
-): Promise<BasicAuthResult | null> {
+export async function authenticateBasicAuth(authHeader?: string): Promise<BasicAuthResult | null> {
   if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }
@@ -39,10 +37,7 @@ export async function authenticateBasicAuth(
 
   if (!user) {
     // Prevent timing attacks by still running password verification
-    await verifyPassword(
-      password,
-      "$argon2id$v=19$m=65536,t=3,p=4$fakesalt$fakehash"
-    );
+    await verifyPassword(password, "$argon2id$v=19$m=65536,t=3,p=4$fakesalt$fakehash");
     throw new Error("Invalid credentials");
   }
 
@@ -79,9 +74,7 @@ export async function authenticateBasicAuth(
  * Validate Basic Auth credentials without generating tokens
  * Used for one-time authentication checks
  */
-export async function validateBasicAuth(
-  authHeader?: string
-): Promise<AuthUser | null> {
+export async function validateBasicAuth(authHeader?: string): Promise<AuthUser | null> {
   if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }

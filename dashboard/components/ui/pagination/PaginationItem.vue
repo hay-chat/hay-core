@@ -1,5 +1,6 @@
 <template>
-  <li :class="cn('', props.class)" v-bind="$attrs">
+  <li :class="cn('', props.class)"
+v-bind="$attrs">
     <slot />
   </li>
 </template>

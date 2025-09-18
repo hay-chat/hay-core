@@ -1,10 +1,4 @@
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  JoinColumn,
-  Index,
-} from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { PluginRegistry } from "./plugin-registry.entity";
 import { Organization } from "./organization.entity";

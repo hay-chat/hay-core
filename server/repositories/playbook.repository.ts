@@ -51,10 +51,7 @@ export class PlaybookRepository {
     });
   }
 
-  async findByStatus(
-    organizationId: string,
-    status: PlaybookStatus
-  ): Promise<Playbook[]> {
+  async findByStatus(organizationId: string, status: PlaybookStatus): Promise<Playbook[]> {
     return await this.getRepository().find({
       where: { organization_id: organizationId, status },
       relations: ["agents"],
@@ -65,7 +62,7 @@ export class PlaybookRepository {
   async update(
     id: string,
     organizationId: string,
-    data: Partial<Playbook>
+    data: Partial<Playbook>,
   ): Promise<Playbook | null> {
     const playbook = await this.findById(id);
     if (!playbook || playbook.organization_id !== organizationId) {
@@ -82,10 +79,7 @@ export class PlaybookRepository {
     // not when the playbook itself is updated. See conversation.entity.ts updatePlaybook method.
 
     if (Object.keys(data).length > 0) {
-      await this.getRepository().update(
-        { id, organization_id: organizationId },
-        data
-      );
+      await this.getRepository().update({ id, organization_id: organizationId }, data);
     }
 
     return await this.findById(id);
@@ -103,7 +97,7 @@ export class PlaybookRepository {
   async assignAgents(
     playbookId: string,
     agentIds: string[],
-    organizationId: string
+    organizationId: string,
   ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId);
     if (!playbook || playbook.organization_id !== organizationId) {
@@ -128,7 +122,7 @@ export class PlaybookRepository {
   async addAgent(
     playbookId: string,
     agentId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId);
     if (!playbook || playbook.organization_id !== organizationId) {
@@ -138,7 +132,7 @@ export class PlaybookRepository {
     const agentExists = playbook.agents.some((agent) => agent.id === agentId);
     if (!agentExists) {
       const agent = await this.getAgentRepository().findOne({
-        where: { id: agentId, organization_id: organizationId }
+        where: { id: agentId, organization_id: organizationId },
       });
       if (agent) {
         playbook.agents.push(agent);
@@ -152,7 +146,7 @@ export class PlaybookRepository {
   async removeAgent(
     playbookId: string,
     agentId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Playbook | null> {
     const playbook = await this.findById(playbookId);
     if (!playbook || playbook.organization_id !== organizationId) {

@@ -9,7 +9,7 @@
           size: size,
         }),
         isActive && 'border-primary',
-        props.class
+        props.class,
       )
     "
     :aria-current="isActive ? 'page' : undefined"
@@ -29,8 +29,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
       },
       size: {
@@ -43,7 +42,7 @@ const buttonVariants = cva(
       variant: "ghost",
       size: "icon",
     },
-  }
+  },
 );
 
 export interface PaginationLinkProps {

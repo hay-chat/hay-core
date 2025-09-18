@@ -1,5 +1,6 @@
 <template>
-  <div v-if="password" class="space-y-3">
+  <div v-if="password"
+class="space-y-3">
     <!-- Strength bar -->
     <div class="space-y-2">
       <div class="flex justify-between items-center">
@@ -8,7 +9,8 @@
           {{ strengthText }}
         </span>
       </div>
-      <Progress :value="strengthPercentage" :class="strengthBarColor" />
+      <Progress :value="strengthPercentage"
+:class="strengthBarColor" />
     </div>
 
     <!-- Requirements checklist -->
@@ -16,28 +18,38 @@
       <p class="text-sm text-gray-600">Password must contain:</p>
       <ul class="space-y-1">
         <li :class="requirementClass(validation.hasMinLength)">
-          <CheckIcon v-if="validation.hasMinLength" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasMinLength"
+class="h-3 w-3" />
+          <XMarkIcon v-else
+class="h-3 w-3" />
           At least 8 characters
         </li>
         <li :class="requirementClass(validation.hasUpperCase)">
-          <CheckIcon v-if="validation.hasUpperCase" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasUpperCase"
+class="h-3 w-3" />
+          <XMarkIcon v-else
+class="h-3 w-3" />
           One uppercase letter
         </li>
         <li :class="requirementClass(validation.hasLowerCase)">
-          <CheckIcon v-if="validation.hasLowerCase" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasLowerCase"
+class="h-3 w-3" />
+          <XMarkIcon v-else
+class="h-3 w-3" />
           One lowercase letter
         </li>
         <li :class="requirementClass(validation.hasNumber)">
-          <CheckIcon v-if="validation.hasNumber" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasNumber"
+class="h-3 w-3" />
+          <XMarkIcon v-else
+class="h-3 w-3" />
           One number
         </li>
         <li :class="requirementClass(validation.hasSpecialChar)">
-          <CheckIcon v-if="validation.hasSpecialChar" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasSpecialChar"
+class="h-3 w-3" />
+          <XMarkIcon v-else
+class="h-3 w-3" />
           One special character
         </li>
       </ul>
@@ -57,7 +69,7 @@ const props = defineProps<PasswordStrengthProps>();
 
 const validation = computed(() => {
   const result = validatePassword(props.password);
-  
+
   // Calculate strength based on requirements met
   let requirementsMet = 0;
   if (result.hasMinLength) requirementsMet++;
@@ -65,17 +77,17 @@ const validation = computed(() => {
   if (result.hasLowerCase) requirementsMet++;
   if (result.hasNumber) requirementsMet++;
   if (result.hasSpecialChar) requirementsMet++;
-  
-  let strength: 'weak' | 'medium' | 'strong' = 'weak';
+
+  let strength: "weak" | "medium" | "strong" = "weak";
   if (requirementsMet >= 5) {
-    strength = 'strong';
+    strength = "strong";
   } else if (requirementsMet >= 3) {
-    strength = 'medium';
+    strength = "medium";
   }
-  
+
   return {
     ...result,
-    strength
+    strength,
   };
 });
 
@@ -132,9 +144,6 @@ const strengthPercentage = computed(() => {
 });
 
 const requirementClass = (met: boolean) => {
-  return [
-    "flex items-center space-x-2 text-xs",
-    met ? "text-green-600" : "text-gray-400",
-  ];
+  return ["flex items-center space-x-2 text-xs", met ? "text-green-600" : "text-gray-400"];
 };
 </script>

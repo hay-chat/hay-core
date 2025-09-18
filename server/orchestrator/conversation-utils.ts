@@ -1,44 +1,41 @@
-import { conversationRepository } from "@server/repositories/conversation.repository";
+import { ConversationRepository } from "@server/repositories/conversation.repository";
+import { MessageRepository } from "@server/repositories/message.repository";
 import { MessageType } from "@server/database/entities/message.entity";
+import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
 
-/**
- * Simple utility functions for conversation operations using V2 patterns
- * These replace the complex V1 orchestrator service methods used by API routes
- */
+const conversationRepository = new ConversationRepository();
+const messageRepository = new MessageRepository();
+const llmService = new LLMService();
 
 /**
- * Generate a conversation title using AI
- * Replaces OrchestratorService.generateConversationTitle()
+ * Generate a conversation title using AI based on conversation content
  */
 export async function generateConversationTitle(
   conversationId: string,
   organizationId: string,
-  force: boolean = false
+  force: boolean = false,
 ): Promise<void> {
-  const conversation = await conversationRepository.findById(conversationId);
-  if (!conversation) {
-    throw new Error("Conversation not found");
-  }
-
-  // Only generate title if not already set or if forced
-  if (!force && conversation.title && conversation.title !== "New Conversation") {
-    return;
-  }
-
-  // Get messages for context
-  const messages = await conversation.getMessages();
-  const publicMessages = messages.filter(
-    (m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT
-  );
-
-  if (publicMessages.length < 2) {
-    return; // Need at least some conversation to generate title
-  }
-
   try {
-    const { Hay } = await import("@server/services/hay.service");
-    Hay.init();
+    const conversation = await conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== organizationId) {
+      throw new Error("Conversation not found");
+    }
+
+    // Only generate title if not already set or if forced
+    if (!force && conversation.title && conversation.title !== "New Conversation") {
+      return;
+    }
+
+    // Get messages for context
+    const messages = await messageRepository.findByConversation(conversationId);
+    const publicMessages = messages.filter(
+      (m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT,
+    );
+
+    if (publicMessages.length < 2) {
+      return; // Need at least some conversation to generate title
+    }
 
     const conversationContext = publicMessages
       .slice(0, 10) // Use first 10 messages
@@ -49,22 +46,28 @@ export async function generateConversationTitle(
 
 Examples:
 - "Password Reset Help"
-- "Billing Question"  
+- "Billing Question"
 - "Product Feature Request"
 - "Technical Support Issue"
 
 Return only the title, no quotes or extra text.`;
 
-    const response = await Hay.invokeWithSystemPrompt(
-      systemPrompt,
-      `Generate a title for this conversation:\n\n${conversationContext}`
-    );
+    const response = await llmService.invoke({
+      history:
+        systemPrompt +
+        "\n\nUser: " +
+        `Generate a title for this conversation:\n\n${conversationContext}`,
+    });
 
-    const title = response.content.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
-    
+    const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
+
     await conversationRepository.update(conversationId, organizationId, {
       title: title.substring(0, 255), // Ensure it fits in the column
     });
+
+    console.log(
+      `[ConversationUtils] Generated title for conversation ${conversationId}: "${title}"`,
+    );
   } catch (error) {
     console.error("Error generating conversation title:", error);
     // Don't throw - title generation is not critical
@@ -72,57 +75,181 @@ Return only the title, no quotes or extra text.`;
 }
 
 /**
- * Detect if a user message indicates the conversation should be resolved
- * Replaces OrchestratorService.detectResolution()
+ * Send a contextual inactivity warning message to the user
  */
-export async function detectResolution(
+export async function sendInactivityWarning(
   conversationId: string,
   organizationId: string,
-  userMessage: string
 ): Promise<void> {
   try {
-    const { Hay } = await import("@server/services/hay.service");
-    Hay.init();
+    const conversation = await conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== organizationId) {
+      throw new Error("Conversation not found");
+    }
 
-    const systemPrompt = `You are a conversation resolution detector. Analyze the user's message to determine if they indicate the issue is resolved or they want to end the conversation.
+    // Get recent messages for context
+    const messages = await messageRepository.findByConversation(conversationId);
+    const recentMessages = messages
+      .filter((m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT)
+      .slice(-5); // Last 5 messages
 
-Examples of resolution indicators:
-- "Thanks, that fixed it"
-- "Perfect, problem solved"
-- "That works great, thank you"
-- "All good now"
-- "Thanks for your help"
+    if (recentMessages.length === 0) {
+      return;
+    }
 
-Examples of NON-resolution:
-- Just saying "Thanks" with follow-up questions
-- Acknowledging but asking more questions
-- General politeness without resolution indication
+    const conversationContext = recentMessages
+      .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
+      .join("\n");
 
-Respond with JSON: {"resolved": true/false, "confidence": 0.0-1.0, "reasoning": "explanation"}`;
+    const systemPrompt = `You are a helpful assistant checking in on a conversation that has been inactive.
+Generate a friendly, contextual message asking if the user still needs help with their issue.
+The message should:
+- Reference the specific topic they were discussing
+- Ask if they've resolved their issue or need further assistance
+- Be warm and helpful, not robotic
+- Be concise (1-2 sentences)
 
-    const response = await Hay.invokeWithSystemPrompt(
-      systemPrompt,
-      `User message: ${userMessage}`
-    );
+Do not include any system-like language about "automatic closure" or timeouts.`;
 
-    const analysis = JSON.parse(response.content);
-    
-    // Only mark as resolved if high confidence
-    if (analysis.resolved && analysis.confidence >= 0.8) {
-      console.log(`[ConversationUtils] High confidence resolution detected: "${userMessage}"`);
-      
-      await conversationRepository.update(conversationId, organizationId, {
-        status: "resolved",
-        ended_at: getUTCNow(),
-        resolution_metadata: {
-          resolved: true,
-          confidence: analysis.confidence,
-          reason: "customer_indicated_resolution",
+    const response = await llmService.invoke({
+      history:
+        systemPrompt +
+        "\n\nUser: " +
+        `Based on this conversation, generate a check-in message:\n\n${conversationContext}`,
+    });
+
+    // Add the warning message to the conversation
+    await messageRepository.create({
+      conversation_id: conversationId,
+      content: response.trim(),
+      type: MessageType.BOT_AGENT,
+      sender: "system",
+      metadata: {
+        isInactivityWarning: true,
+        warningTimestamp: getUTCNow().toISOString(),
+      },
+    });
+
+    console.log(`[ConversationUtils] Sent inactivity warning for conversation ${conversationId}`);
+  } catch (error) {
+    console.error("Error sending inactivity warning:", error);
+    throw error;
+  }
+}
+
+/**
+ * Close an inactive conversation with an appropriate message
+ */
+export async function closeInactiveConversation(
+  conversationId: string,
+  organizationId: string,
+  timeSinceLastMessage: number,
+  sendMessage: boolean = true,
+): Promise<void> {
+  try {
+    const conversation = await conversationRepository.findById(conversationId);
+    if (
+      !conversation ||
+      conversation.organization_id !== organizationId ||
+      conversation.status !== "open"
+    ) {
+      return;
+    }
+
+    // Generate title if not already set
+    await generateConversationTitle(conversationId, organizationId);
+
+    if (sendMessage) {
+      // Get recent messages for context
+      const messages = await messageRepository.findByConversation(conversationId);
+      const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
+
+      let closureMessage: string;
+      if (hasWarning) {
+        // User didn't respond to warning
+        closureMessage =
+          "Since I haven't heard back from you, I'll close this conversation for now. Feel free to start a new conversation whenever you need help!";
+      } else {
+        // No warning was sent (e.g., conversation was already inactive for too long)
+        const recentMessages = messages
+          .filter((m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT)
+          .slice(-3);
+
+        const conversationContext = recentMessages
+          .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
+          .join("\n");
+
+        const systemPrompt = `You are closing an inactive conversation. Generate a brief, friendly closing message that:
+- Acknowledges the conversation topic
+- Mentions you're closing due to inactivity
+- Invites them to start a new conversation if needed
+Keep it to 1-2 sentences.`;
+
+        closureMessage = await llmService.invoke({
+          history:
+            systemPrompt +
+            "\n\nUser: " +
+            `Generate a closing message for this conversation:\n\n${conversationContext}`,
+        });
+      }
+
+      // Add closure message
+      await messageRepository.create({
+        conversation_id: conversationId,
+        content: closureMessage.trim(),
+        type: MessageType.SYSTEM,
+        sender: "system",
+        metadata: {
+          reason: "inactivity_timeout",
+          inactivity_duration_ms: timeSinceLastMessage,
         },
       });
     }
+
+    // Update conversation status to resolved
+    await conversationRepository.update(conversationId, organizationId, {
+      status: "resolved",
+      ended_at: getUTCNow(),
+      resolution_metadata: {
+        resolved: false,
+        confidence: 1.0,
+        reason: sendMessage ? "inactivity_timeout" : "inactivity_timeout_silent",
+      },
+    });
+
+    console.log(
+      `[ConversationUtils] Closed inactive conversation ${conversationId} (silent: ${!sendMessage})`,
+    );
   } catch (error) {
-    console.error("[ConversationUtils] Error in resolution detection:", error);
-    // Don't throw - resolution detection is not critical
+    console.error("Error closing inactive conversation:", error);
+    throw error;
+  }
+}
+
+/**
+ * Check if a message indicates the user wants to close the conversation
+ */
+export async function checkForClosureIntent(
+  conversationId: string,
+  messageId: string,
+): Promise<boolean> {
+  try {
+    const message = await messageRepository.findById(messageId);
+    if (!message) {
+      return false;
+    }
+
+    // Check if message has closure intent
+    if (message.intent === "close_satisfied" || message.intent === "close_unsatisfied") {
+      console.log(
+        `[ConversationUtils] Detected closure intent (${message.intent}) in message ${messageId}`,
+      );
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error checking closure intent:", error);
+    return false;
   }
 }

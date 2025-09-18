@@ -35,27 +35,19 @@ export class CustomerRepository extends BaseRepository<Customer> {
     });
   }
 
-  async findByExternalId(
-    externalId: string,
-    organizationId: string
-  ): Promise<Customer | null> {
+  async findByExternalId(externalId: string, organizationId: string): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { external_id: externalId, organization_id: organizationId },
     });
   }
 
-  async findByEmail(
-    email: string,
-    organizationId: string
-  ): Promise<Customer | null> {
+  async findByEmail(email: string, organizationId: string): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { email, organization_id: organizationId },
     });
   }
 
-  override async findByOrganization(
-    organizationId: string
-  ): Promise<Customer[]> {
+  override async findByOrganization(organizationId: string): Promise<Customer[]> {
     return await this.getLegacyRepository().find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
@@ -65,17 +57,14 @@ export class CustomerRepository extends BaseRepository<Customer> {
   override async update(
     id: string,
     organizationId: string,
-    data: Partial<Customer>
+    data: Partial<Customer>,
   ): Promise<Customer | null> {
     const customer = await this.findById(id);
     if (!customer || customer.organization_id !== organizationId) {
       return null;
     }
 
-    await this.getLegacyRepository().update(
-      { id, organization_id: organizationId },
-      data
-    );
+    await this.getLegacyRepository().update({ id, organization_id: organizationId }, data);
 
     return await this.findById(id);
   }
@@ -95,7 +84,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   override async paginateQuery(
     listParams: any,
     organizationId: string,
-    baseWhere?: Record<string, any>
+    baseWhere?: Record<string, any>,
   ) {
     const queryBuilder = this.getLegacyRepository().createQueryBuilder("entity");
 
@@ -132,15 +121,11 @@ export class CustomerRepository extends BaseRepository<Customer> {
     const total = await queryBuilder.getCount();
 
     // Apply pagination
-    queryBuilder
-      .skip(listParams.pagination.offset)
-      .take(listParams.pagination.limit);
+    queryBuilder.skip(listParams.pagination.offset).take(listParams.pagination.limit);
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
-      const selectFields = listParams.select.map(
-        (field: string) => `entity.${field}`
-      );
+      const selectFields = listParams.select.map((field: string) => `entity.${field}`);
       queryBuilder.select(selectFields);
     }
 
@@ -154,9 +139,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
         limit: listParams.pagination.limit,
         total,
         totalPages: Math.ceil(total / listParams.pagination.limit),
-        hasNext:
-          listParams.pagination.page <
-          Math.ceil(total / listParams.pagination.limit),
+        hasNext: listParams.pagination.page < Math.ceil(total / listParams.pagination.limit),
         hasPrev: listParams.pagination.page > 1,
       },
     };
@@ -168,7 +151,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Customer>,
     filters?: Record<string, any>,
-    _organizationId?: string
+    _organizationId?: string,
   ): void {
     if (!filters) return;
 
@@ -187,11 +170,11 @@ export class CustomerRepository extends BaseRepository<Customer> {
     if (filters.hasConversations !== undefined) {
       if (filters.hasConversations) {
         queryBuilder.andWhere(
-          "EXISTS (SELECT 1 FROM conversations WHERE conversations.customer_id = entity.id)"
+          "EXISTS (SELECT 1 FROM conversations WHERE conversations.customer_id = entity.id)",
         );
       } else {
         queryBuilder.andWhere(
-          "NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.customer_id = entity.id)"
+          "NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.customer_id = entity.id)",
         );
       }
     }
@@ -202,7 +185,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
    */
   protected override applySearch(
     queryBuilder: SelectQueryBuilder<Customer>,
-    search?: { query?: string; searchFields?: string[] }
+    search?: { query?: string; searchFields?: string[] },
   ): void {
     if (!search?.query) return;
 
@@ -216,10 +199,13 @@ export class CustomerRepository extends BaseRepository<Customer> {
     if (searchConditions) {
       queryBuilder.andWhere(
         `(${searchConditions})`,
-        searchFields.reduce((params, _, index) => {
-          params[`searchQuery${index}`] = `%${search.query}%`;
-          return params;
-        }, {} as Record<string, any>)
+        searchFields.reduce(
+          (params, _, index) => {
+            params[`searchQuery${index}`] = `%${search.query}%`;
+            return params;
+          },
+          {} as Record<string, any>,
+        ),
       );
     }
   }
@@ -229,7 +215,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
    */
   protected override applyIncludes(
     queryBuilder: SelectQueryBuilder<Customer>,
-    include?: string[]
+    include?: string[],
   ): void {
     if (!include || include.length === 0) return;
 
@@ -246,9 +232,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
-            console.warn(
-              `Invalid relation '${relation}' for Customer entity`
-            );
+            console.warn(`Invalid relation '${relation}' for Customer entity`);
           }
       }
     });
@@ -261,21 +245,24 @@ export class CustomerRepository extends BaseRepository<Customer> {
   async mergeCustomers(
     sourceCustomerId: string,
     targetCustomerId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Customer | null> {
     const sourceCustomer = await this.findById(sourceCustomerId);
     const targetCustomer = await this.findById(targetCustomerId);
 
-    if (!sourceCustomer || !targetCustomer || 
-        sourceCustomer.organization_id !== organizationId || 
-        targetCustomer.organization_id !== organizationId) {
+    if (
+      !sourceCustomer ||
+      !targetCustomer ||
+      sourceCustomer.organization_id !== organizationId ||
+      targetCustomer.organization_id !== organizationId
+    ) {
       return null;
     }
 
     // Update all conversations to point to the target customer
     await this.getLegacyRepository().query(
       `UPDATE conversations SET customer_id = $1 WHERE customer_id = $2 AND organization_id = $3`,
-      [targetCustomerId, sourceCustomerId, organizationId]
+      [targetCustomerId, sourceCustomerId, organizationId],
     );
 
     // Merge metadata if both have it
@@ -286,7 +273,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
         _merged_from: sourceCustomerId,
         _merged_at: new Date().toISOString(),
       };
-      
+
       await this.update(targetCustomerId, organizationId, {
         external_metadata: mergedMetadata,
       });

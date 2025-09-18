@@ -2,15 +2,14 @@
   <NuxtLayout name="auth">
     <div class="space-y-6">
       <!-- Success State -->
-      <div v-if="emailSent" class="text-center space-y-4">
-        <div
-          class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100"
-        >
+      <div v-if="emailSent"
+class="text-center space-y-4">
+        <div class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100">
           <CheckCircleIcon class="w-6 h-6 text-green-600" />
         </div>
 
         <div>
-          <CardTitle class="text-2xl">Check your email</CardTitle>
+          <CardTitle class="text-2xl"> Check your email </CardTitle>
           <CardDescription class="mt-2">
             We've sent a password reset link to
             <strong>{{ form.email }}</strong>
@@ -20,7 +19,7 @@
         <div class="space-y-4">
           <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p class="text-sm text-blue-800">
-              <strong>Didn't receive the email?</strong><br />
+              <strong>Didn't receive the email?</strong><br >
               Check your spam folder or try resending the link.
             </p>
           </div>
@@ -33,19 +32,17 @@
               :disabled="resendLoading || resendCooldown > 0"
               @click="resendEmail"
             >
-              <div v-if="resendLoading" class="flex items-center space-x-2">
-                <div
-                  class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"
-                ></div>
+              <div v-if="resendLoading"
+class="flex items-center space-x-2">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900" />
                 <span>Resending...</span>
               </div>
-              <span v-else-if="resendCooldown > 0">
-                Resend in {{ resendCooldown }}s
-              </span>
+              <span v-else-if="resendCooldown > 0"> Resend in {{ resendCooldown }}s </span>
               <span v-else>Resend email</span>
             </Button>
 
-            <Button variant="ghost" size="lg" class="w-full" @click="goBack">
+            <Button variant="ghost"
+size="lg" class="w-full" @click="goBack">
               Back to sign in
             </Button>
           </div>
@@ -53,18 +50,19 @@
       </div>
 
       <!-- Request Form -->
-      <div v-else class="space-y-6">
+      <div v-else
+class="space-y-6">
         <!-- Header -->
         <div class="text-center">
-          <CardTitle class="text-2xl">Forgot your password?</CardTitle>
+          <CardTitle class="text-2xl"> Forgot your password? </CardTitle>
           <CardDescription class="mt-2">
-            Enter your email address and we'll send you a link to reset your
-            password.
+            Enter your email address and we'll send you a link to reset your password.
           </CardDescription>
         </div>
 
         <!-- Reset Form -->
-        <form class="space-y-4" @submit.prevent="handleSubmit">
+        <form class="space-y-4"
+@submit.prevent="handleSubmit">
           <FormField
             id="email"
             v-model="form.email"
@@ -78,27 +76,20 @@
           />
 
           <!-- Submit Button -->
-          <Button
-            type="submit"
-            size="lg"
-            class="w-full"
-            :disabled="loading || !isFormValid"
-          >
-            <div v-if="loading" class="flex items-center space-x-2">
-              <div
-                class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
-              ></div>
+          <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
+            <div v-if="loading"
+class="flex items-center space-x-2">
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               <span>Sending reset link...</span>
             </div>
             <span v-else>Send reset link</span>
           </Button>
 
           <!-- Error Message -->
-          <div
-            v-if="error"
-            class="p-3 rounded-md bg-red-50 border border-red-200"
-          >
-            <p class="text-sm text-red-800">{{ error }}</p>
+          <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+            <p class="text-sm text-red-800">
+              {{ error }}
+            </p>
           </div>
         </form>
 
@@ -119,16 +110,10 @@
         <div class="text-center space-y-2">
           <p class="text-sm text-gray-600">Need help?</p>
           <div class="space-x-4">
-            <NuxtLink
-              to="/support"
-              class="text-sm text-primary hover:text-primary/80 font-medium"
-            >
+            <NuxtLink to="/support" class="text-sm text-primary hover:text-primary/80 font-medium">
               Contact Support
             </NuxtLink>
-            <NuxtLink
-              to="/help"
-              class="text-sm text-primary hover:text-primary/80 font-medium"
-            >
+            <NuxtLink to="/help" class="text-sm text-primary hover:text-primary/80 font-medium">
               Help Center
             </NuxtLink>
           </div>

@@ -42,20 +42,14 @@ export class MessageRepository {
     });
   }
 
-  async findByType(
-    conversationId: string,
-    type: MessageType
-  ): Promise<Message[]> {
+  async findByType(conversationId: string, type: MessageType): Promise<Message[]> {
     return await this.getRepository().find({
       where: { conversation_id: conversationId, type },
       order: { created_at: "ASC" },
     });
   }
 
-  async getLastMessages(
-    conversationId: string,
-    limit: number = 10
-  ): Promise<Message[]> {
+  async getLastMessages(conversationId: string, limit: number = 10): Promise<Message[]> {
     return await this.getRepository().find({
       where: { conversation_id: conversationId },
       order: { created_at: "DESC" },

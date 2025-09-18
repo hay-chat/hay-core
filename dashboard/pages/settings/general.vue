@@ -5,15 +5,17 @@
       <div>
         <h1 class="text-3xl font-bold tracking-tight">General Settings</h1>
         <p class="text-muted-foreground">
-          Manage your platform preferences and configuration
-        </p>
+Manage your platform preferences and configuration
+</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="resetToDefaults">
+        <Button variant="outline"
+@click="resetToDefaults">
           <RotateCcw class="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
-        <Button :disabled="!hasChanges" @click="saveSettings">
+        <Button :disabled="!hasChanges"
+@click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -86,8 +88,8 @@
               <option value="DD MMM YYYY">DD MMM YYYY</option>
             </select>
             <p class="text-xs text-muted-foreground mt-1">
-              Preview: {{ formatDatePreview() }}
-            </p>
+Preview: {{ formatDatePreview() }}
+</p>
           </div>
 
           <div>
@@ -101,8 +103,8 @@
               <option value="24h">24-hour</option>
             </select>
             <p class="text-xs text-muted-foreground mt-1">
-              Preview: {{ formatTimePreview() }}
-            </p>
+Preview: {{ formatTimePreview() }}
+</p>
           </div>
         </div>
 
@@ -114,7 +116,8 @@
             class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
           >
             <option value="">No default agent</option>
-            <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+            <option v-for="agent in agents"
+:key="agent.id" :value="agent.id">
               {{ agent.name }}
             </option>
           </select>
@@ -129,9 +132,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Notification Preferences</CardTitle>
-        <CardDescription
-          >Control how and when you receive notifications</CardDescription
-        >
+        <CardDescription> Control how and when you receive notifications </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- Email Notifications -->
@@ -145,9 +146,7 @@
                   Get notified when a new conversation starts
                 </p>
               </div>
-              <Checkbox
-                v-model="settings.notifications.email.newConversations"
-              />
+              <Checkbox v-model="settings.notifications.email.newConversations" />
             </div>
 
             <div class="flex items-center justify-between">
@@ -157,9 +156,7 @@
                   When a conversation needs human intervention
                 </p>
               </div>
-              <Checkbox
-                v-model="settings.notifications.email.escalatedConversations"
-              />
+              <Checkbox v-model="settings.notifications.email.escalatedConversations" />
             </div>
 
             <div class="flex items-center justify-between">
@@ -169,17 +166,15 @@
                   When agent performance drops below thresholds
                 </p>
               </div>
-              <Checkbox
-                v-model="settings.notifications.email.performanceAlerts"
-              />
+              <Checkbox v-model="settings.notifications.email.performanceAlerts" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Weekly Reports</Label>
                 <p class="text-xs text-muted-foreground">
-                  Weekly performance summary emails
-                </p>
+Weekly performance summary emails
+</p>
               </div>
               <Checkbox v-model="settings.notifications.email.weeklyReports" />
             </div>
@@ -194,8 +189,8 @@
               <div>
                 <Label class="font-normal">Real-time Alerts</Label>
                 <p class="text-xs text-muted-foreground">
-                  Show notifications in the dashboard
-                </p>
+Show notifications in the dashboard
+</p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.realTimeAlerts" />
             </div>
@@ -214,12 +209,10 @@
               <div>
                 <Label class="font-normal">Feature Announcements</Label>
                 <p class="text-xs text-muted-foreground">
-                  New features and product updates
-                </p>
+New features and product updates
+</p>
               </div>
-              <Checkbox
-                v-model="settings.notifications.inApp.featureAnnouncements"
-              />
+              <Checkbox v-model="settings.notifications.inApp.featureAnnouncements" />
             </div>
           </div>
         </div>
@@ -248,8 +241,7 @@
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            No notifications will be sent during quiet hours (except critical
-            alerts)
+            No notifications will be sent during quiet hours (except critical alerts)
           </p>
         </div>
       </CardContent>
@@ -259,10 +251,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Webhook Configuration</CardTitle>
-        <CardDescription
-          >Configure external webhook endpoints for
-          notifications</CardDescription
-        >
+        <CardDescription> Configure external webhook endpoints for notifications </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div>
@@ -295,17 +284,14 @@
         <div>
           <Label>Webhook Events</Label>
           <div class="grid gap-2 mt-2 md:grid-cols-2">
-            <div
-              v-for="event in webhookEvents"
-              :key="event.id"
-              class="flex items-center space-x-2"
-            >
+            <div v-for="event in webhookEvents" :key="event.id" class="flex items-center space-x-2">
               <Checkbox
                 :id="event.id"
                 :checked="settings.webhooks.events.includes(event.id)"
                 @update:checked="toggleWebhookEvent(event.id)"
               />
-              <Label :for="event.id" class="text-sm">{{ event.name }}</Label>
+              <Label :for="event.id"
+class="text-sm">{{ event.name }}</Label>
             </div>
           </div>
         </div>
@@ -320,7 +306,8 @@
             <Zap class="h-4 w-4 mr-2" />
             Test Webhook
           </Button>
-          <Button variant="outline" size="sm" @click="viewWebhookLogs">
+          <Button variant="outline"
+size="sm" @click="viewWebhookLogs">
             <FileText class="h-4 w-4 mr-2" />
             View Logs
           </Button>
@@ -332,9 +319,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Data Retention</CardTitle>
-        <CardDescription
-          >Configure how long different types of data are kept</CardDescription
-        >
+        <CardDescription> Configure how long different types of data are kept </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
@@ -405,9 +390,9 @@
             <div class="text-sm">
               <p class="font-medium text-yellow-800">Data Retention Policy</p>
               <p class="text-yellow-700">
-                Changing retention settings will only affect new data. Existing
-                data will be retained according to previous settings. Consider
-                compliance requirements before making changes.
+                Changing retention settings will only affect new data. Existing data will be
+                retained according to previous settings. Consider compliance requirements before
+                making changes.
               </p>
             </div>
           </div>
@@ -476,9 +461,7 @@ const webhookEvents = [
 
 // Computed properties
 const hasChanges = computed(() => {
-  return (
-    JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value)
-  );
+  return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
 });
 
 // Methods
@@ -489,9 +472,7 @@ const formatDatePreview = () => {
       .getDate()
       .toString()
       .padStart(2, "0")}/${now.getFullYear()}`,
-    "DD/MM/YYYY": `${now.getDate().toString().padStart(2, "0")}/${(
-      now.getMonth() + 1
-    )
+    "DD/MM/YYYY": `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1)
       .toString()
       .padStart(2, "0")}/${now.getFullYear()}`,
     "YYYY-MM-DD": `${now.getFullYear()}-${(now.getMonth() + 1)
@@ -503,10 +484,7 @@ const formatDatePreview = () => {
       year: "numeric",
     }),
   };
-  return (
-    formats[settings.value.dateFormat as keyof typeof formats] ||
-    "Invalid format"
-  );
+  return formats[settings.value.dateFormat as keyof typeof formats] || "Invalid format";
 };
 
 const formatTimePreview = () => {
@@ -552,11 +530,7 @@ const saveSettings = async () => {
 };
 
 const resetToDefaults = () => {
-  if (
-    confirm(
-      "Are you sure you want to reset all settings to their default values?"
-    )
-  ) {
+  if (confirm("Are you sure you want to reset all settings to their default values?")) {
     settings.value = {
       defaultLanguage: "en",
       timezone: "UTC",

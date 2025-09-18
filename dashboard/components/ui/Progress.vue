@@ -1,10 +1,7 @@
 <template>
   <div
     :class="
-      cn(
-        'relative h-4 w-full overflow-hidden rounded-full bg-background-secondary',
-        $props.class
-      )
+      cn('relative h-4 w-full overflow-hidden rounded-full bg-background-secondary', $props.class)
     "
   >
     <div

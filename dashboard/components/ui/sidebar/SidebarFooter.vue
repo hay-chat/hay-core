@@ -1,5 +1,6 @@
 <template>
-  <div :data-sidebar="state" :class="cn('flex flex-col gap-2', className)">
+  <div :data-sidebar="state"
+:class="cn('flex flex-col gap-2', className)">
     <slot />
   </div>
 </template>

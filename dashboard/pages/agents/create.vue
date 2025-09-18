@@ -3,13 +3,14 @@
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-2">Create Agent</h1>
       <p class="text-muted-foreground">
-        Configure a new AI agent for your organization
-      </p>
+Configure a new AI agent for your organization
+</p>
     </div>
 
-    <form @submit.prevent="handleSubmit" class="space-y-6">
+    <form class="space-y-6" @submit.prevent="handleSubmit">
       <div>
-        <label for="name" class="block text-sm font-medium mb-2">Name</label>
+        <label for="name"
+class="block text-sm font-medium mb-2">Name</label>
         <input
           id="name"
           v-model="form.name"
@@ -21,9 +22,8 @@
       </div>
 
       <div>
-        <label for="description" class="block text-sm font-medium mb-2"
-          >Description</label
-        >
+        <label for="description"
+class="block text-sm font-medium mb-2">Description</label>
         <textarea
           id="description"
           v-model="form.description"
@@ -34,9 +34,8 @@
       </div>
 
       <div>
-        <label for="instructions" class="block text-sm font-medium mb-2"
-          >Instructions</label
-        >
+        <label for="instructions"
+class="block text-sm font-medium mb-2">Instructions</label>
         <textarea
           id="instructions"
           v-model="form.instructions"
@@ -47,9 +46,8 @@
       </div>
 
       <div>
-        <label for="tone" class="block text-sm font-medium mb-2"
-          >Tone</label
-        >
+        <label for="tone"
+class="block text-sm font-medium mb-2">Tone</label>
         <textarea
           id="tone"
           v-model="form.tone"
@@ -60,9 +58,8 @@
       </div>
 
       <div>
-        <label for="avoid" class="block text-sm font-medium mb-2"
-          >Things to Avoid</label
-        >
+        <label for="avoid"
+class="block text-sm font-medium mb-2">Things to Avoid</label>
         <textarea
           id="avoid"
           v-model="form.avoid"
@@ -73,9 +70,8 @@
       </div>
 
       <div>
-        <label for="trigger" class="block text-sm font-medium mb-2"
-          >Trigger Conditions</label
-        >
+        <label for="trigger"
+class="block text-sm font-medium mb-2">Trigger Conditions</label>
         <textarea
           id="trigger"
           v-model="form.trigger"
@@ -92,7 +88,8 @@
           type="checkbox"
           class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
         />
-        <label for="enabled" class="text-sm font-medium">Enable agent</label>
+        <label for="enabled"
+class="text-sm font-medium">Enable agent</label>
       </div>
 
       <div class="flex gap-4">
@@ -103,10 +100,7 @@
         >
           {{ isLoading ? "Creating..." : "Create Agent" }}
         </button>
-        <NuxtLink
-          to="/agents"
-          class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-        >
+        <NuxtLink to="/agents" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
           Cancel
         </NuxtLink>
       </div>

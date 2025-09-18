@@ -3,10 +3,10 @@
     <div class="space-y-6">
       <!-- Header -->
       <div class="text-center">
-        <CardTitle class="text-2xl">Create your account</CardTitle>
+        <CardTitle class="text-2xl"> Create your account </CardTitle>
         <CardDescription class="mt-2">
-          Get started with your Hay organization
-        </CardDescription>
+Get started with your Hay organization
+</CardDescription>
       </div>
 
       {{ form }}
@@ -44,7 +44,8 @@
       </div> -->
 
       <!-- Signup Form -->
-      <form class="space-y-4" @submit.prevent="handleSubmit">
+      <form class="space-y-4"
+@submit.prevent="handleSubmit">
         <!-- Organization Name -->
         <FormField
           id="organizationName"
@@ -115,44 +116,23 @@
         <!-- Terms and Privacy Agreement -->
         <div class="space-y-3">
           <div class="flex items-start space-x-2">
-            <Checkbox
-              id="terms"
-              v-model:checked="form.acceptTerms"
-              class="mt-1"
-            />
-            <Label
-              for="terms"
-              class="text-sm text-gray-700 cursor-pointer leading-5"
-            >
+            <Checkbox id="terms" v-model:checked="form.acceptTerms" class="mt-1" />
+            <Label for="terms" class="text-sm text-gray-700 cursor-pointer leading-5">
               I agree to the
-              <NuxtLink
-                to="/terms"
-                class="text-primary hover:text-primary/80 font-medium"
-              >
+              <NuxtLink to="/terms" class="text-primary hover:text-primary/80 font-medium">
                 Terms of Service
               </NuxtLink>
               and
-              <NuxtLink
-                to="/privacy"
-                class="text-primary hover:text-primary/80 font-medium"
-              >
+              <NuxtLink to="/privacy" class="text-primary hover:text-primary/80 font-medium">
                 Privacy Policy
               </NuxtLink>
             </Label>
           </div>
 
           <div class="flex items-start space-x-2">
-            <Checkbox
-              id="marketing"
-              v-model:checked="form.acceptMarketing"
-              class="mt-1"
-            />
-            <Label
-              for="marketing"
-              class="text-sm text-gray-700 cursor-pointer leading-5"
-            >
-              I would like to receive product updates and marketing
-              communications
+            <Checkbox id="marketing" v-model:checked="form.acceptMarketing" class="mt-1" />
+            <Label for="marketing" class="text-sm text-gray-700 cursor-pointer leading-5">
+              I would like to receive product updates and marketing communications
               <span class="text-gray-500">(optional)</span>
             </Label>
           </div>
@@ -165,21 +145,19 @@
           class="w-full"
           :disabled="authStore.isLoading || !isFormValid"
         >
-          <div v-if="authStore.isLoading" class="flex items-center space-x-2">
-            <div
-              class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
-            ></div>
+          <div v-if="authStore.isLoading"
+class="flex items-center space-x-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             <span>Creating account...</span>
           </div>
           <span v-else>Create account</span>
         </Button>
 
         <!-- Error Message -->
-        <div
-          v-if="error"
-          class="p-3 rounded-md bg-red-50 border border-red-200"
-        >
-          <p class="text-sm text-red-800">{{ error }}</p>
+        <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <p class="text-sm text-red-800">
+            {{ error }}
+          </p>
         </div>
       </form>
 
@@ -187,10 +165,7 @@
       <div class="text-center">
         <p class="text-sm text-gray-600">
           Already have an account?
-          <NuxtLink
-            to="/login"
-            class="font-medium text-primary hover:text-primary/80"
-          >
+          <NuxtLink to="/login" class="font-medium text-primary hover:text-primary/80">
             Sign in
           </NuxtLink>
         </p>
@@ -264,8 +239,7 @@ const validateField = (field: keyof typeof errors) => {
       if (!form.organizationName) {
         errors.organizationName = "Organization name is required";
       } else if (form.organizationName.length < 2) {
-        errors.organizationName =
-          "Organization name must be at least 2 characters";
+        errors.organizationName = "Organization name must be at least 2 characters";
       } else {
         errors.organizationName = "";
       }
@@ -355,8 +329,7 @@ const handleSubmit = async () => {
       error.value =
         "Password does not meet security requirements. Please choose a stronger password.";
     } else {
-      error.value =
-        "Unable to create your account. Please check your information and try again.";
+      error.value = "Unable to create your account. Please check your information and try again.";
     }
     console.error("Signup error:", err);
   }
@@ -365,8 +338,6 @@ const handleSubmit = async () => {
 // SEO
 useHead({
   title: "Sign Up - Hay Dashboard",
-  meta: [
-    { name: "description", content: "Create your Hay organization account" },
-  ],
+  meta: [{ name: "description", content: "Create your Hay organization account" }],
 });
 </script>

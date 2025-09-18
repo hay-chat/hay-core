@@ -65,7 +65,7 @@ export class HayService {
   static async invokeConversation(
     conversationId: string,
     organizationId: string,
-    inputs: HayInputMessage[]
+    inputs: HayInputMessage[],
   ): Promise<HayResponse> {
     if (!Hay.initialized) {
       Hay.init();
@@ -92,15 +92,11 @@ export class HayService {
 
     const usage = aiResponse.usage_metadata || undefined;
 
-    const aiMessage = await Hay.conversationService.addMessage(
-      conversationId,
-      organizationId,
-      {
-        content: aiContent,
-        type: MessageType.BOT_AGENT,
-        usage_metadata: usage,
-      }
-    );
+    const aiMessage = await Hay.conversationService.addMessage(conversationId, organizationId, {
+      content: aiContent,
+      type: MessageType.BOT_AGENT,
+      usage_metadata: usage,
+    });
 
     return {
       id: aiMessage.id,
@@ -114,22 +110,20 @@ export class HayService {
   static async invokeWithHistory(
     conversationId: string,
     organizationId: string,
-    newMessages: HayInputMessage[]
+    newMessages: HayInputMessage[],
   ): Promise<HayResponse> {
     if (!Hay.initialized) {
       Hay.init();
     }
 
-    const existingMessages = await Hay.conversationService.getMessages(
-      conversationId
-    );
+    const existingMessages = await Hay.conversationService.getMessages(conversationId);
 
     const existingLcMessages = existingMessages.map((msg) =>
       Hay.toLangChainMessage({
         type: msg.type,
         content: msg.content,
         usage_metadata: msg.usage_metadata || undefined,
-      })
+      }),
     );
 
     const newLcMessages = newMessages.map((m) => Hay.toLangChainMessage(m));
@@ -145,15 +139,11 @@ export class HayService {
 
     const usage = aiResponse.usage_metadata || undefined;
 
-    const aiMessage = await Hay.conversationService.addMessage(
-      conversationId,
-      organizationId,
-      {
-        content: aiContent,
-        type: MessageType.BOT_AGENT,
-        usage_metadata: usage,
-      }
-    );
+    const aiMessage = await Hay.conversationService.addMessage(conversationId, organizationId, {
+      content: aiContent,
+      type: MessageType.BOT_AGENT,
+      usage_metadata: usage,
+    });
 
     return {
       id: aiMessage.id,
@@ -166,16 +156,13 @@ export class HayService {
 
   static async invokeWithSystemPrompt(
     systemPrompt: string,
-    userPrompt: string
+    userPrompt: string,
   ): Promise<{ content: string; model?: string; usage_metadata?: any }> {
     if (!Hay.initialized) {
       Hay.init();
     }
 
-    const messages = [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ];
+    const messages = [new SystemMessage(systemPrompt), new HumanMessage(userPrompt)];
 
     const aiResponse = await Hay.model.invoke(messages);
 
@@ -192,7 +179,7 @@ export class HayService {
   }
 
   static async invoke(
-    prompt: string
+    prompt: string,
   ): Promise<{ content: string; model?: string; usage_metadata?: any }> {
     if (!Hay.initialized) {
       Hay.init();
@@ -217,7 +204,7 @@ export class HayService {
     conversationId: string,
     organizationId: string,
     name: string,
-    args: Record<string, any>
+    args: Record<string, any>,
   ): Promise<any> {
     if (!Hay.initialized) {
       Hay.init();
@@ -236,10 +223,7 @@ export class HayService {
     return toolOutput;
   }
 
-  private static async executeTool(
-    name: string,
-    args: Record<string, any>
-  ): Promise<string> {
+  private static async executeTool(name: string, args: Record<string, any>): Promise<string> {
     // Tool execution logic here
     // This is a placeholder implementation
     return `Executed tool: ${name} with args: ${JSON.stringify(args)}`;

@@ -1,4 +1,4 @@
-import { User } from '../entities/user.entity';
+import { User } from "../entities/user.entity";
 
 export interface JWTPayload {
   userId: string;
@@ -25,7 +25,7 @@ export interface ApiKeyScope {
 export interface AuthContext {
   user: User | null;
   sessionId?: string;
-  authMethod?: 'basic' | 'jwt' | 'apikey';
+  authMethod?: "basic" | "jwt" | "apikey";
   apiKeyId?: string;
   scopes?: ApiKeyScope[];
 }

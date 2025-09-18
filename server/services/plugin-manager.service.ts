@@ -40,11 +40,7 @@ export class PluginManagerService {
    */
   private async loadManifestSchema(): Promise<void> {
     try {
-      const schemaPath = path.join(
-        this.pluginsDir,
-        "base",
-        "plugin-manifest.schema.json"
-      );
+      const schemaPath = path.join(this.pluginsDir, "base", "plugin-manifest.schema.json");
       const schemaContent = await fs.readFile(schemaPath, "utf-8");
       this.manifestSchema = JSON.parse(schemaContent);
       if (this.manifestSchema) {
@@ -52,10 +48,7 @@ export class PluginManagerService {
       }
       console.log("✅ Loaded plugin manifest schema");
     } catch (error) {
-      console.warn(
-        "⚠️  Could not load plugin manifest schema, validation will be skipped:",
-        error
-      );
+      console.warn("⚠️  Could not load plugin manifest schema, validation will be skipped:", error);
     }
   }
 
@@ -119,14 +112,12 @@ export class PluginManagerService {
 
         if (tsExists) {
           console.warn(
-            `⚠️  Plugin at ${pluginPath} is using deprecated manifest.ts. Please migrate to manifest.json`
+            `⚠️  Plugin at ${pluginPath} is using deprecated manifest.ts. Please migrate to manifest.json`,
           );
           const manifestModule = await import(tsManifestPath);
           manifest = manifestModule.manifest || manifestModule.default;
         } else {
-          console.warn(
-            `⚠️  No manifest.json found for plugin at ${pluginPath}`
-          );
+          console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
           return;
         }
       }
@@ -166,16 +157,9 @@ export class PluginManagerService {
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
 
-        if (
-          entry.isDirectory() &&
-          entry.name !== "node_modules" &&
-          entry.name !== "dist"
-        ) {
+        if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== "dist") {
           await processDirectory(fullPath);
-        } else if (
-          entry.isFile() &&
-          (entry.name.endsWith(".ts") || entry.name.endsWith(".js"))
-        ) {
+        } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".js"))) {
           const content = await fs.readFile(fullPath);
           hash.update(content);
         }
@@ -216,10 +200,7 @@ export class PluginManagerService {
 
     try {
       console.log(`📦 Installing plugin ${plugin.name}...`);
-      const pluginPath = path.join(
-        this.pluginsDir,
-        pluginId.replace("hay-plugin-", "")
-      );
+      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
 
       execSync(installCommand, {
         cwd: pluginPath,
@@ -231,20 +212,11 @@ export class PluginManagerService {
       plugin.installed = true;
       console.log(`✅ [HAY OK] Plugin ${plugin.name} installed successfully`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await pluginRegistryRepository.updateInstallStatus(
-        plugin.id,
-        false,
-        errorMessage
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await pluginRegistryRepository.updateInstallStatus(plugin.id, false, errorMessage);
       plugin.installed = false;
-      console.error(
-        `❌ [HAY FAILED] Plugin ${plugin.name} installation failed`
-      );
-      throw new Error(
-        `Failed to install plugin ${plugin.name}: ${errorMessage}`
-      );
+      console.error(`❌ [HAY FAILED] Plugin ${plugin.name} installation failed`);
+      throw new Error(`Failed to install plugin ${plugin.name}: ${errorMessage}`);
     }
   }
 
@@ -268,10 +240,7 @@ export class PluginManagerService {
 
     try {
       console.log(`🔨 Building plugin ${plugin.name}...`);
-      const pluginPath = path.join(
-        this.pluginsDir,
-        pluginId.replace("hay-plugin-", "")
-      );
+      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
 
       execSync(buildCommand, {
         cwd: pluginPath,
@@ -283,13 +252,8 @@ export class PluginManagerService {
       plugin.built = true;
       console.log(`✅ [HAY OK] Plugin ${plugin.name} built successfully`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await pluginRegistryRepository.updateBuildStatus(
-        plugin.id,
-        false,
-        errorMessage
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await pluginRegistryRepository.updateBuildStatus(plugin.id, false, errorMessage);
       plugin.built = false;
       console.error(`❌ [HAY FAILED] Plugin ${plugin.name} build failed`);
       throw new Error(`Failed to build plugin ${plugin.name}: ${errorMessage}`);
@@ -361,10 +325,7 @@ export class PluginManagerService {
 
           if (jsonExists) {
             try {
-              const manifestContent = await fs.readFile(
-                jsonManifestPath,
-                "utf-8"
-              );
+              const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
               manifest = JSON.parse(manifestContent);
             } catch (error) {
               // Skip this folder if manifest is invalid

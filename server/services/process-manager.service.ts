@@ -26,10 +26,7 @@ export class ProcessManagerService {
    * Start a plugin process for an organization
    */
   async startPlugin(organizationId: string, pluginId: string): Promise<void> {
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      organizationId,
-      pluginId
-    );
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
 
     if (!instance) {
       throw new Error(`Plugin instance not found for org ${organizationId}`);
@@ -47,13 +44,9 @@ export class ProcessManagerService {
       return;
     }
 
-    const plugin = await pluginManagerService.getPlugin(
-      instance.plugin.pluginId
-    );
+    const plugin = await pluginManagerService.getPlugin(instance.plugin.pluginId);
     if (!plugin) {
-      throw new Error(
-        `Plugin ${instance.plugin.pluginId} not found in registry`
-      );
+      throw new Error(`Plugin ${instance.plugin.pluginId} not found in registry`);
     }
 
     // Ensure plugin is installed and built
@@ -68,9 +61,7 @@ export class ProcessManagerService {
     if (!startCommand) {
       // Some plugins (like channels) don't need a separate process
       // They just serve assets and handle webhooks
-      console.log(
-        `ℹ️  Plugin ${plugin.name} doesn't require a separate process`
-      );
+      console.log(`ℹ️  Plugin ${plugin.name} doesn't require a separate process`);
       await pluginInstanceRepository.updateStatus(instance.id, "running");
       return;
     }
@@ -80,15 +71,10 @@ export class ProcessManagerService {
 
     try {
       // Prepare environment variables
-      const env = await environmentManagerService.prepareEnvironment(
-        organizationId,
-        instance
-      );
+      const env = await environmentManagerService.prepareEnvironment(organizationId, instance);
 
       // Get the actual folder name for this plugin
-      const folderName = await pluginManagerService.getPluginFolderName(
-        plugin.pluginId
-      );
+      const folderName = await pluginManagerService.getPluginFolderName(plugin.pluginId);
       if (!folderName) {
         throw new Error(`Could not find folder for plugin ${plugin.pluginId}`);
       }
@@ -146,14 +132,12 @@ export class ProcessManagerService {
       // Set up event handlers
       this.setupProcessHandlers(processKey, processInfo);
 
-      console.log(
-        `✅ Started plugin ${plugin.name} for org ${organizationId} (PID: ${pid})`
-      );
+      console.log(`✅ Started plugin ${plugin.name} for org ${organizationId} (PID: ${pid})`);
     } catch (error) {
       await pluginInstanceRepository.updateStatus(
         instance.id,
         "error",
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error ? error.message : String(error),
       );
       throw error;
     }
@@ -179,10 +163,7 @@ export class ProcessManagerService {
     }
 
     // Update status to stopping
-    await pluginInstanceRepository.updateStatus(
-      processInfo.pluginInstanceId,
-      "stopping"
-    );
+    await pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "stopping");
 
     // Gracefully terminate the process
     processInfo.process.kill("SIGTERM");
@@ -199,18 +180,10 @@ export class ProcessManagerService {
     this.processes.delete(processKey);
 
     // Update status
-    await pluginInstanceRepository.updateStatus(
-      processInfo.pluginInstanceId,
-      "stopped"
-    );
-    await pluginInstanceRepository.updateProcessId(
-      processInfo.pluginInstanceId,
-      null
-    );
+    await pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "stopped");
+    await pluginInstanceRepository.updateProcessId(processInfo.pluginInstanceId, null);
 
-    console.log(
-      `🛑 Stopped plugin ${processInfo.pluginName} for org ${organizationId}`
-    );
+    console.log(`🛑 Stopped plugin ${processInfo.pluginName} for org ${organizationId}`);
   }
 
   /**
@@ -224,12 +197,8 @@ export class ProcessManagerService {
   /**
    * Set up process event handlers
    */
-  private setupProcessHandlers(
-    processKey: string,
-    processInfo: ProcessInfo
-  ): void {
-    const { process, pluginInstanceId, pluginName, organizationId } =
-      processInfo;
+  private setupProcessHandlers(processKey: string, processInfo: ProcessInfo): void {
+    const { process, pluginInstanceId, pluginName, organizationId } = processInfo;
 
     // Handle stdout
     process.stdout?.on("data", (data) => {
@@ -238,9 +207,7 @@ export class ProcessManagerService {
 
     // Handle stderr
     process.stderr?.on("data", (data) => {
-      console.error(
-        `[${pluginName}:${organizationId}] ERROR: ${data.toString()}`
-      );
+      console.error(`[${pluginName}:${organizationId}] ERROR: ${data.toString()}`);
     });
 
     // Handle IPC messages
@@ -251,15 +218,12 @@ export class ProcessManagerService {
     // Handle process exit
     process.on("exit", async (code, signal) => {
       console.log(
-        `Plugin ${pluginName} for org ${organizationId} exited with code ${code} and signal ${signal}`
+        `Plugin ${pluginName} for org ${organizationId} exited with code ${code} and signal ${signal}`,
       );
 
       this.processes.delete(processKey);
 
-      if (
-        code !== 0 &&
-        processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS
-      ) {
+      if (code !== 0 && processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS) {
         // Schedule restart
         await this.scheduleRestart(processKey, processInfo);
       } else {
@@ -267,7 +231,7 @@ export class ProcessManagerService {
         await pluginInstanceRepository.updateStatus(
           pluginInstanceId,
           code === 0 ? "stopped" : "error",
-          code !== 0 ? `Process exited with code ${code}` : undefined
+          code !== 0 ? `Process exited with code ${code}` : undefined,
         );
         await pluginInstanceRepository.updateProcessId(pluginInstanceId, null);
       }
@@ -275,16 +239,9 @@ export class ProcessManagerService {
 
     // Handle process errors
     process.on("error", async (error) => {
-      console.error(
-        `Error in plugin ${pluginName} for org ${organizationId}:`,
-        error
-      );
+      console.error(`Error in plugin ${pluginName} for org ${organizationId}:`, error);
 
-      await pluginInstanceRepository.updateStatus(
-        pluginInstanceId,
-        "error",
-        error.message
-      );
+      await pluginInstanceRepository.updateStatus(pluginInstanceId, "error", error.message);
     });
   }
 
@@ -295,38 +252,26 @@ export class ProcessManagerService {
     const processInfo = this.processes.get(processKey);
     if (!processInfo) return;
 
-    console.log(
-      `[IPC from ${processInfo.pluginName}:${processInfo.organizationId}]`,
-      message
-    );
+    console.log(`[IPC from ${processInfo.pluginName}:${processInfo.organizationId}]`, message);
 
     // Handle different message types
     if (message.type === "health") {
       pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId);
     } else if (message.type === "error") {
-      pluginInstanceRepository.updateStatus(
-        processInfo.pluginInstanceId,
-        "error",
-        message.error
-      );
+      pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "error", message.error);
     }
   }
 
   /**
    * Schedule a process restart
    */
-  private async scheduleRestart(
-    processKey: string,
-    processInfo: ProcessInfo
-  ): Promise<void> {
+  private async scheduleRestart(processKey: string, processInfo: ProcessInfo): Promise<void> {
     processInfo.restartAttempts++;
 
-    await pluginInstanceRepository.incrementRestartCount(
-      processInfo.pluginInstanceId
-    );
+    await pluginInstanceRepository.incrementRestartCount(processInfo.pluginInstanceId);
 
     console.log(
-      `Scheduling restart for ${processInfo.pluginName} (attempt ${processInfo.restartAttempts}/${this.MAX_RESTART_ATTEMPTS})`
+      `Scheduling restart for ${processInfo.pluginName} (attempt ${processInfo.restartAttempts}/${this.MAX_RESTART_ATTEMPTS})`,
     );
 
     const timer = setTimeout(async () => {
@@ -346,11 +291,7 @@ export class ProcessManagerService {
   /**
    * Cross-platform command spawning helper
    */
-  private spawnCommand(
-    command: string,
-    cwd: string,
-    env: NodeJS.ProcessEnv
-  ): ChildProcess {
+  private spawnCommand(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
     console.log(`Executing command: ${command} in ${cwd}`);
 
     // Parse the command to check if it needs shell execution
@@ -439,7 +380,7 @@ export class ProcessManagerService {
     organizationId: string,
     pluginId: string,
     action: string,
-    payload?: any
+    payload?: any,
   ): Promise<any> {
     // Ensure plugin is running before sending message
     const { pluginInstanceManagerService } = await import("./plugin-instance-manager.service");
@@ -479,21 +420,14 @@ export class ProcessManagerService {
                 processInfo.process.stdout?.off("data", responseHandler);
 
                 if (response.error) {
-                  reject(
-                    new Error(
-                      `MCP Error: ${response.error.message || response.error}`
-                    )
-                  );
+                  reject(new Error(`MCP Error: ${response.error.message || response.error}`));
                 } else {
                   resolve(response);
                 }
                 return;
               }
             } catch (parseError) {
-              console.warn(
-                `Failed to parse MCP response line: ${line}`,
-                parseError
-              );
+              console.warn(`Failed to parse MCP response line: ${line}`, parseError);
             }
           }
         }
@@ -507,9 +441,7 @@ export class ProcessManagerService {
 
       // Send JSON-RPC request to stdin
       const requestLine = JSON.stringify(request) + "\n";
-      console.log(
-        `[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`
-      );
+      console.log(`[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`);
 
       if (processInfo.process.stdin) {
         processInfo.process.stdin.write(requestLine);
@@ -526,12 +458,10 @@ export class ProcessManagerService {
   async stopAll(): Promise<void> {
     console.log("Stopping all plugin processes...");
 
-    const promises = Array.from(this.processes.entries()).map(
-      async ([processKey]) => {
-        const [organizationId, pluginId] = processKey.split(":");
-        await this.stopPlugin(organizationId, pluginId);
-      }
-    );
+    const promises = Array.from(this.processes.entries()).map(async ([processKey]) => {
+      const [organizationId, pluginId] = processKey.split(":");
+      await this.stopPlugin(organizationId, pluginId);
+    });
 
     await Promise.all(promises);
   }

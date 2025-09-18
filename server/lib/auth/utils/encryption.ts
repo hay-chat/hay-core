@@ -13,9 +13,7 @@ const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
 function getEncryptionKey(): string {
   const key = process.env.PLUGIN_ENCRYPTION_KEY || process.env.JWT_SECRET;
   if (!key) {
-    throw new Error(
-      "PLUGIN_ENCRYPTION_KEY or JWT_SECRET must be set for encryption"
-    );
+    throw new Error("PLUGIN_ENCRYPTION_KEY or JWT_SECRET must be set for encryption");
   }
   return key;
 }
@@ -32,29 +30,26 @@ function deriveKey(password: string, salt: Buffer): Buffer {
  */
 export function encryptValue(text: string): string {
   const password = getEncryptionKey();
-  
+
   // Generate random salt and IV
   const salt = crypto.randomBytes(SALT_LENGTH);
   const iv = crypto.randomBytes(IV_LENGTH);
-  
+
   // Derive key from password and salt
   const key = deriveKey(password, salt);
-  
+
   // Create cipher
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  
+
   // Encrypt the text
-  const encrypted = Buffer.concat([
-    cipher.update(text, "utf8"),
-    cipher.final(),
-  ]);
-  
+  const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
+
   // Get the auth tag
   const tag = cipher.getAuthTag();
-  
+
   // Combine salt + iv + tag + encrypted
   const combined = Buffer.concat([salt, iv, tag, encrypted]);
-  
+
   // Return as base64
   return combined.toString("base64");
 }
@@ -64,29 +59,26 @@ export function encryptValue(text: string): string {
  */
 export function decryptValue(encryptedText: string): string {
   const password = getEncryptionKey();
-  
+
   // Decode from base64
   const combined = Buffer.from(encryptedText, "base64");
-  
+
   // Extract components
   const salt = combined.slice(0, SALT_LENGTH);
   const iv = combined.slice(SALT_LENGTH, TAG_POSITION);
   const tag = combined.slice(TAG_POSITION, ENCRYPTED_POSITION);
   const encrypted = combined.slice(ENCRYPTED_POSITION);
-  
+
   // Derive key from password and salt
   const key = deriveKey(password, salt);
-  
+
   // Create decipher
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
-  
+
   // Decrypt
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ]);
-  
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+
   return decrypted.toString("utf8");
 }
 
@@ -95,10 +87,10 @@ export function decryptValue(encryptedText: string): string {
  */
 export function encryptConfig(
   config: Record<string, any>,
-  schema: Record<string, any>
+  schema: Record<string, any>,
 ): Record<string, any> {
   const encrypted: Record<string, any> = {};
-  
+
   for (const [key, value] of Object.entries(config)) {
     if (schema[key]?.encrypted && value !== null && value !== undefined) {
       // Encrypt sensitive values
@@ -111,18 +103,16 @@ export function encryptConfig(
       encrypted[key] = value;
     }
   }
-  
+
   return encrypted;
 }
 
 /**
  * Decrypt sensitive values in a config object
  */
-export function decryptConfig(
-  config: Record<string, any>
-): Record<string, any> {
+export function decryptConfig(config: Record<string, any>): Record<string, any> {
   const decrypted: Record<string, any> = {};
-  
+
   for (const [key, value] of Object.entries(config)) {
     if (value && typeof value === "object" && value.encrypted) {
       // Decrypt encrypted values
@@ -137,7 +127,7 @@ export function decryptConfig(
       decrypted[key] = value;
     }
   }
-  
+
   return decrypted;
 }
 

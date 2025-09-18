@@ -8,11 +8,9 @@
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>
-        <Button variant="outline" @click="handleCancel">Cancel</Button>
         <Button
-          :variant="destructive ? 'destructive' : 'default'"
-          @click="handleConfirm"
-        >
+variant="outline" @click="handleCancel"> Cancel </Button>
+        <Button :variant="destructive ? 'destructive' : 'default'" @click="handleConfirm">
           {{ confirmText }}
         </Button>
       </DialogFooter>

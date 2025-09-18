@@ -13,10 +13,7 @@ export default defineNuxtConfig({
   // Runtime config for domain handling
   runtimeConfig: {
     public: {
-      baseDomain:
-        process.env["NODE_ENV"] === "development"
-          ? "localhost:3000"
-          : "hay.chat",
+      baseDomain: process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.chat",
       apiBaseUrl:
         process.env["NODE_ENV"] === "development"
           ? "http://localhost:3001"
@@ -156,9 +153,7 @@ export default defineNuxtConfig({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "description", content: "Hay platform dashboard application" },
       ],
-      link: [
-        { rel: "stylesheet", href: "https://use.typekit.net/ztc8xao.css" },
-      ],
+      link: [{ rel: "stylesheet", href: "https://use.typekit.net/ztc8xao.css" }],
     },
   },
 

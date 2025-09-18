@@ -3,10 +3,7 @@ import { z } from "zod";
 import { DocumentProcessorFactory } from "@server/processors";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
-import {
-  splitTextIntoChunks,
-  createChunkMetadata,
-} from "@server/utils/text-chunking";
+import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
 import {
   DocumentationType,
   DocumentationStatus,
@@ -27,7 +24,7 @@ export const documentsRouter = t.router({
       z.object({
         query: z.string(),
         limit: z.number().min(1).max(50).optional().default(10),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       // Ensure vector store is initialized
@@ -39,30 +36,24 @@ export const documentsRouter = t.router({
       const searchResults = await vectorStoreService.search(
         ctx.organizationId!,
         input.query,
-        input.limit
+        input.limit,
       );
 
       // Get document details for the search results
       const documentIds = [
-        ...new Set(
-          searchResults.map((r) => r.metadata?.documentId).filter(Boolean)
-        ),
+        ...new Set(searchResults.map((r) => r.metadata?.documentId).filter(Boolean)),
       ];
 
       const documents =
         documentIds.length > 0
-          ? (await Promise.all(
-              documentIds.map((id) =>
-                documentRepository.findById(id)
-              )
-            )).filter((doc) => doc && doc.organizationId === ctx.organizationId)
+          ? (await Promise.all(documentIds.map((id) => documentRepository.findById(id)))).filter(
+              (doc) => doc && doc.organizationId === ctx.organizationId,
+            )
           : [];
 
       // Map results with document details
       return searchResults.map((result) => {
-        const doc = documents.find(
-          (d) => d?.id === result.metadata?.documentId
-        );
+        const doc = documents.find((d) => d?.id === result.metadata?.documentId);
         return {
           id: result.id,
           documentId: result.metadata?.documentId,
@@ -86,7 +77,7 @@ export const documentsRouter = t.router({
         type: z.nativeEnum(DocumentationType).optional(),
         status: z.nativeEnum(DocumentationStatus).optional(),
         visibility: z.nativeEnum(DocumentVisibility).optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.organizationId) {
@@ -99,11 +90,7 @@ export const documentsRouter = t.router({
       if (input.fileBuffer && input.mimeType) {
         const buffer = Buffer.from(input.fileBuffer, "base64");
         const processor = new DocumentProcessorFactory();
-        const processed = await processor.processDocument(
-          buffer,
-          input.mimeType,
-          input.fileName
-        );
+        const processed = await processor.processDocument(buffer, input.mimeType, input.fileName);
         processedContent = processed.content;
         metadata = processed.metadata;
       }
@@ -144,7 +131,7 @@ export const documentsRouter = t.router({
       const embeddingIds = await vectorStoreService.addChunks(
         ctx.organizationId,
         document.id,
-        vectorChunks
+        vectorChunks,
       );
 
       return {
@@ -162,7 +149,7 @@ export const documentsRouter = t.router({
         title: z.string().optional(),
         content: z.string().optional(),
         regenerateEmbeddings: z.boolean().optional().default(false),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
@@ -172,34 +159,24 @@ export const documentsRouter = t.router({
       }
 
       // Update document
-      const updatedDocument = await documentRepository.update(
-        document.id,
-        ctx.organizationId!,
-        {
-          ...(input.title && { title: input.title }),
-          ...(input.content && { content: input.content }),
-        }
-      );
+      const updatedDocument = await documentRepository.update(document.id, ctx.organizationId!, {
+        ...(input.title && { title: input.title }),
+        ...(input.content && { content: input.content }),
+      });
 
       if (!updatedDocument) {
         throw new Error("Failed to update document");
       }
 
       // Regenerate embeddings if content changed or explicitly requested
-      if (
-        (input.content && input.content !== document.content) ||
-        input.regenerateEmbeddings
-      ) {
+      if ((input.content && input.content !== document.content) || input.regenerateEmbeddings) {
         // Ensure vector store is initialized
         if (!vectorStoreService.initialized) {
           await vectorStoreService.initialize();
         }
 
         // Delete old embeddings
-        await vectorStoreService.deleteByDocumentId(
-          ctx.organizationId!,
-          document.id
-        );
+        await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
 
         // Split new content into chunks
         const contentToEmbed = input.content || document.content || "";
@@ -222,7 +199,7 @@ export const documentsRouter = t.router({
         const embeddingIds = await vectorStoreService.addChunks(
           ctx.organizationId!,
           document.id,
-          vectorChunks
+          vectorChunks,
         );
 
         return {
@@ -244,7 +221,7 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         id: z.string(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
@@ -261,14 +238,11 @@ export const documentsRouter = t.router({
       // Delete embeddings associated with the document
       const deletedEmbeddings = await vectorStoreService.deleteByDocumentId(
         ctx.organizationId!,
-        document.id
+        document.id,
       );
 
       // Delete the document itself
-      const deleted = await documentRepository.delete(
-        document.id,
-        ctx.organizationId!
-      );
+      const deleted = await documentRepository.delete(document.id, ctx.organizationId!);
 
       return {
         success: true,
@@ -283,7 +257,7 @@ export const documentsRouter = t.router({
         documentId: z.string().optional(),
         chunkSize: z.number().optional().default(1000),
         chunkOverlap: z.number().optional().default(200),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Ensure vector store is initialized
@@ -299,10 +273,7 @@ export const documentsRouter = t.router({
         }
 
         // Delete old embeddings
-        await vectorStoreService.deleteByDocumentId(
-          ctx.organizationId!,
-          document.id
-        );
+        await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
 
         // Split content into chunks
         const chunks = splitTextIntoChunks(document.content || "", {
@@ -324,7 +295,7 @@ export const documentsRouter = t.router({
         const embeddingIds = await vectorStoreService.addChunks(
           ctx.organizationId!,
           document.id,
-          vectorChunks
+          vectorChunks,
         );
 
         return {
@@ -335,18 +306,13 @@ export const documentsRouter = t.router({
       }
 
       // Regenerate for all documents in organization
-      const documents = await documentRepository.findByOrganization(
-        ctx.organizationId!
-      );
+      const documents = await documentRepository.findByOrganization(ctx.organizationId!);
       let totalEmbeddings = 0;
       let totalChunks = 0;
 
       for (const document of documents) {
         // Delete old embeddings
-        await vectorStoreService.deleteByDocumentId(
-          ctx.organizationId!,
-          document.id
-        );
+        await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
 
         // Split content into chunks
         const chunks = splitTextIntoChunks(document.content || "", {
@@ -368,7 +334,7 @@ export const documentsRouter = t.router({
         const embeddingIds = await vectorStoreService.addChunks(
           ctx.organizationId!,
           document.id,
-          vectorChunks
+          vectorChunks,
         );
 
         totalEmbeddings += embeddingIds.length;
@@ -397,7 +363,7 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         url: z.string().url(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.organizationId) {
@@ -411,16 +377,16 @@ export const documentsRouter = t.router({
         status: JobStatus.QUEUED,
         priority: JobPriority.NORMAL,
         data: {
-          type: 'page_discovery',
+          type: "page_discovery",
           url: input.url,
           progress: {
-            status: 'starting',
+            status: "starting",
             pagesFound: 0,
             pagesProcessed: 0,
             totalEstimated: 0,
             currentUrl: null,
-            discoveredPages: []
-          }
+            discoveredPages: [],
+          },
         },
         organizationId: ctx.organizationId,
       });
@@ -438,11 +404,11 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         jobId: z.string(),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const job = await jobRepository.findById(input.jobId);
-      
+
       if (!job || job.organizationId !== ctx.organizationId) {
         throw new Error("Job not found");
       }
@@ -460,20 +426,24 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         url: z.string().url(),
-        pages: z.array(z.object({
-          url: z.string(),
-          title: z.string().optional(),
-          description: z.string().optional(),
-          selected: z.boolean(),
-        })),
-        metadata: z.object({
-          type: z.nativeEnum(DocumentationType).optional(),
-          status: z.nativeEnum(DocumentationStatus).optional(),
-          visibility: z.nativeEnum(DocumentVisibility).optional(),
-          tags: z.array(z.string()).optional(),
-          categories: z.array(z.string()).optional(),
-        }).optional(),
-      })
+        pages: z.array(
+          z.object({
+            url: z.string(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            selected: z.boolean(),
+          }),
+        ),
+        metadata: z
+          .object({
+            type: z.nativeEnum(DocumentationType).optional(),
+            status: z.nativeEnum(DocumentationStatus).optional(),
+            visibility: z.nativeEnum(DocumentVisibility).optional(),
+            tags: z.array(z.string()).optional(),
+            categories: z.array(z.string()).optional(),
+          })
+          .optional(),
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.organizationId) {
@@ -481,8 +451,8 @@ export const documentsRouter = t.router({
       }
 
       // Filter selected pages
-      const selectedPages = input.pages.filter(p => p.selected);
-      
+      const selectedPages = input.pages.filter((p) => p.selected);
+
       if (selectedPages.length === 0) {
         throw new Error("No pages selected for import");
       }
@@ -494,7 +464,7 @@ export const documentsRouter = t.router({
         status: JobStatus.QUEUED,
         priority: JobPriority.NORMAL,
         data: {
-          type: 'web_import',
+          type: "web_import",
           url: input.url,
           pages: selectedPages,
           metadata: input.metadata,
@@ -515,7 +485,7 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         documentId: z.string(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Find the document
@@ -540,7 +510,7 @@ export const documentsRouter = t.router({
         status: JobStatus.QUEUED,
         priority: JobPriority.HIGH,
         data: {
-          type: 'web_recrawl',
+          type: "web_recrawl",
           documentId: document.id,
           url: document.sourceUrl,
         },
@@ -560,22 +530,22 @@ export const documentsRouter = t.router({
     // Get enabled plugins with document_importer capability
     // For now, return only the native web importer
     // TODO: Load plugins with document_importer capability
-    
+
     return {
       native: [
         {
-          id: 'web',
-          name: 'Import from Website',
-          description: 'Crawl and import documentation from any website',
-          icon: 'globe',
-          supportedFormats: ['html', 'xhtml'],
+          id: "web",
+          name: "Import from Website",
+          description: "Crawl and import documentation from any website",
+          icon: "globe",
+          supportedFormats: ["html", "xhtml"],
         },
         {
-          id: 'upload',
-          name: 'Upload Files',
-          description: 'Upload documents from your computer',
-          icon: 'upload',
-          supportedFormats: ['pdf', 'txt', 'md', 'doc', 'docx', 'html', 'json', 'csv'],
+          id: "upload",
+          name: "Upload Files",
+          description: "Upload documents from your computer",
+          icon: "upload",
+          supportedFormats: ["pdf", "txt", "md", "doc", "docx", "html", "json", "csv"],
         },
       ],
       plugins: [], // TODO: Load from plugin system
@@ -589,7 +559,7 @@ async function processWebImport(
   jobId: string,
   url: string,
   selectedPages: any[],
-  metadata?: any
+  metadata?: any,
 ) {
   try {
     // Update job status to processing
@@ -602,10 +572,10 @@ async function processWebImport(
     const htmlProcessor = new HtmlProcessor();
 
     // Track progress
-    scraper.on('progress', async (progress) => {
+    scraper.on("progress", async (progress) => {
       await jobRepository.update(jobId, organizationId, {
         data: {
-          type: 'web_import',
+          type: "web_import",
           url,
           pages: selectedPages,
           metadata,
@@ -625,14 +595,11 @@ async function processWebImport(
     const documents = [];
     for (const page of pages) {
       // Convert HTML to markdown
-      const processed = await htmlProcessor.process(
-        Buffer.from(page.html),
-        page.title
-      );
+      const processed = await htmlProcessor.process(Buffer.from(page.html), page.title);
 
       // Create document
       const document = await documentRepository.create({
-        title: page.title || metadata?.title || 'Untitled',
+        title: page.title || metadata?.title || "Untitled",
         content: processed.content,
         type: metadata?.type || DocumentationType.ARTICLE,
         status: metadata?.status || DocumentationStatus.PUBLISHED,
@@ -665,11 +632,7 @@ async function processWebImport(
         }),
       }));
 
-      await vectorStoreService.addChunks(
-        organizationId,
-        document.id,
-        vectorChunks
-      );
+      await vectorStoreService.addChunks(organizationId, document.id, vectorChunks);
 
       documents.push(document);
     }
@@ -679,45 +642,40 @@ async function processWebImport(
       status: JobStatus.COMPLETED,
       result: {
         documentsCreated: documents.length,
-        documentIds: documents.map(d => d.id),
+        documentIds: documents.map((d) => d.id),
       },
     });
-
   } catch (error) {
-    console.error('Web import error:', error);
-    
+    console.error("Web import error:", error);
+
     // Update job as failed
     await jobRepository.update(jobId, organizationId, {
       status: JobStatus.FAILED,
       result: {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
     });
   }
 }
 
 // Async function to process page discovery
-async function processPageDiscovery(
-  organizationId: string,
-  jobId: string,
-  url: string
-) {
+async function processPageDiscovery(organizationId: string, jobId: string, url: string) {
   try {
     // Update job status to processing
     await jobRepository.update(jobId, organizationId, {
       status: JobStatus.PROCESSING,
       data: {
-        type: 'page_discovery',
+        type: "page_discovery",
         url,
         progress: {
-          status: 'discovering',
+          status: "discovering",
           pagesFound: 0,
           pagesProcessed: 0,
           totalEstimated: 0,
           currentUrl: url,
-          discoveredPages: []
-        }
-      }
+          discoveredPages: [],
+        },
+      },
     });
 
     // Initialize scraper
@@ -725,27 +683,27 @@ async function processPageDiscovery(
     const discoveredPages: any[] = [];
 
     // Listen for discovery progress events
-    scraper.on('discovery-progress', async (progress: any) => {
+    scraper.on("discovery-progress", async (progress: any) => {
       // Update job with progress
       await jobRepository.update(jobId, organizationId, {
         data: {
-          type: 'page_discovery',
+          type: "page_discovery",
           url,
           progress: {
-            status: 'discovering',
+            status: "discovering",
             pagesFound: progress.found,
             pagesProcessed: progress.processed,
             totalEstimated: progress.total,
             currentUrl: progress.currentUrl,
-            discoveredPages: discoveredPages
-          }
-        }
+            discoveredPages: discoveredPages,
+          },
+        },
       });
     });
 
     // Discover URLs
     const pages = await scraper.discoverUrls(url);
-    
+
     // Store discovered pages
     discoveredPages.push(...pages);
 
@@ -753,42 +711,37 @@ async function processPageDiscovery(
     await jobRepository.update(jobId, organizationId, {
       status: JobStatus.COMPLETED,
       data: {
-        type: 'page_discovery',
+        type: "page_discovery",
         url,
         progress: {
-          status: 'completed',
+          status: "completed",
           pagesFound: pages.length,
           pagesProcessed: pages.length,
           totalEstimated: pages.length,
           currentUrl: null,
-          discoveredPages: pages
-        }
+          discoveredPages: pages,
+        },
       },
       result: {
         pages,
-        totalFound: pages.length
-      }
+        totalFound: pages.length,
+      },
     });
-
   } catch (error) {
-    console.error('Error in page discovery:', error);
-    
+    console.error("Error in page discovery:", error);
+
     // Update job as failed
     await jobRepository.update(jobId, organizationId, {
       status: JobStatus.FAILED,
       result: {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
     });
   }
 }
 
 // Async function to process web recrawl
-async function processWebRecrawl(
-  organizationId: string,
-  jobId: string,
-  document: any
-) {
+async function processWebRecrawl(organizationId: string, jobId: string, document: any) {
   try {
     // Update job status to processing
     await jobRepository.update(jobId, organizationId, {
@@ -809,10 +762,7 @@ async function processWebRecrawl(
     const page = pages[0];
 
     // Convert HTML to markdown
-    const processed = await htmlProcessor.process(
-      Buffer.from(page.html),
-      page.title
-    );
+    const processed = await htmlProcessor.process(Buffer.from(page.html), page.title);
 
     // Update document
     await documentRepository.update(document.id, organizationId, {
@@ -847,7 +797,7 @@ async function processWebRecrawl(
     const embeddingIds = await vectorStoreService.addChunks(
       organizationId,
       document.id,
-      vectorChunks
+      vectorChunks,
     );
 
     // Update job as completed
@@ -859,15 +809,14 @@ async function processWebRecrawl(
         chunksCreated: chunks.length,
       },
     });
-
   } catch (error) {
-    console.error('Recrawl error:', error);
-    
+    console.error("Recrawl error:", error);
+
     // Update job as failed
     await jobRepository.update(jobId, organizationId, {
       status: JobStatus.FAILED,
       result: {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
     });
   }

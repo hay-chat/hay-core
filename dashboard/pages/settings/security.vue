@@ -9,11 +9,13 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="downloadSecurityReport">
+        <Button variant="outline"
+@click="downloadSecurityReport">
           <Download class="h-4 w-4 mr-2" />
           Security Report
         </Button>
-        <Button :disabled="!hasChanges" @click="saveSettings">
+        <Button :disabled="!hasChanges"
+@click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -24,53 +26,50 @@
     <Card>
       <CardHeader>
         <CardTitle>Security Overview</CardTitle>
-        <CardDescription
-          >Current security status and recommendations</CardDescription
-        >
+        <CardDescription> Current security status and recommendations </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-3">
           <div class="flex items-center space-x-3 p-3 border rounded-lg">
-            <div
-              class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center"
-            >
+            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
               <Shield class="h-5 w-5 text-green-600" />
             </div>
             <div>
               <div class="font-medium">Security Score</div>
               <div class="text-2xl font-bold text-green-600">
-                {{ securityScore }}/100
+{{ securityScore }}/100
+</div>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-3 p-3 border rounded-lg">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Key class="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <div class="font-medium">Active Sessions</div>
+              <div class="text-2xl font-bold">
+                {{ activeSessions }}
               </div>
             </div>
           </div>
 
           <div class="flex items-center space-x-3 p-3 border rounded-lg">
-            <div
-              class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center"
-            >
-              <Key class="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <div class="font-medium">Active Sessions</div>
-              <div class="text-2xl font-bold">{{ activeSessions }}</div>
-            </div>
-          </div>
-
-          <div class="flex items-center space-x-3 p-3 border rounded-lg">
-            <div
-              class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center"
-            >
+            <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
               <AlertTriangle class="h-5 w-5 text-orange-600" />
             </div>
             <div>
               <div class="font-medium">Security Alerts</div>
-              <div class="text-2xl font-bold">{{ securityAlerts }}</div>
+              <div class="text-2xl font-bold">
+                {{ securityAlerts }}
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Security Recommendations -->
-        <div v-if="recommendations.length > 0" class="mt-6">
+        <div v-if="recommendations.length > 0"
+class="mt-6">
           <h3 class="font-medium mb-3">Security Recommendations</h3>
           <div class="space-y-2">
             <div
@@ -80,14 +79,14 @@
             >
               <AlertTriangle class="h-4 w-4 text-yellow-600 mt-0.5" />
               <div class="flex-1">
-                <div class="font-medium text-yellow-800">{{ rec.title }}</div>
-                <div class="text-sm text-yellow-700">{{ rec.description }}</div>
+                <div class="font-medium text-yellow-800">
+                  {{ rec.title }}
+                </div>
+                <div class="text-sm text-yellow-700">
+                  {{ rec.description }}
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                @click="implementRecommendation(rec.id)"
-              >
+              <Button variant="outline" size="sm" @click="implementRecommendation(rec.id)">
                 Fix
               </Button>
             </div>
@@ -100,10 +99,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Authentication</CardTitle>
-        <CardDescription
-          >Configure password policies and authentication
-          methods</CardDescription
-        >
+        <CardDescription> Configure password policies and authentication methods </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- Password Requirements -->
@@ -114,8 +110,8 @@
               <div>
                 <Label class="font-normal">Minimum Length</Label>
                 <p class="text-xs text-muted-foreground">
-                  Minimum number of characters required
-                </p>
+Minimum number of characters required
+</p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.minLength"
@@ -132,26 +128,20 @@
               <div>
                 <Label class="font-normal">Require Uppercase Letters</Label>
                 <p class="text-xs text-muted-foreground">
-                  At least one uppercase letter (A-Z)
-                </p>
+At least one uppercase letter (A-Z)
+</p>
               </div>
-              <Checkbox
-                v-model="
-                  settings.authentication.passwordPolicy.requireUppercase
-                "
-              />
+              <Checkbox v-model="settings.authentication.passwordPolicy.requireUppercase" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Numbers</Label>
                 <p class="text-xs text-muted-foreground">
-                  At least one number (0-9)
-                </p>
+At least one number (0-9)
+</p>
               </div>
-              <Checkbox
-                v-model="settings.authentication.passwordPolicy.requireNumbers"
-              />
+              <Checkbox v-model="settings.authentication.passwordPolicy.requireNumbers" />
             </div>
 
             <div class="flex items-center justify-between">
@@ -161,11 +151,7 @@
                   At least one special character (!@#$%^&*)
                 </p>
               </div>
-              <Checkbox
-                v-model="
-                  settings.authentication.passwordPolicy.requireSpecialChars
-                "
-              />
+              <Checkbox v-model="settings.authentication.passwordPolicy.requireSpecialChars" />
             </div>
 
             <div class="flex items-center justify-between">
@@ -197,8 +183,8 @@
               <div>
                 <Label class="font-normal">Session Timeout</Label>
                 <p class="text-xs text-muted-foreground">
-                  Automatic logout after inactivity
-                </p>
+Automatic logout after inactivity
+</p>
               </div>
               <select
                 v-model="settings.authentication.sessionTimeout"
@@ -217,8 +203,8 @@
               <div>
                 <Label class="font-normal">Concurrent Sessions Limit</Label>
                 <p class="text-xs text-muted-foreground">
-                  Maximum simultaneous sessions per user
-                </p>
+Maximum simultaneous sessions per user
+</p>
               </div>
               <select
                 v-model="settings.authentication.maxConcurrentSessions"
@@ -236,8 +222,8 @@
               <div>
                 <Label class="font-normal">Remember Me Duration</Label>
                 <p class="text-xs text-muted-foreground">
-                  How long "Remember Me" sessions last
-                </p>
+How long "Remember Me" sessions last
+</p>
               </div>
               <select
                 v-model="settings.authentication.rememberMeDuration"
@@ -260,8 +246,8 @@
               <div>
                 <Label class="font-normal">Require 2FA for All Users</Label>
                 <p class="text-xs text-muted-foreground">
-                  Mandatory two-factor authentication
-                </p>
+Mandatory two-factor authentication
+</p>
               </div>
               <Checkbox v-model="settings.authentication.require2FA" />
             </div>
@@ -270,8 +256,8 @@
               <div>
                 <Label class="font-normal">2FA Grace Period</Label>
                 <p class="text-xs text-muted-foreground">
-                  Days to set up 2FA before enforcement
-                </p>
+Days to set up 2FA before enforcement
+</p>
               </div>
               <select
                 v-model="settings.authentication.twoFAGracePeriod"
@@ -289,47 +275,36 @@
               <div>
                 <Label class="font-normal">Allowed 2FA Methods</Label>
                 <p class="text-xs text-muted-foreground">
-                  Which 2FA methods users can use
-                </p>
+Which 2FA methods users can use
+</p>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center space-x-2">
                   <Checkbox
                     id="totp"
-                    :checked="
-                      settings.authentication.allowedTwoFAMethods.includes(
-                        'totp'
-                      )
-                    "
+                    :checked="settings.authentication.allowedTwoFAMethods.includes('totp')"
                     @update:checked="toggleTwoFAMethod('totp')"
                   />
-                  <Label for="totp" class="text-sm"
-                    >TOTP Apps (Google Authenticator, Authy)</Label
-                  >
+                  <Label for="totp"
+class="text-sm">TOTP Apps (Google Authenticator, Authy)</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
                     id="sms"
-                    :checked="
-                      settings.authentication.allowedTwoFAMethods.includes(
-                        'sms'
-                      )
-                    "
+                    :checked="settings.authentication.allowedTwoFAMethods.includes('sms')"
                     @update:checked="toggleTwoFAMethod('sms')"
                   />
-                  <Label for="sms" class="text-sm">SMS Codes</Label>
+                  <Label for="sms"
+class="text-sm">SMS Codes</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
                     id="backup"
-                    :checked="
-                      settings.authentication.allowedTwoFAMethods.includes(
-                        'backup'
-                      )
-                    "
+                    :checked="settings.authentication.allowedTwoFAMethods.includes('backup')"
                     @update:checked="toggleTwoFAMethod('backup')"
                   />
-                  <Label for="backup" class="text-sm">Backup Codes</Label>
+                  <Label for="backup"
+class="text-sm">Backup Codes</Label>
                 </div>
               </div>
             </div>
@@ -349,7 +324,8 @@
         <div>
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-medium">API Keys</h3>
-            <Button size="sm" @click="createAPIKey">
+            <Button size="sm"
+@click="createAPIKey">
               <Plus class="h-4 w-4 mr-2" />
               Create API Key
             </Button>
@@ -363,34 +339,35 @@
             <p class="text-sm text-muted-foreground">No API keys created yet</p>
           </div>
 
-          <div v-else class="space-y-3">
+          <div v-else
+class="space-y-3">
             <div
               v-for="key in apiKeys"
               :key="key.id"
               class="flex items-center justify-between p-3 border rounded-lg"
             >
               <div>
-                <div class="font-medium">{{ key.name }}</div>
+                <div class="font-medium">
+                  {{ key.name }}
+                </div>
                 <div class="text-sm text-muted-foreground">
                   Created {{ formatDate(key.createdAt) }} • Last used
                   {{ formatDate(key.lastUsed) }}
                 </div>
-                <div
-                  class="font-mono text-xs bg-background-tertiary px-2 py-1 rounded mt-1"
-                >
+                <div class="font-mono text-xs bg-background-tertiary px-2 py-1 rounded mt-1">
                   {{ key.maskedKey }}
                 </div>
               </div>
               <div class="flex items-center space-x-2">
-                <Badge
-                  :variant="key.status === 'active' ? 'success' : 'secondary'"
-                >
+                <Badge :variant="key.status === 'active' ? 'success' : 'secondary'">
                   {{ key.status }}
                 </Badge>
-                <Button variant="ghost" size="sm" @click="toggleAPIKey(key.id)">
+                <Button variant="ghost"
+size="sm" @click="toggleAPIKey(key.id)">
                   {{ key.status === "active" ? "Disable" : "Enable" }}
                 </Button>
-                <Button variant="ghost" size="sm" @click="deleteAPIKey(key.id)">
+                <Button variant="ghost"
+size="sm" @click="deleteAPIKey(key.id)">
                   <Trash2 class="h-4 w-4" />
                 </Button>
               </div>
@@ -428,8 +405,8 @@
                 class="mt-1"
               />
               <p class="text-xs text-muted-foreground mt-1">
-                Maximum burst requests allowed
-              </p>
+Maximum burst requests allowed
+</p>
             </div>
           </div>
         </div>
@@ -452,8 +429,7 @@
               <Label for="ip-addresses">Allowed IP Addresses</Label>
               <div class="space-y-2 mt-1">
                 <div
-                  v-for="(ip, index) in settings.apiSecurity.ipWhitelist
-                    .addresses"
+                  v-for="(ip, index) in settings.apiSecurity.ipWhitelist.addresses"
                   :key="index"
                   class="flex items-center space-x-2"
                 >
@@ -462,15 +438,12 @@
                     placeholder="192.168.1.1 or 192.168.1.0/24"
                     class="flex-1"
                   />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    @click="removeIPAddress(index)"
-                  >
+                  <Button variant="ghost" size="sm" @click="removeIPAddress(index)">
                     <X class="h-4 w-4" />
                   </Button>
                 </div>
-                <Button variant="outline" size="sm" @click="addIPAddress">
+                <Button variant="outline"
+size="sm" @click="addIPAddress">
                   <Plus class="h-4 w-4 mr-2" />
                   Add IP Address
                 </Button>
@@ -498,13 +471,12 @@
             >
               <div class="flex items-center space-x-3">
                 <div
-                  :class="[
-                    'w-2 h-2 rounded-full',
-                    attempt.success ? 'bg-green-500' : 'bg-red-500',
-                  ]"
-                ></div>
+                  :class="['w-2 h-2 rounded-full', attempt.success ? 'bg-green-500' : 'bg-red-500']"
+                />
                 <div>
-                  <div class="font-medium">{{ attempt.email }}</div>
+                  <div class="font-medium">
+                    {{ attempt.email }}
+                  </div>
                   <div class="text-sm text-muted-foreground">
                     {{ attempt.ipAddress }} •
                     {{ formatDate(attempt.timestamp) }}
@@ -537,7 +509,9 @@
                 :class="['h-4 w-4 mt-0.5', getEventIconColor(event.severity)]"
               />
               <div class="flex-1">
-                <div class="font-medium">{{ event.title }}</div>
+                <div class="font-medium">
+                  {{ event.title }}
+                </div>
                 <div class="text-sm text-muted-foreground">
                   {{ event.description }}
                 </div>
@@ -574,12 +548,12 @@ const Badge = ({ variant = "default", ...props }) =>
       variant === "outline"
         ? "border border-gray-300 text-gray-700"
         : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : "bg-gray-100 text-gray-800"
+          ? "bg-blue-100 text-blue-800"
+          : variant === "destructive"
+            ? "bg-red-100 text-red-800"
+            : variant === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });
@@ -628,8 +602,7 @@ const recommendations = ref([
   {
     id: "update-password-policy",
     title: "Strengthen Password Policy",
-    description:
-      "Require special characters and increase minimum length to 12 characters",
+    description: "Require special characters and increase minimum length to 12 characters",
   },
 ]);
 
@@ -705,9 +678,7 @@ const securityEvents = ref([
 
 // Computed properties
 const hasChanges = computed(() => {
-  return (
-    JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value)
-  );
+  return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
 });
 
 // Methods
@@ -749,8 +720,7 @@ const getEventIconColor = (severity: string) => {
 };
 
 const toggleTwoFAMethod = (method: string) => {
-  const index =
-    settings.value.authentication.allowedTwoFAMethods.indexOf(method);
+  const index = settings.value.authentication.allowedTwoFAMethods.indexOf(method);
   if (index > -1) {
     settings.value.authentication.allowedTwoFAMethods.splice(index, 1);
   } else {
@@ -779,11 +749,7 @@ const toggleAPIKey = (keyId: string) => {
 };
 
 const deleteAPIKey = (keyId: string) => {
-  if (
-    confirm(
-      "Are you sure you want to delete this API key? This action cannot be undone."
-    )
-  ) {
+  if (confirm("Are you sure you want to delete this API key? This action cannot be undone.")) {
     const index = apiKeys.value.findIndex((k) => k.id === keyId);
     if (index > -1) {
       apiKeys.value.splice(index, 1);

@@ -43,9 +43,7 @@ export const documentListInputSchema = baseListInputSchema.extend({
 // Conversation-specific filters
 export const conversationFiltersSchema = z
   .object({
-    status: z
-      .enum(["open", "processing", "pending-human", "resolved", "closed"])
-      .optional(),
+    status: z.enum(["open", "processing", "pending-human", "resolved", "closed"]).optional(),
     agentId: z.string().uuid().optional(),
     playbookId: z.string().uuid().optional(),
     hasMessages: z.boolean().optional(),
@@ -57,9 +55,7 @@ export const conversationListInputSchema = baseListInputSchema.extend({
   filters: conversationFiltersSchema,
   sorting: z
     .object({
-      orderBy: z
-        .enum(["created_at", "updated_at", "title", "status"])
-        .default("created_at"),
+      orderBy: z.enum(["created_at", "updated_at", "title", "status"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
     .optional()
@@ -88,9 +84,7 @@ export const agentListInputSchema = baseListInputSchema.extend({
   filters: agentFiltersSchema,
   sorting: z
     .object({
-      orderBy: z
-        .enum(["created_at", "updated_at", "name", "enabled"])
-        .default("created_at"),
+      orderBy: z.enum(["created_at", "updated_at", "name", "enabled"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
     .optional()
@@ -119,9 +113,7 @@ export const playbookListInputSchema = baseListInputSchema.extend({
   filters: playbookFiltersSchema,
   sorting: z
     .object({
-      orderBy: z
-        .enum(["created_at", "updated_at", "name", "status"])
-        .default("created_at"),
+      orderBy: z.enum(["created_at", "updated_at", "name", "status"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
     .optional()
@@ -151,9 +143,7 @@ export const messageListInputSchema = baseListInputSchema.extend({
   filters: messageFiltersSchema,
   sorting: z
     .object({
-      orderBy: z
-        .enum(["created_at", "updated_at", "type"])
-        .default("created_at"),
+      orderBy: z.enum(["created_at", "updated_at", "type"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
     .optional()

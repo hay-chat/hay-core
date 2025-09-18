@@ -9,11 +9,9 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw
-            class="mr-2 h-4 w-4"
-            :class="{ 'animate-spin': loading }"
-          />
+        <Button variant="outline"
+:disabled="loading" @click="refreshData">
+          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
       </div>
@@ -126,22 +124,25 @@
     <!-- Jobs Table -->
     <Card>
       <CardContent class="p-0">
-        <div v-if="loading && !jobs.length" class="p-8 text-center">
+        <div v-if="loading && !jobs.length"
+class="p-8 text-center">
           <Loader2 class="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
           <p class="mt-2 text-sm text-muted-foreground">Loading jobs...</p>
         </div>
 
-        <div v-else-if="!jobs.length" class="p-8 text-center">
+        <div v-else-if="!jobs.length"
+class="p-8 text-center">
           <Inbox class="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 class="mt-2 text-sm font-semibold text-foreground">
-            No jobs found
-          </h3>
+No jobs found
+</h3>
           <p class="mt-1 text-sm text-muted-foreground">
-            There are no jobs matching your filters.
-          </p>
+There are no jobs matching your filters.
+</p>
         </div>
 
-        <div v-else class="overflow-x-auto">
+        <div v-else
+class="overflow-x-auto">
           <table class="w-full">
             <thead class="border-b bg-background-secondary">
               <tr>
@@ -195,10 +196,8 @@
               >
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <code
-                      class="text-xs bg-background-tertiary px-2 py-1 rounded"
-                      >{{ job.id.slice(0, 8) }}</code
-                    >
+                    <code class="text-xs bg-background-tertiary px-2 py-1 rounded">{{
+                    >{{ job.id.slice(0, 8) }}</code>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
@@ -215,31 +214,25 @@
                   </Badge>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <div v-if="job.status === 'processing'" class="w-24">
+                  <div v-if="job.status === 'processing'"
+class="w-24">
                     <div class="flex items-center">
-                      <div
-                        class="flex-1 bg-background-tertiary rounded-full h-2 mr-2"
-                      >
+                      <div class="flex-1 bg-background-tertiary rounded-full h-2 mr-2">
                         <div
                           class="bg-primary rounded-full h-2 transition-all duration-300"
                           :style="{ width: `${job.progress || 0}%` }"
-                        ></div>
+                        />
                       </div>
-                      <span class="text-xs text-muted-foreground"
-                        >{{ job.progress || 0 }}%</span
-                      >
+                      <span class="text-xs text-muted-foreground">{{ job.progress || 0 }}%</span>
                     </div>
                   </div>
-                  <span v-else class="text-sm text-muted-foreground">-</span>
+                  <span v-else
+class="text-sm text-muted-foreground">-</span>
                 </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground"
-                >
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {{ formatDate(job.createdAt) }}
                 </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground"
-                >
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {{ formatDuration(job.duration) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -247,31 +240,26 @@
                     <Button
                       variant="ghost"
                       size="sm"
-                      @click="viewJobDetails(job)"
                       title="View Details"
+                      @click="viewJobDetails(job)"
                     >
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="
-                        job.status === 'failed' &&
-                        job.attempts < job.maxAttempts
-                      "
+                      v-if="job.status === 'failed' && job.attempts < job.maxAttempts"
                       variant="ghost"
                       size="sm"
-                      @click="retryJob(job)"
                       title="Retry Job"
+                      @click="retryJob(job)"
                     >
                       <RotateCw class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="
-                        ['pending', 'queued', 'processing'].includes(job.status)
-                      "
+                      v-if="['pending', 'queued', 'processing'].includes(job.status)"
                       variant="ghost"
                       size="sm"
-                      @click="cancelJob(job)"
                       title="Cancel Job"
+                      @click="cancelJob(job)"
                     >
                       <X class="h-4 w-4" />
                     </Button>
@@ -283,12 +271,12 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="px-6 py-4 border-t">
+        <div v-if="totalPages > 1"
+class="px-6 py-4 border-t">
           <div class="flex items-center justify-between">
             <p class="text-sm text-muted-foreground">
               Showing {{ (currentPage - 1) * pageSize + 1 }} to
-              {{ Math.min(currentPage * pageSize, totalJobs) }} of
-              {{ totalJobs }} jobs
+              {{ Math.min(currentPage * pageSize, totalJobs) }} of {{ totalJobs }} jobs
             </p>
             <div class="flex space-x-2">
               <Button
@@ -319,7 +307,8 @@
         <DialogHeader>
           <DialogTitle>Job Details</DialogTitle>
         </DialogHeader>
-        <div v-if="selectedJob" class="space-y-4">
+        <div v-if="selectedJob"
+class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm font-medium text-muted-foreground">ID</p>
@@ -329,7 +318,9 @@
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Type</p>
-              <p class="text-sm">{{ formatJobType(selectedJob.type) }}</p>
+              <p class="text-sm">
+                {{ formatJobType(selectedJob.type) }}
+              </p>
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Status</p>
@@ -346,8 +337,8 @@
             <div>
               <p class="text-sm font-medium text-muted-foreground">Attempts</p>
               <p class="text-sm">
-                {{ selectedJob.attempts }} / {{ selectedJob.maxAttempts }}
-              </p>
+{{ selectedJob.attempts }} / {{ selectedJob.maxAttempts }}
+</p>
             </div>
             <div>
               <p class="text-sm font-medium text-muted-foreground">Created</p>
@@ -369,36 +360,34 @@
             </div>
           </div>
 
-          <div v-if="selectedJob.payload" class="space-y-2">
+          <div v-if="selectedJob.payload"
+class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Payload</p>
-            <pre
-              class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto"
-              >{{ JSON.stringify(selectedJob.payload, null, 2) }}</pre
-            >
+            <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
+            >{{ JSON.stringify(selectedJob.payload, null, 2) }}</pre>
           </div>
 
-          <div v-if="selectedJob.result" class="space-y-2">
+          <div v-if="selectedJob.result"
+class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Result</p>
-            <pre
-              class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto"
-              >{{ JSON.stringify(selectedJob.result, null, 2) }}</pre
-            >
+            <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
+            >{{ JSON.stringify(selectedJob.result, null, 2) }}</pre>
           </div>
 
-          <div v-if="selectedJob.error" class="space-y-2">
+          <div v-if="selectedJob.error"
+class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Error</p>
-            <div
-              class="bg-destructive/10 border border-destructive/20 p-3 rounded"
-            >
-              <p class="text-sm text-destructive">{{ selectedJob.error }}</p>
+            <div class="bg-destructive/10 border border-destructive/20 p-3 rounded">
+              <p class="text-sm text-destructive">
+                {{ selectedJob.error }}
+              </p>
             </div>
           </div>
 
-          <div v-if="selectedJob.metadata?.logs" class="space-y-2">
+          <div v-if="selectedJob.metadata?.logs"
+class="space-y-2">
             <p class="text-sm font-medium text-muted-foreground">Logs</p>
-            <div
-              class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto"
-            >
+            <div class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto">
               <p
                 v-for="(log, index) in selectedJob.metadata.logs"
                 :key="index"
@@ -428,10 +417,7 @@ import {
   X,
   XCircle,
 } from "lucide-vue-next";
-import {
-  createAuthenticatedWebSocket,
-  parseWebSocketMessage,
-} from "@/utils/websocket";
+import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/websocket";
 
 // State
 const loading = ref(false);
@@ -495,13 +481,8 @@ const formatJobType = (type: string) => {
     .join(" ");
 };
 
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
+const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     pending: "secondary",
     queued: "secondary",
     processing: "default",
@@ -519,7 +500,7 @@ const getPriorityLabel = (priority: number) => {
 };
 
 const getPriorityVariant = (
-  priority: number
+  priority: number,
 ): "default" | "secondary" | "destructive" | "outline" => {
   const variants: ("default" | "secondary" | "destructive" | "outline")[] = [
     "outline",
@@ -586,11 +567,7 @@ const setupWebSocket = () => {
         // Handle different message types for queue updates
         if (message.type === "queue_update" || message.type === "job_update") {
           fetchStats();
-          if (
-            ["", "pending", "queued", "processing", "retrying"].includes(
-              statusFilter.value
-            )
-          ) {
+          if (["", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
             fetchJobs();
           }
         }
@@ -623,11 +600,7 @@ const setupWebSocket = () => {
         if (!loading.value) {
           fetchStats();
           // Only refresh jobs if we're viewing active jobs
-          if (
-            ["", "pending", "queued", "processing", "retrying"].includes(
-              statusFilter.value
-            )
-          ) {
+          if (["", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
             fetchJobs();
           }
         }

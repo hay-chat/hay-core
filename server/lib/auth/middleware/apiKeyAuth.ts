@@ -1,19 +1,14 @@
 import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { AuthUser } from "@server/lib/auth/AuthUser";
-import {
-  extractApiKeyFromHeader,
-  verifyApiKey,
-} from "@server/lib/auth/utils/hashing";
+import { extractApiKeyFromHeader, verifyApiKey } from "@server/lib/auth/utils/hashing";
 import { AppDataSource } from "@server/database/data-source";
 
 /**
  * Authenticate a user using API Key
  * Returns the authenticated user with API key scopes
  */
-export async function authenticateApiKeyAuth(
-  authHeader?: string
-): Promise<AuthUser | null> {
+export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthUser | null> {
   if (!authHeader) {
     return null;
   }
@@ -85,7 +80,7 @@ export async function authenticateApiKeyAuth(
  * Used for quick authorization checks
  */
 export async function validateApiKey(
-  authHeader?: string
+  authHeader?: string,
 ): Promise<{ apiKeyId: string; userId: string } | null> {
   if (!authHeader) {
     return null;
@@ -127,7 +122,7 @@ export async function validateApiKey(
 export async function checkApiKeyScope(
   apiKeyId: string,
   resource: string,
-  action: string
+  action: string,
 ): Promise<boolean> {
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
   const apiKey = await apiKeyRepository.findOne({

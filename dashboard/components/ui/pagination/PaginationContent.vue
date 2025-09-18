@@ -1,8 +1,5 @@
 <template>
-  <ul
-    :class="cn('flex flex-row items-center gap-1', props.class)"
-    v-bind="$attrs"
-  >
+  <ul :class="cn('flex flex-row items-center gap-1', props.class)" v-bind="$attrs">
     <slot />
   </ul>
 </template>

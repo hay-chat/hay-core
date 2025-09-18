@@ -9,11 +9,9 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw
-            class="mr-2 h-4 w-4"
-            :class="{ 'animate-spin': loading }"
-          />
+        <Button variant="outline"
+:disabled="loading" @click="refreshData">
+          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
         <Button @click="createAgent">
@@ -65,27 +63,25 @@
     </div>
 
     <!-- Bulk Actions -->
-    <div
-      v-if="selectedAgents.length > 0"
-      class="bg-background-tertiary p-4 rounded-lg"
-    >
+    <div v-if="selectedAgents.length > 0" class="bg-background-tertiary p-4 rounded-lg">
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
-          {{ selectedAgents.length }} agent{{
-            selectedAgents.length === 1 ? "" : "s"
-          }}
+          {{ selectedAgents.length }} agent{{ selectedAgents.length === 1 ? "" : "s" }}
           selected
         </p>
         <div class="flex space-x-2">
-          <Button variant="outline" size="sm" @click="bulkToggleStatus">
+          <Button variant="outline"
+size="sm" @click="bulkToggleStatus">
             <Power class="mr-2 h-4 w-4" />
             Toggle Status
           </Button>
-          <Button variant="outline" size="sm" @click="bulkExport">
+          <Button variant="outline"
+size="sm" @click="bulkExport">
             <Download class="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="destructive" size="sm" @click="bulkDelete">
+          <Button variant="destructive"
+size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             Delete
           </Button>
@@ -119,15 +115,18 @@
                 <Bot class="h-6 w-6 text-white" />
               </div>
               <div class="flex-1">
-                <CardTitle class="text-lg">{{ agent.name }}</CardTitle>
-                <CardDescription class="mt-1">{{
-                  agent.description
-                }}</CardDescription>
+                <CardTitle class="text-lg">
+                  {{ agent.name }}
+                </CardTitle>
+                <CardDescription class="mt-1">
+                  {{ agent.description }}
+                </CardDescription>
               </div>
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+              <DropdownMenuTrigger as-child>
+                <Button variant="ghost"
+size="sm" class="h-8 w-8 p-0">
                   <MoreVertical class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -141,10 +140,7 @@
                   {{ agent.status === "active" ? "Disable" : "Enable" }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  class="text-destructive"
-                  @click="() => deleteAgent(agent)"
-                >
+                <DropdownMenuItem class="text-destructive" @click="() => deleteAgent(agent)">
                   <Trash2 class="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
@@ -162,10 +158,10 @@
                   agent.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : agent.status === 'inactive'
-                    ? 'bg-gray-100 text-gray-800'
-                    : agent.status === 'training'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-red-100 text-red-800',
+                      ? 'bg-gray-100 text-gray-800'
+                      : agent.status === 'training'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -174,17 +170,15 @@
                     agent.status === 'active'
                       ? 'bg-green-600'
                       : agent.status === 'inactive'
-                      ? 'bg-gray-600'
-                      : agent.status === 'training'
-                      ? 'bg-blue-600'
-                      : 'bg-red-600',
+                        ? 'bg-gray-600'
+                        : agent.status === 'training'
+                          ? 'bg-blue-600'
+                          : 'bg-red-600',
                   ]"
-                ></div>
+                />
                 {{ agent.status }}
               </div>
-              <span
-                class="text-xs text-muted-foreground bg-background-tertiary px-2 py-1 rounded"
-              >
+              <span class="text-xs text-muted-foreground bg-background-tertiary px-2 py-1 rounded">
                 {{ agent.type }}
               </span>
             </div>
@@ -226,21 +220,11 @@
 
             <!-- Quick Actions -->
             <div class="flex space-x-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                class="flex-1"
-                @click="toggleAgentStatus(agent)"
-              >
+              <Button variant="outline" size="sm" class="flex-1" @click="toggleAgentStatus(agent)">
                 <Power class="mr-1 h-3 w-3" />
                 {{ agent.status === "active" ? "Disable" : "Enable" }}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                class="flex-1"
-                @click="viewAgent(agent.id)"
-              >
+              <Button variant="outline" size="sm" class="flex-1" @click="viewAgent(agent.id)">
                 <Settings class="mr-1 h-3 w-3" />
                 Manage
               </Button>
@@ -251,17 +235,10 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else-if="!loading && filteredAgents.length === 0"
-      class="text-center py-12"
-    >
+    <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
       <Bot class="mx-auto h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{
-          searchQuery || statusFilter || typeFilter
-            ? "No agents found"
-            : "No agents yet"
-        }}
+        {{ searchQuery || statusFilter || typeFilter ? "No agents found" : "No agents yet" }}
       </h3>
       <p class="mt-2 text-sm text-muted-foreground">
         {{
@@ -271,31 +248,23 @@
         }}
       </p>
       <div class="mt-6">
-        <Button
-          @click="
-            searchQuery || statusFilter || typeFilter
-              ? clearFilters()
-              : createAgent()
-          "
-        >
-          {{
-            searchQuery || statusFilter || typeFilter
-              ? "Clear Filters"
-              : "Create Agent"
-          }}
+        <Button @click="searchQuery || statusFilter || typeFilter ? clearFilters() : createAgent()">
+          {{ searchQuery || statusFilter || typeFilter ? "Clear Filters" : "Create Agent" }}
         </Button>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      <Card v-for="i in 6" :key="i" class="animate-pulse">
+    <div v-if="loading"
+class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <Card v-for="i in 6"
+:key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
-            <div class="h-12 w-12 bg-background-tertiary rounded-lg"></div>
+            <div class="h-12 w-12 bg-background-tertiary rounded-lg" />
             <div class="flex-1 space-y-2">
-              <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
-              <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
+              <div class="h-4 bg-background-tertiary rounded w-3/4" />
+              <div class="h-3 bg-background-tertiary rounded w-1/2" />
             </div>
           </div>
         </CardHeader>
@@ -303,12 +272,12 @@
           <div class="space-y-3">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
-                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
-                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2" />
+                <div class="h-4 bg-background-tertiary rounded w-3/4" />
               </div>
               <div class="space-y-1">
-                <div class="h-3 bg-background-tertiary rounded w-1/2"></div>
-                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
+                <div class="h-3 bg-background-tertiary rounded w-1/2" />
+                <div class="h-4 bg-background-tertiary rounded w-3/4" />
               </div>
             </div>
           </div>
@@ -396,8 +365,7 @@ const filteredAgents = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
       (agent) =>
-        agent.name.toLowerCase().includes(query) ||
-        agent.description.toLowerCase().includes(query)
+        agent.name.toLowerCase().includes(query) || agent.description.toLowerCase().includes(query),
     );
   }
 
@@ -422,9 +390,7 @@ const paginatedAgents = computed(() => {
 });
 
 // Total pages
-const totalPages = computed(() =>
-  Math.ceil(filteredAgents.value.length / pageSize.value)
-);
+const totalPages = computed(() => Math.ceil(filteredAgents.value.length / pageSize.value));
 
 // Methods
 const formatTimeAgo = (date: Date) => {
@@ -529,9 +495,7 @@ const toggleAgentStatus = async (agent: any) => {
     agent.status = newEnabledState ? "active" : "inactive";
     agent.enabled = newEnabledState;
 
-    toast.success(
-      `Agent ${newEnabledState ? "enabled" : "disabled"} successfully`
-    );
+    toast.success(`Agent ${newEnabledState ? "enabled" : "disabled"} successfully`);
   } catch (error: any) {
     console.error("Error toggling agent status:", error);
     toast.error(error.message || "Failed to toggle agent status");
@@ -605,9 +569,7 @@ const performSingleDelete = async () => {
     });
 
     if (result.success) {
-      const index = agents.value.findIndex(
-        (a) => a.id === agentToDelete.value.id
-      );
+      const index = agents.value.findIndex((a) => a.id === agentToDelete.value.id);
       if (index > -1) {
         agents.value.splice(index, 1);
       }
@@ -643,20 +605,16 @@ const performBulkDelete = async () => {
       }
     }
 
-    agents.value = agents.value.filter(
-      (agent) => !successfulDeletes.includes(agent.id)
-    );
+    agents.value = agents.value.filter((agent) => !successfulDeletes.includes(agent.id));
 
     selectedAgents.value = [];
 
     if (errors.length > 0) {
       toast.warning(
-        `Successfully deleted ${successfulDeletes.length} agent(s). Failed to delete ${errors.length} agent(s).`
+        `Successfully deleted ${successfulDeletes.length} agent(s). Failed to delete ${errors.length} agent(s).`,
       );
     } else {
-      toast.success(
-        `Successfully deleted ${successfulDeletes.length} agent(s)`
-      );
+      toast.success(`Successfully deleted ${successfulDeletes.length} agent(s)`);
     }
   } catch (error: any) {
     console.error("Error deleting agents:", error);

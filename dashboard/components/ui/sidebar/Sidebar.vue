@@ -33,7 +33,7 @@
             'group-data-[side=right]:rotate-180',
             variant === 'floating' || variant === 'inset'
               ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]'
-              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon]'
+              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon]',
           )
         "
       >
@@ -41,10 +41,9 @@
           :class="
             cn(
               'duration-200 relative h-full w-full flex flex-col transition-[width] ease-linear',
-              !mobile &&
-                'group-data-[collapsible=offcanvas]:w-[--sidebar-width]',
+              !mobile && 'group-data-[collapsible=offcanvas]:w-[--sidebar-width]',
               mobile && 'w-[--sidebar-width]',
-              'group-data-[side=right]:rotate-180'
+              'group-data-[side=right]:rotate-180',
             )
           "
         >
@@ -63,11 +62,7 @@
 <script setup lang="ts">
 import { ref, computed, provide, onMounted } from "vue";
 import { cn } from "@/lib/utils";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export interface SidebarProps {
   side?: "left" | "right";

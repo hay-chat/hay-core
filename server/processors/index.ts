@@ -1,20 +1,20 @@
-import { PdfProcessor } from './pdf.processor';
-import { TextProcessor } from './text.processor';
-import { HtmlProcessor } from './html.processor';
-import { BaseProcessor } from './base.processor';
+import { PdfProcessor } from "./pdf.processor";
+import { TextProcessor } from "./text.processor";
+import { HtmlProcessor } from "./html.processor";
+import { BaseProcessor } from "./base.processor";
 
 export class DocumentProcessorFactory {
   private processors: BaseProcessor[] = [
     new PdfProcessor(),
     new TextProcessor(),
-    new HtmlProcessor()
+    new HtmlProcessor(),
   ];
-  
+
   getProcessor(mimeType: string): BaseProcessor | null {
-    const processor = this.processors.find(p => p.canProcess(mimeType));
+    const processor = this.processors.find((p) => p.canProcess(mimeType));
     return processor || null;
   }
-  
+
   async processDocument(buffer: Buffer, mimeType: string, fileName?: string) {
     const processor = this.getProcessor(mimeType);
     if (!processor) {
@@ -25,4 +25,4 @@ export class DocumentProcessorFactory {
   }
 }
 
-export * from './base.processor';
+export * from "./base.processor";

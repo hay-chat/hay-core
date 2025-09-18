@@ -26,7 +26,7 @@ export class AuthUser {
       sessionId?: string;
       apiKeyId?: string;
       scopes?: ApiKeyScope[];
-    }
+    },
   ) {
     this._user = user;
     this.id = user.id;
@@ -57,7 +57,7 @@ export class AuthUser {
     return this.scopes.some(
       (scope) =>
         (scope.resource === resource || scope.resource === "*") &&
-        (scope.actions.includes(action) || scope.actions.includes("*"))
+        (scope.actions.includes(action) || scope.actions.includes("*")),
     );
   }
 

@@ -1,5 +1,6 @@
 <template>
-  <div class="rich-instruction-input" :data-component-id="componentId">
+  <div class="rich-instruction-input"
+:data-component-id="componentId">
     <div
       ref="editorRef"
       class="instruction-content"
@@ -12,7 +13,7 @@
       @blur="handleBlur"
       @paste="handlePaste"
       v-html="renderedContent"
-    ></div>
+    />
   </div>
 </template>
 
@@ -37,7 +38,7 @@ const emit = defineEmits<{
       slashIndex: number;
       textarea: HTMLElement;
       mode?: string;
-    }
+    },
   ];
   "close-slash-menu": [];
   keydown: [event: KeyboardEvent];
@@ -45,9 +46,7 @@ const emit = defineEmits<{
 
 const editorRef = ref<HTMLElement | null>(null);
 const isFocused = ref(false);
-const componentId = ref(
-  `rich-input-${Math.random().toString(36).substr(2, 9)}`
-);
+const componentId = ref(`rich-input-${Math.random().toString(36).substr(2, 9)}`);
 const { registerComponent, unregisterComponent } = useComponentRegistry();
 
 // Convert markdown-like references to visual tags
@@ -83,29 +82,29 @@ const convertToMarkdown = (htmlContent: string): string => {
   // Convert action tags back to markdown - more comprehensive regex
   content = content.replace(
     /<span[^>]*class="[^"]*mention-action[^"]*"[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g,
-    "[action]($1)"
+    "[action]($1)",
   );
   content = content.replace(
     /<span[^>]*data-id="([^"]+)"[^>]*class="[^"]*mention-action[^"]*"[^>]*>.*?<\/span>/g,
-    "[action]($1)"
+    "[action]($1)",
   );
   content = content.replace(
     /<span[^>]*mention-action[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g,
-    "[action]($1)"
+    "[action]($1)",
   );
 
   // Convert document tags back to markdown - more comprehensive regex
   content = content.replace(
     /<span[^>]*class="[^"]*mention-document[^"]*"[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g,
-    "[document]($1)"
+    "[document]($1)",
   );
   content = content.replace(
     /<span[^>]*data-id="([^"]+)"[^>]*class="[^"]*mention-document[^"]*"[^>]*>.*?<\/span>/g,
-    "[document]($1)"
+    "[document]($1)",
   );
   content = content.replace(
     /<span[^>]*mention-document[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g,
-    "[document]($1)"
+    "[document]($1)",
   );
 
   // Parse DOM to handle nested tags properly
@@ -154,7 +153,7 @@ const convertToMarkdown = (htmlContent: string): string => {
   content = tempDiv.innerHTML;
   content = content.replace(
     /<span[^>]*class="[^"]*mention-merge-field[^"]*"[^>]*>([^<]+)<\/span>/g,
-    "$1"
+    "$1",
   );
 
   // Get the final processed HTML
@@ -169,11 +168,7 @@ const convertToMarkdown = (htmlContent: string): string => {
       const element = node as Element;
       if (element.tagName === "BR") {
         result += "\n";
-      } else if (
-        element.tagName === "DIV" &&
-        result &&
-        !result.endsWith("\n")
-      ) {
+      } else if (element.tagName === "DIV" && result && !result.endsWith("\n")) {
         result += "\n";
       }
 
@@ -205,11 +200,7 @@ const handleInput = () => {
   let cursorPosition = 0;
   if (selection && selection.rangeCount > 0) {
     const range = selection.getRangeAt(0);
-    cursorPosition = getTextOffset(
-      editor,
-      range.startContainer,
-      range.startOffset
-    );
+    cursorPosition = getTextOffset(editor, range.startContainer, range.startOffset);
   }
 
   isConverting = true;
@@ -258,11 +249,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const textContent = editor.textContent || "";
-      const cursorOffset = getTextOffset(
-        editor,
-        range.startContainer,
-        range.startOffset
-      );
+      const cursorOffset = getTextOffset(editor, range.startContainer, range.startOffset);
 
       // Check if we just typed after a slash
       const slashIndex = textContent.lastIndexOf("/", cursorOffset - 1);
@@ -284,11 +271,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const textContent = editor.textContent || "";
-      const cursorOffset = getTextOffset(
-        editor,
-        range.startContainer,
-        range.startOffset
-      );
+      const cursorOffset = getTextOffset(editor, range.startContainer, range.startOffset);
 
       const slashIndex = textContent.lastIndexOf("/", cursorOffset - 1);
       if (slashIndex !== -1) {
@@ -317,11 +300,7 @@ const checkForSlashCommand = () => {
 
   const range = selection.getRangeAt(0);
   const textContent = editor.textContent || "";
-  const cursorOffset = getTextOffset(
-    editor,
-    range.startContainer,
-    range.startOffset
-  );
+  const cursorOffset = getTextOffset(editor, range.startContainer, range.startOffset);
 
   // Find the last "/" before cursor
   const slashIndex = textContent.lastIndexOf("/", cursorOffset - 1);
@@ -452,11 +431,7 @@ const insertReference = (type: "action" | "document", item: any) => {
 
   // Find and remove the slash command
   const textContent = editor.textContent || "";
-  const cursorOffset = getTextOffset(
-    editor,
-    range.startContainer,
-    range.startOffset
-  );
+  const cursorOffset = getTextOffset(editor, range.startContainer, range.startOffset);
   const slashIndex = textContent.lastIndexOf("/", cursorOffset - 1);
 
   if (slashIndex !== -1) {
@@ -469,11 +444,7 @@ const insertReference = (type: "action" | "document", item: any) => {
     tagElement.innerHTML = item.name;
 
     // Find the slash position and replace the slash command
-    const walker = document.createTreeWalker(
-      editor,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
 
     let currentOffset = 0;
     let currentNode;
@@ -482,20 +453,15 @@ const insertReference = (type: "action" | "document", item: any) => {
       if (currentOffset + nodeLength > slashIndex) {
         // This text node contains the slash
         const nodeSlashIndex = slashIndex - currentOffset;
-        const beforeSlash =
-          currentNode.textContent?.slice(0, nodeSlashIndex) || "";
+        const beforeSlash = currentNode.textContent?.slice(0, nodeSlashIndex) || "";
         const afterQuery =
-          currentNode.textContent?.slice(
-            nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1)
-          ) || "";
+          currentNode.textContent?.slice(nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1)) ||
+          "";
 
         // Replace the text node content
         const newRange = document.createRange();
         newRange.setStart(currentNode, nodeSlashIndex);
-        newRange.setEnd(
-          currentNode,
-          nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1)
-        );
+        newRange.setEnd(currentNode, nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1));
         newRange.deleteContents();
 
         // Insert the tag
@@ -533,7 +499,7 @@ watch(
       editor.innerHTML = renderedContent.value;
     }
   },
-  { flush: "post" }
+  { flush: "post" },
 );
 
 // Register this component instance

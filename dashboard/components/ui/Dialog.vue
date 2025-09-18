@@ -1,6 +1,7 @@
 <template>
-  <HeadlessTransitionRoot :show="open" as="template">
-    <HeadlessDialog @close="$emit('update:open', false)" class="relative z-50">
+  <HeadlessTransitionRoot :show="open"
+as="template">
+    <HeadlessDialog class="relative z-50" @close="$emit('update:open', false)">
       <HeadlessTransitionChild
         as="template"
         enter="duration-300 ease-out"
@@ -42,13 +43,13 @@ import {
   TransitionRoot as HeadlessTransitionRoot,
   TransitionChild as HeadlessTransitionChild,
   DialogPanel as HeadlessDialogPanel,
-} from '@headlessui/vue';
+} from "@headlessui/vue";
 
 defineProps<{
   open: boolean;
 }>();
 
 defineEmits<{
-  'update:open': [value: boolean];
+  "update:open": [value: boolean];
 }>();
 </script>

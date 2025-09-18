@@ -6,15 +6,16 @@
     >
       <div class="flex items-center justify-between px-6 py-4">
         <div class="flex items-center space-x-4">
-          <Button variant="ghost" @click="exitPlayground">
+          <Button variant="ghost"
+@click="exitPlayground">
             <X class="h-4 w-4 mr-2" />
             Exit Playground
           </Button>
           <div>
             <h1 class="text-xl font-semibold">Conversation Playground</h1>
             <p class="text-sm text-muted-foreground">
-              Test conversations with AI Assistant
-            </p>
+Test conversations with AI Assistant
+</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -28,30 +29,18 @@
               title="Playbook can only be set when creating a new test"
             >
               <option value="">No playbook (free chat)</option>
-              <option
-                v-for="playbook in playbooks"
-                :key="playbook.id"
-                :value="playbook.id"
-              >
+              <option v-for="playbook in playbooks" :key="playbook.id" :value="playbook.id">
                 {{ playbook.name }}
               </option>
             </select>
           </div>
 
           <Badge :variant="getStatusVariant(conversation?.status)">
-            <component
-              :is="getStatusIcon(conversation?.status)"
-              class="h-3 w-3 mr-1"
-            />
+            <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
             {{ formatStatus(conversation?.status) }}
           </Badge>
 
-          <Button
-            variant="outline"
-            size="sm"
-            @click="resetConversation"
-            :disabled="isResetting"
-          >
+          <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
             <RefreshCw class="h-4 w-4 mr-2" />
             New Test
           </Button>
@@ -64,30 +53,29 @@
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
-        <div
-          ref="messagesContainer"
-          class="flex-1 overflow-y-auto p-6 space-y-4"
-        >
-          <div v-if="messagesLoading" class="space-y-4">
-            <div v-for="i in 3" :key="i" class="animate-pulse">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+          <div v-if="messagesLoading"
+class="space-y-4">
+            <div v-for="i in 3"
+:key="i" class="animate-pulse">
               <div class="flex space-x-3">
-                <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
+                <div class="w-8 h-8 bg-gray-200 rounded-full" />
                 <div class="flex-1">
-                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
-                  <div class="h-10 bg-gray-200 rounded w-3/4"></div>
+                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2" />
+                  <div class="h-10 bg-gray-200 rounded w-3/4" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div v-else-if="messages.length === 0" class="text-center py-12">
-            <MessageSquare
-              class="h-12 w-12 text-muted-foreground mx-auto mb-4"
-            />
+          <div v-else-if="messages.length === 0"
+class="text-center py-12">
+            <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p class="text-muted-foreground">Send a message to start testing</p>
           </div>
 
-          <div v-else class="space-y-4">
+          <div v-else
+class="space-y-4">
             <!-- Messages -->
             <ChatMessage
               v-for="(message, index) in messages"
@@ -97,10 +85,9 @@
             />
 
             <!-- Typing indicator -->
-            <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
-              <div
-                class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"
-              >
+            <div v-if="isAgentTyping"
+class="flex space-x-3 max-w-2xl">
+              <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <Bot class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
@@ -108,15 +95,15 @@
                   <div class="flex space-x-1">
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
-                    ></div>
+                    />
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
-                    ></div>
+                    />
                     <div
                       class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
                       style="animation-delay: 0.2s"
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
@@ -131,13 +118,10 @@
               v-model="newMessage"
               placeholder="Type your test message..."
               class="flex-1"
-              @keyup.enter="sendMessage"
               :disabled="!conversation"
+              @keyup.enter="sendMessage"
             />
-            <Button
-              :disabled="!newMessage.trim() || !conversation"
-              @click="sendMessage"
-            >
+            <Button :disabled="!newMessage.trim() || !conversation" @click="sendMessage">
               <Send class="h-4 w-4" />
             </Button>
           </div>
@@ -158,13 +142,7 @@
             <CardContent class="space-y-3 text-sm">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Status:</span>
-                <Badge
-                  :variant="
-                    orchestratorStatus === 'processing'
-                      ? 'default'
-                      : 'secondary'
-                  "
-                >
+                <Badge :variant="orchestratorStatus === 'processing' ? 'default' : 'secondary'">
                   {{ orchestratorStatus }}
                 </Badge>
               </div>
@@ -180,10 +158,7 @@
                 <span class="text-muted-foreground">Needs Processing:</span>
                 <span>{{ conversation?.needs_processing }}</span>
               </div>
-              <div
-                v-if="conversation?.playbook_id"
-                class="flex justify-between"
-              >
+              <div v-if="conversation?.playbook_id" class="flex justify-between">
                 <span class="text-muted-foreground">Active Playbook:</span>
                 <span class="font-medium">
                   {{ getPlaybookName(conversation.playbook_id) }}
@@ -195,7 +170,7 @@
           <!-- Quick Actions -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Test Scenarios</CardTitle>
+              <CardTitle class="text-base"> Test Scenarios </CardTitle>
             </CardHeader>
             <CardContent class="space-y-2">
               <Button
@@ -240,7 +215,7 @@
           <!-- Tips -->
           <Card>
             <CardHeader>
-              <CardTitle class="text-base">Testing Tips</CardTitle>
+              <CardTitle class="text-base"> Testing Tips </CardTitle>
             </CardHeader>
             <CardContent>
               <ul class="text-sm space-y-2 text-muted-foreground">
@@ -250,15 +225,11 @@
                 </li>
                 <li class="flex items-start">
                   <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                  <span
-                    >Try switching playbooks to test different scenarios</span
-                  >
+                  <span>Try switching playbooks to test different scenarios</span>
                 </li>
                 <li class="flex items-start">
                   <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                  <span
-                    >Use "New Test" to start fresh with a new conversation</span
-                  >
+                  <span>Use "New Test" to start fresh with a new conversation</span>
                 </li>
               </ul>
             </CardContent>
@@ -335,12 +306,9 @@ const exitPlayground = () => {
 
 // Status helpers
 const getStatusVariant = (
-  status: string
+  status: string,
 ): "default" | "secondary" | "destructive" | "outline" | undefined => {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     processing: "outline",
     "pending-human": "destructive",
@@ -454,9 +422,7 @@ const sendMessage = async () => {
     });
 
     // Update with actual message from server
-    const messageIndex = messages.value.findIndex(
-      (m) => m.id === tempMessageId
-    );
+    const messageIndex = messages.value.findIndex((m) => m.id === tempMessageId);
     if (messageIndex !== -1) {
       messages.value[messageIndex] = {
         ...result,
@@ -513,9 +479,7 @@ const resetConversation = async () => {
 const loadPlaybooks = async () => {
   try {
     const response = await HayApi.playbooks.list.query();
-    playbooks.value = Array.isArray(response)
-      ? response
-      : (response as any)?.items || [];
+    playbooks.value = Array.isArray(response) ? response : (response as any)?.items || [];
   } catch (error) {
     console.error("Failed to load playbooks:", error);
   }
@@ -545,11 +509,7 @@ const pollConversation = async () => {
         sender = "customer";
       } else if (msg.sender) {
         sender =
-          msg.sender === "assistant"
-            ? "agent"
-            : msg.sender === "user"
-            ? "customer"
-            : msg.sender;
+          msg.sender === "assistant" ? "agent" : msg.sender === "user" ? "customer" : msg.sender;
       }
 
       return {

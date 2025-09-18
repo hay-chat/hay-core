@@ -13,29 +13,27 @@ import type { ObjectLiteral } from "typeorm";
  */
 export function createListProcedure<
   TEntity extends ObjectLiteral,
-  TInput extends Record<string, any>
+  TInput extends Record<string, any>,
 >(
   inputSchema: z.ZodType<TInput>,
   repository: BaseRepository<TEntity>,
   options?: {
     baseWhere?: (ctx: any, input: TInput) => Record<string, any>;
     transform?: (items: TEntity[]) => any[];
-  }
+  },
 ) {
   return authenticatedProcedure
     .input(inputSchema)
     .use(withPagination)
     .query(async ({ ctx, input }) => {
       // Get base where conditions if provided
-      const baseWhere = options?.baseWhere
-        ? options.baseWhere(ctx, input as TInput)
-        : undefined;
+      const baseWhere = options?.baseWhere ? options.baseWhere(ctx, input as TInput) : undefined;
 
       // Execute paginated query
       const result = await repository.paginateQuery(
         ctx.listParams!,
         ctx.organizationId!,
-        baseWhere
+        baseWhere,
       );
 
       // Transform items if transformer is provided
@@ -52,26 +50,24 @@ export function createListProcedure<
  * Useful for basic entity listing without complex filtering
  */
 export function createSimpleListProcedure<TEntity extends ObjectLiteral>(
-  repository: BaseRepository<TEntity>
+  repository: BaseRepository<TEntity>,
 ) {
-  return authenticatedProcedure
-    .input(z.object({}).optional())
-    .query(async ({ ctx }) => {
-      // Use simple find for basic listing
-      const items = await repository.findByOrganization(ctx.organizationId!, {
-        order: { created_at: "DESC" } as any,
-      });
-
-      return {
-        items,
-        pagination: {
-          page: 1,
-          limit: items.length,
-          total: items.length,
-          totalPages: 1,
-          hasNext: false,
-          hasPrev: false,
-        },
-      };
+  return authenticatedProcedure.input(z.object({}).optional()).query(async ({ ctx }) => {
+    // Use simple find for basic listing
+    const items = await repository.findByOrganization(ctx.organizationId!, {
+      order: { created_at: "DESC" } as any,
     });
+
+    return {
+      items,
+      pagination: {
+        page: 1,
+        limit: items.length,
+        total: items.length,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
+  });
 }

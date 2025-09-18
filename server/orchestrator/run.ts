@@ -47,23 +47,61 @@ export const runConversation = async (conversationId: string) => {
 
     // 01.1. Get Intent and Sentiment
 
-    const { intent, sentiment } = await perceptionLayer.perceive(
-      lastCustomerMessage
-    );
+    const { intent, sentiment } = await perceptionLayer.perceive(lastCustomerMessage);
     await lastCustomerMessage.savePerception({
       intent: intent.label,
       sentiment: sentiment.label,
     });
 
+    // Check if user wants to close the conversation
+    if (intent.label === "close_satisfied" || intent.label === "close_unsatisfied") {
+      console.log(
+        `[Orchestrator] User indicated closure intent (${intent.label}), marking conversation as resolved`,
+      );
+
+      // Generate a title for the conversation before closing
+      const { generateConversationTitle } = await import("./conversation-utils");
+      await generateConversationTitle(conversation.id, conversation.organization_id);
+
+      // Update conversation status to resolved
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        status: "resolved",
+        ended_at: new Date(),
+        resolution_metadata: {
+          resolved: intent.label === "close_satisfied",
+          confidence: intent.score || 1.0,
+          reason: `user_indicated_${intent.label}`,
+        },
+      });
+
+      // Add a closing message
+      const closingMessage =
+        intent.label === "close_satisfied"
+          ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
+          : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+
+      await conversation.addMessage({
+        content: closingMessage,
+        type: MessageType.BOT_AGENT,
+        metadata: {
+          isClosureMessage: true,
+          closureReason: intent.label,
+        },
+      });
+
+      // Set processed and unlock early since we're closing
+      conversation.setProcessed(true);
+      await conversation.unlock();
+      return; // Exit early since conversation is closed
+    }
+
     // 01.2. Get Agent Candidates
     const currentAgent = conversation.agent_id;
     if (!currentAgent) {
-      const activeAgents = await agentRepository.findByOrganization(
-        conversation.organization_id
-      );
+      const activeAgents = await agentRepository.findByOrganization(conversation.organization_id);
       const agentCandidate = await perceptionLayer.getAgentCandidate(
         lastCustomerMessage,
-        activeAgents
+        activeAgents,
       );
       if (agentCandidate) {
         conversation.updateAgent(agentCandidate.id);
@@ -79,12 +117,12 @@ export const runConversation = async (conversationId: string) => {
     const currentPlaybook = conversation.playbook_id;
     const activePlaybooks = await playbookRepository.findByStatus(
       conversation.organization_id,
-      PlaybookStatus.ACTIVE
+      PlaybookStatus.ACTIVE,
     );
 
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
-      activePlaybooks
+      activePlaybooks,
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
@@ -94,7 +132,7 @@ export const runConversation = async (conversationId: string) => {
     // 02.2. Get Document Candidates
     const retrievedDocuments = await retrievalLayer.getRelevantDocuments(
       publicMessages,
-      conversation.organization_id
+      conversation.organization_id,
     );
 
     if (retrievedDocuments.length > 0) {
@@ -174,10 +212,7 @@ async function handleExecutionLoop(conversation: Conversation) {
         },
       };
 
-      const toolResult = await toolExecutionService.handleToolExecution(
-        conversation,
-        toolMessage
-      );
+      const toolResult = await toolExecutionService.handleToolExecution(conversation, toolMessage);
 
       if (toolResult.success) {
         // Add tool response message
@@ -202,9 +237,7 @@ async function handleExecutionLoop(conversation: Conversation) {
             toolStatus: "ERROR",
           },
         });
-        console.log(
-          "[Orchestrator] Tool execution failed, continuing execution loop..."
-        );
+        console.log("[Orchestrator] Tool execution failed, continuing execution loop...");
         // Continue the loop to let LLM handle the error
       }
     } else {
@@ -217,7 +250,7 @@ async function handleExecutionLoop(conversation: Conversation) {
         console.log(
           "[Orchestrator] Added bot response " +
             executionResult.userMessage +
-            ", ending execution loop"
+            ", ending execution loop",
         );
 
         break;
@@ -230,8 +263,6 @@ async function handleExecutionLoop(conversation: Conversation) {
   }
 
   if (iterations >= maxIterations) {
-    console.warn(
-      "[Orchestrator] Reached maximum execution iterations, ending loop"
-    );
+    console.warn("[Orchestrator] Reached maximum execution iterations, ending loop");
   }
 }

@@ -10,25 +10,23 @@
       '',
     ]"
   >
-    <div v-if="message.type !== 'System'" class="chat-message__avatar">
-      <component :is="avatarIcon" class="chat-message__avatar-icon" />
+    <div v-if="message.type !== 'System'"
+class="chat-message__avatar">
+      <component :is="avatarIcon"
+class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
       <div
-        class="chat-message__header"
         v-if="
-          message.type == 'BotAgent' ||
-          message.type == 'HumanAgent' ||
-          message.type == 'Customer'
+          message.type == 'BotAgent' || message.type == 'HumanAgent' || message.type == 'Customer'
         "
+        class="chat-message__header"
       >
         <span class="chat-message__sender">{{ message.sender }}</span>
         <span class="chat-message__time">{{ formattedTime }}</span>
-        <div
-          v-if="message.metadata?.isPlaybook"
-          class="chat-message__playbook-badge"
-        >
-          <Badge variant="outline" class="text-xs">
+        <div v-if="message.metadata?.isPlaybook" class="chat-message__playbook-badge">
+          <Badge variant="outline"
+class="text-xs">
             <Zap class="h-2 w-2 mr-1" />
             Playbook
           </Badge>
@@ -38,10 +36,8 @@
         :class="[
           'chat-message__bubble',
           {
-            'chat-message__bubble--needs-approval':
-              message.status === MessageStatus.PENDING,
-            'chat-message__bubble--collapsed':
-              isCollapsibleVariant && isSystemCollapsed,
+            'chat-message__bubble--needs-approval': message.status === MessageStatus.PENDING,
+            'chat-message__bubble--collapsed': isCollapsibleVariant && isSystemCollapsed,
             'chat-message__bubble--expanded':
               isCollapsibleVariant && !isSystemCollapsed && isSystemExpandable,
           },
@@ -49,8 +45,7 @@
       >
         <div v-if="message.type === 'Playbook'">
           <div class="chat-message__document-title font-bold">
-            <ListVideo class="mr-2 h-4 w-4 inline" /> Agent is now following a
-            playbook
+            <ListVideo class="mr-2 h-4 w-4 inline" /> Agent is now following a playbook
           </div>
           <a
             class="chat-message__document-title text-xs opacity-70 mt-2"
@@ -61,8 +56,8 @@
         </div>
         <div v-else-if="message.type === 'Document'">
           <div class="chat-message__document-title font-bold">
-            <FileSearch class="mr-2 h-4 w-4 inline" /> Agent is using a document
-            to provide the answer
+            <FileSearch class="mr-2 h-4 w-4 inline" /> Agent is using a document to provide the
+            answer
           </div>
           <a
             class="chat-message__document-title text-xs opacity-70 mt-2"
@@ -71,9 +66,7 @@
             {{ message.metadata?.documentTitle }}
           </a>
         </div>
-        <div
-          v-else-if="message.type === 'ToolCall' && message.metadata?.toolName"
-        >
+        <div v-else-if="message.type === 'ToolCall' && message.metadata?.toolName">
           <div class="chat-message__tool-call-title font-bold">
             <Zap class="mr-2 h-4 w-4 inline" />
             Running action <{{ message.metadata?.toolName }}>
@@ -83,41 +76,42 @@
           <div class="chat-message__tool-response-title font-bold">
             <Zap class="mr-2 h-4 w-4 inline" /><template
               v-if="message.metadata?.toolStatus === 'ERROR'"
-              >Action failed</template
             >
-            <template v-else>Action responded</template> <{{
-              message.metadata?.toolName
-            }}>
+              Action failed
+            </template>
+            <template v-else> Action responded </template> <{{ message.metadata?.toolName }}>
           </div>
         </div>
         <div v-else-if="message.type === 'System'">
           <div class="chat-message__system-title font-bold">
-            <BrainCircuit class="mr-2 h-4 w-4 inline" /> Agent is following
-            system instructions
+            <BrainCircuit class="mr-2 h-4 w-4 inline" /> Agent is following system instructions
           </div>
           <div
-            class="chat-message__system-content chat-message__text"
             ref="systemMessageRef"
+            class="chat-message__system-content chat-message__text"
             v-html="markdownToHtml(message.content)"
-          ></div>
+          />
         </div>
         <div
           v-else
-          class="chat-message__text"
           ref="systemMessageRef"
+          class="chat-message__text"
           v-html="markdownToHtml(message.content)"
-        ></div>
+        />
       </div>
       <div
         v-if="isCollapsibleVariant && isSystemExpandable"
-        @click="toggleSystemExpanded"
         class="chat-message__expand-button"
+        @click="toggleSystemExpanded"
       >
-        <ChevronDown v-if="isSystemCollapsed" class="h-3 w-3" />
-        <ChevronUp v-else class="h-3 w-3" />
+        <ChevronDown v-if="isSystemCollapsed"
+class="h-3 w-3" />
+        <ChevronUp v-else
+class="h-3 w-3" />
         {{ isSystemCollapsed ? "Expand" : "Collapse" }}
       </div>
-      <div v-if="message.attachments?.length" class="chat-message__attachments">
+      <div v-if="message.attachments?.length"
+class="chat-message__attachments">
         <div
           v-for="attachment in message.attachments"
           :key="attachment.id"
@@ -127,19 +121,19 @@
           <span>{{ attachment.name }}</span>
         </div>
       </div>
-      <div
-        v-if="message.status === MessageStatus.PENDING"
-        class="chat-message__actions"
-      >
-        <Button size="sm" variant="outline" @click="$emit('approve')">
+      <div v-if="message.status === MessageStatus.PENDING" class="chat-message__actions">
+        <Button size="sm"
+variant="outline" @click="$emit('approve')">
           <Check class="h-3 w-3 mr-1" />
           Approve
         </Button>
-        <Button size="sm" variant="outline" @click="$emit('edit')">
+        <Button size="sm"
+variant="outline" @click="$emit('edit')">
           <Edit class="h-3 w-3 mr-1" />
           Edit
         </Button>
-        <Button size="sm" variant="destructive" @click="$emit('reject')">
+        <Button size="sm"
+variant="destructive" @click="$emit('reject')">
           <X class="h-3 w-3 mr-1" />
           Reject
         </Button>
@@ -148,10 +142,7 @@
         v-else-if="message.metadata && message.type === 'BotAgent'"
         class="chat-message__metadata"
       >
-        <div
-          v-if="message.metadata.confidence"
-          class="chat-message__confidence"
-        >
+        <div v-if="message.metadata.confidence" class="chat-message__confidence">
           Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
         </div>
       </div>
@@ -223,13 +214,11 @@ const systemMessageRef = ref<HTMLElement | null>(null);
 const isSystemExpandable = ref(false);
 const isSystemCollapsed = ref(false);
 const isCollapsibleVariant = computed(() =>
-  ["System", "ToolCall", "ToolResponse", "Document", "Playbook"].includes(
-    props.message.type
-  )
+  ["System", "ToolCall", "ToolResponse", "Document", "Playbook"].includes(props.message.type),
 );
 
 const checkSystemMessageHeight = async () => {
-  if (isCollapsibleVariant && systemMessageRef.value) {
+  if (isCollapsibleVariant.value && systemMessageRef.value) {
     await nextTick();
     const element = systemMessageRef.value;
 
@@ -257,10 +246,10 @@ onMounted(() => {
 watch(
   () => props.message.content,
   () => {
-    if (isCollapsibleVariant) {
+    if (isCollapsibleVariant.value) {
       nextTick(() => checkSystemMessageHeight());
     }
-  }
+  },
 );
 
 const formattedTime = computed(() => {
@@ -282,8 +271,7 @@ const avatarIcon = computed(() => {
     return sentimentIcon[props.message.sentiment as MessageSentiment] || User;
   }
 
-  if (props.message.type === "BotAgent" || props.message.type === "HumanAgent")
-    return Bot;
+  if (props.message.type === "BotAgent" || props.message.type === "HumanAgent") return Bot;
 });
 </script>
 

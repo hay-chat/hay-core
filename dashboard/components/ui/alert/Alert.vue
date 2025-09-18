@@ -1,9 +1,6 @@
 <template>
   <div
-    :class="[
-      'relative w-full rounded-lg border p-4 flex gap-4',
-      variantStyles[variant],
-    ]"
+    :class="['relative w-full rounded-lg border p-4 flex gap-4', variantStyles[variant]]"
     role="alert"
   >
     <AlertCircle class="h-4 w-4" />

@@ -9,9 +9,7 @@ import { useUserStore } from "@/stores/user";
 // Helper function to get auth cookie
 function getAuthToken(): string {
   const authStore = useAuthStore();
-  return authStore.tokens?.accessToken
-    ? `Bearer ${authStore.tokens.accessToken}`
-    : "";
+  return authStore.tokens?.accessToken ? `Bearer ${authStore.tokens.accessToken}` : "";
 }
 
 function getOrganizationId(): string {
@@ -23,7 +21,7 @@ function getOrganizationId(): string {
 function isTokenExpiringSoon(): boolean {
   const authStore = useAuthStore();
   if (!authStore.tokens?.expiresAt) return false;
-  
+
   const timeUntilExpiry = authStore.tokens.expiresAt - Date.now();
   return timeUntilExpiry < 60000; // Less than 1 minute
 }
@@ -35,45 +33,46 @@ let refreshPromise: Promise<void> | null = null;
 // Refresh the access token
 async function refreshTokenIfNeeded(): Promise<void> {
   const authStore = useAuthStore();
-  
+
   // If not authenticated or no refresh token, skip
   if (!authStore.isAuthenticated || !authStore.tokens?.refreshToken) {
     return;
   }
-  
+
   // Check if token is expiring soon
   if (!isTokenExpiringSoon()) {
     return;
   }
-  
+
   // Check if there's a refresh token available before attempting refresh
   if (!authStore.tokens?.refreshToken) {
-    console.log('[API] No refresh token available, skipping refresh');
-    if (typeof window !== 'undefined') {
+    console.log("[API] No refresh token available, skipping refresh");
+    if (typeof window !== "undefined") {
       setTimeout(() => {
-        authStore.logout('token_expired');
+        authStore.logout("token_expired");
       }, 0);
     }
-    return Promise.reject(new Error('No refresh token available'));
+    return Promise.reject(new Error("No refresh token available"));
   }
-  
+
   // If already refreshing, wait for the existing refresh to complete
   if (isRefreshing && refreshPromise) {
     return refreshPromise;
   }
-  
+
   isRefreshing = true;
-  
-  refreshPromise = authStore.refreshTokens()
+
+  refreshPromise = authStore
+    .refreshTokens()
     .then(() => {
-      console.log('[API] Token refreshed successfully');
+      console.log("[API] Token refreshed successfully");
     })
     .catch((error) => {
-      console.error('[API] Failed to refresh token:', error);
+      console.error("[API] Failed to refresh token:", error);
       // If refresh fails, logout the user
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         setTimeout(() => {
-          authStore.logout('token_expired');
+          authStore.logout("token_expired");
         }, 0);
       }
     })
@@ -81,7 +80,7 @@ async function refreshTokenIfNeeded(): Promise<void> {
       isRefreshing = false;
       refreshPromise = null;
     });
-  
+
   return refreshPromise;
 }
 
@@ -98,39 +97,39 @@ const errorLink: TRPCLink<AppRouter> = () => {
           if (err instanceof TRPCClientError) {
             const message = err.message?.toLowerCase();
             const data = err.data;
-            
+
             // Check for token expiration in various formats
             if (
-              message?.includes('token has expired') ||
-              message?.includes('token expired') ||
-              message?.includes('jwt expired') ||
-              data?.code === 'UNAUTHORIZED' ||
-              (data?.httpStatus === 401 && message?.includes('expired'))
+              message?.includes("token has expired") ||
+              message?.includes("token expired") ||
+              message?.includes("jwt expired") ||
+              data?.code === "UNAUTHORIZED" ||
+              (data?.httpStatus === 401 && message?.includes("expired"))
             ) {
               // Token has expired, trigger logout
               const authStore = useAuthStore();
-              
+
               // Only logout if we're authenticated (to avoid loops)
               if (authStore.isAuthenticated) {
-                console.log('[API] Token expired, logging out user');
-                
+                console.log("[API] Token expired, logging out user");
+
                 // Use setTimeout to ensure we're not in a reactive context
-                if (typeof window !== 'undefined') {
+                if (typeof window !== "undefined") {
                   setTimeout(() => {
-                    authStore.logout('token_expired');
+                    authStore.logout("token_expired");
                   }, 0);
                 }
               }
             }
           }
-          
+
           observer.error(err);
         },
         complete() {
           observer.complete();
         },
       });
-      
+
       return unsubscribe;
     });
   };
@@ -155,7 +154,7 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
               observer.complete();
             },
           });
-          
+
           return unsubscribe;
         })
         .catch((error) => {
@@ -166,14 +165,13 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
 };
 
 // Get API base URL - this will be replaced at build time by Nuxt
-const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3001/v1'
-  : 'https://api.hay.chat/v1';
+const API_BASE_URL =
+  process.env.NODE_ENV === "development" ? "http://localhost:3001/v1" : "https://api.hay.chat/v1";
 
 // Create a base client without token refresh for auth endpoints
 export const HayAuthApi = createTRPCClient<AppRouter>({
   links: [
-    errorLink,         // Handle errors including expired tokens
+    errorLink, // Handle errors including expired tokens
     httpLink({
       url: API_BASE_URL,
       // You can pass any HTTP headers you wish here
@@ -190,8 +188,8 @@ export const HayAuthApi = createTRPCClient<AppRouter>({
 // Main API client with token refresh middleware
 export const HayApi = createTRPCClient<AppRouter>({
   links: [
-    tokenRefreshLink,  // Check token before requests
-    errorLink,         // Handle errors including expired tokens
+    tokenRefreshLink, // Check token before requests
+    errorLink, // Handle errors including expired tokens
     httpLink({
       url: API_BASE_URL,
       // You can pass any HTTP headers you wish here

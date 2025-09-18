@@ -7,7 +7,7 @@ import {
   OneToMany,
   ManyToOne,
   JoinColumn,
-  Index
+  Index,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { Conversation } from "./conversation.entity";
@@ -44,7 +44,7 @@ export class Customer {
   @JoinColumn()
   organization!: Organization;
 
-  @OneToMany(() => Conversation, conversation => conversation.customer)
+  @OneToMany(() => Conversation, (conversation) => conversation.customer)
   conversations!: Conversation[];
 
   @CreateDateColumn()

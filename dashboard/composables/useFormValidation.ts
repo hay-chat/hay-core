@@ -16,7 +16,7 @@ export interface ValidationRules {
 
 export function useFormValidation<T extends Record<string, unknown>>(
   form: T,
-  rules: ValidationRules
+  rules: ValidationRules,
 ) {
   const errors = reactive<Record<string, string>>({});
   const touched = reactive<Record<string, boolean>>({});
@@ -61,9 +61,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
 
     // Max length validation
     if (rule.maxLength && value.length > rule.maxLength) {
-      errors[
-        field as string
-      ] = `Must be no more than ${rule.maxLength} characters`;
+      errors[field as string] = `Must be no more than ${rule.maxLength} characters`;
       return false;
     }
 

@@ -42,19 +42,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await queryBuilder.getOne();
   }
 
-  async findByAgent(
-    agentId: string,
-    organizationId: string
-  ): Promise<Conversation[]> {
+  async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
       where: { agent_id: agentId, organization_id: organizationId },
       order: { created_at: "DESC" },
     });
   }
 
-  override async findByOrganization(
-    organizationId: string
-  ): Promise<Conversation[]> {
+  override async findByOrganization(organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
       where: { organization_id: organizationId },
       order: { created_at: "DESC" },
@@ -64,7 +59,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   override async update(
     id: string,
     organizationId: string,
-    data: Partial<Conversation>
+    data: Partial<Conversation>,
   ): Promise<Conversation | null> {
     // For single conversation updates, organizationId is optional for security
     // but we still validate it exists if provided
@@ -79,10 +74,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   // Simple update method for internal use (orchestrator, etc.)
-  async updateById(
-    id: string,
-    data: Partial<Conversation>
-  ): Promise<Conversation | null> {
+  async updateById(id: string, data: Partial<Conversation>): Promise<Conversation | null> {
     const conversation = await this.findById(id);
     if (!conversation) {
       return null;
@@ -117,7 +109,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           openStatus: "open",
           processingStatus: "processing",
           fiveMinutesAgo,
-        }
+        },
       );
 
       queryBuilder.leftJoinAndSelect("conversation.messages", "messages");
@@ -125,10 +117,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
       return await queryBuilder.getMany();
     } catch (error) {
-      console.error(
-        "[ConversationRepository] Error getting available conversations:",
-        error
-      );
+      console.error("[ConversationRepository] Error getting available conversations:", error);
       return [];
     }
   }
@@ -148,7 +137,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   override async paginateQuery(
     listParams: ListParams,
     organizationId: string,
-    baseWhere?: Record<string, any>
+    baseWhere?: Record<string, any>,
   ) {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
@@ -185,15 +174,11 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     const total = await queryBuilder.getCount();
 
     // Apply pagination
-    queryBuilder
-      .skip(listParams.pagination.offset)
-      .take(listParams.pagination.limit);
+    queryBuilder.skip(listParams.pagination.offset).take(listParams.pagination.limit);
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
-      const selectFields = listParams.select.map(
-        (field: string) => `entity.${field}`
-      );
+      const selectFields = listParams.select.map((field: string) => `entity.${field}`);
       queryBuilder.select(selectFields);
     }
 
@@ -207,9 +192,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         limit: listParams.pagination.limit,
         total,
         totalPages: Math.ceil(total / listParams.pagination.limit),
-        hasNext:
-          listParams.pagination.page <
-          Math.ceil(total / listParams.pagination.limit),
+        hasNext: listParams.pagination.page < Math.ceil(total / listParams.pagination.limit),
         hasPrev: listParams.pagination.page > 1,
       },
     };
@@ -221,7 +204,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Conversation>,
     filters?: Record<string, any>,
-    _organizationId?: string
+    _organizationId?: string,
   ): void {
     if (!filters) return;
 
@@ -246,11 +229,11 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (filters.hasMessages !== undefined) {
       if (filters.hasMessages) {
         queryBuilder.andWhere(
-          "EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = entity.id)"
+          "EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = entity.id)",
         );
       } else {
         queryBuilder.andWhere(
-          "NOT EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = entity.id)"
+          "NOT EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = entity.id)",
         );
       }
     }
@@ -261,7 +244,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   protected override applySearch(
     queryBuilder: SelectQueryBuilder<Conversation>,
-    search?: { query?: string; searchFields?: string[] }
+    search?: { query?: string; searchFields?: string[] },
   ): void {
     if (!search?.query) return;
 
@@ -275,10 +258,13 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (searchConditions) {
       queryBuilder.andWhere(
         `(${searchConditions})`,
-        searchFields.reduce((params, _, index) => {
-          params[`searchQuery${index}`] = `%${search.query}%`;
-          return params;
-        }, {} as Record<string, string>)
+        searchFields.reduce(
+          (params, _, index) => {
+            params[`searchQuery${index}`] = `%${search.query}%`;
+            return params;
+          },
+          {} as Record<string, string>,
+        ),
       );
     }
   }
@@ -288,7 +274,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   protected override applyIncludes(
     queryBuilder: SelectQueryBuilder<Conversation>,
-    include?: string[]
+    include?: string[],
   ): void {
     if (!include || include.length === 0) return;
 
@@ -308,9 +294,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
-            console.warn(
-              `Invalid relation '${relation}' for Conversation entity`
-            );
+            console.warn(`Invalid relation '${relation}' for Conversation entity`);
           }
       }
     });
@@ -325,10 +309,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .andWhere("conversation.status IN (:...statuses)", {
         statuses: ["open", "processing"],
       })
-      .andWhere(
-        "(conversation.cooldown_until IS NULL OR conversation.cooldown_until <= :now)",
-        { now: new Date() }
-      );
+      .andWhere("(conversation.cooldown_until IS NULL OR conversation.cooldown_until <= :now)", {
+        now: new Date(),
+      });
 
     const results = await query.getMany();
 
@@ -374,8 +357,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return (
       conversation.messages
         .filter((msg) => msg.type === MessageType.CUSTOMER)
-        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0] ||
-      null
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0] || null
     );
   }
 
@@ -405,15 +387,15 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     organizationId: string,
     days: number = 30,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<Array<{ date: string; count: number; label: string }>> {
     const end = endDate || new Date();
     const start = startDate || new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-    
+
     // Adjust dates to start and end of day in UTC
     const startOfDay = new Date(start);
     startOfDay.setUTCHours(0, 0, 0, 0);
-    
+
     const endOfDay = new Date(end);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
@@ -430,40 +412,39 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     `;
 
     const rawResults = await this.getRepository().query(query, [
-      organizationId, 
-      startOfDay.toISOString(), 
-      endOfDay.toISOString()
+      organizationId,
+      startOfDay.toISOString(),
+      endOfDay.toISOString(),
     ]);
 
     // Create a map of date -> count for existing data
     const dataMap = new Map<string, number>();
     rawResults.forEach((row: any) => {
-      const dateStr = row.date instanceof Date 
-        ? row.date.toISOString().split('T')[0] 
-        : row.date.split(' ')[0]; // Handle different date formats from DB
+      const dateStr =
+        row.date instanceof Date ? row.date.toISOString().split("T")[0] : row.date.split(" ")[0]; // Handle different date formats from DB
       dataMap.set(dateStr, parseInt(row.count, 10));
     });
 
     // Generate all dates in range and fill missing dates with 0
     const result: Array<{ date: string; count: number; label: string }> = [];
     const currentDate = new Date(startOfDay);
-    
+
     while (currentDate <= endOfDay) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = currentDate.toISOString().split("T")[0];
       const count = dataMap.get(dateStr) || 0;
-      
+
       // Format label as "MMM DD"
-      const label = currentDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
+      const label = currentDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
       });
-      
+
       result.push({
         date: dateStr,
         count,
-        label
+        label,
       });
-      
+
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 

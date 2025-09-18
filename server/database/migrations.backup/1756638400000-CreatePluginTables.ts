@@ -76,7 +76,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
           },
         ],
       }),
-      true
+      true,
     );
 
     // Create unique index on plugin name
@@ -86,7 +86,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
         name: "idx_plugin_registry_name",
         columnNames: ["name"],
         isUnique: true,
-      })
+      }),
     );
 
     // Create plugin_instances table (org-scoped)
@@ -201,7 +201,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
           },
         ],
       }),
-      true
+      true,
     );
 
     // Create composite unique index on organizationId and pluginId
@@ -211,7 +211,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
         name: "idx_plugin_instances_org_plugin",
         columnNames: ["organization_id", "plugin_id"],
         isUnique: true,
-      })
+      }),
     );
 
     // Create index on organization_id for faster lookups
@@ -220,7 +220,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
       new TableIndex({
         name: "idx_plugin_instances_org",
         columnNames: ["organization_id"],
-      })
+      }),
     );
 
     // Create index on enabled for faster filtering
@@ -229,7 +229,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
       new TableIndex({
         name: "idx_plugin_instances_enabled",
         columnNames: ["enabled"],
-      })
+      }),
     );
 
     // Create index on status for monitoring queries
@@ -238,7 +238,7 @@ export class CreatePluginTables1756638400000 implements MigrationInterface {
       new TableIndex({
         name: "idx_plugin_instances_status",
         columnNames: ["status"],
-      })
+      }),
     );
   }
 

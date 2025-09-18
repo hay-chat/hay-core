@@ -1,15 +1,13 @@
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <label :for="editorId" class="text-sm font-medium">
+      <label :for="editorId"
+class="text-sm font-medium">
         {{ label }}
       </label>
       <div class="text-xs text-muted-foreground">
         Press
-        <kbd
-          class="px-1.5 py-0.5 text-xs font-semibold bg-background-tertiary rounded"
-          >/</kbd
-        >
+        <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-background-tertiary rounded">/</kbd>
         to mention Actions or Documents
       </div>
     </div>
@@ -51,16 +49,22 @@
 
       <button
         v-if="instructions.length === 0"
-        @click="addInstruction"
         class="w-full text-left text-muted-foreground hover:text-foreground transition-colors py-2"
-      ></button>
+        @click="addInstruction"
+      />
 
-      <div class="instructions-editor__loading" v-if="loading">
+      <div v-if="loading" class="instructions-editor__loading">
         <Loading />
       </div>
     </div>
-    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    <p v-if="hint" class="text-sm text-muted-foreground">{{ hint }}</p>
+    <p v-if="error"
+class="text-sm text-red-500">
+      {{ error }}
+    </p>
+    <p v-if="hint"
+class="text-sm text-muted-foreground">
+      {{ hint }}
+    </p>
   </div>
 </template>
 
@@ -104,8 +108,7 @@ let activeIndex = 0;
 let currentQuery = "";
 let commandMode: "select" | "actions" | "documents" = "select";
 let isInternalUpdate = false;
-let activeSlashContext: { slashIndex: number; textarea: HTMLElement } | null =
-  null;
+let activeSlashContext: { slashIndex: number; textarea: HTMLElement } | null = null;
 
 // Global menu state - once we enter actions/documents mode, stay there until reset
 let isInSubMenu = false;
@@ -227,14 +230,10 @@ const deleteInstruction = (index: number) => {
   // Focus the previous instruction if available, otherwise focus the next one
   nextTick(() => {
     const targetIndex = index > 0 ? index - 1 : 0;
-    const instructionElements = document.querySelectorAll(
-      ".instruction-item-wrapper"
-    );
+    const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
     const targetElement = instructionElements[targetIndex];
     if (targetElement) {
-      const editor = targetElement.querySelector(
-        "[contenteditable]"
-      ) as HTMLElement;
+      const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
       if (editor) {
         editor.focus();
         // Position cursor at end of the previous instruction
@@ -264,14 +263,10 @@ const addSibling = (index: number) => {
 
   // Focus the newly created instruction
   nextTick(() => {
-    const instructionElements = document.querySelectorAll(
-      ".instruction-item-wrapper"
-    );
+    const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
     const targetElement = instructionElements[index + 1];
     if (targetElement) {
-      const editor = targetElement.querySelector(
-        "[contenteditable]"
-      ) as HTMLElement;
+      const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
       if (editor) {
         editor.focus();
         // Position cursor at start of the new (empty) instruction
@@ -334,10 +329,7 @@ const indent = (index: number) => {
 
 const outdent = (index: number) => {
   if (instructions.value[index] && (instructions.value[index].level || 0) > 0) {
-    instructions.value[index].level = Math.max(
-      0,
-      (instructions.value[index].level || 0) - 1
-    );
+    instructions.value[index].level = Math.max(0, (instructions.value[index].level || 0) - 1);
     emitChange();
   }
 };
@@ -345,14 +337,10 @@ const outdent = (index: number) => {
 const navigateUp = (index: number) => {
   if (index > 0) {
     nextTick(() => {
-      const instructionElements = document.querySelectorAll(
-        ".instruction-item-wrapper"
-      );
+      const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
       const targetElement = instructionElements[index - 1];
       if (targetElement) {
-        const editor = targetElement.querySelector(
-          "[contenteditable]"
-        ) as HTMLElement;
+        const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
         if (editor) {
           editor.focus();
           // Position cursor at end
@@ -373,14 +361,10 @@ const navigateUp = (index: number) => {
 const navigateDown = (index: number) => {
   if (index < instructions.value.length - 1) {
     nextTick(() => {
-      const instructionElements = document.querySelectorAll(
-        ".instruction-item-wrapper"
-      );
+      const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
       const targetElement = instructionElements[index + 1];
       if (targetElement) {
-        const editor = targetElement.querySelector(
-          "[contenteditable]"
-        ) as HTMLElement;
+        const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
         if (editor) {
           editor.focus();
           // Position cursor at start
@@ -402,10 +386,7 @@ const navigateDown = (index: number) => {
 function highlightMatch(text: string, query: string): string {
   if (!query.trim()) return text;
 
-  const regex = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-    "gi"
-  );
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
   return text.replace(regex, "<strong>$1</strong>");
 }
 
@@ -431,18 +412,14 @@ function showMenu(rect: DOMRect, items: any[]) {
 
   if (commandMode === "select") {
     html = `
-      <div class="mention-item ${
-        activeIndex === 0 ? "active" : ""
-      }" data-type="actions">
+      <div class="mention-item ${activeIndex === 0 ? "active" : ""}" data-type="actions">
         <div class="mention-item-icon">⚡</div>
         <div class="mention-item-content">
           <div class="mention-item-name">Actions</div>
           <div class="mention-item-meta">Insert MCP tool action</div>
         </div>
       </div>
-      <div class="mention-item ${
-        activeIndex === 1 ? "active" : ""
-      }" data-type="documents">
+      <div class="mention-item ${activeIndex === 1 ? "active" : ""}" data-type="documents">
         <div class="mention-item-icon"></div>
         <div class="mention-item-content">
           <div class="mention-item-name">Documents</div>
@@ -470,17 +447,14 @@ function showMenu(rect: DOMRect, items: any[]) {
         }" data-id="${tool.id}">
           <div class="mention-item-icon">⚡</div>
           <div class="mention-item-content">
-            <div class="mention-item-name">${highlightMatch(
-              tool.name,
-              currentQuery
-            )}</div>
+            <div class="mention-item-name">${highlightMatch(tool.name, currentQuery)}</div>
             <div class="mention-item-meta">${highlightMatch(
               tool.label,
-              currentQuery
+              currentQuery,
             )} - ${highlightMatch(tool.pluginName, currentQuery)}</div>
           </div>
         </div>
-      `
+      `,
         )
         .join("");
     }
@@ -514,12 +488,9 @@ function showMenu(rect: DOMRect, items: any[]) {
             <div class="mention-item-content">
               <div class="mention-item-name">${highlightMatch(
                 doc.name || "Untitled",
-                currentQuery
+                currentQuery,
               )}</div>
-              <div class="mention-item-meta">${highlightMatch(
-                metaInfo,
-                currentQuery
-              )}</div>
+              <div class="mention-item-meta">${highlightMatch(metaInfo, currentQuery)}</div>
             </div>
           </div>
         `;
@@ -564,9 +535,7 @@ function handleItemSelection(item: any) {
 
     if (activeSlashContext) {
       const items =
-        commandMode === "actions"
-          ? filterTools(currentQuery)
-          : filterDocuments(currentQuery);
+        commandMode === "actions" ? filterTools(currentQuery) : filterDocuments(currentQuery);
       showMenu(activeSlashContext.textarea.getBoundingClientRect(), items);
     }
   } else if (commandMode === "actions") {
@@ -620,7 +589,7 @@ function filterTools(query: string) {
     (tool) =>
       tool.name.toLowerCase().includes(q) ||
       tool.label.toLowerCase().includes(q) ||
-      tool.pluginName.toLowerCase().includes(q)
+      tool.pluginName.toLowerCase().includes(q),
   );
 }
 
@@ -646,7 +615,7 @@ const handleSlashCommand = (data: {
   console.log(
     `[DEBUG] Parent received: query="${query}", mode="${
       mode || "undefined"
-    }", isInSubMenu=${isInSubMenu}, subMenuMode=${subMenuMode}`
+    }", isInSubMenu=${isInSubMenu}, subMenuMode=${subMenuMode}`,
   );
 
   activeSlashContext = { slashIndex, textarea };
@@ -668,9 +637,7 @@ const handleSlashCommand = (data: {
   // Rule 2: If we're already in a sub-menu, stay in that mode (filtering)
   else if (isInSubMenu && subMenuMode) {
     commandMode = subMenuMode;
-    console.log(
-      `[DEBUG] Staying in ${subMenuMode} mode for filtering, query="${query}"`
-    );
+    console.log(`[DEBUG] Staying in ${subMenuMode} mode for filtering, query="${query}"`);
   }
   // Rule 3: Default to select mode only if we're not in a sub-menu
   else {
@@ -764,13 +731,11 @@ function handleListClick(e: MouseEvent) {
       const lastIndex = instructions.value.length - 1;
       nextTick(() => {
         // Find the last instruction item's editor
-        const lastInstructionWrapper = document.querySelectorAll(
-          ".instruction-item-wrapper"
-        )[lastIndex];
+        const lastInstructionWrapper = document.querySelectorAll(".instruction-item-wrapper")[
+          lastIndex
+        ];
         if (lastInstructionWrapper) {
-          const editor = lastInstructionWrapper.querySelector(
-            "[contenteditable]"
-          ) as HTMLElement;
+          const editor = lastInstructionWrapper.querySelector("[contenteditable]") as HTMLElement;
           if (editor) {
             editor.focus();
             // Place cursor at end
@@ -817,7 +782,7 @@ watch(
       instructions.value = JSON.parse(JSON.stringify(newValue));
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Watch for changes in instructions and emit
@@ -826,7 +791,7 @@ watch(
   () => {
     emitChange();
   },
-  { deep: true }
+  { deep: true },
 );
 </script>
 
@@ -998,7 +963,9 @@ kbd {
   background: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: 0.625rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 16px rgba(0, 0, 0, 0.1);
   padding: 0.375rem;
   display: none;
 }

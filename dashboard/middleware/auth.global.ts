@@ -8,7 +8,7 @@ export default defineNuxtRouteMiddleware(
     if (to.path === from.path) {
       return;
     }
-    
+
     const authStore = useAuthStore();
     const userStore = useUserStore();
 
@@ -30,12 +30,12 @@ export default defineNuxtRouteMiddleware(
     if (!hasValidAuth) {
       // If authenticated but missing user data, clear auth state
       if (authStore.isAuthenticated && !userStore.user?.id) {
-        console.log('[Auth Middleware] Authenticated but missing user data, logging out');
+        console.log("[Auth Middleware] Authenticated but missing user data, logging out");
         authStore.logout();
         return;
       }
-      
+
       return navigateTo("/login");
     }
-  }
+  },
 );

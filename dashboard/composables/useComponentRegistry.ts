@@ -18,6 +18,6 @@ export const useComponentRegistry = () => {
     registerComponent,
     unregisterComponent,
     getComponent,
-    componentRegistry
+    componentRegistry,
   };
 };

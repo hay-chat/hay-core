@@ -1,7 +1,10 @@
 <template>
   <div
     :class="
-      cn('rounded-lg border bg-background text-neutral shadow-sm', $props.class)
+      cn(
+        'rounded-lg border bg-background text-neutral shadow-sm flex flex-col -gap-4',
+        $props.class,
+      )
     "
   >
     <slot />

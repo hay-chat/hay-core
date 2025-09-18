@@ -9,7 +9,8 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" @click="refreshPlugins">
+        <Button variant="outline"
+size="sm" @click="refreshPlugins">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -29,7 +30,7 @@
         :metric="stats.enabled"
         subtitle="Active plugins"
         :icon="CheckCircle"
-        subtitleColor="green"
+        subtitle-color="green"
       />
       <MetricCard
         title="Channels"
@@ -56,7 +57,8 @@
           size="sm"
           @click="selectedCategory = category.id"
         >
-          <component :is="category.icon" class="h-4 w-4 mr-2" />
+          <component :is="category.icon"
+class="h-4 w-4 mr-2" />
           {{ category.name }}
         </Button>
       </div>
@@ -66,32 +68,31 @@
     <div class="flex items-center space-x-4">
       <div class="relative flex-1 max-w-sm">
         <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          placeholder="Search plugins..."
-          class="pl-8"
-        />
+        <Input v-model="searchQuery" placeholder="Search plugins..." class="pl-8" />
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <div v-for="i in 6" :key="i" class="animate-pulse">
+    <div v-if="loading"
+class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div v-for="i in 6"
+:key="i" class="animate-pulse">
         <Card>
           <CardHeader>
-            <div class="h-4 bg-gray-200 rounded w-1/3"></div>
-            <div class="h-3 bg-gray-200 rounded w-2/3 mt-2"></div>
+            <div class="h-4 bg-gray-200 rounded w-1/3" />
+            <div class="h-3 bg-gray-200 rounded w-2/3 mt-2" />
           </CardHeader>
           <CardContent>
-            <div class="h-3 bg-gray-200 rounded w-full"></div>
-            <div class="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
+            <div class="h-3 bg-gray-200 rounded w-full" />
+            <div class="h-3 bg-gray-200 rounded w-1/2 mt-2" />
           </CardContent>
         </Card>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredPlugins.length === 0" class="text-center py-12">
+    <div v-else-if="filteredPlugins.length === 0"
+class="text-center py-12">
       <Package class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">No plugins found</h3>
       <p class="text-muted-foreground">
@@ -104,7 +105,8 @@
     </div>
 
     <!-- Plugins Grid -->
-    <div v-else class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else
+class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       <Card
         v-for="plugin in filteredPlugins"
         :key="plugin.id"
@@ -113,19 +115,19 @@
         <CardHeader>
           <div class="flex items-start justify-between">
             <div class="flex items-center space-x-3">
-              <div
-                class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden"
-              >
+              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden">
                 <img
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
-                  @error="handleThumbnailError($event)"
                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                  @error="handleThumbnailError($event)"
                 />
               </div>
               <div>
-                <CardTitle class="text-lg">{{ plugin.name }}</CardTitle>
+                <CardTitle class="text-lg">
+                  {{ plugin.name }}
+                </CardTitle>
               </div>
             </div>
           </div>
@@ -134,12 +136,7 @@
           <div class="space-y-4">
             <!-- Plugin Type Badges -->
             <div class="flex flex-wrap gap-1">
-              <Badge
-                v-for="type in plugin.type"
-                :key="type"
-                variant="outline"
-                class="text-xs"
-              >
+              <Badge v-for="type in plugin.type" :key="type" variant="outline" class="text-xs">
                 {{ formatPluginType(type) }}
               </Badge>
             </div>
@@ -159,35 +156,20 @@
             </div>
 
             <!-- Features for channels -->
-            <div v-if="plugin.type.includes('channel')" class="space-y-2">
+            <div v-if="plugin.type.includes('channel')"
+class="space-y-2">
               <div class="text-sm font-medium">Features:</div>
               <div class="flex flex-wrap gap-1">
-                <Badge
-                  v-if="plugin.features?.fileUpload"
-                  variant="outline"
-                  class="text-xs"
-                >
+                <Badge v-if="plugin.features?.fileUpload" variant="outline" class="text-xs">
                   File Upload
                 </Badge>
-                <Badge
-                  v-if="plugin.features?.typing"
-                  variant="outline"
-                  class="text-xs"
-                >
+                <Badge v-if="plugin.features?.typing" variant="outline" class="text-xs">
                   Typing Indicators
                 </Badge>
-                <Badge
-                  v-if="plugin.features?.readReceipts"
-                  variant="outline"
-                  class="text-xs"
-                >
+                <Badge v-if="plugin.features?.readReceipts" variant="outline" class="text-xs">
                   Read Receipts
                 </Badge>
-                <Badge
-                  v-if="plugin.features?.voiceMessages"
-                  variant="outline"
-                  class="text-xs"
-                >
+                <Badge v-if="plugin.features?.voiceMessages" variant="outline" class="text-xs">
                   Voice Messages
                 </Badge>
               </div>
@@ -206,7 +188,8 @@
               </Button>
 
               <template v-else>
-                <Button size="sm" @click="navigateToSettings(plugin.id)">
+                <Button size="sm"
+@click="navigateToSettings(plugin.id)">
                   <Settings class="h-3 w-3 mr-1" />
                   Configure
                 </Button>
@@ -217,9 +200,7 @@
                   @click="disablePlugin(plugin.id)"
                 >
                   <Power class="h-3 w-3 mr-1" />
-                  {{
-                    disablingPlugin === plugin.id ? "Disabling..." : "Disable"
-                  }}
+                  {{ disablingPlugin === plugin.id ? "Disabling..." : "Disable" }}
                 </Button>
               </template>
             </div>
@@ -272,8 +253,7 @@ const stats = computed(() => {
     total: allPlugins.length,
     enabled: appStore.enabledPlugins.length,
     chatConnectors: allPlugins.filter((p) => p.type.includes("channel")).length,
-    mcpConnectors: allPlugins.filter((p) => p.type.includes("mcp-connector"))
-      .length,
+    mcpConnectors: allPlugins.filter((p) => p.type.includes("mcp-connector")).length,
   };
 });
 
@@ -303,7 +283,7 @@ const filteredPlugins = computed(() => {
       (p) =>
         (p.id && p.id.toLowerCase().includes(query)) ||
         (p.name && p.name.toLowerCase().includes(query)) ||
-        (p.description && p.description.toLowerCase().includes(query))
+        (p.description && p.description.toLowerCase().includes(query)),
     );
   }
 
@@ -384,9 +364,7 @@ const enablePlugin = async (pluginId: string) => {
     await appStore.enablePlugin(pluginId);
 
     // Show success toast
-    toast.success(
-      `Plugin ${pluginId.replace("hay-plugin-", "")} enabled successfully`
-    );
+    toast.success(`Plugin ${pluginId.replace("hay-plugin-", "")} enabled successfully`);
 
     // Navigate to settings if plugin has configuration
     const plugin = appStore.getPluginById(pluginId);
@@ -398,8 +376,7 @@ const enablePlugin = async (pluginId: string) => {
 
     // Show error toast with details
     // TRPCError messages are in error.message for client errors
-    const errorMessage =
-      error?.message || error?.data?.message || "Failed to enable plugin";
+    const errorMessage = error?.message || error?.data?.message || "Failed to enable plugin";
 
     // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
@@ -417,15 +394,12 @@ const disablePlugin = async (pluginId: string) => {
     await appStore.disablePlugin(pluginId);
 
     // Show success toast
-    toast.success(
-      `Plugin ${pluginId.replace("hay-plugin-", "")} disabled successfully`
-    );
+    toast.success(`Plugin ${pluginId.replace("hay-plugin-", "")} disabled successfully`);
   } catch (error: any) {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details
-    const errorMessage =
-      error?.message || error?.data?.message || "Failed to disable plugin";
+    const errorMessage = error?.message || error?.data?.message || "Failed to disable plugin";
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {
@@ -453,8 +427,7 @@ useHead({
   meta: [
     {
       name: "description",
-      content:
-        "Discover and install plugins to extend your platform capabilities",
+      content: "Discover and install plugins to extend your platform capabilities",
     },
   ],
 });

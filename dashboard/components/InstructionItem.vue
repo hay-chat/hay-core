@@ -9,9 +9,7 @@
       <RichInstructionInput
         ref="editorRef"
         v-model="localInstructions"
-        :placeholder="
-          level === 0 ? 'Enter instruction...' : 'Enter sub-instruction...'
-        "
+        :placeholder="level === 0 ? 'Enter instruction...' : 'Enter sub-instruction...'"
         :mcp-tools="mcpTools"
         :documents="documents"
         @slash-command="handleSlashCommand"
@@ -60,7 +58,7 @@ const emit = defineEmits<{
       slashIndex: number;
       textarea: HTMLElement;
       mode?: string;
-    }
+    },
   ];
   "close-slash-menu": [];
 }>();
@@ -90,15 +88,12 @@ const handleSlashCommand = (data: any) => {
 
 // Handle keyboard events from RichInstructionInput
 const handleKeyDown = (e: KeyboardEvent) => {
-  const editor = editorRef.value?.$el?.querySelector(
-    "[contenteditable]"
-  ) as HTMLElement;
+  const editor = editorRef.value?.$el?.querySelector("[contenteditable]") as HTMLElement;
   if (!editor) return;
 
   // Check if slash command menu is open for keys that should be handled by parent
   const menuEl = document.querySelector(".mention-menu");
-  const isMenuOpen =
-    menuEl && (menuEl as HTMLElement).style.display === "block";
+  const isMenuOpen = menuEl && (menuEl as HTMLElement).style.display === "block";
 
   if (isMenuOpen && e.key === "Escape") {
     // Let parent handle Escape to close menu
@@ -144,36 +139,24 @@ const handleKeyDown = (e: KeyboardEvent) => {
       selection.addRange(newRange);
 
       // Recalculate cursor position
-      cursorPosition = getTextOffset(
-        editor,
-        newRange.startContainer,
-        newRange.startOffset
-      );
+      cursorPosition = getTextOffset(editor, newRange.startContainer, newRange.startOffset);
     }
 
     // Get the current markdown content
     const richInputComponent = editorRef.value;
     let currentMarkdownContent = "";
     if (richInputComponent && richInputComponent.convertToMarkdown) {
-      currentMarkdownContent = richInputComponent.convertToMarkdown(
-        editor.innerHTML
-      );
+      currentMarkdownContent = richInputComponent.convertToMarkdown(editor.innerHTML);
     } else {
       // Fallback: use existing text-based approach
       currentMarkdownContent = textValue;
     }
 
     // For safe splitting, we need to map the visual cursor position to the markdown cursor position
-    const markdownCursorPosition = mapVisualToMarkdownPosition(
-      editor,
-      cursorPosition
-    );
+    const markdownCursorPosition = mapVisualToMarkdownPosition(editor, cursorPosition);
 
     // Split content at the correct position in markdown
-    const beforeCursor = currentMarkdownContent.slice(
-      0,
-      markdownCursorPosition
-    );
+    const beforeCursor = currentMarkdownContent.slice(0, markdownCursorPosition);
     const afterCursor = currentMarkdownContent.slice(markdownCursorPosition);
 
     // Check if current instruction is empty and the next one would also be empty
@@ -191,19 +174,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
     localInstructions.value = beforeCursor;
 
     // Handle special case: if we're at a level > 0 and current instruction is empty, outdent instead of creating new instruction
-    if (
-      props.level > 0 &&
-      beforeCursor.trim() === "" &&
-      afterCursor.trim() === ""
-    ) {
+    if (props.level > 0 && beforeCursor.trim() === "" && afterCursor.trim() === "") {
       // We're indented and it's empty, outdent instead of creating new instruction
       emit("outdent");
 
       // Restore focus to the current editor after outdenting
       nextTick(() => {
-        const editor = editorRef.value?.$el?.querySelector(
-          "[contenteditable]"
-        ) as HTMLElement;
+        const editor = editorRef.value?.$el?.querySelector("[contenteditable]") as HTMLElement;
         if (editor) {
           editor.focus();
           // Place cursor at end
@@ -231,9 +208,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
         // Set the content from after cursor if any
         if (afterCursor.trim()) {
           // Find the RichInstructionInput component for the next editor
-          const nextRichInputWrapper = nextEditor.closest(
-            ".rich-instruction-input"
-          );
+          const nextRichInputWrapper = nextEditor.closest(".rich-instruction-input");
           if (nextRichInputWrapper) {
             // Set the content as text first, which will preserve markdown format
             nextEditor.textContent = afterCursor;
@@ -289,9 +264,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
     // Restore focus to the current editor after indentation
     nextTick(() => {
-      const editor = editorRef.value?.$el?.querySelector(
-        "[contenteditable]"
-      ) as HTMLElement;
+      const editor = editorRef.value?.$el?.querySelector("[contenteditable]") as HTMLElement;
       if (editor) {
         editor.focus();
         // Place cursor at end
@@ -368,10 +341,7 @@ const setCursorPosition = (element: HTMLElement, position: number) => {
 };
 
 // Helper function to find if cursor is inside an MCP merge field
-const findMcpFieldAtCursor = (
-  editor: HTMLElement,
-  selection: Selection | null
-): Element | null => {
+const findMcpFieldAtCursor = (editor: HTMLElement, selection: Selection | null): Element | null => {
   if (!selection || selection.rangeCount === 0) return null;
 
   const range = selection.getRangeAt(0);
@@ -381,10 +351,7 @@ const findMcpFieldAtCursor = (
   while (node && node !== editor) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node as Element;
-      if (
-        element.classList &&
-        element.classList.contains("mention-merge-field")
-      ) {
+      if (element.classList && element.classList.contains("mention-merge-field")) {
         return element;
       }
     }
@@ -395,35 +362,25 @@ const findMcpFieldAtCursor = (
 };
 
 // Helper function to map visual cursor position to markdown position
-const mapVisualToMarkdownPosition = (
-  editor: HTMLElement,
-  visualPosition: number
-): number => {
+const mapVisualToMarkdownPosition = (editor: HTMLElement, visualPosition: number): number => {
   // This is a simplified approach - we'll iterate through the visual content
   // and build up the markdown content, tracking positions
   let visualOffset = 0;
   let markdownOffset = 0;
 
-  const walker = document.createTreeWalker(
-    editor,
-    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-    {
-      acceptNode: (node) => {
-        // Accept text nodes and MCP merge field elements
-        if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const element = node as Element;
-          if (
-            element.classList &&
-            element.classList.contains("mcp-merge-field")
-          ) {
-            return NodeFilter.FILTER_ACCEPT;
-          }
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) => {
+      // Accept text nodes and MCP merge field elements
+      if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        if (element.classList && element.classList.contains("mcp-merge-field")) {
+          return NodeFilter.FILTER_ACCEPT;
         }
-        return NodeFilter.FILTER_SKIP;
-      },
-    }
-  );
+      }
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
 
   let currentNode;
   while ((currentNode = walker.nextNode())) {
@@ -438,10 +395,7 @@ const mapVisualToMarkdownPosition = (
       markdownOffset += textLength;
     } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
       const element = currentNode as Element;
-      if (
-        element.classList &&
-        element.classList.contains("mention-merge-field")
-      ) {
+      if (element.classList && element.classList.contains("mention-merge-field")) {
         const visualText = element.textContent || "";
         const visualLength = visualText.length;
 
@@ -479,8 +433,7 @@ const findNextEditor = (currentElement: HTMLElement): HTMLElement | null => {
   // First, check if there are children of the current instruction
   const childrenContainer = currentWrapper.querySelector(".children");
   if (childrenContainer) {
-    const firstChildEditor =
-      childrenContainer.querySelector("[contenteditable]");
+    const firstChildEditor = childrenContainer.querySelector("[contenteditable]");
     if (firstChildEditor) {
       return firstChildEditor as HTMLElement;
     }
@@ -501,14 +454,9 @@ const findNextEditor = (currentElement: HTMLElement): HTMLElement | null => {
     // If we're in a children container, check the parent's next sibling
     if (parentWrapper.classList.contains("children")) {
       const parentInstructionWrapper = parentWrapper.parentElement;
-      if (
-        parentInstructionWrapper &&
-        parentInstructionWrapper.nextElementSibling
-      ) {
+      if (parentInstructionWrapper && parentInstructionWrapper.nextElementSibling) {
         const nextEditor =
-          parentInstructionWrapper.nextElementSibling.querySelector(
-            "[contenteditable]"
-          );
+          parentInstructionWrapper.nextElementSibling.querySelector("[contenteditable]");
         if (nextEditor) {
           return nextEditor as HTMLElement;
         }

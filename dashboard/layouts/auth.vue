@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 login-bg"
-  >
+  <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 login-bg">
     <!-- Content -->
     <div class="relative">
       <!-- Header -->
@@ -49,7 +47,8 @@
                 d="M172.914 33.6768C181.304 33.6768 188.782 39.6048 188.782 50.0016V78H177.838V52.7376C177.838 46.536 174.008 43.8912 169.266 43.8912C163.611 43.8912 160.693 49.5456 160.693 49.5456V78H149.749V9.0528H160.693V39.9696C160.693 39.9696 164.523 33.6768 172.914 33.6768Z"
                 fill="#0F282C"
               />
-              <rect width="100" height="100" rx="14" fill="#001BF4" />
+              <rect width="100"
+height="100" rx="14" fill="#001BF4" />
               <path
                 d="M74.8947 70.2578C74.8947 70.2578 36.6116 72 22 72C33.9815 28.4457 41.8719 1.44192 44.5021 52.836C55.0225 15.9601 61.7441 8.12027 61.7441 51.6746C82.4928 4.92628 76.6481 47.6096 74.8947 70.2578Z"
                 fill="white"
@@ -86,7 +85,8 @@
                 d="M172.914 33.6768C181.304 33.6768 188.782 39.6048 188.782 50.0016V78H177.838V52.7376C177.838 46.536 174.008 43.8912 169.266 43.8912C163.611 43.8912 160.693 49.5456 160.693 49.5456V78H149.749V9.0528H160.693V39.9696C160.693 39.9696 164.523 33.6768 172.914 33.6768Z"
                 fill="#0F282C"
               />
-              <rect width="100" height="100" rx="14" fill="#001BF4" />
+              <rect width="100"
+height="100" rx="14" fill="#001BF4" />
               <path
                 d="M74.8947 70.2578C74.8947 70.2578 36.6116 72 22 72C33.9815 28.4457 41.8719 1.44192 44.5021 52.836C55.0225 15.9601 61.7441 8.12027 61.7441 51.6746C82.4928 4.92628 76.6481 47.6096 74.8947 70.2578Z"
                 fill="white"
@@ -98,9 +98,7 @@
 
       <!-- Main content area -->
       <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div
-          class="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 border border-gray-200"
-        >
+        <div class="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 border border-gray-200">
           <slot />
         </div>
       </div>
@@ -109,15 +107,19 @@
       <div class="mt-8 text-center text-sm text-gray-600">
         <p>&copy; 2025 Hay Chat. All rights reserved.</p>
         <div class="mt-2 space-x-4">
-          <NuxtLink to="/privacy" class="hover:text-gray-900 transition-colors">
+          <NuxtLink to="/privacy"
+class="hover:text-gray-900 transition-colors">
             Privacy Policy
           </NuxtLink>
-          <NuxtLink to="/terms" class="hover:text-gray-900 transition-colors">
+          <NuxtLink to="/terms"
+class="hover:text-gray-900 transition-colors">
             Terms of Service
           </NuxtLink>
-          <NuxtLink to="/support" class="hover:text-gray-900 transition-colors">
-            Support
-          </NuxtLink>
+          <NuxtLink to="/support"
+class="hover:text-gray-900 transition-colors"
+>
+Support
+</NuxtLink>
         </div>
       </div>
     </div>

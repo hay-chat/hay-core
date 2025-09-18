@@ -10,21 +10,21 @@
  */
 export function parseUTCDate(dateString: string | Date | null | undefined): Date | null {
   if (!dateString) return null;
-  
+
   // If already a Date object, return it
   if (dateString instanceof Date) {
     return dateString;
   }
-  
+
   // Parse the UTC date string
   const date = new Date(dateString);
-  
+
   // Check if date is valid
   if (isNaN(date.getTime())) {
     console.warn(`Invalid date string: ${dateString}`);
     return null;
   }
-  
+
   return date;
 }
 
@@ -36,7 +36,7 @@ export function parseUTCDate(dateString: string | Date | null | undefined): Date
 export function formatRelativeTime(date: Date | string | null | undefined): string {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return "Unknown";
-  
+
   const now = new Date();
   const diff = now.getTime() - parsedDate.getTime();
   const seconds = Math.floor(diff / 1000);
@@ -75,16 +75,16 @@ export function formatRelativeTime(date: Date | string | null | undefined): stri
 export function formatLocalDateTime(
   date: Date | string | null | undefined,
   options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  },
 ): string {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return "Unknown";
-  
+
   return parsedDate.toLocaleString(undefined, options);
 }
 
@@ -96,10 +96,10 @@ export function formatLocalDateTime(
 export function formatShortDate(date: Date | string | null | undefined): string {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return "Unknown";
-  
+
   return parsedDate.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -111,10 +111,10 @@ export function formatShortDate(date: Date | string | null | undefined): string 
 export function formatTime(date: Date | string | null | undefined): string {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return "Unknown";
-  
+
   return parsedDate.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -126,18 +126,18 @@ export function formatTime(date: Date | string | null | undefined): string {
  */
 export function formatDuration(
   startDate: Date | string | null | undefined,
-  endDate: Date | string | null | undefined = new Date()
+  endDate: Date | string | null | undefined = new Date(),
 ): string {
   const start = parseUTCDate(startDate);
   const end = parseUTCDate(endDate);
-  
+
   if (!start || !end) return "Unknown";
-  
+
   const diff = Math.abs(end.getTime() - start.getTime());
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (days > 0) {
     const remainingHours = hours % 24;
     return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
@@ -157,7 +157,7 @@ export function formatDuration(
 export function isToday(date: Date | string | null | undefined): boolean {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return false;
-  
+
   const today = new Date();
   return (
     parsedDate.getDate() === today.getDate() &&
@@ -172,13 +172,10 @@ export function isToday(date: Date | string | null | undefined): boolean {
  * @param minutes - Number of minutes
  * @returns true if date is within the last N minutes
  */
-export function isWithinMinutes(
-  date: Date | string | null | undefined,
-  minutes: number
-): boolean {
+export function isWithinMinutes(date: Date | string | null | undefined, minutes: number): boolean {
   const parsedDate = parseUTCDate(date);
   if (!parsedDate) return false;
-  
+
   const now = new Date();
   const diff = now.getTime() - parsedDate.getTime();
   return diff < minutes * 60000;

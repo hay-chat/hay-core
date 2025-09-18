@@ -24,8 +24,12 @@ async function startServer() {
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
   const { processManagerService } = await import("@server/services/process-manager.service");
-  const { pluginInstanceManagerService } = await import("@server/services/plugin-instance-manager.service");
-  const { pluginInstanceRepository } = await import("@server/repositories/plugin-instance.repository");
+  const { pluginInstanceManagerService } = await import(
+    "@server/services/plugin-instance-manager.service"
+  );
+  const { pluginInstanceRepository } = await import(
+    "@server/repositories/plugin-instance.repository"
+  );
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
   const { pluginRouteService } = await import("@server/services/plugin-route.service");
   const { websocketService } = await import("@server/services/websocket.service");
@@ -42,7 +46,7 @@ async function startServer() {
       exposedHeaders: ["Content-Range", "X-Total-Count"],
       maxAge: 86400,
       optionsSuccessStatus: 204,
-    })
+    }),
   );
 
   // Add JSON parsing middleware with increased size limit for document uploads
@@ -79,7 +83,7 @@ async function startServer() {
     try {
       const script = await pluginAssetService.generateEmbedScript(
         req.params.organizationId,
-        req.params.pluginId
+        req.params.pluginId,
       );
       res.setHeader("Content-Type", "application/javascript");
       res.send(script);
@@ -116,7 +120,7 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-    })
+    }),
   );
 
   // Create HTTP server
@@ -140,12 +144,8 @@ async function startServer() {
   });
 
   httpServer.listen(config.server.port, async () => {
-    console.log(
-      `🚀 Server is running on port http://localhost:${config.server.port}`
-    );
-    console.log(
-      `🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`
-    );
+    console.log(`🚀 Server is running on port http://localhost:${config.server.port}`);
+    console.log(`🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`);
 
     // Start the orchestrator worker if database is connected
     if (dbConnected) {

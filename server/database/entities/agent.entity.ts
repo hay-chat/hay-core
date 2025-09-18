@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   ManyToMany,
-  JoinColumn
+  JoinColumn,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { Playbook } from "./playbook.entity";
@@ -44,7 +44,7 @@ export class Agent {
   @JoinColumn()
   organization!: Organization;
 
-  @ManyToMany(() => Playbook, playbook => playbook.agents)
+  @ManyToMany(() => Playbook, (playbook) => playbook.agents)
   playbooks!: Playbook[];
 
   @CreateDateColumn()

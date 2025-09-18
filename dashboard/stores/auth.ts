@@ -46,7 +46,7 @@ export const useAuthStore = defineStore("auth", {
       this.tokens = {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
+        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
       };
       const userStore = useUserStore();
       userStore.setUser(result.user as User);
@@ -56,14 +56,14 @@ export const useAuthStore = defineStore("auth", {
 
     async logout(reason?: string) {
       const router = useRouter();
-      
+
       // Only try to call logout API if we have a valid token
       if (this.tokens?.accessToken) {
         try {
           await HayAuthApi.auth.logout.mutate();
         } catch (error) {
           // Ignore errors on logout - token might already be invalid
-          console.log('[Auth] Logout API call failed (expected if token expired):', error);
+          console.log("[Auth] Logout API call failed (expected if token expired):", error);
         }
       }
 
@@ -71,22 +71,22 @@ export const useAuthStore = defineStore("auth", {
       this.tokens = null;
       this.isAuthenticated = false;
       this.isInitialized = false;
-      
+
       // Clear user store
       const userStore = useUserStore();
       userStore.clearUser();
-      
+
       // Show notification if there's a reason
-      if (reason === 'token_expired' && process.client) {
+      if (reason === "token_expired" && process.client) {
         const { $toast } = useNuxtApp() as any;
         if ($toast) {
-          $toast.error('Your session has expired. Please login again.');
+          $toast.error("Your session has expired. Please login again.");
         }
       }
 
       // Navigate to login page
       if (process.client) {
-        await router.push('/login');
+        await router.push("/login");
       }
     },
 
@@ -115,7 +115,7 @@ export const useAuthStore = defineStore("auth", {
       this.tokens = {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
+        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
       };
 
       // Store user data with organization
@@ -141,7 +141,7 @@ export const useAuthStore = defineStore("auth", {
         this.tokens = {
           accessToken: result.accessToken,
           refreshToken: currentTokens.refreshToken, // Keep existing refresh token
-          expiresAt: Date.now() + (result.expiresIn * 1000), // Convert seconds to milliseconds
+          expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
         // Update cookie
@@ -149,12 +149,12 @@ export const useAuthStore = defineStore("auth", {
           const token = useCookie("auth-token");
           token.value = result.accessToken;
         }
-        
+
         this.updateActivity();
         return;
       } catch (error) {
         // If refresh fails, clear auth state
-        console.error('[Auth] Failed to refresh token:', error);
+        console.error("[Auth] Failed to refresh token:", error);
         throw error;
       }
     },

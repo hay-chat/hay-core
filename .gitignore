@@ -5,6 +5,7 @@ plugins/*/dist/
 plugins/*/*/dist/
 
 # Logs
+.eslintcache
 logs
 *.log
 npm-debug.log*

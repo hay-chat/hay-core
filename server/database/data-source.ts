@@ -27,12 +27,27 @@ export const AppDataSource = new DataSource({
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-  entities: [User, ApiKey, Organization, Document, Job, Session, Embedding, Agent, Playbook, Conversation, Message, Customer, PluginRegistry, PluginInstance],
-  migrations: __filename.includes('dist') 
-    ? [__dirname + "/migrations/*.js"]   // Production: compiled JS files in same relative location
-    : ["./database/migrations/*.ts"],    // Development: TypeScript files
+  entities: [
+    User,
+    ApiKey,
+    Organization,
+    Document,
+    Job,
+    Session,
+    Embedding,
+    Agent,
+    Playbook,
+    Conversation,
+    Message,
+    Customer,
+    PluginRegistry,
+    PluginInstance,
+  ],
+  migrations: __filename.includes("dist")
+    ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
+    : ["./database/migrations/*.ts"], // Development: TypeScript files
   subscribers: [],
-  namingStrategy: new SnakeNamingStrategy()
+  namingStrategy: new SnakeNamingStrategy(),
 });
 
 // Initialize the data source
@@ -47,7 +62,7 @@ export async function initializeDatabase() {
   console.log("  - SSL:", config.database.ssl);
   console.log("  - Connection Timeout:", config.database.connectionTimeout, "ms");
   console.log("  - Max Connections:", config.database.maxConnections);
-  
+
   try {
     console.log("🔄 Attempting to connect to database...");
     await AppDataSource.initialize();
@@ -62,7 +77,7 @@ export async function initializeDatabase() {
     return true;
   } catch (error) {
     console.error("❌ Error during Data Source initialization:");
-    
+
     // Log detailed error information
     interface DbError extends Error {
       code?: string;
@@ -71,7 +86,7 @@ export async function initializeDatabase() {
       address?: string;
       port?: number;
     }
-    
+
     if (error instanceof Error) {
       const dbError = error as DbError;
       console.error("  - Error message:", dbError.message);
@@ -94,10 +109,8 @@ export async function initializeDatabase() {
     } else {
       console.error("  - Full error:", error);
     }
-    
-    console.warn(
-      "⚠️  Running without database connection - authentication will not work properly"
-    );
+
+    console.warn("⚠️  Running without database connection - authentication will not work properly");
     return false;
   }
 }

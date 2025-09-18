@@ -1,11 +1,11 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class InsertDefaultPlaybooks1756476000000 implements MigrationInterface {
-    name = 'InsertDefaultPlaybooks1756476000000'
+  name = "InsertDefaultPlaybooks1756476000000";
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Insert default system playbooks (no organization_id means system playbook)
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Insert default system playbooks (no organization_id means system playbook)
+    await queryRunner.query(`
             INSERT INTO playbooks (id, title, trigger, description, kind, prompt_template, required_fields, status, is_system, created_at, updated_at, organization_id)
             VALUES 
             (
@@ -51,14 +51,14 @@ export class InsertDefaultPlaybooks1756476000000 implements MigrationInterface {
                 NULL
             )
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove default system playbooks
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove default system playbooks
+    await queryRunner.query(`
             DELETE FROM playbooks 
             WHERE trigger IN ('default_welcome', 'default_ender', 'default_intake')
             AND is_system = true
         `);
-    }
+  }
 }

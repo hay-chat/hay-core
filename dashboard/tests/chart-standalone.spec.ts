@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Chart Component Standalone Test', () => {
-  test('should test chart with mock data', async ({ page }) => {
+test.describe("Chart Component Standalone Test", () => {
+  test("should test chart with mock data", async ({ page }) => {
     // Create a simple HTML page with our chart component to test it independently
     const htmlContent = `
 <!DOCTYPE html>
@@ -113,33 +113,33 @@ test.describe('Chart Component Standalone Test', () => {
 
     // Set the HTML content
     await page.setContent(htmlContent);
-    
+
     // Wait for Vue and chart to initialize
     await page.waitForTimeout(2000);
-    
+
     // Take initial screenshot
-    await page.screenshot({ 
-      path: 'test-results/chart-standalone-initial.png',
-      fullPage: true
+    await page.screenshot({
+      path: "test-results/chart-standalone-initial.png",
+      fullPage: true,
     });
 
     // Check if chart is rendered
-    const chartContainer = page.locator('.chart-container');
+    const chartContainer = page.locator(".chart-container");
     await expect(chartContainer).toBeVisible();
 
     // Check for SVG elements
-    const svg = page.locator('.chart-container svg');
+    const svg = page.locator(".chart-container svg");
     await expect(svg).toBeVisible();
 
     // Take screenshot after chart should be rendered
-    await page.screenshot({ 
-      path: 'test-results/chart-standalone-rendered.png',
-      fullPage: true
+    await page.screenshot({
+      path: "test-results/chart-standalone-rendered.png",
+      fullPage: true,
     });
 
     // Test hover functionality
     const chartBox = await svg.boundingBox();
-    
+
     if (chartBox) {
       // Test hovering over different points
       const points = [
@@ -147,28 +147,30 @@ test.describe('Chart Component Standalone Test', () => {
         { x: chartBox.x + chartBox.width * 0.5, y: chartBox.y + chartBox.height * 0.5 },
         { x: chartBox.x + chartBox.width * 0.8, y: chartBox.y + chartBox.height * 0.5 },
       ];
-      
+
       for (let i = 0; i < points.length; i++) {
         const point = points[i];
         console.log(`Hovering at point ${i + 1}: ${point.x}, ${point.y}`);
-        
+
         // Move mouse to point
         await page.mouse.move(point.x, point.y);
         await page.waitForTimeout(1000);
-        
+
         // Take screenshot at each hover point
-        await page.screenshot({ 
+        await page.screenshot({
           path: `test-results/chart-standalone-hover-${i + 1}.png`,
-          fullPage: true
+          fullPage: true,
         });
-        
+
         // Check for tooltip
-        const tooltip = page.locator('[role="tooltip"], .tooltip, .vis-tooltip, div[style*="position: absolute"]');
+        const tooltip = page.locator(
+          '[role="tooltip"], .tooltip, .vis-tooltip, div[style*="position: absolute"]',
+        );
         const isTooltipVisible = await tooltip.isVisible().catch(() => false);
         console.log(`Tooltip visible at point ${i + 1}: ${isTooltipVisible}`);
-        
+
         if (isTooltipVisible) {
-          const tooltipText = await tooltip.textContent().catch(() => 'Could not get tooltip text');
+          const tooltipText = await tooltip.textContent().catch(() => "Could not get tooltip text");
           console.log(`Tooltip text at point ${i + 1}: ${tooltipText}`);
         }
       }
@@ -176,15 +178,15 @@ test.describe('Chart Component Standalone Test', () => {
 
     // Check for any errors
     const errors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
         errors.push(msg.text());
-        console.log('Console error:', msg.text());
+        console.log("Console error:", msg.text());
       }
     });
 
     await page.waitForTimeout(1000);
-    console.log('Total console errors:', errors.length);
-    console.log('Errors:', errors);
+    console.log("Total console errors:", errors.length);
+    console.log("Errors:", errors);
   });
 });

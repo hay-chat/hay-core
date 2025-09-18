@@ -33,10 +33,7 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
         if (req.res) {
           req.res.setHeader("X-Access-Token", result.tokens.accessToken);
           req.res.setHeader("X-Refresh-Token", result.tokens.refreshToken);
-          req.res.setHeader(
-            "X-Token-Expires-In",
-            result.tokens.expiresIn.toString()
-          );
+          req.res.setHeader("X-Token-Expires-In", result.tokens.expiresIn.toString());
         }
         logAuthSuccess("basic", result.user.id);
         return result.user;
@@ -93,11 +90,7 @@ export async function optionalAuth(req: Request): Promise<AuthUser | null> {
 /**
  * Check if the user has required scopes
  */
-export function requireScopes(
-  authUser: AuthUser,
-  resource: string,
-  action: string
-): void {
+export function requireScopes(authUser: AuthUser, resource: string, action: string): void {
   if (!authUser.hasScope(resource, action)) {
     throw new Error(`Insufficient permissions for ${action} on ${resource}`);
   }

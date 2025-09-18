@@ -4,9 +4,9 @@ import path from "path";
 // Load environment variables
 // In production, the compiled code is in server/dist/server/config, so we need to go up 4 levels to project root
 // In development, the source is in server/config, so we need to go up 2 levels to project root
-const envPath = __dirname.includes('dist') 
-  ? path.resolve(__dirname, "../../../../.env")  // Production: server/dist/server/config -> project root
-  : path.resolve(__dirname, "../../.env");        // Development: server/config -> project root
+const envPath = __dirname.includes("dist")
+  ? path.resolve(__dirname, "../../../../.env") // Production: server/dist/server/config -> project root
+  : path.resolve(__dirname, "../../.env"); // Development: server/config -> project root
 dotenv.config({ path: envPath });
 
 export const config = {
@@ -50,9 +50,9 @@ export const config = {
   },
 
   organization: {
-    extractionMethods: (
-      process.env.ORGANIZATION_EXTRACTION_METHOD || "subdomain,header,jwt"
-    ).split(","),
+    extractionMethods: (process.env.ORGANIZATION_EXTRACTION_METHOD || "subdomain,header,jwt").split(
+      ",",
+    ),
     defaultOrganization: process.env.DEFAULT_ORGANIZATION || "default",
   },
 
@@ -67,18 +67,13 @@ export const config = {
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
-    connectionTimeout: parseInt(
-      process.env.DB_CONNECTION_TIMEOUT || "60000",
-      10
-    ),
+    connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || "60000", 10),
   },
 
   jwt: {
     secret: process.env.JWT_SECRET || "default-secret-change-in-production",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-    refreshSecret:
-      process.env.JWT_REFRESH_SECRET ||
-      "default-refresh-secret-change-in-production",
+    refreshSecret: process.env.JWT_REFRESH_SECRET || "default-refresh-secret-change-in-production",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
@@ -87,14 +82,8 @@ export const config = {
   },
 
   conversation: {
-    cooldownInterval: parseInt(
-      process.env.CONVERSATION_COOLDOWN_INTERVAL || "10000",
-      10
-    ),
-    inactivityInterval: parseInt(
-      process.env.CONVERSATION_INACTIVITY_INTERVAL || "1800000",
-      10
-    ),
+    cooldownInterval: parseInt(process.env.CONVERSATION_COOLDOWN_INTERVAL || "10000", 10),
+    inactivityInterval: parseInt(process.env.CONVERSATION_INACTIVITY_INTERVAL || "1800000", 10),
   },
 
   openai: {
@@ -103,9 +92,7 @@ export const config = {
       embedding: {
         model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
         dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
-        temperature: parseFloat(
-          process.env.OPENAI_EMBEDDING_TEMPERATURE || "0.7"
-        ),
+        temperature: parseFloat(process.env.OPENAI_EMBEDDING_TEMPERATURE || "0.7"),
         maxTokens: parseInt(process.env.OPENAI_EMBEDDING_MAX_TOKENS || "2000"),
         organizationId: process.env.OPENAI_EMBEDDING_ORG_ID || "",
       },

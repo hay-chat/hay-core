@@ -18,7 +18,7 @@ export class ToolExecutionService {
 
   async handleToolExecution(
     conversation: Conversation,
-    toolMessage: Partial<Message>
+    toolMessage: Partial<Message>,
   ): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
       const toolCall = toolMessage.metadata?.tool_call;
@@ -30,13 +30,9 @@ export class ToolExecutionService {
         };
       }
 
-      console.log(
-        `Executing tool: ${toolCall.tool_name} with args:`,
-        toolCall.arguments
-      );
+      console.log(`Executing tool: ${toolCall.tool_name} with args:`, toolCall.arguments);
 
-      const currentContext =
-        conversation.orchestration_status as ConversationContext | null;
+      const currentContext = conversation.orchestration_status as ConversationContext | null;
       if (currentContext) {
         // Initialize toolLog if it doesn't exist
         if (!currentContext.toolLog) {
@@ -75,7 +71,7 @@ export class ToolExecutionService {
             toolCall,
             result,
             true,
-            toolLogEntry.latencyMs
+            toolLogEntry.latencyMs,
           );
 
           currentContext.toolLog.push(toolLogEntry);
@@ -96,7 +92,7 @@ export class ToolExecutionService {
             toolCall,
             { error: err.message },
             false,
-            toolLogEntry.latencyMs
+            toolLogEntry.latencyMs,
           );
 
           currentContext.toolLog.push(toolLogEntry);
@@ -118,68 +114,54 @@ export class ToolExecutionService {
     }
   }
 
-  private async executeToolCall(
-    conversation: Conversation,
-    toolCall: any
-  ): Promise<any> {
+  private async executeToolCall(conversation: Conversation, toolCall: any): Promise<any> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
     console.log(`[ToolExecution] Executing MCP tool: ${fullToolName}`);
-    console.log(
-      `[ToolExecution] Tool arguments:`,
-      JSON.stringify(toolArgs, null, 2)
-    );
+    console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));
 
     // Parse the tool name to extract plugin and tool parts
     // Expected format: "{pluginId}:{toolName}"
     const colonIndex = fullToolName.lastIndexOf(":");
     if (colonIndex === -1) {
       throw new Error(
-        `Invalid tool name format: ${fullToolName}. Expected format: {pluginId}:{toolName}`
+        `Invalid tool name format: ${fullToolName}. Expected format: {pluginId}:{toolName}`,
       );
     }
 
     const pluginId = fullToolName.substring(0, colonIndex);
     const actualToolName = fullToolName.substring(colonIndex + 1);
 
-    console.log(
-      `[ToolExecution] Parsed plugin ID: ${pluginId}, tool name: ${actualToolName}`
-    );
+    console.log(`[ToolExecution] Parsed plugin ID: ${pluginId}, tool name: ${actualToolName}`);
 
     // Find the plugin that contains this tool
     const allPlugins = pluginManagerService.getAllPlugins();
     console.log(
       `[ToolExecution] Available plugins:`,
-      allPlugins.map((p) => ({ id: p.pluginId, name: p.name }))
+      allPlugins.map((p) => ({ id: p.pluginId, name: p.name })),
     );
 
     let matchingPlugin = null;
     let toolSchema = null;
 
     for (const plugin of allPlugins) {
-      console.log(
-        `[ToolExecution] Checking plugin: ${plugin.pluginId} (${plugin.name})`
-      );
+      console.log(`[ToolExecution] Checking plugin: ${plugin.pluginId} (${plugin.name})`);
       if (plugin.pluginId === pluginId) {
         console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
         const manifest = plugin.manifest as any;
         if (manifest.capabilities?.mcp?.tools) {
           console.log(
             `[ToolExecution] Available tools in plugin:`,
-            manifest.capabilities.mcp.tools.map((t: any) => t.name)
+            manifest.capabilities.mcp.tools.map((t: any) => t.name),
           );
-          const tool = manifest.capabilities.mcp.tools.find(
-            (t: any) => t.name === actualToolName
-          );
+          const tool = manifest.capabilities.mcp.tools.find((t: any) => t.name === actualToolName);
           if (tool) {
             matchingPlugin = plugin;
             toolSchema = tool;
             console.log(`[ToolExecution] Found matching tool:`, tool.name);
             break;
           } else {
-            console.log(
-              `[ToolExecution] Tool '${actualToolName}' not found in this plugin`
-            );
+            console.log(`[ToolExecution] Tool '${actualToolName}' not found in this plugin`);
           }
         } else {
           console.log(`[ToolExecution] Plugin has no MCP tools defined`);
@@ -190,31 +172,24 @@ export class ToolExecutionService {
     if (!matchingPlugin || !toolSchema) {
       const availableTools = allPlugins.flatMap(
         (p) =>
-          p.manifest?.capabilities?.mcp?.tools?.map(
-            (t: any) => `${p.pluginId}:${t.name}`
-          ) || []
+          p.manifest?.capabilities?.mcp?.tools?.map((t: any) => `${p.pluginId}:${t.name}`) || [],
       );
       throw new Error(
         `Tool '${actualToolName}' not found in plugin '${pluginId}'. Available tools: ${availableTools.join(
-          ", "
-        )}`
+          ", ",
+        )}`,
       );
     }
 
     console.log(
-      `[ToolExecution] Found tool '${actualToolName}' in plugin '${matchingPlugin.name}'`
+      `[ToolExecution] Found tool '${actualToolName}' in plugin '${matchingPlugin.name}'`,
     );
 
     // Validate tool arguments against input schema
     if (toolSchema.input_schema) {
-      const validation = this.validateToolArguments(
-        toolArgs,
-        toolSchema.input_schema
-      );
+      const validation = this.validateToolArguments(toolArgs, toolSchema.input_schema);
       if (!validation.valid) {
-        throw new Error(
-          `Invalid tool arguments: ${validation.errors.join(", ")}`
-        );
+        throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
       }
     }
 
@@ -230,13 +205,9 @@ export class ToolExecutionService {
     }
 
     // Get the plugin's start command
-    const startCommand = pluginManagerService.getStartCommand(
-      matchingPlugin.pluginId
-    );
+    const startCommand = pluginManagerService.getStartCommand(matchingPlugin.pluginId);
     if (!startCommand) {
-      throw new Error(
-        `Plugin '${matchingPlugin.name}' has no start command defined`
-      );
+      throw new Error(`Plugin '${matchingPlugin.name}' has no start command defined`);
     }
 
     console.log(`[ToolExecution] Plugin start command: ${startCommand}`);
@@ -249,14 +220,11 @@ export class ToolExecutionService {
       organizationId,
       matchingPlugin.pluginId,
       actualToolName,
-      toolArgs
+      toolArgs,
     );
   }
 
-  private validateToolArguments(
-    args: any,
-    schema: any
-  ): { valid: boolean; errors: string[] } {
+  private validateToolArguments(args: any, schema: any): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     // Basic validation - check required properties
@@ -270,9 +238,7 @@ export class ToolExecutionService {
 
     // Type validation for properties
     if (schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(
-        schema.properties as any
-      )) {
+      for (const [fieldName, fieldSchema] of Object.entries(schema.properties as any)) {
         if (fieldName in args) {
           const fieldValue = args[fieldName];
           const fieldType = (fieldSchema as any).type;
@@ -281,10 +247,7 @@ export class ToolExecutionService {
             errors.push(`Field '${fieldName}' must be a string`);
           } else if (fieldType === "number" && typeof fieldValue !== "number") {
             errors.push(`Field '${fieldName}' must be a number`);
-          } else if (
-            fieldType === "boolean" &&
-            typeof fieldValue !== "boolean"
-          ) {
+          } else if (fieldType === "boolean" && typeof fieldValue !== "boolean") {
             errors.push(`Field '${fieldName}' must be a boolean`);
           }
 
@@ -292,9 +255,7 @@ export class ToolExecutionService {
           const enumValues = (fieldSchema as any).enum;
           if (enumValues && Array.isArray(enumValues)) {
             if (!enumValues.includes(fieldValue)) {
-              errors.push(
-                `Field '${fieldName}' must be one of: ${enumValues.join(", ")}`
-              );
+              errors.push(`Field '${fieldName}' must be one of: ${enumValues.join(", ")}`);
             }
           }
         }
@@ -308,28 +269,21 @@ export class ToolExecutionService {
     organizationId: string,
     pluginId: string,
     toolName: string,
-    toolArgs: any
+    toolArgs: any,
   ): Promise<any> {
     console.log(`[ToolExecution] Executing MCP tool: ${pluginId}:${toolName}`);
     console.log(`[ToolExecution] Organization ID: ${organizationId}`);
-    console.log(
-      `[ToolExecution] Tool arguments:`,
-      JSON.stringify(toolArgs, null, 2)
-    );
+    console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));
 
     // Check if the plugin process is running
     if (!processManagerService.isRunning(organizationId, pluginId)) {
-      console.log(
-        `[ToolExecution] Plugin process not running, attempting to start...`
-      );
+      console.log(`[ToolExecution] Plugin process not running, attempting to start...`);
       try {
         await processManagerService.startPlugin(organizationId, pluginId);
         console.log(`[ToolExecution] Plugin process started successfully`);
       } catch (error) {
         console.error(`[ToolExecution] Failed to start plugin process:`, error);
-        throw new Error(
-          `Plugin process not available: ${(error as Error).message}`
-        );
+        throw new Error(`Plugin process not available: ${(error as Error).message}`);
       }
     }
 
@@ -346,7 +300,7 @@ export class ToolExecutionService {
 
     console.log(
       `[ToolExecution] Sending MCP request to running process:`,
-      JSON.stringify(mcpRequest, null, 2)
+      JSON.stringify(mcpRequest, null, 2),
     );
 
     try {
@@ -355,18 +309,13 @@ export class ToolExecutionService {
         organizationId,
         pluginId,
         "mcp_call",
-        mcpRequest
+        mcpRequest,
       );
 
-      console.log(
-        `[ToolExecution] MCP response received:`,
-        JSON.stringify(result, null, 2)
-      );
+      console.log(`[ToolExecution] MCP response received:`, JSON.stringify(result, null, 2));
 
       if (result.error) {
-        throw new Error(
-          `MCP tool error: ${result.error.message || result.error}`
-        );
+        throw new Error(`MCP tool error: ${result.error.message || result.error}`);
       }
 
       return result.result || result;

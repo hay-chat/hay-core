@@ -11,7 +11,7 @@ export type HashAlgorithm = "bcrypt" | "argon2";
  */
 export async function hashPassword(
   password: string,
-  algorithm: HashAlgorithm = "argon2"
+  algorithm: HashAlgorithm = "argon2",
 ): Promise<string> {
   if (algorithm === "bcrypt") {
     return bcrypt.hash(password, authConfig.bcrypt.saltRounds);
@@ -28,10 +28,7 @@ export async function hashPassword(
 /**
  * Verify a password against a hash
  */
-export async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   // Detect algorithm based on hash format
   if (hash.startsWith("$2a$") || hash.startsWith("$2b$")) {
     return bcrypt.compare(password, hash);
@@ -45,9 +42,7 @@ export async function verifyPassword(
 /**
  * Generate a secure random API key
  */
-export function generateApiKey(
-  length: number = authConfig.apiKey.length
-): string {
+export function generateApiKey(length: number = authConfig.apiKey.length): string {
   const key = crypto.randomBytes(length).toString("base64url");
   return `${authConfig.apiKey.prefix}${key}`;
 }
@@ -97,18 +92,14 @@ export function secureCompare(a: string, b: string): boolean {
 /**
  * Parse Basic Auth header
  */
-export function parseBasicAuth(
-  authHeader: string
-): { email: string; password: string } | null {
+export function parseBasicAuth(authHeader: string): { email: string; password: string } | null {
   if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }
 
   try {
     const base64Credentials = authHeader.slice(6);
-    const credentials = Buffer.from(base64Credentials, "base64").toString(
-      "utf-8"
-    );
+    const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
     const [email, password] = credentials.split(":");
 
     if (!email || !password) {

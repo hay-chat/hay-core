@@ -6,10 +6,10 @@
 
 <script setup lang="ts">
 interface TooltipProviderProps {
-  delayDuration?: number
+  delayDuration?: number;
 }
 
 const props = withDefaults(defineProps<TooltipProviderProps>(), {
-  delayDuration: 700
-})
+  delayDuration: 700,
+});
 </script>

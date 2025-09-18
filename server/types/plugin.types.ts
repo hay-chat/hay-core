@@ -3,9 +3,7 @@ export interface HayPluginManifest {
   name: string;
   description: string;
   version: string;
-  type: Array<
-    "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel"
-  >;
+  type: Array<"mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel">;
   entry: string;
   capabilities?: {
     document_importer?: {

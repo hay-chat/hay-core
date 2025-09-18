@@ -19,7 +19,7 @@ export class DocumentRepository extends BaseRepository<Document> {
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Document>,
     filters?: Record<string, any>,
-    organizationId?: string
+    organizationId?: string,
   ): void {
     if (!filters) return;
 
@@ -61,7 +61,7 @@ export class DocumentRepository extends BaseRepository<Document> {
    */
   protected override applySearch(
     queryBuilder: SelectQueryBuilder<Document>,
-    search?: { query?: string; searchFields?: string[] }
+    search?: { query?: string; searchFields?: string[] },
   ): void {
     if (!search?.query) return;
 
@@ -75,10 +75,13 @@ export class DocumentRepository extends BaseRepository<Document> {
     if (searchConditions) {
       queryBuilder.andWhere(
         `(${searchConditions})`,
-        searchFields.reduce((params, _, index) => {
-          params[`searchQuery${index}`] = `%${search.query}%`;
-          return params;
-        }, {} as Record<string, any>)
+        searchFields.reduce(
+          (params, _, index) => {
+            params[`searchQuery${index}`] = `%${search.query}%`;
+            return params;
+          },
+          {} as Record<string, any>,
+        ),
       );
     }
   }
@@ -88,7 +91,7 @@ export class DocumentRepository extends BaseRepository<Document> {
    */
   protected override applyIncludes(
     queryBuilder: SelectQueryBuilder<Document>,
-    include?: string[]
+    include?: string[],
   ): void {
     if (!include || include.length === 0) return;
 

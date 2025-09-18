@@ -27,10 +27,7 @@ export const createContext = async ({
 
       // Store the error for procedures that require auth
       // This allows us to provide better error messages
-      if (
-        error.message.includes("Token has expired") ||
-        error.message.includes("token expired")
-      ) {
+      if (error.message.includes("Token has expired") || error.message.includes("token expired")) {
         // We'll let the auth middleware handle this with proper TRPC error
         (req as any).authError = error.message;
       }
@@ -41,8 +38,7 @@ export const createContext = async ({
   }
 
   // Extract organizationId from header
-  const organizationId =
-    (req.headers["x-organization-id"] as string | null) || null;
+  const organizationId = (req.headers["x-organization-id"] as string | null) || null;
 
   const context: Context = {
     user,

@@ -12,16 +12,19 @@ export class PlaybookService {
     this.agentRepository = new AgentRepository();
   }
 
-  async createPlaybook(organizationId: string, data: {
-    title: string;
-    trigger: string;
-    description?: string;
-    instructions?: any;
-    status?: PlaybookStatus;
-    agentIds?: string[];
-  }): Promise<Playbook> {
+  async createPlaybook(
+    organizationId: string,
+    data: {
+      title: string;
+      trigger: string;
+      description?: string;
+      instructions?: any;
+      status?: PlaybookStatus;
+      agentIds?: string[];
+    },
+  ): Promise<Playbook> {
     const { agentIds, ...playbookData } = data;
-    
+
     const agents: Agent[] = [];
     if (agentIds && agentIds.length > 0) {
       for (const agentId of agentIds) {
@@ -36,7 +39,7 @@ export class PlaybookService {
     return await this.playbookRepository.create({
       ...playbookData,
       organization_id: organizationId,
-      agents
+      agents,
     });
   }
 
@@ -66,10 +69,10 @@ export class PlaybookService {
       instructions?: any;
       status?: PlaybookStatus;
       agentIds?: string[];
-    }
+    },
   ): Promise<Playbook | null> {
     const { agentIds, ...updateData } = data;
-    
+
     let agents: Agent[] | undefined;
     if (agentIds !== undefined) {
       agents = [];
@@ -84,7 +87,7 @@ export class PlaybookService {
 
     return await this.playbookRepository.update(playbookId, organizationId, {
       ...updateData,
-      ...(agents !== undefined && { agents })
+      ...(agents !== undefined && { agents }),
     });
   }
 
@@ -92,7 +95,11 @@ export class PlaybookService {
     return await this.playbookRepository.delete(playbookId, organizationId);
   }
 
-  async addAgentToPlaybook(organizationId: string, playbookId: string, agentId: string): Promise<Playbook | null> {
+  async addAgentToPlaybook(
+    organizationId: string,
+    playbookId: string,
+    agentId: string,
+  ): Promise<Playbook | null> {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent || agent.organization_id !== organizationId) {
       throw new Error("Agent not found");
@@ -101,18 +108,27 @@ export class PlaybookService {
     return await this.playbookRepository.addAgent(playbookId, agentId, organizationId);
   }
 
-  async removeAgentFromPlaybook(organizationId: string, playbookId: string, agentId: string): Promise<Playbook | null> {
+  async removeAgentFromPlaybook(
+    organizationId: string,
+    playbookId: string,
+    agentId: string,
+  ): Promise<Playbook | null> {
     return await this.playbookRepository.removeAgent(playbookId, agentId, organizationId);
   }
 
-  async getActivePlaybook(kind: string, organizationId: string, trigger?: string): Promise<Playbook | null> {
+  async getActivePlaybook(
+    kind: string,
+    organizationId: string,
+    trigger?: string,
+  ): Promise<Playbook | null> {
     const playbooks = await this.playbookRepository.findByOrganization(organizationId);
-    
+
     // First try org-specific playbook
-    let playbook = playbooks.find(p => 
-      p.kind === kind && 
-      p.status === PlaybookStatus.ACTIVE &&
-      (!trigger || p.trigger === trigger)
+    const playbook = playbooks.find(
+      (p) =>
+        p.kind === kind &&
+        p.status === PlaybookStatus.ACTIVE &&
+        (!trigger || p.trigger === trigger),
     );
 
     if (!playbook) {

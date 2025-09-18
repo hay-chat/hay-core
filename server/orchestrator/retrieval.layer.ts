@@ -15,10 +15,7 @@ export class RetrievalLayer {
     this.llmService = new LLMService();
   }
 
-  async getPlaybookCandidate(
-    messages: Message[],
-    playbooks: Playbook[]
-  ): Promise<Playbook | null> {
+  async getPlaybookCandidate(messages: Message[], playbooks: Playbook[]): Promise<Playbook | null> {
     if (playbooks.length === 0) {
       return null;
     }
@@ -36,7 +33,7 @@ export class RetrievalLayer {
           (p) =>
             `- ID: ${p.id}, Title: "${p.title}", Trigger: "${
               p.trigger
-            }", Description: "${p.description || "No description"}"`
+            }", Description: "${p.description || "No description"}"`,
         )
         .join("\n")}
 
@@ -81,15 +78,10 @@ export class RetrievalLayer {
     return playbooks.find((p) => p.id === topCandidate.id) || null;
   }
 
-  async getRelevantDocuments(
-    messages: Message[],
-    organizationId: string
-  ): Promise<Document[]> {
+  async getRelevantDocuments(messages: Message[], organizationId: string): Promise<Document[]> {
     try {
       // Get customer messages for context
-      const customerMessages = messages
-        .filter((msg) => msg.type === "Customer")
-        .slice(-3);
+      const customerMessages = messages.filter((msg) => msg.type === "Customer").slice(-3);
 
       if (customerMessages.length === 0) {
         return [];
@@ -110,7 +102,7 @@ export class RetrievalLayer {
       const searchResults = await vectorStoreService.search(
         organizationId,
         query,
-        5 // Get top 5 most relevant chunks
+        5, // Get top 5 most relevant chunks
       );
 
       if (!searchResults || searchResults.length === 0) {
@@ -118,9 +110,7 @@ export class RetrievalLayer {
       }
 
       // Filter out low relevance results
-      const filteredResults = searchResults.filter(
-        (result) => (result.similarity || 0) > 0.4
-      );
+      const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.4);
 
       console.log("[RetrievalLayer] Filtered results", filteredResults);
       console.log("[RetrievalLayer] Search results", searchResults);

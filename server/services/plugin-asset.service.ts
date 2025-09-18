@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs/promises';
-import { processManagerService } from './process-manager.service';
-import { pluginRegistryRepository } from '../repositories/plugin-registry.repository';
-import { pluginInstanceRepository } from '../repositories/plugin-instance.repository';
-import type { PublicAsset } from '../../plugins/base';
+import { Request, Response } from "express";
+import path from "path";
+import fs from "fs/promises";
+import { processManagerService } from "./process-manager.service";
+import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
+import type { PublicAsset } from "../../plugins/base";
 
 interface AssetCache {
   content: string | Buffer;
@@ -31,7 +31,12 @@ export class PluginAssetService {
       return [];
     }
 
-    const pluginDir = path.join(process.cwd(), '..', 'plugins', plugin.pluginId.replace('hay-plugin-', ''));
+    const pluginDir = path.join(
+      process.cwd(),
+      "..",
+      "plugins",
+      plugin.pluginId.replace("hay-plugin-", ""),
+    );
     const assets: PublicAsset[] = [];
 
     for (const assetDef of manifest.capabilities.chat_connector.publicAssets) {
@@ -39,7 +44,7 @@ export class PluginAssetService {
       try {
         const content = await fs.readFile(filePath);
         const contentType = this.getContentType(assetDef.type);
-        
+
         assets.push({
           path: assetDef.path,
           content,
@@ -47,7 +52,10 @@ export class PluginAssetService {
           cache: true,
         });
       } catch (error) {
-        console.error(`Failed to load asset ${assetDef.file} for plugin ${plugin.pluginId}:`, error);
+        console.error(
+          `Failed to load asset ${assetDef.file} for plugin ${plugin.pluginId}:`,
+          error,
+        );
       }
     }
 
@@ -64,24 +72,24 @@ export class PluginAssetService {
     // Check cache first
     if (this.assetCache.has(cacheKey)) {
       const cached = this.assetCache.get(cacheKey)!;
-      
+
       // Check if-none-match header for etag
-      if (req.headers['if-none-match'] === cached.etag) {
+      if (req.headers["if-none-match"] === cached.etag) {
         res.status(304).end();
         return;
       }
 
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('ETag', cached.etag);
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-      res.setHeader('Last-Modified', cached.lastModified.toUTCString());
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+      res.setHeader("Last-Modified", cached.lastModified.toUTCString());
       res.send(cached.content);
       return;
     }
 
     // Build path to plugin thumbnail (go up one level from server directory)
-    const pluginDir = path.join(process.cwd(), '..', 'plugins', pluginName);
-    const thumbnailPath = path.join(pluginDir, 'thumbnail.jpg');
+    const pluginDir = path.join(process.cwd(), "..", "plugins", pluginName);
+    const thumbnailPath = path.join(pluginDir, "thumbnail.jpg");
 
     try {
       const content = await fs.readFile(thumbnailPath);
@@ -91,31 +99,34 @@ export class PluginAssetService {
       // Cache the thumbnail
       this.assetCache.set(cacheKey, {
         content,
-        contentType: 'image/jpeg',
+        contentType: "image/jpeg",
         etag,
         lastModified,
       });
 
       // Set cache timeout (24 hours for thumbnails)
-      setTimeout(() => {
-        this.assetCache.delete(cacheKey);
-      }, 24 * 60 * 60 * 1000);
+      setTimeout(
+        () => {
+          this.assetCache.delete(cacheKey);
+        },
+        24 * 60 * 60 * 1000,
+      );
 
       // Check if-none-match header for etag
-      if (req.headers['if-none-match'] === etag) {
+      if (req.headers["if-none-match"] === etag) {
         res.status(304).end();
         return;
       }
 
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('ETag', etag);
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-      res.setHeader('Last-Modified', lastModified.toUTCString());
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+      res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
     } catch (error) {
       // If thumbnail doesn't exist, return 404
       console.warn(`Thumbnail not found for plugin ${pluginName}:`, error);
-      res.status(404).json({ error: 'Thumbnail not found' });
+      res.status(404).json({ error: "Thumbnail not found" });
     }
   }
 
@@ -129,17 +140,17 @@ export class PluginAssetService {
     // Check cache first
     if (this.assetCache.has(cacheKey)) {
       const cached = this.assetCache.get(cacheKey)!;
-      
+
       // Check if-none-match header for etag
-      if (req.headers['if-none-match'] === cached.etag) {
+      if (req.headers["if-none-match"] === cached.etag) {
         res.status(304).end();
         return;
       }
 
-      res.setHeader('Content-Type', cached.contentType);
-      res.setHeader('ETag', cached.etag);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.setHeader('Last-Modified', cached.lastModified.toUTCString());
+      res.setHeader("Content-Type", cached.contentType);
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Last-Modified", cached.lastModified.toUTCString());
       res.send(cached.content);
       return;
     }
@@ -148,21 +159,26 @@ export class PluginAssetService {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
 
     if (!plugin) {
-      res.status(404).json({ error: 'Plugin not found' });
+      res.status(404).json({ error: "Plugin not found" });
       return;
     }
 
     const manifest = plugin.manifest as any;
     const assetDef = manifest.capabilities?.chat_connector?.publicAssets?.find(
-      (a: any) => a.path === assetPath
+      (a: any) => a.path === assetPath,
     );
 
     if (!assetDef) {
-      res.status(404).json({ error: 'Asset not found' });
+      res.status(404).json({ error: "Asset not found" });
       return;
     }
 
-    const pluginDir = path.join(process.cwd(), '..', 'plugins', plugin.pluginId.replace('hay-plugin-', ''));
+    const pluginDir = path.join(
+      process.cwd(),
+      "..",
+      "plugins",
+      plugin.pluginId.replace("hay-plugin-", ""),
+    );
     const filePath = path.join(pluginDir, assetDef.file);
 
     try {
@@ -185,39 +201,33 @@ export class PluginAssetService {
       }, this.cacheTimeout);
 
       // Check if-none-match header for etag
-      if (req.headers['if-none-match'] === etag) {
+      if (req.headers["if-none-match"] === etag) {
         res.status(304).end();
         return;
       }
 
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('ETag', etag);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.setHeader('Last-Modified', lastModified.toUTCString());
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
     } catch (error) {
       console.error(`Failed to serve asset ${assetPath} for plugin ${pluginName}:`, error);
-      res.status(500).json({ error: 'Failed to load asset' });
+      res.status(500).json({ error: "Failed to load asset" });
     }
   }
 
   /**
    * Generate embed script for a plugin instance
    */
-  async generateEmbedScript(
-    organizationId: string, 
-    pluginId: string
-  ): Promise<string> {
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      organizationId,
-      pluginId
-    );
+  async generateEmbedScript(organizationId: string, pluginId: string): Promise<string> {
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
 
     if (!instance) {
-      throw new Error('Plugin instance not found');
+      throw new Error("Plugin instance not found");
     }
 
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
     const config = instance.config || {};
 
     const script = `
@@ -256,14 +266,14 @@ export class PluginAssetService {
    */
   private getContentType(type: string): string {
     switch (type) {
-      case 'script':
-        return 'application/javascript';
-      case 'stylesheet':
-        return 'text/css';
-      case 'image':
-        return 'image/png';
+      case "script":
+        return "application/javascript";
+      case "stylesheet":
+        return "text/css";
+      case "image":
+        return "image/png";
       default:
-        return 'application/octet-stream';
+        return "application/octet-stream";
     }
   }
 
@@ -271,10 +281,10 @@ export class PluginAssetService {
    * Generate ETag for content
    */
   private generateETag(content: Buffer | string): string {
-    const crypto = require('crypto');
-    const hash = crypto.createHash('md5');
+    const crypto = require("crypto");
+    const hash = crypto.createHash("md5");
     hash.update(content);
-    return `"${hash.digest('hex')}"`;
+    return `"${hash.digest("hex")}"`;
   }
 
   /**

@@ -1,20 +1,20 @@
 <template>
   <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
-    <TransitionGroup name="toast" tag="div">
+    <TransitionGroup name="toast"
+tag="div">
       <div
         v-for="toast in toasts"
         :key="toast.id"
         :class="[
           'px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300',
-          toastClasses[toast.type]
+          toastClasses[toast.type],
         ]"
       >
         <div class="flex items-center justify-between">
           <span>{{ toast.message }}</span>
           <button
-            @click="remove(toast.id)"
-            class="ml-4 text-white/80 hover:text-white"
-          >
+class="ml-4 text-white/80 hover:text-white" @click="remove(toast.id)"
+>
             <X class="h-4 w-4" />
           </button>
         </div>

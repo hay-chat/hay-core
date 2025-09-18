@@ -38,8 +38,7 @@ export class VectorStoreService {
     // Initialize OpenAI embeddings
     this.embeddings = new OpenAIEmbeddings({
       openAIApiKey: config.openai.apiKey,
-      modelName:
-        config.openai.models.embedding.model || "text-embedding-3-small",
+      modelName: config.openai.models.embedding.model || "text-embedding-3-small",
       dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
     });
 
@@ -70,13 +69,10 @@ export class VectorStoreService {
       ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
     };
 
-    this.vectorStore = await TypeORMVectorStore.fromDataSource(
-      this.embeddings,
-      {
-        postgresConnectionOptions,
-        tableName: "embeddings",
-      }
-    );
+    this.vectorStore = await TypeORMVectorStore.fromDataSource(this.embeddings, {
+      postgresConnectionOptions,
+      tableName: "embeddings",
+    });
 
     this._initialized = true;
   }
@@ -89,11 +85,7 @@ export class VectorStoreService {
    * @param chunks - Array of text chunks with optional metadata
    * @returns Array of embedding IDs
    */
-  async addChunks(
-    orgId: string,
-    docId: string | null,
-    chunks: VectorChunk[]
-  ): Promise<string[]> {
+  async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {
     if (!this.embeddings) {
       throw new Error("Embeddings not initialized.");
     }
@@ -140,11 +132,7 @@ export class VectorStoreService {
    * @param k - Number of results to return (default: 10)
    * @returns Array of search results with similarity scores
    */
-  async search(
-    orgId: string,
-    query: string,
-    k: number = 10
-  ): Promise<SearchResult[]> {
+  async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {
     if (!this.vectorStore) {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
@@ -194,7 +182,7 @@ export class VectorStoreService {
   async deleteByDocumentId(orgId: string, docId: string): Promise<number> {
     const result = await AppDataSource.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
-      [orgId, docId]
+      [orgId, docId],
     );
 
     return result[1]; // Returns affected row count
@@ -210,7 +198,7 @@ export class VectorStoreService {
   async deleteByOrganizationId(orgId: string): Promise<number> {
     const result = await AppDataSource.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1`,
-      [orgId]
+      [orgId],
     );
 
     return result[1]; // Returns affected row count
@@ -235,7 +223,7 @@ export class VectorStoreService {
       FROM embeddings
       WHERE "organization_id" = $1
     `,
-      [orgId]
+      [orgId],
     );
 
     const result = stats[0];
@@ -244,9 +232,7 @@ export class VectorStoreService {
       totalEmbeddings: result.totalEmbeddings || 0,
       totalDocuments: result.totalDocuments || 0,
       avgEmbeddingsPerDocument:
-        result.totalDocuments > 0
-          ? Math.round(result.totalEmbeddings / result.totalDocuments)
-          : 0,
+        result.totalDocuments > 0 ? Math.round(result.totalEmbeddings / result.totalDocuments) : 0,
     };
   }
 }

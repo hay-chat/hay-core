@@ -1,10 +1,6 @@
 import * as jwt from "jsonwebtoken";
 import { authConfig } from "@server/config/auth.config";
-import type {
-  JWTPayload,
-  RefreshTokenPayload,
-  AuthTokens,
-} from "@server/types/auth.types";
+import type { JWTPayload, RefreshTokenPayload, AuthTokens } from "@server/types/auth.types";
 import { User } from "@server/entities/user.entity";
 
 /**
@@ -24,20 +20,14 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
 
   const refreshPayload: RefreshTokenPayload = {
     ...payload,
-    sessionId:
-      sessionId ||
-      `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+    sessionId: sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
   };
 
   const refreshSignOptions: any = {
     expiresIn: authConfig.jwt.refreshExpiresIn,
     algorithm: authConfig.jwt.algorithm,
   };
-  const refreshToken = jwt.sign(
-    refreshPayload,
-    authConfig.jwt.secret,
-    refreshSignOptions
-  );
+  const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.secret, refreshSignOptions);
 
   // Calculate expiration time in seconds
   const expiresIn =
@@ -93,9 +83,7 @@ export function decodeToken<T = JWTPayload>(token: string): T | null {
 /**
  * Generate a new access token from a refresh token
  */
-export async function refreshAccessToken(
-  refreshToken: string
-): Promise<string> {
+export async function refreshAccessToken(refreshToken: string): Promise<string> {
   const payload = verifyRefreshToken(refreshToken);
 
   const newPayload: JWTPayload = {

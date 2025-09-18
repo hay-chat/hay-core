@@ -1,14 +1,11 @@
 <template>
-  <div v-if="organization" class="space-y-8">
+  <div v-if="organization"
+class="space-y-8">
     <!-- Organization Header -->
     <div class="bg-background border rounded-lg p-6">
-      <div
-        class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
-      >
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div class="flex items-start space-x-4">
-          <div
-            class="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center"
-          >
+          <div class="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center">
             <Building2 class="h-8 w-8 text-primary" />
           </div>
           <div class="flex-1">
@@ -22,8 +19,8 @@
                   organization.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : organization.status === 'inactive'
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-red-100 text-red-800',
+                      ? 'bg-gray-100 text-gray-800'
+                      : 'bg-red-100 text-red-800',
                 ]"
               >
                 {{ organization.status }}
@@ -32,9 +29,7 @@
             <p class="mt-2 text-muted-foreground">
               {{ organization.description }}
             </p>
-            <div
-              class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground"
-            >
+            <div class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground">
               <span>Created {{ formatDate(organization.createdAt) }}</span>
               <span>•</span>
               <span>{{ organization.memberCount }} members</span>
@@ -44,14 +39,12 @@
           </div>
         </div>
         <div class="flex space-x-3">
-          <Button variant="outline" @click="editOrganization">
+          <Button variant="outline"
+@click="editOrganization">
             <Settings class="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button
-            v-if="organization.id !== currentOrganization?.id"
-            @click="switchToOrganization"
-          >
+          <Button v-if="organization.id !== currentOrganization?.id" @click="switchToOrganization">
             <Building2 class="mr-2 h-4 w-4" />
             Switch To
           </Button>
@@ -73,7 +66,8 @@
           ]"
           @click="activeTab = tab.id"
         >
-          <component :is="tab.icon" class="mr-2 h-4 w-4 inline" />
+          <component :is="tab.icon"
+class="mr-2 h-4 w-4 inline" />
           {{ tab.name }}
         </button>
       </nav>
@@ -82,14 +76,13 @@
     <!-- Tab Content -->
     <div class="space-y-6">
       <!-- Overview Tab -->
-      <div v-if="activeTab === 'overview'" class="space-y-6">
+      <div v-if="activeTab === 'overview'"
+class="space-y-6">
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium">Total Members</CardTitle>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle class="text-sm font-medium"> Total Members </CardTitle>
               <Users class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -103,10 +96,8 @@
           </Card>
 
           <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium">Active Agents</CardTitle>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle class="text-sm font-medium"> Active Agents </CardTitle>
               <Bot class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -120,10 +111,8 @@
           </Card>
 
           <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium">Conversations</CardTitle>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle class="text-sm font-medium"> Conversations </CardTitle>
               <MessageSquare class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -137,16 +126,14 @@
           </Card>
 
           <Card>
-            <CardHeader
-              class="flex flex-row items-center justify-between space-y-0 pb-2"
-            >
-              <CardTitle class="text-sm font-medium">Storage Used</CardTitle>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle class="text-sm font-medium"> Storage Used </CardTitle>
               <HardDrive class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
-                {{ organization.storageUsed }}GB
-              </div>
+{{ organization.storageUsed }}GB
+</div>
               <p class="text-xs text-muted-foreground">
                 of {{ organization.storageLimit }}GB limit
               </p>
@@ -159,9 +146,7 @@
           <Card>
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
-              <CardDescription
-                >Latest updates in this organization</CardDescription
-              >
+              <CardDescription> Latest updates in this organization </CardDescription>
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
@@ -178,10 +163,10 @@
                         activity.type === 'success'
                           ? 'text-green-500'
                           : activity.type === 'warning'
-                          ? 'text-yellow-500'
-                          : activity.type === 'error'
-                          ? 'text-red-500'
-                          : 'text-blue-500',
+                            ? 'text-yellow-500'
+                            : activity.type === 'error'
+                              ? 'text-red-500'
+                              : 'text-blue-500',
                       ]"
                     />
                   </div>
@@ -220,11 +205,9 @@
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
-                        width: `${
-                          (organization.apiCalls / organization.apiLimit) * 100
-                        }%`,
+                        width: `${(organization.apiCalls / organization.apiLimit) * 100}%`,
                       }"
-                    ></div>
+                    />
                   </div>
                 </div>
 
@@ -232,42 +215,31 @@
                   <div class="flex items-center justify-between text-sm">
                     <span>Storage</span>
                     <span
-                      >{{ organization.storageUsed }}GB /
-                      {{ organization.storageLimit }}GB</span
+                      >{{ organization.storageUsed }}GB / {{ organization.storageLimit }}GB</span
                     >
                   </div>
                   <div class="mt-2 bg-background-tertiary rounded-full h-2">
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
-                        width: `${
-                          (organization.storageUsed /
-                            organization.storageLimit) *
-                          100
-                        }%`,
+                        width: `${(organization.storageUsed / organization.storageLimit) * 100}%`,
                       }"
-                    ></div>
+                    />
                   </div>
                 </div>
 
                 <div>
                   <div class="flex items-center justify-between text-sm">
                     <span>Active Agents</span>
-                    <span
-                      >{{ organization.agentCount }} /
-                      {{ organization.agentLimit }}</span
-                    >
+                    <span>{{ organization.agentCount }} / {{ organization.agentLimit }}</span>
                   </div>
                   <div class="mt-2 bg-background-tertiary rounded-full h-2">
                     <div
                       class="bg-primary h-2 rounded-full"
                       :style="{
-                        width: `${
-                          (organization.agentCount / organization.agentLimit) *
-                          100
-                        }%`,
+                        width: `${(organization.agentCount / organization.agentLimit) * 100}%`,
                       }"
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
@@ -277,15 +249,16 @@
       </div>
 
       <!-- Members Tab -->
-      <div v-if="activeTab === 'members'" class="space-y-6">
+      <div v-if="activeTab === 'members'"
+class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">
-              Organization Members
-            </h3>
+Organization Members
+</h3>
             <p class="text-sm text-muted-foreground">
-              Manage who has access to this organization
-            </p>
+Manage who has access to this organization
+</p>
           </div>
           <Button @click="inviteMember">
             <UserPlus class="mr-2 h-4 w-4" />
@@ -308,7 +281,9 @@
                     <User class="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p class="font-medium text-foreground">{{ member.name }}</p>
+                    <p class="font-medium text-foreground">
+                      {{ member.name }}
+                    </p>
                     <p class="text-sm text-muted-foreground">
                       {{ member.email }}
                     </p>
@@ -326,11 +301,7 @@
                       <option value="viewer">Viewer</option>
                     </select>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    @click="removeMember(member)"
-                  >
+                  <Button variant="ghost" size="sm" @click="removeMember(member)">
                     <X class="h-4 w-4" />
                   </Button>
                 </div>
@@ -341,17 +312,16 @@
       </div>
 
       <!-- Settings Tab -->
-      <div v-if="activeTab === 'settings'" class="space-y-6">
+      <div v-if="activeTab === 'settings'"
+class="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>General Settings</CardTitle>
-            <CardDescription
-              >Basic organization information and preferences</CardDescription
-            >
+            <CardDescription> Basic organization information and preferences </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
-              <Label htmlFor="orgName">Organization Name</Label>
+              <Label html-for="orgName">Organization Name</Label>
               <Input
                 id="orgName"
                 v-model="organizationForm.name"
@@ -359,7 +329,7 @@
               />
             </div>
             <div>
-              <Label htmlFor="orgDescription">Description</Label>
+              <Label html-for="orgDescription">Description</Label>
               <Input
                 id="orgDescription"
                 v-model="organizationForm.description"
@@ -367,7 +337,7 @@
               />
             </div>
             <div>
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label html-for="timezone">Timezone</Label>
               <select
                 id="timezone"
                 v-model="organizationForm.timezone"
@@ -380,7 +350,7 @@
               </select>
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSettings">Save Changes</Button>
+              <Button @click="saveSettings"> Save Changes </Button>
             </div>
           </CardContent>
         </Card>
@@ -388,18 +358,15 @@
         <Card>
           <CardHeader>
             <CardTitle>Security Settings</CardTitle>
-            <CardDescription
-              >Configure security policies for this
-              organization</CardDescription
-            >
+            <CardDescription> Configure security policies for this organization </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Two-Factor Authentication</p>
                 <p class="text-sm text-muted-foreground">
-                  Require 2FA for all members
-                </p>
+Require 2FA for all members
+</p>
               </div>
               <Checkbox v-model:checked="organizationForm.require2FA" />
             </div>
@@ -407,15 +374,13 @@
               <div>
                 <p class="font-medium">SSO Integration</p>
                 <p class="text-sm text-muted-foreground">
-                  Enable single sign-on
-                </p>
+Enable single sign-on
+</p>
               </div>
               <Checkbox v-model:checked="organizationForm.ssoEnabled" />
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSecuritySettings"
-                >Save Security Settings</Button
-              >
+              <Button @click="saveSecuritySettings"> Save Security Settings </Button>
             </div>
           </CardContent>
         </Card>
@@ -423,9 +388,7 @@
         <Card>
           <CardHeader>
             <CardTitle>API Keys</CardTitle>
-            <CardDescription
-              >Manage API keys for this organization</CardDescription
-            >
+            <CardDescription> Manage API keys for this organization </CardDescription>
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
@@ -433,15 +396,17 @@
                 <div>
                   <h4 class="font-medium">Primary API Key</h4>
                   <p class="text-sm text-muted-foreground">
-                    Used for API access
-                  </p>
+Used for API access
+</p>
                 </div>
                 <div class="flex space-x-2">
-                  <Button variant="outline" size="sm" @click="regenerateApiKey">
+                  <Button variant="outline"
+size="sm" @click="regenerateApiKey">
                     <RefreshCw class="mr-2 h-4 w-4" />
                     Regenerate
                   </Button>
-                  <Button variant="outline" size="sm" @click="copyApiKey">
+                  <Button variant="outline"
+size="sm" @click="copyApiKey">
                     <Copy class="mr-2 h-4 w-4" />
                     Copy
                   </Button>
@@ -458,41 +423,34 @@
   </div>
 
   <!-- Loading State -->
-  <div v-else-if="loading" class="space-y-8">
+  <div v-else-if="loading"
+class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
-        <div
-          class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse"
-        ></div>
+        <div class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse" />
         <div class="flex-1 space-y-2">
-          <div
-            class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse"
-          ></div>
-          <div
-            class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse"
-          ></div>
-          <div
-            class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse"
-          ></div>
+          <div class="h-6 bg-background-tertiary rounded w-1/3 animate-pulse" />
+          <div class="h-4 bg-background-tertiary rounded w-2/3 animate-pulse" />
+          <div class="h-3 bg-background-tertiary rounded w-1/2 animate-pulse" />
         </div>
       </div>
     </div>
   </div>
 
   <!-- Error State -->
-  <div v-else class="text-center py-12">
+  <div v-else
+class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">
-      Organization not found
-    </h3>
+Organization not found
+</h3>
     <p class="mt-2 text-sm text-muted-foreground">
-      The organization you're looking for doesn't exist or you don't have
-      permission to view it.
+      The organization you're looking for doesn't exist or you don't have permission to view it.
     </p>
     <div class="mt-6">
       <Button @click="router.push('/organizations')">
-        Back to Organizations
-      </Button>
+Back to Organizations
+</Button>
     </div>
   </div>
 </template>
@@ -648,8 +606,7 @@ const loadOrganization = async () => {
     organization.value = {
       id: organizationId,
       name: "Acme Corp",
-      description:
-        "Main business organization for customer support and sales automation",
+      description: "Main business organization for customer support and sales automation",
       status: "active",
       memberCount: 12,
       agentCount: 8,
@@ -789,7 +746,7 @@ useHead({
   title: computed(() =>
     organization.value
       ? `${organization.value.name} - Hay Dashboard`
-      : "Organization - Hay Dashboard"
+      : "Organization - Hay Dashboard",
   ),
   meta: [
     {

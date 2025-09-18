@@ -1,9 +1,11 @@
 <template>
-  <div class="flex flex-col space-y-1.5 p-6 pb-2">
+  <div class="flex flex-col space-y-1.5 p-6 card-header">
     <slot />
   </div>
 </template>
 
-<script setup lang="ts">
-// CardHeader component for consistent card header styling
-</script>
+<style lang="scss">
+.card-header + .card-content {
+  @apply pt-0;
+}
+</style>

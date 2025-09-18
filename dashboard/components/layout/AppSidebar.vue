@@ -58,7 +58,7 @@ const route = useRoute();
 const user = computed(() => {
   // If authenticated but missing user data, trigger logout
   if (authStore.isAuthenticated && authStore.isInitialized && !userStore.user?.id) {
-    console.log('[AppSidebar] Missing user data while authenticated, logging out');
+    console.log("[AppSidebar] Missing user data while authenticated, logging out");
     authStore.logout();
     return {
       name: "User",
@@ -69,9 +69,7 @@ const user = computed(() => {
 
   return {
     name: userStore.user
-      ? `${userStore.user.firstName || ""} ${
-          userStore.user.lastName || ""
-        }`.trim() || "User"
+      ? `${userStore.user.firstName || ""} ${userStore.user.lastName || ""}`.trim() || "User"
       : "User",
     email: userStore.user?.email || "user@example.com",
     avatar: "/avatars/user.jpg",

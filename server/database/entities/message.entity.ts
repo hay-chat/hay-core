@@ -94,6 +94,12 @@ export class Message {
     playbookTitle?: string;
     documentId?: string;
     documentTitle?: string;
+    isInactivityWarning?: boolean;
+    warningTimestamp?: string;
+    reason?: string;
+    inactivity_duration_ms?: number;
+    isClosureMessage?: boolean;
+    closureReason?: string;
   } | null;
 
   @Column({
@@ -133,17 +139,13 @@ export class Message {
   status!: MessageStatus;
 
   async saveIntent(intent: MessageIntent): Promise<Message | null> {
-    const { MessageRepository } = await import(
-      "../../repositories/message.repository"
-    );
+    const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, { intent });
   }
 
   async saveSentiment(sentiment: MessageSentiment): Promise<Message | null> {
-    const { MessageRepository } = await import(
-      "../../repositories/message.repository"
-    );
+    const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, { sentiment });
   }
@@ -152,9 +154,7 @@ export class Message {
     intent: MessageIntent;
     sentiment: MessageSentiment;
   }): Promise<Message | null> {
-    const { MessageRepository } = await import(
-      "../../repositories/message.repository"
-    );
+    const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, {
       intent: perception.intent,

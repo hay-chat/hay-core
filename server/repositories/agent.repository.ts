@@ -44,11 +44,7 @@ export class AgentRepository {
     });
   }
 
-  async update(
-    id: string,
-    organizationId: string,
-    data: Partial<Agent>
-  ): Promise<Agent | null> {
+  async update(id: string, organizationId: string, data: Partial<Agent>): Promise<Agent | null> {
     const agent = await this.findById(id);
     if (!agent || agent.organization_id !== organizationId) {
       return null;

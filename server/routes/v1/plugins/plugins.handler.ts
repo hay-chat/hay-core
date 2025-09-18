@@ -5,6 +5,7 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
+import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
 /**
@@ -121,7 +122,7 @@ export const enablePlugin = authenticatedProcedure
       console.log(`🚀 [HAY] Enabling ${plugin.name} for organization...`);
       const instance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
-        plugin.id,
+        input.pluginId,
         input.configuration || {}
       );
       
@@ -169,7 +170,7 @@ export const disablePlugin = authenticatedProcedure
     
     await pluginInstanceRepository.disablePlugin(
       ctx.organizationId!,
-      plugin.id
+      input.pluginId
     );
     
     return {
@@ -193,31 +194,55 @@ export const configurePlugin = authenticatedProcedure
         message: `Plugin ${input.pluginId} not found`,
       });
     }
-    
+
+    const manifest = plugin.manifest as HayPluginManifest;
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
-      plugin.id
+      input.pluginId
     );
-    
+
+    // When updating configuration, we need to handle partial updates properly
+    let finalConfig = input.configuration;
+
+    if (instance && instance.config) {
+      // Get existing decrypted config
+      const existingDecrypted = decryptConfig(instance.config);
+
+      // Merge with new config, preserving non-updated encrypted fields
+      for (const [key, value] of Object.entries(input.configuration)) {
+        // If the value is masked (all asterisks), keep the existing value
+        if (typeof value === 'string' && /^\*+$/.test(value)) {
+          finalConfig[key] = existingDecrypted[key];
+        }
+      }
+
+      // Also preserve any fields not included in the update
+      for (const [key, value] of Object.entries(existingDecrypted)) {
+        if (!(key in finalConfig)) {
+          finalConfig[key] = value;
+        }
+      }
+    }
+
     if (!instance) {
       // Create new instance if it doesn't exist
       const newInstance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
-        plugin.id,
-        input.configuration
+        input.pluginId,
+        finalConfig
       );
-      
+
       return {
         success: true,
         instance: newInstance,
       };
     }
-    
-    await pluginInstanceRepository.updateConfig(instance.id, input.configuration);
-    
+
+    await pluginInstanceRepository.updateConfig(instance.id, finalConfig);
+
     return {
       success: true,
-      instance: { ...instance, config: input.configuration },
+      instance: { ...instance, config: finalConfig },
     };
   });
 
@@ -236,17 +261,18 @@ export const getPluginConfiguration = authenticatedProcedure
         message: `Plugin ${input.pluginId} not found`,
       });
     }
-    
+
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
-      plugin.id
+      input.pluginId
     );
-    
+
+    const manifest = plugin.manifest as HayPluginManifest;
+
     if (!instance) {
       // Return default configuration from manifest
-      const manifest = plugin.manifest as HayPluginManifest;
       const defaultConfig: Record<string, any> = {};
-      
+
       if (manifest.configSchema) {
         Object.entries(manifest.configSchema).forEach(([key, field]) => {
           if (field.default !== undefined) {
@@ -254,15 +280,30 @@ export const getPluginConfiguration = authenticatedProcedure
           }
         });
       }
-      
+
       return {
         configuration: defaultConfig,
         enabled: false,
       };
     }
-    
+
+    // Decrypt the configuration but mask sensitive values for the UI
+    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+    const maskedConfig: Record<string, any> = {};
+
+    // Mask sensitive values for display
+    for (const [key, value] of Object.entries(decryptedConfig)) {
+      const schema = manifest.configSchema?.[key];
+      if (schema?.encrypted && value) {
+        // For encrypted fields, only show masked value
+        maskedConfig[key] = "*".repeat(8);
+      } else {
+        maskedConfig[key] = value;
+      }
+    }
+
     return {
-      configuration: instance.config || {},
+      configuration: maskedConfig,
       enabled: instance.enabled,
     };
   });

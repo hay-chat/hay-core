@@ -1,7 +1,7 @@
 export enum PlaybookStatus {
   DRAFT = "draft",
   ACTIVE = "active",
-  ARCHIVED = "archived"
+  ARCHIVED = "archived",
 }
 
 export interface Agent {

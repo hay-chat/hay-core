@@ -18,11 +18,13 @@
           <option value="90d">Last 90 days</option>
           <option value="custom">Custom Range</option>
         </select>
-        <Button variant="outline" size="sm" @click="exportReport">
+        <Button variant="outline"
+size="sm" @click="exportReport">
           <Download class="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="outline" size="sm" @click="refreshData">
+        <Button variant="outline"
+size="sm" @click="refreshData">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -32,9 +34,7 @@
     <!-- KPI Cards -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Total Conversations</span>
           <MessageSquare class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -51,9 +51,7 @@
       </Card>
 
       <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Resolution Rate</span>
           <CheckCircle class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -68,9 +66,7 @@
       </Card>
 
       <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Avg Response Time</span>
           <Clock class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -78,18 +74,14 @@
           <div class="text-2xl font-bold">{{ kpis.avgResponseTime }}s</div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingDown class="h-3 w-3 text-green-600" />
-            <span class="text-green-600"
-              >-{{ kpis.responseTimeImprovement }}%</span
-            >
+            <span class="text-green-600">-{{ kpis.responseTimeImprovement }}%</span>
             <span class="text-muted-foreground">vs last period</span>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader
-          class="flex flex-row items-center justify-between space-y-0 pb-2"
-        >
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Customer Satisfaction</span>
           <Heart class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -110,9 +102,7 @@
       <Card>
         <CardHeader>
           <CardTitle>Conversation Volume</CardTitle>
-          <CardDescription
-            >Messages and conversations over time</CardDescription
-          >
+          <CardDescription> Messages and conversations over time </CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -139,9 +129,7 @@
             class="h-80 flex items-center justify-center border-2 border-dashed border-muted rounded-lg"
           >
             <div class="text-center">
-              <TrendingUp
-                class="h-12 w-12 text-muted-foreground mx-auto mb-2"
-              />
+              <TrendingUp class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
               <p class="text-sm text-muted-foreground">
                 Resolution rate trend will be displayed here
               </p>
@@ -161,11 +149,7 @@
         </CardHeader>
         <CardContent>
           <div class="space-y-4">
-            <div
-              v-for="bucket in responseTimeBuckets"
-              :key="bucket.range"
-              class="space-y-2"
-            >
+            <div v-for="bucket in responseTimeBuckets" :key="bucket.range" class="space-y-2">
               <div class="flex items-center justify-between text-sm">
                 <span>{{ bucket.range }}</span>
                 <span class="font-medium">{{ bucket.percentage }}%</span>
@@ -174,7 +158,7 @@
                 <div
                   class="bg-primary h-2 rounded-full transition-all duration-300"
                   :style="{ width: `${bucket.percentage}%` }"
-                ></div>
+                />
               </div>
             </div>
           </div>
@@ -201,10 +185,12 @@
                   {{ index + 1 }}
                 </div>
                 <div>
-                  <div class="font-medium">{{ issue.topic }}</div>
-                  <div class="text-sm text-muted-foreground">
-                    {{ issue.count }} conversations
+                  <div class="font-medium">
+                    {{ issue.topic }}
                   </div>
+                  <div class="text-sm text-muted-foreground">
+{{ issue.count }} conversations
+</div>
                 </div>
               </div>
               <div class="text-right">
@@ -221,9 +207,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Agent Performance</CardTitle>
-        <CardDescription
-          >Individual agent metrics and statistics</CardDescription
-        >
+        <CardDescription> Individual agent metrics and statistics </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="overflow-x-auto">
@@ -234,8 +218,8 @@
                 <th class="text-left py-3 px-4 font-medium">Conversations</th>
                 <th class="text-left py-3 px-4 font-medium">Resolution Rate</th>
                 <th class="text-left py-3 px-4 font-medium">
-                  Avg Response Time
-                </th>
+Avg Response Time
+</th>
                 <th class="text-left py-3 px-4 font-medium">Satisfaction</th>
                 <th class="text-left py-3 px-4 font-medium">Status</th>
               </tr>
@@ -254,7 +238,9 @@
                       <Bot class="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <div class="font-medium">{{ agent.name }}</div>
+                      <div class="font-medium">
+                        {{ agent.name }}
+                      </div>
                       <div class="text-sm text-muted-foreground">
                         {{ agent.type }}
                       </div>
@@ -266,33 +252,27 @@
                     {{ formatNumber(agent.conversations) }}
                   </div>
                   <div class="text-sm text-muted-foreground">
-                    {{ agent.conversationsChange > 0 ? "+" : ""
-                    }}{{ agent.conversationsChange }}% change
+                    {{ agent.conversationsChange > 0 ? "+" : "" }}{{ agent.conversationsChange }}%
+                    change
                   </div>
                 </td>
                 <td class="py-3 px-4">
                   <div class="font-medium">{{ agent.resolutionRate }}%</div>
-                  <div
-                    class="w-full bg-background-tertiary rounded-full h-1 mt-1"
-                  >
+                  <div class="w-full bg-background-tertiary rounded-full h-1 mt-1">
                     <div
                       class="bg-green-500 h-1 rounded-full"
                       :style="{ width: `${agent.resolutionRate}%` }"
-                    ></div>
+                    />
                   </div>
                 </td>
                 <td class="py-3 px-4">
                   <div class="font-medium">{{ agent.avgResponseTime }}s</div>
                   <div
                     class="text-sm"
-                    :class="
-                      agent.responseTimeChange < 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    "
+                    :class="agent.responseTimeChange < 0 ? 'text-green-600' : 'text-red-600'"
                   >
-                    {{ agent.responseTimeChange > 0 ? "+" : ""
-                    }}{{ agent.responseTimeChange }}% change
+                    {{ agent.responseTimeChange > 0 ? "+" : "" }}{{ agent.responseTimeChange }}%
+                    change
                   </div>
                 </td>
                 <td class="py-3 px-4">
@@ -302,11 +282,7 @@
                   </div>
                 </td>
                 <td class="py-3 px-4">
-                  <Badge
-                    :variant="
-                      agent.status === 'active' ? 'success' : 'secondary'
-                    "
-                  >
+                  <Badge :variant="agent.status === 'active' ? 'success' : 'secondary'">
                     {{ agent.status }}
                   </Badge>
                 </td>
@@ -321,9 +297,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Channel Performance</CardTitle>
-        <CardDescription
-          >Performance metrics across different channels</CardDescription
-        >
+        <CardDescription> Performance metrics across different channels </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -333,15 +307,16 @@
             class="p-4 border rounded-lg"
           >
             <div class="flex items-center space-x-3 mb-3">
-              <component :is="channel.icon" class="h-5 w-5 text-primary" />
-              <h3 class="font-medium">{{ channel.name }}</h3>
+              <component :is="channel.icon"
+class="h-5 w-5 text-primary" />
+              <h3 class="font-medium">
+                {{ channel.name }}
+              </h3>
             </div>
             <div class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Messages:</span>
-                <span class="font-medium">{{
-                  formatNumber(channel.messages)
-                }}</span>
+                <span class="font-medium">{{ formatNumber(channel.messages) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-muted-foreground">Resolution:</span>
@@ -391,12 +366,12 @@ const Badge = ({ variant = "default", ...props }) =>
       variant === "outline"
         ? "border border-gray-300 text-gray-700"
         : variant === "secondary"
-        ? "bg-blue-100 text-blue-800"
-        : variant === "destructive"
-        ? "bg-red-100 text-red-800"
-        : variant === "success"
-        ? "bg-green-100 text-green-800"
-        : "bg-gray-100 text-gray-800"
+          ? "bg-blue-100 text-blue-800"
+          : variant === "destructive"
+            ? "bg-red-100 text-red-800"
+            : variant === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
     }`,
     ...props,
   });

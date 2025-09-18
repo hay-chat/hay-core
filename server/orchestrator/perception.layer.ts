@@ -1,8 +1,4 @@
-import {
-  Message,
-  MessageIntent,
-  MessageSentiment,
-} from "@server/database/entities/message.entity";
+import { Message, MessageIntent, MessageSentiment } from "@server/database/entities/message.entity";
 import { Agent } from "@server/database/entities/agent.entity";
 import { LLMService } from "../services/core/llm.service";
 
@@ -63,17 +59,14 @@ User message: "${message.content}"`;
     return JSON.parse(perception) as Perception;
   }
 
-  async getAgentCandidate(
-    message: Message,
-    agents: Agent[]
-  ): Promise<Agent | null> {
+  async getAgentCandidate(message: Message, agents: Agent[]): Promise<Agent | null> {
     if (agents.length === 0) {
       return null;
     }
 
     // Filter agents that have triggers defined
     const agentsWithTriggers = agents.filter(
-      (agent) => agent.trigger && agent.trigger.trim().length > 0
+      (agent) => agent.trigger && agent.trigger.trim().length > 0,
     );
 
     if (agentsWithTriggers.length === 0) {
@@ -92,7 +85,7 @@ ${agentsWithTriggers
     (a) =>
       `- ID: ${a.id}, Name: "${a.name}", Trigger: "${
         a.trigger
-      }", Description: "${a.description || "No description"}"`
+      }", Description: "${a.description || "No description"}"`,
   )
   .join("\n")}
 

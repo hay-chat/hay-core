@@ -36,7 +36,7 @@ export const useAppStore = defineStore("app", {
     pluginsLastUpdated: null,
     pluginsLoading: false,
   }),
-  
+
   getters: {
     shouldRefreshCount: (state) => {
       if (!state.lastUpdated) return true;
@@ -46,11 +46,11 @@ export const useAppStore = defineStore("app", {
     },
 
     enabledPlugins: (state): Plugin[] => {
-      return state.plugins.filter(plugin => plugin.enabled);
+      return state.plugins.filter((plugin) => plugin.enabled);
     },
-    
+
     availablePlugins: (state): Plugin[] => {
-      return state.plugins.filter(plugin => !plugin.enabled);
+      return state.plugins.filter((plugin) => !plugin.enabled);
     },
 
     shouldRefreshPlugins: (state) => {
@@ -60,16 +60,18 @@ export const useAppStore = defineStore("app", {
       return Date.now() - state.pluginsLastUpdated > fiveMinutes;
     },
 
-    getPluginById: (state) => (id: string): Plugin | undefined => {
-      return state.plugins.find(plugin => plugin.id === id);
-    }
+    getPluginById:
+      (state) =>
+      (id: string): Plugin | undefined => {
+        return state.plugins.find((plugin) => plugin.id === id);
+      },
   },
 
   actions: {
     async fetchOpenConversationsCount() {
       try {
         this.isLoading = true;
-        
+
         const result = await Hay.conversations.list.query({
           filters: { status: "open" },
           pagination: { page: 1, limit: 1 }, // We only need the count, not the data
@@ -77,7 +79,7 @@ export const useAppStore = defineStore("app", {
 
         this.openConversationsCount = result.pagination.total;
         this.lastUpdated = Date.now();
-        
+
         return this.openConversationsCount;
       } catch (error) {
         console.error("[AppStore] Failed to fetch conversations count:", error);
@@ -171,7 +173,7 @@ export const useAppStore = defineStore("app", {
 
     // Method to manually update plugin status without full refresh
     updatePluginStatus(pluginId: string, enabled: boolean) {
-      const plugin = this.plugins.find(p => p.id === pluginId);
+      const plugin = this.plugins.find((p) => p.id === pluginId);
       if (plugin) {
         plugin.enabled = enabled;
         this.pluginsLastUpdated = Date.now();

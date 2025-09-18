@@ -11,7 +11,7 @@ export class MessageService {
 
   async saveSystemMessage(
     conversation: Conversation,
-    systemMessage: Partial<Message>
+    systemMessage: Partial<Message>,
   ): Promise<Message> {
     return await this.messageRepository.create({
       conversation_id: conversation.id,
@@ -19,7 +19,7 @@ export class MessageService {
       type: MessageType.SYSTEM,
       sender: "system",
       metadata: systemMessage.metadata || {},
-      usage_metadata: null
+      usage_metadata: null,
     });
   }
 
@@ -28,9 +28,9 @@ export class MessageService {
     toolCall: any,
     toolResult: any,
     success: boolean = true,
-    latencyMs: number = 0
+    latencyMs: number = 0,
   ): Promise<Message> {
-    const content = success 
+    const content = success
       ? `Tool "${toolCall.name}" executed successfully`
       : `Tool "${toolCall.name}" failed`;
 
@@ -41,9 +41,9 @@ export class MessageService {
       sender: "system",
       metadata: {
         latency_ms: latencyMs,
-        ...(toolResult as any)
+        ...(toolResult as any),
       } as any,
-      usage_metadata: null
+      usage_metadata: null,
     });
   }
 
@@ -51,7 +51,7 @@ export class MessageService {
     conversation: Conversation,
     content: string,
     metadata: any = {},
-    usageMetadata: any = null
+    usageMetadata: any = null,
   ): Promise<Message> {
     return await this.messageRepository.create({
       conversation_id: conversation.id,
@@ -59,7 +59,7 @@ export class MessageService {
       type: MessageType.BOT_AGENT,
       sender: "assistant",
       metadata,
-      usage_metadata: usageMetadata
+      usage_metadata: usageMetadata,
     });
   }
 
@@ -77,42 +77,36 @@ export class MessageService {
   createAssistantResponse(
     content: string,
     metadata: any = {},
-    usageMetadata: any = null
+    usageMetadata: any = null,
   ): Partial<Message> {
     return {
       content,
       type: MessageType.BOT_AGENT,
       sender: "assistant",
       metadata,
-      usage_metadata: usageMetadata
+      usage_metadata: usageMetadata,
     };
   }
 
-  createToolCallResponse(
-    toolCall: any,
-    metadata: any = {}
-  ): Partial<Message> {
+  createToolCallResponse(toolCall: any, metadata: any = {}): Partial<Message> {
     return {
       content: JSON.stringify(toolCall),
       type: MessageType.TOOL_CALL,
       sender: "assistant",
       metadata: {
-        ...metadata
+        ...metadata,
       } as any,
-      usage_metadata: null
+      usage_metadata: null,
     };
   }
 
-  createSystemMessage(
-    content: string,
-    metadata: any = {}
-  ): Partial<Message> {
+  createSystemMessage(content: string, metadata: any = {}): Partial<Message> {
     return {
       content,
       type: MessageType.SYSTEM,
       sender: "system",
       metadata,
-      usage_metadata: null
+      usage_metadata: null,
     };
   }
 

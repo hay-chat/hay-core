@@ -38,20 +38,13 @@ export const useDomain = () => {
   /**
    * Generate URL for a organization subdomain
    */
-  const getOrganizationUrl = (
-    organization: string,
-    path: string = "/"
-  ): string => {
+  const getOrganizationUrl = (organization: string, path: string = "/"): string => {
     const baseDomain = config.public.baseDomain;
-    const protocol =
-      process.env["NODE_ENV"] === "development" ? "http" : "https";
+    const protocol = process.env["NODE_ENV"] === "development" ? "http" : "https";
 
     // In development, check if we're already on a proxied domain (no port in URL)
     const currentPort = process.client ? window.location.port : "";
-    const port =
-      process.env["NODE_ENV"] === "development" && currentPort
-        ? `:${currentPort}`
-        : "";
+    const port = process.env["NODE_ENV"] === "development" && currentPort ? `:${currentPort}` : "";
 
     return `${protocol}://${organization}.${baseDomain}${port}${path}`;
   };
@@ -61,15 +54,11 @@ export const useDomain = () => {
    */
   const getMainUrl = (path: string = "/"): string => {
     const baseDomain = config.public.baseDomain;
-    const protocol =
-      process.env["NODE_ENV"] === "development" ? "http" : "https";
+    const protocol = process.env["NODE_ENV"] === "development" ? "http" : "https";
 
     // In development, check if we're already on a proxied domain (no port in URL)
     const currentPort = process.client ? window.location.port : "";
-    const port =
-      process.env["NODE_ENV"] === "development" && currentPort
-        ? `:${currentPort}`
-        : "";
+    const port = process.env["NODE_ENV"] === "development" && currentPort ? `:${currentPort}` : "";
 
     return `${protocol}://${baseDomain}${port}${path}`;
   };

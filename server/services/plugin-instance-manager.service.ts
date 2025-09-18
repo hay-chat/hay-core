@@ -57,10 +57,7 @@ export class PluginInstanceManagerService {
    * Ensure a plugin instance is running for an organization
    * This is called on-demand when a plugin is needed
    */
-  async ensureInstanceRunning(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async ensureInstanceRunning(organizationId: string, pluginId: string): Promise<void> {
     const instanceKey = this.getInstanceKey(organizationId, pluginId);
 
     // Check if already starting (avoid duplicate startups)
@@ -80,9 +77,7 @@ export class PluginInstanceManagerService {
     const canStart = await this.canStartInstance(pluginId);
     if (!canStart) {
       // Queue the request or wait
-      console.log(
-        `⏳ Instance pool limit reached for ${pluginId}, queueing request`
-      );
+      console.log(`⏳ Instance pool limit reached for ${pluginId}, queueing request`);
       await this.waitForAvailableSlot(pluginId);
     }
 
@@ -100,23 +95,15 @@ export class PluginInstanceManagerService {
   /**
    * Start a plugin instance
    */
-  private async startInstance(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  private async startInstance(organizationId: string, pluginId: string): Promise<void> {
     try {
-      console.log(
-        `🚀 Starting plugin ${pluginId} for organization ${organizationId} on-demand`
-      );
+      console.log(`🚀 Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
 
       await processManagerService.startPlugin(organizationId, pluginId);
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
-      console.error(
-        `Failed to start plugin ${pluginId} for org ${organizationId}:`,
-        error
-      );
+      console.error(`Failed to start plugin ${pluginId} for org ${organizationId}:`, error);
       throw error;
     }
   }
@@ -124,10 +111,7 @@ export class PluginInstanceManagerService {
   /**
    * Update the last activity timestamp for an instance
    */
-  async updateActivityTimestamp(
-    organizationId: string,
-    pluginId: string
-  ): Promise<void> {
+  async updateActivityTimestamp(organizationId: string, pluginId: string): Promise<void> {
     const instanceKey = this.getInstanceKey(organizationId, pluginId);
     const now = getUTCNow();
 
@@ -135,10 +119,7 @@ export class PluginInstanceManagerService {
     this.instanceActivity.set(instanceKey, now);
 
     // Update database
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      organizationId,
-      pluginId
-    );
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
 
     if (instance) {
       await pluginInstanceRepository.update(instance.id, organizationId, {
@@ -152,18 +133,13 @@ export class PluginInstanceManagerService {
    */
   private async cleanupInactiveInstances(): Promise<void> {
     const now = getUTCNow();
-    const inactiveThreshold = new Date(
-      now.getTime() - this.INACTIVITY_TIMEOUT_MS
-    );
+    const inactiveThreshold = new Date(now.getTime() - this.INACTIVITY_TIMEOUT_MS);
 
     // Get all running instances
     const runningInstances = await pluginInstanceRepository.findRunningInstances();
 
     for (const instance of runningInstances) {
-      const instanceKey = this.getInstanceKey(
-        instance.organizationId,
-        instance.plugin.pluginId
-      );
+      const instanceKey = this.getInstanceKey(instance.organizationId, instance.plugin.pluginId);
 
       // Check in-memory activity first (more recent)
       const memoryActivity = this.instanceActivity.get(instanceKey);
@@ -171,28 +147,20 @@ export class PluginInstanceManagerService {
 
       if (!lastActivity || lastActivity < inactiveThreshold) {
         // Check if instance is actually running in process manager
-        if (
-          processManagerService.isRunning(
-            instance.organizationId,
-            instance.plugin.pluginId
-          )
-        ) {
+        if (processManagerService.isRunning(instance.organizationId, instance.plugin.pluginId)) {
           console.log(
-            `🛑 Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`
+            `🛑 Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
           try {
             await processManagerService.stopPlugin(
               instance.organizationId,
-              instance.plugin.pluginId
+              instance.plugin.pluginId,
             );
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
-            console.error(
-              `Error stopping inactive instance ${instanceKey}:`,
-              error
-            );
+            console.error(`Error stopping inactive instance ${instanceKey}:`, error);
           }
         }
       }
@@ -229,9 +197,7 @@ export class PluginInstanceManagerService {
       await new Promise((resolve) => setTimeout(resolve, checkInterval));
     }
 
-    throw new Error(
-      `Timeout waiting for available instance slot for plugin ${pluginId}`
-    );
+    throw new Error(`Timeout waiting for available instance slot for plugin ${pluginId}`);
   }
 
   /**
@@ -258,9 +224,7 @@ export class PluginInstanceManagerService {
    */
   private updatePoolStats(pluginId: string): void {
     const processes = processManagerService.getRunningProcesses();
-    const runningCount = processes.filter(
-      (p) => p.pluginName === pluginId
-    ).length;
+    const runningCount = processes.filter((p) => p.pluginName === pluginId).length;
 
     const stats = this.getPoolStats(pluginId);
     stats.runningCount = runningCount;
@@ -284,18 +248,12 @@ export class PluginInstanceManagerService {
   }> {
     const runningInstances = await pluginInstanceRepository.findRunningInstances();
     const now = getUTCNow();
-    const inactiveThreshold = new Date(
-      now.getTime() - this.INACTIVITY_TIMEOUT_MS
-    );
+    const inactiveThreshold = new Date(now.getTime() - this.INACTIVITY_TIMEOUT_MS);
 
     let totalInactive = 0;
     for (const instance of runningInstances) {
-      const instanceKey = this.getInstanceKey(
-        instance.organizationId,
-        instance.plugin.pluginId
-      );
-      const lastActivity =
-        this.instanceActivity.get(instanceKey) || instance.lastActivityAt;
+      const instanceKey = this.getInstanceKey(instance.organizationId, instance.plugin.pluginId);
+      const lastActivity = this.instanceActivity.get(instanceKey) || instance.lastActivityAt;
 
       if (!lastActivity || lastActivity < inactiveThreshold) {
         totalInactive++;
@@ -314,23 +272,13 @@ export class PluginInstanceManagerService {
    * Force stop all instances for an organization
    */
   async stopAllForOrganization(organizationId: string): Promise<void> {
-    const instances = await pluginInstanceRepository.findByOrganization(
-      organizationId
-    );
+    const instances = await pluginInstanceRepository.findByOrganization(organizationId);
 
     for (const instance of instances) {
-      if (
-        processManagerService.isRunning(organizationId, instance.plugin.pluginId)
-      ) {
-        await processManagerService.stopPlugin(
-          organizationId,
-          instance.plugin.pluginId
-        );
+      if (processManagerService.isRunning(organizationId, instance.plugin.pluginId)) {
+        await processManagerService.stopPlugin(organizationId, instance.plugin.pluginId);
 
-        const instanceKey = this.getInstanceKey(
-          organizationId,
-          instance.plugin.pluginId
-        );
+        const instanceKey = this.getInstanceKey(organizationId, instance.plugin.pluginId);
         this.instanceActivity.delete(instanceKey);
       }
     }
@@ -339,13 +287,8 @@ export class PluginInstanceManagerService {
   /**
    * Set priority for an organization's instances
    */
-  async setOrganizationPriority(
-    organizationId: string,
-    priority: number
-  ): Promise<void> {
-    const instances = await pluginInstanceRepository.findByOrganization(
-      organizationId
-    );
+  async setOrganizationPriority(organizationId: string, priority: number): Promise<void> {
+    const instances = await pluginInstanceRepository.findByOrganization(organizationId);
 
     for (const instance of instances) {
       await pluginInstanceRepository.update(instance.id, organizationId, { priority });

@@ -25,13 +25,12 @@ export class ConversationService {
       metadata?: Record<string, any>;
       status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
       customer_id?: string | null;
-    }
+    },
   ): Promise<Conversation> {
     // If no customer_id is provided, create an anonymous customer
     let customerId = data.customer_id;
     if (!customerId) {
-      const anonymousCustomer =
-        await this.customerService.createAnonymousCustomer(organizationId);
+      const anonymousCustomer = await this.customerService.createAnonymousCustomer(organizationId);
       customerId = anonymousCustomer.id;
     }
 
@@ -52,19 +51,13 @@ export class ConversationService {
     return await this.conversationRepository.findByOrganization(organizationId);
   }
 
-  async getConversationsByAgent(
-    organizationId: string,
-    agentId: string
-  ): Promise<Conversation[]> {
-    return await this.conversationRepository.findByAgent(
-      agentId,
-      organizationId
-    );
+  async getConversationsByAgent(organizationId: string, agentId: string): Promise<Conversation[]> {
+    return await this.conversationRepository.findByAgent(agentId, organizationId);
   }
 
   async getConversation(
     conversationId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<Conversation | null> {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
@@ -95,28 +88,18 @@ export class ConversationService {
       };
       playbook_id?: string | null;
       orchestration_status?: Record<string, any> | null;
-    }
+    },
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved
     const updateData = { ...data };
     if (data.status === "closed" || data.status === "resolved") {
       updateData.closed_at = getUTCNow();
     }
-    return await this.conversationRepository.update(
-      conversationId,
-      organizationId,
-      updateData
-    );
+    return await this.conversationRepository.update(conversationId, organizationId, updateData);
   }
 
-  async deleteConversation(
-    organizationId: string,
-    conversationId: string
-  ): Promise<boolean> {
-    return await this.conversationRepository.delete(
-      conversationId,
-      organizationId
-    );
+  async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {
+    return await this.conversationRepository.delete(conversationId, organizationId);
   }
 
   async addMessage(
@@ -128,7 +111,7 @@ export class ConversationService {
       sender?: string;
       usage_metadata?: Record<string, any>;
       metadata?: Record<string, any>;
-    }
+    },
   ): Promise<Message> {
     return await this.messageRepository.create({
       conversation_id: conversationId,
@@ -146,7 +129,7 @@ export class ConversationService {
       content: string;
       type: MessageType;
       usage_metadata?: Record<string, any>;
-    }>
+    }>,
   ): Promise<Message[]> {
     const messagesToCreate = messages.map((msg) => ({
       conversation_id: conversationId,
@@ -165,12 +148,9 @@ export class ConversationService {
   async getLastMessages(
     conversationId: string,
     organizationId: string,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<Message[]> {
-    const messages = await this.messageRepository.getLastMessages(
-      conversationId,
-      limit
-    );
+    const messages = await this.messageRepository.getLastMessages(conversationId, limit);
     return messages.reverse();
   }
 
@@ -178,13 +158,13 @@ export class ConversationService {
     organizationId: string,
     days: number = 30,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<Array<{ date: string; count: number; label: string }>> {
     return await this.conversationRepository.getDailyStats(
       organizationId,
       days,
       startDate,
-      endDate
+      endDate,
     );
   }
 }
