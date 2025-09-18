@@ -47,7 +47,7 @@ export const documentsRouter = t.router({
 
       const documents =
         documentIds.length > 0
-          ? (await Promise.all(documentIds.map((id) => documentRepository.findById(id)))).filter(
+          ? (await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))).filter(
               (doc) => doc && doc.organizationId === ctx.organizationId,
             )
           : [];
@@ -451,8 +451,13 @@ export const documentsRouter = t.router({
         throw new Error("Organization ID is required");
       }
 
-      // Filter selected pages
-      const selectedPages = input.pages.filter((p) => p.selected);
+      // Filter selected pages and add discoveredAt
+      const selectedPages = input.pages
+        .filter((p) => p.selected)
+        .map((p) => ({
+          ...p,
+          discoveredAt: new Date(),
+        }));
 
       if (selectedPages.length === 0) {
         throw new Error("No pages selected for import");
@@ -600,13 +605,13 @@ async function processWebImport(
 
       // Create document
       const document = await documentRepository.create({
-        title: page.title || metadata?.title || "Untitled",
+        title: page.title || (metadata?.title as string) || "Untitled",
         content: processed.content,
-        type: metadata?.type || DocumentationType.ARTICLE,
-        status: metadata?.status || DocumentationStatus.PUBLISHED,
-        visibility: metadata?.visibility || DocumentVisibility.PRIVATE,
-        tags: metadata?.tags,
-        categories: metadata?.categories,
+        type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
+        status: (metadata?.status as DocumentationStatus) || DocumentationStatus.PUBLISHED,
+        visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
+        tags: metadata?.tags as string[] | undefined,
+        categories: metadata?.categories as string[] | undefined,
         importMethod: ImportMethod.WEB,
         sourceUrl: page.url,
         lastCrawledAt: page.crawledAt,
@@ -701,7 +706,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
             progress: {
               status: "discovering",
               pagesFound: progress.found,
-              pagesProcessed: progress.processed,
+              pagesProcessed: 0, // No pages processed during discovery
               totalEstimated: progress.total,
               currentUrl: progress.currentUrl,
               discoveredPages: discoveredPages,
@@ -763,6 +768,9 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     const htmlProcessor = new HtmlProcessor();
 
     // Scrape the single URL
+    if (!document.sourceUrl) {
+      throw new Error("Document has no source URL to recrawl");
+    }
     const pages = await scraper.scrapeWebsite(document.sourceUrl);
 
     if (pages.length === 0) {

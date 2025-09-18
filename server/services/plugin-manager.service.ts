@@ -135,7 +135,7 @@ export class PluginManagerService {
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
-        manifest: manifest as unknown as Record<string, unknown>,
+        manifest: manifest as any,
         checksum,
       });
 

@@ -92,7 +92,7 @@ export class PluginRouteService {
         }
 
         if (
-          !this.verifySignature(req.body, signature, webhookSecret, webhookConfig.signatureHeader)
+          !this.verifySignature(req.body, signature, webhookSecret as string, webhookConfig.signatureHeader)
         ) {
           res.status(401).json({ error: "Invalid signature" });
           return;

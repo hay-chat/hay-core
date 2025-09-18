@@ -190,7 +190,7 @@ export class Conversation {
 
       // Extract tool schemas from all plugins
       for (const plugin of allPlugins) {
-        const manifest = plugin.manifest as Record<string, unknown>;
+        const manifest = plugin.manifest as any;
         if (manifest?.capabilities?.mcp?.tools) {
           toolSchemas.push(...manifest.capabilities.mcp.tools);
         }
@@ -236,15 +236,15 @@ The following tools are available for you to use. You MUST return only valid JSO
 
         if (toolSchema) {
           // Add tool ID to enabled_tools list
-          if (!enabledToolIds.includes(toolSchema.name)) {
-            enabledToolIds.push(toolSchema.name);
+          if (!enabledToolIds.includes(toolSchema.name as string)) {
+            enabledToolIds.push(toolSchema.name as string);
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
-          const inputSchema = toolSchema.input_schema || toolSchema.parameters || {};
+          const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
           const requiredFields =
-            inputSchema.required && inputSchema.required.length > 0
-              ? ` (Required: ${inputSchema.required.join(", ")})`
+            inputSchema.required && Array.isArray(inputSchema.required) && inputSchema.required.length > 0
+              ? ` (Required: ${(inputSchema.required as string[]).join(", ")})`
               : "";
 
           return `- **${actionName}**: ${

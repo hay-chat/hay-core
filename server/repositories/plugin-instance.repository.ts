@@ -68,13 +68,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       updates.lastError = error;
     }
 
-    await this.getRepository().update(id, updates);
+    await this.getRepository().update(id, updates as any);
   }
 
   async updateProcessId(id: string, processId: string | null): Promise<void> {
     await this.getRepository().update(id, {
       processId: processId || undefined,
-    });
+    } as any);
   }
 
   async updateConfig(id: string, config: Record<string, unknown>): Promise<void> {
@@ -94,7 +94,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // Encrypt sensitive fields before storing
     const encryptedConfig = encryptConfig(config, configSchema);
 
-    await this.getRepository().update(id, { config: encryptedConfig });
+    await this.getRepository().update(id, { config: encryptedConfig } as any);
   }
 
   async incrementRestartCount(id: string): Promise<void> {
@@ -104,7 +104,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async updateHealthCheck(id: string): Promise<void> {
     await this.getRepository().update(id, {
       lastHealthCheck: new Date(),
-    });
+    } as any);
   }
 
   async upsertInstance(
@@ -134,7 +134,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       await this.getRepository().update(existing.id, {
         ...data,
         updatedAt: new Date(),
-      });
+      } as any);
       return (await this.findById(existing.id))!;
     } else {
       const entity = this.getRepository().create({

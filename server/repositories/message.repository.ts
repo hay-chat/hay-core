@@ -58,7 +58,7 @@ export class MessageRepository {
   }
 
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
-    await this.getRepository().update(id, data);
+    await this.getRepository().update(id, data as any);
     return await this.findById(id);
   }
 

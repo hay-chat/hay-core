@@ -1,5 +1,6 @@
 import { CustomerRepository } from "../repositories/customer.repository";
-import { Customer, ExternalMetadata } from "../database/entities/customer.entity";
+import { Customer } from "../database/entities/customer.entity";
+import type { ExternalMetadata } from "../database/entities/customer.entity";
 
 export class CustomerService {
   private customerRepository: CustomerRepository;

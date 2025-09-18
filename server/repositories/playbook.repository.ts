@@ -79,7 +79,7 @@ export class PlaybookRepository {
     // not when the playbook itself is updated. See conversation.entity.ts updatePlaybook method.
 
     if (Object.keys(data).length > 0) {
-      await this.getRepository().update({ id, organization_id: organizationId }, data);
+      await this.getRepository().update({ id, organization_id: organizationId }, data as any);
     }
 
     return await this.findById(id);

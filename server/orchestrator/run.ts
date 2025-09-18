@@ -152,9 +152,9 @@ export const runConversation = async (conversationId: string) => {
         toolLog: [],
       };
       await conversationRepository.updateById(conversation.id, {
-        orchestration_status: initialContext,
+        orchestration_status: initialContext as any,
       });
-      conversation.orchestration_status = initialContext;
+      conversation.orchestration_status = initialContext as any;
     }
 
     // 04. Execution - Handle iterative execution with tool calls

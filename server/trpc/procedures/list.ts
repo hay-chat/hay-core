@@ -58,7 +58,7 @@ export function createSimpleListProcedure<TEntity extends ObjectLiteral>(
   return authenticatedProcedure.input(z.object({}).optional()).query(async ({ ctx }) => {
     // Use simple find for basic listing
     const items = await repository.findByOrganization(ctx.organizationId!, {
-      order: { created_at: "DESC" },
+      order: { created_at: "DESC" } as any,
     });
 
     return {

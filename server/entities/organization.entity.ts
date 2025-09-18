@@ -89,7 +89,7 @@ export class Organization extends BaseEntity {
     return new Date() > this.trialEndsAt;
   }
 
-  toJSON(): Omit<Organization, "users" | "documents" | "apiKeys" | "jobs"> {
+  toJSON(): any {
     const {
       users: _users,
       documents: _documents,

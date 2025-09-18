@@ -395,7 +395,7 @@ export class ProcessManagerService {
     }
 
     // For MCP communication, we expect the payload to be a JSON-RPC request
-    const request = payload; // The payload should already be the JSON-RPC request
+    const request = payload as any; // The payload should already be the JSON-RPC request
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {

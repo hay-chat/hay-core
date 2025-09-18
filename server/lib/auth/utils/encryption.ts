@@ -126,10 +126,10 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
   const decrypted: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(config)) {
-    if (value && typeof value === "object" && value.encrypted) {
+    if (value && typeof value === "object" && (value as any).encrypted) {
       // Decrypt encrypted values
       try {
-        decrypted[key] = decryptValue(value.value);
+        decrypted[key] = decryptValue((value as any).value);
       } catch (error) {
         console.error(`Failed to decrypt config key ${key}:`, error);
         decrypted[key] = null;
@@ -147,7 +147,7 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
  * Check if a value is encrypted
  */
 export function isEncrypted(value: unknown): value is EncryptedValue {
-  return value && typeof value === "object" && value.encrypted === true;
+  return !!(value && typeof value === "object" && (value as any).encrypted === true);
 }
 
 /**

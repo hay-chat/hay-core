@@ -121,11 +121,11 @@ import { HayApi } from "@/utils/api";
 interface Agent {
   id: string;
   name: string;
-  description?: string;
-  instructions?: string;
-  tone?: string;
-  avoid?: string;
-  trigger?: string;
+  description?: string | null;
+  instructions?: string | null;
+  tone?: string | null;
+  avoid?: string | null;
+  trigger?: string | null;
   enabled: boolean;
 }
 

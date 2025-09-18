@@ -50,7 +50,7 @@ export class AgentRepository {
       return null;
     }
 
-    await this.getRepository().update({ id, organization_id: organizationId }, data);
+    await this.getRepository().update({ id, organization_id: organizationId }, data as any);
 
     return await this.findById(id);
   }

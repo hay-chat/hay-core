@@ -1,5 +1,5 @@
-import { Repository, SelectQueryBuilder, DeepPartial, FindOptionsWhere } from "typeorm";
-import type { FindManyOptions, ObjectLiteral } from "typeorm";
+import { Repository, SelectQueryBuilder } from "typeorm";
+import type { FindManyOptions, ObjectLiteral, DeepPartial } from "typeorm";
 import { AppDataSource } from "../database/data-source";
 import type { ListParams } from "../trpc/middleware/pagination";
 import type { PaginatedResponse } from "../types/list-input";
@@ -206,13 +206,15 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
 
   async findById(id: string): Promise<T | null> {
     return await this.getRepository().findOne({
-      where: { id } as FindOptionsWhere<T>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      where: { id } as any,
     });
   }
 
   async update(id: string, organizationId: string, data: Partial<T>): Promise<T | null> {
     const result = await this.getRepository().update(
-      { id, organizationId } as FindOptionsWhere<T>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { id, organizationId } as any,
       data,
     );
 
@@ -227,7 +229,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     const result = await this.getRepository().delete({
       id,
       organizationId,
-    } as FindOptionsWhere<T>);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     return result.affected !== 0;
   }
@@ -237,7 +240,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   async findByOrganization(organizationId: string, options?: FindManyOptions<T>): Promise<T[]> {
     return await this.getRepository().find({
-      where: { organizationId } as FindOptionsWhere<T>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      where: { organizationId } as any,
       ...options,
     });
   }

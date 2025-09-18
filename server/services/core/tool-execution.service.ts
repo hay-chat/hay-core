@@ -98,7 +98,10 @@ export class ToolExecutionService {
 
           await this.messageService.saveToolMessage(
             conversation,
-            toolCall,
+            {
+              name: toolCall.tool_name,
+              args: toolCall.arguments,
+            },
             result,
             true,
             toolLogEntry.latencyMs,
@@ -106,7 +109,7 @@ export class ToolExecutionService {
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext,
+            orchestration_status: currentContext as any,
           });
 
           return { success: true, result };
@@ -119,7 +122,10 @@ export class ToolExecutionService {
 
           await this.messageService.saveToolMessage(
             conversation,
-            toolCall,
+            {
+              name: toolCall.tool_name,
+              args: toolCall.arguments,
+            },
             { error: err.message },
             false,
             toolLogEntry.latencyMs,
@@ -127,7 +133,7 @@ export class ToolExecutionService {
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext,
+            orchestration_status: currentContext as any,
           });
 
           return { success: false, error: err.message || "Unknown error" };
@@ -222,9 +228,12 @@ export class ToolExecutionService {
 
     // Validate tool arguments against input schema
     if (toolSchema.input_schema) {
-      const validation = this.validateToolArguments(toolArgs, toolSchema.input_schema);
-      if (!validation.valid) {
-        throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
+      // Ensure input_schema is an object before validation
+      if (typeof toolSchema.input_schema === 'object') {
+        const validation = this.validateToolArguments(toolArgs, toolSchema.input_schema as ToolSchema["inputSchema"]);
+        if (!validation.valid) {
+          throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
+        }
       }
     }
 
@@ -264,6 +273,10 @@ export class ToolExecutionService {
     schema: ToolSchema["inputSchema"],
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
+
+    if (!schema) {
+      return { valid: true, errors: [] };
+    }
 
     // Basic validation - check required properties
     if (schema.required && Array.isArray(schema.required)) {
@@ -352,11 +365,12 @@ export class ToolExecutionService {
 
       console.log(`[ToolExecution] MCP response received:`, JSON.stringify(result, null, 2));
 
-      if (result.error) {
-        throw new Error(`MCP tool error: ${result.error.message || result.error}`);
+      const mcpResult = result as any;
+      if (mcpResult.error) {
+        throw new Error(`MCP tool error: ${mcpResult.error.message || mcpResult.error}`);
       }
 
-      return result.result || result;
+      return mcpResult.result || mcpResult;
     } catch (error) {
       console.error(`[ToolExecution] MCP tool execution failed:`, error);
       throw error;

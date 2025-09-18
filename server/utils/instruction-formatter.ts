@@ -1,4 +1,4 @@
-import { InstructionItem } from "../database/entities/playbook.entity";
+import type { InstructionItem } from "../database/entities/playbook.entity";
 
 interface ParsedReference {
   type: "action" | "document";

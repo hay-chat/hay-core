@@ -36,7 +36,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       installed,
       installedAt: installed ? new Date() : undefined,
       lastInstallError: error,
-    });
+    } as any);
   }
 
   async updateBuildStatus(id: string, built: boolean, error?: string): Promise<void> {
@@ -44,11 +44,11 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       built,
       builtAt: built ? new Date() : undefined,
       lastBuildError: error,
-    });
+    } as any);
   }
 
   async updateChecksum(id: string, checksum: string): Promise<void> {
-    await this.getRepository().update(id, { checksum });
+    await this.getRepository().update(id, { checksum } as any);
   }
 
   async upsertPlugin(plugin: Partial<PluginRegistry>): Promise<PluginRegistry> {
@@ -58,7 +58,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       await this.getRepository().update(existing.id, {
         ...plugin,
         updatedAt: new Date(),
-      });
+      } as any);
       return (await this.getRepository().findOne({ where: { id: existing.id } }))!;
     } else {
       const entity = this.getRepository().create(plugin as PluginRegistry);

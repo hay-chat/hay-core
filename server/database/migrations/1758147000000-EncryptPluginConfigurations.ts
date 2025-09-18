@@ -21,7 +21,7 @@ export class EncryptPluginConfigurations1758147000000 implements MigrationInterf
         continue;
       }
 
-      const manifest = instance.manifest as Record<string, unknown>;
+      const manifest = instance.manifest as any;
       const configSchema = manifest?.configSchema || {};
 
       // Check if config is already encrypted
@@ -40,7 +40,7 @@ export class EncryptPluginConfigurations1758147000000 implements MigrationInterf
 
       if (needsEncryption) {
         // Encrypt the configuration
-        const encryptedConfig = encryptConfig(instance.config, configSchema);
+        const encryptedConfig = encryptConfig(instance.config, configSchema as any);
 
         // Update the database
         await queryRunner.query(`UPDATE plugin_instances SET config = $1 WHERE id = $2`, [

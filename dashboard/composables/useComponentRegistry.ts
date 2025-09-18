@@ -1,6 +1,6 @@
 // Component instance interface for rich input components
 interface ComponentInstance {
-  insertReference?: (type: string, item: Record<string, unknown>) => void;
+  insertReference?: (type: "action" | "document", item: any) => void;
   [key: string]: unknown;
 }
 

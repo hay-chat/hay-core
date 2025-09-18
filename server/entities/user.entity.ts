@@ -42,7 +42,7 @@ export class User extends BaseEntity {
   organization?: Organization;
 
   // Helper methods
-  toJSON(): Omit<User, "password"> {
+  toJSON(): any {
     const { password: _password, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }

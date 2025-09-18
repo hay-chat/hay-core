@@ -65,7 +65,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
       return null;
     }
 
-    await this.getLegacyRepository().update({ id, organization_id: organizationId }, data);
+    await this.getLegacyRepository().update({ id, organization_id: organizationId }, data as any);
 
     return await this.findById(id);
   }

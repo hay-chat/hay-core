@@ -13,7 +13,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   };
 
   const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn,
+    expiresIn: authConfig.jwt.expiresIn as any,
     algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
   };
   const accessToken = jwt.sign(payload, authConfig.jwt.secret, signOptions);
@@ -24,7 +24,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   };
 
   const refreshSignOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.refreshExpiresIn,
+    expiresIn: authConfig.jwt.refreshExpiresIn as any,
     algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
   };
   const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.secret, refreshSignOptions);
@@ -92,7 +92,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   };
 
   const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn,
+    expiresIn: authConfig.jwt.expiresIn as any,
     algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
   };
   return jwt.sign(newPayload, authConfig.jwt.secret, signOptions);

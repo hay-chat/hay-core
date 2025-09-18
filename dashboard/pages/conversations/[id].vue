@@ -342,9 +342,9 @@ interface Agent {
 
 interface ConversationData {
   id: string;
-  title?: string;
+  title?: string | null;
   status: string;
-  cooldown_until?: string;
+  cooldown_until?: string | null;
   created_at: string;
   updated_at: string;
   messages?: Message[];

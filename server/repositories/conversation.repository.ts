@@ -68,7 +68,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data);
+    await this.getRepository().update({ id }, data as any);
 
     return await this.findById(id);
   }
@@ -80,7 +80,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data);
+    await this.getRepository().update({ id }, data as any);
 
     return await this.findById(id);
   }

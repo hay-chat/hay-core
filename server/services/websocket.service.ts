@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
 import type { Message } from "../database/entities/message.entity";
+import { MessageType } from "../database/entities/message.entity";
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -146,7 +147,7 @@ export class WebSocketService {
 
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
-      client.organizationId = decoded.organizationId;
+      client.organizationId = decoded.organizationId || '';
       client.authenticated = true;
       return true;
     } catch (error) {
@@ -362,7 +363,7 @@ export class WebSocketService {
     const { conversationId } = message;
 
     // Load conversation with messages
-    const conversation = await conversationRepository.findById(conversationId);
+    const conversation = await conversationRepository.findById(conversationId as string);
     if (!conversation || conversation.organization_id !== client.organizationId) {
       return;
     }
@@ -374,7 +375,7 @@ export class WebSocketService {
         type: "history",
         messages: messages.map((msg: Message) => ({
           text: msg.content,
-          sender: msg.role === "user" ? "user" : "agent",
+          sender: msg.type === MessageType.CUSTOMER ? "user" : "agent",
           timestamp: msg.created_at,
           metadata: msg.metadata,
         })),
@@ -392,12 +393,12 @@ export class WebSocketService {
     const { conversationId } = message;
 
     // Add to conversation subscribers
-    if (!this.conversationClients.has(conversationId)) {
-      this.conversationClients.set(conversationId, new Set());
+    if (!this.conversationClients.has(conversationId as string)) {
+      this.conversationClients.set(conversationId as string, new Set());
     }
-    this.conversationClients.get(conversationId)!.add(clientId);
+    this.conversationClients.get(conversationId as string)!.add(clientId as string);
 
-    client.conversationId = conversationId;
+    client.conversationId = conversationId as string;
   }
 
   /**
