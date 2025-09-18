@@ -1,8 +1,7 @@
 <template>
   <Card>
     <CardHeader class="flex !flex-row items-center gap-2 pb-2">
-      <component :is="icon"
-class="h-4 w-4 text-muted-foreground" />
+      <component :is="icon" class="h-4 w-4 text-muted-foreground" />
       <div class="text-sm font-medium !mt-0">
         {{ title }}
       </div>
@@ -11,8 +10,7 @@ class="h-4 w-4 text-muted-foreground" />
       <div class="text-2xl font-bold">
         {{ formattedMetric }}
       </div>
-      <p v-if="subtitle"
-class="text-xs text-muted-foreground">
+      <p v-if="subtitle" class="text-xs text-muted-foreground">
         <span :class="subtitleClass">{{ subtitle }}</span>
         <span v-if="subtitleSuffix"> {{ subtitleSuffix }}</span>
       </p>
@@ -21,14 +19,14 @@ class="text-xs text-muted-foreground">
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, type Component } from "vue";
 import Card from "@/components/ui/Card.vue";
 import CardContent from "@/components/ui/CardContent.vue";
 import CardHeader from "@/components/ui/CardHeader.vue";
 
 interface Props {
   title: string;
-  icon: any;
+  icon: Component;
   metric: number | string;
   subtitle?: string;
   subtitleSuffix?: string;

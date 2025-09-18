@@ -1,6 +1,5 @@
 <template>
-  <div v-if="agent"
-class="space-y-8">
+  <div v-if="agent" class="space-y-8">
     <!-- Agent Header -->
     <div class="bg-background border rounded-lg p-6">
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -59,8 +58,7 @@ class="space-y-8">
             <Power class="mr-2 h-4 w-4" />
             {{ agent.status === "active" ? "Disable" : "Enable" }}
           </Button>
-          <Button variant="outline"
-@click="editAgent">
+          <Button variant="outline" @click="editAgent">
             <Settings class="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -86,8 +84,7 @@ class="space-y-8">
           ]"
           @click="activeTab = tab.id"
         >
-          <component :is="tab.icon"
-class="mr-2 h-4 w-4 inline" />
+          <component :is="tab.icon" class="mr-2 h-4 w-4 inline" />
           {{ tab.name }}
         </button>
       </nav>
@@ -96,8 +93,7 @@ class="mr-2 h-4 w-4 inline" />
     <!-- Tab Content -->
     <div class="space-y-6">
       <!-- Overview Tab -->
-      <div v-if="activeTab === 'overview'"
-class="space-y-6">
+      <div v-if="activeTab === 'overview'" class="space-y-6">
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
@@ -212,14 +208,11 @@ class="space-y-6">
       </div>
 
       <!-- Playbooks Tab -->
-      <div v-if="activeTab === 'playbooks'"
-class="space-y-6">
+      <div v-if="activeTab === 'playbooks'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">Agent Playbooks</h3>
-            <p class="text-sm text-muted-foreground">
-Automated workflows and response patterns
-</p>
+            <p class="text-sm text-muted-foreground">Automated workflows and response patterns</p>
           </div>
           <Button @click="createPlaybook">
             <Plus class="mr-2 h-4 w-4" />
@@ -300,20 +293,16 @@ Automated workflows and response patterns
       </div>
 
       <!-- Conversations Tab -->
-      <div v-if="activeTab === 'conversations'"
-class="space-y-6">
+      <div v-if="activeTab === 'conversations'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h3 class="text-lg font-medium text-foreground">
-All Conversations
-</h3>
+            <h3 class="text-lg font-medium text-foreground">All Conversations</h3>
             <p class="text-sm text-muted-foreground">
               Complete conversation history for this agent
             </p>
           </div>
           <div class="flex space-x-2">
-            <Button variant="outline"
-@click="exportConversations">
+            <Button variant="outline" @click="exportConversations">
               <Download class="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -381,12 +370,9 @@ All Conversations
       </div>
 
       <!-- Analytics Tab -->
-      <div v-if="activeTab === 'analytics'"
-class="space-y-6">
+      <div v-if="activeTab === 'analytics'" class="space-y-6">
         <div>
-          <h3 class="text-lg font-medium text-foreground">
-Performance Analytics
-</h3>
+          <h3 class="text-lg font-medium text-foreground">Performance Analytics</h3>
           <p class="text-sm text-muted-foreground">
             Detailed insights into agent performance and trends
           </p>
@@ -465,8 +451,7 @@ Performance Analytics
       </div>
 
       <!-- Settings Tab -->
-      <div v-if="activeTab === 'settings'"
-class="space-y-6">
+      <div v-if="activeTab === 'settings'" class="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Agent Configuration</CardTitle>
@@ -475,8 +460,7 @@ class="space-y-6">
           <CardContent class="space-y-4">
             <div>
               <Label html-for="agentName">Agent Name</Label>
-              <Input id="agentName"
-v-model="agentSettings.name" />
+              <Input id="agentName" v-model="agentSettings.name" />
             </div>
             <div>
               <Label html-for="agentDescription">Description</Label>
@@ -530,27 +514,21 @@ v-model="agentSettings.name" />
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Auto-escalation</p>
-                <p class="text-sm text-muted-foreground">
-Automatically escalate complex queries
-</p>
+                <p class="text-sm text-muted-foreground">Automatically escalate complex queries</p>
               </div>
               <Checkbox v-model:checked="agentSettings.autoEscalation" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Learning Mode</p>
-                <p class="text-sm text-muted-foreground">
-Continue learning from conversations
-</p>
+                <p class="text-sm text-muted-foreground">Continue learning from conversations</p>
               </div>
               <Checkbox v-model:checked="agentSettings.learningMode" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Real-time Analytics</p>
-                <p class="text-sm text-muted-foreground">
-Enable real-time performance tracking
-</p>
+                <p class="text-sm text-muted-foreground">Enable real-time performance tracking</p>
               </div>
               <Checkbox v-model:checked="agentSettings.realTimeAnalytics" />
             </div>
@@ -571,11 +549,7 @@ Enable real-time performance tracking
                   Permanently delete this agent and all its data
                 </p>
               </div>
-              <Button variant="destructive"
-@click="deleteAgent"
->
-Delete Agent
-</Button>
+              <Button variant="destructive" @click="deleteAgent"> Delete Agent </Button>
             </div>
           </CardContent>
         </Card>
@@ -584,8 +558,7 @@ Delete Agent
   </div>
 
   <!-- Loading State -->
-  <div v-else-if="loading"
-class="space-y-8">
+  <div v-else-if="loading" class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
         <div class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse" />
@@ -599,8 +572,7 @@ class="space-y-8">
   </div>
 
   <!-- Error State -->
-  <div v-else
-class="text-center py-12">
+  <div v-else class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">Agent not found</h3>
     <p class="mt-2 text-sm text-muted-foreground">

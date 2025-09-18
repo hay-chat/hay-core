@@ -6,8 +6,7 @@
     >
       <div class="flex items-center justify-between px-6 py-4">
         <div class="flex items-center space-x-4">
-          <Button variant="ghost"
-@click="goBack">
+          <Button variant="ghost" @click="goBack">
             <ArrowLeft class="h-4 w-4 mr-2" />
             Back to Conversations
           </Button>
@@ -34,8 +33,7 @@
             <Clock class="h-3 w-3 mr-1" />
             Cooldown {{ formatCountdown(conversation.cooldown_until) }}
           </Badge>
-          <Button variant="outline"
-size="sm" @click="exportConversation">
+          <Button variant="outline" size="sm" @click="exportConversation">
             <Download class="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -67,10 +65,8 @@ size="sm" @click="exportConversation">
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
-          <div v-if="loading"
-class="space-y-4">
-            <div v-for="i in 5"
-:key="i" class="animate-pulse">
+          <div v-if="loading" class="space-y-4">
+            <div v-for="i in 5" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
                 <div class="w-8 h-8 bg-gray-200 rounded-full" />
                 <div class="flex-1">
@@ -83,13 +79,10 @@ class="space-y-4">
 
           <div v-else-if="conversation?.messages?.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p class="text-muted-foreground">
-No messages in this conversation yet
-</p>
+            <p class="text-muted-foreground">No messages in this conversation yet</p>
           </div>
 
-          <div v-else
-class="space-y-4">
+          <div v-else class="space-y-4">
             <!-- Conversation Start -->
             <div class="text-center">
               <div
@@ -101,7 +94,7 @@ class="space-y-4">
             </div>
 
             <!-- Messages -->
-            <template v-for="(message, index) in conversation?.messages" :key="message.id">
+            <template v-for="message in conversation?.messages" :key="message.id">
               <ChatMessage
                 :message="message"
                 @approve="message.needsApproval ? approveMessage(message.id) : undefined"
@@ -111,8 +104,7 @@ class="space-y-4">
             </template>
 
             <!-- Typing indicator -->
-            <div v-if="isTyping"
-class="flex space-x-3 max-w-2xl">
+            <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
               <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <User class="h-4 w-4 text-primary" />
               </div>
@@ -138,8 +130,7 @@ class="flex space-x-3 max-w-2xl">
         </div>
 
         <!-- Human Takeover Panel -->
-        <div v-if="humanTakeover"
-class="border-t bg-yellow-50 p-4">
+        <div v-if="humanTakeover" class="border-t bg-yellow-50 p-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <AlertTriangle class="h-4 w-4 text-yellow-600" />
@@ -147,17 +138,12 @@ class="border-t bg-yellow-50 p-4">
                 >You are now handling this conversation</span
               >
             </div>
-            <Button variant="outline"
-size="sm" @click="endTakeover"
->
-End Takeover
-</Button>
+            <Button variant="outline" size="sm" @click="endTakeover"> End Takeover </Button>
           </div>
         </div>
 
         <!-- Message Input (when human takeover is active) -->
-        <div v-if="humanTakeover"
-class="border-t p-4">
+        <div v-if="humanTakeover" class="border-t p-4">
           <div class="flex space-x-3">
             <Input
               v-model="newMessage"
@@ -165,8 +151,7 @@ class="border-t p-4">
               class="flex-1"
               @keyup.enter="sendMessage"
             />
-            <Button :disabled="!newMessage.trim()"
-@click="sendMessage">
+            <Button :disabled="!newMessage.trim()" @click="sendMessage">
               <Send class="h-4 w-4" />
             </Button>
           </div>
@@ -248,8 +233,7 @@ class="border-t p-4">
               <div v-if="previousConversations.length === 0" class="text-sm text-muted-foreground">
                 No previous conversations
               </div>
-              <div v-else
-class="space-y-3">
+              <div v-else class="space-y-3">
                 <div
                   v-for="prevConv in previousConversations"
                   :key="prevConv.id"
@@ -273,23 +257,19 @@ class="space-y-3">
               <CardTitle class="text-base"> Quick Actions </CardTitle>
             </CardHeader>
             <CardContent class="space-y-2">
-              <Button variant="outline"
-size="sm" class="w-full justify-start">
+              <Button variant="outline" size="sm" class="w-full justify-start">
                 <Ticket class="h-4 w-4 mr-2" />
                 Create Support Ticket
               </Button>
-              <Button variant="outline"
-size="sm" class="w-full justify-start">
+              <Button variant="outline" size="sm" class="w-full justify-start">
                 <Mail class="h-4 w-4 mr-2" />
                 Send Email
               </Button>
-              <Button variant="outline"
-size="sm" class="w-full justify-start">
+              <Button variant="outline" size="sm" class="w-full justify-start">
                 <Phone class="h-4 w-4 mr-2" />
                 Schedule Call
               </Button>
-              <Button variant="outline"
-size="sm" class="w-full justify-start">
+              <Button variant="outline" size="sm" class="w-full justify-start">
                 <Star class="h-4 w-4 mr-2" />
                 Request Feedback
               </Button>
@@ -346,6 +326,44 @@ import {
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
 
+interface Message {
+  id: string;
+  type: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  needsApproval?: boolean;
+  created_at: string;
+}
+
+interface Agent {
+  id: string;
+  name: string;
+}
+
+interface ConversationData {
+  id: string;
+  title?: string;
+  status: string;
+  cooldown_until?: string;
+  created_at: string;
+  updated_at: string;
+  messages?: Message[];
+  agent?: Agent;
+}
+
+interface PreviousConversation {
+  id: string;
+  title: string;
+  date: string;
+}
+
+interface RelatedArticle {
+  id: string;
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 // Get conversation ID from route
 const route = useRoute();
 const conversationId = route.params["id"] as string;
@@ -359,10 +377,10 @@ const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
 
 // Data from API
-const conversation = ref<any>(null);
+const conversation = ref<ConversationData | null>(null);
 
-const previousConversations = ref<any[]>([]);
-const relatedArticles = ref<any[]>([]);
+const previousConversations = ref<PreviousConversation[]>([]);
+const relatedArticles = ref<RelatedArticle[]>([]);
 
 const goBack = () => {
   navigateTo("/conversations");
@@ -426,15 +444,7 @@ const formatDate = (date: Date | string | undefined) => {
   }).format(dateObj);
 };
 
-const formatDuration = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  }
-  return `${minutes}m`;
-};
+// formatDuration function removed - was unused
 
 const toggleSupervisionMode = () => {
   supervisionMode.value = !supervisionMode.value;

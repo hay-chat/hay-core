@@ -2,14 +2,20 @@ import { TRPCError } from "@trpc/server";
 import { t } from "@server/trpc/init";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import type { Context } from "@server/trpc/context";
+import type { Request } from "express";
 
 /**
  * Middleware to ensure user is authenticated
  */
+interface RequestWithAuthError extends Request {
+  authError?: string;
+}
+
 export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
   // Check if there was an authentication error stored in the request
-  if ((ctx.req as any).authError) {
-    const errorMessage = (ctx.req as any).authError;
+  const reqWithAuth = ctx.req as RequestWithAuthError;
+  if (reqWithAuth.authError) {
+    const errorMessage = reqWithAuth.authError;
 
     // Provide specific error for token expiration
     if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {

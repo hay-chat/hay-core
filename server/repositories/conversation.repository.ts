@@ -137,7 +137,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   override async paginateQuery(
     listParams: ListParams,
     organizationId: string,
-    baseWhere?: Record<string, any>,
+    baseWhere?: Record<string, unknown>,
   ) {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
@@ -203,7 +203,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Conversation>,
-    filters?: Record<string, any>,
+    filters?: Record<string, unknown>,
     _organizationId?: string,
   ): void {
     if (!filters) return;
@@ -419,10 +419,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     // Create a map of date -> count for existing data
     const dataMap = new Map<string, number>();
-    rawResults.forEach((row: any) => {
+    interface DateCountRow {
+      date: Date | string;
+      count: string | number;
+    }
+    rawResults.forEach((row: DateCountRow) => {
       const dateStr =
         row.date instanceof Date ? row.date.toISOString().split("T")[0] : row.date.split(" ")[0]; // Handle different date formats from DB
-      dataMap.set(dateStr, parseInt(row.count, 10));
+      dataMap.set(dateStr, parseInt(row.count as string, 10));
     });
 
     // Generate all dates in range and fill missing dates with 0

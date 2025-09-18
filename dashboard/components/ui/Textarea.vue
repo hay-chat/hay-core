@@ -20,7 +20,7 @@ defineEmits<{
 }>();
 
 const textareaAttrs = computed(() => {
-  const attrs: Record<string, any> = {
+  const attrs: Record<string, string | number | boolean> = {
     value: props.modelValue || "",
     rows: props.rows || 4,
     disabled: props.disabled || false,

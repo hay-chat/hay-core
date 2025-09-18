@@ -17,12 +17,16 @@ import { computed, inject } from "vue";
 import { cn } from "@/lib/utils";
 
 interface SidebarContentProps {
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
+}
+
+interface SidebarContext {
+  state: { value: string };
 }
 
 const props = defineProps<SidebarContentProps>();
 const className = computed(() => props.class);
 
-const sidebar = inject<any>("sidebar");
+const sidebar = inject<SidebarContext>("sidebar");
 const state = computed(() => sidebar?.state?.value || "expanded");
 </script>

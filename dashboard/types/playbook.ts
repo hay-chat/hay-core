@@ -4,6 +4,12 @@ export enum PlaybookStatus {
   ARCHIVED = "archived",
 }
 
+export interface InstructionItem {
+  id: string;
+  level: number;
+  instructions: string;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -20,7 +26,7 @@ export interface Playbook {
   title: string;
   trigger: string;
   description?: string | null;
-  instructions?: any;
+  instructions?: InstructionItem[] | string | null;
   status: PlaybookStatus;
   organization_id: string;
   agents?: Agent[];
@@ -32,7 +38,7 @@ export interface CreatePlaybookInput {
   title: string;
   trigger: string;
   description?: string;
-  instructions?: any;
+  instructions?: InstructionItem[] | string | null;
   status?: PlaybookStatus;
   agentIds?: string[];
 }
@@ -41,7 +47,7 @@ export interface UpdatePlaybookInput {
   title?: string;
   trigger?: string;
   description?: string;
-  instructions?: any;
+  instructions?: InstructionItem[] | string | null;
   status?: PlaybookStatus;
   agentIds?: string[];
 }

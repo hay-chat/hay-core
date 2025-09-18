@@ -1,4 +1,3 @@
-import { Repository } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 

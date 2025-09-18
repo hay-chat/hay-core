@@ -1,4 +1,4 @@
-import { Repository, SelectQueryBuilder } from "typeorm";
+import { Repository, SelectQueryBuilder, DeepPartial, FindOptionsWhere } from "typeorm";
 import type { FindManyOptions, ObjectLiteral } from "typeorm";
 import { AppDataSource } from "../database/data-source";
 import type { ListParams } from "../trpc/middleware/pagination";
@@ -32,7 +32,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   async paginateQuery(
     listParams: ListParams,
     organizationId: string,
-    baseWhere?: Record<string, any>,
+    baseWhere?: Record<string, unknown>,
   ): Promise<PaginatedResponse<T>> {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
@@ -93,8 +93,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   protected applyFilters(
     queryBuilder: SelectQueryBuilder<T>,
-    filters?: Record<string, any>,
-    organizationId?: string,
+    filters?: Record<string, unknown>,
+    _organizationId?: string,
   ): void {
     // Base implementation - override in child classes for entity-specific filters
     if (!filters) return;
@@ -137,7 +137,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
             params[`searchQuery${index}`] = `%${search.query}%`;
             return params;
           },
-          {} as Record<string, any>,
+          {} as Record<string, unknown>,
         ),
       );
     }
@@ -200,18 +200,21 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    * Standard CRUD operations
    */
   async create(data: Partial<T>): Promise<T> {
-    const entity = this.getRepository().create(data as any);
-    return await this.getRepository().save(entity as any);
+    const entity = this.getRepository().create(data as DeepPartial<T>);
+    return await this.getRepository().save(entity as T & DeepPartial<T>);
   }
 
   async findById(id: string): Promise<T | null> {
     return await this.getRepository().findOne({
-      where: { id } as any,
+      where: { id } as FindOptionsWhere<T>,
     });
   }
 
   async update(id: string, organizationId: string, data: Partial<T>): Promise<T | null> {
-    const result = await this.getRepository().update({ id, organizationId } as any, data);
+    const result = await this.getRepository().update(
+      { id, organizationId } as FindOptionsWhere<T>,
+      data,
+    );
 
     if (result.affected === 0) {
       return null;
@@ -224,7 +227,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     const result = await this.getRepository().delete({
       id,
       organizationId,
-    } as any);
+    } as FindOptionsWhere<T>);
 
     return result.affected !== 0;
   }
@@ -234,7 +237,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
    */
   async findByOrganization(organizationId: string, options?: FindManyOptions<T>): Promise<T[]> {
     return await this.getRepository().find({
-      where: { organizationId } as any,
+      where: { organizationId } as FindOptionsWhere<T>,
       ...options,
     });
   }

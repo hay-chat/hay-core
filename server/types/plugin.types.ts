@@ -11,7 +11,7 @@ export interface HayPluginManifest {
       description: string;
       icon?: string;
       supportedFormats?: string[];
-      configSchema?: Record<string, any>;
+      configSchema?: Record<string, unknown>;
     };
     mcp?: {
       tools?: Array<{
@@ -65,8 +65,8 @@ export interface HayPluginManifest {
       label?: string;
       placeholder?: string;
       required?: boolean;
-      default?: any;
-      options?: Array<{ label: string; value: any }>;
+      default?: unknown;
+      options?: Array<{ label: string; value: unknown }>;
       regex?: string;
       env?: string;
       encrypted?: boolean;

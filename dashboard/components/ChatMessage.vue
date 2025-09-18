@@ -10,10 +10,8 @@
       '',
     ]"
   >
-    <div v-if="message.type !== 'System'"
-class="chat-message__avatar">
-      <component :is="avatarIcon"
-class="chat-message__avatar-icon" />
+    <div v-if="message.type !== 'System'" class="chat-message__avatar">
+      <component :is="avatarIcon" class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
       <div
@@ -25,8 +23,7 @@ class="chat-message__avatar-icon" />
         <span class="chat-message__sender">{{ message.sender }}</span>
         <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="message.metadata?.isPlaybook" class="chat-message__playbook-badge">
-          <Badge variant="outline"
-class="text-xs">
+          <Badge variant="outline" class="text-xs">
             <Zap class="h-2 w-2 mr-1" />
             Playbook
           </Badge>
@@ -69,7 +66,7 @@ class="text-xs">
         <div v-else-if="message.type === 'ToolCall' && message.metadata?.toolName">
           <div class="chat-message__tool-call-title font-bold">
             <Zap class="mr-2 h-4 w-4 inline" />
-            Running action <{{ message.metadata?.toolName }}>
+            Running action &lt;{{ message.metadata?.toolName }}&gt;
           </div>
         </div>
         <div v-else-if="message.type === 'ToolResponse'">
@@ -79,7 +76,7 @@ class="text-xs">
             >
               Action failed
             </template>
-            <template v-else> Action responded </template> <{{ message.metadata?.toolName }}>
+            <template v-else> Action responded </template> &lt;{{ message.metadata?.toolName }}&gt;
           </div>
         </div>
         <div v-else-if="message.type === 'System'">
@@ -104,14 +101,11 @@ class="text-xs">
         class="chat-message__expand-button"
         @click="toggleSystemExpanded"
       >
-        <ChevronDown v-if="isSystemCollapsed"
-class="h-3 w-3" />
-        <ChevronUp v-else
-class="h-3 w-3" />
+        <ChevronDown v-if="isSystemCollapsed" class="h-3 w-3" />
+        <ChevronUp v-else class="h-3 w-3" />
         {{ isSystemCollapsed ? "Expand" : "Collapse" }}
       </div>
-      <div v-if="message.attachments?.length"
-class="chat-message__attachments">
+      <div v-if="message.attachments?.length" class="chat-message__attachments">
         <div
           v-for="attachment in message.attachments"
           :key="attachment.id"
@@ -122,18 +116,15 @@ class="chat-message__attachments">
         </div>
       </div>
       <div v-if="message.status === MessageStatus.PENDING" class="chat-message__actions">
-        <Button size="sm"
-variant="outline" @click="$emit('approve')">
+        <Button size="sm" variant="outline" @click="$emit('approve')">
           <Check class="h-3 w-3 mr-1" />
           Approve
         </Button>
-        <Button size="sm"
-variant="outline" @click="$emit('edit')">
+        <Button size="sm" variant="outline" @click="$emit('edit')">
           <Edit class="h-3 w-3 mr-1" />
           Edit
         </Button>
-        <Button size="sm"
-variant="destructive" @click="$emit('reject')">
+        <Button size="sm" variant="destructive" @click="$emit('reject')">
           <X class="h-3 w-3 mr-1" />
           Reject
         </Button>
@@ -155,18 +146,10 @@ import { computed, ref, onMounted, nextTick, watch } from "vue";
 import {
   User,
   Bot,
-  Info,
   Paperclip,
-  Wrench,
   Check,
   Edit,
   X,
-  PhoneCall,
-  PhoneOff,
-  Users,
-  UserPlus,
-  UserMinus,
-  ArrowRightLeft,
   ChevronDown,
   ChevronUp,
   FileSearch,
@@ -174,7 +157,6 @@ import {
   Frown,
   Smile,
   Laugh,
-  Meh,
   Zap,
   BrainCircuit,
 } from "lucide-vue-next";
@@ -183,27 +165,13 @@ import Button from "@/components/ui/Button.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
-interface Attachment {
-  id: string;
-  name: string;
-}
-
-interface Metadata {
-  tool?: string;
-  confidence?: number;
-  isPlaybook?: boolean;
-  needsApproval?: boolean;
-  action?: string;
-  [key: string]: any;
-}
-
 interface Props {
   message: Message;
   inverted?: boolean;
 }
 
 const props = defineProps<Props>();
-const emit = defineEmits<{
+defineEmits<{
   approve: [];
   edit: [];
   reject: [];
@@ -272,6 +240,7 @@ const avatarIcon = computed(() => {
   }
 
   if (props.message.type === "BotAgent" || props.message.type === "HumanAgent") return Bot;
+  return User;
 });
 </script>
 

@@ -12,8 +12,7 @@
       v-if="withHandle"
       class="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border"
     >
-      <svg width="15"
-height="15" viewBox="0 0 15 15" fill="none">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
         <path
           d="M5.5 4.625C6.12132 4.625 6.625 4.12132 6.625 3.5C6.625 2.87868 6.12132 2.375 5.5 2.375C4.87868 2.375 4.375 2.87868 4.375 3.5C4.375 4.12132 4.87868 4.625 5.5 4.625Z"
           fill="currentColor"
@@ -49,7 +48,7 @@ import { cn } from "@/lib/utils";
 
 interface ResizableHandleProps {
   withHandle?: boolean;
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
 }
 
 const props = withDefaults(defineProps<ResizableHandleProps>(), {

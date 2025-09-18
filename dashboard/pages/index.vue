@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline"
-:disabled="loading" @click="refreshData">
+        <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
@@ -142,16 +141,14 @@
               <CardTitle>Top Performing Agents</CardTitle>
               <CardDescription> Best agents by resolution rate this month </CardDescription>
             </div>
-            <Button variant="ghost"
-size="sm" @click="viewAllAgents">
+            <Button variant="ghost" size="sm" @click="viewAllAgents">
               View All
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div v-if="topAgents.length > 0"
-class="space-y-4">
+          <div v-if="topAgents.length > 0" class="space-y-4">
             <div
               v-for="agent in topAgents"
               :key="agent.id"
@@ -171,15 +168,12 @@ class="space-y-4">
                 </div>
               </div>
               <div class="text-right">
-                <div class="text-sm font-medium text-foreground">
-{{ agent.resolutionRate }}%
-</div>
+                <div class="text-sm font-medium text-foreground">{{ agent.resolutionRate }}%</div>
                 <div class="text-xs text-muted-foreground">resolution rate</div>
               </div>
             </div>
           </div>
-          <div v-else
-class="text-center py-8 text-muted-foreground">
+          <div v-else class="text-center py-8 text-muted-foreground">
             <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No agents created yet</p>
             <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
@@ -197,16 +191,14 @@ class="text-center py-8 text-muted-foreground">
               <CardTitle>Recent Conversations</CardTitle>
               <CardDescription> Latest customer interactions </CardDescription>
             </div>
-            <Button variant="ghost"
-size="sm" @click="viewAllConversations">
+            <Button variant="ghost" size="sm" @click="viewAllConversations">
               View All
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div v-if="recentConversations.length > 0"
-class="space-y-4">
+          <div v-if="recentConversations.length > 0" class="space-y-4">
             <div
               v-for="conversation in recentConversations"
               :key="conversation.id"
@@ -249,13 +241,10 @@ class="space-y-4">
               </div>
             </div>
           </div>
-          <div v-else
-class="text-center py-8 text-muted-foreground">
+          <div v-else class="text-center py-8 text-muted-foreground">
             <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No conversations yet</p>
-            <p class="text-sm mt-2">
-Start chatting with your agents to see conversations here
-</p>
+            <p class="text-sm mt-2">Start chatting with your agents to see conversations here</p>
           </div>
         </CardContent>
       </Card>
@@ -314,9 +303,33 @@ const loading = ref(false);
 const router = useRouter();
 
 // Real data - fetched from API
-const agents = ref<any[]>([]);
-const conversations = ref<any[]>([]);
-const conversationStats = ref<Array<{ date: string; count: number; label: string }>>([]);
+interface Agent {
+  id: string;
+  name: string;
+  enabled: boolean;
+  createdAt: string;
+}
+
+interface Conversation {
+  id: string;
+  title?: string;
+  status: string;
+  agentId: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: Array<{ content: string }>;
+}
+
+interface ConversationStat {
+  date: string;
+  count: number;
+  label: string;
+  chartIndex?: number;
+}
+
+const agents = ref<Agent[]>([]);
+const conversations = ref<Conversation[]>([]);
+const conversationStats = ref<ConversationStat[]>([]);
 
 // Computed properties for dashboard data
 const metrics = computed(() => {
@@ -615,15 +628,21 @@ const fetchDashboardData = async () => {
       }),
     ]);
 
-    agents.value = agentsData || [];
-    conversations.value = conversationsData?.items || conversationsData || [];
+    agents.value = (agentsData as Agent[]) || [];
+    conversations.value =
+      (conversationsData as { items?: Conversation[] })?.items ||
+      (conversationsData as Conversation[]) ||
+      [];
 
     // Handle the nested data structure from the API response
-    const statsData = (conversationStatsData as any)?.result?.data || conversationStatsData || [];
+    const statsData =
+      (conversationStatsData as { result?: { data?: ConversationStat[] } })?.result?.data ||
+      (conversationStatsData as ConversationStat[]) ||
+      [];
 
     // Process the data to add numeric indices for proper chart rendering
     conversationStats.value = Array.isArray(statsData)
-      ? statsData.map((item: any, index: number) => ({
+      ? statsData.map((item: ConversationStat, index: number) => ({
           ...item,
           chartIndex: index, // Add numeric index for x-axis
           count: Number(item.count) || 0, // Ensure count is numeric

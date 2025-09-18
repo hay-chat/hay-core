@@ -36,7 +36,6 @@
         aria-orientation="vertical"
         aria-labelledby="user-menu-button"
         tabindex="-1"
-        @click.away="dropdownOpen = false"
       >
         <!-- User Info Section -->
         <div class="px-4 py-2 border-b border-border">
@@ -79,16 +78,14 @@
                 dropdownOpen = false;
               "
             >
-              <Building2 class="mr-3 h-4 w-4"
-aria-hidden="true" />
+              <Building2 class="mr-3 h-4 w-4" aria-hidden="true" />
               <div class="flex-1 text-left">
                 <p class="font-medium">
                   {{ currentOrganization.name }}
                 </p>
                 <p class="text-xs text-muted-foreground">Switch organization</p>
               </div>
-              <ChevronDown class="h-4 w-4"
-aria-hidden="true" />
+              <ChevronDown class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -101,8 +98,7 @@ aria-hidden="true" />
             tabindex="-1"
             @click="handleSignOut"
           >
-            <LogOut class="mr-3 h-4 w-4"
-aria-hidden="true" />
+            <LogOut class="mr-3 h-4 w-4" aria-hidden="true" />
             Sign out
           </button>
         </div>
@@ -126,6 +122,8 @@ import {
   UserCog,
 } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
+import { useUserStore } from "@/stores/user";
+import { useOrganizationStore } from "@/stores/organization";
 
 const userStore = useUserStore();
 const authStore = useAuthStore();

@@ -1,6 +1,14 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { config } from "@server/config/env";
 
+// Type for document metadata
+interface DocumentMetadata {
+  title?: string;
+  source?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
 export class EmbeddingService {
   private embeddings: OpenAIEmbeddings;
 
@@ -23,7 +31,7 @@ export class EmbeddingService {
     return embeddings;
   }
 
-  async createDocumentEmbedding(content: string, metadata?: any) {
+  async createDocumentEmbedding(content: string, metadata?: DocumentMetadata) {
     const embedding = await this.createEmbedding(content);
 
     return {

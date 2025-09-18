@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm">
+        <Button variant="outline" size="sm">
           <FileText class="h-4 w-4 mr-2" />
           Import
         </Button>
@@ -77,15 +76,11 @@ size="sm">
       </div>
 
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm" @click="toggleView">
-          <LayoutGrid v-if="viewMode === 'table'"
-class="h-4 w-4" />
-          <List v-else
-class="h-4 w-4" />
+        <Button variant="outline" size="sm" @click="toggleView">
+          <LayoutGrid v-if="viewMode === 'table'" class="h-4 w-4" />
+          <List v-else class="h-4 w-4" />
         </Button>
-        <Button variant="outline"
-size="sm">
+        <Button variant="outline" size="sm">
           <Filter class="h-4 w-4 mr-2" />
           More Filters
         </Button>
@@ -93,10 +88,8 @@ size="sm">
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="space-y-4">
-      <div v-for="i in 5"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="space-y-4">
+      <div v-for="i in 5" :key="i" class="animate-pulse">
         <Card>
           <CardHeader>
             <div class="h-4 bg-gray-200 rounded w-1/3" />
@@ -111,8 +104,7 @@ class="space-y-4">
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredPlaybooks.length === 0"
-class="text-center py-12">
+    <div v-else-if="filteredPlaybooks.length === 0" class="text-center py-12">
       <Book class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No playbooks found" : "No playbooks created yet" }}
@@ -124,8 +116,7 @@ class="text-center py-12">
             : "Create your first playbook to automate conversations."
         }}
       </p>
-      <Button v-if="!searchQuery"
-@click="createPlaybook">
+      <Button v-if="!searchQuery" @click="createPlaybook">
         <Plus class="h-4 w-4 mr-2" />
         Create Your First Playbook
       </Button>
@@ -208,9 +199,7 @@ class="text-center py-12">
                     </div>
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm">
-{{ playbook.agents?.length || 0 }} agents
-</td>
+                <td class="py-3 px-4 text-sm">{{ playbook.agents?.length || 0 }} agents</td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status)">
                     {{ playbook.status }}
@@ -313,13 +302,13 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 
 // Data from API
-const playbooks = ref<any[]>([]);
+const playbooks = ref<Playbook[]>([]);
 
 // Stats computed from playbooks
 const stats = computed(() => {
   const total = playbooks.value.length;
   const active = playbooks.value.filter((p) => p.status === "active").length;
-  const draft = playbooks.value.filter((p) => p.status === "draft").length;
+  const _draft = playbooks.value.filter((p) => p.status === "draft").length;
 
   return {
     total,
@@ -358,7 +347,7 @@ const paginatedPlaybooks = computed(() => {
 const totalPages = computed(() => Math.ceil(filteredPlaybooks.value.length / pageSize.value));
 
 // Methods
-const getCategoryLabel = (category: string) => {
+const _getCategoryLabel = (category: string) => {
   const labels = {
     "customer-support": "Customer Support",
     sales: "Sales",
@@ -404,7 +393,7 @@ const duplicatePlaybook = (id: string) => {
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
-const playbookToDelete = ref<any>(null);
+const playbookToDelete = ref<Playbook | null>(null);
 const deleteDialogTitle = ref("Delete Playbook");
 const deleteDialogDescription = ref("");
 

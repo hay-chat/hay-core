@@ -9,13 +9,11 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm">
+        <Button variant="outline" size="sm">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
-        <Button variant="outline"
-size="sm">
+        <Button variant="outline" size="sm">
           <Settings class="h-4 w-4 mr-2" />
           Settings
         </Button>
@@ -29,8 +27,7 @@ size="sm">
         <span class="text-sm font-medium">Filters:</span>
       </div>
       <div class="flex items-center space-x-2">
-        <Label for="type-filter"
-class="text-sm">Type:</Label>
+        <Label for="type-filter" class="text-sm">Type:</Label>
         <select id="type-filter" v-model="selectedType" class="px-3 py-1 text-sm border rounded-md">
           <option value="">All Types</option>
           <option value="new-playbook">New Playbook</option>
@@ -40,23 +37,20 @@ class="text-sm">Type:</Label>
         </select>
       </div>
       <div class="flex items-center space-x-2">
-        <Label for="agent-filter"
-class="text-sm">Agent:</Label>
+        <Label for="agent-filter" class="text-sm">Agent:</Label>
         <select
           id="agent-filter"
           v-model="selectedAgent"
           class="px-3 py-1 text-sm border rounded-md"
         >
           <option value="">All Agents</option>
-          <option v-for="agent in agents"
-:key="agent.id" :value="agent.id">
+          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
             {{ agent.name }}
           </option>
         </select>
       </div>
       <div class="flex items-center space-x-2">
-        <Label for="date-filter"
-class="text-sm">Date:</Label>
+        <Label for="date-filter" class="text-sm">Date:</Label>
         <select
           id="date-filter"
           v-model="selectedDateRange"
@@ -78,10 +72,8 @@ class="text-sm">Date:</Label>
         >
       </div>
 
-      <div v-if="loading"
-class="space-y-4">
-        <div v-for="i in 3"
-:key="i" class="animate-pulse">
+      <div v-if="loading" class="space-y-4">
+        <div v-for="i in 3" :key="i" class="animate-pulse">
           <Card>
             <CardHeader>
               <div class="h-4 bg-gray-200 rounded w-1/4" />
@@ -103,8 +95,7 @@ class="space-y-4">
         </p>
       </div>
 
-      <div v-else
-class="space-y-4">
+      <div v-else class="space-y-4">
         <Card
           v-for="insight in filteredPendingInsights"
           :key="insight.id"
@@ -125,8 +116,7 @@ class="space-y-4">
                   {{ insight.title }}
                 </h3>
               </div>
-              <Button variant="ghost"
-size="sm">
+              <Button variant="ghost" size="sm">
                 <MoreHorizontal class="h-4 w-4" />
               </Button>
             </div>
@@ -161,8 +151,7 @@ size="sm">
                   <X class="h-4 w-4 mr-2" />
                   Reject
                 </Button>
-                <Button size="sm"
-@click="acceptInsight(insight.id)">
+                <Button size="sm" @click="acceptInsight(insight.id)">
                   <Check class="h-4 w-4 mr-2" />
                   Accept
                 </Button>
@@ -181,22 +170,19 @@ size="sm">
         <CardHeader>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-medium">Recent Implementations</h3>
-            <Button variant="outline"
-size="sm">
+            <Button variant="outline" size="sm">
               <Download class="h-4 w-4 mr-2" />
               Export
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div v-if="acceptedInsights.length === 0"
-class="text-center py-8">
+          <div v-if="acceptedInsights.length === 0" class="text-center py-8">
             <CheckCircle class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p class="text-muted-foreground">No accepted insights yet</p>
           </div>
 
-          <div v-else
-class="space-y-4">
+          <div v-else class="space-y-4">
             <div
               v-for="insight in acceptedInsights"
               :key="insight.id"
@@ -215,12 +201,10 @@ class="space-y-4">
                 </p>
               </div>
               <div class="flex items-center space-x-2">
-                <Button variant="ghost"
-size="sm">
+                <Button variant="ghost" size="sm">
                   <BarChart3 class="h-4 w-4" />
                 </Button>
-                <Button variant="ghost"
-size="sm">
+                <Button variant="ghost" size="sm">
                   <ExternalLink class="h-4 w-4" />
                 </Button>
               </div>
@@ -252,7 +236,7 @@ import {
 } from "lucide-vue-next";
 
 // TODO: Import actual Badge component when available
-const Badge = ({ variant = "default", ...props }) =>
+const Badge = ({ variant = "default", ...props }: { variant?: string; [key: string]: unknown }) =>
   h("span", {
     class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
       variant === "outline"
@@ -275,13 +259,30 @@ const selectedAgent = ref("");
 const selectedDateRange = ref("30d");
 
 // Mock data - TODO: Replace with actual API calls
-const agents = ref([
+interface Agent {
+  id: string;
+  name: string;
+}
+
+const agents = ref<Agent[]>([
   { id: "1", name: "Customer Support Agent" },
   { id: "2", name: "Sales Assistant" },
   { id: "3", name: "Technical Support" },
 ]);
 
-const pendingInsights = ref([
+interface PendingInsight {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  affectedConversations: number;
+  agentName: string;
+  impactScore: number;
+  createdAt: Date;
+  agentId: string;
+}
+
+const pendingInsights = ref<PendingInsight[]>([
   {
     id: "1",
     type: "new-playbook",
@@ -320,7 +321,15 @@ const pendingInsights = ref([
   },
 ]);
 
-const acceptedInsights = ref([
+interface AcceptedInsight {
+  id: string;
+  type: string;
+  title: string;
+  implementedAt: Date;
+  performance: number;
+}
+
+const acceptedInsights = ref<AcceptedInsight[]>([
   {
     id: "4",
     type: "improvement",
@@ -375,7 +384,7 @@ const formatDate = (date: Date) => {
   }).format(date);
 };
 
-const previewInsight = (insight: any) => {
+const previewInsight = (insight: PendingInsight) => {
   // TODO: Open insight preview modal
   console.log("Preview insight:", insight);
 };

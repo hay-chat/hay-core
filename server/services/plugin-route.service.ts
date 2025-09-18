@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import crypto from "crypto";
 import { processManagerService } from "./process-manager.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
@@ -6,6 +6,7 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { environmentManagerService } from "./environment-manager.service";
 import type { WebhookRequest, WebhookResponse } from "../../plugins/base";
+import type { HayPluginManifest } from "../../plugins/base/types";
 
 interface RateLimitEntry {
   count: number;
@@ -34,9 +35,9 @@ export class PluginRouteService {
       }
 
       // Check if plugin has webhook capability
-      const manifest = plugin.manifest as any;
+      const manifest = plugin.manifest as HayPluginManifest;
       const webhookConfig = manifest.capabilities?.chat_connector?.webhooks?.find(
-        (w: any) => w.path === `/${fullPath}` || w.path === fullPath,
+        (w) => w.path === `/${fullPath}` || w.path === fullPath,
       );
 
       if (!webhookConfig) {
@@ -135,7 +136,7 @@ export class PluginRouteService {
    * Verify webhook signature
    */
   private verifySignature(
-    body: any,
+    body: unknown,
     signature: string,
     secret: string,
     headerName: string,

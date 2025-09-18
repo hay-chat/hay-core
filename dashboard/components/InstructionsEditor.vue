@@ -1,8 +1,7 @@
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <label :for="editorId"
-class="text-sm font-medium">
+      <label :for="editorId" class="text-sm font-medium">
         {{ label }}
       </label>
       <div class="text-xs text-muted-foreground">
@@ -57,12 +56,10 @@ class="text-sm font-medium">
         <Loading />
       </div>
     </div>
-    <p v-if="error"
-class="text-sm text-red-500">
+    <p v-if="error" class="text-sm text-red-500">
       {{ error }}
     </p>
-    <p v-if="hint"
-class="text-sm text-muted-foreground">
+    <p v-if="hint" class="text-sm text-muted-foreground">
       {{ hint }}
     </p>
   </div>
@@ -78,6 +75,22 @@ interface InstructionData {
   id: string;
   instructions: string;
   level?: number;
+}
+
+interface MCPTool {
+  id: string;
+  name: string;
+  label: string;
+  pluginName: string;
+  description?: string;
+}
+
+interface DocumentItem {
+  id: string;
+  name: string;
+  type: string;
+  url?: string;
+  title?: string;
 }
 
 interface Props {
@@ -99,8 +112,8 @@ const emit = defineEmits<{
 
 const editorId = `editor-${Math.random().toString(36).substring(2, 11)}`;
 const instructions = ref<InstructionData[]>([]);
-const mcpTools = ref<any[]>([]);
-const documents = ref<any[]>([]);
+const mcpTools = ref<MCPTool[]>([]);
+const documents = ref<DocumentItem[]>([]);
 const loading = ref(true);
 const { getComponent } = useComponentRegistry();
 let menuEl: HTMLDivElement | null = null;
@@ -201,7 +214,7 @@ const fetchDocuments = async () => {
     });
 
     documents.value = (result.items || [])
-      .map((doc: any) => ({
+      .map((doc: Partial<DocumentItem>) => ({
         id: doc.id || "",
         name: doc.name || doc.title || "Untitled Document",
         type: doc.type || "document",
@@ -400,7 +413,7 @@ function ensureMenu() {
   return menuEl;
 }
 
-function showMenu(rect: DOMRect, items: any[]) {
+function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string })[]) {
   const el = ensureMenu();
   el.style.display = "block";
   el.style.position = "fixed";
@@ -527,7 +540,7 @@ function hideMenu() {
   console.log(`[DEBUG] Menu hidden and state reset`);
 }
 
-function handleItemSelection(item: any) {
+function handleItemSelection(item: MCPTool | DocumentItem | { type: string }) {
   if (commandMode === "select") {
     const type = activeIndex === 0 ? "actions" : "documents";
     commandMode = type as "actions" | "documents";
@@ -547,7 +560,7 @@ function handleItemSelection(item: any) {
   }
 }
 
-function insertAction(tool: any) {
+function insertAction(tool: MCPTool) {
   if (!activeSlashContext) return;
 
   // Find the corresponding RichInstructionInput component
@@ -565,7 +578,7 @@ function insertAction(tool: any) {
   }
 }
 
-function insertDocument(doc: any) {
+function insertDocument(doc: DocumentItem) {
   if (!activeSlashContext) return;
 
   // Find the corresponding RichInstructionInput component
@@ -645,7 +658,7 @@ const handleSlashCommand = (data: {
     console.log(`[DEBUG] Using select mode (default)`);
   }
 
-  let items: any[] = [];
+  let items: (MCPTool | DocumentItem | { type: string })[] = [];
   if (commandMode === "select") {
     items = [{ type: "actions" }, { type: "documents" }];
   } else if (commandMode === "actions") {
@@ -665,7 +678,7 @@ const handleSlashCommand = (data: {
 function handleKeyDown(e: KeyboardEvent) {
   // Handle slash commands when menu is open
   if (menuEl && menuEl.style.display === "block") {
-    let items: any[] = [];
+    let items: (MCPTool | DocumentItem | { type: string })[] = [];
 
     if (commandMode === "select") {
       items = [{ type: "actions" }, { type: "documents" }];

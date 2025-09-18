@@ -4,7 +4,7 @@ export interface ProcessedDocument {
     fileName?: string;
     fileType?: string;
     pageCount?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

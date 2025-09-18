@@ -118,6 +118,7 @@
     "eslint-plugin-vue": "^9.18.1",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
+    "prettier-plugin-vue": "^1.1.6",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.6.2",

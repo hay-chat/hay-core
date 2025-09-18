@@ -31,8 +31,7 @@
           </PaginationItem>
 
           <!-- Page numbers -->
-          <template v-for="page in visiblePages"
-:key="page">
+          <template v-for="page in visiblePages" :key="page">
             <PaginationItem v-if="page === 'ellipsis-start' || page === 'ellipsis-end'">
               <PaginationEllipsis />
             </PaginationItem>

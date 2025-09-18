@@ -2,7 +2,7 @@
 
 export interface ToolCall {
   name: string;
-  args: Record<string, any>;
+  args: Record<string, unknown>;
 }
 
 export interface RagPack {
@@ -21,7 +21,7 @@ export interface RagPack {
 export interface PlaybookState {
   id: string;
   stepId: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   startedAt: string;
   history: Array<{ stepId: string; ts: string; notes?: string }>;
 }
@@ -30,14 +30,14 @@ export interface ConversationContext {
   version: "v1";
   lastTurn: number;
   activePlaybook?: PlaybookState;
-  perception?: any;
+  perception?: unknown;
   rag?: RagPack | null;
   toolLog: Array<{
     turn: number;
     name: string;
-    input: any;
+    input: unknown;
     ok: boolean;
-    result?: any;
+    result?: unknown;
     errorClass?: string;
     latencyMs: number;
     idempotencyKey: string;

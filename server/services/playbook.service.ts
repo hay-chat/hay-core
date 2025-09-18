@@ -1,6 +1,6 @@
 import { PlaybookRepository } from "../repositories/playbook.repository";
 import { AgentRepository } from "../repositories/agent.repository";
-import { Playbook, PlaybookStatus, PlaybookKind } from "../database/entities/playbook.entity";
+import { Playbook, PlaybookStatus, InstructionItem } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 
 export class PlaybookService {
@@ -18,7 +18,7 @@ export class PlaybookService {
       title: string;
       trigger: string;
       description?: string;
-      instructions?: any;
+      instructions?: InstructionItem[] | string | null;
       status?: PlaybookStatus;
       agentIds?: string[];
     },
@@ -66,7 +66,7 @@ export class PlaybookService {
       title?: string;
       trigger?: string;
       description?: string;
-      instructions?: any;
+      instructions?: InstructionItem[] | string | null;
       status?: PlaybookStatus;
       agentIds?: string[];
     },

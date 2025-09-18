@@ -5,11 +5,7 @@
     "noEmit": false,
     "types": ["node"]
   },
-  "include": [
-    "./**/*",
-    "../server/routes/v1/index.ts",
-    "../server/trpc/app-router-type.ts"
-  ],
+  "include": ["./**/*", "../server/routes/v1/index.ts", "../server/trpc/app-router-type.ts"],
   "exclude": [
     "node_modules",
     ".nuxt",

@@ -2,7 +2,6 @@ import { t, authenticatedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { vectorStoreService } from "@server/services/vector-store.service";
-import { embeddingService } from "@server/services/embedding.service";
 
 const embedInput = z.object({
   documentId: z.string().uuid().nullable().optional(),
@@ -41,7 +40,7 @@ export const embeddingsRouter = t.router({
         await vectorStoreService.initialize();
       }
 
-      let chunks: Array<{ content: string; metadata?: any }> = [];
+      let chunks: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
 
       if (input.chunks && input.chunks.length > 0) {
         // Use provided chunks

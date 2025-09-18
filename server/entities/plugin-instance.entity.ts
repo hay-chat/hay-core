@@ -21,7 +21,7 @@ export class PluginInstance extends OrganizationScopedEntity {
   enabled!: boolean;
 
   @Column({ type: "jsonb", nullable: true })
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
 
   @Column({ type: "boolean", default: false })
   running!: boolean;

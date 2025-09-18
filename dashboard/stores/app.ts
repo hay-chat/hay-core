@@ -13,8 +13,8 @@ interface Plugin {
   enabled: boolean;
   hasConfiguration: boolean;
   hasCustomUI: boolean;
-  capabilities?: any;
-  features?: any;
+  capabilities?: Record<string, unknown>;
+  features?: Record<string, unknown>;
 }
 
 interface AppState {
@@ -149,7 +149,7 @@ export const useAppStore = defineStore("app", {
       return this.plugins;
     },
 
-    async enablePlugin(pluginId: string, configuration?: Record<string, any>) {
+    async enablePlugin(pluginId: string, configuration?: Record<string, unknown>) {
       try {
         await Hay.plugins.enable.mutate({ pluginId, configuration });
         await this.fetchPlugins(); // Refresh to get updated status

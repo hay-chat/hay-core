@@ -55,7 +55,7 @@ const refreshTokenSchema = z.object({
 
 export const authRouter = t.router({
   // Public endpoints
-  login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
+  login: publicProcedure.input(loginSchema).mutation(async ({ input }) => {
     const { email, password } = input;
 
     // Find user by email with organization
@@ -303,7 +303,7 @@ export const authRouter = t.router({
     };
   }),
 
-  logout: protectedProcedure.mutation(async ({ ctx }) => {
+  logout: protectedProcedure.mutation(async () => {
     // In a stateless JWT system, logout is handled client-side
     // Here we could invalidate refresh tokens if we're tracking them
     return { success: true };

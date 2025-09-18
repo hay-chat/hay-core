@@ -6,11 +6,11 @@ export interface ExecutionResult {
   userMessage?: string;
   tool?: {
     name: string;
-    args: Record<string, any>;
+    args: Record<string, unknown>;
   };
   handoff?: {
     reason: string;
-    fields: Record<string, any>;
+    fields: Record<string, unknown>;
   };
   close?: {
     reason: string;
@@ -20,7 +20,7 @@ export interface ExecutionResult {
 
 export class ExecutionLayer {
   private llmService: LLMService;
-  private plannerSchema: any;
+  private plannerSchema: object;
 
   constructor() {
     this.llmService = new LLMService();

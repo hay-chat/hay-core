@@ -41,7 +41,7 @@ export class Conversation {
   closed_at!: Date | null;
 
   @Column({ type: "jsonb", nullable: true })
-  context!: Record<string, any> | null;
+  context!: Record<string, unknown> | null;
 
   @Column({ type: "jsonb", nullable: true })
   resolution_metadata!: {
@@ -68,7 +68,7 @@ export class Conversation {
   playbook_id!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
-  metadata!: Record<string, any> | null;
+  metadata!: Record<string, unknown> | null;
 
   @Column({ type: "boolean", default: false })
   needs_processing!: boolean;
@@ -93,7 +93,7 @@ export class Conversation {
   customer!: Customer | null;
 
   @Column({ type: "jsonb", nullable: true })
-  orchestration_status!: Record<string, any> | null;
+  orchestration_status!: Record<string, unknown> | null;
 
   @Column({ type: "uuid", array: true, nullable: true })
   document_ids!: string[] | null;
@@ -168,19 +168,29 @@ export class Conversation {
       return;
     }
 
-    const analysis = analyzeInstructions(playbook.instructions);
-    const instructionText = analysis.formattedText;
-    const referencedActions = analysis.actions;
+    // Handle different instruction formats
+    let instructionText = "";
+    let referencedActions: string[] = [];
+
+    if (playbook.instructions) {
+      if (typeof playbook.instructions === "string") {
+        instructionText = playbook.instructions;
+      } else if (Array.isArray(playbook.instructions)) {
+        const analysis = analyzeInstructions(playbook.instructions);
+        instructionText = analysis.formattedText;
+        referencedActions = analysis.actions;
+      }
+    }
 
     // Get tool schemas from plugin manager service
-    const toolSchemas: any[] = [];
+    const toolSchemas: Array<Record<string, unknown>> = [];
     try {
       const { pluginManagerService } = await import("../../services/plugin-manager.service");
       const allPlugins = pluginManagerService.getAllPlugins();
 
       // Extract tool schemas from all plugins
       for (const plugin of allPlugins) {
-        const manifest = plugin.manifest as any;
+        const manifest = plugin.manifest as Record<string, unknown>;
         if (manifest?.capabilities?.mcp?.tools) {
           toolSchemas.push(...manifest.capabilities.mcp.tools);
         }
@@ -310,7 +320,7 @@ The following tools are available for you to use. You MUST return only valid JSO
   async addMessage(messageData: {
     content: string;
     type: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<Message> {
     const { messageRepository } = await import("../../repositories/message.repository");
     return messageRepository.create({

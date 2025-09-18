@@ -1,7 +1,6 @@
 <template>
   <div class="space-y-1">
-    <template v-for="item in items"
-:key="item.title">
+    <template v-for="item in items" :key="item.title">
       <NuxtLink
         v-if="!item.items && item.url"
         :to="item.url"
@@ -10,11 +9,9 @@
           'bg-accent text-accent-foreground': item.isActive,
         }"
       >
-        <component :is="item.icon"
-class="h-4 w-4" />
+        <component :is="item.icon" class="h-4 w-4" />
         <span>{{ item.title }}</span>
-        <Badge v-if="item.badge"
-class="ml-auto">
+        <Badge v-if="item.badge" class="ml-auto">
           {{ item.badge }}
         </Badge>
       </NuxtLink>
@@ -24,16 +21,14 @@ class="ml-auto">
           class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
           @click="toggleExpanded(item.title)"
         >
-          <component :is="item.icon"
-class="h-4 w-4" />
+          <component :is="item.icon" class="h-4 w-4" />
           <span>{{ item.title }}</span>
           <ChevronRight
             class="ml-auto h-4 w-4 transition-transform"
             :class="{ 'rotate-90': expanded[item.title] }"
           />
         </button>
-        <div v-if="expanded[item.title]"
-class="ml-7 space-y-1">
+        <div v-if="expanded[item.title]" class="ml-7 space-y-1">
           <NuxtLink
             v-for="subItem in item.items"
             :key="subItem.title"
@@ -52,13 +47,13 @@ class="ml-7 space-y-1">
 </template>
 
 <script setup lang="ts">
-import { reactive, watchEffect } from "vue";
+import { reactive, watchEffect, type Component } from "vue";
 import { ChevronRight } from "lucide-vue-next";
 
 interface NavItem {
   title: string;
   url?: string;
-  icon?: any;
+  icon?: Component;
   badge?: string;
   isActive?: boolean;
   items?: {

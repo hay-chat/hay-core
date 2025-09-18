@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 interface ResizablePanelGroupProps {
   id?: string;
   direction?: "horizontal" | "vertical";
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
 }
 
 const props = withDefaults(defineProps<ResizablePanelGroupProps>(), {

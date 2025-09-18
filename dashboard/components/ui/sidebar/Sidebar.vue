@@ -68,7 +68,7 @@ export interface SidebarProps {
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
   defaultSize?: number;
   minSize?: number;
   maxSize?: number;

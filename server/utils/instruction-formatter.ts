@@ -1,8 +1,4 @@
-interface InstructionItem {
-  id: string;
-  level: number;
-  instructions: string;
-}
+import { InstructionItem } from "../database/entities/playbook.entity";
 
 interface ParsedReference {
   type: "action" | "document";
@@ -126,7 +122,7 @@ export function convertInstructionsToText(instructionsJson: InstructionItem[]): 
  * @param input - Input to check
  * @returns True if input is a valid instructions array
  */
-export function isInstructionsJson(input: any): input is InstructionItem[] {
+export function isInstructionsJson(input: unknown): input is InstructionItem[] {
   return (
     Array.isArray(input) &&
     input.length > 0 &&
@@ -146,7 +142,9 @@ export function isInstructionsJson(input: any): input is InstructionItem[] {
  * @param instructions - Instructions in JSON array or string format
  * @returns Formatted string ready for display
  */
-export function formatInstructions(instructions: any): string {
+export function formatInstructions(
+  instructions: InstructionItem[] | string | null | undefined,
+): string {
   if (!instructions) {
     return "No specific instructions provided.";
   }

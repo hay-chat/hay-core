@@ -4,9 +4,7 @@
       <!-- Header -->
       <div class="text-center">
         <CardTitle class="text-2xl"> Create your account </CardTitle>
-        <CardDescription class="mt-2">
-Get started with your Hay organization
-</CardDescription>
+        <CardDescription class="mt-2"> Get started with your Hay organization </CardDescription>
       </div>
 
       {{ form }}
@@ -44,8 +42,7 @@ Get started with your Hay organization
       </div> -->
 
       <!-- Signup Form -->
-      <form class="space-y-4"
-@submit.prevent="handleSubmit">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
         <!-- Organization Name -->
         <FormField
           id="organizationName"
@@ -145,8 +142,7 @@ Get started with your Hay organization
           class="w-full"
           :disabled="authStore.isLoading || !isFormValid"
         >
-          <div v-if="authStore.isLoading"
-class="flex items-center space-x-2">
+          <div v-if="authStore.isLoading" class="flex items-center space-x-2">
             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             <span>Creating account...</span>
           </div>
@@ -177,6 +173,7 @@ class="flex items-center space-x-2">
 <script setup lang="ts">
 import { nextTick } from "vue";
 import { validateEmail, validatePassword } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
 
 definePageMeta({
   layout: false,
@@ -209,7 +206,7 @@ const errors = reactive({
 
 const error = ref("");
 
-const socialLoading = reactive({
+const _socialLoading = reactive({
   google: false,
   github: false,
   microsoft: false,
@@ -320,12 +317,13 @@ const handleSubmit = async () => {
 
     // Successful signup - redirect to dashboard
     await router.push("/");
-  } catch (err: any) {
+  } catch (err) {
     // Handle different types of registration errors
-    if (err.message.includes("already exists")) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage.includes("already exists")) {
       error.value =
         "An account with this email address already exists. Please try signing in instead.";
-    } else if (err.message.includes("Password")) {
+    } else if (errorMessage.includes("Password")) {
       error.value =
         "Password does not meet security requirements. Please choose a stronger password.";
     } else {

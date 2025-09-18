@@ -34,10 +34,10 @@ export class Job extends OrganizationScopedEntity {
   priority!: JobPriority;
 
   @Column({ type: "jsonb", nullable: true })
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 
   @Column({ type: "jsonb", nullable: true })
-  result?: Record<string, any>;
+  result?: Record<string, unknown>;
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.jobs)

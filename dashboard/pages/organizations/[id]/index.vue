@@ -1,6 +1,5 @@
 <template>
-  <div v-if="organization"
-class="space-y-8">
+  <div v-if="organization" class="space-y-8">
     <!-- Organization Header -->
     <div class="bg-background border rounded-lg p-6">
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -39,8 +38,7 @@ class="space-y-8">
           </div>
         </div>
         <div class="flex space-x-3">
-          <Button variant="outline"
-@click="editOrganization">
+          <Button variant="outline" @click="editOrganization">
             <Settings class="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -66,8 +64,7 @@ class="space-y-8">
           ]"
           @click="activeTab = tab.id"
         >
-          <component :is="tab.icon"
-class="mr-2 h-4 w-4 inline" />
+          <component :is="tab.icon" class="mr-2 h-4 w-4 inline" />
           {{ tab.name }}
         </button>
       </nav>
@@ -76,8 +73,7 @@ class="mr-2 h-4 w-4 inline" />
     <!-- Tab Content -->
     <div class="space-y-6">
       <!-- Overview Tab -->
-      <div v-if="activeTab === 'overview'"
-class="space-y-6">
+      <div v-if="activeTab === 'overview'" class="space-y-6">
         <!-- Key Metrics -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -131,9 +127,7 @@ class="space-y-6">
               <HardDrive class="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div class="text-2xl font-bold">
-{{ organization.storageUsed }}GB
-</div>
+              <div class="text-2xl font-bold">{{ organization.storageUsed }}GB</div>
               <p class="text-xs text-muted-foreground">
                 of {{ organization.storageLimit }}GB limit
               </p>
@@ -249,16 +243,11 @@ class="space-y-6">
       </div>
 
       <!-- Members Tab -->
-      <div v-if="activeTab === 'members'"
-class="space-y-6">
+      <div v-if="activeTab === 'members'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h3 class="text-lg font-medium text-foreground">
-Organization Members
-</h3>
-            <p class="text-sm text-muted-foreground">
-Manage who has access to this organization
-</p>
+            <h3 class="text-lg font-medium text-foreground">Organization Members</h3>
+            <p class="text-sm text-muted-foreground">Manage who has access to this organization</p>
           </div>
           <Button @click="inviteMember">
             <UserPlus class="mr-2 h-4 w-4" />
@@ -312,8 +301,7 @@ Manage who has access to this organization
       </div>
 
       <!-- Settings Tab -->
-      <div v-if="activeTab === 'settings'"
-class="space-y-6">
+      <div v-if="activeTab === 'settings'" class="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>General Settings</CardTitle>
@@ -364,18 +352,14 @@ class="space-y-6">
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Two-Factor Authentication</p>
-                <p class="text-sm text-muted-foreground">
-Require 2FA for all members
-</p>
+                <p class="text-sm text-muted-foreground">Require 2FA for all members</p>
               </div>
               <Checkbox v-model:checked="organizationForm.require2FA" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">SSO Integration</p>
-                <p class="text-sm text-muted-foreground">
-Enable single sign-on
-</p>
+                <p class="text-sm text-muted-foreground">Enable single sign-on</p>
               </div>
               <Checkbox v-model:checked="organizationForm.ssoEnabled" />
             </div>
@@ -395,18 +379,14 @@ Enable single sign-on
               <div class="flex justify-between items-center">
                 <div>
                   <h4 class="font-medium">Primary API Key</h4>
-                  <p class="text-sm text-muted-foreground">
-Used for API access
-</p>
+                  <p class="text-sm text-muted-foreground">Used for API access</p>
                 </div>
                 <div class="flex space-x-2">
-                  <Button variant="outline"
-size="sm" @click="regenerateApiKey">
+                  <Button variant="outline" size="sm" @click="regenerateApiKey">
                     <RefreshCw class="mr-2 h-4 w-4" />
                     Regenerate
                   </Button>
-                  <Button variant="outline"
-size="sm" @click="copyApiKey">
+                  <Button variant="outline" size="sm" @click="copyApiKey">
                     <Copy class="mr-2 h-4 w-4" />
                     Copy
                   </Button>
@@ -423,8 +403,7 @@ size="sm" @click="copyApiKey">
   </div>
 
   <!-- Loading State -->
-  <div v-else-if="loading"
-class="space-y-8">
+  <div v-else-if="loading" class="space-y-8">
     <div class="bg-background border rounded-lg p-6">
       <div class="flex items-start space-x-4">
         <div class="h-16 w-16 bg-background-tertiary rounded-lg animate-pulse" />
@@ -438,19 +417,14 @@ class="space-y-8">
   </div>
 
   <!-- Error State -->
-  <div v-else
-class="text-center py-12">
+  <div v-else class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
-    <h3 class="mt-4 text-lg font-medium text-foreground">
-Organization not found
-</h3>
+    <h3 class="mt-4 text-lg font-medium text-foreground">Organization not found</h3>
     <p class="mt-2 text-sm text-muted-foreground">
       The organization you're looking for doesn't exist or you don't have permission to view it.
     </p>
     <div class="mt-6">
-      <Button @click="router.push('/organizations')">
-Back to Organizations
-</Button>
+      <Button @click="router.push('/organizations')"> Back to Organizations </Button>
     </div>
   </div>
 </template>
@@ -498,7 +472,15 @@ const currentOrganization = ref({
 });
 
 // Organization form
-const organizationForm = reactive({
+interface OrganizationForm {
+  name: string;
+  description: string;
+  timezone: string;
+  require2FA: boolean;
+  ssoEnabled: boolean;
+}
+
+const organizationForm = reactive<OrganizationForm>({
   name: "",
   description: "",
   timezone: "UTC",
@@ -513,9 +495,34 @@ const tabs = [
   { id: "settings", name: "Settings", icon: Settings },
 ];
 
+interface Organization {
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  memberCount: number;
+  agentCount: number;
+  totalConversations: number;
+  storageUsed: number;
+  storageLimit: number;
+  apiCalls: number;
+  apiLimit: number;
+  agentLimit: number;
+  createdAt: Date;
+  apiKey: string;
+}
+
 // Mock organization data - TODO: Replace with real API calls
-const organization = ref(null as any);
-const members = ref([
+const organization = ref<Organization | null>(null);
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  joinedAt: Date;
+}
+
+const members = ref<Member[]>([
   {
     id: "1",
     name: "John Doe",
@@ -655,7 +662,7 @@ const inviteMember = () => {
   console.log("Invite member");
 };
 
-const updateMemberRole = async (member: any) => {
+const updateMemberRole = async (member: Member) => {
   try {
     // TODO: Update member role via API
     console.log("Update member role:", member.id, member.role);
@@ -667,7 +674,7 @@ const updateMemberRole = async (member: any) => {
   }
 };
 
-const removeMember = async (member: any) => {
+const removeMember = async (member: Member) => {
   try {
     // TODO: Show confirmation dialog
     // TODO: Remove member via API

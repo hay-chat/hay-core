@@ -24,6 +24,12 @@ export enum PlaybookKind {
   CUSTOM = "custom",
 }
 
+export interface InstructionItem {
+  id: string;
+  level: number;
+  instructions: string;
+}
+
 @Entity("playbooks")
 export class Playbook {
   @PrimaryGeneratedColumn("uuid")
@@ -39,7 +45,7 @@ export class Playbook {
   description!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
-  instructions!: any;
+  instructions!: InstructionItem[] | string | null;
 
   @Column({
     type: "enum",

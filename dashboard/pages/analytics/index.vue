@@ -18,13 +18,11 @@
           <option value="90d">Last 90 days</option>
           <option value="custom">Custom Range</option>
         </select>
-        <Button variant="outline"
-size="sm" @click="exportReport">
+        <Button variant="outline" size="sm" @click="exportReport">
           <Download class="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="outline"
-size="sm" @click="refreshData">
+        <Button variant="outline" size="sm" @click="refreshData">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -188,9 +186,7 @@ size="sm" @click="refreshData">
                   <div class="font-medium">
                     {{ issue.topic }}
                   </div>
-                  <div class="text-sm text-muted-foreground">
-{{ issue.count }} conversations
-</div>
+                  <div class="text-sm text-muted-foreground">{{ issue.count }} conversations</div>
                 </div>
               </div>
               <div class="text-right">
@@ -217,9 +213,7 @@ size="sm" @click="refreshData">
                 <th class="text-left py-3 px-4 font-medium">Agent</th>
                 <th class="text-left py-3 px-4 font-medium">Conversations</th>
                 <th class="text-left py-3 px-4 font-medium">Resolution Rate</th>
-                <th class="text-left py-3 px-4 font-medium">
-Avg Response Time
-</th>
+                <th class="text-left py-3 px-4 font-medium">Avg Response Time</th>
                 <th class="text-left py-3 px-4 font-medium">Satisfaction</th>
                 <th class="text-left py-3 px-4 font-medium">Status</th>
               </tr>
@@ -307,8 +301,7 @@ Avg Response Time
             class="p-4 border rounded-lg"
           >
             <div class="flex items-center space-x-3 mb-3">
-              <component :is="channel.icon"
-class="h-5 w-5 text-primary" />
+              <component :is="channel.icon" class="h-5 w-5 text-primary" />
               <h3 class="font-medium">
                 {{ channel.name }}
               </h3>

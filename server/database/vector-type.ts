@@ -6,7 +6,7 @@ export class VectorType {
   }
 }
 
-export const VectorColumnType = (dimensions?: number) => ({
+export const VectorColumnType = (_dimensions?: number) => ({
   type: "simple-array",
   transformer: {
     to: (value: number[] | null): string | null => {
@@ -17,7 +17,7 @@ export const VectorColumnType = (dimensions?: number) => ({
       if (!value) return null;
       if (Array.isArray(value)) return value;
 
-      const cleaned = value.replace(/[\[\]]/g, "");
+      const cleaned = value.replace(/[[\]]/g, "");
       if (!cleaned) return null;
 
       return cleaned.split(",").map((v) => parseFloat(v.trim()));

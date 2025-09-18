@@ -5,11 +5,9 @@
       <p class="text-muted-foreground">Update your AI agent configuration</p>
     </div>
 
-    <form v-if="agent"
-@submit.prevent="handleSubmit" class="space-y-6">
+    <form v-if="agent" class="space-y-6" @submit.prevent="handleSubmit">
       <div>
-        <label for="name"
-class="block text-sm font-medium mb-2">Name</label>
+        <label for="name" class="block text-sm font-medium mb-2">Name</label>
         <input
           id="name"
           v-model="form.name"
@@ -21,8 +19,7 @@ class="block text-sm font-medium mb-2">Name</label>
       </div>
 
       <div>
-        <label for="description"
-class="block text-sm font-medium mb-2">Description</label>
+        <label for="description" class="block text-sm font-medium mb-2">Description</label>
         <textarea
           id="description"
           v-model="form.description"
@@ -33,8 +30,7 @@ class="block text-sm font-medium mb-2">Description</label>
       </div>
 
       <div>
-        <label for="instructions"
-class="block text-sm font-medium mb-2">Instructions</label>
+        <label for="instructions" class="block text-sm font-medium mb-2">Instructions</label>
         <textarea
           id="instructions"
           v-model="form.instructions"
@@ -45,8 +41,7 @@ class="block text-sm font-medium mb-2">Instructions</label>
       </div>
 
       <div>
-        <label for="tone"
-class="block text-sm font-medium mb-2">Tone</label>
+        <label for="tone" class="block text-sm font-medium mb-2">Tone</label>
         <textarea
           id="tone"
           v-model="form.tone"
@@ -57,8 +52,7 @@ class="block text-sm font-medium mb-2">Tone</label>
       </div>
 
       <div>
-        <label for="avoid"
-class="block text-sm font-medium mb-2">Things to Avoid</label>
+        <label for="avoid" class="block text-sm font-medium mb-2">Things to Avoid</label>
         <textarea
           id="avoid"
           v-model="form.avoid"
@@ -69,8 +63,7 @@ class="block text-sm font-medium mb-2">Things to Avoid</label>
       </div>
 
       <div>
-        <label for="trigger"
-class="block text-sm font-medium mb-2">Trigger Conditions</label>
+        <label for="trigger" class="block text-sm font-medium mb-2">Trigger Conditions</label>
         <textarea
           id="trigger"
           v-model="form.trigger"
@@ -87,8 +80,7 @@ class="block text-sm font-medium mb-2">Trigger Conditions</label>
           type="checkbox"
           class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
         />
-        <label for="enabled"
-class="text-sm font-medium">Enable agent</label>
+        <label for="enabled" class="text-sm font-medium">Enable agent</label>
       </div>
 
       <div class="flex gap-4">
@@ -105,15 +97,13 @@ class="text-sm font-medium">Enable agent</label>
       </div>
     </form>
 
-    <div v-else-if="loading"
-class="space-y-4">
+    <div v-else-if="loading" class="space-y-4">
       <div class="h-10 bg-background-tertiary rounded animate-pulse" />
       <div class="h-24 bg-background-tertiary rounded animate-pulse" />
       <div class="h-32 bg-background-tertiary rounded animate-pulse" />
     </div>
 
-    <div v-else
-class="text-center py-12">
+    <div v-else class="text-center py-12">
       <p class="text-muted-foreground">Agent not found</p>
       <NuxtLink to="/agents" class="text-primary hover:underline mt-2 inline-block">
         Back to agents
@@ -128,6 +118,17 @@ import { useRoute, useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import { HayApi } from "@/utils/api";
 
+interface Agent {
+  id: string;
+  name: string;
+  description?: string;
+  instructions?: string;
+  tone?: string;
+  avoid?: string;
+  trigger?: string;
+  enabled: boolean;
+}
+
 definePageMeta({
   // Auth is handled by global middleware
 });
@@ -138,7 +139,7 @@ const toast = useToast();
 
 const loading = ref(true);
 const isLoading = ref(false);
-const agent = ref<any>(null);
+const agent = ref<Agent | null>(null);
 const form = ref({
   name: "",
   description: "",
@@ -153,7 +154,7 @@ const loadAgent = async () => {
   loading.value = true;
   try {
     const agents = await HayApi.agents.list.query();
-    const foundAgent = agents.find((a: any) => a.id === route.params.id);
+    const foundAgent = agents.find((a: Agent) => a.id === route.params.id);
 
     if (foundAgent) {
       agent.value = foundAgent;
@@ -167,9 +168,9 @@ const loadAgent = async () => {
         enabled: foundAgent.enabled,
       };
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to load agent:", error);
-    toast.error(error.message || "Failed to load agent");
+    toast.error((error as Error).message || "Failed to load agent");
   } finally {
     loading.value = false;
   }
@@ -199,9 +200,9 @@ const handleSubmit = async () => {
 
     toast.success("Agent updated successfully");
     await router.push("/agents");
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to update agent:", error);
-    toast.error(error.message || "Failed to update agent");
+    toast.error((error as Error).message || "Failed to update agent");
   } finally {
     isLoading.value = false;
   }

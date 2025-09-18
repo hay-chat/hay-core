@@ -1,10 +1,8 @@
 <template>
   <div class="space-y-2">
-    <Label v-if="label"
-:for="id">
+    <Label v-if="label" :for="id">
       {{ label }}
-      <span v-if="required"
-class="text-red-500">*</span>
+      <span v-if="required" class="text-red-500">*</span>
     </Label>
     <div class="relative">
       <Input
@@ -25,19 +23,15 @@ class="text-red-500">*</span>
           class="text-gray-400 hover:text-gray-600 focus:outline-none"
           @click="togglePasswordVisibility"
         >
-          <EyeIcon v-if="showPassword"
-class="h-5 w-5" />
-          <EyeSlashIcon v-else
-class="h-5 w-5" />
+          <EyeIcon v-if="showPassword" class="h-5 w-5" />
+          <EyeSlashIcon v-else class="h-5 w-5" />
         </button>
       </div>
     </div>
-    <p v-if="errorMessage"
-class="text-sm text-red-600">
+    <p v-if="errorMessage" class="text-sm text-red-600">
       {{ errorMessage }}
     </p>
-    <p v-if="description"
-class="text-sm text-gray-500">
+    <p v-if="description" class="text-sm text-gray-500">
       {{ description }}
     </p>
   </div>

@@ -51,9 +51,27 @@ module.exports = {
         sourceType: "module",
         extraFileExtensions: [".vue"],
       },
-      extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended"],
+      extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended", "prettier"],
       plugins: ["vue"],
       rules: {
+        // Disable ALL Vue formatting rules - let Prettier handle formatting
+        "vue/max-attributes-per-line": "off",
+        "vue/first-attribute-linebreak": "off",
+        "vue/html-closing-bracket-newline": "off",
+        "vue/html-indent": "off",
+        "vue/html-self-closing": "off",
+        "vue/singleline-html-element-content-newline": "off",
+        "vue/multiline-html-element-content-newline": "off",
+        "vue/html-closing-bracket-spacing": "off",
+        "vue/no-multi-spaces": "off",
+        "vue/attribute-hyphenation": "off",
+        "vue/mustache-interpolation-spacing": "off",
+        "vue/no-spaces-around-equal-signs-in-attribute": "off",
+        "vue/template-curly-spacing": "off",
+        "vue/html-quotes": "off",
+        "vue/props-name-casing": "off",
+
+        // Keep non-formatting Vue rules
         "vue/multi-word-component-names": "off",
         "vue/no-v-html": "off",
         "vue/require-default-prop": "off",
@@ -72,7 +90,8 @@ module.exports = {
           },
         ],
         "vue/component-api-style": ["error", ["script-setup"]],
-        "vue/custom-event-name-casing": ["error", "camelCase"],
+        // Allow both camelCase and kebab-case for custom events
+        "vue/custom-event-name-casing": "off",
       },
       globals: {
         // Vue Composition API

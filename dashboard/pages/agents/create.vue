@@ -2,15 +2,12 @@
   <div class="container mx-auto px-4 py-8 max-w-2xl">
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-2">Create Agent</h1>
-      <p class="text-muted-foreground">
-Configure a new AI agent for your organization
-</p>
+      <p class="text-muted-foreground">Configure a new AI agent for your organization</p>
     </div>
 
     <form class="space-y-6" @submit.prevent="handleSubmit">
       <div>
-        <label for="name"
-class="block text-sm font-medium mb-2">Name</label>
+        <label for="name" class="block text-sm font-medium mb-2">Name</label>
         <input
           id="name"
           v-model="form.name"
@@ -22,8 +19,7 @@ class="block text-sm font-medium mb-2">Name</label>
       </div>
 
       <div>
-        <label for="description"
-class="block text-sm font-medium mb-2">Description</label>
+        <label for="description" class="block text-sm font-medium mb-2">Description</label>
         <textarea
           id="description"
           v-model="form.description"
@@ -34,8 +30,7 @@ class="block text-sm font-medium mb-2">Description</label>
       </div>
 
       <div>
-        <label for="instructions"
-class="block text-sm font-medium mb-2">Instructions</label>
+        <label for="instructions" class="block text-sm font-medium mb-2">Instructions</label>
         <textarea
           id="instructions"
           v-model="form.instructions"
@@ -46,8 +41,7 @@ class="block text-sm font-medium mb-2">Instructions</label>
       </div>
 
       <div>
-        <label for="tone"
-class="block text-sm font-medium mb-2">Tone</label>
+        <label for="tone" class="block text-sm font-medium mb-2">Tone</label>
         <textarea
           id="tone"
           v-model="form.tone"
@@ -58,8 +52,7 @@ class="block text-sm font-medium mb-2">Tone</label>
       </div>
 
       <div>
-        <label for="avoid"
-class="block text-sm font-medium mb-2">Things to Avoid</label>
+        <label for="avoid" class="block text-sm font-medium mb-2">Things to Avoid</label>
         <textarea
           id="avoid"
           v-model="form.avoid"
@@ -70,8 +63,7 @@ class="block text-sm font-medium mb-2">Things to Avoid</label>
       </div>
 
       <div>
-        <label for="trigger"
-class="block text-sm font-medium mb-2">Trigger Conditions</label>
+        <label for="trigger" class="block text-sm font-medium mb-2">Trigger Conditions</label>
         <textarea
           id="trigger"
           v-model="form.trigger"
@@ -88,8 +80,7 @@ class="block text-sm font-medium mb-2">Trigger Conditions</label>
           type="checkbox"
           class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
         />
-        <label for="enabled"
-class="text-sm font-medium">Enable agent</label>
+        <label for="enabled" class="text-sm font-medium">Enable agent</label>
       </div>
 
       <div class="flex gap-4">
@@ -149,9 +140,9 @@ const handleSubmit = async () => {
 
     toast.success("Agent created successfully");
     await router.push("/agents");
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to create agent:", error);
-    toast.error(error.message || "Failed to create agent");
+    toast.error((error as Error).message || "Failed to create agent");
   } finally {
     isLoading.value = false;
   }

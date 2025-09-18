@@ -22,7 +22,7 @@ export class ConversationService {
       title?: string;
       agentId?: string | null;
       playbook_id?: string | null;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
       customer_id?: string | null;
     },
@@ -80,14 +80,14 @@ export class ConversationService {
       processing_locked_by?: string | null;
       ended_at?: Date;
       closed_at?: Date | null;
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       resolution_metadata?: {
         resolved: boolean;
         confidence: number;
         reason: string;
       };
       playbook_id?: string | null;
-      orchestration_status?: Record<string, any> | null;
+      orchestration_status?: Record<string, unknown> | null;
     },
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved
@@ -109,8 +109,8 @@ export class ConversationService {
       content: string;
       type: MessageType;
       sender?: string;
-      usage_metadata?: Record<string, any>;
-      metadata?: Record<string, any>;
+      usage_metadata?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
     },
   ): Promise<Message> {
     return await this.messageRepository.create({
@@ -128,7 +128,7 @@ export class ConversationService {
     messages: Array<{
       content: string;
       type: MessageType;
-      usage_metadata?: Record<string, any>;
+      usage_metadata?: Record<string, unknown>;
     }>,
   ): Promise<Message[]> {
     const messagesToCreate = messages.map((msg) => ({

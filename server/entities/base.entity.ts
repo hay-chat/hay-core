@@ -24,7 +24,7 @@ export abstract class BaseEntity extends TypeOrmBaseEntity {
   updatedBy?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   validateEntity(): void {
     // Implement validation logic here if needed

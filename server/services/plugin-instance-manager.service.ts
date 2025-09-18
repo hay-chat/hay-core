@@ -3,14 +3,6 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { processManagerService } from "./process-manager.service";
 import { getUTCNow } from "@server/utils/date.utils";
 
-interface InstanceInfo {
-  organizationId: string;
-  pluginId: string;
-  lastActivityAt: Date;
-  priority: number;
-  isRunning: boolean;
-}
-
 interface InstancePoolStats {
   runningCount: number;
   maxAllowed: number;

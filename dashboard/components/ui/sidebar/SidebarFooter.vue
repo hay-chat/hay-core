@@ -1,6 +1,5 @@
 <template>
-  <div :data-sidebar="state"
-:class="cn('flex flex-col gap-2', className)">
+  <div :data-sidebar="state" :class="cn('flex flex-col gap-2', className)">
     <slot />
   </div>
 </template>
@@ -10,12 +9,16 @@ import { computed, inject } from "vue";
 import { cn } from "@/lib/utils";
 
 interface SidebarFooterProps {
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
+}
+
+interface SidebarContext {
+  state: { value: string };
 }
 
 const props = defineProps<SidebarFooterProps>();
 const className = computed(() => props.class);
 
-const sidebar = inject<any>("sidebar");
+const sidebar = inject<SidebarContext>("sidebar");
 const state = computed(() => sidebar?.state?.value || "expanded");
 </script>

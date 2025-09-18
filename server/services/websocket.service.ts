@@ -1,15 +1,14 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
+import { IncomingMessage } from "http";
 import { processManagerService } from "./process-manager.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
-import {
-  conversationRepository,
-  ConversationRepository,
-} from "../repositories/conversation.repository";
-import { CustomerIdentifier } from "../../plugins/base";
+import { conversationRepository } from "../repositories/conversation.repository";
 import jwt from "jsonwebtoken";
 import { config } from "../config/env";
+import type { JWTPayload } from "../types/auth.types";
+import type { Message } from "../database/entities/message.entity";
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -18,7 +17,40 @@ interface WebSocketClient {
   conversationId?: string;
   pluginId?: string;
   authenticated: boolean;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
+}
+
+interface WebSocketMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
+interface IdentifyMessage extends WebSocketMessage {
+  customerId: string;
+  conversationId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface ChatMessage extends WebSocketMessage {
+  content: string;
+  timestamp?: number;
+}
+
+interface TypingMessage extends WebSocketMessage {
+  isTyping: boolean;
+}
+
+interface LoadHistoryMessage extends WebSocketMessage {
+  limit?: number;
+  offset?: number;
+}
+
+interface SubscribeMessage extends WebSocketMessage {
+  events?: string[];
+}
+
+interface JWTPayloadWithOrg extends JWTPayload {
+  organizationId?: string;
 }
 
 export class WebSocketService {
@@ -57,7 +89,7 @@ export class WebSocketService {
   /**
    * Handle new WebSocket connection
    */
-  private handleConnection(ws: WebSocket, req: any): void {
+  private handleConnection(ws: WebSocket, req: IncomingMessage): void {
     const clientId = this.generateClientId();
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const token = url.searchParams.get("token");
@@ -113,7 +145,7 @@ export class WebSocketService {
     if (!client) return false;
 
     try {
-      const decoded = jwt.verify(token, config.jwt.secret) as any;
+      const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
       client.organizationId = decoded.organizationId;
       client.authenticated = true;
       return true;
@@ -171,7 +203,7 @@ export class WebSocketService {
   /**
    * Handle customer identification
    */
-  private async handleIdentify(clientId: string, message: any): Promise<void> {
+  private async handleIdentify(clientId: string, message: IdentifyMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -266,7 +298,7 @@ export class WebSocketService {
   /**
    * Handle chat message
    */
-  private async handleChatMessage(clientId: string, message: any): Promise<void> {
+  private async handleChatMessage(clientId: string, message: ChatMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client || !client.conversationId || !client.pluginId) return;
 
@@ -304,7 +336,7 @@ export class WebSocketService {
   /**
    * Handle typing indicator
    */
-  private async handleTypingIndicator(clientId: string, message: any): Promise<void> {
+  private async handleTypingIndicator(clientId: string, message: TypingMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client || !client.conversationId) return;
 
@@ -323,7 +355,7 @@ export class WebSocketService {
   /**
    * Handle load history request
    */
-  private async handleLoadHistory(clientId: string, message: any): Promise<void> {
+  private async handleLoadHistory(clientId: string, message: LoadHistoryMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -340,7 +372,7 @@ export class WebSocketService {
     client.ws.send(
       JSON.stringify({
         type: "history",
-        messages: messages.map((msg: any) => ({
+        messages: messages.map((msg: Message) => ({
           text: msg.content,
           sender: msg.role === "user" ? "user" : "agent",
           timestamp: msg.created_at,
@@ -353,7 +385,7 @@ export class WebSocketService {
   /**
    * Handle subscription request
    */
-  private async handleSubscribe(clientId: string, message: any): Promise<void> {
+  private async handleSubscribe(clientId: string, message: SubscribeMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -405,7 +437,7 @@ export class WebSocketService {
   /**
    * Send message to specific client
    */
-  sendToClient(clientId: string, message: any): boolean {
+  sendToClient(clientId: string, message: Record<string, unknown>): boolean {
     const client = this.clients.get(clientId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
       return false;
@@ -418,7 +450,7 @@ export class WebSocketService {
   /**
    * Send message to all clients in a conversation
    */
-  sendToConversation(conversationId: string, message: any): number {
+  sendToConversation(conversationId: string, message: Record<string, unknown>): number {
     const clientIds = this.conversationClients.get(conversationId);
     if (!clientIds) return 0;
 
@@ -435,7 +467,11 @@ export class WebSocketService {
   /**
    * Broadcast to conversation except sender
    */
-  broadcastToConversation(conversationId: string, message: any, excludeClientId?: string): number {
+  broadcastToConversation(
+    conversationId: string,
+    message: Record<string, unknown>,
+    excludeClientId?: string,
+  ): number {
     const clientIds = this.conversationClients.get(conversationId);
     if (!clientIds) return 0;
 
@@ -452,7 +488,11 @@ export class WebSocketService {
   /**
    * Send message from plugin to conversation
    */
-  sendPluginMessage(organizationId: string, conversationId: string, message: any): void {
+  sendPluginMessage(
+    organizationId: string,
+    conversationId: string,
+    message: Record<string, unknown>,
+  ): void {
     this.sendToConversation(conversationId, {
       type: "message",
       data: message,
@@ -485,7 +525,7 @@ export class WebSocketService {
    */
   shutdown(): void {
     // Close all client connections
-    for (const [clientId, client] of this.clients) {
+    for (const [_clientId, client] of this.clients) {
       client.ws.close(1000, "Server shutting down");
     }
 

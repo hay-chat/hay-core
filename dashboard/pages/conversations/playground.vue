@@ -6,16 +6,13 @@
     >
       <div class="flex items-center justify-between px-6 py-4">
         <div class="flex items-center space-x-4">
-          <Button variant="ghost"
-@click="exitPlayground">
+          <Button variant="ghost" @click="exitPlayground">
             <X class="h-4 w-4 mr-2" />
             Exit Playground
           </Button>
           <div>
             <h1 class="text-xl font-semibold">Conversation Playground</h1>
-            <p class="text-sm text-muted-foreground">
-Test conversations with AI Assistant
-</p>
+            <p class="text-sm text-muted-foreground">Test conversations with AI Assistant</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -54,10 +51,8 @@ Test conversations with AI Assistant
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
-          <div v-if="messagesLoading"
-class="space-y-4">
-            <div v-for="i in 3"
-:key="i" class="animate-pulse">
+          <div v-if="messagesLoading" class="space-y-4">
+            <div v-for="i in 3" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
                 <div class="w-8 h-8 bg-gray-200 rounded-full" />
                 <div class="flex-1">
@@ -68,25 +63,22 @@ class="space-y-4">
             </div>
           </div>
 
-          <div v-else-if="messages.length === 0"
-class="text-center py-12">
+          <div v-else-if="messages.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p class="text-muted-foreground">Send a message to start testing</p>
           </div>
 
-          <div v-else
-class="space-y-4">
+          <div v-else class="space-y-4">
             <!-- Messages -->
             <ChatMessage
-              v-for="(message, index) in messages"
+              v-for="message in messages"
               :key="message.id"
               :message="message"
               :inverted="true"
             />
 
             <!-- Typing indicator -->
-            <div v-if="isAgentTyping"
-class="flex space-x-3 max-w-2xl">
+            <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
               <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <Bot class="h-4 w-4 text-primary" />
               </div>
@@ -247,7 +239,7 @@ import {
   MessageSquare,
   Send,
   Bot,
-  FlaskConical,
+  // FlaskConical,
   Activity,
   Clock,
   HelpCircle,
@@ -272,9 +264,30 @@ const messagesContainer = ref<HTMLElement>();
 const selectedPlaybookId = ref("");
 
 // Data
-const conversation = ref<any>(null);
-const messages = ref<any[]>([]);
-const playbooks = ref<any[]>([]);
+interface ConversationData {
+  id: string;
+  status: string;
+  playbook_id?: string;
+  needs_processing?: boolean;
+  messages?: MessageData[];
+}
+
+interface MessageData {
+  id: string;
+  content: string;
+  created_at: string;
+  type: string;
+  sender?: string;
+}
+
+interface PlaybookData {
+  id: string;
+  name: string;
+}
+
+const conversation = ref<ConversationData | null>(null);
+const messages = ref<MessageData[]>([]);
+const playbooks = ref<PlaybookData[]>([]);
 
 // Orchestrator status
 const orchestratorStatus = ref("idle");
@@ -282,13 +295,13 @@ const lastOrchestratorCheck = ref("");
 const processingCount = ref(0);
 
 // Polling
-let pollingInterval: NodeJS.Timeout | null = null;
+let pollingInterval: ReturnType<typeof setTimeout> | null = null;
 
 // Navigation
 const router = useRouter();
 
 // Methods
-const shouldShowHeader = (index: number): boolean => {
+const _shouldShowHeader = (index: number): boolean => {
   // Always show header for first message
   if (index === 0) return true;
 
@@ -340,7 +353,7 @@ const formatStatus = (status: string) => {
   return labels[status as keyof typeof labels] || status;
 };
 
-const formatDate = (date: Date | string | undefined) => {
+const _formatDate = (date: Date | string | undefined) => {
   if (!date) return "N/A";
   const dateObj = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("en-US", {
@@ -479,7 +492,9 @@ const resetConversation = async () => {
 const loadPlaybooks = async () => {
   try {
     const response = await HayApi.playbooks.list.query();
-    playbooks.value = Array.isArray(response) ? response : (response as any)?.items || [];
+    playbooks.value = Array.isArray(response)
+      ? response
+      : (response as { items?: PlaybookData[] })?.items || [];
   } catch (error) {
     console.error("Failed to load playbooks:", error);
   }
@@ -501,7 +516,7 @@ const pollConversation = async () => {
     const allMessages = response.messages || [];
 
     // Transform messages to match the component format
-    const transformedMessages = allMessages.map((msg: any) => {
+    const transformedMessages = allMessages.map((msg: MessageData) => {
       let sender = "system";
       if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
         sender = "agent";

@@ -4,9 +4,7 @@
       <!-- Header -->
       <div class="text-center">
         <CardTitle class="text-2xl"> Welcome back </CardTitle>
-        <CardDescription class="mt-2">
-Sign in to your account to continue
-</CardDescription>
+        <CardDescription class="mt-2"> Sign in to your account to continue </CardDescription>
       </div>
 
       <!-- Social Login -->
@@ -42,8 +40,7 @@ Sign in to your account to continue
       </div> -->
 
       <!-- Login Form -->
-      <form class="space-y-4"
-@submit.prevent="handleSubmit">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
         <FormField
           id="email"
           v-model="form.email"
@@ -70,10 +67,8 @@ Sign in to your account to continue
         <!-- Remember me and Forgot password -->
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <Checkbox id="remember"
-v-model:checked="form.rememberMe" />
-            <Label for="remember"
-class="text-sm text-gray-700 cursor-pointer"> Remember me </Label>
+            <Checkbox id="remember" v-model:checked="form.rememberMe" />
+            <Label for="remember" class="text-sm text-gray-700 cursor-pointer"> Remember me </Label>
           </div>
           <NuxtLink
             to="/forgot-password"
@@ -85,8 +80,7 @@ class="text-sm text-gray-700 cursor-pointer"> Remember me </Label>
 
         <!-- Submit Button -->
         <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
-          <div v-if="loading"
-class="flex items-center space-x-2">
+          <div v-if="loading" class="flex items-center space-x-2">
             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             <span>Signing in...</span>
           </div>
@@ -116,6 +110,7 @@ class="flex items-center space-x-2">
 
 <script setup lang="ts">
 import { validateEmail } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
 
 definePageMeta({
   layout: false,
@@ -124,7 +119,7 @@ definePageMeta({
 // Navigation
 const router = useRouter();
 
-// Auth composable - wrapped to handle SSR
+// Auth store
 const authStore = useAuthStore();
 
 // Form state
@@ -141,7 +136,7 @@ const errors = reactive({
 
 const error = ref("");
 
-const socialLoading = reactive({
+const _socialLoading = reactive({
   google: false,
   github: false,
   microsoft: false,

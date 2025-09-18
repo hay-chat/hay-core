@@ -12,10 +12,11 @@ import {
 } from "@server/entities/document.entity";
 import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
-import { WebScraperService } from "@server/services/web-scraper.service";
+import { WebScraperService, type DiscoveredPage } from "@server/services/web-scraper.service";
 import { HtmlProcessor } from "@server/processors/html.processor";
 import { jobRepository } from "@server/repositories/job.repository";
 import { JobStatus, JobPriority } from "@server/entities/job.entity";
+import { Document } from "@server/entities/document.entity";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -84,7 +85,7 @@ export const documentsRouter = t.router({
         throw new Error("Organization ID is required");
       }
       let processedContent = input.content;
-      let metadata: any = {};
+      let metadata: Record<string, unknown> = {};
 
       // Process file if provided
       if (input.fileBuffer && input.mimeType) {
@@ -242,7 +243,7 @@ export const documentsRouter = t.router({
       );
 
       // Delete the document itself
-      const deleted = await documentRepository.delete(document.id, ctx.organizationId!);
+      await documentRepository.delete(document.id, ctx.organizationId!);
 
       return {
         success: true,
@@ -526,7 +527,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  getImporters: authenticatedProcedure.query(async ({ ctx }) => {
+  getImporters: authenticatedProcedure.query(async () => {
     // Get enabled plugins with document_importer capability
     // For now, return only the native web importer
     // TODO: Load plugins with document_importer capability
@@ -558,8 +559,8 @@ async function processWebImport(
   organizationId: string,
   jobId: string,
   url: string,
-  selectedPages: any[],
-  metadata?: any,
+  selectedPages: DiscoveredPage[],
+  metadata?: Record<string, unknown>,
 ) {
   try {
     // Update job status to processing
@@ -680,26 +681,35 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 
     // Initialize scraper
     const scraper = new WebScraperService();
-    const discoveredPages: any[] = [];
+    const discoveredPages: DiscoveredPage[] = [];
 
     // Listen for discovery progress events
-    scraper.on("discovery-progress", async (progress: any) => {
-      // Update job with progress
-      await jobRepository.update(jobId, organizationId, {
-        data: {
-          type: "page_discovery",
-          url,
-          progress: {
-            status: "discovering",
-            pagesFound: progress.found,
-            pagesProcessed: progress.processed,
-            totalEstimated: progress.total,
-            currentUrl: progress.currentUrl,
-            discoveredPages: discoveredPages,
+    scraper.on(
+      "discovery-progress",
+      async (progress: {
+        status: string;
+        found: number;
+        total?: number;
+        currentUrl?: string;
+        discoveredPages?: DiscoveredPage[];
+      }) => {
+        // Update job with progress
+        await jobRepository.update(jobId, organizationId, {
+          data: {
+            type: "page_discovery",
+            url,
+            progress: {
+              status: "discovering",
+              pagesFound: progress.found,
+              pagesProcessed: progress.processed,
+              totalEstimated: progress.total,
+              currentUrl: progress.currentUrl,
+              discoveredPages: discoveredPages,
+            },
           },
-        },
-      });
-    });
+        });
+      },
+    );
 
     // Discover URLs
     const pages = await scraper.discoverUrls(url);
@@ -741,7 +751,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 }
 
 // Async function to process web recrawl
-async function processWebRecrawl(organizationId: string, jobId: string, document: any) {
+async function processWebRecrawl(organizationId: string, jobId: string, document: Document) {
   try {
     // Update job status to processing
     await jobRepository.update(jobId, organizationId, {

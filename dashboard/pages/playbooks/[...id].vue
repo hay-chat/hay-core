@@ -2,9 +2,7 @@
   <div class="container mx-auto max-w-4xl py-8">
     <div class="mb-8 flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold mb-2">
-{{ isEditMode ? "Edit" : "Create New" }} Playbook
-</h1>
+        <h1 class="text-3xl font-bold mb-2">{{ isEditMode ? "Edit" : "Create New" }} Playbook</h1>
         <p class="text-muted-foreground">
           {{
             isEditMode
@@ -19,21 +17,16 @@
       </Button>
     </div>
 
-    <div v-if="loading"
-class="text-center py-12">
+    <div v-if="loading" class="text-center py-12">
       <Loading label="Loading playbook..." />
     </div>
 
     <Card v-else-if="!isEditMode || playbook">
       <CardContent class="p-6">
-        <form
-data-testid="playbook-form" @submit.prevent="handleSubmit"
-class="space-y-6"
->
+        <form data-testid="playbook-form" class="space-y-6" @submit.prevent="handleSubmit">
           <!-- Title Field -->
           <div class="space-y-2">
-            <label for="title"
-class="text-sm font-medium">
+            <label for="title" class="text-sm font-medium">
               Playbook Title <span class="text-red-500">*</span>
             </label>
             <Input
@@ -43,16 +36,14 @@ class="text-sm font-medium">
               :class="errors.title ? 'border-red-500' : ''"
               required
             />
-            <p v-if="errors.title"
-class="text-sm text-red-500">
+            <p v-if="errors.title" class="text-sm text-red-500">
               {{ errors.title }}
             </p>
           </div>
 
           <!-- Trigger Field -->
           <div class="space-y-2">
-            <label for="trigger"
-class="text-sm font-medium">
+            <label for="trigger" class="text-sm font-medium">
               Trigger <span class="text-red-500">*</span>
             </label>
             <Input
@@ -62,8 +53,7 @@ class="text-sm font-medium">
               :class="errors.trigger ? 'border-red-500' : ''"
               required
             />
-            <p v-if="errors.trigger"
-class="text-sm text-red-500">
+            <p v-if="errors.trigger" class="text-sm text-red-500">
               {{ errors.trigger }}
             </p>
             <p class="text-sm text-muted-foreground">
@@ -73,8 +63,7 @@ class="text-sm text-red-500">
 
           <!-- Description Field -->
           <div class="space-y-2">
-            <label for="description"
-class="text-sm font-medium"> Description </label>
+            <label for="description" class="text-sm font-medium"> Description </label>
             <Textarea
               id="description"
               v-model="form.description"
@@ -94,8 +83,7 @@ class="text-sm font-medium"> Description </label>
 
           <!-- Status Field -->
           <div class="space-y-2">
-            <label for="status"
-class="text-sm font-medium">Status</label>
+            <label for="status" class="text-sm font-medium">Status</label>
             <select
               id="status"
               v-model="form.status"
@@ -118,8 +106,7 @@ class="text-sm font-medium">Status</label>
             <div v-else-if="agents.length === 0" class="p-4 text-center text-muted-foreground">
               No agents available. Create agents first.
             </div>
-            <div v-else
-class="space-y-2 border rounded-md p-4">
+            <div v-else class="space-y-2 border rounded-md p-4">
               <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
                 <input
                   :id="`agent-${agent.id}`"
@@ -128,8 +115,7 @@ class="space-y-2 border rounded-md p-4">
                   :value="agent.id"
                   class="h-4 w-4 rounded border-gray-300"
                 />
-                <label :for="`agent-${agent.id}`"
-class="flex-1 cursor-pointer">
+                <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
                   <div class="font-medium">{{ agent.name }}</div>
                   <div v-if="agent.description" class="text-sm text-muted-foreground">
                     {{ agent.description }}
@@ -185,8 +171,7 @@ class="flex-1 cursor-pointer">
       </CardContent>
     </Card>
 
-    <div v-else-if="isEditMode && !loading"
-class="text-center py-12">
+    <div v-else-if="isEditMode && !loading" class="text-center py-12">
       <Error label="Playbook not found" />
     </div>
 
@@ -207,7 +192,7 @@ class="text-center py-12">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
-import type { PlaybookStatus } from "~/types/playbook";
+import type { PlaybookStatus, InstructionItem, Agent, Playbook } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
 
@@ -235,7 +220,7 @@ const form = ref({
   title: "",
   trigger: "",
   description: "",
-  instructions: null as any,
+  instructions: null as InstructionItem[] | string | null,
   status: "draft" as PlaybookStatus,
   agentIds: [] as string[],
 });
@@ -244,8 +229,8 @@ const form = ref({
 const loading = ref(false);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
-const agents = ref<any[]>([]);
-const playbook = ref<any>(null);
+const agents = ref<Agent[]>([]);
+const playbook = ref<Playbook | null>(null);
 const errors = ref<Record<string, string>>({});
 
 // Format date
@@ -290,7 +275,7 @@ onMounted(async () => {
         description: playbookResponse.description || "",
         instructions: playbookResponse.instructions || null,
         status: playbookResponse.status,
-        agentIds: playbookResponse.agents?.map((a: any) => a.id) || [],
+        agentIds: playbookResponse.agents?.map((a) => a.id) || [],
       };
 
       loadingInstructions.value = false;

@@ -10,7 +10,7 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 export class PluginManagerService {
   private pluginsDir: string;
   private registry: Map<string, PluginRegistry> = new Map();
-  private ajv: any;
+  private ajv: Ajv;
   private manifestSchema: Record<string, unknown> | null = null;
 
   constructor() {

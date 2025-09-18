@@ -2,8 +2,7 @@
   <NuxtLayout name="auth">
     <div class="space-y-6">
       <!-- Success State -->
-      <div v-if="emailSent"
-class="text-center space-y-4">
+      <div v-if="emailSent" class="text-center space-y-4">
         <div class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100">
           <CheckCircleIcon class="w-6 h-6 text-green-600" />
         </div>
@@ -19,7 +18,7 @@ class="text-center space-y-4">
         <div class="space-y-4">
           <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p class="text-sm text-blue-800">
-              <strong>Didn't receive the email?</strong><br >
+              <strong>Didn't receive the email?</strong><br />
               Check your spam folder or try resending the link.
             </p>
           </div>
@@ -32,8 +31,7 @@ class="text-center space-y-4">
               :disabled="resendLoading || resendCooldown > 0"
               @click="resendEmail"
             >
-              <div v-if="resendLoading"
-class="flex items-center space-x-2">
+              <div v-if="resendLoading" class="flex items-center space-x-2">
                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900" />
                 <span>Resending...</span>
               </div>
@@ -41,8 +39,7 @@ class="flex items-center space-x-2">
               <span v-else>Resend email</span>
             </Button>
 
-            <Button variant="ghost"
-size="lg" class="w-full" @click="goBack">
+            <Button variant="ghost" size="lg" class="w-full" @click="goBack">
               Back to sign in
             </Button>
           </div>
@@ -50,8 +47,7 @@ size="lg" class="w-full" @click="goBack">
       </div>
 
       <!-- Request Form -->
-      <div v-else
-class="space-y-6">
+      <div v-else class="space-y-6">
         <!-- Header -->
         <div class="text-center">
           <CardTitle class="text-2xl"> Forgot your password? </CardTitle>
@@ -61,8 +57,7 @@ class="space-y-6">
         </div>
 
         <!-- Reset Form -->
-        <form class="space-y-4"
-@submit.prevent="handleSubmit">
+        <form class="space-y-4" @submit.prevent="handleSubmit">
           <FormField
             id="email"
             v-model="form.email"
@@ -77,8 +72,7 @@ class="space-y-6">
 
           <!-- Submit Button -->
           <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
-            <div v-if="loading"
-class="flex items-center space-x-2">
+            <div v-if="loading" class="flex items-center space-x-2">
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               <span>Sending reset link...</span>
             </div>

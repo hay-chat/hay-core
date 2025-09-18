@@ -1,6 +1,5 @@
 <template>
-  <div v-if="password"
-class="space-y-3">
+  <div v-if="password" class="space-y-3">
     <!-- Strength bar -->
     <div class="space-y-2">
       <div class="flex justify-between items-center">
@@ -9,8 +8,7 @@ class="space-y-3">
           {{ strengthText }}
         </span>
       </div>
-      <Progress :value="strengthPercentage"
-:class="strengthBarColor" />
+      <Progress :value="strengthPercentage" :class="strengthBarColor" />
     </div>
 
     <!-- Requirements checklist -->
@@ -18,38 +16,28 @@ class="space-y-3">
       <p class="text-sm text-gray-600">Password must contain:</p>
       <ul class="space-y-1">
         <li :class="requirementClass(validation.hasMinLength)">
-          <CheckIcon v-if="validation.hasMinLength"
-class="h-3 w-3" />
-          <XMarkIcon v-else
-class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasMinLength" class="h-3 w-3" />
+          <XMarkIcon v-else class="h-3 w-3" />
           At least 8 characters
         </li>
         <li :class="requirementClass(validation.hasUpperCase)">
-          <CheckIcon v-if="validation.hasUpperCase"
-class="h-3 w-3" />
-          <XMarkIcon v-else
-class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasUpperCase" class="h-3 w-3" />
+          <XMarkIcon v-else class="h-3 w-3" />
           One uppercase letter
         </li>
         <li :class="requirementClass(validation.hasLowerCase)">
-          <CheckIcon v-if="validation.hasLowerCase"
-class="h-3 w-3" />
-          <XMarkIcon v-else
-class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasLowerCase" class="h-3 w-3" />
+          <XMarkIcon v-else class="h-3 w-3" />
           One lowercase letter
         </li>
         <li :class="requirementClass(validation.hasNumber)">
-          <CheckIcon v-if="validation.hasNumber"
-class="h-3 w-3" />
-          <XMarkIcon v-else
-class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasNumber" class="h-3 w-3" />
+          <XMarkIcon v-else class="h-3 w-3" />
           One number
         </li>
         <li :class="requirementClass(validation.hasSpecialChar)">
-          <CheckIcon v-if="validation.hasSpecialChar"
-class="h-3 w-3" />
-          <XMarkIcon v-else
-class="h-3 w-3" />
+          <CheckIcon v-if="validation.hasSpecialChar" class="h-3 w-3" />
+          <XMarkIcon v-else class="h-3 w-3" />
           One special character
         </li>
       </ul>

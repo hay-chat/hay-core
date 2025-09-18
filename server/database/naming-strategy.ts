@@ -35,7 +35,7 @@ export class SnakeNamingStrategy extends DefaultNamingStrategy implements Naming
     firstTableName: string,
     secondTableName: string,
     firstPropertyName: string,
-    secondPropertyName: string,
+    _secondPropertyName: string,
   ): string {
     return snakeCase(
       firstTableName + "_" + firstPropertyName.replace(/\./gi, "_") + "_" + secondTableName,

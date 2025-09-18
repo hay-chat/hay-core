@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface SidebarProviderProps {
   defaultOpen?: boolean;
   open?: boolean;
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
 }
 
 const props = withDefaults(defineProps<SidebarProviderProps>(), {

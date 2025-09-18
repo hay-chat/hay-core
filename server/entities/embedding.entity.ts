@@ -18,7 +18,7 @@ export class Embedding {
   pageContent!: string;
 
   @Column({ type: "jsonb", nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Column({
     type: "text",
@@ -34,7 +34,7 @@ export class Embedding {
 
         // Handle pgvector format
         if (typeof value === "string") {
-          const cleaned = value.replace(/[\[\]]/g, "");
+          const cleaned = value.replace(/[[\]]/g, "");
           if (!cleaned) return null;
           return cleaned.split(",").map((v) => parseFloat(v.trim()));
         }

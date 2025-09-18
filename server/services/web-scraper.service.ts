@@ -202,7 +202,7 @@ export class WebScraperService extends EventEmitter {
     const $ = cheerio.load(content, { xmlMode: true });
 
     // Parse XML sitemap
-    $("url > loc").each((_: number, element: any) => {
+    $("url > loc").each((_: number, element: cheerio.Element) => {
       const url = $(element).text().trim();
       if (url && this.isSameDomain(url)) {
         urls.push(url);
@@ -210,7 +210,7 @@ export class WebScraperService extends EventEmitter {
     });
 
     // Parse sitemap index
-    $("sitemap > loc").each((_: number, element: any) => {
+    $("sitemap > loc").each((_: number, element: cheerio.Element) => {
       const url = $(element).text().trim();
       if (url && this.isSameDomain(url)) {
         urls.push(url);
@@ -374,7 +374,7 @@ export class WebScraperService extends EventEmitter {
     const urls: string[] = [];
     const $ = cheerio.load(html);
 
-    $("a[href]").each((_: number, element: any) => {
+    $("a[href]").each((_: number, element: cheerio.Element) => {
       const href = $(element).attr("href");
       if (href) {
         try {

@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from "typeorm";
+import type { HayPluginManifest } from "../types/plugin.types";
 
 @Entity("plugin_registry")
 @Index(["pluginId"], { unique: true })
@@ -23,7 +24,7 @@ export class PluginRegistry {
   version!: string;
 
   @Column({ type: "jsonb" })
-  manifest!: Record<string, any>;
+  manifest!: HayPluginManifest;
 
   @Column({ type: "boolean", default: false })
   installed!: boolean;

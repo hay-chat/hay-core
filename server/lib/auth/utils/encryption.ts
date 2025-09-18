@@ -85,11 +85,23 @@ export function decryptValue(encryptedText: string): string {
 /**
  * Encrypt sensitive values in a config object based on schema
  */
+interface ConfigSchema {
+  [key: string]: {
+    encrypted?: boolean;
+    [key: string]: unknown;
+  };
+}
+
+interface EncryptedValue {
+  encrypted: true;
+  value: string;
+}
+
 export function encryptConfig(
-  config: Record<string, any>,
-  schema: Record<string, any>,
-): Record<string, any> {
-  const encrypted: Record<string, any> = {};
+  config: Record<string, unknown>,
+  schema: ConfigSchema,
+): Record<string, unknown> {
+  const encrypted: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(config)) {
     if (schema[key]?.encrypted && value !== null && value !== undefined) {
@@ -110,8 +122,8 @@ export function encryptConfig(
 /**
  * Decrypt sensitive values in a config object
  */
-export function decryptConfig(config: Record<string, any>): Record<string, any> {
-  const decrypted: Record<string, any> = {};
+export function decryptConfig(config: Record<string, unknown>): Record<string, unknown> {
+  const decrypted: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(config)) {
     if (value && typeof value === "object" && value.encrypted) {
@@ -134,7 +146,7 @@ export function decryptConfig(config: Record<string, any>): Record<string, any> 
 /**
  * Check if a value is encrypted
  */
-export function isEncrypted(value: any): boolean {
+export function isEncrypted(value: unknown): value is EncryptedValue {
   return value && typeof value === "object" && value.encrypted === true;
 }
 

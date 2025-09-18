@@ -3,7 +3,7 @@ export interface Message {
   conversation_id: string;
   content: string;
   type: MessageType;
-  usage_metadata?: Record<string, any> | null;
+  usage_metadata?: Record<string, unknown> | null;
   sender?: string | null;
   metadata?: {
     model?: string;
@@ -14,11 +14,11 @@ export interface Message {
     confidence?: number;
     toolStatus?: string;
     toolName?: string;
-    toolArgs?: Record<string, any>;
-    toolResult?: Record<string, any>;
+    toolArgs?: Record<string, unknown>;
+    toolResult?: Record<string, unknown>;
     tool_call?: {
       tool_name: string;
-      arguments: Record<string, any>;
+      arguments: Record<string, unknown>;
     };
     isPlaybook?: boolean;
     playbookId?: string;

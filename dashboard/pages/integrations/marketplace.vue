@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm" @click="refreshPlugins">
+        <Button variant="outline" size="sm" @click="refreshPlugins">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -57,8 +56,7 @@ size="sm" @click="refreshPlugins">
           size="sm"
           @click="selectedCategory = category.id"
         >
-          <component :is="category.icon"
-class="h-4 w-4 mr-2" />
+          <component :is="category.icon" class="h-4 w-4 mr-2" />
           {{ category.name }}
         </Button>
       </div>
@@ -73,10 +71,8 @@ class="h-4 w-4 mr-2" />
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <div v-for="i in 6"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div v-for="i in 6" :key="i" class="animate-pulse">
         <Card>
           <CardHeader>
             <div class="h-4 bg-gray-200 rounded w-1/3" />
@@ -91,8 +87,7 @@ class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredPlugins.length === 0"
-class="text-center py-12">
+    <div v-else-if="filteredPlugins.length === 0" class="text-center py-12">
       <Package class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">No plugins found</h3>
       <p class="text-muted-foreground">
@@ -105,8 +100,7 @@ class="text-center py-12">
     </div>
 
     <!-- Plugins Grid -->
-    <div v-else
-class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       <Card
         v-for="plugin in filteredPlugins"
         :key="plugin.id"
@@ -156,8 +150,7 @@ class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             </div>
 
             <!-- Features for channels -->
-            <div v-if="plugin.type.includes('channel')"
-class="space-y-2">
+            <div v-if="plugin.type.includes('channel')" class="space-y-2">
               <div class="text-sm font-medium">Features:</div>
               <div class="flex flex-wrap gap-1">
                 <Badge v-if="plugin.features?.fileUpload" variant="outline" class="text-xs">
@@ -188,8 +181,7 @@ class="space-y-2">
               </Button>
 
               <template v-else>
-                <Button size="sm"
-@click="navigateToSettings(plugin.id)">
+                <Button size="sm" @click="navigateToSettings(plugin.id)">
                   <Settings class="h-3 w-3 mr-1" />
                   Configure
                 </Button>
@@ -223,12 +215,12 @@ import {
   Power,
   Search,
   Globe,
-  Hash,
   FileText,
   Zap,
   Database,
 } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
+import { useToast } from "@/composables/useToast";
 
 // Reactive state
 const loading = ref(true);
@@ -358,7 +350,7 @@ const refreshPlugins = () => {
 const enablePlugin = async (pluginId: string) => {
   console.log("🔍 [DEBUG] Enabling plugin with ID:", pluginId);
   enablingPlugin.value = pluginId;
-  const toast = useToast();
+  const { toast } = useToast();
 
   try {
     await appStore.enablePlugin(pluginId);
@@ -371,7 +363,7 @@ const enablePlugin = async (pluginId: string) => {
     if (plugin?.hasConfiguration) {
       navigateToSettings(pluginId);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to enable plugin:", error);
 
     // Show error toast with details
@@ -388,14 +380,14 @@ const enablePlugin = async (pluginId: string) => {
 
 const disablePlugin = async (pluginId: string) => {
   disablingPlugin.value = pluginId;
-  const toast = useToast();
+  const { toast } = useToast();
 
   try {
     await appStore.disablePlugin(pluginId);
 
     // Show success toast
     toast.success(`Plugin ${pluginId.replace("hay-plugin-", "")} disabled successfully`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details

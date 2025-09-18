@@ -9,7 +9,7 @@ interface TooltipProviderProps {
   delayDuration?: number;
 }
 
-const props = withDefaults(defineProps<TooltipProviderProps>(), {
+const _props = withDefaults(defineProps<TooltipProviderProps>(), {
   delayDuration: 700,
 });
 </script>

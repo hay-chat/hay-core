@@ -25,10 +25,8 @@
                         : 'border-muted bg-background text-muted-foreground',
                   ]"
                 >
-                  <CheckCircle v-if="currentStep > index"
-class="h-5 w-5" />
-                  <span v-else
-class="text-sm font-medium">{{ index + 1 }}</span>
+                  <CheckCircle v-if="currentStep > index" class="h-5 w-5" />
+                  <span v-else class="text-sm font-medium">{{ index + 1 }}</span>
                 </div>
               </div>
               <div class="ml-4 flex-1">
@@ -68,8 +66,7 @@ class="text-sm font-medium">{{ index + 1 }}</span>
       </CardHeader>
       <CardContent>
         <!-- Step 1: Basic Information -->
-        <div v-if="currentStep === 0"
-class="space-y-6">
+        <div v-if="currentStep === 0" class="space-y-6">
           <div class="grid gap-4 md:grid-cols-2">
             <div>
               <Label html-for="agentName">Agent Name</Label>
@@ -158,16 +155,14 @@ class="space-y-6">
                 ]"
                 @click="agentForm.avatar = avatar.id"
               >
-                <component :is="avatar.icon"
-class="h-6 w-6 text-primary" />
+                <component :is="avatar.icon" class="h-6 w-6 text-primary" />
               </button>
             </div>
           </div>
         </div>
 
         <!-- Step 2: Knowledge Base -->
-        <div v-if="currentStep === 1"
-class="space-y-6">
+        <div v-if="currentStep === 1" class="space-y-6">
           <div class="text-center">
             <p class="text-sm text-muted-foreground mb-6">
               Choose how to populate your agent's knowledge base. You can select multiple sources.
@@ -190,9 +185,7 @@ class="space-y-6">
                     @update:checked="toggleKnowledgeSource('zendesk')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">
-Import from Zendesk
-</h4>
+                    <h4 class="font-medium text-foreground">Import from Zendesk</h4>
                     <p class="text-sm text-muted-foreground">
                       Import articles, FAQs, and support documentation from your Zendesk account.
                     </p>
@@ -240,9 +233,7 @@ Import from Zendesk
                     @update:checked="toggleKnowledgeSource('documents')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">
-Upload Documents
-</h4>
+                    <h4 class="font-medium text-foreground">Upload Documents</h4>
                     <p class="text-sm text-muted-foreground">
                       Upload PDF, DOCX, TXT files with your knowledge base content.
                     </p>
@@ -266,9 +257,7 @@ Upload Documents
                     @update:checked="toggleKnowledgeSource('tickets')"
                   />
                   <div class="flex-1">
-                    <h4 class="font-medium text-foreground">
-Import Support Tickets
-</h4>
+                    <h4 class="font-medium text-foreground">Import Support Tickets</h4>
                     <p class="text-sm text-muted-foreground">
                       Learn from historical support tickets and their resolutions.
                     </p>
@@ -297,8 +286,7 @@ Import Support Tickets
                   <X class="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="outline"
-@click="addWebsiteUrl">
+              <Button variant="outline" @click="addWebsiteUrl">
                 <Plus class="mr-2 h-4 w-4" />
                 Add URL
               </Button>
@@ -309,21 +297,17 @@ Import Support Tickets
             <Label>Upload Documents</Label>
             <div class="border-2 border-dashed border-muted rounded-lg p-6 text-center">
               <Upload class="mx-auto h-12 w-12 text-muted-foreground" />
-              <p class="mt-2 text-sm text-muted-foreground">
-Drop files here or click to upload
-</p>
+              <p class="mt-2 text-sm text-muted-foreground">Drop files here or click to upload</p>
               <p class="text-xs text-muted-foreground">
                 Supports PDF, DOCX, TXT files up to 10MB each
               </p>
-              <Button
-variant="outline" class="mt-4"> Choose Files </Button>
+              <Button variant="outline" class="mt-4"> Choose Files </Button>
             </div>
           </div>
         </div>
 
         <!-- Step 3: Personality & Behavior -->
-        <div v-if="currentStep === 2"
-class="space-y-6">
+        <div v-if="currentStep === 2" class="space-y-6">
           <div>
             <Label>Tone of Voice</Label>
             <div class="grid gap-3 mt-2 md:grid-cols-3">
@@ -414,18 +398,13 @@ class="space-y-6">
         </div>
 
         <!-- Step 4: Review & Create -->
-        <div v-if="currentStep === 3"
-class="space-y-6">
+        <div v-if="currentStep === 3" class="space-y-6">
           <div class="bg-background-secondary rounded-lg p-6">
-            <h3 class="font-medium text-foreground mb-4">
-Agent Configuration Summary
-</h3>
+            <h3 class="font-medium text-foreground mb-4">Agent Configuration Summary</h3>
 
             <div class="grid gap-4 md:grid-cols-2">
               <div>
-                <h4 class="text-sm font-medium text-foreground">
-Basic Information
-</h4>
+                <h4 class="text-sm font-medium text-foreground">Basic Information</h4>
                 <ul class="text-sm text-muted-foreground space-y-1 mt-2">
                   <li><strong>Name:</strong> {{ agentForm.name }}</li>
                   <li><strong>Type:</strong> {{ agentForm.type }}</li>
@@ -435,9 +414,7 @@ Basic Information
               </div>
 
               <div>
-                <h4 class="text-sm font-medium text-foreground">
-Knowledge Sources
-</h4>
+                <h4 class="text-sm font-medium text-foreground">Knowledge Sources</h4>
                 <ul class="text-sm text-muted-foreground space-y-1 mt-2">
                   <li v-for="source in agentForm.knowledgeSources" :key="source">
                     • {{ getSourceDisplayName(source) }}
@@ -474,9 +451,7 @@ Knowledge Sources
 
           <!-- Test Conversation Preview -->
           <div>
-            <h3 class="font-medium text-foreground mb-4">
-Test Conversation Preview
-</h3>
+            <h3 class="font-medium text-foreground mb-4">Test Conversation Preview</h3>
             <div class="border rounded-lg p-4 bg-background">
               <div class="space-y-3">
                 <div class="flex space-x-3">
@@ -486,9 +461,7 @@ Test Conversation Preview
                     <User class="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div class="flex-1">
-                    <p class="text-sm text-foreground">
-Hi, I need help with my account setup.
-</p>
+                    <p class="text-sm text-foreground">Hi, I need help with my account setup.</p>
                   </div>
                 </div>
                 <div class="flex space-x-3">
@@ -518,21 +491,15 @@ Hi, I need help with my account setup.
       </Button>
 
       <div class="flex space-x-3">
-        <Button variant="outline"
-:disabled="creating" @click="saveDraft"
->
-Save Draft
-</Button>
+        <Button variant="outline" :disabled="creating" @click="saveDraft"> Save Draft </Button>
 
         <Button v-if="currentStep < steps.length - 1" :disabled="!canProceed" @click="nextStep">
           Next
           <ChevronRight class="ml-2 h-4 w-4" />
         </Button>
 
-        <Button v-else
-:disabled="creating || !canProceed" @click="createAgent">
-          <div v-if="creating"
-class="flex items-center space-x-2">
+        <Button v-else :disabled="creating || !canProceed" @click="createAgent">
+          <div v-if="creating" class="flex items-center space-x-2">
             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             <span>Creating Agent...</span>
           </div>

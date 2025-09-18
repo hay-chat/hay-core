@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
+import type { HayPluginManifest } from "../../plugins/base/types";
 
 interface UITemplate {
   name: string;
@@ -14,8 +14,8 @@ interface ConfigField {
   label?: string;
   description?: string;
   required?: boolean;
-  default?: any;
-  options?: Array<{ label: string; value: any }>;
+  default?: unknown;
+  options?: Array<{ label: string; value: unknown }>;
   validation?: {
     min?: number;
     max?: number;
@@ -43,7 +43,7 @@ export class PluginUIService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as any;
+    const manifest = plugin.manifest as HayPluginManifest;
 
     // Check if plugin has custom configuration UI
     if (manifest.ui?.configuration) {
@@ -328,7 +328,7 @@ const saveConfiguration = async () => {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as any;
+    const manifest = plugin.manifest as HayPluginManifest;
     const templates: Record<string, UITemplate> = {};
 
     if (manifest.ui?.templates) {

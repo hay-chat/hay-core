@@ -4,23 +4,18 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Conversations</h1>
-        <p class="text-muted-foreground">
-Monitor and manage all customer conversations
-</p>
+        <p class="text-muted-foreground">Monitor and manage all customer conversations</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button size="sm"
-@click="openPlayground">
+        <Button size="sm" @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
           Conversation Playground
         </Button>
-        <Button variant="outline"
-size="sm">
+        <Button variant="outline" size="sm">
           <Download class="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="outline"
-size="sm" @click="refreshConversations">
+        <Button variant="outline" size="sm" @click="refreshConversations">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -84,8 +79,7 @@ size="sm" @click="refreshConversations">
 
         <select v-model="selectedAgent" class="px-3 py-2 text-sm border border-input rounded-md">
           <option value="">All Agents</option>
-          <option v-for="agent in agents"
-:key="agent.id" :value="agent.id">
+          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
             {{ agent.name }}
           </option>
         </select>
@@ -102,8 +96,7 @@ size="sm" @click="refreshConversations">
       </div>
 
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm" @click="toggleBulkMode">
+        <Button variant="outline" size="sm" @click="toggleBulkMode">
           <CheckSquare class="h-4 w-4 mr-2" />
           {{ bulkMode ? "Exit" : "Select" }}
         </Button>
@@ -115,10 +108,8 @@ size="sm" @click="toggleBulkMode">
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="space-y-4">
-      <div v-for="i in 5"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="space-y-4">
+      <div v-for="i in 5" :key="i" class="animate-pulse">
         <Card>
           <CardContent class="p-4">
             <div class="flex items-center space-x-4">
@@ -135,8 +126,7 @@ class="space-y-4">
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error"
-class="text-center py-12">
+    <div v-else-if="error" class="text-center py-12">
       <Error />
       <h3 class="text-lg font-medium mb-2">Error Loading Conversations</h3>
       <p class="text-muted-foreground mb-4">
@@ -161,8 +151,7 @@ class="text-center py-12">
             : "Click 'New Conversation' to start your first conversation."
         }}
       </p>
-      <Button v-if="!searchQuery"
-@click="openPlayground">
+      <Button v-if="!searchQuery" @click="openPlayground">
         <Plus class="h-4 w-4 mr-2" />
         Start Playground
       </Button>
@@ -175,8 +164,7 @@ class="text-center py-12">
           <table class="w-full">
             <thead class="border-b">
               <tr>
-                <th v-if="bulkMode"
-class="text-left py-3 px-4 w-12">
+                <th v-if="bulkMode" class="text-left py-3 px-4 w-12">
                   <Checkbox
                     :checked="
                       selectedConversations.length > 0 &&
@@ -200,8 +188,7 @@ class="text-left py-3 px-4 w-12">
                 class="border-b hover:bg-background-secondary cursor-pointer"
                 @click="!bulkMode && viewConversation(conversation.id)"
               >
-                <td v-if="bulkMode"
-class="py-3 px-4" @click.stop>
+                <td v-if="bulkMode" class="py-3 px-4" @click.stop>
                   <Checkbox
                     :checked="selectedConversations.includes(conversation.id)"
                     @update:checked="toggleConversationSelection(conversation.id)"
@@ -237,14 +224,12 @@ class="py-3 px-4" @click.stop>
                     <Star class="h-4 w-4 text-yellow-500 fill-current" />
                     <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                   </div>
-                  <span v-else
-class="text-xs text-muted-foreground">Not rated</span>
+                  <span v-else class="text-xs text-muted-foreground">Not rated</span>
                 </td>
                 <td class="py-3 px-4 text-sm text-muted-foreground">
                   {{ formatRelativeTime(conversation.updated_at) }}
                 </td>
-                <td class="py-3 px-4"
-@click.stop>
+                <td class="py-3 px-4" @click.stop>
                   <div class="flex items-center space-x-2">
                     <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
                       <Eye class="h-4 w-4" />
@@ -295,14 +280,10 @@ import {
   RefreshCcw,
   CheckSquare,
   Archive,
-  User,
-  Bot,
   Star,
   Eye,
   UserCheck,
   MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
   Circle,
   CheckCircle,
   AlertTriangle,
@@ -326,7 +307,7 @@ const appStore = useAppStore();
 // Reactive state
 const loading = ref(true);
 const error = ref<string | null>(null);
-const realTimeEnabled = ref(true);
+const _realTimeEnabled = ref(true);
 const searchQuery = ref("");
 const selectedStatus = ref("");
 const selectedAgent = ref("");
@@ -337,7 +318,19 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 
 // API data
-const conversations = ref<any[]>([]);
+interface Conversation {
+  id: string;
+  title?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  ended_at?: string;
+  metadata?: {
+    satisfaction?: number;
+  };
+}
+
+const conversations = ref<Conversation[]>([]);
 const totalConversations = ref(0);
 
 // Computed total pages
@@ -524,7 +517,6 @@ onMounted(async () => {
   // TODO: Setup real-time updates via WebSocket
 });
 
-// eslint-disable-next-line no-undef
 onUnmounted(() => {
   // TODO: Cleanup WebSocket connections
 });

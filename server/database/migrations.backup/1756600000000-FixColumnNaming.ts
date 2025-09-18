@@ -14,7 +14,7 @@ export class FixColumnNaming1756600000000 implements MigrationInterface {
             AND table_schema = 'public'
         `);
 
-    const userColumnNames = userColumns.map((col: any) => col.column_name);
+    const userColumnNames = userColumns.map((col: { column_name: string }) => col.column_name);
 
     // Check and rename columns if needed
     if (
@@ -58,7 +58,7 @@ export class FixColumnNaming1756600000000 implements MigrationInterface {
             AND table_schema = 'public'
         `);
 
-    const apiKeyColumnNames = apiKeyColumns.map((col: any) => col.column_name);
+    const apiKeyColumnNames = apiKeyColumns.map((col: { column_name: string }) => col.column_name);
 
     if (apiKeyColumnNames.includes("userid") && !apiKeyColumnNames.includes("user_id")) {
       await queryRunner.query(`ALTER TABLE "api_keys" RENAME COLUMN "userid" TO "user_id"`);
@@ -100,7 +100,7 @@ export class FixColumnNaming1756600000000 implements MigrationInterface {
             AND table_schema = 'public'
         `);
 
-    const orgColumnNames = orgColumns.map((col: any) => col.column_name);
+    const orgColumnNames = orgColumns.map((col: { column_name: string }) => col.column_name);
 
     if (orgColumnNames.includes("isactive") && !orgColumnNames.includes("is_active")) {
       await queryRunner.query(
@@ -126,7 +126,7 @@ export class FixColumnNaming1756600000000 implements MigrationInterface {
             AND table_schema = 'public'
         `);
 
-    const docColumnNames = docColumns.map((col: any) => col.column_name);
+    const docColumnNames = docColumns.map((col: { column_name: string }) => col.column_name);
 
     if (docColumnNames.includes("organizationid") && !docColumnNames.includes("organization_id")) {
       await queryRunner.query(
@@ -141,7 +141,7 @@ export class FixColumnNaming1756600000000 implements MigrationInterface {
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Revert column names back (if needed)
     // This is intentionally left empty as we don't want to revert to incorrect names
   }

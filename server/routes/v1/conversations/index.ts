@@ -5,7 +5,6 @@ import { MessageType } from "../../../database/entities/message.entity";
 import { Hay } from "../../../services/hay.service";
 import type { HayInputMessage } from "../../../services/hay.service";
 import { TRPCError } from "@trpc/server";
-import { PlaybookService } from "../../../services/playbook.service";
 import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
@@ -13,7 +12,6 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { config } from "../../../config/env";
 
 const conversationService = new ConversationService();
-const playbookService = new PlaybookService();
 const conversationRepository = new ConversationRepository();
 
 const createConversationSchema = z.object({

@@ -27,7 +27,7 @@ async function startServer() {
   const { pluginInstanceManagerService } = await import(
     "@server/services/plugin-instance-manager.service"
   );
-  const { pluginInstanceRepository } = await import(
+  const { pluginInstanceRepository: _pluginInstanceRepository } = await import(
     "@server/repositories/plugin-instance.repository"
   );
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
@@ -134,7 +134,11 @@ async function startServer() {
     websocketService.initialize(httpServer);
   }
 
-  httpServer.on("error", (error: any) => {
+  interface ServerError extends Error {
+    code?: string;
+  }
+
+  httpServer.on("error", (error: ServerError) => {
     if (error.code === "EADDRINUSE") {
       console.error(`❌ Port ${config.server.port} is already in use.`);
       process.exit(1);

@@ -1,6 +1,5 @@
 <template>
-  <Menu as="div"
-class="relative inline-block text-left">
+  <Menu as="div" class="relative inline-block text-left">
     <slot />
   </Menu>
 </template>

@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline"
-:disabled="loading" @click="refreshData">
+        <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
@@ -176,10 +175,8 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <Card v-for="i in 6"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
             <div class="h-12 w-12 bg-background-tertiary rounded-lg" />
@@ -227,14 +224,30 @@ const loading = ref(false);
 const searchQuery = ref("");
 const statusFilter = ref("");
 
+interface CurrentOrganization {
+  id: string;
+  name: string;
+}
+
 // Mock current organization - TODO: Get from store
-const currentOrganization = ref({
+const currentOrganization = ref<CurrentOrganization>({
   id: "1",
   name: "Acme Corp",
 });
 
+interface Organization {
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  memberCount: number;
+  agentCount: number;
+  lastActivity: Date;
+  createdAt: Date;
+}
+
 // Mock organizations data - TODO: Replace with real API calls
-const organizations = ref([
+const organizations = ref<Organization[]>([
   {
     id: "1",
     name: "Acme Corp",
@@ -390,7 +403,7 @@ const switchToOrganization = async (id: string) => {
   }
 };
 
-const showOptionsMenu = (org: any) => {
+const showOptionsMenu = (org: Organization) => {
   // TODO: Show context menu with options like:
   // - Edit organization
   // - Manage members

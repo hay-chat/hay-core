@@ -8,12 +8,26 @@ import {
 } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { ConversationService } from "./conversation.service";
-import { Message, MessageType } from "../database/entities/message.entity";
+import { MessageType } from "../database/entities/message.entity";
+
+// Type for usage metadata
+type UsageMetadata = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  tool_name?: string;
+  function_name?: string;
+  tool_call_id?: string;
+  [key: string]: unknown;
+};
+
+// Type for tool arguments
+type ToolArgs = Record<string, unknown>;
 
 export interface HayInputMessage {
   type: MessageType;
   content: string;
-  usage_metadata?: Record<string, any>;
+  usage_metadata?: UsageMetadata;
 }
 
 export interface HayResponse {
@@ -157,7 +171,7 @@ export class HayService {
   static async invokeWithSystemPrompt(
     systemPrompt: string,
     userPrompt: string,
-  ): Promise<{ content: string; model?: string; usage_metadata?: any }> {
+  ): Promise<{ content: string; model?: string; usage_metadata?: UsageMetadata }> {
     if (!Hay.initialized) {
       Hay.init();
     }
@@ -180,7 +194,7 @@ export class HayService {
 
   static async invoke(
     prompt: string,
-  ): Promise<{ content: string; model?: string; usage_metadata?: any }> {
+  ): Promise<{ content: string; model?: string; usage_metadata?: UsageMetadata }> {
     if (!Hay.initialized) {
       Hay.init();
     }
@@ -204,8 +218,8 @@ export class HayService {
     conversationId: string,
     organizationId: string,
     name: string,
-    args: Record<string, any>,
-  ): Promise<any> {
+    args: ToolArgs,
+  ): Promise<string> {
     if (!Hay.initialized) {
       Hay.init();
     }
@@ -223,7 +237,7 @@ export class HayService {
     return toolOutput;
   }
 
-  private static async executeTool(name: string, args: Record<string, any>): Promise<string> {
+  private static async executeTool(name: string, args: ToolArgs): Promise<string> {
     // Tool execution logic here
     // This is a placeholder implementation
     return `Executed tool: ${name} with args: ${JSON.stringify(args)}`;
@@ -245,9 +259,8 @@ export class HayService {
       case MessageType.TOOL_RESPONSE:
         return new ToolMessage({
           content: message.content,
-          tool_call_id: message.usage_metadata?.tool_call_id || "tool",
+          tool_call_id: (message.usage_metadata?.tool_call_id as string) || "tool",
         });
-      case MessageType.CUSTOMER:
       default:
         return new HumanMessage(message.content);
     }

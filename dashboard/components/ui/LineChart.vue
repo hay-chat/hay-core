@@ -1,7 +1,6 @@
 <template>
   <div class="chart-container">
-    <Line :data="chartData"
-:options="chartOptions" />
+    <Line :data="chartData" :options="chartOptions" />
   </div>
 </template>
 

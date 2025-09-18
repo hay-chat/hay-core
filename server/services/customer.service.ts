@@ -1,5 +1,5 @@
 import { CustomerRepository } from "../repositories/customer.repository";
-import { Customer } from "../database/entities/customer.entity";
+import { Customer, ExternalMetadata } from "../database/entities/customer.entity";
 
 export class CustomerService {
   private customerRepository: CustomerRepository;
@@ -19,7 +19,7 @@ export class CustomerService {
       phone?: string | null;
       name?: string | null;
       notes?: string | null;
-      external_metadata?: Record<string, any> | null;
+      external_metadata?: ExternalMetadata | null;
     },
   ): Promise<Customer> {
     // Check if customer with external_id already exists
@@ -106,7 +106,7 @@ export class CustomerService {
       phone?: string | null;
       name?: string | null;
       notes?: string | null;
-      external_metadata?: Record<string, any> | null;
+      external_metadata?: ExternalMetadata | null;
     },
   ): Promise<Customer | null> {
     // Check if updating external_id to one that already exists
@@ -158,7 +158,7 @@ export class CustomerService {
       phone?: string | null;
       name?: string | null;
       notes?: string | null;
-      external_metadata?: Record<string, any> | null;
+      external_metadata?: ExternalMetadata | null;
     },
   ): Promise<Customer> {
     // Try to find by external_id first

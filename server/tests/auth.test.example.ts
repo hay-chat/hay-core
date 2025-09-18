@@ -8,7 +8,7 @@ import axios from "axios";
 const API_URL = "http://localhost:3000/trpc";
 
 // Helper function to make tRPC requests
-async function trpcCall(procedure: string, input?: any, headers?: any) {
+async function trpcCall(procedure: string, input?: unknown, headers?: Record<string, string>) {
   const response = await axios.post(`${API_URL}/${procedure}`, input, { headers });
   return response.data;
 }

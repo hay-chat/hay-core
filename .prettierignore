@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+/dist/
+**/dist/
+.nuxt/
+.output/
+coverage/
+
+# Logs and caches
+*.log
+logs/
+.eslintcache
+*.tsbuildinfo
+
+# Generated reports
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Plugins
+plugins/*/dist/
+plugins/*/*/dist/
+plugins/*/node_modules/
+
+# Server and dashboard build artifacts
+server/dist/
+dashboard/dist/
+dashboard/.nuxt/
+dashboard/.output/
+
+# Misc
+.DS_Store
+.vscode/
+.idea/
+.env

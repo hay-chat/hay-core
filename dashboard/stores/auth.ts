@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { HayApi, HayAuthApi } from "@/utils/api";
+import { HayAuthApi } from "@/utils/api";
 import { useUserStore, type User } from "./user";
 
 interface Tokens {
@@ -78,7 +78,7 @@ export const useAuthStore = defineStore("auth", {
 
       // Show notification if there's a reason
       if (reason === "token_expired" && process.client) {
-        const { $toast } = useNuxtApp() as any;
+        const { $toast } = useNuxtApp() as { $toast?: { error: (msg: string) => void } };
         if ($toast) {
           $toast.error("Your session has expired. Please login again.");
         }

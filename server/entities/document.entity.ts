@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne, JoinColumn } from "typeorm";
+import { Column, Entity, ManyToOne, JoinColumn } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 
@@ -81,7 +81,7 @@ export class Document extends OrganizationScopedEntity {
     model: string;
     contentLength: number;
     createdAt: Date;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 
   @Column({

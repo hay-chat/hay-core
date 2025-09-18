@@ -78,8 +78,8 @@ export function splitTextIntoChunks(text: string, options: ChunkOptions = {}): s
 export function createChunkMetadata(
   chunkIndex: number,
   totalChunks: number,
-  documentMetadata: Record<string, any> = {},
-): Record<string, any> {
+  documentMetadata: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     ...documentMetadata,
     chunkIndex,

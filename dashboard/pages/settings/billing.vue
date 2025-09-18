@@ -4,13 +4,10 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Billing</h1>
-        <p class="text-muted-foreground">
-Manage your subscription, usage, and payment methods
-</p>
+        <p class="text-muted-foreground">Manage your subscription, usage, and payment methods</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-@click="downloadInvoice">
+        <Button variant="outline" @click="downloadInvoice">
           <Download class="h-4 w-4 mr-2" />
           Download Invoice
         </Button>
@@ -77,13 +74,11 @@ Manage your subscription, usage, and payment methods
             </div>
 
             <div class="flex space-x-2">
-              <Button variant="outline"
-@click="changePlan">
+              <Button variant="outline" @click="changePlan">
                 <ArrowUpCircle class="h-4 w-4 mr-2" />
                 Change Plan
               </Button>
-              <Button variant="outline"
-@click="cancelSubscription">
+              <Button variant="outline" @click="cancelSubscription">
                 <XCircle class="h-4 w-4 mr-2" />
                 Cancel Subscription
               </Button>
@@ -177,8 +172,7 @@ Manage your subscription, usage, and payment methods
             </div>
 
             <!-- Usage Alerts -->
-            <div v-if="usageAlerts.length > 0"
-class="space-y-2">
+            <div v-if="usageAlerts.length > 0" class="space-y-2">
               <div
                 v-for="alert in usageAlerts"
                 :key="alert.type"
@@ -213,9 +207,7 @@ class="space-y-2">
               <CreditCard class="h-4 w-4 text-gray-600" />
             </div>
             <div>
-              <div class="font-medium">
-**** **** **** {{ paymentMethod.last4 }}
-</div>
+              <div class="font-medium">**** **** **** {{ paymentMethod.last4 }}</div>
               <div class="text-sm text-muted-foreground">
                 {{ paymentMethod.brand }} • Expires {{ paymentMethod.expMonth }}/{{
                   paymentMethod.expYear
@@ -227,13 +219,8 @@ class="space-y-2">
             <Badge :variant="paymentMethod.status === 'valid' ? 'success' : 'destructive'">
               {{ paymentMethod.status }}
             </Badge>
-            <Button variant="outline"
-size="sm" @click="updatePaymentMethod"
->
-Update
-</Button>
-            <Button variant="ghost"
-size="sm" @click="removePaymentMethod">
+            <Button variant="outline" size="sm" @click="updatePaymentMethod"> Update </Button>
+            <Button variant="ghost" size="sm" @click="removePaymentMethod">
               <Trash2 class="h-4 w-4" />
             </Button>
           </div>
@@ -241,9 +228,7 @@ size="sm" @click="removePaymentMethod">
 
         <div v-else class="text-center py-8 border-2 border-dashed border-muted rounded-lg">
           <CreditCard class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p class="text-sm text-muted-foreground mb-4">
-No payment method on file
-</p>
+          <p class="text-sm text-muted-foreground mb-4">No payment method on file</p>
           <Button @click="addPaymentMethod">
             <Plus class="h-4 w-4 mr-2" />
             Add Payment Method
@@ -260,11 +245,7 @@ No payment method on file
             <CardTitle>Billing History</CardTitle>
             <CardDescription>Your past invoices and payments</CardDescription>
           </div>
-          <Button variant="outline"
-size="sm" @click="viewAllInvoices"
->
-View All
-</Button>
+          <Button variant="outline" size="sm" @click="viewAllInvoices"> View All </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -297,9 +278,7 @@ View All
                   {{ formatDate(invoice.date) }}
                 </td>
                 <td class="py-3 px-4">
-                  <div class="font-medium">
-${{ invoice.amount.toFixed(2) }}
-</div>
+                  <div class="font-medium">${{ invoice.amount.toFixed(2) }}</div>
                   <div class="text-sm text-muted-foreground">
                     {{ invoice.currency.toUpperCase() }}
                   </div>
@@ -338,9 +317,7 @@ ${{ invoice.amount.toFixed(2) }}
         >
           <div class="text-center">
             <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-            <p class="text-sm text-muted-foreground">
-Usage analytics will be displayed here
-</p>
+            <p class="text-sm text-muted-foreground">Usage analytics will be displayed here</p>
           </div>
         </div>
       </CardContent>
@@ -374,11 +351,7 @@ Usage analytics will be displayed here
               <Badge variant="outline">
                 {{ change.type }}
               </Badge>
-              <Button variant="ghost"
-size="sm" @click="cancelChange(change.id)"
->
-Cancel
-</Button>
+              <Button variant="ghost" size="sm" @click="cancelChange(change.id)"> Cancel </Button>
             </div>
           </div>
         </div>

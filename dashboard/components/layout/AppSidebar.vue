@@ -19,17 +19,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import {
-  Home,
-  MessageSquare,
-  FileText,
-  Users,
-  Settings,
-  BarChart,
-  BookOpen,
-  Puzzle,
-  ListTodo,
-} from "lucide-vue-next";
+import { Home, MessageSquare, FileText, Users, Settings, BookOpen, Puzzle } from "lucide-vue-next";
 
 import {
   Sidebar,

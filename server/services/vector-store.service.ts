@@ -12,19 +12,18 @@ import { TypeORMVectorStore } from "@langchain/community/vectorstores/typeorm";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
-import type { Document as LangchainDocument } from "@langchain/core/documents";
 import type { DataSourceOptions } from "typeorm";
 
 export interface VectorChunk {
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SearchResult {
   id: string;
   documentId: string;
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   similarity?: number;
 }
 
@@ -163,7 +162,14 @@ export class VectorStoreService {
 
     // console.log("🚨 [VectorStoreService] ROW Search results", results);
 
-    return results.map((row: any) => ({
+    interface SearchResultRow {
+      id: string;
+      metadata: { documentId: string };
+      content: string;
+      similarity: number;
+    }
+
+    return results.map((row: SearchResultRow) => ({
       id: row.id,
       documentId: row.metadata.documentId,
       content: row.content,

@@ -12,6 +12,9 @@ import {
 import { Organization } from "../../entities/organization.entity";
 import { Conversation } from "./conversation.entity";
 
+// Type for flexible JSON metadata
+export type ExternalMetadata = Record<string, unknown>;
+
 @Entity("customers")
 @Index(["organization_id", "external_id"], { unique: true })
 @Index(["organization_id", "email"])
@@ -35,7 +38,7 @@ export class Customer {
   notes!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
-  external_metadata!: Record<string, any> | null;
+  external_metadata!: ExternalMetadata | null;
 
   @Column({ type: "uuid" })
   organization_id!: string;

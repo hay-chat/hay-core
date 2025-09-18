@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline"
-:disabled="loading" @click="refreshData">
+        <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
@@ -70,18 +69,15 @@
           selected
         </p>
         <div class="flex space-x-2">
-          <Button variant="outline"
-size="sm" @click="bulkToggleStatus">
+          <Button variant="outline" size="sm" @click="bulkToggleStatus">
             <Power class="mr-2 h-4 w-4" />
             Toggle Status
           </Button>
-          <Button variant="outline"
-size="sm" @click="bulkExport">
+          <Button variant="outline" size="sm" @click="bulkExport">
             <Download class="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="destructive"
-size="sm" @click="bulkDelete">
+          <Button variant="destructive" size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             Delete
           </Button>
@@ -125,8 +121,7 @@ size="sm" @click="bulkDelete">
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <Button variant="ghost"
-size="sm" class="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
                   <MoreVertical class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -255,10 +250,8 @@ size="sm" class="h-8 w-8 p-0">
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      <Card v-for="i in 6"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
             <div class="h-12 w-12 bg-background-tertiary rounded-lg" />
@@ -331,6 +324,32 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import ToastContainer from "@/components/ui/ToastContainer.vue";
 import { HayApi } from "@/utils/api";
 
+interface AgentData {
+  id: string;
+  name: string;
+  description: string;
+  status: "active" | "inactive" | "training" | "error";
+  type: string;
+  conversationCount: number;
+  resolutionRate: number;
+  avgResponseTime: number;
+  satisfactionScore: number;
+  lastActivity: Date;
+  createdAt: Date;
+  enabled: boolean;
+  instructions?: string | null;
+}
+
+interface AgentApiResponse {
+  id: string;
+  name: string;
+  description?: string | null;
+  enabled: boolean;
+  instructions?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 definePageMeta({
   // Auth is handled by global middleware
 });
@@ -347,13 +366,13 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 
 // Agents data from API
-const agents = ref<any[]>([]);
+const agents = ref<AgentData[]>([]);
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
 const deleteDialogTitle = ref("");
 const deleteDialogDescription = ref("");
-const agentToDelete = ref<any>(null);
+const agentToDelete = ref<AgentData | null>(null);
 const isBulkDelete = ref(false);
 
 // Computed
@@ -423,7 +442,7 @@ const refreshData = async () => {
   loading.value = true;
   try {
     const result = await HayApi.agents.list.query();
-    agents.value = result.map((agent: any) => ({
+    agents.value = result.map((agent: AgentApiResponse) => ({
       id: agent.id,
       name: agent.name,
       description: agent.description || "",
@@ -438,9 +457,9 @@ const refreshData = async () => {
       enabled: agent.enabled,
       instructions: agent.instructions,
     }));
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error refreshing data:", error);
-    toast.error(error.message || "Failed to load agents");
+    toast.error((error as Error).message || "Failed to load agents");
   } finally {
     loading.value = false;
   }
@@ -481,7 +500,7 @@ const viewAgent = (id: string) => {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toggleAgentStatus = async (agent: any) => {
+const toggleAgentStatus = async (agent: AgentData) => {
   try {
     const newEnabledState = agent.status !== "active";
     await HayApi.agents.update.mutate({
@@ -496,13 +515,13 @@ const toggleAgentStatus = async (agent: any) => {
     agent.enabled = newEnabledState;
 
     toast.success(`Agent ${newEnabledState ? "enabled" : "disabled"} successfully`);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error toggling agent status:", error);
-    toast.error(error.message || "Failed to toggle agent status");
+    toast.error((error as Error).message || "Failed to toggle agent status");
   }
 };
 
-const deleteAgent = (agent: any) => {
+const deleteAgent = (agent: AgentData) => {
   agentToDelete.value = agent;
   isBulkDelete.value = false;
   deleteDialogTitle.value = "Delete Agent";
@@ -576,9 +595,9 @@ const performSingleDelete = async () => {
 
       toast.success(result.message || "Agent deleted successfully");
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting agent:", error);
-    toast.error(error.message || "Failed to delete agent. Please try again.");
+    toast.error((error as Error).message || "Failed to delete agent. Please try again.");
   } finally {
     agentToDelete.value = null;
   }
@@ -587,7 +606,6 @@ const performSingleDelete = async () => {
 const performBulkDelete = async () => {
   const errors: string[] = [];
   const successfulDeletes: string[] = [];
-  const totalCount = selectedAgents.value.length;
 
   try {
     for (const agentId of selectedAgents.value) {
@@ -616,9 +634,9 @@ const performBulkDelete = async () => {
     } else {
       toast.success(`Successfully deleted ${successfulDeletes.length} agent(s)`);
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting agents:", error);
-    toast.error(error.message || "Failed to delete agents. Please try again.");
+    toast.error((error as Error).message || "Failed to delete agents. Please try again.");
   }
 };
 

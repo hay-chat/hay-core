@@ -1,6 +1,5 @@
 <template>
-  <div class="rich-instruction-input"
-:data-component-id="componentId">
+  <div class="rich-instruction-input" :data-component-id="componentId">
     <div
       ref="editorRef"
       class="instruction-content"
@@ -21,11 +20,27 @@
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useComponentRegistry } from "@/composables/useComponentRegistry";
 
+interface MCPTool {
+  id: string;
+  name: string;
+  label: string;
+  pluginName: string;
+  description?: string;
+}
+
+interface DocumentItem {
+  id: string;
+  name: string;
+  type: string;
+  url?: string;
+  title?: string;
+}
+
 interface Props {
   modelValue: string;
   placeholder?: string;
-  mcpTools: any[];
-  documents: any[];
+  mcpTools: MCPTool[];
+  documents: DocumentItem[];
 }
 
 const props = defineProps<Props>();
@@ -420,7 +435,7 @@ const handleBlur = () => {
 };
 
 // Insert action or document reference
-const insertReference = (type: "action" | "document", item: any) => {
+const insertReference = (type: "action" | "document", item: MCPTool | DocumentItem) => {
   const editor = editorRef.value;
   if (!editor) return;
 
@@ -453,7 +468,7 @@ const insertReference = (type: "action" | "document", item: any) => {
       if (currentOffset + nodeLength > slashIndex) {
         // This text node contains the slash
         const nodeSlashIndex = slashIndex - currentOffset;
-        const beforeSlash = currentNode.textContent?.slice(0, nodeSlashIndex) || "";
+        const _beforeSlash = currentNode.textContent?.slice(0, nodeSlashIndex) || "";
         const afterQuery =
           currentNode.textContent?.slice(nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1)) ||
           "";
@@ -492,7 +507,7 @@ const insertReference = (type: "action" | "document", item: any) => {
 // Watch for changes in modelValue
 watch(
   () => props.modelValue,
-  (newValue) => {
+  (_newValue) => {
     const editor = editorRef.value;
     if (editor && document.activeElement !== editor && !isConverting) {
       // Only update if not currently focused to avoid cursor issues

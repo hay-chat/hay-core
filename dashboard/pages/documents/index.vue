@@ -9,8 +9,7 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
-        <Button variant="outline"
-:disabled="loading" @click="refreshData">
+        <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
@@ -76,18 +75,15 @@
           selected
         </p>
         <div class="flex space-x-2">
-          <Button variant="outline"
-size="sm" @click="bulkArchive">
+          <Button variant="outline" size="sm" @click="bulkArchive">
             <Archive class="mr-2 h-4 w-4" />
             Archive
           </Button>
-          <Button variant="outline"
-size="sm" @click="bulkDownload">
+          <Button variant="outline" size="sm" @click="bulkDownload">
             <Download class="mr-2 h-4 w-4" />
             Download
           </Button>
-          <Button variant="destructive"
-size="sm" @click="bulkDelete">
+          <Button variant="destructive" size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             Delete
           </Button>
@@ -128,8 +124,7 @@ size="sm" @click="bulkDelete">
                   :is="getFileIcon(document.type)"
                   class="h-4 w-4 min-w-4 text-muted-foreground"
                 />
-                <div class="truncate"
-:title="document.title || document.name">
+                <div class="truncate" :title="document.title || document.name">
                   {{ document.title || document.name }}
                 </div>
               </div>
@@ -173,8 +168,7 @@ size="sm" @click="bulkDelete">
             <TableCell class="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="ghost"
-size="sm" class="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
                     <MoreVertical class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -235,8 +229,7 @@ size="sm" class="h-8 w-8 p-0">
         <Button v-if="searchQuery || typeFilter || statusFilter" @click="clearFilters()">
           Clear Filters
         </Button>
-        <NuxtLink v-else
-to="/documents/import">
+        <NuxtLink v-else to="/documents/import">
           <Button>Import Document</Button>
         </NuxtLink>
       </div>
@@ -257,12 +250,10 @@ to="/documents/import">
     <ToastContainer />
 
     <!-- Search Results -->
-    <div v-if="searchResults.length > 0"
-class="space-y-4">
+    <div v-if="searchResults.length > 0" class="space-y-4">
       <h3 class="text-lg font-semibold">Search Results</h3>
       <div class="grid gap-4">
-        <Card v-for="result in searchResults"
-:key="result.id">
+        <Card v-for="result in searchResults" :key="result.id">
           <CardHeader>
             <CardTitle class="text-base">
               {{ result.title }}
@@ -283,10 +274,8 @@ class="space-y-4">
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading"
-class="space-y-4">
-      <div v-for="i in 5"
-:key="i" class="animate-pulse">
+    <div v-if="loading" class="space-y-4">
+      <div v-for="i in 5" :key="i" class="animate-pulse">
         <div class="bg-background-tertiary rounded-lg p-4 flex items-center space-x-4">
           <div class="h-10 w-10 bg-background-tertiary-foreground/20 rounded" />
           <div class="flex-1 space-y-2">
@@ -341,18 +330,12 @@ class="space-y-4">
                 class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                 @change="handleFileUpload"
               />
-              <p class="text-xs text-muted-foreground mt-2">
-Supported formats: .txt, .md, .pdf
-</p>
+              <p class="text-xs text-muted-foreground mt-2">Supported formats: .txt, .md, .pdf</p>
             </div>
           </div>
 
           <div class="flex justify-end space-x-2">
-            <Button variant="outline"
-@click="showUploadDialog = false"
->
-Cancel
-</Button>
+            <Button variant="outline" @click="showUploadDialog = false"> Cancel </Button>
             <Button :disabled="uploading" @click="uploadDocument">
               {{ uploading ? "Uploading..." : "Upload" }}
             </Button>
@@ -381,22 +364,44 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  X,
   FileCode,
   FileJson,
   File,
-  Globe,
 } from "lucide-vue-next";
 
 // State
 const loading = ref(false);
 const searching = ref(false);
 const searchQuery = ref("");
-const searchResults = ref<any[]>([]);
+interface SearchResult {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  status: string;
+  similarity: number;
+}
+
+const searchResults = ref<SearchResult[]>([]);
 const typeFilter = ref("");
 const statusFilter = ref("");
 const selectedDocuments = ref<string[]>([]);
-const documents = ref<any[]>([]);
+interface Document {
+  id: string;
+  name: string;
+  title?: string;
+  description?: string;
+  type: string;
+  category: string;
+  fileSize: number;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sourceUrl?: string;
+  importMethod?: string;
+}
+
+const documents = ref<Document[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalDocuments = ref(0);
@@ -408,7 +413,7 @@ const uploading = ref(false);
 const showDeleteDialog = ref(false);
 const deleteDialogTitle = ref("");
 const deleteDialogDescription = ref("");
-const documentToDelete = ref<any>(null);
+const documentToDelete = ref<Document | null>(null);
 const isBulkDelete = ref(false);
 
 const uploadForm = ref({
@@ -452,7 +457,7 @@ const allSelected = computed(() => {
 });
 
 // Methods
-const getHostname = (url: string) => {
+const _getHostname = (url: string) => {
   try {
     return new URL(url).hostname;
   } catch {
@@ -475,7 +480,7 @@ const getFileIcon = (type: string) => {
   }
 };
 
-const formatFileSize = (bytes: number) => {
+const _formatFileSize = (bytes: number) => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
@@ -501,16 +506,16 @@ const refreshData = async () => {
     });
 
     // Map the result to the expected document format
-    documents.value = (result.items || []).map((doc: any) => ({
-      id: doc.id,
-      name: doc.title || "Untitled",
-      description: doc.description || doc.content?.substring(0, 100),
-      type: doc.type || "article",
-      category: doc.categories?.[0] || "general",
-      fileSize: doc.attachments?.[0]?.size || 0,
-      status: doc.status || "draft",
-      createdAt: new Date(doc.created_at || doc.createdAt),
-      updatedAt: new Date(doc.updated_at || doc.updatedAt),
+    documents.value = (result.items || []).map((doc: Record<string, unknown>) => ({
+      id: doc.id as string,
+      name: (doc.title as string) || "Untitled",
+      description: (doc.description as string) || (doc.content as string)?.substring(0, 100),
+      type: (doc.type as string) || "article",
+      category: (doc.categories as string[])?.[0] || "general",
+      fileSize: (doc.attachments as Array<{ size: number }>)?.[0]?.size || 0,
+      status: (doc.status as string) || "draft",
+      createdAt: new Date((doc.created_at || doc.createdAt) as string),
+      updatedAt: new Date((doc.updated_at || doc.updatedAt) as string),
     }));
     totalDocuments.value = result.pagination.total;
   } catch (error) {
@@ -532,7 +537,7 @@ const searchDocuments = async () => {
     });
 
     // Map search results to document format
-    searchResults.value = (results || []).map((doc: any) => ({
+    searchResults.value = (results || []).map((doc: SearchResult) => ({
       id: doc.id,
       name: doc.title,
       description: doc.content,
@@ -542,7 +547,7 @@ const searchDocuments = async () => {
     }));
 
     // Also update the main documents list with search results
-    documents.value = searchResults.value.map((doc: any) => ({
+    documents.value = searchResults.value.map((doc: SearchResult) => ({
       ...doc,
       category: "search-result",
       fileSize: 0,
@@ -574,7 +579,7 @@ onMounted(() => {
 });
 
 // Helper function to detect file type from MIME type or extension
-const detectFileType = (mimeType: string, extension: string): string => {
+const _detectFileType = (mimeType: string, extension: string): string => {
   if (mimeType.includes("pdf") || extension === "pdf") return "pdf";
   if (mimeType.includes("word") || extension === "docx" || extension === "doc") return "doc";
   if (mimeType.includes("text/plain") || extension === "txt") return "txt";
@@ -586,7 +591,7 @@ const detectFileType = (mimeType: string, extension: string): string => {
 };
 
 // Helper function to map document status
-const mapDocumentStatus = (documentStatus: string, processingStatus?: string): string => {
+const _mapDocumentStatus = (documentStatus: string, processingStatus?: string): string => {
   if (processingStatus === "processing" || processingStatus === "queued") {
     return "processing";
   }
@@ -630,12 +635,12 @@ const toggleAllSelection = () => {
   }
 };
 
-const viewDocument = (document: any) => {
+const viewDocument = (document: Document) => {
   // TODO: Open document viewer
   console.log("View document:", document);
 };
 
-const downloadDocument = async (document: any) => {
+const downloadDocument = async (document: Document) => {
   try {
     // TODO: Download document via API
     console.log("Download document:", document);
@@ -646,14 +651,14 @@ const downloadDocument = async (document: any) => {
   }
 };
 
-const editDocument = (document: any) => {
+const editDocument = (document: Document) => {
   // TODO: Open edit dialog
   console.log("Edit document:", document);
 };
 
-const recrawlDocument = async (document: any) => {
+const recrawlDocument = async (document: Document) => {
   try {
-    const response = await HayApi.documents.recrawl.mutate({
+    const _response = await HayApi.documents.recrawl.mutate({
       documentId: document.id,
     });
 
@@ -669,7 +674,7 @@ const recrawlDocument = async (document: any) => {
   }
 };
 
-const archiveDocument = async (document: any) => {
+const archiveDocument = async (document: Document) => {
   try {
     // TODO: Archive/unarchive via API
     document.status = document.status === "archived" ? "active" : "archived";
@@ -682,7 +687,7 @@ const archiveDocument = async (document: any) => {
   }
 };
 
-const deleteDocument = (document: any) => {
+const deleteDocument = (document: Document) => {
   documentToDelete.value = document;
   isBulkDelete.value = false;
   deleteDialogTitle.value = "Delete Document";

@@ -129,10 +129,10 @@ export const customersRouter = t.router({
         external_metadata: input.external_metadata || null,
       });
       return customer;
-    } catch (error: any) {
+    } catch (error) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: error.message,
+        message: error instanceof Error ? error.message : "An error occurred",
       });
     }
   }),
@@ -182,13 +182,13 @@ export const customersRouter = t.router({
         }
 
         return customer;
-      } catch (error: any) {
-        if (error.code === "NOT_FOUND") {
+      } catch (error) {
+        if (error instanceof TRPCError && error.code === "NOT_FOUND") {
           throw error;
         }
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: error.message,
+          message: error instanceof Error ? error.message : "An error occurred",
         });
       }
     }),

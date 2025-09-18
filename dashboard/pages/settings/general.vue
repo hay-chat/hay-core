@@ -4,18 +4,14 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">General Settings</h1>
-        <p class="text-muted-foreground">
-Manage your platform preferences and configuration
-</p>
+        <p class="text-muted-foreground">Manage your platform preferences and configuration</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-@click="resetToDefaults">
+        <Button variant="outline" @click="resetToDefaults">
           <RotateCcw class="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
-        <Button :disabled="!hasChanges"
-@click="saveSettings">
+        <Button :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -87,9 +83,7 @@ Manage your platform preferences and configuration
               <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
               <option value="DD MMM YYYY">DD MMM YYYY</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">
-Preview: {{ formatDatePreview() }}
-</p>
+            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatDatePreview() }}</p>
           </div>
 
           <div>
@@ -102,9 +96,7 @@ Preview: {{ formatDatePreview() }}
               <option value="12h">12-hour (AM/PM)</option>
               <option value="24h">24-hour</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">
-Preview: {{ formatTimePreview() }}
-</p>
+            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatTimePreview() }}</p>
           </div>
         </div>
 
@@ -116,8 +108,7 @@ Preview: {{ formatTimePreview() }}
             class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
           >
             <option value="">No default agent</option>
-            <option v-for="agent in agents"
-:key="agent.id" :value="agent.id">
+            <option v-for="agent in agents" :key="agent.id" :value="agent.id">
               {{ agent.name }}
             </option>
           </select>
@@ -172,9 +163,7 @@ Preview: {{ formatTimePreview() }}
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Weekly Reports</Label>
-                <p class="text-xs text-muted-foreground">
-Weekly performance summary emails
-</p>
+                <p class="text-xs text-muted-foreground">Weekly performance summary emails</p>
               </div>
               <Checkbox v-model="settings.notifications.email.weeklyReports" />
             </div>
@@ -188,9 +177,7 @@ Weekly performance summary emails
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Real-time Alerts</Label>
-                <p class="text-xs text-muted-foreground">
-Show notifications in the dashboard
-</p>
+                <p class="text-xs text-muted-foreground">Show notifications in the dashboard</p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.realTimeAlerts" />
             </div>
@@ -208,9 +195,7 @@ Show notifications in the dashboard
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Feature Announcements</Label>
-                <p class="text-xs text-muted-foreground">
-New features and product updates
-</p>
+                <p class="text-xs text-muted-foreground">New features and product updates</p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.featureAnnouncements" />
             </div>
@@ -290,8 +275,7 @@ New features and product updates
                 :checked="settings.webhooks.events.includes(event.id)"
                 @update:checked="toggleWebhookEvent(event.id)"
               />
-              <Label :for="event.id"
-class="text-sm">{{ event.name }}</Label>
+              <Label :for="event.id" class="text-sm">{{ event.name }}</Label>
             </div>
           </div>
         </div>
@@ -306,8 +290,7 @@ class="text-sm">{{ event.name }}</Label>
             <Zap class="h-4 w-4 mr-2" />
             Test Webhook
           </Button>
-          <Button variant="outline"
-size="sm" @click="viewWebhookLogs">
+          <Button variant="outline" size="sm" @click="viewWebhookLogs">
             <FileText class="h-4 w-4 mr-2" />
             View Logs
           </Button>

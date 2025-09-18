@@ -42,8 +42,8 @@ export class User extends BaseEntity {
   organization?: Organization;
 
   // Helper methods
-  toJSON(): any {
-    const { password, ...userWithoutPassword } = this;
+  toJSON(): Omit<User, "password"> {
+    const { password: _password, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
 
@@ -70,7 +70,7 @@ export class User extends BaseEntity {
     return false;
   }
 
-  canAccess(resource: string): boolean {
+  canAccess(_resource: string): boolean {
     return this.isActive && !!this.organizationId;
   }
 

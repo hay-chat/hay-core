@@ -3,8 +3,7 @@
     <!-- Page Header -->
     <div>
       <div class="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <NuxtLink
-to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
+        <NuxtLink to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
         <ChevronRight class="h-4 w-4" />
         <span>Import</span>
       </div>
@@ -16,8 +15,7 @@ to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
 
     <!-- Import Steps Progress -->
     <div class="flex items-center justify-between mb-8">
-      <template v-for="(step, index) in steps"
-:key="index">
+      <template v-for="(step, index) in steps" :key="index">
         <div class="flex items-center gap-2">
           <div
             :class="[
@@ -33,9 +31,7 @@ to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
             {{ step }}
           </span>
         </div>
-        <div v-if="index < steps.length - 1"
-class="flex-1 mx-4 h-px bg-border"
-/>
+        <div v-if="index < steps.length - 1" class="flex-1 mx-4 h-px bg-border" />
       </template>
     </div>
 
@@ -65,10 +61,7 @@ class="flex-1 mx-4 h-px bg-border"
                   Upload documents from your computer
                 </p>
                 <div class="flex flex-wrap gap-2">
-                  <Badge
-v-for="format in uploadFormats" variant="outline"
-:key="format"
->
+                  <Badge v-for="format in uploadFormats" :key="format" variant="outline">
                     {{ format }}
                   </Badge>
                 </div>
@@ -182,11 +175,8 @@ v-for="format in uploadFormats" variant="outline"
         </div>
 
         <!-- Selected Files List -->
-        <div v-if="selectedFiles.length > 0"
-class="mt-6 space-y-2">
-          <h4 class="font-medium mb-2">
-Selected Files ({{ selectedFiles.length }})
-</h4>
+        <div v-if="selectedFiles.length > 0" class="mt-6 space-y-2">
+          <h4 class="font-medium mb-2">Selected Files ({{ selectedFiles.length }})</h4>
           <div
             v-for="(file, index) in selectedFiles"
             :key="index"
@@ -207,22 +197,18 @@ Selected Files ({{ selectedFiles.length }})
             <Badge variant="outline">
               {{ getFileExtension(file.name) }}
             </Badge>
-            <Button variant="ghost"
-size="sm" @click="removeFile(index)">
+            <Button variant="ghost" size="sm" @click="removeFile(index)">
               <X class="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline"
-@click="currentStep = 1">
+          <Button variant="outline" @click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button
-:disabled="selectedFiles.length === 0" @click="proceedToNextStep"
->
+          <Button :disabled="selectedFiles.length === 0" @click="proceedToNextStep">
             Next: Add Details
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -268,14 +254,11 @@ size="sm" @click="removeFile(index)">
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline"
-@click="currentStep = 1">
+          <Button variant="outline" @click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button
-:disabled="!isValidUrl(websiteUrl) || isDiscovering" @click="discoverPages"
->
+          <Button :disabled="!isValidUrl(websiteUrl) || isDiscovering" @click="discoverPages">
             {{ isDiscovering ? "Discovering..." : "Discover Pages" }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -299,8 +282,7 @@ size="sm" @click="removeFile(index)">
       </CardHeader>
       <CardContent>
         <!-- Loading State -->
-        <div v-if="isDiscovering"
-class="space-y-6 py-8">
+        <div v-if="isDiscovering" class="space-y-6 py-8">
           <div class="flex flex-col items-center justify-center">
             <div class="relative">
               <!-- Pulsing background circle -->
@@ -371,16 +353,14 @@ class="space-y-6 py-8">
               </AlertDescription>
             </Alert>
 
-            <Button variant="outline"
-@click="cancelDiscovery" class="mt-4">
+            <Button variant="outline" class="mt-4" @click="cancelDiscovery">
               Cancel Discovery
             </Button>
           </div>
         </div>
 
         <!-- Page Selection (shown after discovery) -->
-        <div v-else
-class="space-y-4">
+        <div v-else class="space-y-4">
           <!-- Select/Deselect All -->
           <div class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg">
             <div class="flex items-center space-x-2">
@@ -408,8 +388,7 @@ class="space-y-4">
               :key="index"
               class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
             >
-              <Checkbox v-model="page.selected"
-class="mt-1" />
+              <Checkbox v-model="page.selected" class="mt-1" />
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate">
                   {{ page.title || "Untitled Page" }}
@@ -438,14 +417,11 @@ class="mt-1" />
         <!-- End of page selection div -->
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline"
-@click="currentStep = 2">
+          <Button variant="outline" @click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button
-:disabled="!discoveredPages.some((p) => p.selected)" @click="currentStep = 4"
->
+          <Button :disabled="!discoveredPages.some((p) => p.selected)" @click="currentStep = 4">
             Next: Add Metadata
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -521,9 +497,7 @@ class="mt-1" />
                   .filter((t) => t)
               "
             />
-            <p class="text-xs text-muted-foreground mt-1">
-e.g., documentation, api, reference
-</p>
+            <p class="text-xs text-muted-foreground mt-1">e.g., documentation, api, reference</p>
           </div>
 
           <div>
@@ -554,8 +528,7 @@ e.g., documentation, api, reference
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline"
-@click="currentStep = 3">
+          <Button variant="outline" @click="currentStep = 3">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -643,10 +616,8 @@ e.g., documentation, api, reference
               </div>
 
               <div class="flex items-center space-x-2">
-                <Checkbox :id="`active-${index}`"
-v-model="file.isActive" />
-                <Label :for="`active-${index}`"
-class="text-sm font-normal">
+                <Checkbox :id="`active-${index}`" v-model="file.isActive" />
+                <Label :for="`active-${index}`" class="text-sm font-normal">
                   Make this document immediately available to AI agents
                 </Label>
               </div>
@@ -655,8 +626,7 @@ class="text-sm font-normal">
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline"
-@click="currentStep = 2">
+          <Button variant="outline" @click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -689,8 +659,7 @@ class="text-sm font-normal">
       </CardHeader>
       <CardContent>
         <!-- Web Import Progress -->
-        <div v-if="importType === 'web' && webImportJob"
-class="space-y-4">
+        <div v-if="importType === 'web' && webImportJob" class="space-y-4">
           <div class="p-4 bg-background-tertiary rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium">Import Status</span>
@@ -710,12 +679,10 @@ class="space-y-4">
                 <AlertCircle class="mr-1 h-3 w-3" />
                 Failed
               </Badge>
-              <Badge
-v-else variant="outline"> Queued </Badge>
+              <Badge v-else variant="outline"> Queued </Badge>
             </div>
 
-            <div v-if="webImportProgress"
-class="space-y-2">
+            <div v-if="webImportProgress" class="space-y-2">
               <div class="flex justify-between text-sm">
                 <span>Progress</span>
                 <span
@@ -740,8 +707,7 @@ class="space-y-2">
         </div>
 
         <!-- Upload Progress -->
-        <div v-else
-class="space-y-4">
+        <div v-else class="space-y-4">
           <!-- Overall Progress -->
           <div class="mb-6">
             <div class="flex justify-between text-sm mb-2">
@@ -779,8 +745,7 @@ class="space-y-4">
                   <AlertCircle class="mr-1 h-3 w-3" />
                   Error
                 </Badge>
-                <Badge
-v-else variant="outline"> Pending </Badge>
+                <Badge v-else variant="outline"> Pending </Badge>
               </div>
             </div>
 
@@ -807,7 +772,7 @@ v-else variant="outline"> Pending </Badge>
         </div>
 
         <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="resetImport" :disabled="isProcessing">
+          <Button variant="outline" :disabled="isProcessing" @click="resetImport">
             Import More Documents
           </Button>
           <Button :disabled="isProcessing" @click="router.push('/documents')">
@@ -860,10 +825,35 @@ const isDragging = ref(false);
 const isProcessing = ref(false);
 const uploadedCount = ref(0);
 const websiteUrl = ref("");
-const webImportJob = ref<any>(null);
-const webImportProgress = ref<any>(null);
-const pluginImporters = ref<any[]>([]);
-const discoveredPages = ref<any[]>([]);
+interface WebImportJob {
+  id: string;
+  status: string;
+}
+
+interface WebImportProgress {
+  processedPages: number;
+  totalPages: number;
+  currentUrl?: string;
+}
+
+interface PluginImporter {
+  id: string;
+  name: string;
+  description: string;
+  supportedFormats?: string[];
+}
+
+interface DiscoveredPage {
+  url: string;
+  title?: string;
+  description?: string;
+  selected: boolean;
+}
+
+const webImportJob = ref<WebImportJob | null>(null);
+const webImportProgress = ref<WebImportProgress | null>(null);
+const pluginImporters = ref<PluginImporter[]>([]);
+const discoveredPages = ref<DiscoveredPage[]>([]);
 const isDiscovering = ref(false);
 const discoveryProgress = ref<{
   status?: string;
@@ -872,10 +862,14 @@ const discoveryProgress = ref<{
   total: number;
   currentUrl?: string;
 } | null>(null);
+type DocumentType = "article" | "guide" | "faq" | "tutorial" | "reference" | "policy";
+type DocumentStatus = "published" | "draft" | "under_review";
+type DocumentVisibility = "private" | "internal" | "public";
+
 const webMetadata = ref({
-  type: "article" as any,
-  status: "published" as any,
-  visibility: "private" as any,
+  type: "article" as DocumentType,
+  status: "published" as DocumentStatus,
+  visibility: "private" as DocumentVisibility,
   tags: [] as string[],
   categories: [] as string[],
   tagsString: "",
@@ -899,7 +893,7 @@ const uploadFormats = ["PDF", "TXT", "MD", "DOC", "DOCX", "HTML", "JSON", "CSV"]
 onMounted(async () => {
   try {
     const importers = await Hay.documents.getImporters.query();
-    pluginImporters.value = importers.plugins || [];
+    pluginImporters.value = (importers as { plugins?: PluginImporter[] }).plugins || [];
   } catch (error) {
     console.error("Failed to load importers:", error);
   }
@@ -907,9 +901,11 @@ onMounted(async () => {
 
 // Clean up polling interval on unmount
 onBeforeUnmount(() => {
-  if ((window as any).__discoveryPollInterval) {
-    clearInterval((window as any).__discoveryPollInterval);
-    delete (window as any).__discoveryPollInterval;
+  if ((window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval) {
+    clearInterval(
+      (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval,
+    );
+    delete (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval;
   }
 });
 
@@ -977,7 +973,7 @@ const discoverPages = async () => {
 
           // Extract discovered pages from job result
           if (jobStatus.result?.pages) {
-            discoveredPages.value = jobStatus.result.pages.map((page: any) => ({
+            discoveredPages.value = jobStatus.result.pages.map((page: DiscoveredPage) => ({
               ...page,
               selected: page.selected !== false, // Default to true unless explicitly false
             }));
@@ -1020,7 +1016,8 @@ const discoverPages = async () => {
     }, 5000); // Poll every 5 seconds
 
     // Store interval ID for cleanup if needed
-    (window as any).__discoveryPollInterval = pollInterval;
+    (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval =
+      pollInterval;
   } catch (error) {
     console.error("Failed to start page discovery:", error);
     isDiscovering.value = false;
@@ -1031,9 +1028,11 @@ const discoverPages = async () => {
 
 const cancelDiscovery = () => {
   // Clear any existing polling interval
-  if ((window as any).__discoveryPollInterval) {
-    clearInterval((window as any).__discoveryPollInterval);
-    delete (window as any).__discoveryPollInterval;
+  if ((window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval) {
+    clearInterval(
+      (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval,
+    );
+    delete (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval;
   }
 
   isDiscovering.value = false;
@@ -1066,7 +1065,7 @@ const startWebImport = async () => {
   }
 };
 
-const pollJobStatus = async (_jobId: string) => {
+const pollJobStatus = async (jobId: string) => {
   const checkStatus = async () => {
     try {
       // TODO: Add job status endpoint
@@ -1080,10 +1079,11 @@ const pollJobStatus = async (_jobId: string) => {
       // } else {
       //   setTimeout(checkStatus, 2000);
       // }
+      console.log("Using jobId:", jobId); // Avoid unused parameter warning
 
       // For now, simulate completion after some time
       setTimeout(() => {
-        webImportJob.value = { status: "completed" };
+        webImportJob.value = { id: jobId, status: "completed" };
         webImportProgress.value = { totalPages: 10, processedPages: 10 };
         isProcessing.value = false;
       }, 5000);
@@ -1203,9 +1203,9 @@ const startUpload = async () => {
           mimeType: file.type,
           fileName: file.name,
           organizationId: organizationId,
-          type: mapCategoryToDocumentType(file.category || "") as any,
-          status: (file.isActive ? "published" : "draft") as any,
-          visibility: "private" as any,
+          type: mapCategoryToDocumentType(file.category || ""),
+          status: (file.isActive ? "published" : "draft") as DocumentStatus,
+          visibility: "private" as DocumentVisibility,
         };
 
         file.uploadStatus = "processing";
@@ -1268,19 +1268,16 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 // Map UI category to server DocumentationType enum
-const mapCategoryToDocumentType = (
-  category: string,
-): "article" | "guide" | "faq" | "tutorial" | "reference" | "policy" => {
-  const mapping: Record<string, "article" | "guide" | "faq" | "tutorial" | "reference" | "policy"> =
-    {
-      product: "guide",
-      api: "reference",
-      faq: "faq",
-      legal: "policy",
-      training: "tutorial",
-      technical: "reference",
-      other: "article",
-    };
+const mapCategoryToDocumentType = (category: string): DocumentType => {
+  const mapping: Record<string, DocumentType> = {
+    product: "guide",
+    api: "reference",
+    faq: "faq",
+    legal: "policy",
+    training: "tutorial",
+    technical: "reference",
+    other: "article",
+  };
   return mapping[category] || "article";
 };
 

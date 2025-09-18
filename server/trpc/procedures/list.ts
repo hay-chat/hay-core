@@ -13,13 +13,16 @@ import type { ObjectLiteral } from "typeorm";
  */
 export function createListProcedure<
   TEntity extends ObjectLiteral,
-  TInput extends Record<string, any>,
+  TInput extends Record<string, unknown>,
 >(
   inputSchema: z.ZodType<TInput>,
   repository: BaseRepository<TEntity>,
   options?: {
-    baseWhere?: (ctx: any, input: TInput) => Record<string, any>;
-    transform?: (items: TEntity[]) => any[];
+    baseWhere?: (
+      ctx: { organizationId?: string | null; user?: unknown; listParams?: unknown },
+      input: TInput,
+    ) => Record<string, unknown>;
+    transform?: <T>(items: TEntity[]) => T[];
   },
 ) {
   return authenticatedProcedure
@@ -38,7 +41,7 @@ export function createListProcedure<
 
       // Transform items if transformer is provided
       if (options?.transform) {
-        result.items = options.transform(result.items);
+        result.items = options.transform(result.items) as TEntity[];
       }
 
       return result;
@@ -55,7 +58,7 @@ export function createSimpleListProcedure<TEntity extends ObjectLiteral>(
   return authenticatedProcedure.input(z.object({}).optional()).query(async ({ ctx }) => {
     // Use simple find for basic listing
     const items = await repository.findByOrganization(ctx.organizationId!, {
-      order: { created_at: "DESC" } as any,
+      order: { created_at: "DESC" },
     });
 
     return {

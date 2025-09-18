@@ -23,13 +23,19 @@ import { computed, inject } from "vue";
 import { cn } from "@/lib/utils";
 
 interface SidebarRailProps {
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
+}
+
+interface SidebarContext {
+  state: { value: string };
+  collapsible?: string;
+  toggleSidebar?: () => void;
 }
 
 const props = defineProps<SidebarRailProps>();
 const className = computed(() => props.class);
 
-const sidebar = inject<any>("sidebar");
+const sidebar = inject<SidebarContext>("sidebar");
 const state = computed(() => sidebar?.state?.value || "expanded");
 const collapsible = computed(() => sidebar?.collapsible || "offcanvas");
 const toggleSidebar = () => sidebar?.toggleSidebar?.();

@@ -85,7 +85,7 @@ export interface ListParams {
     query?: string;
     searchFields?: string[];
   };
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   dateRange?: {
     from?: string;
     to?: string;

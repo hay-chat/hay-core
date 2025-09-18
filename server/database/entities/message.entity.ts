@@ -68,7 +68,7 @@ export class Message {
   type!: MessageType;
 
   @Column({ type: "jsonb", nullable: true })
-  usage_metadata!: Record<string, any> | null;
+  usage_metadata!: Record<string, unknown> | null;
 
   @Column({ type: "varchar", length: 100, nullable: true })
   sender!: string | null;
@@ -83,11 +83,11 @@ export class Message {
     confidence?: number;
     toolStatus?: string;
     toolName?: string;
-    toolArgs?: Record<string, any>;
-    toolResult?: Record<string, any>;
+    toolArgs?: Record<string, unknown>;
+    toolResult?: Record<string, unknown>;
     tool_call?: {
       tool_name: string;
-      arguments: Record<string, any>;
+      arguments: Record<string, unknown>;
     };
     isPlaybook?: boolean;
     playbookId?: string;

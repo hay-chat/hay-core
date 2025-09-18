@@ -1,12 +1,6 @@
-import {
-  Document,
-  DocumentationType,
-  DocumentationStatus,
-  DocumentVisibility,
-} from "../entities/document.entity";
+import { Document } from "../entities/document.entity";
 import { BaseRepository } from "./base.repository";
 import { SelectQueryBuilder } from "typeorm";
-import type { ListParams } from "../trpc/middleware/pagination";
 
 export class DocumentRepository extends BaseRepository<Document> {
   constructor() {
@@ -18,7 +12,7 @@ export class DocumentRepository extends BaseRepository<Document> {
    */
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Document>,
-    filters?: Record<string, any>,
+    filters?: Record<string, unknown>,
     organizationId?: string,
   ): void {
     if (!filters) return;
@@ -80,7 +74,7 @@ export class DocumentRepository extends BaseRepository<Document> {
             params[`searchQuery${index}`] = `%${search.query}%`;
             return params;
           },
-          {} as Record<string, any>,
+          {} as Record<string, string>,
         ),
       );
     }

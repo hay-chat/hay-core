@@ -1,6 +1,7 @@
 import { MessageRepository } from "@server/repositories/message.repository";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
+import type { ToolCall } from "@server/orchestrator/types";
 
 export class MessageService {
   private messageRepository: MessageRepository;
@@ -25,8 +26,8 @@ export class MessageService {
 
   async saveToolMessage(
     conversation: Conversation,
-    toolCall: any,
-    toolResult: any,
+    toolCall: ToolCall,
+    toolResult: unknown,
     success: boolean = true,
     latencyMs: number = 0,
   ): Promise<Message> {
@@ -41,8 +42,8 @@ export class MessageService {
       sender: "system",
       metadata: {
         latency_ms: latencyMs,
-        ...(toolResult as any),
-      } as any,
+        ...(toolResult as Record<string, unknown>),
+      } as Record<string, unknown>,
       usage_metadata: null,
     });
   }
@@ -50,8 +51,8 @@ export class MessageService {
   async saveAssistantMessage(
     conversation: Conversation,
     content: string,
-    metadata: any = {},
-    usageMetadata: any = null,
+    metadata: Record<string, unknown> = {},
+    usageMetadata: Record<string, unknown> | null = null,
   ): Promise<Message> {
     return await this.messageRepository.create({
       conversation_id: conversation.id,
@@ -76,8 +77,8 @@ export class MessageService {
 
   createAssistantResponse(
     content: string,
-    metadata: any = {},
-    usageMetadata: any = null,
+    metadata: Record<string, unknown> = {},
+    usageMetadata: Record<string, unknown> | null = null,
   ): Partial<Message> {
     return {
       content,
@@ -88,19 +89,22 @@ export class MessageService {
     };
   }
 
-  createToolCallResponse(toolCall: any, metadata: any = {}): Partial<Message> {
+  createToolCallResponse(
+    toolCall: ToolCall,
+    metadata: Record<string, unknown> = {},
+  ): Partial<Message> {
     return {
       content: JSON.stringify(toolCall),
       type: MessageType.TOOL_CALL,
       sender: "assistant",
       metadata: {
         ...metadata,
-      } as any,
+      } as Record<string, unknown>,
       usage_metadata: null,
     };
   }
 
-  createSystemMessage(content: string, metadata: any = {}): Partial<Message> {
+  createSystemMessage(content: string, metadata: Record<string, unknown> = {}): Partial<Message> {
     return {
       content,
       type: MessageType.SYSTEM,

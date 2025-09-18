@@ -2,6 +2,9 @@ import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
+// Type for config schema
+type ConfigSchema = NonNullable<HayPluginManifest["configSchema"]>;
+
 export class EnvironmentManagerService {
   /**
    * Prepare environment variables for a plugin instance
@@ -69,10 +72,7 @@ export class EnvironmentManagerService {
   /**
    * Find config key that maps to an environment variable
    */
-  private findConfigKeyForEnvVar(
-    envVar: string,
-    configSchema?: Record<string, any>,
-  ): string | undefined {
+  private findConfigKeyForEnvVar(envVar: string, configSchema?: ConfigSchema): string | undefined {
     if (!configSchema) return undefined;
 
     for (const [key, schema] of Object.entries(configSchema)) {
@@ -94,7 +94,7 @@ export class EnvironmentManagerService {
     const missing: string[] = [];
 
     if (manifest.configSchema) {
-      for (const [key, schema] of Object.entries(manifest.configSchema)) {
+      for (const [_key, schema] of Object.entries(manifest.configSchema)) {
         if (schema.required && schema.env) {
           if (!env[schema.env]) {
             missing.push(schema.env);
@@ -121,7 +121,7 @@ export class EnvironmentManagerService {
 
       // Check if this env var is marked as encrypted in config schema
       const isEncrypted = Object.values(manifest.configSchema || {}).some(
-        (schema: any) => schema.env === key && schema.encrypted,
+        (schema) => schema.env === key && schema.encrypted,
       );
 
       if (isEncrypted) {

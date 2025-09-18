@@ -8,7 +8,7 @@ import axios from "axios";
 const API_URL = "http://localhost:3000/trpc";
 
 // Helper function to make tRPC requests
-async function trpcCall(procedure: string, input?: any, headers?: any) {
+async function trpcCall(procedure: string, input?: unknown, headers?: Record<string, string>) {
   const response = await axios.post(`${API_URL}/${procedure}`, input, {
     headers,
   });
@@ -171,7 +171,7 @@ async function testConversationsPagination() {
 }
 
 // Run all tests
-async function runAllTests() {
+async function _runAllTests() {
   try {
     console.log("🚀 Starting Pagination System Tests\n");
 
@@ -277,4 +277,4 @@ console.log("📋 Example Input Formats:");
 console.log(JSON.stringify(exampleInputs, null, 2));
 
 // Uncomment to run tests
-// runAllTests();
+// _runAllTests();

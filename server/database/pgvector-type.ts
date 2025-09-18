@@ -19,7 +19,7 @@ export function formatEmbeddingForQuery(embedding: number[]): string {
  * @param value Raw vector value from database
  * @returns Array of numbers
  */
-export function parseEmbeddingFromQuery(value: any): number[] | null {
+export function parseEmbeddingFromQuery(value: unknown): number[] | null {
   if (!value) return null;
 
   // If already an array, return it
@@ -27,7 +27,7 @@ export function parseEmbeddingFromQuery(value: any): number[] | null {
 
   // If it's a string, parse it
   if (typeof value === "string") {
-    const cleaned = value.replace(/[\[\]]/g, "");
+    const cleaned = value.replace(/[[\]]/g, "");
     if (!cleaned) return null;
 
     return cleaned.split(",").map((v) => parseFloat(v.trim()));

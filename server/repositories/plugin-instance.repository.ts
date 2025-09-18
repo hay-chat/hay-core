@@ -1,8 +1,8 @@
-import { Repository, type FindManyOptions } from "typeorm";
+import { type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
-import { encryptConfig, decryptConfig } from "@server/lib/auth/utils/encryption";
+import { encryptConfig } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
@@ -77,7 +77,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
-  async updateConfig(id: string, config: Record<string, any>): Promise<void> {
+  async updateConfig(id: string, config: Record<string, unknown>): Promise<void> {
     // Get the plugin instance with its registry to access the manifest
     const instance = await this.getRepository().findOne({
       where: { id },
@@ -149,7 +149,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   async enablePlugin(
     organizationId: string,
     pluginId: string,
-    config?: Record<string, any>,
+    config?: Record<string, unknown>,
   ): Promise<PluginInstance> {
     // Get the plugin registry to access the manifest
     const pluginRegistry = await pluginRegistryRepository.findByPluginId(pluginId);

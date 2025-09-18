@@ -9,13 +9,11 @@
         </p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-@click="downloadSecurityReport">
+        <Button variant="outline" @click="downloadSecurityReport">
           <Download class="h-4 w-4 mr-2" />
           Security Report
         </Button>
-        <Button :disabled="!hasChanges"
-@click="saveSettings">
+        <Button :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -36,9 +34,7 @@
             </div>
             <div>
               <div class="font-medium">Security Score</div>
-              <div class="text-2xl font-bold text-green-600">
-{{ securityScore }}/100
-</div>
+              <div class="text-2xl font-bold text-green-600">{{ securityScore }}/100</div>
             </div>
           </div>
 
@@ -68,8 +64,7 @@
         </div>
 
         <!-- Security Recommendations -->
-        <div v-if="recommendations.length > 0"
-class="mt-6">
+        <div v-if="recommendations.length > 0" class="mt-6">
           <h3 class="font-medium mb-3">Security Recommendations</h3>
           <div class="space-y-2">
             <div
@@ -109,9 +104,7 @@ class="mt-6">
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Minimum Length</Label>
-                <p class="text-xs text-muted-foreground">
-Minimum number of characters required
-</p>
+                <p class="text-xs text-muted-foreground">Minimum number of characters required</p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.minLength"
@@ -127,9 +120,7 @@ Minimum number of characters required
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Uppercase Letters</Label>
-                <p class="text-xs text-muted-foreground">
-At least one uppercase letter (A-Z)
-</p>
+                <p class="text-xs text-muted-foreground">At least one uppercase letter (A-Z)</p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireUppercase" />
             </div>
@@ -137,9 +128,7 @@ At least one uppercase letter (A-Z)
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Numbers</Label>
-                <p class="text-xs text-muted-foreground">
-At least one number (0-9)
-</p>
+                <p class="text-xs text-muted-foreground">At least one number (0-9)</p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireNumbers" />
             </div>
@@ -182,9 +171,7 @@ At least one number (0-9)
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Session Timeout</Label>
-                <p class="text-xs text-muted-foreground">
-Automatic logout after inactivity
-</p>
+                <p class="text-xs text-muted-foreground">Automatic logout after inactivity</p>
               </div>
               <select
                 v-model="settings.authentication.sessionTimeout"
@@ -202,9 +189,7 @@ Automatic logout after inactivity
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Concurrent Sessions Limit</Label>
-                <p class="text-xs text-muted-foreground">
-Maximum simultaneous sessions per user
-</p>
+                <p class="text-xs text-muted-foreground">Maximum simultaneous sessions per user</p>
               </div>
               <select
                 v-model="settings.authentication.maxConcurrentSessions"
@@ -221,9 +206,7 @@ Maximum simultaneous sessions per user
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Remember Me Duration</Label>
-                <p class="text-xs text-muted-foreground">
-How long "Remember Me" sessions last
-</p>
+                <p class="text-xs text-muted-foreground">How long "Remember Me" sessions last</p>
               </div>
               <select
                 v-model="settings.authentication.rememberMeDuration"
@@ -245,9 +228,7 @@ How long "Remember Me" sessions last
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require 2FA for All Users</Label>
-                <p class="text-xs text-muted-foreground">
-Mandatory two-factor authentication
-</p>
+                <p class="text-xs text-muted-foreground">Mandatory two-factor authentication</p>
               </div>
               <Checkbox v-model="settings.authentication.require2FA" />
             </div>
@@ -255,9 +236,7 @@ Mandatory two-factor authentication
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">2FA Grace Period</Label>
-                <p class="text-xs text-muted-foreground">
-Days to set up 2FA before enforcement
-</p>
+                <p class="text-xs text-muted-foreground">Days to set up 2FA before enforcement</p>
               </div>
               <select
                 v-model="settings.authentication.twoFAGracePeriod"
@@ -274,9 +253,7 @@ Days to set up 2FA before enforcement
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Allowed 2FA Methods</Label>
-                <p class="text-xs text-muted-foreground">
-Which 2FA methods users can use
-</p>
+                <p class="text-xs text-muted-foreground">Which 2FA methods users can use</p>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center space-x-2">
@@ -285,8 +262,7 @@ Which 2FA methods users can use
                     :checked="settings.authentication.allowedTwoFAMethods.includes('totp')"
                     @update:checked="toggleTwoFAMethod('totp')"
                   />
-                  <Label for="totp"
-class="text-sm">TOTP Apps (Google Authenticator, Authy)</Label>
+                  <Label for="totp" class="text-sm">TOTP Apps (Google Authenticator, Authy)</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
@@ -294,8 +270,7 @@ class="text-sm">TOTP Apps (Google Authenticator, Authy)</Label>
                     :checked="settings.authentication.allowedTwoFAMethods.includes('sms')"
                     @update:checked="toggleTwoFAMethod('sms')"
                   />
-                  <Label for="sms"
-class="text-sm">SMS Codes</Label>
+                  <Label for="sms" class="text-sm">SMS Codes</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
@@ -303,8 +278,7 @@ class="text-sm">SMS Codes</Label>
                     :checked="settings.authentication.allowedTwoFAMethods.includes('backup')"
                     @update:checked="toggleTwoFAMethod('backup')"
                   />
-                  <Label for="backup"
-class="text-sm">Backup Codes</Label>
+                  <Label for="backup" class="text-sm">Backup Codes</Label>
                 </div>
               </div>
             </div>
@@ -324,8 +298,7 @@ class="text-sm">Backup Codes</Label>
         <div>
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-medium">API Keys</h3>
-            <Button size="sm"
-@click="createAPIKey">
+            <Button size="sm" @click="createAPIKey">
               <Plus class="h-4 w-4 mr-2" />
               Create API Key
             </Button>
@@ -339,8 +312,7 @@ class="text-sm">Backup Codes</Label>
             <p class="text-sm text-muted-foreground">No API keys created yet</p>
           </div>
 
-          <div v-else
-class="space-y-3">
+          <div v-else class="space-y-3">
             <div
               v-for="key in apiKeys"
               :key="key.id"
@@ -362,12 +334,10 @@ class="space-y-3">
                 <Badge :variant="key.status === 'active' ? 'success' : 'secondary'">
                   {{ key.status }}
                 </Badge>
-                <Button variant="ghost"
-size="sm" @click="toggleAPIKey(key.id)">
+                <Button variant="ghost" size="sm" @click="toggleAPIKey(key.id)">
                   {{ key.status === "active" ? "Disable" : "Enable" }}
                 </Button>
-                <Button variant="ghost"
-size="sm" @click="deleteAPIKey(key.id)">
+                <Button variant="ghost" size="sm" @click="deleteAPIKey(key.id)">
                   <Trash2 class="h-4 w-4" />
                 </Button>
               </div>
@@ -404,9 +374,7 @@ size="sm" @click="deleteAPIKey(key.id)">
                 max="1000"
                 class="mt-1"
               />
-              <p class="text-xs text-muted-foreground mt-1">
-Maximum burst requests allowed
-</p>
+              <p class="text-xs text-muted-foreground mt-1">Maximum burst requests allowed</p>
             </div>
           </div>
         </div>
@@ -442,8 +410,7 @@ Maximum burst requests allowed
                     <X class="h-4 w-4" />
                   </Button>
                 </div>
-                <Button variant="outline"
-size="sm" @click="addIPAddress">
+                <Button variant="outline" size="sm" @click="addIPAddress">
                   <Plus class="h-4 w-4 mr-2" />
                   Add IP Address
                 </Button>

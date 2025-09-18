@@ -21,7 +21,7 @@ interface ResizablePanelProps {
   minSize?: number;
   maxSize?: number;
   collapsible?: boolean;
-  class?: any;
+  class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
 }
 
 const props = withDefaults(defineProps<ResizablePanelProps>(), {

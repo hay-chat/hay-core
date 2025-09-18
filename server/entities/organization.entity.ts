@@ -1,4 +1,4 @@
-import { Entity, Column, Index, OneToMany, ManyToMany, JoinTable } from "typeorm";
+import { Entity, Column, Index, OneToMany } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { Document } from "./document.entity";
@@ -28,7 +28,7 @@ export class Organization extends BaseEntity {
   website?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 
   @Column({ type: "jsonb", nullable: true })
   limits?: {
@@ -89,8 +89,14 @@ export class Organization extends BaseEntity {
     return new Date() > this.trialEndsAt;
   }
 
-  toJSON(): any {
-    const { users, documents, apiKeys, jobs, ...organizationData } = this;
+  toJSON(): Omit<Organization, "users" | "documents" | "apiKeys" | "jobs"> {
+    const {
+      users: _users,
+      documents: _documents,
+      apiKeys: _apiKeys,
+      jobs: _jobs,
+      ...organizationData
+    } = this;
     return organizationData;
   }
 }

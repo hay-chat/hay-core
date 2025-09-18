@@ -1,8 +1,6 @@
-import { spawn, ChildProcess, execSync, exec } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import path from "path";
-import { platform } from "os";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
-import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginManagerService } from "./plugin-manager.service";
 import { environmentManagerService } from "./environment-manager.service";
 import { getUTCNow } from "../utils/date.utils";
@@ -248,17 +246,20 @@ export class ProcessManagerService {
   /**
    * Handle IPC messages from plugins
    */
-  private handlePluginMessage(processKey: string, message: any): void {
+  private handlePluginMessage(processKey: string, message: unknown): void {
     const processInfo = this.processes.get(processKey);
     if (!processInfo) return;
 
     console.log(`[IPC from ${processInfo.pluginName}:${processInfo.organizationId}]`, message);
 
     // Handle different message types
-    if (message.type === "health") {
-      pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId);
-    } else if (message.type === "error") {
-      pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "error", message.error);
+    if (typeof message === "object" && message !== null && "type" in message) {
+      const msg = message as { type: string; error?: string };
+      if (msg.type === "health") {
+        pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId);
+      } else if (msg.type === "error" && msg.error) {
+        pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "error", msg.error);
+      }
     }
   }
 
@@ -380,8 +381,8 @@ export class ProcessManagerService {
     organizationId: string,
     pluginId: string,
     action: string,
-    payload?: any,
-  ): Promise<any> {
+    payload?: unknown,
+  ): Promise<unknown> {
     // Ensure plugin is running before sending message
     const { pluginInstanceManagerService } = await import("./plugin-instance-manager.service");
     await pluginInstanceManagerService.ensureInstanceRunning(organizationId, pluginId);

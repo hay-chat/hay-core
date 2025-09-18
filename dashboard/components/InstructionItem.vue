@@ -35,8 +35,8 @@ interface Props {
   level: number;
   index: number;
   hierarchicalNumber: string;
-  mcpTools: any[];
-  documents: any[];
+  mcpTools: unknown[];
+  documents: unknown[];
 }
 
 const props = defineProps<Props>();
@@ -76,13 +76,10 @@ const localInstructions = computed({
   },
 });
 
-// Generate unique ID
-const generateId = () => Math.random().toString(36).substring(2, 11);
-
 // No child management needed - flat structure
 
 // Handle slash command from RichInstructionInput
-const handleSlashCommand = (data: any) => {
+const handleSlashCommand = (data: unknown) => {
   emit("slash-command", data);
 };
 

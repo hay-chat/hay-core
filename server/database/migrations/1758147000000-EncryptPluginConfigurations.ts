@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
-import { encryptConfig, decryptConfig, encryptValue } from "../../lib/auth/utils/encryption";
+import { encryptConfig, decryptConfig } from "../../lib/auth/utils/encryption";
 
 export class EncryptPluginConfigurations1758147000000 implements MigrationInterface {
   name = "EncryptPluginConfigurations1758147000000";
@@ -21,7 +21,7 @@ export class EncryptPluginConfigurations1758147000000 implements MigrationInterf
         continue;
       }
 
-      const manifest = instance.manifest as any;
+      const manifest = instance.manifest as Record<string, unknown>;
       const configSchema = manifest?.configSchema || {};
 
       // Check if config is already encrypted
@@ -29,7 +29,9 @@ export class EncryptPluginConfigurations1758147000000 implements MigrationInterf
       for (const [key, value] of Object.entries(instance.config)) {
         if (configSchema[key]?.encrypted && value !== null && value !== undefined) {
           // Check if it's already in encrypted format
-          if (!(value && typeof value === "object" && (value as any).encrypted)) {
+          if (
+            !(value && typeof value === "object" && (value as Record<string, unknown>).encrypted)
+          ) {
             needsEncryption = true;
             break;
           }
@@ -68,8 +70,8 @@ export class EncryptPluginConfigurations1758147000000 implements MigrationInterf
 
       // Check if config is encrypted
       let isEncrypted = false;
-      for (const [key, value] of Object.entries(instance.config)) {
-        if (value && typeof value === "object" && (value as any).encrypted) {
+      for (const [_key, value] of Object.entries(instance.config)) {
+        if (value && typeof value === "object" && (value as Record<string, unknown>).encrypted) {
           isEncrypted = true;
           break;
         }

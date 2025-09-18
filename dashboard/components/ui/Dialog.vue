@@ -1,6 +1,5 @@
 <template>
-  <HeadlessTransitionRoot :show="open"
-as="template">
+  <HeadlessTransitionRoot :show="open" as="template">
     <HeadlessDialog class="relative z-50" @close="$emit('update:open', false)">
       <HeadlessTransitionChild
         as="template"

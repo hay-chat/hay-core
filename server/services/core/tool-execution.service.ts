@@ -6,6 +6,36 @@ import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { processManagerService } from "@server/services/process-manager.service";
 import { v4 as uuidv4 } from "uuid";
+import type { HayPluginManifest } from "@server/types/plugin.types";
+
+interface ToolExecutionResult {
+  success: boolean;
+  result?: unknown;
+  error?: string;
+}
+
+interface ToolCallData {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+}
+
+interface ToolSchema {
+  name: string;
+  description?: string;
+  inputSchema?: {
+    type: string;
+    properties?: Record<
+      string,
+      {
+        type: string;
+        description?: string;
+        enum?: unknown[];
+        required?: boolean;
+      }
+    >;
+    required?: string[];
+  };
+}
 
 export class ToolExecutionService {
   private conversationRepository: ConversationRepository;
@@ -19,7 +49,7 @@ export class ToolExecutionService {
   async handleToolExecution(
     conversation: Conversation,
     toolMessage: Partial<Message>,
-  ): Promise<{ success: boolean; result?: any; error?: string }> {
+  ): Promise<ToolExecutionResult> {
     try {
       const toolCall = toolMessage.metadata?.tool_call;
       if (!toolCall) {
@@ -41,9 +71,9 @@ export class ToolExecutionService {
         const toolLogEntry: {
           turn: number;
           name: string;
-          input: any;
+          input: Record<string, unknown>;
           ok: boolean;
-          result?: any;
+          result?: unknown;
           errorClass?: string;
           latencyMs: number;
           idempotencyKey: string;
@@ -114,7 +144,10 @@ export class ToolExecutionService {
     }
   }
 
-  private async executeToolCall(conversation: Conversation, toolCall: any): Promise<any> {
+  private async executeToolCall(
+    conversation: Conversation,
+    toolCall: ToolCallData,
+  ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
     console.log(`[ToolExecution] Executing MCP tool: ${fullToolName}`);
@@ -148,13 +181,13 @@ export class ToolExecutionService {
       console.log(`[ToolExecution] Checking plugin: ${plugin.pluginId} (${plugin.name})`);
       if (plugin.pluginId === pluginId) {
         console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
-        const manifest = plugin.manifest as any;
+        const manifest = plugin.manifest as HayPluginManifest;
         if (manifest.capabilities?.mcp?.tools) {
           console.log(
             `[ToolExecution] Available tools in plugin:`,
-            manifest.capabilities.mcp.tools.map((t: any) => t.name),
+            manifest.capabilities.mcp.tools.map((t) => t.name),
           );
-          const tool = manifest.capabilities.mcp.tools.find((t: any) => t.name === actualToolName);
+          const tool = manifest.capabilities.mcp.tools.find((t) => t.name === actualToolName);
           if (tool) {
             matchingPlugin = plugin;
             toolSchema = tool;
@@ -172,7 +205,9 @@ export class ToolExecutionService {
     if (!matchingPlugin || !toolSchema) {
       const availableTools = allPlugins.flatMap(
         (p) =>
-          p.manifest?.capabilities?.mcp?.tools?.map((t: any) => `${p.pluginId}:${t.name}`) || [],
+          (p.manifest as HayPluginManifest)?.capabilities?.mcp?.tools?.map(
+            (t) => `${p.pluginId}:${t.name}`,
+          ) || [],
       );
       throw new Error(
         `Tool '${actualToolName}' not found in plugin '${pluginId}'. Available tools: ${availableTools.join(
@@ -224,7 +259,10 @@ export class ToolExecutionService {
     );
   }
 
-  private validateToolArguments(args: any, schema: any): { valid: boolean; errors: string[] } {
+  private validateToolArguments(
+    args: Record<string, unknown>,
+    schema: ToolSchema["inputSchema"],
+  ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     // Basic validation - check required properties
@@ -238,10 +276,10 @@ export class ToolExecutionService {
 
     // Type validation for properties
     if (schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(schema.properties as any)) {
+      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
         if (fieldName in args) {
           const fieldValue = args[fieldName];
-          const fieldType = (fieldSchema as any).type;
+          const fieldType = fieldSchema.type;
 
           if (fieldType === "string" && typeof fieldValue !== "string") {
             errors.push(`Field '${fieldName}' must be a string`);
@@ -252,7 +290,7 @@ export class ToolExecutionService {
           }
 
           // Validate enum values
-          const enumValues = (fieldSchema as any).enum;
+          const enumValues = fieldSchema.enum;
           if (enumValues && Array.isArray(enumValues)) {
             if (!enumValues.includes(fieldValue)) {
               errors.push(`Field '${fieldName}' must be one of: ${enumValues.join(", ")}`);
@@ -269,8 +307,8 @@ export class ToolExecutionService {
     organizationId: string,
     pluginId: string,
     toolName: string,
-    toolArgs: any,
-  ): Promise<any> {
+    toolArgs: Record<string, unknown>,
+  ): Promise<unknown> {
     console.log(`[ToolExecution] Executing MCP tool: ${pluginId}:${toolName}`);
     console.log(`[ToolExecution] Organization ID: ${organizationId}`);
     console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));

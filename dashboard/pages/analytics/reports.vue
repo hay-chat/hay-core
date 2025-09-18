@@ -4,13 +4,10 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Custom Reports</h1>
-        <p class="text-muted-foreground">
-Build and schedule custom analytics reports
-</p>
+        <p class="text-muted-foreground">Build and schedule custom analytics reports</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline"
-size="sm" @click="viewScheduledReports">
+        <Button variant="outline" size="sm" @click="viewScheduledReports">
           <Calendar class="h-4 w-4 mr-2" />
           Scheduled Reports
         </Button>
@@ -95,8 +92,7 @@ size="sm" @click="viewScheduledReports">
             <div class="space-y-4">
               <div v-for="category in metricCategories" :key="category.name" class="space-y-3">
                 <h3 class="font-medium flex items-center space-x-2">
-                  <component :is="category.icon"
-class="h-4 w-4" />
+                  <component :is="category.icon" class="h-4 w-4" />
                   <span>{{ category.name }}</span>
                 </h3>
                 <div class="grid gap-2 md:grid-cols-2">
@@ -110,8 +106,7 @@ class="h-4 w-4" />
                       :checked="reportConfig.metrics.includes(metric.id)"
                       @update:checked="toggleMetric(metric.id)"
                     />
-                    <Label :for="metric.id"
-class="text-sm">
+                    <Label :for="metric.id" class="text-sm">
                       {{ metric.name }}
                     </Label>
                   </div>
@@ -141,8 +136,7 @@ class="text-sm">
                     :checked="reportConfig.groupBy.includes(group.id)"
                     @update:checked="toggleGroupBy(group.id)"
                   />
-                  <Label :for="group.id"
-class="text-sm">{{ group.name }}</Label>
+                  <Label :for="group.id" class="text-sm">{{ group.name }}</Label>
                 </div>
               </div>
             </div>
@@ -321,8 +315,7 @@ class="text-sm">{{ group.name }}</Label>
                 class="w-full justify-start"
                 @click="loadTemplate(template)"
               >
-                <component :is="template.icon"
-class="h-4 w-4 mr-2" />
+                <component :is="template.icon" class="h-4 w-4 mr-2" />
                 {{ template.name }}
               </Button>
             </div>
@@ -338,8 +331,7 @@ class="h-4 w-4 mr-2" />
             <div v-if="recentReports.length === 0" class="text-sm text-muted-foreground">
               No recent reports
             </div>
-            <div v-else
-class="space-y-3">
+            <div v-else class="space-y-3">
               <div
                 v-for="report in recentReports"
                 :key="report.id"
@@ -353,8 +345,7 @@ class="space-y-3">
                   Generated {{ formatDate(report.createdAt) }}
                 </div>
                 <div class="flex items-center justify-between mt-2">
-                  <Badge variant="outline"
-class="text-xs">
+                  <Badge variant="outline" class="text-xs">
                     {{ report.format }}
                   </Badge>
                   <Button variant="ghost" size="sm" @click.stop="downloadReport(report.id)">

@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import path from "path";
 import fs from "fs/promises";
-import { processManagerService } from "./process-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { PublicAsset } from "../../plugins/base";
+import type { HayPluginManifest } from "../../plugins/base/types";
 
 interface AssetCache {
   content: string | Buffer;
@@ -26,7 +26,7 @@ export class PluginAssetService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as any;
+    const manifest = plugin.manifest as HayPluginManifest;
     if (!manifest.capabilities?.chat_connector?.publicAssets) {
       return [];
     }
@@ -163,9 +163,9 @@ export class PluginAssetService {
       return;
     }
 
-    const manifest = plugin.manifest as any;
+    const manifest = plugin.manifest as HayPluginManifest;
     const assetDef = manifest.capabilities?.chat_connector?.publicAssets?.find(
-      (a: any) => a.path === assetPath,
+      (a) => a.path === assetPath,
     );
 
     if (!assetDef) {

@@ -2,6 +2,7 @@ import { Repository, SelectQueryBuilder } from "typeorm";
 import { Customer } from "../database/entities/customer.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
+import type { ListParams } from "../trpc/middleware/pagination";
 
 export class CustomerRepository extends BaseRepository<Customer> {
   private legacyRepository!: Repository<Customer>;
@@ -82,9 +83,9 @@ export class CustomerRepository extends BaseRepository<Customer> {
    * Override pagination method to handle snake_case field naming
    */
   override async paginateQuery(
-    listParams: any,
+    listParams: ListParams,
     organizationId: string,
-    baseWhere?: Record<string, any>,
+    baseWhere?: Record<string, unknown>,
   ) {
     const queryBuilder = this.getLegacyRepository().createQueryBuilder("entity");
 
@@ -150,7 +151,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
    */
   protected override applyFilters(
     queryBuilder: SelectQueryBuilder<Customer>,
-    filters?: Record<string, any>,
+    filters?: Record<string, unknown>,
     _organizationId?: string,
   ): void {
     if (!filters) return;
@@ -204,7 +205,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
             params[`searchQuery${index}`] = `%${search.query}%`;
             return params;
           },
-          {} as Record<string, any>,
+          {} as Record<string, unknown>,
         ),
       );
     }

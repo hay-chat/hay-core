@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { ChevronsUpDown, LogOut, Settings, User2, Bell } from "lucide-vue-next";
+import { useAuthStore } from "@/stores/auth";
 const authStore = useAuthStore();
 
 interface User {

@@ -2,6 +2,7 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import { authenticate } from "@server/lib/auth/middleware";
 import type { ListParams } from "./middleware/pagination";
+import type { Request } from "express";
 
 export interface Context {
   user: AuthUser | null;
@@ -9,6 +10,10 @@ export interface Context {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   listParams?: ListParams; // Added by pagination middleware
+}
+
+interface RequestWithAuthError extends Request {
+  authError?: string;
 }
 
 export const createContext = async ({
@@ -29,7 +34,7 @@ export const createContext = async ({
       // This allows us to provide better error messages
       if (error.message.includes("Token has expired") || error.message.includes("token expired")) {
         // We'll let the auth middleware handle this with proper TRPC error
-        (req as any).authError = error.message;
+        (req as RequestWithAuthError).authError = error.message;
       }
     } else {
       console.error("[Context] Authentication error:", error);
