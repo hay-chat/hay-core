@@ -9,7 +9,7 @@
   >
     <MenuItems
       :class="[
-        'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md flex flex-col',
+        'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-background p-1 text-popover-foreground shadow-md flex flex-col',
         side === 'top' ? 'bottom-full mb-2' : 'mt-2',
         align === 'end' ? 'right-0' : 'left-0',
       ]"

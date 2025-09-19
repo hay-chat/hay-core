@@ -9,13 +9,11 @@
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
+        <!-- Date Range Selector -->
+        <DateRangeSelector v-model="dateRange" @change="refreshData" />
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
-        </Button>
-        <Button @click="createAgent">
-          <Plus class="mr-2 h-4 w-4" />
-          Create Agent
         </Button>
       </div>
     </div>
@@ -34,40 +32,39 @@
       <MetricCard
         title="Total Conversations"
         :icon="MessageSquare"
-        :metric="metrics.totalConversations"
-        :subtitle="`+${metrics.conversationsGrowth}%`"
-        subtitle-suffix="from last month"
+        :metric="conversationMetrics.totalConversations"
+        :subtitle="`${conversationMetrics.resolvedConversations}`"
+        subtitle-suffix="resolved"
         subtitle-color="green"
       />
 
       <MetricCard
         title="Resolution Rate"
         :icon="CheckCircle"
-        :metric="`${metrics.resolutionRate}%`"
-        :subtitle="`+${metrics.resolutionRateChange}%`"
-        subtitle-suffix="improvement"
+        :metric="`${conversationMetrics.resolutionRate.toFixed(1)}%`"
+        subtitle="of conversations"
+        subtitle-suffix="resolved"
         subtitle-color="green"
         :format-metric="false"
       />
 
       <MetricCard
-        title="Avg Response Time"
-        :icon="Clock"
-        :metric="`${metrics.avgResponseTime}s`"
-        :subtitle="`-${metrics.responseTimeImprovement}%`"
-        subtitle-suffix="faster"
-        subtitle-color="green"
+        title="Avg Messages"
+        :icon="MessageCircle"
+        :metric="conversationMetrics.avgMessagesPerConversation.toFixed(1)"
+        subtitle="messages per"
+        subtitle-suffix="conversation"
         :format-metric="false"
       />
     </div>
 
     <!-- Charts and Activity -->
-    <div class="grid gap-6 lg:grid-cols-7">
+    <div class="grid gap-6 md:grid-cols-2">
       <!-- Activity Chart -->
-      <Card class="lg:col-span-4">
+      <Card>
         <CardHeader>
           <CardTitle>Conversation Activity</CardTitle>
-          <CardDescription> Daily conversation volume over the last 30 days </CardDescription>
+          <CardDescription>Daily conversation volume</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="">
@@ -87,7 +84,7 @@
       </Card>
 
       <!-- Recent Activity -->
-      <Card class="lg:col-span-3">
+      <!-- <Card class="lg:col-span-3">
         <CardHeader>
           <CardTitle>Recent Activity</CardTitle>
           <CardDescription> Latest updates from your organization </CardDescription>
@@ -128,11 +125,8 @@
             </div>
           </div>
         </CardContent>
-      </Card>
-    </div>
+      </Card> -->
 
-    <!-- Agent Performance and Recent Conversations -->
-    <div class="grid gap-6 lg:grid-cols-2">
       <!-- Top Performing Agents -->
       <Card>
         <CardHeader>
@@ -246,6 +240,59 @@
           </div>
         </CardContent>
       </Card>
+      <!-- Sentiment Score Gauge -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Customer Sentiment Score</CardTitle>
+          <CardDescription>Last 30 days</CardDescription>
+        </CardHeader>
+        <CardContent class="flex align-center justify-center">
+          <SimpleGauge
+            title="Customer Sentiment Score"
+            subtitle="Last 30 days"
+            :counts="sentimentCounts"
+            :show-breakdown="true"
+            :show-view-report="true"
+            @view-report="viewInsights"
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Sentiment Breakdown -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Sentiment Breakdown</CardTitle>
+          <CardDescription>Detailed analysis by sentiment type</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div v-if="sentimentBreakdown.length > 0" class="space-y-4">
+            <div
+              v-for="sentiment in sentimentBreakdown"
+              :key="sentiment.type"
+              class="flex items-center justify-between p-4 border rounded-lg"
+              :class="sentiment.bgClass"
+            >
+              <div class="flex items-center space-x-3">
+                <component :is="sentiment.icon" :class="['h-8 w-8', sentiment.iconClass]" />
+                <div>
+                  <p class="font-medium text-foreground capitalize">{{ sentiment.type }}</p>
+                  <p class="text-sm text-muted-foreground">{{ sentiment.count }} messages</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold text-foreground">
+                  {{ sentiment.percentage.toFixed(1) }}%
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-8 text-muted-foreground">
+            <Smile class="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No sentiment data yet</p>
+            <p class="text-sm mt-2">Analysis will appear as messages are processed</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Quick Actions -->
@@ -268,9 +315,9 @@
             <BookOpen class="h-6 w-6" />
             <span>Manage Playbooks</span>
           </Button>
-          <Button variant="outline" class="h-20 flex-col space-y-2" @click="viewAnalytics">
+          <Button variant="outline" class="h-20 flex-col space-y-2" @click="scrollToTop">
             <BarChart3 class="h-6 w-6" />
-            <span>View Analytics</span>
+            <span>View Dashboard</span>
           </Button>
         </div>
       </CardContent>
@@ -283,7 +330,6 @@ import {
   Bot,
   MessageSquare,
   CheckCircle,
-  Clock,
   BarChart3,
   User,
   Plus,
@@ -293,12 +339,24 @@ import {
   BookOpen,
   AlertCircle,
   Zap,
+  MessageCircle,
+  Smile,
+  Meh,
+  Frown,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
+import SimpleGauge from "@/components/ui/SimpleGauge.vue";
+import DateRangeSelector from "@/components/ui/DateRangeSelector.vue";
 
 // State
 const loading = ref(false);
 const router = useRouter();
+
+// Date range for analytics
+const dateRange = ref({
+  startDate: "",
+  endDate: "",
+});
 
 // Real data - fetched from API
 interface Agent {
@@ -334,6 +392,15 @@ interface ConversationStat {
 const agents = ref<Agent[]>([]);
 const conversations = ref<Conversation[]>([]);
 const conversationStats = ref<ConversationStat[]>([]);
+
+// Analytics data
+const sentimentData = ref<Array<{ sentiment: string; count: number; percentage: number }>>([]);
+const conversationMetrics = ref({
+  totalConversations: 0,
+  resolvedConversations: 0,
+  resolutionRate: 0,
+  avgMessagesPerConversation: 0,
+});
 
 // Computed properties for dashboard data
 const metrics = computed(() => {
@@ -424,6 +491,60 @@ const topAgents = computed(() => {
   return agentsWithStats;
 });
 
+// Computed properties for sentiment visualization
+const formattedSentimentData = computed(() => {
+  return sentimentData.value.map((item) => ({
+    label: item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1),
+    value: item.count,
+  }));
+});
+
+// Computed property for sentiment gauge counts
+const sentimentCounts = computed(() => {
+  const counts = { pos: 0, neu: 0, neg: 0 };
+
+  sentimentData.value.forEach((item) => {
+    if (item.sentiment === "positive") {
+      counts.pos = item.count;
+    } else if (item.sentiment === "neutral") {
+      counts.neu = item.count;
+    } else if (item.sentiment === "negative") {
+      counts.neg = item.count;
+    }
+  });
+
+  return counts;
+});
+
+const sentimentBreakdown = computed(() => {
+  const sentimentMap = {
+    positive: {
+      type: "positive",
+      icon: Smile,
+      iconClass: "text-green-600",
+      bgClass: "bg-green-50 border-green-200",
+    },
+    neutral: {
+      type: "neutral",
+      icon: Meh,
+      iconClass: "text-yellow-600",
+      bgClass: "bg-yellow-50 border-yellow-200",
+    },
+    negative: {
+      type: "negative",
+      icon: Frown,
+      iconClass: "text-red-600",
+      bgClass: "bg-red-50 border-red-200",
+    },
+  };
+
+  return sentimentData.value.map((item) => ({
+    ...sentimentMap[item.sentiment as keyof typeof sentimentMap],
+    count: item.count,
+    percentage: item.percentage,
+  }));
+});
+
 // Computed property for recent conversations
 const recentConversations = computed(() => {
   return conversations.value
@@ -464,181 +585,42 @@ const formatTimeAgo = (date: Date) => {
 
 const fetchDashboardData = async () => {
   try {
-    // Fetch agents, conversations, and conversation stats in parallel
-    const [agentsData, conversationsData, analyticsData] = await Promise.all([
-      HayApi.agents.list.query(),
-      HayApi.conversations.list.query({
-        pagination: { page: 1, limit: 10 },
-      }),
-      HayApi.analytics.conversationActivity.query({}),
-      // Promise.resolve({
-      //   result: {
-      //     data: [
-            {
-              date: "2025-08-10",
-              count: 0,
-              label: "Aug 10",
-            },
-            {
-              date: "2025-08-11",
-              count: 0,
-              label: "Aug 11",
-            },
-            {
-              date: "2025-08-12",
-              count: 0,
-              label: "Aug 12",
-            },
-            {
-              date: "2025-08-13",
-              count: 0,
-              label: "Aug 13",
-            },
-            {
-              date: "2025-08-14",
-              count: 0,
-              label: "Aug 14",
-            },
-            {
-              date: "2025-08-15",
-              count: 0,
-              label: "Aug 15",
-            },
-            {
-              date: "2025-08-16",
-              count: 0,
-              label: "Aug 16",
-            },
-            {
-              date: "2025-08-17",
-              count: 0,
-              label: "Aug 17",
-            },
-            {
-              date: "2025-08-18",
-              count: 0,
-              label: "Aug 18",
-            },
-            {
-              date: "2025-08-19",
-              count: 0,
-              label: "Aug 19",
-            },
-            {
-              date: "2025-08-20",
-              count: 0,
-              label: "Aug 20",
-            },
-            {
-              date: "2025-08-21",
-              count: 0,
-              label: "Aug 21",
-            },
-            {
-              date: "2025-08-22",
-              count: 0,
-              label: "Aug 22",
-            },
-            {
-              date: "2025-08-23",
-              count: 0,
-              label: "Aug 23",
-            },
-            {
-              date: "2025-08-24",
-              count: 0,
-              label: "Aug 24",
-            },
-            {
-              date: "2025-08-25",
-              count: 0,
-              label: "Aug 25",
-            },
-            {
-              date: "2025-08-26",
-              count: 0,
-              label: "Aug 26",
-            },
-            {
-              date: "2025-08-27",
-              count: 0,
-              label: "Aug 27",
-            },
-            {
-              date: "2025-08-28",
-              count: 0,
-              label: "Aug 28",
-            },
-            {
-              date: "2025-08-29",
-              count: 0,
-              label: "Aug 29",
-            },
-            {
-              date: "2025-08-30",
-              count: 0,
-              label: "Aug 30",
-            },
-            {
-              date: "2025-08-31",
-              count: 0,
-              label: "Aug 31",
-            },
-            {
-              date: "2025-09-01",
-              count: 0,
-              label: "Sep 1",
-            },
-            {
-              date: "2025-09-02",
-              count: 0,
-              label: "Sep 2",
-            },
-            {
-              date: "2025-09-03",
-              count: 0,
-              label: "Sep 3",
-            },
-            {
-              date: "2025-09-04",
-              count: 0,
-              label: "Sep 4",
-            },
-            {
-              date: "2025-09-05",
-              count: 0,
-              label: "Sep 5",
-            },
-            {
-              date: "2025-09-06",
-              count: 0,
-              label: "Sep 6",
-            },
-            {
-              date: "2025-09-07",
-              count: 5,
-              label: "Sep 7",
-            },
-            {
-              date: "2025-09-08",
-              count: 35,
-              label: "Sep 8",
-            },
-            {
-              date: "2025-09-09",
-      //       count: 1,
-      //       label: "Sep 9",
-      //     },
-      //   ],
-      // },
-      // }),
-    ]);
+    const dateFilters = {
+      startDate: dateRange.value.startDate
+        ? new Date(dateRange.value.startDate).toISOString()
+        : undefined,
+      endDate: dateRange.value.endDate
+        ? new Date(dateRange.value.endDate).toISOString()
+        : undefined,
+    };
 
-    agents.value = (agentsData as any) || [];
-    conversations.value = (conversationsData as any)?.items || (conversationsData as any) || [];
+    // Fetch all data in parallel
+    const [agentsData, conversationsData, analyticsData, sentimentAnalysis, metricsData] =
+      await Promise.all([
+        HayApi.agents.list.query(),
+        HayApi.conversations.list.query({
+          pagination: { page: 1, limit: 10 },
+        }),
+        HayApi.analytics.conversationActivity.query(dateFilters),
+        HayApi.analytics.sentimentAnalysis.query(dateFilters),
+        HayApi.analytics.conversationMetrics.query(dateFilters),
+      ]);
+
+    agents.value = (agentsData as Agent[]) || [];
+
+    // Handle both paginated and non-paginated responses
+    if (
+      conversationsData &&
+      typeof conversationsData === "object" &&
+      "items" in conversationsData
+    ) {
+      conversations.value = (conversationsData as { items: Conversation[] }).items || [];
+    } else {
+      conversations.value = (conversationsData as Conversation[]) || [];
+    }
 
     // Handle the analytics data from the new endpoint
-    const statsData = (analyticsData as any)?.data || [];
+    const statsData = (analyticsData as { data?: ConversationStat[] })?.data || [];
 
     // Process the data to add numeric indices for proper chart rendering
     conversationStats.value = Array.isArray(statsData)
@@ -648,6 +630,23 @@ const fetchDashboardData = async () => {
           count: Number(item.count) || 0, // Ensure count is numeric
         }))
       : [];
+
+    // Update sentiment data
+    sentimentData.value =
+      (
+        sentimentAnalysis as {
+          data?: Array<{ sentiment: string; count: number; percentage: number }>;
+        }
+      )?.data || [];
+
+    // Update conversation metrics
+    const metrics = (metricsData as { data?: Record<string, number> })?.data || {};
+    conversationMetrics.value = {
+      totalConversations: metrics.totalConversations || 0,
+      resolvedConversations: metrics.resolvedConversations || 0,
+      resolutionRate: metrics.resolutionRate || 0,
+      avgMessagesPerConversation: metrics.avgMessagesPerConversation || 0,
+    };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
     // Set empty arrays on error to prevent UI issues
@@ -692,8 +691,10 @@ const managePlaybooks = () => {
   router.push("/playbooks");
 };
 
-const viewAnalytics = () => {
-  router.push("/analytics");
+const scrollToTop = () => {
+  if (typeof window !== "undefined") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 };
 
 // Lifecycle

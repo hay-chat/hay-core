@@ -16,6 +16,15 @@ import {
 } from "chart.js";
 import type { ChartOptions, ChartData } from "chart.js";
 import { Bar } from "vue-chartjs";
+import {
+  getChartColor,
+  getTooltipConfig,
+  getScaleConfig,
+  getLegendConfig,
+  SENTIMENT_COLORS,
+  CHART_COLORS,
+  getThemeColors,
+} from "@/utils/chart-config";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -26,13 +35,30 @@ interface Props {
   title?: string;
   showLegend?: boolean;
   horizontal?: boolean;
+  showPercentage?: boolean;
+  theme?: keyof typeof CHART_COLORS;
+  useSentimentColors?: boolean;
+  formatValue?: (value: number) => string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: 300,
-  colors: () => ["#10B981", "#F59E0B", "#EF4444"], // Green, Yellow, Red for sentiment
+  colors: undefined,
   showLegend: false,
   horizontal: false,
+  showPercentage: true,
+  theme: "primary",
+  useSentimentColors: false,
+});
+
+const chartColors = computed(() => {
+  if (props.colors && props.colors.length > 0) {
+    return props.colors;
+  }
+  if (props.useSentimentColors) {
+    return [SENTIMENT_COLORS.positive, SENTIMENT_COLORS.neutral, SENTIMENT_COLORS.negative];
+  }
+  return getThemeColors(props.theme, props.data.length);
 });
 
 const chartData = computed<ChartData<"bar">>(() => ({
@@ -42,12 +68,15 @@ const chartData = computed<ChartData<"bar">>(() => ({
       label: props.title || "Data",
       data: props.data.map((item) => item.value),
       backgroundColor: props.data.map((item, index) =>
-        item.color || props.colors[index % props.colors.length]
+        item.color || chartColors.value[index % chartColors.value.length]
       ),
       borderColor: props.data.map((item, index) =>
-        item.color || props.colors[index % props.colors.length]
+        item.color || chartColors.value[index % chartColors.value.length]
       ),
-      borderWidth: 1,
+      borderWidth: 0,
+      borderRadius: 4,
+      barThickness: undefined,
+      maxBarThickness: 60,
     },
   ],
 }));
@@ -57,41 +86,17 @@ const chartOptions = computed<ChartOptions<"bar">>(() => ({
   maintainAspectRatio: false,
   indexAxis: props.horizontal ? "y" : "x",
   plugins: {
-    legend: {
-      display: props.showLegend,
-    },
-    tooltip: {
-      callbacks: {
-        label: (context) => {
-          const label = context.dataset.label || "";
-          const value = context.parsed.y || context.parsed.x;
-          // Check if we should show percentage
-          const total = context.dataset.data.reduce((a, b) => (a as number) + (b as number), 0) as number;
-          const percentage = ((value / total) * 100).toFixed(1);
-          return `${label}: ${value} (${percentage}%)`;
-        },
-      },
-    },
+    legend: getLegendConfig(props.showLegend),
+    tooltip: getTooltipConfig({
+      showPercentage: props.showPercentage,
+      formatValue: props.formatValue,
+    }),
   },
-  scales: {
-    x: {
-      grid: {
-        display: false,
-      },
-      ticks: {
-        color: "rgb(156, 163, 175)",
-      },
-    },
-    y: {
-      grid: {
-        color: "rgba(156, 163, 175, 0.1)",
-      },
-      ticks: {
-        color: "rgb(156, 163, 175)",
-      },
-      beginAtZero: true,
-    },
-  },
+  scales: getScaleConfig({
+    hideXGrid: true,
+    hideYGrid: false,
+    beginAtZero: true,
+  }) as ChartOptions<"bar">["scales"],
 }));
 </script>
 

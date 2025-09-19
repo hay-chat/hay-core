@@ -16,6 +16,9 @@
     <p v-if="label" class="font-secondary font-bold text-lg text-red">
       {{ label }}
     </p>
+    <p v-if="description" class="text-neutral-muted">
+      {{ description }}
+    </p>
   </div>
 </template>
 
@@ -24,6 +27,10 @@ defineProps({
   label: {
     type: String,
     default: "Something went wrong...",
+  },
+  description: {
+    type: String,
+    default: "Please try again later.",
   },
 });
 </script>

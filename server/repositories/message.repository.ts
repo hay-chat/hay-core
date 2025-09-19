@@ -111,28 +111,37 @@ export class MessageRepository {
     startDate?: Date,
     endDate?: Date
   ): Promise<number> {
-    const queryBuilder = this.getRepository()
-      .createQueryBuilder("message")
-      .innerJoin("message.conversation", "conversation")
-      .select("conversation.id", "conversation_id")
-      .addSelect("COUNT(*)", "message_count")
-      .where("conversation.organization_id = :organizationId", { organizationId });
+    // Build the query with proper parameterization
+    let query = `
+      WITH conversation_message_counts AS (
+        SELECT c.id, COUNT(m.id) as message_count
+        FROM conversations c
+        LEFT JOIN messages m ON m.conversation_id = c.id
+        WHERE c.organization_id = $1
+    `;
+
+    const params: any[] = [organizationId];
+    let paramIndex = 2;
 
     if (startDate) {
-      queryBuilder.andWhere("conversation.created_at >= :startDate", { startDate });
+      query += ` AND c.created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
     }
 
     if (endDate) {
-      queryBuilder.andWhere("conversation.created_at <= :endDate", { endDate });
+      query += ` AND c.created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
     }
 
-    queryBuilder.groupBy("conversation.id");
+    query += `
+        GROUP BY c.id
+      )
+      SELECT AVG(message_count) as avg_messages FROM conversation_message_counts
+    `;
 
-    const subQuery = `(${queryBuilder.getQuery()})`;
-    const avgResult = await this.getRepository().query(
-      `SELECT AVG(message_count) as avg_messages FROM ${subQuery} as counts`,
-      queryBuilder.getParameters()
-    );
+    const avgResult = await this.getRepository().query(query, params);
 
     return avgResult[0]?.avg_messages ? parseFloat(avgResult[0].avg_messages) : 0;
   }
