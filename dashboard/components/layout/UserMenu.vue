@@ -42,7 +42,7 @@
           <p class="text-sm font-medium text-foreground">
             {{ userStore.user?.firstName || "User" }}
           </p>
-          <p class="text-xs text-muted-foreground">
+          <p class="text-xs text-neutral-muted">
             {{ userStore.user?.email || "" }}
           </p>
         </div>
@@ -53,7 +53,7 @@
             v-for="item in userMenuItems"
             :key="item.name"
             :to="item.href"
-            class="flex items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
+            class="flex items-center px-4 py-2 text-sm text-neutral-muted hover:bg-background-tertiary hover:text-foreground transition-colors"
             role="menuitem"
             tabindex="-1"
             @click="dropdownOpen = false"
@@ -66,13 +66,13 @@
         <!-- Organization Switcher -->
         <div class="border-t border-border">
           <div class="px-4 py-2">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <p class="text-xs font-medium text-neutral-muted uppercase tracking-wider">
               Organization
             </p>
           </div>
           <div class="py-1">
             <button
-              class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
+              class="flex w-full items-center px-4 py-2 text-sm text-neutral-muted hover:bg-background-tertiary hover:text-foreground transition-colors"
               @click="
                 showOrgSwitcher = true;
                 dropdownOpen = false;
@@ -83,7 +83,7 @@
                 <p class="font-medium">
                   {{ currentOrganization.name }}
                 </p>
-                <p class="text-xs text-muted-foreground">Switch organization</p>
+                <p class="text-xs text-neutral-muted">Switch organization</p>
               </div>
               <ChevronDown class="h-4 w-4" aria-hidden="true" />
             </button>
@@ -93,7 +93,7 @@
         <!-- Sign Out -->
         <div class="border-t border-border py-1">
           <button
-            class="flex w-full items-center px-4 py-2 text-sm text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors"
+            class="flex w-full items-center px-4 py-2 text-sm text-neutral-muted hover:bg-background-tertiary hover:text-foreground transition-colors"
             role="menuitem"
             tabindex="-1"
             @click="handleSignOut"

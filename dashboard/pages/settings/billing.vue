@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Billing</h1>
-        <p class="text-muted-foreground">Manage your subscription, usage, and payment methods</p>
+        <p class="text-neutral-muted">Manage your subscription, usage, and payment methods</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="downloadInvoice">
@@ -33,10 +33,10 @@
                 <h3 class="font-semibold text-lg">
                   {{ currentPlan.name }}
                 </h3>
-                <p class="text-muted-foreground">
+                <p class="text-neutral-muted">
                   {{ currentPlan.description }}
                 </p>
-                <div class="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
+                <div class="flex items-center space-x-4 mt-2 text-sm text-neutral-muted">
                   <span>{{ formatNumber(currentPlan.conversations) }} conversations/month</span>
                   <span>{{ formatNumber(currentPlan.agents) }} agents</span>
                   <span>{{ currentPlan.support }} support</span>
@@ -44,7 +44,7 @@
               </div>
               <div class="text-right">
                 <div class="text-2xl font-bold">${{ currentPlan.price }}</div>
-                <div class="text-sm text-muted-foreground">
+                <div class="text-sm text-neutral-muted">
                   {{ currentPlan.period }}
                 </div>
                 <Badge v-if="currentPlan.discount" variant="success" class="mt-1">
@@ -55,15 +55,15 @@
 
             <div class="grid gap-3 text-sm">
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Billing Cycle:</span>
+                <span class="text-neutral-muted">Billing Cycle:</span>
                 <span class="font-medium">{{ currentPlan.billingCycle }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Next Billing Date:</span>
+                <span class="text-neutral-muted">Next Billing Date:</span>
                 <span class="font-medium">{{ formatDate(currentPlan.nextBillingDate) }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Auto-Renewal:</span>
+                <span class="text-neutral-muted">Auto-Renewal:</span>
                 <div class="flex items-center space-x-2">
                   <span class="font-medium">{{
                     currentPlan.autoRenewal ? "Enabled" : "Disabled"
@@ -109,7 +109,7 @@
                     }"
                   />
                 </div>
-                <div class="text-xs text-muted-foreground">
+                <div class="text-xs text-neutral-muted">
                   {{ Math.round((usage.conversations / currentPlan.conversations) * 100) }}% used
                 </div>
               </div>
@@ -208,7 +208,7 @@
             </div>
             <div>
               <div class="font-medium">**** **** **** {{ paymentMethod.last4 }}</div>
-              <div class="text-sm text-muted-foreground">
+              <div class="text-sm text-neutral-muted">
                 {{ paymentMethod.brand }} • Expires {{ paymentMethod.expMonth }}/{{
                   paymentMethod.expYear
                 }}
@@ -227,8 +227,8 @@
         </div>
 
         <div v-else class="text-center py-8 border-2 border-dashed border-muted rounded-lg">
-          <CreditCard class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p class="text-sm text-muted-foreground mb-4">No payment method on file</p>
+          <CreditCard class="h-8 w-8 text-neutral-muted mx-auto mb-2" />
+          <p class="text-sm text-neutral-muted mb-4">No payment method on file</p>
           <Button @click="addPaymentMethod">
             <Plus class="h-4 w-4 mr-2" />
             Add Payment Method
@@ -270,7 +270,7 @@
                   <div class="font-medium">
                     {{ invoice.number }}
                   </div>
-                  <div class="text-sm text-muted-foreground">
+                  <div class="text-sm text-neutral-muted">
                     {{ invoice.description }}
                   </div>
                 </td>
@@ -279,7 +279,7 @@
                 </td>
                 <td class="py-3 px-4">
                   <div class="font-medium">${{ invoice.amount.toFixed(2) }}</div>
-                  <div class="text-sm text-muted-foreground">
+                  <div class="text-sm text-neutral-muted">
                     {{ invoice.currency.toUpperCase() }}
                   </div>
                 </td>
@@ -316,8 +316,8 @@
           class="h-80 flex items-center justify-center border-2 border-dashed border-muted rounded-lg"
         >
           <div class="text-center">
-            <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-            <p class="text-sm text-muted-foreground">Usage analytics will be displayed here</p>
+            <BarChart3 class="h-12 w-12 text-neutral-muted mx-auto mb-2" />
+            <p class="text-sm text-neutral-muted">Usage analytics will be displayed here</p>
           </div>
         </div>
       </CardContent>
@@ -340,10 +340,10 @@
               <div class="font-medium">
                 {{ change.title }}
               </div>
-              <div class="text-sm text-muted-foreground">
+              <div class="text-sm text-neutral-muted">
                 {{ change.description }}
               </div>
-              <div class="text-xs text-muted-foreground">
+              <div class="text-xs text-neutral-muted">
                 Effective {{ formatDate(change.effectiveDate) }}
               </div>
             </div>

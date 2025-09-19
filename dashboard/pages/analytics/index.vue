@@ -4,9 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p class="text-muted-foreground">
-          Monitor your chatbot performance and conversation insights
-        </p>
+        <p class="text-neutral-muted">Monitor your chatbot performance and conversation insights</p>
       </div>
       <div class="flex items-center space-x-2">
         <select
@@ -34,7 +32,7 @@
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Total Conversations</span>
-          <MessageSquare class="h-4 w-4 text-muted-foreground" />
+          <MessageSquare class="h-4 w-4 text-neutral-muted" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">
@@ -43,7 +41,7 @@
           <div class="flex items-center space-x-1 text-xs">
             <TrendingUp class="h-3 w-3 text-green-600" />
             <span class="text-green-600">+{{ kpis.conversationsGrowth }}%</span>
-            <span class="text-muted-foreground">vs last period</span>
+            <span class="text-neutral-muted">vs last period</span>
           </div>
         </CardContent>
       </Card>
@@ -51,14 +49,14 @@
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Resolution Rate</span>
-          <CheckCircle class="h-4 w-4 text-muted-foreground" />
+          <CheckCircle class="h-4 w-4 text-neutral-muted" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ kpis.resolutionRate }}%</div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingUp class="h-3 w-3 text-green-600" />
             <span class="text-green-600">+{{ kpis.resolutionGrowth }}%</span>
-            <span class="text-muted-foreground">vs last period</span>
+            <span class="text-neutral-muted">vs last period</span>
           </div>
         </CardContent>
       </Card>
@@ -66,14 +64,14 @@
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Avg Response Time</span>
-          <Clock class="h-4 w-4 text-muted-foreground" />
+          <Clock class="h-4 w-4 text-neutral-muted" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ kpis.avgResponseTime }}s</div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingDown class="h-3 w-3 text-green-600" />
             <span class="text-green-600">-{{ kpis.responseTimeImprovement }}%</span>
-            <span class="text-muted-foreground">vs last period</span>
+            <span class="text-neutral-muted">vs last period</span>
           </div>
         </CardContent>
       </Card>
@@ -81,14 +79,14 @@
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
           <span class="text-sm font-medium">Customer Satisfaction</span>
-          <Heart class="h-4 w-4 text-muted-foreground" />
+          <Heart class="h-4 w-4 text-neutral-muted" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ kpis.satisfaction }}%</div>
           <div class="flex items-center space-x-1 text-xs">
             <TrendingUp class="h-3 w-3 text-green-600" />
             <span class="text-green-600">+{{ kpis.satisfactionGrowth }}%</span>
-            <span class="text-muted-foreground">vs last period</span>
+            <span class="text-neutral-muted">vs last period</span>
           </div>
         </CardContent>
       </Card>
@@ -107,8 +105,8 @@
             class="h-80 flex items-center justify-center border-2 border-dashed border-muted rounded-lg"
           >
             <div class="text-center">
-              <BarChart3 class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p class="text-sm text-muted-foreground">
+              <BarChart3 class="h-12 w-12 text-neutral-muted mx-auto mb-2" />
+              <p class="text-sm text-neutral-muted">
                 Conversation volume chart will be displayed here
               </p>
             </div>
@@ -127,10 +125,8 @@
             class="h-80 flex items-center justify-center border-2 border-dashed border-muted rounded-lg"
           >
             <div class="text-center">
-              <TrendingUp class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p class="text-sm text-muted-foreground">
-                Resolution rate trend will be displayed here
-              </p>
+              <TrendingUp class="h-12 w-12 text-neutral-muted mx-auto mb-2" />
+              <p class="text-sm text-neutral-muted">Resolution rate trend will be displayed here</p>
             </div>
           </div>
         </CardContent>
@@ -186,12 +182,12 @@
                   <div class="font-medium">
                     {{ issue.topic }}
                   </div>
-                  <div class="text-sm text-muted-foreground">{{ issue.count }} conversations</div>
+                  <div class="text-sm text-neutral-muted">{{ issue.count }} conversations</div>
                 </div>
               </div>
               <div class="text-right">
                 <div class="text-sm font-medium">{{ issue.percentage }}%</div>
-                <div class="text-xs text-muted-foreground">of total</div>
+                <div class="text-xs text-neutral-muted">of total</div>
               </div>
             </div>
           </div>
@@ -235,7 +231,7 @@
                       <div class="font-medium">
                         {{ agent.name }}
                       </div>
-                      <div class="text-sm text-muted-foreground">
+                      <div class="text-sm text-neutral-muted">
                         {{ agent.type }}
                       </div>
                     </div>
@@ -245,7 +241,7 @@
                   <div class="font-medium">
                     {{ formatNumber(agent.conversations) }}
                   </div>
-                  <div class="text-sm text-muted-foreground">
+                  <div class="text-sm text-neutral-muted">
                     {{ agent.conversationsChange > 0 ? "+" : "" }}{{ agent.conversationsChange }}%
                     change
                   </div>
@@ -308,19 +304,19 @@
             </div>
             <div class="space-y-2 text-sm">
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Messages:</span>
+                <span class="text-neutral-muted">Messages:</span>
                 <span class="font-medium">{{ formatNumber(channel.messages) }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Resolution:</span>
+                <span class="text-neutral-muted">Resolution:</span>
                 <span class="font-medium">{{ channel.resolutionRate }}%</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Response Time:</span>
+                <span class="text-neutral-muted">Response Time:</span>
                 <span class="font-medium">{{ channel.avgResponseTime }}s</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Satisfaction:</span>
+                <span class="text-neutral-muted">Satisfaction:</span>
                 <div class="flex items-center space-x-1">
                   <Star class="h-3 w-3 text-yellow-500 fill-current" />
                   <span class="font-medium">{{ channel.satisfaction }}/5</span>

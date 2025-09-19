@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Plugin Marketplace</h1>
-        <p class="text-muted-foreground">
+        <p class="text-neutral-muted">
           Discover and install plugins to extend your platform capabilities
         </p>
       </div>
@@ -65,7 +65,7 @@
     <!-- Search -->
     <div class="flex items-center space-x-4">
       <div class="relative flex-1 max-w-sm">
-        <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
         <Input v-model="searchQuery" placeholder="Search plugins..." class="pl-8" />
       </div>
     </div>
@@ -88,9 +88,9 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredPlugins.length === 0" class="text-center py-12">
-      <Package class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+      <Package class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">No plugins found</h3>
-      <p class="text-muted-foreground">
+      <p class="text-neutral-muted">
         {{
           searchQuery
             ? "Try adjusting your search terms."
@@ -138,13 +138,13 @@
             <!-- Status -->
             <div class="space-y-2 text-sm">
               <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Status:</span>
+                <span class="text-neutral-muted">Status:</span>
                 <Badge :variant="plugin.enabled ? 'default' : 'secondary'">
                   {{ plugin.enabled ? "Enabled" : "Disabled" }}
                 </Badge>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Version:</span>
+                <span class="text-neutral-muted">Version:</span>
                 <span class="font-medium">{{ plugin.version }}</span>
               </div>
             </div>
@@ -368,7 +368,8 @@ const enablePlugin = async (pluginId: string) => {
 
     // Show error toast with details
     // TRPCError messages are in error.message for client errors
-    const errorMessage = (error as any)?.message || (error as any)?.data?.message || "Failed to enable plugin";
+    const errorMessage =
+      (error as any)?.message || (error as any)?.data?.message || "Failed to enable plugin";
 
     // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
@@ -391,7 +392,8 @@ const disablePlugin = async (pluginId: string) => {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details
-    const errorMessage = (error as any)?.message || (error as any)?.data?.message || "Failed to disable plugin";
+    const errorMessage =
+      (error as any)?.message || (error as any)?.data?.message || "Failed to disable plugin";
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {

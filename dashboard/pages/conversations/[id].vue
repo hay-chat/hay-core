@@ -14,7 +14,7 @@
             <h1 class="text-xl font-semibold">
               {{ conversation?.title || "Loading..." }}
             </h1>
-            <p class="text-sm text-muted-foreground">
+            <p class="text-sm text-neutral-muted">
               Conversation #{{ conversation?.id?.slice(0, 8) }}
             </p>
           </div>
@@ -78,15 +78,15 @@
           </div>
 
           <div v-else-if="conversation?.messages?.length === 0" class="text-center py-12">
-            <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p class="text-muted-foreground">No messages in this conversation yet</p>
+            <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
+            <p class="text-neutral-muted">No messages in this conversation yet</p>
           </div>
 
           <div v-else class="space-y-4">
             <!-- Conversation Start -->
             <div class="text-center">
               <div
-                class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-muted-foreground"
+                class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-neutral-muted"
               >
                 <Clock class="h-3 w-3 mr-1" />
                 Conversation started {{ formatDate(conversation?.created_at) }}
@@ -173,22 +173,22 @@
                 </div>
                 <div>
                   <div class="font-medium">Customer</div>
-                  <div class="text-sm text-muted-foreground">
+                  <div class="text-sm text-neutral-muted">
                     {{ conversation?.id?.slice(0, 8) }}
                   </div>
                 </div>
               </div>
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Conversation ID:</span>
+                  <span class="text-neutral-muted">Conversation ID:</span>
                   <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Status:</span>
+                  <span class="text-neutral-muted">Status:</span>
                   <span>{{ conversation?.status }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Created:</span>
+                  <span class="text-neutral-muted">Created:</span>
                   <span>{{ formatDate(conversation?.created_at) }}</span>
                 </div>
               </div>
@@ -202,23 +202,23 @@
             </CardHeader>
             <CardContent class="space-y-3 text-sm">
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Agent:</span>
+                <span class="text-neutral-muted">Agent:</span>
                 <span>{{ conversation?.agent?.name || "AI Assistant" }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Status:</span>
+                <span class="text-neutral-muted">Status:</span>
                 <span>{{ formatStatus(conversation?.status) }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Messages:</span>
+                <span class="text-neutral-muted">Messages:</span>
                 <span>{{ conversation?.messages?.length }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Created:</span>
+                <span class="text-neutral-muted">Created:</span>
                 <span>{{ formatDate(conversation?.created_at) }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Updated:</span>
+                <span class="text-neutral-muted">Updated:</span>
                 <span>{{ formatDate(conversation?.updated_at) }}</span>
               </div>
             </CardContent>
@@ -230,7 +230,7 @@
               <CardTitle class="text-base"> Previous Conversations </CardTitle>
             </CardHeader>
             <CardContent>
-              <div v-if="previousConversations.length === 0" class="text-sm text-muted-foreground">
+              <div v-if="previousConversations.length === 0" class="text-sm text-neutral-muted">
                 No previous conversations
               </div>
               <div v-else class="space-y-3">
@@ -243,7 +243,7 @@
                   <div class="text-sm font-medium">
                     {{ prevConv.subject || prevConv.title }}
                   </div>
-                  <div class="text-xs text-muted-foreground">
+                  <div class="text-xs text-neutral-muted">
                     {{ formatDate(prevConv.createdAt || prevConv.date) }} •
                     {{ prevConv.status || "Unknown" }}
                   </div>
@@ -292,7 +292,7 @@
                   <div class="font-medium">
                     {{ article.title }}
                   </div>
-                  <div class="text-xs text-muted-foreground">
+                  <div class="text-xs text-neutral-muted">
                     {{ article.category || "General" }}
                   </div>
                 </div>

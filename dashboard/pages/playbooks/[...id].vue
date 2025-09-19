@@ -3,7 +3,7 @@
     <div class="mb-8 flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold mb-2">{{ isEditMode ? "Edit" : "Create New" }} Playbook</h1>
-        <p class="text-muted-foreground">
+        <p class="text-neutral-muted">
           {{
             isEditMode
               ? "Update your playbook configuration"
@@ -56,9 +56,7 @@
             <p v-if="errors.trigger" class="text-sm text-red-500">
               {{ errors.trigger }}
             </p>
-            <p class="text-sm text-muted-foreground">
-              Define when this playbook should be activated
-            </p>
+            <p class="text-sm text-neutral-muted">Define when this playbook should be activated</p>
           </div>
 
           <!-- Description Field -->
@@ -100,10 +98,10 @@
             <label class="text-sm font-medium"
               >{{ isEditMode ? "Assigned" : "Assign" }} Agents</label
             >
-            <div v-if="loadingAgents" class="p-4 text-center text-muted-foreground">
+            <div v-if="loadingAgents" class="p-4 text-center text-neutral-muted">
               Loading agents...
             </div>
-            <div v-else-if="agents.length === 0" class="p-4 text-center text-muted-foreground">
+            <div v-else-if="agents.length === 0" class="p-4 text-center text-neutral-muted">
               No agents available. Create agents first.
             </div>
             <div v-else class="space-y-2 border rounded-md p-4">
@@ -117,7 +115,7 @@
                 />
                 <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
                   <div class="font-medium">{{ agent.name }}</div>
-                  <div v-if="agent.description" class="text-sm text-muted-foreground">
+                  <div v-if="agent.description" class="text-sm text-neutral-muted">
                     {{ agent.description }}
                   </div>
                 </label>
@@ -126,7 +124,7 @@
           </div>
 
           <!-- Metadata (only in edit mode) -->
-          <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-muted-foreground">
+          <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-neutral-muted">
             <div>Created: {{ formatDate(playbook.created_at) }}</div>
             <div>Last updated: {{ formatDate(playbook.updated_at) }}</div>
           </div>
@@ -236,18 +234,22 @@ const loading = ref(false);
 const isSubmitting = ref(false);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
-const playbook = ref<Playbook | {
-  id: string;
-  title: string;
-  trigger: string;
-  description?: string | null;
-  instructions?: string | { id: string; level: number; instructions: string; }[] | null;
-  status: PlaybookStatus;
-  organization_id: string | null;
-  agents?: Agent[];
-  created_at: string;
-  updated_at: string;
-} | null>(null);
+const playbook = ref<
+  | Playbook
+  | {
+      id: string;
+      title: string;
+      trigger: string;
+      description?: string | null;
+      instructions?: string | { id: string; level: number; instructions: string }[] | null;
+      status: PlaybookStatus;
+      organization_id: string | null;
+      agents?: Agent[];
+      created_at: string;
+      updated_at: string;
+    }
+  | null
+>(null);
 const errors = ref<Record<string, string>>({});
 
 // Format date
@@ -291,7 +293,7 @@ onMounted(async () => {
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
         instructions: Array.isArray(playbookResponse.instructions)
-          ? playbookResponse.instructions as InstructionData[]
+          ? (playbookResponse.instructions as InstructionData[])
           : [],
         status: playbookResponse.status,
         agentIds: playbookResponse.agents?.map((a) => a.id) || [],

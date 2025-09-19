@@ -3,7 +3,7 @@
     <!-- Page Header -->
     <div>
       <h1 class="text-2xl font-bold text-foreground">Create New Agent</h1>
-      <p class="mt-1 text-sm text-muted-foreground">
+      <p class="mt-1 text-sm text-neutral-muted">
         Follow the steps below to create and configure your AI agent.
       </p>
     </div>
@@ -22,7 +22,7 @@
                       ? 'border-primary bg-primary text-white'
                       : currentStep === index
                         ? 'border-primary bg-background text-primary'
-                        : 'border-muted bg-background text-muted-foreground',
+                        : 'border-muted bg-background text-neutral-muted',
                   ]"
                 >
                   <CheckCircle v-if="currentStep > index" class="h-5 w-5" />
@@ -33,12 +33,12 @@
                 <p
                   :class="[
                     'text-sm font-medium',
-                    currentStep >= index ? 'text-foreground' : 'text-muted-foreground',
+                    currentStep >= index ? 'text-foreground' : 'text-neutral-muted',
                   ]"
                 >
                   {{ step.title }}
                 </p>
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-neutral-muted">
                   {{ step.description }}
                 </p>
               </div>
@@ -76,7 +76,7 @@
                 placeholder="Customer Support Bot"
                 required
               />
-              <p class="text-xs text-muted-foreground mt-1">
+              <p class="text-xs text-neutral-muted mt-1">
                 Choose a descriptive name for your agent
               </p>
             </div>
@@ -164,7 +164,7 @@
         <!-- Step 2: Knowledge Base -->
         <div v-if="currentStep === 1" class="space-y-6">
           <div class="text-center">
-            <p class="text-sm text-muted-foreground mb-6">
+            <p class="text-sm text-neutral-muted mb-6">
               Choose how to populate your agent's knowledge base. You can select multiple sources.
             </p>
           </div>
@@ -186,11 +186,11 @@
                   />
                   <div class="flex-1">
                     <h4 class="font-medium text-foreground">Import from Zendesk</h4>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       Import articles, FAQs, and support documentation from your Zendesk account.
                     </p>
                   </div>
-                  <ExternalLink class="h-5 w-5 text-muted-foreground" />
+                  <ExternalLink class="h-5 w-5 text-neutral-muted" />
                 </div>
               </CardContent>
             </Card>
@@ -210,11 +210,11 @@
                   />
                   <div class="flex-1">
                     <h4 class="font-medium text-foreground">Scrape Website</h4>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       Automatically extract content from your website pages and documentation.
                     </p>
                   </div>
-                  <Globe class="h-5 w-5 text-muted-foreground" />
+                  <Globe class="h-5 w-5 text-neutral-muted" />
                 </div>
               </CardContent>
             </Card>
@@ -234,11 +234,11 @@
                   />
                   <div class="flex-1">
                     <h4 class="font-medium text-foreground">Upload Documents</h4>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       Upload PDF, DOCX, TXT files with your knowledge base content.
                     </p>
                   </div>
-                  <FileText class="h-5 w-5 text-muted-foreground" />
+                  <FileText class="h-5 w-5 text-neutral-muted" />
                 </div>
               </CardContent>
             </Card>
@@ -258,11 +258,11 @@
                   />
                   <div class="flex-1">
                     <h4 class="font-medium text-foreground">Import Support Tickets</h4>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       Learn from historical support tickets and their resolutions.
                     </p>
                   </div>
-                  <MessageSquare class="h-5 w-5 text-muted-foreground" />
+                  <MessageSquare class="h-5 w-5 text-neutral-muted" />
                 </div>
               </CardContent>
             </Card>
@@ -296,9 +296,9 @@
           <div v-if="agentForm.knowledgeSources.includes('documents')" class="space-y-4">
             <Label>Upload Documents</Label>
             <div class="border-2 border-dashed border-muted rounded-lg p-6 text-center">
-              <Upload class="mx-auto h-12 w-12 text-muted-foreground" />
-              <p class="mt-2 text-sm text-muted-foreground">Drop files here or click to upload</p>
-              <p class="text-xs text-muted-foreground">
+              <Upload class="mx-auto h-12 w-12 text-neutral-muted" />
+              <p class="mt-2 text-sm text-neutral-muted">Drop files here or click to upload</p>
+              <p class="text-xs text-neutral-muted">
                 Supports PDF, DOCX, TXT files up to 10MB each
               </p>
               <Button variant="outline" class="mt-4"> Choose Files </Button>
@@ -325,7 +325,7 @@
                   <h4 class="font-medium text-foreground">
                     {{ tone.name }}
                   </h4>
-                  <p class="text-xs text-muted-foreground mt-1">
+                  <p class="text-xs text-neutral-muted mt-1">
                     {{ tone.description }}
                   </p>
                 </CardContent>
@@ -364,7 +364,7 @@
               rows="4"
               class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <p class="text-xs text-muted-foreground mt-1">
+            <p class="text-xs text-neutral-muted mt-1">
               These instructions will guide the agent's behavior in all conversations.
             </p>
           </div>
@@ -405,7 +405,7 @@
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <h4 class="text-sm font-medium text-foreground">Basic Information</h4>
-                <ul class="text-sm text-muted-foreground space-y-1 mt-2">
+                <ul class="text-sm text-neutral-muted space-y-1 mt-2">
                   <li><strong>Name:</strong> {{ agentForm.name }}</li>
                   <li><strong>Type:</strong> {{ agentForm.type }}</li>
                   <li><strong>Language:</strong> {{ agentForm.language }}</li>
@@ -415,7 +415,7 @@
 
               <div>
                 <h4 class="text-sm font-medium text-foreground">Knowledge Sources</h4>
-                <ul class="text-sm text-muted-foreground space-y-1 mt-2">
+                <ul class="text-sm text-neutral-muted space-y-1 mt-2">
                   <li v-for="source in agentForm.knowledgeSources" :key="source">
                     • {{ getSourceDisplayName(source) }}
                   </li>
@@ -424,7 +424,7 @@
 
               <div>
                 <h4 class="text-sm font-medium text-foreground">Personality</h4>
-                <ul class="text-sm text-muted-foreground space-y-1 mt-2">
+                <ul class="text-sm text-neutral-muted space-y-1 mt-2">
                   <li>
                     <strong>Tone:</strong>
                     {{ getToneDisplayName(agentForm.tone) }}
@@ -442,7 +442,7 @@
 
               <div>
                 <h4 class="text-sm font-medium text-foreground">Description</h4>
-                <p class="text-sm text-muted-foreground mt-2">
+                <p class="text-sm text-neutral-muted mt-2">
                   {{ agentForm.description }}
                 </p>
               </div>
@@ -458,7 +458,7 @@
                   <div
                     class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                   >
-                    <User class="h-4 w-4 text-muted-foreground" />
+                    <User class="h-4 w-4 text-neutral-muted" />
                   </div>
                   <div class="flex-1">
                     <p class="text-sm text-foreground">Hi, I need help with my account setup.</p>

@@ -4,16 +4,13 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-foreground">Plugins</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <p class="mt-1 text-sm text-neutral-muted">
           Manage AI providers, vector stores, and document processors
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw
-            class="mr-2 h-4 w-4"
-            :class="{ 'animate-spin': loading }"
-          />
+          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
       </div>
@@ -29,7 +26,7 @@
           :class="[
             selectedCategory === category.id
               ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+              : 'border-transparent text-neutral-muted hover:text-foreground hover:border-border',
             'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors',
           ]"
         >
@@ -38,7 +35,7 @@
             :class="[
               selectedCategory === category.id
                 ? 'bg-primary/10 text-primary'
-                : 'bg-background-tertiary text-muted-foreground',
+                : 'bg-background-tertiary text-neutral-muted',
               'ml-2 rounded-full px-2 py-0.5 text-xs font-medium',
             ]"
           >
@@ -69,10 +66,10 @@
               plugin.status === 'active'
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                 : plugin.status === 'error'
-                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                : plugin.status === 'configuring'
-                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                  : plugin.status === 'configuring'
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
             ]"
           >
             <div
@@ -81,10 +78,10 @@
                 plugin.status === 'active'
                   ? 'bg-green-600 dark:bg-green-400'
                   : plugin.status === 'error'
-                  ? 'bg-red-600 dark:bg-red-400'
-                  : plugin.status === 'configuring'
-                  ? 'bg-yellow-600 dark:bg-yellow-400 animate-pulse'
-                  : 'bg-gray-600 dark:bg-gray-400',
+                    ? 'bg-red-600 dark:bg-red-400'
+                    : plugin.status === 'configuring'
+                      ? 'bg-yellow-600 dark:bg-yellow-400 animate-pulse'
+                      : 'bg-gray-600 dark:bg-gray-400',
               ]"
             ></div>
             {{ plugin.status }}
@@ -98,16 +95,14 @@
                 'p-3 rounded-lg',
                 plugin.available
                   ? 'bg-primary/10 text-primary'
-                  : 'bg-background-tertiary text-muted-foreground',
+                  : 'bg-background-tertiary text-neutral-muted',
               ]"
             >
               <component :is="getPluginIcon(plugin.type)" class="h-6 w-6" />
             </div>
             <div class="flex-1">
               <CardTitle class="text-lg">{{ plugin.name }}</CardTitle>
-              <CardDescription class="mt-1">{{
-                plugin.description
-              }}</CardDescription>
+              <CardDescription class="mt-1">{{ plugin.description }}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -117,10 +112,8 @@
           <div class="space-y-3">
             <!-- Type -->
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Type</span>
-              <Badge variant="secondary">{{
-                formatPluginType(plugin.type)
-              }}</Badge>
+              <span class="text-neutral-muted">Type</span>
+              <Badge variant="secondary">{{ formatPluginType(plugin.type) }}</Badge>
             </div>
 
             <!-- Model/Version -->
@@ -128,16 +121,13 @@
               v-if="plugin.configuration?.model"
               class="flex items-center justify-between text-sm"
             >
-              <span class="text-muted-foreground">Model</span>
+              <span class="text-neutral-muted">Model</span>
               <span class="font-medium">{{ plugin.configuration.model }}</span>
             </div>
 
             <!-- Usage Stats -->
-            <div
-              v-if="plugin.usage"
-              class="flex items-center justify-between text-sm"
-            >
-              <span class="text-muted-foreground">Usage</span>
+            <div v-if="plugin.usage" class="flex items-center justify-between text-sm">
+              <span class="text-neutral-muted">Usage</span>
               <span class="font-medium">
                 {{ formatNumber(plugin.usage.monthlyUsage?.requests || 0) }}
                 requests
@@ -149,18 +139,13 @@
               v-if="plugin.usage?.monthlyUsage?.cost"
               class="flex items-center justify-between text-sm"
             >
-              <span class="text-muted-foreground">Cost</span>
-              <span class="font-medium"
-                >${{ plugin.usage.monthlyUsage.cost.toFixed(2) }}</span
-              >
+              <span class="text-neutral-muted">Cost</span>
+              <span class="font-medium">${{ plugin.usage.monthlyUsage.cost.toFixed(2) }}</span>
             </div>
 
             <!-- Health Status -->
-            <div
-              v-if="plugin.healthCheck"
-              class="flex items-center justify-between text-sm"
-            >
-              <span class="text-muted-foreground">Health</span>
+            <div v-if="plugin.healthCheck" class="flex items-center justify-between text-sm">
+              <span class="text-neutral-muted">Health</span>
               <span
                 :class="[
                   'flex items-center',
@@ -170,11 +155,7 @@
                 ]"
               >
                 <component
-                  :is="
-                    plugin.healthCheck.status === 'healthy'
-                      ? CheckCircle
-                      : XCircle
-                  "
+                  :is="plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle"
                   class="h-4 w-4 mr-1"
                 />
                 {{ plugin.healthCheck.status }}
@@ -184,10 +165,7 @@
 
           <!-- Actions -->
           <div class="mt-6 flex space-x-2">
-            <NuxtLink
-              :to="`/plugins/${plugin.pluginId || plugin.id}`"
-              class="flex-1"
-            >
+            <NuxtLink :to="`/plugins/${plugin.pluginId || plugin.id}`" class="flex-1">
               <Button variant="outline" class="w-full" size="sm">
                 <Settings class="mr-2 h-4 w-4" />
                 Configure
@@ -215,13 +193,10 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else-if="!loading && filteredPlugins.length === 0"
-      class="text-center py-12"
-    >
-      <Puzzle class="mx-auto h-12 w-12 text-muted-foreground" />
+    <div v-else-if="!loading && filteredPlugins.length === 0" class="text-center py-12">
+      <Puzzle class="mx-auto h-12 w-12 text-neutral-muted" />
       <h3 class="mt-4 text-lg font-medium text-foreground">No plugins found</h3>
-      <p class="mt-2 text-sm text-muted-foreground">
+      <p class="mt-2 text-sm text-neutral-muted">
         {{
           selectedCategory === "all"
             ? "No plugins are available."
@@ -236,17 +211,11 @@
         <CardHeader>
           <div class="flex items-start space-x-4">
             <div class="p-3 rounded-lg bg-background-tertiary">
-              <div
-                class="h-6 w-6 bg-background-tertiary-foreground/20 rounded"
-              ></div>
+              <div class="h-6 w-6 bg-background-tertiary-foreground/20 rounded"></div>
             </div>
             <div class="flex-1 space-y-2">
-              <div
-                class="h-5 bg-background-tertiary-foreground/20 rounded w-3/4"
-              ></div>
-              <div
-                class="h-4 bg-background-tertiary-foreground/20 rounded w-full"
-              ></div>
+              <div class="h-5 bg-background-tertiary-foreground/20 rounded w-3/4"></div>
+              <div class="h-4 bg-background-tertiary-foreground/20 rounded w-full"></div>
             </div>
           </div>
         </CardHeader>
@@ -264,33 +233,25 @@
     <Card v-if="stats && !loading">
       <CardHeader>
         <CardTitle>Usage Overview</CardTitle>
-        <CardDescription
-          >Total usage across all active plugins this month</CardDescription
-        >
+        <CardDescription>Total usage across all active plugins this month</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-3">
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">
-              Total Requests
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Total Requests</p>
             <p class="text-2xl font-bold">
               {{ formatNumber(stats.totalRequests) }}
             </p>
           </div>
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">
-              Total Tokens
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Total Tokens</p>
             <p class="text-2xl font-bold">
               {{ formatNumber(stats.totalTokens) }}
             </p>
           </div>
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Total Cost</p>
-            <p class="text-2xl font-bold">
-              ${{ stats.totalCost?.toFixed(2) || "0.00" }}
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Total Cost</p>
+            <p class="text-2xl font-bold">${{ stats.totalCost?.toFixed(2) || "0.00" }}</p>
           </div>
         </div>
       </CardContent>
@@ -353,17 +314,15 @@ const stats = ref<any>(null);
 const categories = computed(() => {
   const allCount =
     plugins.value.length +
-    availablePlugins.value.filter(
-      (p) => !plugins.value.find((cp) => cp.pluginId === p.id)
-    ).length;
+    availablePlugins.value.filter((p) => !plugins.value.find((cp) => cp.pluginId === p.id)).length;
   const llmCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === "llm_provider" || p.type === "embedding_provider"
+    (p) => p.type === "llm_provider" || p.type === "embedding_provider",
   ).length;
   const vectorCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === "vector_store"
+    (p) => p.type === "vector_store",
   ).length;
   const processorCount = [...plugins.value, ...availablePlugins.value].filter(
-    (p) => p.type === "document_processor"
+    (p) => p.type === "document_processor",
   ).length;
 
   return [
@@ -397,9 +356,7 @@ const filteredPlugins = computed(() => {
   }
 
   if (selectedCategory.value === "llm") {
-    return allPlugins.filter(
-      (p) => p.type === "llm_provider" || p.type === "embedding_provider"
-    );
+    return allPlugins.filter((p) => p.type === "llm_provider" || p.type === "embedding_provider");
   }
 
   if (selectedCategory.value === "vector") {
@@ -448,8 +405,6 @@ onMounted(async () => {
 // SEO
 useHead({
   title: "Plugins - Hay Dashboard",
-  meta: [
-    { name: "description", content: "Manage AI providers and integrations" },
-  ],
+  meta: [{ name: "description", content: "Manage AI providers and integrations" }],
 });
 </script>

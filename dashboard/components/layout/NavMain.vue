@@ -33,7 +33,7 @@
             v-for="subItem in item.items"
             :key="subItem.title"
             :to="subItem.url"
-            class="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            class="block rounded-lg px-3 py-2 text-sm text-neutral-muted transition-colors hover:bg-accent hover:text-accent-foreground"
             :class="{
               'bg-accent text-accent-foreground': subItem.isActive,
             }"

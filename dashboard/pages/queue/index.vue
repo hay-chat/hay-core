@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-foreground">Job Queue</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <p class="mt-1 text-sm text-neutral-muted">
           Monitor and manage background jobs and processing tasks.
         </p>
       </div>
@@ -22,7 +22,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-muted-foreground">Pending</p>
+              <p class="text-sm text-neutral-muted">Pending</p>
               <p class="text-2xl font-bold text-yellow-600">
                 {{ stats.pending || 0 }}
               </p>
@@ -36,7 +36,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-muted-foreground">Processing</p>
+              <p class="text-sm text-neutral-muted">Processing</p>
               <p class="text-2xl font-bold text-blue-600">
                 {{ stats.processing || 0 }}
               </p>
@@ -50,7 +50,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-muted-foreground">Completed</p>
+              <p class="text-sm text-neutral-muted">Completed</p>
               <p class="text-2xl font-bold text-green-600">
                 {{ stats.completed || 0 }}
               </p>
@@ -64,7 +64,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-muted-foreground">Failed</p>
+              <p class="text-sm text-neutral-muted">Failed</p>
               <p class="text-2xl font-bold text-red-600">
                 {{ stats.failed || 0 }}
               </p>
@@ -80,7 +80,7 @@
       <div class="flex-1">
         <div class="relative">
           <Search
-            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
+            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-muted"
           />
           <Input
             v-model="searchQuery"
@@ -124,14 +124,14 @@
     <Card>
       <CardContent class="p-0">
         <div v-if="loading && !jobs.length" class="p-8 text-center">
-          <Loader2 class="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-          <p class="mt-2 text-sm text-muted-foreground">Loading jobs...</p>
+          <Loader2 class="mx-auto h-8 w-8 animate-spin text-neutral-muted" />
+          <p class="mt-2 text-sm text-neutral-muted">Loading jobs...</p>
         </div>
 
         <div v-else-if="!jobs.length" class="p-8 text-center">
-          <Inbox class="mx-auto h-12 w-12 text-muted-foreground" />
+          <Inbox class="mx-auto h-12 w-12 text-neutral-muted" />
           <h3 class="mt-2 text-sm font-semibold text-foreground">No jobs found</h3>
-          <p class="mt-1 text-sm text-muted-foreground">There are no jobs matching your filters.</p>
+          <p class="mt-1 text-sm text-neutral-muted">There are no jobs matching your filters.</p>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -139,42 +139,42 @@
             <thead class="border-b bg-background-secondary">
               <tr>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Job ID
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Type
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Status
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Priority
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Progress
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Created
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Duration
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
                   Actions
                 </th>
@@ -215,15 +215,15 @@
                           :style="{ width: `${job.progress || 0}%` }"
                         />
                       </div>
-                      <span class="text-xs text-muted-foreground">{{ job.progress || 0 }}%</span>
+                      <span class="text-xs text-neutral-muted">{{ job.progress || 0 }}%</span>
                     </div>
                   </div>
-                  <span v-else class="text-sm text-muted-foreground">-</span>
+                  <span v-else class="text-sm text-neutral-muted">-</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-muted">
                   {{ formatDate(job.created_at) }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-muted">
                   {{ formatDuration((job as any).duration) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -237,7 +237,12 @@
                       <Eye class="h-4 w-4" />
                     </Button>
                     <Button
-                      v-if="job.status === 'failed' && job.attempts && job.max_attempts && job.attempts < job.max_attempts"
+                      v-if="
+                        job.status === 'failed' &&
+                        job.attempts &&
+                        job.max_attempts &&
+                        job.attempts < job.max_attempts
+                      "
                       variant="ghost"
                       size="sm"
                       title="Retry Job"
@@ -264,7 +269,7 @@
         <!-- Pagination -->
         <div v-if="totalPages > 1" class="px-6 py-4 border-t">
           <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
+            <p class="text-sm text-neutral-muted">
               Showing {{ (currentPage - 1) * pageSize + 1 }} to
               {{ Math.min(currentPage * pageSize, totalJobs) }} of {{ totalJobs }} jobs
             </p>
@@ -300,47 +305,47 @@
         <div v-if="selectedJob" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <p class="text-sm font-medium text-muted-foreground">ID</p>
+              <p class="text-sm font-medium text-neutral-muted">ID</p>
               <code class="text-xs bg-background-tertiary px-2 py-1 rounded">{{
                 selectedJob.id
               }}</code>
             </div>
             <div>
-              <p class="text-sm font-medium text-muted-foreground">Type</p>
+              <p class="text-sm font-medium text-neutral-muted">Type</p>
               <p class="text-sm">
                 {{ formatJobType(selectedJob.type) }}
               </p>
             </div>
             <div>
-              <p class="text-sm font-medium text-muted-foreground">Status</p>
+              <p class="text-sm font-medium text-neutral-muted">Status</p>
               <Badge :variant="getStatusVariant(selectedJob.status)">
                 {{ selectedJob.status }}
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-muted-foreground">Priority</p>
+              <p class="text-sm font-medium text-neutral-muted">Priority</p>
               <Badge :variant="getPriorityVariant(selectedJob.priority)">
                 {{ getPriorityLabel(selectedJob.priority) }}
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-muted-foreground">Attempts</p>
+              <p class="text-sm font-medium text-neutral-muted">Attempts</p>
               <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.max_attempts }}</p>
             </div>
             <div>
-              <p class="text-sm font-medium text-muted-foreground">Created</p>
+              <p class="text-sm font-medium text-neutral-muted">Created</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.created_at, true) }}
               </p>
             </div>
             <div v-if="selectedJob.started_at">
-              <p class="text-sm font-medium text-muted-foreground">Started</p>
+              <p class="text-sm font-medium text-neutral-muted">Started</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.started_at, true) }}
               </p>
             </div>
             <div v-if="selectedJob.completed_at">
-              <p class="text-sm font-medium text-muted-foreground">Completed</p>
+              <p class="text-sm font-medium text-neutral-muted">Completed</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.completed_at, true) }}
               </p>
@@ -348,21 +353,21 @@
           </div>
 
           <div v-if="selectedJob.payload" class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Payload</p>
+            <p class="text-sm font-medium text-neutral-muted">Payload</p>
             <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
               JSON.stringify(selectedJob.payload, null, 2)
             }}</pre>
           </div>
 
           <div v-if="selectedJob.result" class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Result</p>
+            <p class="text-sm font-medium text-neutral-muted">Result</p>
             <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
               JSON.stringify(selectedJob.result, null, 2)
             }}</pre>
           </div>
 
           <div v-if="selectedJob.error" class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Error</p>
+            <p class="text-sm font-medium text-neutral-muted">Error</p>
             <div class="bg-destructive/10 border border-destructive/20 p-3 rounded">
               <p class="text-sm text-destructive">
                 {{ selectedJob.error }}
@@ -371,7 +376,7 @@
           </div>
 
           <div v-if="(selectedJob as any).metadata?.logs" class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">Logs</p>
+            <p class="text-sm font-medium text-neutral-muted">Logs</p>
             <div class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto">
               <p
                 v-for="(log, index) in (selectedJob as any).metadata.logs"

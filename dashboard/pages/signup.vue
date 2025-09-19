@@ -37,7 +37,7 @@
           <span class="w-full border-t" />
         </div>
         <div class="relative flex justify-center text-xs uppercase">
-          <span class="bg-white px-2 text-muted-foreground"> Or create account with email </span>
+          <span class="bg-white px-2 text-neutral-muted"> Or create account with email </span>
         </div>
       </div> -->
 

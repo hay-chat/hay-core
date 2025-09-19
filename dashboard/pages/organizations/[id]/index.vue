@@ -25,10 +25,10 @@
                 {{ organization.status }}
               </div>
             </div>
-            <p class="mt-2 text-muted-foreground">
+            <p class="mt-2 text-neutral-muted">
               {{ organization.description }}
             </p>
-            <div class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground">
+            <div class="mt-3 flex items-center space-x-4 text-sm text-neutral-muted">
               <span>Created {{ formatDate(organization.createdAt) }}</span>
               <span>•</span>
               <span>{{ organization.memberCount }} members</span>
@@ -60,7 +60,7 @@
             'py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
             activeTab === tab.id
               ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground',
+              : 'border-transparent text-neutral-muted hover:text-foreground hover:border-neutral-muted',
           ]"
           @click="activeTab = tab.id"
         >
@@ -79,13 +79,13 @@
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium"> Total Members </CardTitle>
-              <Users class="h-4 w-4 text-muted-foreground" />
+              <Users class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
                 {{ organization.memberCount }}
               </div>
-              <p class="text-xs text-muted-foreground">
+              <p class="text-xs text-neutral-muted">
                 <span class="text-green-600">+2</span> this month
               </p>
             </CardContent>
@@ -94,13 +94,13 @@
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium"> Active Agents </CardTitle>
-              <Bot class="h-4 w-4 text-muted-foreground" />
+              <Bot class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
                 {{ organization.agentCount }}
               </div>
-              <p class="text-xs text-muted-foreground">
+              <p class="text-xs text-neutral-muted">
                 <span class="text-green-600">+1</span> this week
               </p>
             </CardContent>
@@ -109,13 +109,13 @@
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium"> Conversations </CardTitle>
-              <MessageSquare class="h-4 w-4 text-muted-foreground" />
+              <MessageSquare class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">
                 {{ organization.totalConversations }}
               </div>
-              <p class="text-xs text-muted-foreground">
+              <p class="text-xs text-neutral-muted">
                 <span class="text-green-600">+12%</span> from last month
               </p>
             </CardContent>
@@ -124,13 +124,11 @@
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle class="text-sm font-medium"> Storage Used </CardTitle>
-              <HardDrive class="h-4 w-4 text-muted-foreground" />
+              <HardDrive class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">{{ organization.storageUsed }}GB</div>
-              <p class="text-xs text-muted-foreground">
-                of {{ organization.storageLimit }}GB limit
-              </p>
+              <p class="text-xs text-neutral-muted">of {{ organization.storageLimit }}GB limit</p>
             </CardContent>
           </Card>
         </div>
@@ -168,10 +166,10 @@
                     <p class="text-sm font-medium text-foreground">
                       {{ activity.title }}
                     </p>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       {{ activity.description }}
                     </p>
-                    <p class="text-xs text-muted-foreground mt-1">
+                    <p class="text-xs text-neutral-muted mt-1">
                       {{ formatTimeAgo(activity.timestamp) }}
                     </p>
                   </div>
@@ -247,7 +245,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">Organization Members</h3>
-            <p class="text-sm text-muted-foreground">Manage who has access to this organization</p>
+            <p class="text-sm text-neutral-muted">Manage who has access to this organization</p>
           </div>
           <Button @click="inviteMember">
             <UserPlus class="mr-2 h-4 w-4" />
@@ -273,7 +271,7 @@
                     <p class="font-medium text-foreground">
                       {{ member.name }}
                     </p>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-sm text-neutral-muted">
                       {{ member.email }}
                     </p>
                   </div>
@@ -352,14 +350,14 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Two-Factor Authentication</p>
-                <p class="text-sm text-muted-foreground">Require 2FA for all members</p>
+                <p class="text-sm text-neutral-muted">Require 2FA for all members</p>
               </div>
               <Checkbox v-model:checked="organizationForm.require2FA" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">SSO Integration</p>
-                <p class="text-sm text-muted-foreground">Enable single sign-on</p>
+                <p class="text-sm text-neutral-muted">Enable single sign-on</p>
               </div>
               <Checkbox v-model:checked="organizationForm.ssoEnabled" />
             </div>
@@ -379,7 +377,7 @@
               <div class="flex justify-between items-center">
                 <div>
                   <h4 class="font-medium">Primary API Key</h4>
-                  <p class="text-sm text-muted-foreground">Used for API access</p>
+                  <p class="text-sm text-neutral-muted">Used for API access</p>
                 </div>
                 <div class="flex space-x-2">
                   <Button variant="outline" size="sm" @click="regenerateApiKey">
@@ -420,7 +418,7 @@
   <div v-else class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">Organization not found</h3>
-    <p class="mt-2 text-sm text-muted-foreground">
+    <p class="mt-2 text-sm text-neutral-muted">
       The organization you're looking for doesn't exist or you don't have permission to view it.
     </p>
     <div class="mt-6">

@@ -8,6 +8,7 @@ import { embeddingsRouter } from "./embeddings";
 import { customersRouter } from "./customers";
 import { pluginsRouter } from "./plugins";
 import { webConversationsRouter } from "./web-conversations";
+import { analyticsRouter } from "./analytics";
 
 const AppRouter = router({
   auth: authRouter,
@@ -19,6 +20,7 @@ const AppRouter = router({
   customers: customersRouter,
   plugins: pluginsRouter,
   webConversations: webConversationsRouter,
+  analytics: analyticsRouter,
 });
 
 export const v1Router = AppRouter;

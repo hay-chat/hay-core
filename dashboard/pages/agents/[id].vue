@@ -2,7 +2,7 @@
   <div class="container mx-auto px-4 py-8 max-w-2xl">
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-2">Edit Agent</h1>
-      <p class="text-muted-foreground">Update your AI agent configuration</p>
+      <p class="text-neutral-muted">Update your AI agent configuration</p>
     </div>
 
     <form v-if="agent" class="space-y-6" @submit.prevent="handleSubmit">
@@ -104,7 +104,7 @@
     </div>
 
     <div v-else class="text-center py-12">
-      <p class="text-muted-foreground">Agent not found</p>
+      <p class="text-neutral-muted">Agent not found</p>
       <NuxtLink to="/agents" class="text-primary hover:underline mt-2 inline-block">
         Back to agents
       </NuxtLink>

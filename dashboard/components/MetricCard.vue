@@ -1,7 +1,7 @@
 <template>
   <Card>
     <CardHeader class="flex !flex-row items-center gap-2 pb-2">
-      <component :is="icon" class="h-4 w-4 text-muted-foreground" />
+      <component :is="icon" class="h-4 w-4 text-neutral-muted" />
       <div class="text-sm font-medium !mt-0">
         {{ title }}
       </div>
@@ -10,7 +10,7 @@
       <div class="text-2xl font-bold">
         {{ formattedMetric }}
       </div>
-      <p v-if="subtitle" class="text-xs text-muted-foreground flex gap-1">
+      <p v-if="subtitle" class="text-xs text-neutral-muted flex gap-1">
         <span :class="subtitleClass">{{ subtitle }}</span>
         <span v-if="subtitleSuffix"> {{ subtitleSuffix }}</span>
       </p>

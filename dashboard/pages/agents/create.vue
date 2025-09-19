@@ -2,7 +2,7 @@
   <div class="container mx-auto px-4 py-8 max-w-2xl">
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-2">Create Agent</h1>
-      <p class="text-muted-foreground">Configure a new AI agent for your organization</p>
+      <p class="text-neutral-muted">Configure a new AI agent for your organization</p>
     </div>
 
     <form class="space-y-6" @submit.prevent="handleSubmit">

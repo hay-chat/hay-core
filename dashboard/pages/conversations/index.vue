@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Conversations</h1>
-        <p class="text-muted-foreground">Monitor and manage all customer conversations</p>
+        <p class="text-neutral-muted">Monitor and manage all customer conversations</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button size="sm" @click="openPlayground">
@@ -61,7 +61,7 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="relative">
-          <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
           <Input
             v-model="searchQuery"
             placeholder="Search conversations..."
@@ -127,9 +127,8 @@
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-12">
-      <Error />
-      <h3 class="text-lg font-medium mb-2">Error Loading Conversations</h3>
-      <p class="text-muted-foreground mb-4">
+      <Error label="Error Loading Conversations" />
+      <p class="text-neutral-muted mb-4">
         {{ error }}
       </p>
       <Button variant="outline" @click="fetchConversations">
@@ -140,11 +139,11 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredConversations.length === 0" class="text-center py-12">
-      <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+      <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No conversations found" : "No conversations yet" }}
       </h3>
-      <p class="text-muted-foreground mb-4">
+      <p class="text-neutral-muted mb-4">
         {{
           searchQuery
             ? "Try adjusting your search terms or filters."
@@ -200,7 +199,7 @@
                       <div class="font-medium">
                         {{ conversation.title || "Untitled Conversation" }}
                       </div>
-                      <div class="text-xs text-muted-foreground">
+                      <div class="text-xs text-neutral-muted">
                         {{ conversation.id.slice(0, 8) }}...
                       </div>
                     </div>
@@ -224,9 +223,9 @@
                     <Star class="h-4 w-4 text-yellow-500 fill-current" />
                     <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                   </div>
-                  <span v-else class="text-xs text-muted-foreground">Not rated</span>
+                  <span v-else class="text-xs text-neutral-muted">Not rated</span>
                 </td>
-                <td class="py-3 px-4 text-sm text-muted-foreground">
+                <td class="py-3 px-4 text-sm text-neutral-muted">
                   {{ formatRelativeTime(conversation.updated_at) }}
                 </td>
                 <td class="py-3 px-4" @click.stop>

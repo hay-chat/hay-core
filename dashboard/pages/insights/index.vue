@@ -1,10 +1,10 @@
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
+  <!-- <div class="space-y-6">
+
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Insights</h1>
-        <p class="text-muted-foreground">
+        <p class="text-neutral-muted">
           AI-generated insights to improve your chatbot performance
         </p>
       </div>
@@ -20,10 +20,10 @@
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters ->
     <div class="flex items-center space-x-4 p-4 bg-background-secondary rounded-lg">
       <div class="flex items-center space-x-2">
-        <Filter class="h-4 w-4 text-muted-foreground" />
+        <Filter class="h-4 w-4 text-neutral-muted" />
         <span class="text-sm font-medium">Filters:</span>
       </div>
       <div class="flex items-center space-x-2">
@@ -63,11 +63,11 @@
       </div>
     </div>
 
-    <!-- Pending Insights -->
+    
     <div class="space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Pending Insights</h2>
-        <span class="text-sm text-muted-foreground"
+        <span class="text-sm text-neutral-muted"
           >{{ filteredPendingInsights.length }} insights</span
         >
       </div>
@@ -88,9 +88,9 @@
       </div>
 
       <div v-else-if="filteredPendingInsights.length === 0" class="text-center py-12">
-        <Lightbulb class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <Lightbulb class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
         <h3 class="text-lg font-medium mb-2">No insights available</h3>
-        <p class="text-muted-foreground">
+        <p class="text-neutral-muted">
           Check back later for AI-generated insights to improve your agents.
         </p>
       </div>
@@ -108,7 +108,7 @@
                   <Badge :variant="getInsightTypeVariant(insight.type)">
                     {{ getInsightTypeLabel(insight.type) }}
                   </Badge>
-                  <span class="text-sm text-muted-foreground">
+                  <span class="text-sm text-neutral-muted">
                     {{ formatDate(insight.createdAt) }}
                   </span>
                 </div>
@@ -122,12 +122,12 @@
             </div>
           </CardHeader>
           <CardContent>
-            <p class="text-muted-foreground mb-4">
+            <p class="text-neutral-muted mb-4">
               {{ insight.description }}
             </p>
 
             <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+              <div class="flex items-center space-x-4 text-sm text-neutral-muted">
                 <div class="flex items-center space-x-1">
                   <MessageSquare class="h-4 w-4" />
                   <span>{{ insight.affectedConversations }} conversations</span>
@@ -162,7 +162,7 @@
       </div>
     </div>
 
-    <!-- Accepted Insights History -->
+    
     <div class="space-y-4">
       <h2 class="text-xl font-semibold">Accepted Insights</h2>
 
@@ -178,8 +178,8 @@
         </CardHeader>
         <CardContent>
           <div v-if="acceptedInsights.length === 0" class="text-center py-8">
-            <CheckCircle class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p class="text-muted-foreground">No accepted insights yet</p>
+            <CheckCircle class="h-8 w-8 text-neutral-muted mx-auto mb-2" />
+            <p class="text-neutral-muted">No accepted insights yet</p>
           </div>
 
           <div v-else class="space-y-4">
@@ -195,7 +195,7 @@
                   </Badge>
                   <span class="font-medium">{{ insight.title }}</span>
                 </div>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm text-neutral-muted">
                   Implemented {{ formatDate(insight.implementedAt) }} • {{ insight.performance }}%
                   improvement achieved
                 </p>
@@ -213,6 +213,22 @@
         </CardContent>
       </Card>
     </div>
+  </div> -->
+  <div>
+    <h1>Insights</h1>
+    <svg
+      width="178"
+      height="184"
+      viewBox="0 0 178 184"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M94.2814 80.1376C92.2876 40.6705 93.9285 -8.55177 111.199 1.80066C129.379 12.6985 114.875 59.6346 101.697 90.5184C134.88 69.0582 178.328 45.8669 177.998 65.9999C177.651 87.1931 129.749 98.1007 96.4142 102.131C131.591 120.138 173.4 146.169 155.799 155.95C137.271 166.245 103.875 130.215 83.7179 103.361C85.7118 142.828 84.0719 192.053 66.8009 181.7C48.6211 170.803 63.1247 123.866 76.3019 92.9823C43.1194 114.442 -0.327975 137.633 0.0020752 117.5C0.349711 96.3071 48.2491 85.3992 81.5841 81.369C46.4078 63.3622 4.60047 37.3314 22.2013 27.5507C40.7286 17.2556 74.1237 53.2838 94.2814 80.1376Z"
+        fill="#BEDA58"
+      />
+    </svg>
+    <p>Coming soon</p>
   </div>
 </template>
 

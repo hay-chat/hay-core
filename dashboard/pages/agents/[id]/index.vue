@@ -41,10 +41,10 @@
                 {{ agent.status }}
               </div>
             </div>
-            <p class="mt-2 text-muted-foreground">
+            <p class="mt-2 text-neutral-muted">
               {{ agent.description }}
             </p>
-            <div class="mt-3 flex items-center space-x-4 text-sm text-muted-foreground">
+            <div class="mt-3 flex items-center space-x-4 text-sm text-neutral-muted">
               <span>{{ agent.type }} agent</span>
               <span>•</span>
               <span>Created {{ formatDate(agent.createdAt) }}</span>
@@ -80,7 +80,7 @@
             'py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
             activeTab === tab.id
               ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground',
+              : 'border-transparent text-neutral-muted hover:text-foreground hover:border-neutral-muted',
           ]"
           @click="activeTab = tab.id"
         >
@@ -148,7 +148,7 @@
             </CardHeader>
             <CardContent>
               <div class="h-80 flex items-center justify-center bg-background-secondary rounded-lg">
-                <div class="text-center text-muted-foreground">
+                <div class="text-center text-neutral-muted">
                   <BarChart3 class="h-12 w-12 mx-auto mb-2" />
                   <p>Agent performance metrics will be displayed here</p>
                 </div>
@@ -173,13 +173,13 @@
                   <div
                     class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                   >
-                    <User class="h-4 w-4 text-muted-foreground" />
+                    <User class="h-4 w-4 text-neutral-muted" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-foreground truncate">
                       {{ conversation.customerName }}
                     </p>
-                    <p class="text-xs text-muted-foreground truncate">
+                    <p class="text-xs text-neutral-muted truncate">
                       {{ conversation.lastMessage }}
                     </p>
                     <div class="flex items-center space-x-2 mt-1">
@@ -195,7 +195,7 @@
                       >
                         {{ conversation.status }}
                       </div>
-                      <span class="text-xs text-muted-foreground">{{
+                      <span class="text-xs text-neutral-muted">{{
                         formatTimeAgo(conversation.updatedAt)
                       }}</span>
                     </div>
@@ -212,7 +212,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">Agent Playbooks</h3>
-            <p class="text-sm text-muted-foreground">Automated workflows and response patterns</p>
+            <p class="text-sm text-neutral-muted">Automated workflows and response patterns</p>
           </div>
           <Button @click="createPlaybook">
             <Plus class="mr-2 h-4 w-4" />
@@ -251,18 +251,18 @@
             <CardContent>
               <div class="space-y-3">
                 <div class="text-sm">
-                  <p class="text-muted-foreground">Trigger:</p>
+                  <p class="text-neutral-muted">Trigger:</p>
                   <p class="font-medium">
                     {{ playbook.trigger }}
                   </p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p class="text-muted-foreground">Usage</p>
+                    <p class="text-neutral-muted">Usage</p>
                     <p class="font-medium">{{ playbook.usageCount }} times</p>
                   </div>
                   <div>
-                    <p class="text-muted-foreground">Success Rate</p>
+                    <p class="text-neutral-muted">Success Rate</p>
                     <p class="font-medium">{{ playbook.successRate }}%</p>
                   </div>
                 </div>
@@ -297,9 +297,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h3 class="text-lg font-medium text-foreground">All Conversations</h3>
-            <p class="text-sm text-muted-foreground">
-              Complete conversation history for this agent
-            </p>
+            <p class="text-sm text-neutral-muted">Complete conversation history for this agent</p>
           </div>
           <div class="flex space-x-2">
             <Button variant="outline" @click="exportConversations">
@@ -332,13 +330,13 @@
                     <div
                       class="h-10 w-10 rounded-full bg-background-tertiary flex items-center justify-center"
                     >
-                      <User class="h-5 w-5 text-muted-foreground" />
+                      <User class="h-5 w-5 text-neutral-muted" />
                     </div>
                     <div>
                       <p class="font-medium text-foreground">
                         {{ conversation.customerName }}
                       </p>
-                      <p class="text-sm text-muted-foreground">
+                      <p class="text-sm text-neutral-muted">
                         {{ conversation.lastMessage }}
                       </p>
                     </div>
@@ -358,7 +356,7 @@
                     >
                       {{ conversation.status }}
                     </div>
-                    <p class="text-xs text-muted-foreground mt-1">
+                    <p class="text-xs text-neutral-muted mt-1">
                       {{ formatTimeAgo(conversation.updatedAt) }}
                     </p>
                   </div>
@@ -373,7 +371,7 @@
       <div v-if="activeTab === 'analytics'" class="space-y-6">
         <div>
           <h3 class="text-lg font-medium text-foreground">Performance Analytics</h3>
-          <p class="text-sm text-muted-foreground">
+          <p class="text-sm text-neutral-muted">
             Detailed insights into agent performance and trends
           </p>
         </div>
@@ -398,7 +396,7 @@
             </CardHeader>
             <CardContent>
               <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
-                <div class="text-center text-muted-foreground">
+                <div class="text-center text-neutral-muted">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Response time chart</p>
                 </div>
@@ -412,7 +410,7 @@
             </CardHeader>
             <CardContent>
               <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
-                <div class="text-center text-muted-foreground">
+                <div class="text-center text-neutral-muted">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Resolution rate chart</p>
                 </div>
@@ -426,7 +424,7 @@
             </CardHeader>
             <CardContent>
               <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
-                <div class="text-center text-muted-foreground">
+                <div class="text-center text-neutral-muted">
                   <BarChart3 class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Volume chart</p>
                 </div>
@@ -440,7 +438,7 @@
             </CardHeader>
             <CardContent>
               <div class="h-64 flex items-center justify-center bg-background-secondary rounded-lg">
-                <div class="text-center text-muted-foreground">
+                <div class="text-center text-neutral-muted">
                   <Star class="h-8 w-8 mx-auto mb-2" />
                   <p class="text-sm">Satisfaction chart</p>
                 </div>
@@ -514,21 +512,21 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Auto-escalation</p>
-                <p class="text-sm text-muted-foreground">Automatically escalate complex queries</p>
+                <p class="text-sm text-neutral-muted">Automatically escalate complex queries</p>
               </div>
               <Checkbox v-model:checked="agentSettings.autoEscalation" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Learning Mode</p>
-                <p class="text-sm text-muted-foreground">Continue learning from conversations</p>
+                <p class="text-sm text-neutral-muted">Continue learning from conversations</p>
               </div>
               <Checkbox v-model:checked="agentSettings.learningMode" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Real-time Analytics</p>
-                <p class="text-sm text-muted-foreground">Enable real-time performance tracking</p>
+                <p class="text-sm text-neutral-muted">Enable real-time performance tracking</p>
               </div>
               <Checkbox v-model:checked="agentSettings.realTimeAnalytics" />
             </div>
@@ -545,7 +543,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">Delete Agent</p>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm text-neutral-muted">
                   Permanently delete this agent and all its data
                 </p>
               </div>
@@ -575,7 +573,7 @@
   <div v-else class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
     <h3 class="mt-4 text-lg font-medium text-foreground">Agent not found</h3>
-    <p class="mt-2 text-sm text-muted-foreground">
+    <p class="mt-2 text-sm text-neutral-muted">
       The agent you're looking for doesn't exist or you don't have permission to view it.
     </p>
     <div class="mt-6">

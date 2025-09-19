@@ -97,7 +97,7 @@
             <div class="flex items-center justify-between">
               <div class="space-y-0.5">
                 <Label for="showGreeting">Show Greeting Message</Label>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm text-neutral-muted">
                   Display a welcome message when the chat opens
                 </p>
               </div>
@@ -124,7 +124,7 @@
             
             <div class="space-y-2">
               <Label for="allowedDomains">Allowed Domains</Label>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-sm text-neutral-muted">
                 Specify domains where the widget can be embedded (one per line).
                 Use * to allow all domains.
               </p>
@@ -156,7 +156,7 @@
             <h3 class="text-lg font-semibold">Installation</h3>
             <div class="space-y-2">
               <Label>Embed Code</Label>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-sm text-neutral-muted">
                 Copy and paste this code into your website's HTML
               </p>
               <div class="relative">

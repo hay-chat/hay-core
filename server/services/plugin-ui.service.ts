@@ -221,7 +221,7 @@ const saveConfiguration = async () => {
   private generateFormField(key: string, field: ConfigField): string {
     const label = field.label || key;
     const description = field.description
-      ? `<p class="text-sm text-muted-foreground">${field.description}</p>`
+      ? `<p class="text-sm text-neutral-muted">${field.description}</p>`
       : "";
     const required = field.required ? "required" : "";
     const errorDisplay = `<p v-if="errors.${key}" class="text-sm text-destructive mt-1">{{ errors.${key} }}</p>`;
@@ -299,7 +299,7 @@ const saveConfiguration = async () => {
   private generateTextField(key: string, field: ConfigField): string {
     const label = field.label || key;
     const description = field.description
-      ? `<p class="text-sm text-muted-foreground">${field.description}</p>`
+      ? `<p class="text-sm text-neutral-muted">${field.description}</p>`
       : "";
     const required = field.required ? "required" : "";
     const errorDisplay = `<p v-if="errors.${key}" class="text-sm text-destructive mt-1">{{ errors.${key} }}</p>`;

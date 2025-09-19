@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">General Settings</h1>
-        <p class="text-muted-foreground">Manage your platform preferences and configuration</p>
+        <p class="text-neutral-muted">Manage your platform preferences and configuration</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="resetToDefaults">
@@ -42,7 +42,7 @@
               <option value="zh">Chinese</option>
               <option value="ja">Japanese</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">
+            <p class="text-xs text-neutral-muted mt-1">
               Default language for new conversations and system messages
             </p>
           </div>
@@ -64,7 +64,7 @@
               <option value="Asia/Tokyo">Tokyo (JST)</option>
               <option value="Australia/Sydney">Sydney (AEDT)</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">
+            <p class="text-xs text-neutral-muted mt-1">
               Used for displaying timestamps and scheduling reports
             </p>
           </div>
@@ -83,7 +83,7 @@
               <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
               <option value="DD MMM YYYY">DD MMM YYYY</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatDatePreview() }}</p>
+            <p class="text-xs text-neutral-muted mt-1">Preview: {{ formatDatePreview() }}</p>
           </div>
 
           <div>
@@ -96,7 +96,7 @@
               <option value="12h">12-hour (AM/PM)</option>
               <option value="24h">24-hour</option>
             </select>
-            <p class="text-xs text-muted-foreground mt-1">Preview: {{ formatTimePreview() }}</p>
+            <p class="text-xs text-neutral-muted mt-1">Preview: {{ formatTimePreview() }}</p>
           </div>
         </div>
 
@@ -112,7 +112,7 @@
               {{ agent.name }}
             </option>
           </select>
-          <p class="text-xs text-muted-foreground mt-1">
+          <p class="text-xs text-neutral-muted mt-1">
             Agent to handle conversations when no specific agent is assigned
           </p>
         </div>
@@ -133,7 +133,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">New Conversations</Label>
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-neutral-muted">
                   Get notified when a new conversation starts
                 </p>
               </div>
@@ -143,7 +143,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Escalated Conversations</Label>
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-neutral-muted">
                   When a conversation needs human intervention
                 </p>
               </div>
@@ -153,7 +153,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Agent Performance Alerts</Label>
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-neutral-muted">
                   When agent performance drops below thresholds
                 </p>
               </div>
@@ -163,7 +163,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Weekly Reports</Label>
-                <p class="text-xs text-muted-foreground">Weekly performance summary emails</p>
+                <p class="text-xs text-neutral-muted">Weekly performance summary emails</p>
               </div>
               <Checkbox v-model="settings.notifications.email.weeklyReports" />
             </div>
@@ -177,7 +177,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Real-time Alerts</Label>
-                <p class="text-xs text-muted-foreground">Show notifications in the dashboard</p>
+                <p class="text-xs text-neutral-muted">Show notifications in the dashboard</p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.realTimeAlerts" />
             </div>
@@ -185,7 +185,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">System Updates</Label>
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-neutral-muted">
                   Notifications about system updates and maintenance
                 </p>
               </div>
@@ -195,7 +195,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Feature Announcements</Label>
-                <p class="text-xs text-muted-foreground">New features and product updates</p>
+                <p class="text-xs text-neutral-muted">New features and product updates</p>
               </div>
               <Checkbox v-model="settings.notifications.inApp.featureAnnouncements" />
             </div>
@@ -225,7 +225,7 @@
               />
             </div>
           </div>
-          <p class="text-xs text-muted-foreground mt-1">
+          <p class="text-xs text-neutral-muted mt-1">
             No notifications will be sent during quiet hours (except critical alerts)
           </p>
         </div>
@@ -247,9 +247,7 @@
             placeholder="https://your-domain.com/webhook"
             class="mt-1"
           />
-          <p class="text-xs text-muted-foreground mt-1">
-            Endpoint to receive webhook notifications
-          </p>
+          <p class="text-xs text-neutral-muted mt-1">Endpoint to receive webhook notifications</p>
         </div>
 
         <div>
@@ -261,7 +259,7 @@
             placeholder="Enter webhook secret for verification"
             class="mt-1"
           />
-          <p class="text-xs text-muted-foreground mt-1">
+          <p class="text-xs text-neutral-muted mt-1">
             Secret key for webhook signature verification
           </p>
         </div>

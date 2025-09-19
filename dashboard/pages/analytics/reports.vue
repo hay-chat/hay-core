@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Custom Reports</h1>
-        <p class="text-muted-foreground">Build and schedule custom analytics reports</p>
+        <p class="text-neutral-muted">Build and schedule custom analytics reports</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm" @click="viewScheduledReports">
@@ -228,7 +228,7 @@
                   <h3 class="font-medium text-sm">
                     {{ viz.name }}
                   </h3>
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs text-neutral-muted">
                     {{ viz.description }}
                   </p>
                 </div>
@@ -252,7 +252,7 @@
                 <h3 class="font-medium mb-2">
                   {{ reportConfig.name || "Untitled Report" }}
                 </h3>
-                <p class="text-sm text-muted-foreground mb-3">
+                <p class="text-sm text-neutral-muted mb-3">
                   {{ reportConfig.description || "No description provided" }}
                 </p>
 
@@ -328,7 +328,7 @@
             <CardTitle>Recent Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            <div v-if="recentReports.length === 0" class="text-sm text-muted-foreground">
+            <div v-if="recentReports.length === 0" class="text-sm text-neutral-muted">
               No recent reports
             </div>
             <div v-else class="space-y-3">
@@ -341,7 +341,7 @@
                 <div class="font-medium text-sm">
                   {{ report.name }}
                 </div>
-                <div class="text-xs text-muted-foreground">
+                <div class="text-xs text-neutral-muted">
                   Generated {{ formatDate(report.createdAt) }}
                 </div>
                 <div class="flex items-center justify-between mt-2">

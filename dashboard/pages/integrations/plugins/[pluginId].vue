@@ -3,11 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="router.push('/integrations/marketplace')"
-        >
+        <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
           <ArrowLeft class="h-4 w-4 mr-2" />
           Back to Marketplace
         </Button>
@@ -37,10 +33,8 @@
     <div v-else-if="error" class="text-center py-12">
       <AlertCircle class="h-12 w-12 text-destructive mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">Failed to load plugin</h3>
-      <p class="text-muted-foreground mb-4">{{ error }}</p>
-      <Button @click="router.push('/integrations/marketplace')">
-        Return to Marketplace
-      </Button>
+      <p class="text-neutral-muted mb-4">{{ error }}</p>
+      <Button @click="router.push('/integrations/marketplace')"> Return to Marketplace </Button>
     </div>
 
     <!-- Plugin Settings -->
@@ -64,16 +58,11 @@
                     getPluginIconBg(plugin.type),
                   ]"
                 >
-                  <component
-                    :is="getPluginIcon(plugin.type)"
-                    class="h-6 w-6 text-white"
-                  />
+                  <component :is="getPluginIcon(plugin.type)" class="h-6 w-6 text-white" />
                 </div>
               </div>
               <div>
-                <CardTitle>{{
-                  plugin.name || getPluginDisplayName(plugin.id)
-                }}</CardTitle>
+                <CardTitle>{{ plugin.name || getPluginDisplayName(plugin.id) }}</CardTitle>
                 <CardDescription>{{
                   plugin.description || `Version ${plugin.version}`
                 }}</CardDescription>
@@ -84,7 +73,15 @@
       </Card>
 
       <!-- Embed Code for channels -->
-      <Card v-if="plugin && (Array.isArray(plugin.type) ? plugin.type.includes('channel') : plugin.type === 'channel') && enabled">
+      <Card
+        v-if="
+          plugin &&
+          (Array.isArray(plugin.type)
+            ? plugin.type.includes('channel')
+            : plugin.type === 'channel') &&
+          enabled
+        "
+      >
         <CardHeader>
           <CardTitle>Installation</CardTitle>
           <CardDescription>
@@ -96,12 +93,7 @@
             <div>
               <Label>Embed Code</Label>
               <div class="relative">
-                <Textarea
-                  :value="embedCode"
-                  readonly
-                  class="font-mono text-xs"
-                  :rows="4"
-                />
+                <Textarea :value="embedCode" readonly class="font-mono text-xs" :rows="4" />
                 <Button
                   variant="outline"
                   size="sm"
@@ -113,9 +105,8 @@
                 </Button>
               </div>
             </div>
-            <div class="text-sm text-muted-foreground">
-              Place this code before the closing &lt;/body&gt; tag on your
-              website.
+            <div class="text-sm text-neutral-muted">
+              Place this code before the closing &lt;/body&gt; tag on your website.
             </div>
           </div>
         </CardContent>
@@ -132,33 +123,31 @@
         </CardHeader>
         <CardContent>
           <!-- Custom Template (if available) -->
-          <div
-            v-if="hasCustomTemplate && templateHtml"
-            v-html="templateHtml"
-          ></div>
+          <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
 
           <!-- Auto-generated Form -->
           <form v-else @submit.prevent="saveConfiguration" class="space-y-4">
-            <div
-              v-for="(field, key) in configSchema"
-              :key="key"
-              class="space-y-2"
-            >
+            <div v-for="(field, key) in configSchema" :key="key" class="space-y-2">
               <!-- Text Input -->
               <template v-if="field.type === 'string' && !field.options">
                 <Label :for="key" :required="field.required">
                   {{ field.label || key }}
-                  <Lock v-if="field.encrypted" class="inline-block h-3 w-3 ml-1 text-muted-foreground" />
+                  <Lock
+                    v-if="field.encrypted"
+                    class="inline-block h-3 w-3 ml-1 text-neutral-muted"
+                  />
                 </Label>
-                <p
-                  v-if="field.description"
-                  class="text-sm text-muted-foreground"
-                >
+                <p v-if="field.description" class="text-sm text-neutral-muted">
                   {{ field.description }}
                 </p>
 
                 <!-- Encrypted field with edit mode -->
-                <div v-if="field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])" class="space-y-2">
+                <div
+                  v-if="
+                    field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])
+                  "
+                  class="space-y-2"
+                >
                   <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
                     <Input
                       :id="key"
@@ -171,11 +160,13 @@
                       type="button"
                       size="sm"
                       variant="outline"
-                      @click="() => {
-                        editingEncryptedFields.add(key);
-                        formData[key] = ''; // Clear the masked value
-                        editingEncryptedFields = new Set(editingEncryptedFields);
-                      }"
+                      @click="
+                        () => {
+                          editingEncryptedFields.add(key);
+                          formData[key] = ''; // Clear the masked value
+                          editingEncryptedFields = new Set(editingEncryptedFields);
+                        }
+                      "
                     >
                       <Edit3 class="h-4 w-4 mr-1" />
                       Edit
@@ -196,16 +187,18 @@
                       type="button"
                       size="sm"
                       variant="ghost"
-                      @click="() => {
-                        editingEncryptedFields.delete(key);
-                        formData[key] = originalFormData[key]; // Restore masked value
-                        editingEncryptedFields = new Set(editingEncryptedFields);
-                      }"
+                      @click="
+                        () => {
+                          editingEncryptedFields.delete(key);
+                          formData[key] = originalFormData[key]; // Restore masked value
+                          editingEncryptedFields = new Set(editingEncryptedFields);
+                        }
+                      "
                     >
                       <X class="h-4 w-4" />
                     </Button>
                   </div>
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs text-neutral-muted">
                     This value is encrypted and stored securely. Click edit to update it.
                   </p>
                 </div>
@@ -217,12 +210,11 @@
                     v-model="formData[key]"
                     :type="field.encrypted ? 'password' : 'text'"
                     :placeholder="
-                      field.placeholder ||
-                      'Enter ' + (field.label || key).toLowerCase()
+                      field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
                     "
                     :required="field.required"
                   />
-                  <p v-if="field.encrypted" class="text-xs text-muted-foreground mt-1">
+                  <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
                     This value will be encrypted and stored securely.
                   </p>
                 </div>
@@ -233,10 +225,7 @@
                 <Label :for="key" :required="field.required">
                   {{ field.label || key }}
                 </Label>
-                <p
-                  v-if="field.description"
-                  class="text-sm text-muted-foreground"
-                >
+                <p v-if="field.description" class="text-sm text-neutral-muted">
                   {{ field.description }}
                 </p>
                 <select
@@ -245,14 +234,8 @@
                   class="w-full px-3 py-2 text-sm border border-input rounded-md"
                   :required="field.required"
                 >
-                  <option value="">
-                    Select {{ (field.label || key).toLowerCase() }}
-                  </option>
-                  <option
-                    v-for="option in field.options"
-                    :key="option.value"
-                    :value="option.value"
-                  >
+                  <option value="">Select {{ (field.label || key).toLowerCase() }}</option>
+                  <option v-for="option in field.options" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>
                 </select>
@@ -263,10 +246,7 @@
                 <div class="flex items-center justify-between space-x-2">
                   <div class="space-y-0.5">
                     <Label :for="key">{{ field.label || key }}</Label>
-                    <p
-                      v-if="field.description"
-                      class="text-sm text-muted-foreground"
-                    >
+                    <p v-if="field.description" class="text-sm text-neutral-muted">
                       {{ field.description }}
                     </p>
                   </div>
@@ -279,19 +259,13 @@
                 <Label :for="key" :required="field.required">
                   {{ field.label || key }}
                 </Label>
-                <p
-                  v-if="field.description"
-                  class="text-sm text-muted-foreground"
-                >
+                <p v-if="field.description" class="text-sm text-neutral-muted">
                   {{ field.description }}
                 </p>
                 <Textarea
                   :id="key"
                   v-model="formData[key]"
-                  :placeholder="
-                    field.placeholder ||
-                    'Enter ' + (field.label || key).toLowerCase()
-                  "
+                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
                   :rows="4"
                   :required="field.required"
                 />
@@ -302,29 +276,21 @@
                 <Label :for="key" :required="field.required">
                   {{ field.label || key }}
                 </Label>
-                <p
-                  v-if="field.description"
-                  class="text-sm text-muted-foreground"
-                >
+                <p v-if="field.description" class="text-sm text-neutral-muted">
                   {{ field.description }}
                 </p>
                 <Input
                   :id="key"
                   v-model.number="formData[key]"
                   type="number"
-                  :placeholder="
-                    field.placeholder ||
-                    'Enter ' + (field.label || key).toLowerCase()
-                  "
+                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
                   :required="field.required"
                 />
               </template>
             </div>
 
             <div class="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" @click="resetForm">
-                Reset
-              </Button>
+              <Button type="button" variant="outline" @click="resetForm"> Reset </Button>
               <Button type="submit" :disabled="saving">
                 <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
                 Save Configuration
@@ -354,21 +320,13 @@
             <div
               v-if="testResult"
               class="p-4 rounded-lg"
-              :class="
-                testResult.success
-                  ? 'bg-green-50 text-green-800'
-                  : 'bg-red-50 text-red-800'
-              "
+              :class="testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'"
             >
               <div class="flex items-center space-x-2">
                 <CheckCircle v-if="testResult.success" class="h-5 w-5" />
                 <XCircle v-else class="h-5 w-5" />
                 <span class="font-medium">
-                  {{
-                    testResult.success
-                      ? "Connection successful!"
-                      : "Connection failed"
-                  }}
+                  {{ testResult.success ? "Connection successful!" : "Connection failed" }}
                 </span>
               </div>
               <p v-if="testResult.message" class="mt-2 text-sm">
@@ -516,7 +474,7 @@ const fetchPlugin = async () => {
       pluginId: pluginId.value,
     });
     enabled.value = configData.enabled;
-    instanceId.value = 'instanceId' in configData ? configData.instanceId : null;
+    instanceId.value = "instanceId" in configData ? configData.instanceId : null;
     formData.value = { ...configData.configuration };
     originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
 
@@ -526,16 +484,11 @@ const fetchPlugin = async () => {
       configSchema.value = pluginData.manifest.configSchema;
 
       // Initialize form data with defaults
-      Object.entries(configSchema.value).forEach(
-        ([key, field]: [string, any]) => {
-          if (
-            formData.value[key] === undefined &&
-            field.default !== undefined
-          ) {
-            formData.value[key] = field.default;
-          }
+      Object.entries(configSchema.value).forEach(([key, field]: [string, any]) => {
+        if (formData.value[key] === undefined && field.default !== undefined) {
+          formData.value[key] = field.default;
         }
-      );
+      });
     }
 
     // Check for custom template
@@ -572,9 +525,13 @@ const saveConfiguration = async () => {
       const field = configSchema.value[key];
 
       // Handle encrypted fields
-      if (field?.encrypted && originalFormData.value[key] && /^\*+$/.test(originalFormData.value[key])) {
+      if (
+        field?.encrypted &&
+        originalFormData.value[key] &&
+        /^\*+$/.test(originalFormData.value[key])
+      ) {
         // This is an existing encrypted field
-        if (editingEncryptedFields.value.has(key) && value && value !== '') {
+        if (editingEncryptedFields.value.has(key) && value && value !== "") {
           // User edited this field, send the new value
           cleanedConfig[key] = value;
         } else if (!editingEncryptedFields.value.has(key)) {
@@ -607,8 +564,7 @@ const saveConfiguration = async () => {
     console.error("Failed to save configuration:", err);
 
     // Show error toast
-    const errorMessage =
-      err?.message || err?.data?.message || "Failed to save configuration";
+    const errorMessage = err?.message || err?.data?.message || "Failed to save configuration";
     toast.error(errorMessage);
   } finally {
     saving.value = false;
@@ -641,8 +597,7 @@ const testConnection = async () => {
   } catch (err) {
     testResult.value = {
       success: false,
-      message:
-        "Failed to establish connection. Please check your configuration.",
+      message: "Failed to establish connection. Please check your configuration.",
     };
   } finally {
     testing.value = false;
@@ -676,7 +631,7 @@ useHead({
   title: computed(() =>
     plugin.value
       ? `${getPluginDisplayName(plugin.value.name)} Settings - Hay Dashboard`
-      : "Plugin Settings - Hay Dashboard"
+      : "Plugin Settings - Hay Dashboard",
   ),
 });
 </script>

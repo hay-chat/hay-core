@@ -4,7 +4,7 @@
       <label :for="editorId" class="text-sm font-medium">
         {{ label }}
       </label>
-      <div class="text-xs text-muted-foreground">
+      <div class="text-xs text-neutral-muted">
         Press
         <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-background-tertiary rounded">/</kbd>
         to mention Actions or Documents
@@ -48,7 +48,7 @@
 
       <button
         v-if="instructions.length === 0"
-        class="w-full text-left text-muted-foreground hover:text-foreground transition-colors py-2"
+        class="w-full text-left text-neutral-muted hover:text-foreground transition-colors py-2"
         @click="addInstruction"
       />
 
@@ -59,7 +59,7 @@
     <p v-if="error" class="text-sm text-red-500">
       {{ error }}
     </p>
-    <p v-if="hint" class="text-sm text-muted-foreground">
+    <p v-if="hint" class="text-sm text-neutral-muted">
       {{ hint }}
     </p>
   </div>
@@ -453,10 +453,9 @@ function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string
       `;
     } else {
       html = items
-        .map(
-          (item, i) => {
-            const tool = item as MCPTool;
-            return `
+        .map((item, i) => {
+          const tool = item as MCPTool;
+          return `
         <div class="mention-item mention-item-action ${
           i === activeIndex ? "active" : ""
         }" data-id="${tool.id}">
@@ -470,8 +469,7 @@ function showMenu(rect: DOMRect, items: (MCPTool | DocumentItem | { type: string
           </div>
         </div>
       `;
-          },
-        )
+        })
         .join("");
     }
   } else if (commandMode === "documents") {

@@ -2,13 +2,13 @@
   <div class="max-w-4xl mx-auto space-y-8">
     <!-- Page Header -->
     <div>
-      <div class="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+      <div class="flex items-center gap-2 text-sm text-neutral-muted mb-4">
         <NuxtLink to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
         <ChevronRight class="h-4 w-4" />
         <span>Import</span>
       </div>
       <h1 class="text-3xl font-bold text-foreground">Import Document</h1>
-      <p class="mt-2 text-muted-foreground">
+      <p class="mt-2 text-neutral-muted">
         Add new documents to your knowledge base from various sources.
       </p>
     </div>
@@ -22,12 +22,12 @@
               'flex items-center justify-center w-8 h-8 rounded-full',
               currentStep >= index + 1
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-background-tertiary text-muted-foreground',
+                : 'bg-background-tertiary text-neutral-muted',
             ]"
           >
             {{ index + 1 }}
           </div>
-          <span :class="currentStep >= index + 1 ? 'text-foreground' : 'text-muted-foreground'">
+          <span :class="currentStep >= index + 1 ? 'text-foreground' : 'text-neutral-muted'">
             {{ step }}
           </span>
         </div>
@@ -53,13 +53,11 @@
           >
             <div class="flex items-start gap-4">
               <div class="p-3 bg-background-tertiary rounded-lg">
-                <Upload class="h-6 w-6 text-muted-foreground" />
+                <Upload class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
                 <h3 class="font-semibold mb-1">Upload Files</h3>
-                <p class="text-sm text-muted-foreground mb-2">
-                  Upload documents from your computer
-                </p>
+                <p class="text-sm text-neutral-muted mb-2">Upload documents from your computer</p>
                 <div class="flex flex-wrap gap-2">
                   <Badge v-for="format in uploadFormats" :key="format" variant="outline">
                     {{ format }}
@@ -77,11 +75,11 @@
           >
             <div class="flex items-start gap-4">
               <div class="p-3 bg-background-tertiary rounded-lg">
-                <Globe class="h-6 w-6 text-muted-foreground" />
+                <Globe class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
                 <h3 class="font-semibold mb-1">Import from Website</h3>
-                <p class="text-sm text-muted-foreground mb-2">
+                <p class="text-sm text-neutral-muted mb-2">
                   Crawl and import documentation from any website
                 </p>
                 <div class="flex flex-wrap gap-2">
@@ -106,13 +104,13 @@
             >
               <div class="flex items-start gap-4">
                 <div class="p-3 bg-background-tertiary rounded-lg">
-                  <Package class="h-6 w-6 text-muted-foreground" />
+                  <Package class="h-6 w-6 text-neutral-muted" />
                 </div>
                 <div class="flex-1">
                   <h3 class="font-semibold mb-1">
                     {{ plugin.name }}
                   </h3>
-                  <p class="text-sm text-muted-foreground mb-2">
+                  <p class="text-sm text-neutral-muted mb-2">
                     {{ plugin.description }}
                   </p>
                   <div class="flex items-center gap-2">
@@ -153,7 +151,7 @@
       </CardHeader>
       <CardContent>
         <div
-          class="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
+          class="border-2 border-dashed border-neutral-muted/25 rounded-lg p-12 text-center hover:border-neutral-muted/50 transition-colors cursor-pointer"
           :class="{ 'border-primary bg-primary/5': isDragging }"
           @click="selectFiles"
           @drop="handleDrop"
@@ -161,13 +159,11 @@
           @dragleave.prevent="isDragging = false"
           @dragenter.prevent
         >
-          <Upload class="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <Upload class="mx-auto h-16 w-16 text-neutral-muted mb-4" />
           <h3 class="text-lg font-semibold mb-2">
             {{ isDragging ? "Drop files here" : "Click to upload or drag and drop" }}
           </h3>
-          <p class="text-sm text-muted-foreground mb-4">
-            Support for multiple files up to 10MB each
-          </p>
+          <p class="text-sm text-neutral-muted mb-4">Support for multiple files up to 10MB each</p>
           <Button variant="outline">
             <Upload class="mr-2 h-4 w-4" />
             Browse Files
@@ -184,13 +180,13 @@
           >
             <component
               :is="getFileIcon(file.type)"
-              class="h-5 w-5 text-muted-foreground flex-shrink-0"
+              class="h-5 w-5 text-neutral-muted flex-shrink-0"
             />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium truncate">
                 {{ file.name }}
               </p>
-              <p class="text-xs text-muted-foreground">
+              <p class="text-xs text-neutral-muted">
                 {{ formatFileSize(file.size) }}
               </p>
             </div>
@@ -235,7 +231,7 @@
               placeholder="https://docs.example.com"
               class="mt-2"
             />
-            <p class="text-xs text-muted-foreground mt-2">
+            <p class="text-xs text-neutral-muted mt-2">
               We'll crawl this website and import all documentation pages automatically.
             </p>
           </div>
@@ -336,7 +332,7 @@
               />
               <p
                 v-if="discoveryProgress?.currentUrl"
-                class="mt-2 text-xs text-muted-foreground text-center truncate"
+                class="mt-2 text-xs text-neutral-muted text-center truncate"
               >
                 Scanning: {{ discoveryProgress.currentUrl }}
               </p>
@@ -393,10 +389,10 @@
                 <p class="font-medium text-sm truncate">
                   {{ page.title || "Untitled Page" }}
                 </p>
-                <p class="text-xs text-muted-foreground truncate">
+                <p class="text-xs text-neutral-muted truncate">
                   {{ page.url }}
                 </p>
-                <p v-if="page.description" class="text-xs text-muted-foreground mt-1 line-clamp-2">
+                <p v-if="page.description" class="text-xs text-neutral-muted mt-1 line-clamp-2">
                   {{ page.description }}
                 </p>
               </div>
@@ -497,7 +493,7 @@
                   .filter((t) => t)
               "
             />
-            <p class="text-xs text-muted-foreground mt-1">e.g., documentation, api, reference</p>
+            <p class="text-xs text-neutral-muted mt-1">e.g., documentation, api, reference</p>
           </div>
 
           <div>
@@ -519,7 +515,7 @@
           <!-- Preview of selected pages -->
           <div class="border-t pt-4">
             <h4 class="text-sm font-medium mb-2">Selected Pages Summary</h4>
-            <div class="text-sm text-muted-foreground space-y-1">
+            <div class="text-sm text-neutral-muted space-y-1">
               <p>• {{ discoveredPages.filter((p) => p.selected).length }} pages will be imported</p>
               <p>• Each page will be converted to markdown format</p>
               <p>• Content will be chunked and vectorized for AI search</p>
@@ -557,7 +553,7 @@
             class="p-4 border rounded-lg space-y-4"
           >
             <div class="flex items-center gap-3 mb-4">
-              <component :is="getFileIcon(file.type)" class="h-5 w-5 text-muted-foreground" />
+              <component :is="getFileIcon(file.type)" class="h-5 w-5 text-neutral-muted" />
               <span class="font-medium">{{ file.name }}</span>
               <Badge variant="outline">
                 {{ getFileExtension(file.name) }}
@@ -610,9 +606,7 @@
                   v-model="file.tags"
                   placeholder="Enter tags separated by commas"
                 />
-                <p class="text-xs text-muted-foreground mt-1">
-                  e.g., customer-support, billing, api
-                </p>
+                <p class="text-xs text-neutral-muted mt-1">e.g., customer-support, billing, api</p>
               </div>
 
               <div class="flex items-center space-x-2">
@@ -694,12 +688,13 @@
               </div>
               <Progress
                 :value="
-                  ((webImportProgress?.processedPages || 0) / Math.max(webImportProgress?.totalPages || 1, 1)) *
+                  ((webImportProgress?.processedPages || 0) /
+                    Math.max(webImportProgress?.totalPages || 1, 1)) *
                   100
                 "
                 class="h-2"
               />
-              <p v-if="webImportProgress?.currentUrl" class="text-xs text-muted-foreground truncate">
+              <p v-if="webImportProgress?.currentUrl" class="text-xs text-neutral-muted truncate">
                 Processing: {{ webImportProgress.currentUrl }}
               </p>
             </div>
@@ -721,7 +716,7 @@
           <div v-for="(file, index) in selectedFiles" :key="index" class="p-4 border rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
-                <component :is="getFileIcon(file.type)" class="h-4 w-4 text-muted-foreground" />
+                <component :is="getFileIcon(file.type)" class="h-4 w-4 text-neutral-muted" />
                 <span class="text-sm font-medium">{{ file.documentName || file.name }}</span>
               </div>
               <div class="flex items-center gap-2">
@@ -993,10 +988,12 @@ const discoverPages = async () => {
 
           // Extract discovered pages from job result
           if (jobStatus.result?.pages) {
-            discoveredPages.value = (jobStatus.result.pages as any[]).map((page: DiscoveredPage) => ({
-              ...page,
-              selected: page.selected !== false, // Default to true unless explicitly false
-            }));
+            discoveredPages.value = (jobStatus.result.pages as any[]).map(
+              (page: DiscoveredPage) => ({
+                ...page,
+                selected: page.selected !== false, // Default to true unless explicitly false
+              }),
+            );
 
             // Final progress update
             discoveryProgress.value = {
@@ -1036,8 +1033,7 @@ const discoverPages = async () => {
     }, 5000); // Poll every 5 seconds
 
     // Store interval ID for cleanup if needed
-    (window as Window & { __discoveryPollInterval?: any }).__discoveryPollInterval =
-      pollInterval;
+    (window as Window & { __discoveryPollInterval?: any }).__discoveryPollInterval = pollInterval;
   } catch (error) {
     console.error("Failed to start page discovery:", error);
     isDiscovering.value = false;

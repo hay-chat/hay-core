@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <p class="mt-1 text-sm text-neutral-muted">
           Welcome back! Here's what's happening with your AI agents.
         </p>
       </div>
@@ -118,10 +118,10 @@
                 <p class="text-sm font-medium text-foreground">
                   {{ activity.title }}
                 </p>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm text-neutral-muted">
                   {{ activity.description }}
                 </p>
-                <p class="text-xs text-muted-foreground mt-1">
+                <p class="text-xs text-neutral-muted mt-1">
                   {{ formatTimeAgo(activity.timestamp) }}
                 </p>
               </div>
@@ -162,18 +162,16 @@
                   <p class="font-medium text-foreground">
                     {{ agent.name }}
                   </p>
-                  <p class="text-sm text-muted-foreground">
-                    {{ agent.conversations }} conversations
-                  </p>
+                  <p class="text-sm text-neutral-muted">{{ agent.conversations }} conversations</p>
                 </div>
               </div>
               <div class="text-right">
                 <div class="text-sm font-medium text-foreground">{{ agent.resolutionRate }}%</div>
-                <div class="text-xs text-muted-foreground">resolution rate</div>
+                <div class="text-xs text-neutral-muted">resolution rate</div>
               </div>
             </div>
           </div>
-          <div v-else class="text-center py-8 text-muted-foreground">
+          <div v-else class="text-center py-8 text-neutral-muted">
             <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No agents created yet</p>
             <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
@@ -209,13 +207,13 @@
                 <div
                   class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
                 >
-                  <User class="h-4 w-4 text-muted-foreground" />
+                  <User class="h-4 w-4 text-neutral-muted" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="font-medium text-foreground truncate">
                     {{ conversation.customerName }}
                   </p>
-                  <p class="text-sm text-muted-foreground truncate">
+                  <p class="text-sm text-neutral-muted truncate">
                     {{ conversation.lastMessage }}
                   </p>
                 </div>
@@ -235,13 +233,13 @@
                 >
                   {{ conversation.status }}
                 </div>
-                <div class="text-xs text-muted-foreground mt-1">
+                <div class="text-xs text-neutral-muted mt-1">
                   {{ formatTimeAgo(conversation.updatedAt) }}
                 </div>
               </div>
             </div>
           </div>
-          <div v-else class="text-center py-8 text-muted-foreground">
+          <div v-else class="text-center py-8 text-neutral-muted">
             <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No conversations yet</p>
             <p class="text-sm mt-2">Start chatting with your agents to see conversations here</p>
@@ -467,15 +465,15 @@ const formatTimeAgo = (date: Date) => {
 const fetchDashboardData = async () => {
   try {
     // Fetch agents, conversations, and conversation stats in parallel
-    const [agentsData, conversationsData, conversationStatsData] = await Promise.all([
+    const [agentsData, conversationsData, analyticsData] = await Promise.all([
       HayApi.agents.list.query(),
       HayApi.conversations.list.query({
         pagination: { page: 1, limit: 10 },
       }),
-      // HayApi.conversations.dailyStats.query({ days: 30 }),
-      Promise.resolve({
-        result: {
-          data: [
+      HayApi.analytics.conversationActivity.query({}),
+      // Promise.resolve({
+      //   result: {
+      //     data: [
             {
               date: "2025-08-10",
               count: 0,
@@ -628,25 +626,19 @@ const fetchDashboardData = async () => {
             },
             {
               date: "2025-09-09",
-              count: 1,
-              label: "Sep 9",
-            },
-          ],
-        },
-      }),
+      //       count: 1,
+      //       label: "Sep 9",
+      //     },
+      //   ],
+      // },
+      // }),
     ]);
 
     agents.value = (agentsData as any) || [];
-    conversations.value =
-      (conversationsData as any)?.items ||
-      (conversationsData as any) ||
-      [];
+    conversations.value = (conversationsData as any)?.items || (conversationsData as any) || [];
 
-    // Handle the nested data structure from the API response
-    const statsData =
-      (conversationStatsData as any)?.result?.data ||
-      (conversationStatsData as any) ||
-      [];
+    // Handle the analytics data from the new endpoint
+    const statsData = (analyticsData as any)?.data || [];
 
     // Process the data to add numeric indices for proper chart rendering
     conversationStats.value = Array.isArray(statsData)

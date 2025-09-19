@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Security Settings</h1>
-        <p class="text-muted-foreground">
+        <p class="text-neutral-muted">
           Manage authentication, access controls, and security policies
         </p>
       </div>
@@ -104,7 +104,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Minimum Length</Label>
-                <p class="text-xs text-muted-foreground">Minimum number of characters required</p>
+                <p class="text-xs text-neutral-muted">Minimum number of characters required</p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.minLength"
@@ -120,7 +120,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Uppercase Letters</Label>
-                <p class="text-xs text-muted-foreground">At least one uppercase letter (A-Z)</p>
+                <p class="text-xs text-neutral-muted">At least one uppercase letter (A-Z)</p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireUppercase" />
             </div>
@@ -128,7 +128,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Numbers</Label>
-                <p class="text-xs text-muted-foreground">At least one number (0-9)</p>
+                <p class="text-xs text-neutral-muted">At least one number (0-9)</p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireNumbers" />
             </div>
@@ -136,9 +136,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require Special Characters</Label>
-                <p class="text-xs text-muted-foreground">
-                  At least one special character (!@#$%^&*)
-                </p>
+                <p class="text-xs text-neutral-muted">At least one special character (!@#$%^&*)</p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireSpecialChars" />
             </div>
@@ -146,9 +144,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Password Expiration</Label>
-                <p class="text-xs text-muted-foreground">
-                  Force password change after specified days
-                </p>
+                <p class="text-xs text-neutral-muted">Force password change after specified days</p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.expirationDays"
@@ -171,7 +167,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Session Timeout</Label>
-                <p class="text-xs text-muted-foreground">Automatic logout after inactivity</p>
+                <p class="text-xs text-neutral-muted">Automatic logout after inactivity</p>
               </div>
               <select
                 v-model="settings.authentication.sessionTimeout"
@@ -189,7 +185,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Concurrent Sessions Limit</Label>
-                <p class="text-xs text-muted-foreground">Maximum simultaneous sessions per user</p>
+                <p class="text-xs text-neutral-muted">Maximum simultaneous sessions per user</p>
               </div>
               <select
                 v-model="settings.authentication.maxConcurrentSessions"
@@ -206,7 +202,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Remember Me Duration</Label>
-                <p class="text-xs text-muted-foreground">How long "Remember Me" sessions last</p>
+                <p class="text-xs text-neutral-muted">How long "Remember Me" sessions last</p>
               </div>
               <select
                 v-model="settings.authentication.rememberMeDuration"
@@ -228,7 +224,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Require 2FA for All Users</Label>
-                <p class="text-xs text-muted-foreground">Mandatory two-factor authentication</p>
+                <p class="text-xs text-neutral-muted">Mandatory two-factor authentication</p>
               </div>
               <Checkbox v-model="settings.authentication.require2FA" />
             </div>
@@ -236,7 +232,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">2FA Grace Period</Label>
-                <p class="text-xs text-muted-foreground">Days to set up 2FA before enforcement</p>
+                <p class="text-xs text-neutral-muted">Days to set up 2FA before enforcement</p>
               </div>
               <select
                 v-model="settings.authentication.twoFAGracePeriod"
@@ -253,7 +249,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Allowed 2FA Methods</Label>
-                <p class="text-xs text-muted-foreground">Which 2FA methods users can use</p>
+                <p class="text-xs text-neutral-muted">Which 2FA methods users can use</p>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center space-x-2">
@@ -308,8 +304,8 @@
             v-if="apiKeys.length === 0"
             class="text-center py-8 border-2 border-dashed border-muted rounded-lg"
           >
-            <Key class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p class="text-sm text-muted-foreground">No API keys created yet</p>
+            <Key class="h-8 w-8 text-neutral-muted mx-auto mb-2" />
+            <p class="text-sm text-neutral-muted">No API keys created yet</p>
           </div>
 
           <div v-else class="space-y-3">
@@ -322,7 +318,7 @@
                 <div class="font-medium">
                   {{ key.name }}
                 </div>
-                <div class="text-sm text-muted-foreground">
+                <div class="text-sm text-neutral-muted">
                   Created {{ formatDate(key.createdAt) }} • Last used
                   {{ formatDate(key.lastUsed) }}
                 </div>
@@ -359,7 +355,7 @@
                 max="10000"
                 class="mt-1"
               />
-              <p class="text-xs text-muted-foreground mt-1">
+              <p class="text-xs text-neutral-muted mt-1">
                 Maximum API requests per minute per API key
               </p>
             </div>
@@ -374,7 +370,7 @@
                 max="1000"
                 class="mt-1"
               />
-              <p class="text-xs text-muted-foreground mt-1">Maximum burst requests allowed</p>
+              <p class="text-xs text-neutral-muted mt-1">Maximum burst requests allowed</p>
             </div>
           </div>
         </div>
@@ -386,9 +382,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <Label class="font-normal">Enable IP Whitelist</Label>
-                <p class="text-xs text-muted-foreground">
-                  Only allow API access from specified IPs
-                </p>
+                <p class="text-xs text-neutral-muted">Only allow API access from specified IPs</p>
               </div>
               <Checkbox v-model="settings.apiSecurity.ipWhitelist.enabled" />
             </div>
@@ -444,7 +438,7 @@
                   <div class="font-medium">
                     {{ attempt.email }}
                   </div>
-                  <div class="text-sm text-muted-foreground">
+                  <div class="text-sm text-neutral-muted">
                     {{ attempt.ipAddress }} •
                     {{ formatDate(attempt.timestamp) }}
                   </div>
@@ -479,10 +473,10 @@
                 <div class="font-medium">
                   {{ event.title }}
                 </div>
-                <div class="text-sm text-muted-foreground">
+                <div class="text-sm text-neutral-muted">
                   {{ event.description }}
                 </div>
-                <div class="text-xs text-muted-foreground">
+                <div class="text-xs text-neutral-muted">
                   {{ formatDate(event.timestamp) }}
                 </div>
               </div>

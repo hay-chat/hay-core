@@ -13,7 +13,7 @@
         fill="#D74848"
       />
     </svg>
-    <p v-if="label" class="font-secondary font-bold text-lg text-muted-foreground">
+    <p v-if="label" class="font-secondary font-bold text-lg text-red">
       {{ label }}
     </p>
   </div>

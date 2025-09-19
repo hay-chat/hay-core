@@ -1,5 +1,5 @@
 import { Repository } from "typeorm";
-import { Message, MessageType } from "../database/entities/message.entity";
+import { Message, MessageType, MessageSentiment } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
 
 export class MessageRepository {
@@ -72,6 +72,69 @@ export class MessageRepository {
       conversation_id: conversationId,
     });
     return result.affected !== 0;
+  }
+
+  async getSentimentDistribution(
+    organizationId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<Array<{ sentiment: MessageSentiment; count: number }>> {
+    const queryBuilder = this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoin("message.conversation", "conversation")
+      .select("message.sentiment", "sentiment")
+      .addSelect("COUNT(*)", "count")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("message.type = :type", { type: MessageType.CUSTOMER })
+      .andWhere("message.sentiment IS NOT NULL");
+
+    if (startDate) {
+      queryBuilder.andWhere("message.created_at >= :startDate", { startDate });
+    }
+
+    if (endDate) {
+      queryBuilder.andWhere("message.created_at <= :endDate", { endDate });
+    }
+
+    queryBuilder.groupBy("message.sentiment");
+
+    const results = await queryBuilder.getRawMany();
+
+    return results.map(row => ({
+      sentiment: row.sentiment as MessageSentiment,
+      count: parseInt(row.count, 10)
+    }));
+  }
+
+  async getAverageMessagesPerConversation(
+    organizationId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<number> {
+    const queryBuilder = this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoin("message.conversation", "conversation")
+      .select("conversation.id", "conversation_id")
+      .addSelect("COUNT(*)", "message_count")
+      .where("conversation.organization_id = :organizationId", { organizationId });
+
+    if (startDate) {
+      queryBuilder.andWhere("conversation.created_at >= :startDate", { startDate });
+    }
+
+    if (endDate) {
+      queryBuilder.andWhere("conversation.created_at <= :endDate", { endDate });
+    }
+
+    queryBuilder.groupBy("conversation.id");
+
+    const subQuery = `(${queryBuilder.getQuery()})`;
+    const avgResult = await this.getRepository().query(
+      `SELECT AVG(message_count) as avg_messages FROM ${subQuery} as counts`,
+      queryBuilder.getParameters()
+    );
+
+    return avgResult[0]?.avg_messages ? parseFloat(avgResult[0].avg_messages) : 0;
   }
 }
 

@@ -11,7 +11,7 @@
         <div v-if="connectionStatus !== 'connected'" class="text-center py-4">
           <div v-if="connectionStatus === 'initializing'" class="space-y-2">
             <Loader2 class="w-6 h-6 animate-spin mx-auto" />
-            <p class="text-sm text-muted-foreground">Initializing secure connection...</p>
+            <p class="text-sm text-neutral-muted">Initializing secure connection...</p>
           </div>
 
           <div v-else-if="connectionStatus === 'error'" class="space-y-2">

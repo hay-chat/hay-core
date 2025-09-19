@@ -454,6 +454,31 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     return result;
   }
+
+  async countByFilters(filters: {
+    organizationId: string;
+    startDate?: Date;
+    endDate?: Date;
+    status?: string;
+  }): Promise<number> {
+    const queryBuilder = this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId: filters.organizationId });
+
+    if (filters.startDate) {
+      queryBuilder.andWhere("conversation.created_at >= :startDate", { startDate: filters.startDate });
+    }
+
+    if (filters.endDate) {
+      queryBuilder.andWhere("conversation.created_at <= :endDate", { endDate: filters.endDate });
+    }
+
+    if (filters.status) {
+      queryBuilder.andWhere("conversation.status = :status", { status: filters.status });
+    }
+
+    return await queryBuilder.getCount();
+  }
 }
 
 export const conversationRepository = new ConversationRepository();

@@ -4,9 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Playbooks</h1>
-        <p class="text-muted-foreground">
-          Automated conversation flows and responses for your agents
-        </p>
+        <p class="text-neutral-muted">Automated conversation flows and responses for your agents</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm">
@@ -55,7 +53,7 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="relative">
-          <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
           <Input v-model="searchQuery" placeholder="Search playbooks..." class="pl-8 w-[300px]" />
         </div>
 
@@ -105,11 +103,11 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredPlaybooks.length === 0" class="text-center py-12">
-      <Book class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+      <Book class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No playbooks found" : "No playbooks created yet" }}
       </h3>
-      <p class="text-muted-foreground mb-4">
+      <p class="text-neutral-muted mb-4">
         {{
           searchQuery
             ? "Try adjusting your search terms."
@@ -141,7 +139,7 @@
               <h3 class="font-semibold">
                 {{ playbook.title }}
               </h3>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-sm text-neutral-muted">
                 {{ playbook.description }}
               </p>
             </div>
@@ -153,11 +151,11 @@
         <CardContent>
           <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Agents:</span>
+              <span class="text-neutral-muted">Agents:</span>
               <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Created:</span>
+              <span class="text-neutral-muted">Created:</span>
               <span class="font-medium">{{ formatDate(new Date(playbook.created_at)) }}</span>
             </div>
           </div>
@@ -194,7 +192,7 @@
                     <div class="font-medium">
                       {{ playbook.title }}
                     </div>
-                    <div class="text-sm text-muted-foreground">
+                    <div class="text-sm text-neutral-muted">
                       {{ playbook.description }}
                     </div>
                   </div>

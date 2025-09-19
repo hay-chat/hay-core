@@ -29,7 +29,7 @@
         class="peak-1"
       />
     </svg>
-    <p v-if="label" class="font-secondary font-bold text-lg text-muted-foreground">
+    <p v-if="label" class="font-secondary font-bold text-lg text-neutral-muted">
       {{ label }}
     </p>
   </div>

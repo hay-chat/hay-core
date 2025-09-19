@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-foreground">AI Agents</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <p class="mt-1 text-sm text-neutral-muted">
           Create and manage your AI agents to automate customer interactions.
         </p>
       </div>
@@ -25,7 +25,7 @@
       <div class="flex-1">
         <div class="relative">
           <Search
-            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
+            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-muted"
           />
           <Input
             v-model="searchQuery"
@@ -173,7 +173,7 @@
                 />
                 {{ agent.status }}
               </div>
-              <span class="text-xs text-muted-foreground bg-background-tertiary px-2 py-1 rounded">
+              <span class="text-xs text-neutral-muted bg-background-tertiary px-2 py-1 rounded">
                 {{ agent.type }}
               </span>
             </div>
@@ -181,13 +181,13 @@
             <!-- Agent Stats -->
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p class="text-muted-foreground">Conversations</p>
+                <p class="text-neutral-muted">Conversations</p>
                 <p class="font-medium">
                   {{ agent.conversationCount.toLocaleString() }}
                 </p>
               </div>
               <div>
-                <p class="text-muted-foreground">Resolution Rate</p>
+                <p class="text-neutral-muted">Resolution Rate</p>
                 <p class="font-medium">{{ agent.resolutionRate }}%</p>
               </div>
             </div>
@@ -208,7 +208,7 @@
             </div>
 
             <!-- Last Activity -->
-            <div class="pt-2 border-t text-xs text-muted-foreground">
+            <div class="pt-2 border-t text-xs text-neutral-muted">
               <p>Last active: {{ formatTimeAgo(agent.lastActivity) }}</p>
               <p>Created: {{ formatDate(agent.createdAt) }}</p>
             </div>
@@ -231,11 +231,11 @@
 
     <!-- Empty State -->
     <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
-      <Bot class="mx-auto h-12 w-12 text-muted-foreground" />
+      <Bot class="mx-auto h-12 w-12 text-neutral-muted" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
         {{ searchQuery || statusFilter || typeFilter ? "No agents found" : "No agents yet" }}
       </h3>
-      <p class="mt-2 text-sm text-muted-foreground">
+      <p class="mt-2 text-sm text-neutral-muted">
         {{
           searchQuery || statusFilter || typeFilter
             ? "Try adjusting your search or filters."

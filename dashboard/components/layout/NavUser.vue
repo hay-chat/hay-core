@@ -11,7 +11,7 @@
           <p class="font-medium">
             {{ user.name }}
           </p>
-          <p class="text-xs text-muted-foreground">
+          <p class="text-xs text-neutral-muted">
             {{ user.email }}
           </p>
         </div>

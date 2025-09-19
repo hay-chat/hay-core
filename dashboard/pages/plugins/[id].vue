@@ -12,10 +12,8 @@
         <h1 class="text-2xl font-bold text-foreground">
           {{ plugin?.name || "Plugin Configuration" }}
         </h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          {{
-            plugin?.description || "Configure plugin settings and monitor usage"
-          }}
+        <p class="mt-1 text-sm text-neutral-muted">
+          {{ plugin?.description || "Configure plugin settings and monitor usage" }}
         </p>
       </div>
       <div class="flex items-center space-x-2">
@@ -25,8 +23,8 @@
             plugin?.status === 'active'
               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
               : plugin?.status === 'error'
-              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
           ]"
         >
           <div
@@ -35,17 +33,13 @@
               plugin?.status === 'active'
                 ? 'bg-green-600 dark:bg-green-400'
                 : plugin?.status === 'error'
-                ? 'bg-red-600 dark:bg-red-400'
-                : 'bg-gray-600 dark:bg-gray-400',
+                  ? 'bg-red-600 dark:bg-red-400'
+                  : 'bg-gray-600 dark:bg-gray-400',
             ]"
           ></div>
           {{ plugin?.status || "inactive" }}
         </div>
-        <Button
-          v-if="plugin?.status === 'active'"
-          variant="outline"
-          @click="togglePlugin"
-        >
+        <Button v-if="plugin?.status === 'active'" variant="outline" @click="togglePlugin">
           <PowerOff class="mr-2 h-4 w-4" />
           Disable
         </Button>
@@ -60,9 +54,7 @@
     <Card>
       <CardHeader>
         <CardTitle>Configuration</CardTitle>
-        <CardDescription>
-          Configure API credentials and settings for this plugin
-        </CardDescription>
+        <CardDescription> Configure API credentials and settings for this plugin </CardDescription>
       </CardHeader>
       <CardContent>
         <form @submit.prevent="saveConfiguration" class="space-y-6">
@@ -77,9 +69,7 @@
                 placeholder="Enter your API key"
                 class="pr-20"
               />
-              <div
-                class="absolute inset-y-0 right-0 flex items-center pr-3 space-x-1"
-              >
+              <div class="absolute inset-y-0 right-0 flex items-center pr-3 space-x-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -100,9 +90,7 @@
                 </Button>
               </div>
             </div>
-            <p class="text-sm text-muted-foreground">
-              Your API key is encrypted and stored securely
-            </p>
+            <p class="text-sm text-neutral-muted">Your API key is encrypted and stored securely</p>
           </div>
 
           <!-- Model Selection (for LLM providers) -->
@@ -114,11 +102,7 @@
               class="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">Select a model</option>
-              <option
-                v-for="model in availableModels"
-                :key="model.id"
-                :value="model.id"
-              >
+              <option v-for="model in availableModels" :key="model.id" :value="model.id">
                 {{ model.name }} ({{ model.contextWindow }} tokens)
               </option>
             </select>
@@ -127,37 +111,20 @@
           <!-- Endpoint (optional) -->
           <div v-if="showEndpoint" class="space-y-2">
             <Label for="endpoint">API Endpoint (Optional)</Label>
-            <Input
-              id="endpoint"
-              v-model="config.endpoint"
-              placeholder="https://api.example.com"
-            />
-            <p class="text-sm text-muted-foreground">
-              Custom endpoint URL (leave empty for default)
-            </p>
+            <Input id="endpoint" v-model="config.endpoint" placeholder="https://api.example.com" />
+            <p class="text-sm text-neutral-muted">Custom endpoint URL (leave empty for default)</p>
           </div>
 
           <!-- Advanced Settings -->
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <Label>Advanced Settings</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                @click="showAdvanced = !showAdvanced"
-              >
-                <component
-                  :is="showAdvanced ? ChevronUp : ChevronDown"
-                  class="h-4 w-4"
-                />
+              <Button type="button" variant="ghost" size="sm" @click="showAdvanced = !showAdvanced">
+                <component :is="showAdvanced ? ChevronUp : ChevronDown" class="h-4 w-4" />
               </Button>
             </div>
 
-            <div
-              v-if="showAdvanced"
-              class="space-y-4 pl-4 border-l-2 border-border"
-            >
+            <div v-if="showAdvanced" class="space-y-4 pl-4 border-l-2 border-border">
               <!-- Max Retries -->
               <div class="space-y-2">
                 <Label for="maxRetries">Max Retries</Label>
@@ -203,23 +170,12 @@
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <Label>Usage Limits</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                @click="showLimits = !showLimits"
-              >
-                <component
-                  :is="showLimits ? ChevronUp : ChevronDown"
-                  class="h-4 w-4"
-                />
+              <Button type="button" variant="ghost" size="sm" @click="showLimits = !showLimits">
+                <component :is="showLimits ? ChevronUp : ChevronDown" class="h-4 w-4" />
               </Button>
             </div>
 
-            <div
-              v-if="showLimits"
-              class="space-y-4 pl-4 border-l-2 border-border"
-            >
+            <div v-if="showLimits" class="space-y-4 pl-4 border-l-2 border-border">
               <!-- Max Requests -->
               <div class="space-y-2">
                 <Label for="maxRequests">Max Requests per Month</Label>
@@ -249,19 +205,12 @@
 
           <!-- Form Actions -->
           <div class="flex justify-between pt-6">
-            <Button
-              type="button"
-              variant="outline"
-              @click="testConnection"
-              :disabled="testing"
-            >
+            <Button type="button" variant="outline" @click="testConnection" :disabled="testing">
               <Zap class="mr-2 h-4 w-4" />
               {{ testing ? "Testing..." : "Test Connection" }}
             </Button>
             <div class="space-x-2">
-              <Button type="button" variant="outline" @click="resetForm">
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" @click="resetForm"> Cancel </Button>
               <Button type="submit" :disabled="saving">
                 {{ saving ? "Saving..." : "Save Changes" }}
               </Button>
@@ -283,9 +232,7 @@
         <div class="space-y-4">
           <div class="flex items-center space-x-4">
             <component
-              :is="
-                plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle
-              "
+              :is="plugin.healthCheck.status === 'healthy' ? CheckCircle : XCircle"
               :class="[
                 'h-8 w-8',
                 plugin.healthCheck.status === 'healthy'
@@ -295,25 +242,16 @@
             />
             <div>
               <p class="font-medium">
-                {{
-                  plugin.healthCheck.status === "healthy"
-                    ? "Healthy"
-                    : "Unhealthy"
-                }}
+                {{ plugin.healthCheck.status === "healthy" ? "Healthy" : "Unhealthy" }}
               </p>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-sm text-neutral-muted">
                 {{ plugin.healthCheck.message }}
               </p>
             </div>
           </div>
 
-          <div
-            v-if="plugin.healthCheck.details"
-            class="bg-background-tertiary rounded-lg p-4"
-          >
-            <pre class="text-xs">{{
-              JSON.stringify(plugin.healthCheck.details, null, 2)
-            }}</pre>
+          <div v-if="plugin.healthCheck.details" class="bg-background-tertiary rounded-lg p-4">
+            <pre class="text-xs">{{ JSON.stringify(plugin.healthCheck.details, null, 2) }}</pre>
           </div>
         </div>
       </CardContent>
@@ -323,26 +261,20 @@
     <Card v-if="plugin?.usage">
       <CardHeader>
         <CardTitle>Usage Statistics</CardTitle>
-        <CardDescription>
-          Track API usage and costs for this plugin
-        </CardDescription>
+        <CardDescription> Track API usage and costs for this plugin </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-6 md:grid-cols-3">
           <!-- Monthly Requests -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">
-              Requests (This Month)
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Requests (This Month)</p>
             <p class="text-2xl font-bold">
               {{ formatNumber(plugin.usage.monthlyUsage?.requests || 0) }}
             </p>
             <Progress
               v-if="limits.maxRequestsPerMonth"
               :value="
-                ((plugin.usage.monthlyUsage?.requests || 0) /
-                  limits.maxRequestsPerMonth) *
-                100
+                ((plugin.usage.monthlyUsage?.requests || 0) / limits.maxRequestsPerMonth) * 100
               "
               class="h-2"
             />
@@ -350,9 +282,7 @@
 
           <!-- Monthly Tokens -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">
-              Tokens (This Month)
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Tokens (This Month)</p>
             <p class="text-2xl font-bold">
               {{ formatNumber(plugin.usage.monthlyUsage?.tokens || 0) }}
             </p>
@@ -360,19 +290,13 @@
 
           <!-- Monthly Cost -->
           <div class="space-y-2">
-            <p class="text-sm font-medium text-muted-foreground">
-              Cost (This Month)
-            </p>
+            <p class="text-sm font-medium text-neutral-muted">Cost (This Month)</p>
             <p class="text-2xl font-bold">
               ${{ (plugin.usage.monthlyUsage?.cost || 0).toFixed(2) }}
             </p>
             <Progress
               v-if="limits.maxCostPerMonth"
-              :value="
-                ((plugin.usage.monthlyUsage?.cost || 0) /
-                  limits.maxCostPerMonth) *
-                100
-              "
+              :value="((plugin.usage.monthlyUsage?.cost || 0) / limits.maxCostPerMonth) * 100"
               class="h-2"
             />
           </div>
@@ -383,22 +307,20 @@
           <h4 class="text-sm font-medium mb-4">All-Time Usage</h4>
           <div class="grid gap-4 md:grid-cols-3 text-sm">
             <div>
-              <span class="text-muted-foreground">Total Requests:</span>
+              <span class="text-neutral-muted">Total Requests:</span>
               <span class="ml-2 font-medium">{{
                 formatNumber(plugin.usage.totalRequests || 0)
               }}</span>
             </div>
             <div>
-              <span class="text-muted-foreground">Total Tokens:</span>
+              <span class="text-neutral-muted">Total Tokens:</span>
               <span class="ml-2 font-medium">{{
                 formatNumber(plugin.usage.totalTokens || 0)
               }}</span>
             </div>
             <div>
-              <span class="text-muted-foreground">Total Cost:</span>
-              <span class="ml-2 font-medium"
-                >${{ (plugin.usage.totalCost || 0).toFixed(2) }}</span
-              >
+              <span class="text-neutral-muted">Total Cost:</span>
+              <span class="ml-2 font-medium">${{ (plugin.usage.totalCost || 0).toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -455,10 +377,7 @@ const showEndpoint = ref(false);
 const pluginId = computed(() => route.params["id"] as string);
 
 const isLLMProvider = computed(() => {
-  return (
-    plugin.value?.type === "llm_provider" ||
-    plugin.value?.type === "embedding_provider"
-  );
+  return plugin.value?.type === "llm_provider" || plugin.value?.type === "embedding_provider";
 });
 
 const availableModels = computed(() => {

@@ -12,7 +12,7 @@
           </Button>
           <div>
             <h1 class="text-xl font-semibold">Conversation Playground</h1>
-            <p class="text-sm text-muted-foreground">Test conversations with AI Assistant</p>
+            <p class="text-sm text-neutral-muted">Test conversations with AI Assistant</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -64,8 +64,8 @@
           </div>
 
           <div v-else-if="messages.length === 0" class="text-center py-12">
-            <MessageSquare class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p class="text-muted-foreground">Send a message to start testing</p>
+            <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
+            <p class="text-neutral-muted">Send a message to start testing</p>
           </div>
 
           <div v-else class="space-y-4">
@@ -133,25 +133,25 @@
             </CardHeader>
             <CardContent class="space-y-3 text-sm">
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Status:</span>
+                <span class="text-neutral-muted">Status:</span>
                 <Badge :variant="orchestratorStatus === 'processing' ? 'default' : 'secondary'">
                   {{ orchestratorStatus }}
                 </Badge>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Last Check:</span>
+                <span class="text-neutral-muted">Last Check:</span>
                 <span>{{ lastOrchestratorCheck || "Never" }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Messages:</span>
+                <span class="text-neutral-muted">Messages:</span>
                 <span>{{ messages.length }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-muted-foreground">Needs Processing:</span>
+                <span class="text-neutral-muted">Needs Processing:</span>
                 <span>{{ conversation?.needs_processing }}</span>
               </div>
               <div v-if="conversation?.playbook_id" class="flex justify-between">
-                <span class="text-muted-foreground">Active Playbook:</span>
+                <span class="text-neutral-muted">Active Playbook:</span>
                 <span class="font-medium">
                   {{ getPlaybookName(conversation.playbook_id) }}
                 </span>
@@ -210,7 +210,7 @@
               <CardTitle class="text-base"> Testing Tips </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul class="text-sm space-y-2 text-muted-foreground">
+              <ul class="text-sm space-y-2 text-neutral-muted">
                 <li class="flex items-start">
                   <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
                   <span>Test different message types to see AI responses</span>
