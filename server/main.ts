@@ -78,7 +78,6 @@ async function startServer() {
     });
   });
 
-
   // Plugin webhook routes - handle incoming webhooks from external services
   server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
     // Set params manually for regex routes
@@ -115,7 +114,7 @@ async function startServer() {
   // Initialize WebSocket server
   // If WS_PORT is different from PORT, run WebSocket on separate port
   if (config.server.wsPort !== config.server.port) {
-    websocketService.initialize(config.server.wsPort);
+    // websocketService.initialize(config.server.wsPort);
   } else {
     websocketService.initialize(httpServer);
   }

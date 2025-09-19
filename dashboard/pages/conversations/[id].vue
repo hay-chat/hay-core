@@ -244,7 +244,8 @@
                     {{ prevConv.subject || prevConv.title }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ formatDate(prevConv.createdAt || prevConv.date) }} • {{ prevConv.status || 'Unknown' }}
+                    {{ formatDate(prevConv.createdAt || prevConv.date) }} •
+                    {{ prevConv.status || "Unknown" }}
                   </div>
                 </div>
               </div>
@@ -292,7 +293,7 @@
                     {{ article.title }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ article.category || 'General' }}
+                    {{ article.category || "General" }}
                   </div>
                 </div>
               </div>

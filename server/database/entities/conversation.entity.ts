@@ -26,6 +26,16 @@ export class Conversation {
 
   @Column({
     type: "enum",
+    enum: ["web", "whatsapp", "instagram", "telegram", "sms", "email"],
+    default: "web",
+  })
+  channel!: "web" | "whatsapp" | "instagram" | "telegram" | "sms" | "email";
+
+  @Column({ type: "jsonb", nullable: true })
+  publicJwk!: Record<string, unknown> | null;
+
+  @Column({
+    type: "enum",
     enum: ["open", "processing", "pending-human", "resolved", "closed"],
     default: "open",
   })
@@ -39,6 +49,9 @@ export class Conversation {
 
   @Column({ type: "timestamptz", nullable: true })
   closed_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastMessageAt!: Date | null;
 
   @Column({ type: "jsonb", nullable: true })
   context!: Record<string, unknown> | null;
@@ -117,7 +130,7 @@ export class Conversation {
 
   async lock(): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
-    const lockDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const lockDuration = 15_000; // 15 seconds
     const lockUntil = new Date(Date.now() + lockDuration);
     await conversationRepository.update(this.id, this.organization_id, {
       processing_locked_until: lockUntil,
@@ -243,7 +256,9 @@ The following tools are available for you to use. You MUST return only valid JSO
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
           const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
           const requiredFields =
-            inputSchema.required && Array.isArray(inputSchema.required) && inputSchema.required.length > 0
+            inputSchema.required &&
+            Array.isArray(inputSchema.required) &&
+            inputSchema.required.length > 0
               ? ` (Required: ${(inputSchema.required as string[]).join(", ")})`
               : "";
 
@@ -321,13 +336,45 @@ The following tools are available for you to use. You MUST return only valid JSO
     content: string;
     type: string;
     metadata?: Record<string, unknown>;
+    sender?: string;
   }): Promise<Message> {
     const { messageRepository } = await import("../../repositories/message.repository");
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+
+    // Handle Customer message cooldown
+    if (messageData.type === MessageType.CUSTOMER) {
+      const { config } = await import("../../config/env");
+
+      // Mark conversation as needing processing
+      await this.setProcessed(false);
+
+      // Set cooldown based on configuration
+      const cooldownUntil = new Date();
+      const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
+      cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
+
+      // Update conversation with cooldown and processing status
+      await conversationRepository.update(this.id, this.organization_id, {
+        status: "open",
+        needs_processing: true,
+        cooldown_until: cooldownUntil,
+        lastMessageAt: new Date(),
+      });
+
+      // Update local instance
+      this.cooldown_until = cooldownUntil;
+      this.needs_processing = true;
+      this.lastMessageAt = new Date();
+      this.status = "open";
+    }
+
+    // Create the message
     return messageRepository.create({
       conversation_id: this.id,
       content: messageData.content,
       type: messageData.type as MessageType,
       metadata: messageData.metadata,
+      sender: messageData.sender,
     });
   }
 

@@ -12,10 +12,16 @@ import { ConversationContext } from "./types";
 
 export const runConversation = async (conversationId: string) => {
   const conversation = await conversationRepository.findById(conversationId);
-
   if (!conversation) {
     throw new Error("Conversation not found");
   }
+
+  console.log(
+    "[Orchestrator] Running conversation",
+    conversationId,
+    conversation?.needs_processing,
+    conversation?.processing_locked_until,
+  );
 
   try {
     // 00. Intialize
@@ -46,17 +52,43 @@ export const runConversation = async (conversationId: string) => {
     const perceptionLayer = new PerceptionLayer();
 
     // 01.1. Get Intent and Sentiment
-
     const { intent, sentiment } = await perceptionLayer.perceive(lastCustomerMessage);
     await lastCustomerMessage.savePerception({
       intent: intent.label,
       sentiment: sentiment.label,
     });
 
-    // Check if user wants to close the conversation
-    if (intent.label === "close_satisfied" || intent.label === "close_unsatisfied") {
+    // Check if user indicated potential closure intent
+    const hasClosureIntent =
+      intent.label === "close_satisfied" || intent.label === "close_unsatisfied";
+
+    // If potential closure detected, validate with full conversation context
+    let shouldClose = false;
+
+    if (hasClosureIntent) {
+      // Get all public messages for full context analysis
+      const publicMessages = await conversation.getPublicMessages();
+
+      // Validate closure intent with full conversation context
+      const { validateConversationClosure } = await import("./conversation-utils");
+      const closureValidation = await validateConversationClosure(
+        publicMessages,
+        intent.label,
+        conversation.playbook_id !== null,
+      );
+
+      shouldClose = closureValidation.shouldClose;
+
+      if (!shouldClose) {
+        console.log(
+          `[Orchestrator] Closure intent detected but validation failed: ${closureValidation.reason}`,
+        );
+      }
+    }
+
+    if (shouldClose) {
       console.log(
-        `[Orchestrator] User indicated closure intent (${intent.label}), marking conversation as resolved`,
+        `[Orchestrator] User indicated closure intent (${intent.label}) with confidence ${intent.score}, marking conversation as resolved`,
       );
 
       // Generate a title for the conversation before closing

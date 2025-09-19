@@ -136,8 +136,13 @@ export class PluginAssetService {
     const { pluginName, assetPath } = req.params;
     const cacheKey = `${pluginName}/${assetPath}`;
 
-    // Check cache first
-    if (this.assetCache.has(cacheKey)) {
+    // Skip cache for widget.js in development
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    const isWidgetJs = assetPath === "widget.js";
+    const shouldUseCache = !isDevelopment || !isWidgetJs;
+
+    // Check cache first (unless it's widget.js in development)
+    if (shouldUseCache && this.assetCache.has(cacheKey)) {
       const cached = this.assetCache.get(cacheKey)!;
 
       // Check if-none-match header for etag
@@ -186,18 +191,20 @@ export class PluginAssetService {
       const etag = this.generateETag(content);
       const lastModified = new Date();
 
-      // Cache the asset
-      this.assetCache.set(cacheKey, {
-        content,
-        contentType,
-        etag,
-        lastModified,
-      });
+      // Cache the asset (unless it's widget.js in development)
+      if (shouldUseCache) {
+        this.assetCache.set(cacheKey, {
+          content,
+          contentType,
+          etag,
+          lastModified,
+        });
 
-      // Set cache timeout
-      setTimeout(() => {
-        this.assetCache.delete(cacheKey);
-      }, this.cacheTimeout);
+        // Set cache timeout
+        setTimeout(() => {
+          this.assetCache.delete(cacheKey);
+        }, this.cacheTimeout);
+      }
 
       // Check if-none-match header for etag
       if (req.headers["if-none-match"] === etag) {

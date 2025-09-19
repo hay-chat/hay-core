@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType } from "../../../database/entities/message.entity";
@@ -9,7 +9,6 @@ import { generateConversationTitle } from "../../../orchestrator/conversation-ut
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { config } from "../../../config/env";
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
@@ -17,10 +16,11 @@ const conversationRepository = new ConversationRepository();
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
-  playbook_id: z.string().uuid().optional(),
+
   metadata: z.record(z.any()).optional(),
   status: z.enum(["open", "processing", "pending-human", "resolved", "closed"]).optional(),
-  customer_id: z.string().uuid().optional(),
+  customerId: z.string().uuid().optional(),
+  organizationId: z.string().uuid().optional(),
 });
 
 const updateConversationSchema = z.object({
@@ -83,28 +83,34 @@ export const conversationsRouter = t.router({
       return conversations;
     }),
 
-  get: authenticatedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      const conversation = await conversationService.getConversation(input.id, ctx.organizationId!);
+  get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
+    // For public access, try to get conversation without org ID restriction for now
+    // In production, you might want to check a public flag or use session tokens
+    const organizationId =
+      ctx.organizationId || process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    const conversation = await conversationService.getConversation(input.id, organizationId);
 
-      if (!conversation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Conversation not found",
-        });
-      }
+    if (!conversation) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Conversation not found",
+      });
+    }
 
-      return conversation;
-    }),
+    return conversation;
+  }),
 
-  create: authenticatedProcedure
-    .input(createConversationSchema)
-    .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationService.createConversation(ctx.organizationId!, input);
+  create: publicProcedure.input(createConversationSchema).mutation(async ({ ctx, input }) => {
+    // For public access, use organization ID from input or a default
+    const organizationId =
+      ctx.organizationId ||
+      input.metadata?.organizationId ||
+      process.env.DEFAULT_ORG_ID ||
+      "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    const conversation = await conversationService.createConversation(organizationId, input);
 
-      return conversation;
-    }),
+    return conversation;
+  }),
 
   update: authenticatedProcedure
     .input(
@@ -194,13 +200,11 @@ export const conversationsRouter = t.router({
       });
     }
 
-    if (input.message.type === MessageType.CUSTOMER) {
-      conversation.setProcessed(false);
-    }
-
+    // The addMessage method now handles cooldown logic for Customer messages
     const message = await conversation.addMessage({
       content: input.message.content,
       type: input.message.type,
+      metadata: input.message.usage_metadata,
     });
 
     // Resolution detection is now handled by the perception layer
@@ -257,11 +261,8 @@ export const conversationsRouter = t.router({
     return response;
   }),
 
-  sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ ctx, input }) => {
-    const conversation = await conversationService.getConversation(
-      input.conversationId,
-      ctx.organizationId!,
-    );
+  sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ input }) => {
+    const conversation = await conversationRepository.findById(input.conversationId);
 
     if (!conversation) {
       throw new TRPCError({
@@ -273,32 +274,14 @@ export const conversationsRouter = t.router({
     // Add the message
     const messageType = input.role === "assistant" ? MessageType.BOT_AGENT : MessageType.CUSTOMER;
 
-    const message = await conversationService.addMessage(
-      input.conversationId,
-      ctx.organizationId!,
-      {
-        content: input.content,
-        type: messageType,
+    // The addMessage method now handles cooldown logic for Customer messages
+    const message = await conversation.addMessage({
+      content: input.content,
+      type: messageType,
+      metadata: {
         sender: input.role || "user",
       },
-    );
-
-    // Mark conversation as needing processing if it's a user message
-    if (input.role === "user" || !input.role) {
-      // Set cooldown based on configuration
-      // This allows the user to keep typing, and we'll process when they stop
-      const cooldownUntil = new Date();
-      const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
-      cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
-
-      // console.log(`[Conversations] Setting cooldown for ${cooldownSeconds} seconds (until ${cooldownUntil.toISOString()})`);
-
-      await conversationService.updateConversation(input.conversationId, ctx.organizationId!, {
-        status: "open",
-        needs_processing: true,
-        cooldown_until: cooldownUntil,
-      });
-    }
+    });
 
     return message;
   }),

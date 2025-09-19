@@ -7,6 +7,7 @@ import { conversationsRouter } from "./conversations";
 import { embeddingsRouter } from "./embeddings";
 import { customersRouter } from "./customers";
 import { pluginsRouter } from "./plugins";
+import { webConversationsRouter } from "./web-conversations";
 
 const AppRouter = router({
   auth: authRouter,
@@ -17,6 +18,7 @@ const AppRouter = router({
   embeddings: embeddingsRouter,
   customers: customersRouter,
   plugins: pluginsRouter,
+  webConversations: webConversationsRouter,
 });
 
 export const v1Router = AppRouter;

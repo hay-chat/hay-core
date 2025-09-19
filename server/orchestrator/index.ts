@@ -1,5 +1,4 @@
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { MessageRepository } from "@server/repositories/message.repository";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { config } from "@server/config/env";
 import { runConversation } from "./run";
@@ -11,12 +10,10 @@ import {
 
 export class Orchestrator {
   private conversationRepository: ConversationRepository;
-  private messageRepository: MessageRepository;
 
   constructor() {
     console.log("Orchestrator initialized with v2 implementation");
     this.conversationRepository = new ConversationRepository();
-    this.messageRepository = new MessageRepository();
   }
 
   async loop() {
@@ -68,7 +65,7 @@ export class Orchestrator {
       for (const conversation of openConversations) {
         try {
           // Get the last message in the conversation
-          const messages = await this.messageRepository.findByConversation(conversation.id);
+          const messages = await conversation.getMessages();
 
           if (messages.length === 0) {
             console.log(`[Orchestrator] Conversation ${conversation.id} has no messages, skipping`);

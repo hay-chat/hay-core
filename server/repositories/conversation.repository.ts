@@ -1,4 +1,4 @@
-import { Repository, SelectQueryBuilder } from "typeorm";
+import { Repository, SelectQueryBuilder, In } from "typeorm";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
@@ -330,7 +330,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
-        type: MessageType.CUSTOMER,
+        type: In([MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT]),
       },
       order: { created_at: "ASC" },
     });

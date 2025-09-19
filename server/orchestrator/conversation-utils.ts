@@ -28,7 +28,7 @@ export async function generateConversationTitle(
     }
 
     // Get messages for context
-    const messages = await messageRepository.findByConversation(conversationId);
+    const messages = await conversation.getMessages();
     const publicMessages = messages.filter(
       (m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT,
     );
@@ -88,7 +88,7 @@ export async function sendInactivityWarning(
     }
 
     // Get recent messages for context
-    const messages = await messageRepository.findByConversation(conversationId);
+    const messages = await conversation.getMessages();
     const recentMessages = messages
       .filter((m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT)
       .slice(-5); // Last 5 messages
@@ -119,8 +119,7 @@ Do not include any system-like language about "automatic closure" or timeouts.`;
     });
 
     // Add the warning message to the conversation
-    await messageRepository.create({
-      conversation_id: conversationId,
+    await conversation.addMessage({
       content: response.trim(),
       type: MessageType.BOT_AGENT,
       sender: "system",
@@ -161,7 +160,7 @@ export async function closeInactiveConversation(
 
     if (sendMessage) {
       // Get recent messages for context
-      const messages = await messageRepository.findByConversation(conversationId);
+      const messages = await conversation.getMessages();
       const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
       let closureMessage: string;
@@ -194,10 +193,9 @@ Keep it to 1-2 sentences.`;
       }
 
       // Add closure message
-      await messageRepository.create({
-        conversation_id: conversationId,
+      await conversation.addMessage({
         content: closureMessage.trim(),
-        type: MessageType.SYSTEM,
+        type: MessageType.BOT_AGENT,
         sender: "system",
         metadata: {
           reason: "inactivity_timeout",
@@ -251,5 +249,72 @@ export async function checkForClosureIntent(
   } catch (error) {
     console.error("Error checking closure intent:", error);
     return false;
+  }
+}
+
+/**
+ * Validate if a conversation should actually be closed based on full context
+ */
+export async function validateConversationClosure(
+  publicMessages: any[],
+  detectedIntent: string,
+  hasActivePlaybook: boolean,
+): Promise<{ shouldClose: boolean; reason: string }> {
+  try {
+    // Create conversation transcript for analysis
+    const transcript = publicMessages
+      .map((m) => {
+        const role = m.type === MessageType.CUSTOMER ? "Customer" : "Agent";
+        return `${role}: ${m.content}`;
+      })
+      .join("\n");
+
+    const validationPrompt = `Analyze this conversation to determine if it should be closed.
+
+CONVERSATION TRANSCRIPT:
+${transcript}
+
+CURRENT SITUATION:
+- The system detected a potential closure intent: "${detectedIntent}"
+- There is ${hasActivePlaybook ? "an active playbook/workflow" : "no active playbook"}
+- The last message from the customer triggered this closure check
+
+VALIDATION TASK:
+Determine if this conversation should ACTUALLY be closed. Consider:
+
+1. Is the customer explicitly indicating they want to END the conversation?
+2. Or are they just providing information/feedback as part of an ongoing dialogue?
+3. If there's an active playbook (like a cancellation flow), is the customer trying to exit it, or are they responding to questions within it?
+
+IMPORTANT GUIDELINES:
+- "It's too expensive" when asked "why do you want to cancel?" is NOT a closure - it's providing requested information
+- "Not interested" or "No thanks" might decline an offer but doesn't necessarily mean end conversation
+- Only mark for closure if the customer is clearly done with the entire interaction
+- When a playbook is active, assume the customer wants to complete it unless they explicitly say otherwise
+
+Respond with a JSON object containing:
+- shouldClose: boolean (true only if conversation should definitely end)
+- reason: string (brief explanation of your decision)`;
+
+    const response = await llmService.invoke({
+      prompt: validationPrompt,
+      jsonSchema: {
+        type: "object",
+        properties: {
+          shouldClose: { type: "boolean" },
+          reason: { type: "string" },
+        },
+        required: ["shouldClose", "reason"],
+      },
+    });
+
+    return JSON.parse(response);
+  } catch (error) {
+    console.error("Error validating conversation closure:", error);
+    // Default to not closing on error
+    return {
+      shouldClose: false,
+      reason: "Validation error - defaulting to keep conversation open",
+    };
   }
 }

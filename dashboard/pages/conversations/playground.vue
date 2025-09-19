@@ -385,8 +385,8 @@ const createTestConversation = async () => {
       metadata: {
         source: "playground",
         test_mode: true,
+        playbookId: selectedPlaybookId.value || undefined,
       },
-      playbook_id: selectedPlaybookId.value || undefined,
       status: "open",
     });
 
@@ -545,11 +545,7 @@ const pollConversation = async () => {
 
     // Update orchestrator status
     lastOrchestratorCheck.value = new Date().toLocaleTimeString();
-    if (response.status === "processing") {
-      orchestratorStatus.value = "processing";
-    } else {
-      orchestratorStatus.value = "idle";
-    }
+    orchestratorStatus.value = response.status;
   } catch (error) {
     console.error("Failed to poll conversation:", error);
   }

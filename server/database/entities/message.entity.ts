@@ -20,6 +20,11 @@ export enum MessageType {
   PLAYBOOK = "Playbook",
 }
 
+export enum MessageDirection {
+  IN = "in",
+  OUT = "out",
+}
+
 export enum MessageSentiment {
   POSITIVE = "positive",
   NEUTRAL = "neutral",
@@ -66,6 +71,16 @@ export class Message {
     enum: MessageType,
   })
   type!: MessageType;
+
+  @Column({
+    type: "enum",
+    enum: MessageDirection,
+    default: MessageDirection.IN,
+  })
+  direction!: MessageDirection;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  providerMessageId!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
   usage_metadata!: Record<string, unknown> | null;

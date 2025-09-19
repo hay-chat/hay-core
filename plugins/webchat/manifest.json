@@ -23,12 +23,12 @@
       "publicAssets": [
         {
           "path": "widget.js",
-          "file": "dist/widget/widget.js",
+          "file": "src/widget/widget.js",
           "type": "script"
         },
         {
           "path": "widget.css",
-          "file": "dist/widget/widget.css",
+          "file": "src/widget/widget.css",
           "type": "stylesheet"
         }
       ],
