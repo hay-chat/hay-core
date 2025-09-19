@@ -172,24 +172,39 @@ export class Orchestrator {
             lastUserMessage.intent === "close_satisfied" ||
             lastUserMessage.intent === "close_unsatisfied"
           ) {
-            console.log(
-              `[Orchestrator] Conversation ${conversation.id} has closure intent (${lastUserMessage.intent}), closing`,
+            // Validate closure with full conversation context
+            const publicMessages = await conversation.getPublicMessages();
+            const { validateConversationClosure } = await import("./conversation-utils");
+            const closureValidation = await validateConversationClosure(
+              publicMessages,
+              lastUserMessage.intent,
+              conversation.playbook_id !== null,
             );
-            await this.conversationRepository.update(
-              conversation.id,
-              conversation.organization_id,
-              {
-                status: "resolved",
-                ended_at: now,
-                resolution_metadata: {
-                  resolved: lastUserMessage.intent === "close_satisfied",
-                  confidence: 1.0,
-                  reason: `user_indicated_${lastUserMessage.intent}`,
+
+            if (closureValidation.shouldClose) {
+              console.log(
+                `[Orchestrator] Conversation ${conversation.id} has validated closure intent (${lastUserMessage.intent}), closing. Reason: ${closureValidation.reason}`,
+              );
+              await this.conversationRepository.update(
+                conversation.id,
+                conversation.organization_id,
+                {
+                  status: "resolved",
+                  ended_at: now,
+                  resolution_metadata: {
+                    resolved: lastUserMessage.intent === "close_satisfied",
+                    confidence: 1.0,
+                    reason: `user_indicated_${lastUserMessage.intent}`,
+                  },
                 },
-              },
-            );
-            // Generate title for closed conversation
-            await generateConversationTitle(conversation.id, conversation.organization_id);
+              );
+              // Generate title for closed conversation
+              await generateConversationTitle(conversation.id, conversation.organization_id);
+            } else {
+              console.log(
+                `[Orchestrator] Conversation ${conversation.id} has closure intent but validation failed: ${closureValidation.reason}. Keeping open.`,
+              );
+            }
           }
         } catch (error) {
           console.error(`[Orchestrator] Error checking conversation ${conversation.id}:`, error);

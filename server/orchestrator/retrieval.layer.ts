@@ -112,9 +112,6 @@ export class RetrievalLayer {
       // Filter out low relevance results
       const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.4);
 
-      console.log("[RetrievalLayer] Filtered results", filteredResults);
-      console.log("[RetrievalLayer] Search results", searchResults);
-
       return filteredResults.map((result) => ({
         id: result.documentId,
         similarity: result.similarity || 0,
