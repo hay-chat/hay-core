@@ -33,6 +33,9 @@ export class PluginManagerService {
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
     console.log("📦 Plugin registry loaded:");
+
+    // Initialize auto-activated plugins
+    await this.initializeAutoActivatedPlugins();
   }
 
   /**
@@ -299,6 +302,42 @@ export class PluginManagerService {
 
     const manifest = plugin.manifest as HayPluginManifest;
     return manifest.capabilities?.mcp?.startCommand;
+  }
+
+  /**
+   * Initialize auto-activated plugins
+   */
+  private async initializeAutoActivatedPlugins(): Promise<void> {
+    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
+
+    for (const plugin of this.registry.values()) {
+      const manifest = plugin.manifest as HayPluginManifest;
+
+      if (manifest.autoActivate && manifest.trpcRouter) {
+        try {
+          // Dynamically import the plugin's router
+          // The pluginId might be like "hay-plugin-cloud" or just "cloud"
+          let pluginDirName = plugin.pluginId;
+          if (plugin.pluginId.startsWith("hay-plugin-")) {
+            pluginDirName = plugin.pluginId.replace("hay-plugin-", "");
+          }
+
+          const routerPath = path.join(this.pluginsDir, pluginDirName, manifest.trpcRouter);
+          console.log(`Loading router from: ${routerPath}`);
+          const routerModule = await import(routerPath);
+          const pluginRouter = routerModule.default || routerModule.cloudRouter || routerModule.router;
+
+          if (pluginRouter) {
+            // Register with the manifest ID, not the directory name
+            const registerId = manifest.id || plugin.pluginId;
+            pluginRouterRegistry.registerRouter(registerId, pluginRouter);
+            console.log(`✅ Auto-activated router for plugin: ${plugin.name} with ID: ${registerId}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Could not load router for plugin ${plugin.name}:`, error);
+        }
+      }
+    }
   }
 
   /**

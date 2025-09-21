@@ -479,7 +479,7 @@ export const documentsRouter = t.router({
       });
 
       // Start the import process asynchronously
-      processWebImport(ctx.organizationId, job.id, input.url, selectedPages, input.metadata);
+      processWebImport(ctx.organizationId, job.id, input.url, selectedPages as any, input.metadata);
 
       return {
         jobId: job.id,

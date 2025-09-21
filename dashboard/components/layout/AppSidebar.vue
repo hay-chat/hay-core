@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Home, MessageSquare, FileText, Users, Settings, BookOpen, Puzzle } from "lucide-vue-next";
 
 import {
@@ -36,6 +36,7 @@ import NavUser from "./NavUser.vue";
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
+import { Hay } from "@/utils/api";
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
@@ -43,6 +44,9 @@ const appStore = useAppStore();
 
 // Get current route
 const route = useRoute();
+
+// Plugin menu items
+const pluginMenuItems = ref<any[]>([]);
 
 // Get user data from store with validation
 const user = computed(() => {
@@ -168,12 +172,25 @@ const navMain = computed(() => [
         url: "/settings/security",
         isActive: route.path === "/settings/security",
       },
-      {
-        title: "Billing",
-        url: "/settings/billing",
-        isActive: route.path === "/settings/billing",
-      },
+      // Add plugin menu items for settings
+      ...pluginMenuItems.value
+        .filter((item) => item.parent === "settings")
+        .map((item) => ({
+          title: item.title,
+          url: item.url,
+          isActive: route.path === item.url,
+        })),
     ],
   },
 ]);
+
+// Fetch plugin menu items
+onMounted(async () => {
+  try {
+    const response = await Hay.plugins.getMenuItems.query();
+    pluginMenuItems.value = response.items || [];
+  } catch (error) {
+    console.error("Failed to fetch plugin menu items:", error);
+  }
+});
 </script>

@@ -4,6 +4,22 @@ node_modules
 plugins/*/dist/
 plugins/*/*/dist/
 
+# Compiled JS files (should only be in dist)
+server/**/*.js
+server/**/*.js.map
+plugins/**/*.js
+plugins/**/*.js.map
+!plugins/*/src/widget/*.js
+!plugins/webchat/src/widget/widget.js
+
+# Cloud plugin (development)
+plugins/cloud/
+
+# Symlinked plugin pages (created dynamically by plugin system)
+dashboard/pages/plugins/*/
+!dashboard/pages/plugins/index.vue
+!dashboard/pages/plugins/[id].vue
+
 # Logs
 .eslintcache
 logs

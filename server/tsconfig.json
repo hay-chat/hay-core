@@ -3,15 +3,15 @@
   "compilerOptions": {
     "module": "commonjs",
     "outDir": "./dist",
-    "rootDir": "../",
+    "rootDir": "./",
     "noEmit": false,
     "types": ["node"],
-    "baseUrl": "../",
+    "baseUrl": "./",
     "paths": {
-      "@server/*": ["./server/*"],
-      "@plugins/*": ["./plugins/*"]
+      "@server/*": ["./*"],
+      "@plugins/*": ["../plugins/*"]
     }
   },
-  "include": ["./**/*.ts", "../plugins/**/*.ts"],
+  "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.example.ts"]
 }

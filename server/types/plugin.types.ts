@@ -3,9 +3,40 @@ export interface HayPluginManifest {
   name: string;
   description: string;
   version: string;
-  type: Array<"mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel">;
+  type: Array<
+    "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel" | "system"
+  >;
   entry: string;
+  autoActivate?: boolean;
+  invisible?: boolean;
+  menuItems?: Array<{
+    id: string;
+    title: string;
+    url: string;
+    icon?: string;
+    parent?: "settings" | "integrations" | "root";
+    position?: number;
+  }>;
+  hooks?: string[];
+  apiEndpoints?: Array<{
+    path: string;
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    handler: string;
+  }>;
+  trpcRouter?: string;
+  services?: Array<{
+    name: string;
+    path: string;
+    singleton?: boolean;
+  }>;
+  dashboardPages?: Array<{
+    route: string;
+    component: string;
+  }>;
   capabilities?: {
+    system?: {
+      database?: boolean;
+    };
     document_importer?: {
       name: string;
       description: string;
@@ -56,6 +87,7 @@ export interface HayPluginManifest {
   permissions?: {
     env?: string[];
     scopes?: string[];
+    database?: boolean;
   };
   configSchema?: Record<
     string,

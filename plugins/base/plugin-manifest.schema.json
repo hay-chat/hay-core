@@ -15,8 +15,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^hay-plugin-[a-z0-9-]+$",
-      "description": "Unique identifier for the plugin (must start with 'hay-plugin-')"
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique identifier for the plugin (alphanumeric and hyphens only)"
     },
     "name": {
       "type": "string",

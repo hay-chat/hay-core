@@ -70,7 +70,7 @@ export const playbooksRouter = t.router({
     }),
 
   create: authenticatedProcedure.input(createPlaybookSchema).mutation(async ({ ctx, input }) => {
-    const playbook = await playbookService.createPlaybook(ctx.organizationId!, input);
+    const playbook = await playbookService.createPlaybook(ctx.organizationId!, input as any);
     return playbook;
   }),
 

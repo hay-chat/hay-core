@@ -48,6 +48,22 @@ export class Organization extends BaseEntity {
   @Column({ type: "varchar", length: 255, nullable: true })
   billingEmail?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  contactEmail?: string;
+
+  // Stripe fields
+  @Column({ type: "varchar", length: 255, nullable: true })
+  stripeCustomerId?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  stripeSubscriptionId?: string;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  stripePlanId?: string;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  stripeSubscriptionStatus?: string;
+
   // Relationships
   @OneToMany(() => User, (user) => user.organization)
   users!: User[];

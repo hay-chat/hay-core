@@ -33,7 +33,6 @@ async function startServer() {
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
   const { pluginRouteService } = await import("@server/services/plugin-route.service");
   const { websocketService } = await import("@server/services/websocket.service");
-  const { extensionLoader } = await import("@server/services/extensions/extension-loader");
 
   const server = express();
 
@@ -100,15 +99,25 @@ async function startServer() {
     });
   });
 
-  // Configure extension loader before setting up tRPC
-  extensionLoader.setApp(server);
-  extensionLoader.setRouter(appRouter);
+  // Initialize plugin system BEFORE creating the router
+  if (dbConnected) {
+    try {
+      await pluginManagerService.initialize();
+      console.log("🔌 Plugin manager initialized");
+    } catch (error) {
+      console.error("Failed to initialize plugin system:", error);
+    }
+  }
+
+  // Create dynamic router with plugin routes (after plugins are loaded)
+  const { createV1Router } = await import("@server/routes/v1");
+  const dynamicRouter = createV1Router();
 
   // Add tRPC middleware with context
   server.use(
     "/v1",
     createExpressMiddleware({
-      router: appRouter,
+      router: dynamicRouter,
       createContext,
     }),
   );
@@ -146,10 +155,12 @@ async function startServer() {
       orchestratorWorker.start(config.orchestrator.interval); // Check every second
       console.log("🤖 Orchestrator worker started");
 
-      // Initialize plugin system
+      // Initialize plugin pages management (plugin system already initialized)
       try {
-        await pluginManagerService.initialize();
-        console.log("🔌 Plugin manager initialized");
+        // Initialize plugin pages management
+        const { pluginPagesService } = await import("./services/plugin-pages.service");
+        await pluginPagesService.initialize();
+        console.log("📄 Plugin pages synced with dashboard");
 
         // Start plugin route service cleanup
         pluginRouteService.startCleanup();
@@ -163,8 +174,6 @@ async function startServer() {
         // This improves scalability and resource usage
         console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
 
-        // Load extensions after plugin system
-        await extensionLoader.loadExtensions();
       } catch (error) {
         console.error("Failed to initialize plugin system:", error);
       }
@@ -177,7 +186,6 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await extensionLoader.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
   });
@@ -187,7 +195,6 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await extensionLoader.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
   });

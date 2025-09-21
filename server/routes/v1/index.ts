@@ -9,8 +9,10 @@ import { customersRouter } from "./customers";
 import { pluginsRouter } from "./plugins";
 import { webConversationsRouter } from "./web-conversations";
 import { analyticsRouter } from "./analytics";
+import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
-const AppRouter = router({
+// Core routers - always available
+const coreRouters = {
   auth: authRouter,
   documents: documentsRouter,
   agents: agentsRouter,
@@ -21,8 +23,15 @@ const AppRouter = router({
   plugins: pluginsRouter,
   webConversations: webConversationsRouter,
   analytics: analyticsRouter,
-});
+};
 
-export const v1Router = AppRouter;
+// Create v1Router with core + plugin routers
+// Plugins will register their routers dynamically
+export const createV1Router = () => {
+  return pluginRouterRegistry.createMergedRouter(coreRouters);
+};
+
+// Export initial router (will be updated when plugins register)
+export const v1Router = router(coreRouters);
 
 export type V1Router = typeof v1Router;

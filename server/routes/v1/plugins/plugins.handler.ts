@@ -11,65 +11,60 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 /**
  * Get all available plugins
  */
-export const getAllPlugins = authenticatedProcedure
-  .query(async ({ ctx }) => {
-    const plugins = pluginManagerService.getAllPlugins();
-    
-    // Get enabled instances for this organization
-    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
-    const enabledPluginIds = new Set(instances.filter(i => i.enabled).map(i => i.pluginId));
-    
-    // Debug logging
-    console.log("🔍 [HAY DEBUG] getAllPlugins:");
-    console.log("  - Registry plugins:", plugins.map(p => ({ id: p.id, pluginId: p.pluginId, name: p.name })));
-    console.log("  - Enabled instances:", instances.filter(i => i.enabled).map(i => ({ pluginId: i.pluginId })));
-    console.log("  - EnabledPluginIds Set:", Array.from(enabledPluginIds));
-    
-    return plugins.map(plugin => {
-      const manifest = plugin.manifest as HayPluginManifest;
-      const result = {
-        id: plugin.pluginId,  // Use pluginId as the identifier for frontend
-        dbId: plugin.id,      // Keep database ID for reference
-        name: plugin.name,
-        version: plugin.version,
-        type: manifest.type,
-        description: manifest.configSchema 
-          ? Object.values(manifest.configSchema)[0]?.description 
-          : `${plugin.name} plugin`,
-        installed: plugin.installed,
-        built: plugin.built,
-        enabled: enabledPluginIds.has(plugin.id),
-        hasConfiguration: !!manifest.configSchema,
-        hasCustomUI: !!manifest.ui?.configuration,
-        capabilities: manifest.capabilities,
-        features: manifest.capabilities?.chat_connector?.features || {},
-      };
-      console.log(`  - Returning plugin ${plugin.name}:`, { id: result.id, dbId: result.dbId, enabled: result.enabled });
-      return result;
-    });
+export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
+  const plugins = pluginManagerService.getAllPlugins();
+
+  // Get enabled instances for this organization
+  const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+  const enabledPluginIds = new Set(instances.filter((i) => i.enabled).map((i) => i.pluginId));
+
+  return plugins.map((plugin) => {
+    const manifest = plugin.manifest as HayPluginManifest;
+    const result = {
+      id: plugin.pluginId, // Use pluginId as the identifier for frontend
+      dbId: plugin.id, // Keep database ID for reference
+      name: plugin.name,
+      version: plugin.version,
+      type: manifest.type,
+      description: manifest.configSchema
+        ? Object.values(manifest.configSchema)[0]?.description
+        : `${plugin.name} plugin`,
+      installed: plugin.installed,
+      built: plugin.built,
+      enabled: enabledPluginIds.has(plugin.id),
+      hasConfiguration: !!manifest.configSchema,
+      hasCustomUI: !!manifest.ui?.configuration,
+      capabilities: manifest.capabilities,
+      features: manifest.capabilities?.chat_connector?.features || {},
+    };
+
+    return result;
   });
+});
 
 /**
  * Get a specific plugin by ID
  */
 export const getPlugin = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
   .query(async ({ input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
-    
+
     if (!plugin) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
       });
     }
-    
+
     const manifest = plugin.manifest as HayPluginManifest;
     return {
-      id: plugin.pluginId,  // Use pluginId as the identifier
-      dbId: plugin.id,      // Keep database ID for reference
+      id: plugin.pluginId, // Use pluginId as the identifier
+      dbId: plugin.id, // Keep database ID for reference
       name: plugin.name,
       version: plugin.version,
       type: manifest.type,
@@ -82,69 +77,70 @@ export const getPlugin = authenticatedProcedure
 /**
  * Get plugin instances for the organization
  */
-export const getPluginInstances = authenticatedProcedure
-  .query(async ({ ctx }) => {
-    return await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
-  });
+export const getPluginInstances = authenticatedProcedure.query(async ({ ctx }) => {
+  return await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+});
 
 /**
  * Enable a plugin for the organization
  */
 export const enablePlugin = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-    configuration: z.record(z.any()).optional(),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+      configuration: z.record(z.any()).optional(),
+    }),
+  )
   .mutation(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
-    
+
     if (!plugin) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
       });
     }
-    
+
     try {
       // Check if plugin needs installation
       if (pluginManagerService.needsInstallation(input.pluginId)) {
         console.log(`🚀 [HAY] Starting installation for ${plugin.name}...`);
         await pluginManagerService.installPlugin(input.pluginId);
       }
-      
+
       // Check if plugin needs building
       if (pluginManagerService.needsBuilding(input.pluginId)) {
         console.log(`🚀 [HAY] Starting build for ${plugin.name}...`);
         await pluginManagerService.buildPlugin(input.pluginId);
       }
-      
+
       // Only enable plugin if installation and build succeeded
       console.log(`🚀 [HAY] Enabling ${plugin.name} for organization...`);
       const instance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
-        input.configuration || {}
+        input.configuration || {},
       );
-      
+
       console.log(`✅ [HAY OK] Plugin ${plugin.name} successfully enabled`);
-      
+
       return {
         success: true,
         instance,
       };
     } catch (error) {
       console.error(`❌ [HAY FAILED] Failed to enable plugin ${plugin.name}:`, error);
-      
+
       // Extract the most relevant error message
-      let errorMessage = 'Unknown error';
+      let errorMessage = "Unknown error";
       if (error instanceof Error) {
         // Clean up the error message for the user
         errorMessage = error.message
-          .replace(/Failed to \w+ plugin hay-plugin-\w+: /, '') // Remove redundant prefix
-          .replace(/Error: /, '') // Remove Error: prefix
-          .replace(/Command failed: /, 'Command failed: '); // Keep command failed for clarity
+          .replace(/Failed to \w+ plugin hay-plugin-\w+: /, "") // Remove redundant prefix
+          .replace(/Error: /, "") // Remove Error: prefix
+          .replace(/Command failed: /, "Command failed: "); // Keep command failed for clarity
       }
-      
+
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: `Failed to enable ${plugin.name}: ${errorMessage}`,
@@ -156,9 +152,11 @@ export const enablePlugin = authenticatedProcedure
  * Disable a plugin for the organization
  */
 export const disablePlugin = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
   .mutation(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
     if (!plugin) {
@@ -167,12 +165,9 @@ export const disablePlugin = authenticatedProcedure
         message: `Plugin ${input.pluginId} not found`,
       });
     }
-    
-    await pluginInstanceRepository.disablePlugin(
-      ctx.organizationId!,
-      input.pluginId
-    );
-    
+
+    await pluginInstanceRepository.disablePlugin(ctx.organizationId!, input.pluginId);
+
     return {
       success: true,
     };
@@ -182,10 +177,12 @@ export const disablePlugin = authenticatedProcedure
  * Configure a plugin
  */
 export const configurePlugin = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-    configuration: z.record(z.any()),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+      configuration: z.record(z.any()),
+    }),
+  )
   .mutation(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
     if (!plugin) {
@@ -198,7 +195,7 @@ export const configurePlugin = authenticatedProcedure
     const manifest = plugin.manifest as HayPluginManifest;
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
-      input.pluginId
+      input.pluginId,
     );
 
     // When updating configuration, we need to handle partial updates properly
@@ -211,7 +208,7 @@ export const configurePlugin = authenticatedProcedure
       // Merge with new config, preserving non-updated encrypted fields
       for (const [key, value] of Object.entries(input.configuration)) {
         // If the value is masked (all asterisks), keep the existing value
-        if (typeof value === 'string' && /^\*+$/.test(value)) {
+        if (typeof value === "string" && /^\*+$/.test(value)) {
           finalConfig[key] = existingDecrypted[key];
         }
       }
@@ -229,7 +226,7 @@ export const configurePlugin = authenticatedProcedure
       const newInstance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
-        finalConfig
+        finalConfig,
       );
 
       return {
@@ -250,9 +247,11 @@ export const configurePlugin = authenticatedProcedure
  * Get plugin configuration
  */
 export const getPluginConfiguration = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
   .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
     if (!plugin) {
@@ -264,7 +263,7 @@ export const getPluginConfiguration = authenticatedProcedure
 
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
-      input.pluginId
+      input.pluginId,
     );
 
     const manifest = plugin.manifest as HayPluginManifest;
@@ -314,19 +313,21 @@ export const getPluginConfiguration = authenticatedProcedure
  * Get UI template for plugin configuration
  */
 export const getPluginUITemplate = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-  }))
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
   .query(async ({ input }) => {
     const template = await pluginUIService.getConfigurationTemplate(input.pluginId);
-    
+
     if (!template) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `No UI template found for plugin ${input.pluginId}`,
       });
     }
-    
+
     return {
       template,
       type: "vue",
@@ -336,51 +337,99 @@ export const getPluginUITemplate = authenticatedProcedure
 /**
  * Get all available MCP tools from enabled plugins
  */
-export const getMCPTools = authenticatedProcedure
-  .query(async ({ ctx }) => {
-    // Get all enabled plugin instances for this organization
-    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
-    const enabledInstances = instances.filter(i => i.enabled);
-    
-    // Get all plugins and filter to only enabled ones
-    const allPlugins = pluginManagerService.getAllPlugins();
-    const enabledPluginIds = new Set(enabledInstances.map(i => i.pluginId));
-    
-    const mcpTools: Array<{
-      id: string;
-      name: string;
-      label: string;
-      description: string;
-      pluginId: string;
-      pluginName: string;
-    }> = [];
-    
-    // Process each enabled plugin
-    for (const plugin of allPlugins) {
-      // Check if this plugin is enabled for the organization
-      if (!enabledPluginIds.has(plugin.id)) {
-        continue;
-      }
-      
-      const manifest = plugin.manifest as HayPluginManifest;
-      
-      // Check if plugin has MCP capabilities with tools
-      if (!manifest.capabilities?.mcp?.tools) {
-        continue;
-      }
-      
-      // Extract tools from this plugin
-      for (const tool of manifest.capabilities.mcp.tools) {
-        mcpTools.push({
-          id: `${plugin.pluginId}:${tool.name}`,
-          name: tool.name,
-          label: tool.label || tool.name,
-          description: tool.description || '',
+export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
+  // Get all enabled plugin instances for this organization
+  const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+  const enabledInstances = instances.filter((i) => i.enabled);
+
+  // Get all plugins and filter to only enabled ones
+  const allPlugins = pluginManagerService.getAllPlugins();
+  const enabledPluginIds = new Set(enabledInstances.map((i) => i.pluginId));
+
+  const mcpTools: Array<{
+    id: string;
+    name: string;
+    label: string;
+    description: string;
+    pluginId: string;
+    pluginName: string;
+  }> = [];
+
+  // Process each enabled plugin
+  for (const plugin of allPlugins) {
+    // Check if this plugin is enabled for the organization
+    if (!enabledPluginIds.has(plugin.id)) {
+      continue;
+    }
+
+    const manifest = plugin.manifest as HayPluginManifest;
+
+    // Check if plugin has MCP capabilities with tools
+    if (!manifest.capabilities?.mcp?.tools) {
+      continue;
+    }
+
+    // Extract tools from this plugin
+    for (const tool of manifest.capabilities.mcp.tools) {
+      mcpTools.push({
+        id: `${plugin.pluginId}:${tool.name}`,
+        name: tool.name,
+        label: tool.label || tool.name,
+        description: tool.description || "",
+        pluginId: plugin.pluginId,
+        pluginName: plugin.name,
+      });
+    }
+  }
+
+  return mcpTools;
+});
+
+/**
+ * Get menu items from all plugins (system and organization-specific)
+ */
+export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
+  const allPlugins = pluginManagerService.getAllPlugins();
+  const menuItems: Array<{
+    id: string;
+    title: string;
+    url: string;
+    icon?: string;
+    parent?: "settings" | "integrations" | "root";
+    position?: number;
+    pluginId: string;
+  }> = [];
+
+  // Get enabled instances for organization-specific plugins
+  const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+  const enabledPluginIds = new Set(instances.filter((i) => i.enabled).map((i) => i.pluginId));
+
+  for (const plugin of allPlugins) {
+    const manifest = plugin.manifest as HayPluginManifest;
+
+    // Check if this is a system plugin (autoActivate) or an enabled organization plugin
+    const isSystemPlugin = manifest.autoActivate === true;
+    const isEnabledOrgPlugin = enabledPluginIds.has(plugin.id);
+
+    if (!isSystemPlugin && !isEnabledOrgPlugin) {
+      continue;
+    }
+
+    // Extract menu items from this plugin
+    if (manifest.menuItems) {
+      for (const item of manifest.menuItems) {
+        menuItems.push({
+          ...item,
           pluginId: plugin.pluginId,
-          pluginName: plugin.name,
         });
       }
     }
-    
-    return mcpTools;
-  });
+  }
+
+  // Sort by position if provided
+  menuItems.sort((a, b) => (a.position || 999) - (b.position || 999));
+
+  return {
+    items: menuItems,
+  };
+});

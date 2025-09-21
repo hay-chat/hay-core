@@ -20,5 +20,8 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
     "sass": "^1.92.0"
+  },
+  "dependencies": {
+    "sonner": "^2.0.7"
   }
 }

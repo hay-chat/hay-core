@@ -32,7 +32,7 @@ export const agentsRouter = t.router({
   }),
 
   create: authenticatedProcedure.input(createAgentSchema).mutation(async ({ ctx, input }) => {
-    const agent = await agentService.createAgent(ctx.organizationId!, input);
+    const agent = await agentService.createAgent(ctx.organizationId!, input as any);
     return agent;
   }),
 
