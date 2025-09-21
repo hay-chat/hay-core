@@ -4,6 +4,7 @@ import { CustomerService } from "./customer.service";
 import { Conversation } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
+import { hookManager } from "./hooks/hook-manager";
 
 export class ConversationService {
   private conversationRepository: ConversationRepository;
@@ -34,7 +35,7 @@ export class ConversationService {
       customerId = anonymousCustomer.id;
     }
 
-    return await this.conversationRepository.create({
+    const conversation = await this.conversationRepository.create({
       title: data.title || "New Conversation",
       agent_id: data.agentId || null,
       playbook_id: data.playbook_id || null,
@@ -45,6 +46,19 @@ export class ConversationService {
       needs_processing: data.status === "open" || data.status === "processing",
       customer_id: customerId,
     });
+
+    // Trigger hook for conversation created
+    await hookManager.trigger("conversation.created", {
+      organizationId,
+      conversationId: conversation.id,
+      metadata: {
+        agentId: data.agentId,
+        customerId,
+        status: data.status || "open",
+      },
+    });
+
+    return conversation;
   }
 
   async getConversations(organizationId: string): Promise<Conversation[]> {
@@ -113,7 +127,7 @@ export class ConversationService {
       metadata?: Record<string, unknown>;
     },
   ): Promise<Message> {
-    return await this.messageRepository.create({
+    const message = await this.messageRepository.create({
       conversation_id: conversationId,
       content: data.content,
       type: data.type,
@@ -121,6 +135,19 @@ export class ConversationService {
       usage_metadata: data.usage_metadata || null,
       metadata: data.metadata || null,
     });
+
+    // Trigger hook for message sent
+    await hookManager.trigger("message.sent", {
+      organizationId,
+      conversationId,
+      metadata: {
+        messageId: message.id,
+        messageType: data.type,
+        sender: data.sender,
+      },
+    });
+
+    return message;
   }
 
   async addMessages(

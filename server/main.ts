@@ -33,6 +33,7 @@ async function startServer() {
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
   const { pluginRouteService } = await import("@server/services/plugin-route.service");
   const { websocketService } = await import("@server/services/websocket.service");
+  const { extensionLoader } = await import("@server/services/extensions/extension-loader");
 
   const server = express();
 
@@ -99,6 +100,10 @@ async function startServer() {
     });
   });
 
+  // Configure extension loader before setting up tRPC
+  extensionLoader.setApp(server);
+  extensionLoader.setRouter(appRouter);
+
   // Add tRPC middleware with context
   server.use(
     "/v1",
@@ -157,6 +162,9 @@ async function startServer() {
         // Note: Plugins will now be started on-demand when needed
         // This improves scalability and resource usage
         console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
+
+        // Load extensions after plugin system
+        await extensionLoader.loadExtensions();
       } catch (error) {
         console.error("Failed to initialize plugin system:", error);
       }
@@ -169,6 +177,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
+    await extensionLoader.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
   });
@@ -178,6 +187,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
+    await extensionLoader.shutdown();
     await processManagerService.stopAll();
     process.exit(0);
   });

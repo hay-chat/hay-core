@@ -7,6 +7,7 @@ import {
   sendInactivityWarning,
   closeInactiveConversation,
 } from "./conversation-utils";
+import { hookManager } from "@server/services/hooks/hook-manager";
 
 export class Orchestrator {
   private conversationRepository: ConversationRepository;
@@ -198,6 +199,17 @@ export class Orchestrator {
                   },
                 },
               );
+
+              // Trigger hook for conversation resolved
+              await hookManager.trigger("conversation.resolved", {
+                organizationId: conversation.organization_id,
+                conversationId: conversation.id,
+                metadata: {
+                  reason: `user_indicated_${lastUserMessage.intent}`,
+                  resolved: lastUserMessage.intent === "close_satisfied",
+                },
+              });
+
               // Generate title for closed conversation
               await generateConversationTitle(conversation.id, conversation.organization_id);
             } else {

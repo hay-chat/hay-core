@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-hay}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hay-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3001}:3001"
+      - "${WS_PORT:-3002}:3002"
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-hay}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      HAY_EXTENSIONS_PATH: /app/extensions/index.js
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_STARTER_ID: ${STRIPE_PRICE_STARTER_ID}
+      STRIPE_PRICE_PRO_ID: ${STRIPE_PRICE_PRO_ID}
+      STRIPE_PRICE_ENTERPRISE_ID: ${STRIPE_PRICE_ENTERPRISE_ID}
+      STRIPE_METERED_PRICE_ID: ${STRIPE_METERED_PRICE_ID}
+    volumes:
+      - ./hay-cloud/dist:/app/extensions:ro
+    networks:
+      - hay-network
+
+  hay-cloud:
+    build:
+      context: ./hay-cloud
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-hay}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_STARTER_ID: ${STRIPE_PRICE_STARTER_ID}
+      STRIPE_PRICE_PRO_ID: ${STRIPE_PRICE_PRO_ID}
+      STRIPE_PRICE_ENTERPRISE_ID: ${STRIPE_PRICE_ENTERPRISE_ID}
+      STRIPE_METERED_PRICE_ID: ${STRIPE_METERED_PRICE_ID}
+    volumes:
+      - ./hay-cloud/dist:/app/extensions:ro
+    networks:
+      - hay-network
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    depends_on:
+      - hay-core
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      NUXT_PUBLIC_API_URL: http://hay-core:3001/v1
+      NUXT_PUBLIC_WS_URL: ws://hay-core:3002/ws
+    networks:
+      - hay-network
+
+volumes:
+  postgres_data:
+
+networks:
+  hay-network:
+    driver: bridge

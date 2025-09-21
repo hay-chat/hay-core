@@ -12,6 +12,6 @@
       "@plugins/*": ["./plugins/*"]
     }
   },
-  "include": ["**/*.ts", "../plugins/**/*.ts"],
+  "include": ["./**/*.ts", "../plugins/**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.example.ts"]
 }

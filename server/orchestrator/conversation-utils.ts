@@ -3,6 +3,7 @@ import { MessageRepository } from "@server/repositories/message.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
+import { hookManager } from "@server/services/hooks/hook-manager";
 
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
@@ -212,6 +213,16 @@ Keep it to 1-2 sentences.`;
         resolved: false,
         confidence: 1.0,
         reason: sendMessage ? "inactivity_timeout" : "inactivity_timeout_silent",
+      },
+    });
+
+    // Trigger hook for conversation resolved
+    await hookManager.trigger("conversation.resolved", {
+      organizationId,
+      conversationId,
+      metadata: {
+        reason: sendMessage ? "inactivity_timeout" : "inactivity_timeout_silent",
+        resolved: false,
       },
     });
 
