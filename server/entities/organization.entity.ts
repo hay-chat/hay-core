@@ -39,30 +39,8 @@ export class Organization extends BaseEntity {
     maxStorageGb?: number;
   };
 
-  @Column({ type: "varchar", length: 50, default: "free" })
-  plan!: "free" | "starter" | "professional" | "enterprise";
-
-  @Column({ type: "timestamptz", nullable: true })
-  trialEndsAt?: Date;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  billingEmail?: string;
-
   @Column({ type: "varchar", length: 255, nullable: true })
   contactEmail?: string;
-
-  // Stripe fields
-  @Column({ type: "varchar", length: 255, nullable: true })
-  stripeCustomerId?: string;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  stripeSubscriptionId?: string;
-
-  @Column({ type: "varchar", length: 50, nullable: true })
-  stripePlanId?: string;
-
-  @Column({ type: "varchar", length: 50, nullable: true })
-  stripeSubscriptionStatus?: string;
 
   // Relationships
   @OneToMany(() => User, (user) => user.organization)
@@ -98,11 +76,6 @@ export class Organization extends BaseEntity {
   canAddApiKey(currentApiKeyCount: number): boolean {
     if (!this.limits?.maxApiKeys) return true;
     return currentApiKeyCount < this.limits.maxApiKeys;
-  }
-
-  isTrialExpired(): boolean {
-    if (!this.trialEndsAt) return false;
-    return new Date() > this.trialEndsAt;
   }
 
   toJSON(): any {

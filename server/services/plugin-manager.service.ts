@@ -325,7 +325,7 @@ export class PluginManagerService {
           const routerPath = path.join(this.pluginsDir, pluginDirName, manifest.trpcRouter);
           console.log(`Loading router from: ${routerPath}`);
           const routerModule = await import(routerPath);
-          const pluginRouter = routerModule.default || routerModule.cloudRouter || routerModule.router;
+          const pluginRouter = routerModule.default || routerModule.router;
 
           if (pluginRouter) {
             // Register with the manifest ID, not the directory name

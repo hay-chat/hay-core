@@ -13,10 +13,6 @@ class OrganizationService {
     return this.repository.findOne({ where: { slug } });
   }
 
-  async findByStripeCustomerId(stripeCustomerId: string): Promise<Organization | null> {
-    return this.repository.findOne({ where: { stripeCustomerId } });
-  }
-
   async create(data: DeepPartial<Organization>): Promise<Organization> {
     const organization = this.repository.create(data);
     return this.repository.save(organization);

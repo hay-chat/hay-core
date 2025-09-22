@@ -171,7 +171,6 @@ export const authRouter = t.router({
           name: organizationName,
           slug: orgSlug,
           isActive: true,
-          plan: "free",
           limits: {
             maxUsers: 5,
             maxDocuments: 100,
