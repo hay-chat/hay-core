@@ -103,7 +103,7 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredPlaybooks.length === 0" class="text-center py-12">
-      <Book class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
+      <img src="/bale/playbook.png" class="h-32 w-32 mx-auto" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No playbooks found" : "No playbooks created yet" }}
       </h3>

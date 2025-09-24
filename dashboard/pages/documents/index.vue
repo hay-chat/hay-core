@@ -214,8 +214,8 @@
 
     <!-- Empty State -->
     <div v-else-if="!loading && filteredDocuments.length === 0" class="text-center py-12">
-      <FileText class="mx-auto h-12 w-12 text-neutral-muted" />
-      <h3 class="mt-4 text-lg font-medium text-foreground">
+      <img src="/bale/document.png" class="h-32 w-32 mx-auto" />
+      <h3 class="text-lg font-medium text-foreground">
         {{ searchQuery || typeFilter || statusFilter ? "No documents found" : "No documents yet" }}
       </h3>
       <p class="mt-2 text-sm text-neutral-muted">

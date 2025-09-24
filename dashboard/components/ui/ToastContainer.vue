@@ -10,7 +10,7 @@
         ]"
       >
         <div class="flex items-center justify-between">
-          <span>{{ toast.message }}</span>
+          <span>{{ toast.title }}</span>
           <button class="ml-4 text-white/80 hover:text-white" @click="remove(toast.id)">
             <X class="h-4 w-4" />
           </button>

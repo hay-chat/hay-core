@@ -231,8 +231,8 @@
 
     <!-- Empty State -->
     <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
-      <Bot class="mx-auto h-12 w-12 text-neutral-muted" />
-      <h3 class="mt-4 text-lg font-medium text-foreground">
+      <img src="/bale/agent.png" class="h-32 w-32 mx-auto" />
+      <h3 class="text-lg font-medium text-foreground">
         {{ searchQuery || statusFilter || typeFilter ? "No agents found" : "No agents yet" }}
       </h3>
       <p class="mt-2 text-sm text-neutral-muted">
@@ -595,7 +595,9 @@ const performSingleDelete = async () => {
         agents.value.splice(index, 1);
       }
 
-      toast.success(result.message || "Agent deleted successfully");
+      console.log("Agent deleted successfully");
+
+      toast.success("Agent deleted successfully");
     }
   } catch (error) {
     console.error("Error deleting agent:", error);
