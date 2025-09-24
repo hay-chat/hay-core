@@ -27,6 +27,8 @@
         :subtitle="`+${metrics.newAgentsThisWeek}`"
         subtitle-suffix="new this week"
         subtitle-color="green"
+        :show-cache-indicator="false"
+        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.AGENTS)"
       />
 
       <MetricCard
@@ -36,6 +38,8 @@
         :subtitle="`${conversationMetrics.resolvedConversations}`"
         subtitle-suffix="resolved"
         subtitle-color="green"
+        :show-cache-indicator="false"
+        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
       />
 
       <MetricCard
@@ -46,6 +50,8 @@
         subtitle-suffix="resolved"
         subtitle-color="green"
         :format-metric="false"
+        :show-cache-indicator="false"
+        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
       />
 
       <MetricCard
@@ -55,6 +61,8 @@
         subtitle="messages per"
         subtitle-suffix="conversation"
         :format-metric="false"
+        :show-cache-indicator="false"
+        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
       />
     </div>
 
@@ -347,10 +355,30 @@ import {
 import { HayApi } from "@/utils/api";
 import SimpleGauge from "@/components/ui/SimpleGauge.vue";
 import DateRangeSelector from "@/components/ui/DateRangeSelector.vue";
+import { useAnalyticsStore } from "@/stores/analytics";
 
 // State
 const loading = ref(false);
 const router = useRouter();
+const analyticsStore = useAnalyticsStore();
+
+// Cache keys for different widgets
+const CACHE_KEYS = {
+  AGENTS: 'dashboard_agents',
+  CONVERSATIONS: 'dashboard_conversations',
+  ACTIVITY: 'dashboard_activity',
+  SENTIMENT: 'dashboard_sentiment',
+  METRICS: 'dashboard_metrics'
+};
+
+// TTL values in milliseconds
+const CACHE_TTL = {
+  AGENTS: 5 * 60 * 1000, // 5 minutes
+  CONVERSATIONS: 1 * 60 * 1000, // 1 minute for recent conversations
+  ACTIVITY: 3 * 60 * 1000, // 3 minutes for activity chart
+  SENTIMENT: 5 * 60 * 1000, // 5 minutes for sentiment data
+  METRICS: 2 * 60 * 1000 // 2 minutes for conversation metrics
+};
 
 // Date range for analytics
 const dateRange = ref({
@@ -583,7 +611,7 @@ const formatTimeAgo = (date: Date) => {
   }
 };
 
-const fetchDashboardData = async () => {
+const fetchDashboardData = async (forceRefresh = false) => {
   try {
     const dateFilters = {
       startDate: dateRange.value.startDate
@@ -594,16 +622,41 @@ const fetchDashboardData = async () => {
         : undefined,
     };
 
-    // Fetch all data in parallel
+    // Fetch all data in parallel using the analytics store for caching
     const [agentsData, conversationsData, analyticsData, sentimentAnalysis, metricsData] =
       await Promise.all([
-        HayApi.agents.list.query(),
-        HayApi.conversations.list.query({
-          pagination: { page: 1, limit: 10 },
-        }),
-        HayApi.analytics.conversationActivity.query(dateFilters),
-        HayApi.analytics.sentimentAnalysis.query(dateFilters),
-        HayApi.analytics.conversationMetrics.query(dateFilters),
+        // Agents data with caching
+        analyticsStore.fetchData(
+          CACHE_KEYS.AGENTS,
+          () => HayApi.agents.list.query(),
+          { ttl: CACHE_TTL.AGENTS, forceRefresh }
+        ),
+        // Conversations data with shorter cache for recent updates
+        analyticsStore.fetchData(
+          CACHE_KEYS.CONVERSATIONS,
+          () => HayApi.conversations.list.query({
+            pagination: { page: 1, limit: 10 },
+          }),
+          { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh }
+        ),
+        // Activity chart data
+        analyticsStore.fetchData(
+          CACHE_KEYS.ACTIVITY,
+          () => HayApi.analytics.conversationActivity.query(dateFilters),
+          { ttl: CACHE_TTL.ACTIVITY, forceRefresh }
+        ),
+        // Sentiment analysis data
+        analyticsStore.fetchData(
+          CACHE_KEYS.SENTIMENT,
+          () => HayApi.analytics.sentimentAnalysis.query(dateFilters),
+          { ttl: CACHE_TTL.SENTIMENT, forceRefresh }
+        ),
+        // Conversation metrics
+        analyticsStore.fetchData(
+          CACHE_KEYS.METRICS,
+          () => HayApi.analytics.conversationMetrics.query(dateFilters),
+          { ttl: CACHE_TTL.METRICS, forceRefresh }
+        ),
       ]);
 
     agents.value = (agentsData as Agent[]) || [];
@@ -659,7 +712,8 @@ const fetchDashboardData = async () => {
 const refreshData = async () => {
   loading.value = true;
   try {
-    await fetchDashboardData();
+    // Force refresh to bypass cache
+    await fetchDashboardData(true);
   } catch (error) {
     console.error("Error refreshing data:", error);
   } finally {
@@ -697,11 +751,31 @@ const scrollToTop = () => {
   }
 };
 
+// Computed property to check if any data is being loaded
+const isAnyDataLoading = computed(() => {
+  return Object.values(CACHE_KEYS).some(key => analyticsStore.isWidgetLoading(key));
+});
+
+// Computed property to check if any data is being refreshed
+const isAnyDataRefreshing = computed(() => {
+  return Object.values(CACHE_KEYS).some(key => analyticsStore.isWidgetRefreshing(key));
+});
+
 // Lifecycle
 onMounted(async () => {
   loading.value = true;
-  await fetchDashboardData();
+  // Don't force refresh on mount - use cached data if available
+  await fetchDashboardData(false);
   loading.value = false;
+});
+
+// Watch for date range changes
+watch(dateRange, async () => {
+  // Clear cache for date-sensitive data and refetch
+  analyticsStore.clearData(CACHE_KEYS.ACTIVITY);
+  analyticsStore.clearData(CACHE_KEYS.SENTIMENT);
+  analyticsStore.clearData(CACHE_KEYS.METRICS);
+  await fetchDashboardData(true);
 });
 
 // TODO: Set up WebSocket listeners for real-time updates

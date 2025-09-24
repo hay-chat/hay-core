@@ -124,8 +124,8 @@ const authStore = useAuthStore();
 
 // Form state
 const form = reactive({
-  email: "teste@teste.com",
-  password: "Allonsy42@",
+  email: "",
+  password: "",
   rememberMe: false,
 });
 
@@ -135,12 +135,6 @@ const errors = reactive({
 });
 
 const error = ref("");
-
-const _socialLoading = reactive({
-  google: false,
-  github: false,
-  microsoft: false,
-});
 
 // Computed
 const loading = computed(() => authStore.isLoading);

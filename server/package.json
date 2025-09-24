@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:base && tsc",
+    "build": "npm run build:base && npm run migration:ensure && tsc",
     "build:base": "cd ../plugins/base && npm run build",
     "start": "node start.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
@@ -14,7 +14,9 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d ./database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
-    "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts"
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts",
+    "migration:ensure": "./scripts/check-migrations.sh",
+    "migration:check": "tsx scripts/ensure-migrations.ts"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

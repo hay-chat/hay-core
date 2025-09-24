@@ -6,7 +6,6 @@
       class="flex items-center justify-center h-screen gap-2 flex-col"
     >
       <Loading />
-      <p class="font-secondary">Loading...</p>
     </div>
 
     <!-- Show content once auth is initialized -->
@@ -28,7 +27,7 @@ onMounted(async () => {
       await authStore.initializeAuth();
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);
-      // Auth store will handle logout if initialization fails
+      authStore.logout();
     }
   }
 });

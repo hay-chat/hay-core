@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import type { HayPluginManifest } from "../../plugins/base/types";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 interface UITemplate {
   name: string;

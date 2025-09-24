@@ -16,21 +16,15 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
         await page.goto("http://localhost:3000/login");
         await page.waitForLoadState("networkidle");
       } catch (error) {
-        console.log(
-          "⚠️  Could not navigate to login page, checking for auth elements"
-        );
+        console.log("⚠️  Could not navigate to login page, checking for auth elements");
       }
     }
 
     // Look for common authentication elements
     const emailInput = page
-      .locator(
-        'input[type="email"], input[name="email"], input[placeholder*="email" i]'
-      )
+      .locator('input[type="email"], input[name="email"], input[placeholder*="email" i]')
       .first();
-    const passwordInput = page
-      .locator('input[type="password"], input[name="password"]')
-      .first();
+    const passwordInput = page.locator('input[type="password"], input[name="password"]').first();
     const loginButton = page
       .locator("button")
       .filter({ hasText: /sign in|login|log in/i })
@@ -40,8 +34,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
       console.log("✅ Found authentication form");
 
       // Use test credentials - adjust these based on your test setup
-      await emailInput.fill("teste@teste.com");
-      await passwordInput.fill("Allonsy42@");
+      await emailInput.fill("");
+      await passwordInput.fill("");
       await loginButton.click();
 
       await page.waitForLoadState("networkidle");
@@ -57,9 +51,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     }
   }
 
-  test("should handle /a shortcut and verify v-model structure", async ({
-    page,
-  }) => {
+  test("should handle /a shortcut and verify v-model structure", async ({ page }) => {
     // Try to authenticate first
     await authenticate(page);
 
@@ -70,15 +62,11 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     await page.waitForLoadState("networkidle");
 
     // Look for the instruction editor container
-    const instructionsEditor = page.locator(
-      '[data-testid="instructions-editor"]'
-    );
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
     await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
 
     // Find the contenteditable element with the correct class
-    const contentEditableElement = page
-      .locator(".instruction-content[contenteditable]")
-      .first();
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
     await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
 
     // Click to focus the editor
@@ -108,23 +96,19 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
       console.log("✅ Successfully pressed Enter in slash command menu");
     } catch (error) {
       console.log(
-        "⚠️  Slash command menu did not appear - this may be expected if no actions are available"
+        "⚠️  Slash command menu did not appear - this may be expected if no actions are available",
       );
     }
 
     // Verify the basic v-model structure by checking DOM elements
     await expect(instructionsEditor).toBeVisible();
-    const instructionItems = page.locator(
-      ".instruction-item, .rich-instruction-input"
-    );
+    const instructionItems = page.locator(".instruction-item, .rich-instruction-input");
     await expect(instructionItems.first()).toBeVisible();
 
     // Check if we can access Vue component data for v-model verification
     const vModelData = await page.evaluate(() => {
       // Try to access Vue component data from the DOM
-      const editorElement = document.querySelector(
-        '[data-testid="instructions-editor"]'
-      );
+      const editorElement = document.querySelector('[data-testid="instructions-editor"]');
       if (editorElement) {
         // Check for Vue 3 component instance
         const vueInstance = (editorElement as any).__vueParentComponent;
@@ -133,10 +117,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
           if (vueInstance.setupState.instructions) {
             return vueInstance.setupState.instructions;
           }
-          if (
-            vueInstance.setupState.form &&
-            vueInstance.setupState.form.instructions
-          ) {
+          if (vueInstance.setupState.form && vueInstance.setupState.form.instructions) {
             return vueInstance.setupState.form.instructions;
           }
         }
@@ -161,15 +142,12 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
         // If the menu appeared and we entered something, check if it was processed
         if (menuAppeared && vModelData[0].instructions.length > 0) {
-          console.log(
-            "✅ Instructions content after /a interaction:",
-            vModelData[0].instructions
-          );
+          console.log("✅ Instructions content after /a interaction:", vModelData[0].instructions);
         }
       }
     } else {
       console.log(
-        "✅ DOM structure verified (Vue data not directly accessible but structure is correct)"
+        "✅ DOM structure verified (Vue data not directly accessible but structure is correct)",
       );
     }
 
@@ -180,25 +158,19 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     expect(finalInstructionCount).toBeGreaterThan(0);
 
     console.log(
-      "✅ Test completed successfully - instruction editor handles /a shortcut and maintains proper structure"
+      "✅ Test completed successfully - instruction editor handles /a shortcut and maintains proper structure",
     );
   });
 
-  test("should maintain v-model structure when typing regular text", async ({
-    page,
-  }) => {
+  test("should maintain v-model structure when typing regular text", async ({ page }) => {
     await authenticate(page);
     await page.goto("http://localhost:3000/playbooks/new");
     await page.waitForLoadState("networkidle");
 
-    const instructionsEditor = page.locator(
-      '[data-testid="instructions-editor"]'
-    );
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
     await expect(instructionsEditor).toBeVisible();
 
-    const contentEditableElement = page
-      .locator(".instruction-content[contenteditable]")
-      .first();
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
     await expect(contentEditableElement).toBeVisible();
 
     await contentEditableElement.click();
@@ -216,16 +188,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Check v-model structure
     const vModelData = await page.evaluate(() => {
-      const editorElement = document.querySelector(
-        '[data-testid="instructions-editor"]'
-      );
+      const editorElement = document.querySelector('[data-testid="instructions-editor"]');
       if (editorElement) {
         const vueInstance = (editorElement as any).__vueParentComponent;
         if (vueInstance && vueInstance.setupState) {
           return (
             vueInstance.setupState.instructions ||
-            (vueInstance.setupState.form &&
-              vueInstance.setupState.form.instructions)
+            (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
           );
         }
       }
@@ -234,10 +203,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     if (vModelData && Array.isArray(vModelData) && vModelData.length > 0) {
       expect(vModelData[0].instructions).toContain(testText);
-      console.log(
-        "✅ v-model correctly updated with regular text:",
-        vModelData[0].instructions
-      );
+      console.log("✅ v-model correctly updated with regular text:", vModelData[0].instructions);
     }
 
     console.log("✅ Regular text input maintains proper v-model structure");
@@ -250,14 +216,10 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     await page.goto("http://localhost:3000/playbooks/new");
     await page.waitForLoadState("networkidle");
 
-    const instructionsEditor = page.locator(
-      '[data-testid="instructions-editor"]'
-    );
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
     await expect(instructionsEditor).toBeVisible();
 
-    const contentEditableElement = page
-      .locator(".instruction-content[contenteditable]")
-      .first();
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
     await expect(contentEditableElement).toBeVisible();
 
     // First, try directly injecting an action format to test the preservation
@@ -278,16 +240,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Get v-model after direct injection
     let vModelWithAction = await page.evaluate(() => {
-      const editorElement = document.querySelector(
-        '[data-testid="instructions-editor"]'
-      );
+      const editorElement = document.querySelector('[data-testid="instructions-editor"]');
       if (editorElement) {
         const vueInstance = (editorElement as any).__vueParentComponent;
         if (vueInstance && vueInstance.setupState) {
           return (
             vueInstance.setupState.instructions ||
-            (vueInstance.setupState.form &&
-              vueInstance.setupState.form.instructions)
+            (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
           );
         }
       }
@@ -298,10 +257,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     if (vModelWithAction && vModelWithAction.length > 0) {
       const instructionsWithDirectAction = vModelWithAction[0].instructions;
-      console.log(
-        "📝 Instructions after direct injection:",
-        instructionsWithDirectAction
-      );
+      console.log("📝 Instructions after direct injection:", instructionsWithDirectAction);
 
       // Now simulate focus loss / movement that might trigger the bug
       await contentEditableElement.blur();
@@ -311,16 +267,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
       // Get v-model after focus change
       const vModelAfterFocus = await page.evaluate(() => {
-        const editorElement = document.querySelector(
-          '[data-testid="instructions-editor"]'
-        );
+        const editorElement = document.querySelector('[data-testid="instructions-editor"]');
         if (editorElement) {
           const vueInstance = (editorElement as any).__vueParentComponent;
           if (vueInstance && vueInstance.setupState) {
             return (
               vueInstance.setupState.instructions ||
-              (vueInstance.setupState.form &&
-                vueInstance.setupState.form.instructions)
+              (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
             );
           }
         }
@@ -329,18 +282,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
       if (vModelAfterFocus && vModelAfterFocus.length > 0) {
         const finalInstructions = vModelAfterFocus[0].instructions;
-        console.log(
-          "📝 Final instructions after focus change:",
-          finalInstructions
-        );
+        console.log("📝 Final instructions after focus change:", finalInstructions);
 
         // Check if action format is preserved after focus change
         const hasActionFormat = /\[action\]\([^)]+\)/.test(finalInstructions);
 
         if (hasActionFormat) {
-          console.log(
-            "✅ SUCCESS: Action format [action](id) preserved after focus change"
-          );
+          console.log("✅ SUCCESS: Action format [action](id) preserved after focus change");
         } else {
           console.log("❌ DETECTED BUG: Action format lost after focus change");
           console.log("Expected: [action](test-action-id)");
@@ -349,42 +297,42 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
         // CRITICAL TEST: Add a new instruction and check if the original action is preserved
         console.log("📝 CRITICAL TEST: Adding new instruction to trigger the bug");
-        
+
         // Press Enter to create a new instruction
         await contentEditableElement.press("Enter");
         await page.waitForTimeout(500);
-        
+
         // Type something in the new instruction
         await page.keyboard.type("Second instruction");
         await page.waitForTimeout(500);
-        
+
         // Get v-model after adding new instruction - this should reveal the bug
         const vModelAfterNewInstruction = await page.evaluate(() => {
-          const editorElement = document.querySelector(
-            '[data-testid="instructions-editor"]'
-          );
+          const editorElement = document.querySelector('[data-testid="instructions-editor"]');
           if (editorElement) {
             const vueInstance = (editorElement as any).__vueParentComponent;
             if (vueInstance && vueInstance.setupState) {
               return (
                 vueInstance.setupState.instructions ||
-                (vueInstance.setupState.form &&
-                  vueInstance.setupState.form.instructions)
+                (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
               );
             }
           }
           return null;
         });
-        
+
         if (vModelAfterNewInstruction && vModelAfterNewInstruction.length > 0) {
-          console.log("📝 Complete v-model after adding new instruction:", vModelAfterNewInstruction);
-          
+          console.log(
+            "📝 Complete v-model after adding new instruction:",
+            vModelAfterNewInstruction,
+          );
+
           // Check if the FIRST instruction still has the action format
           const firstInstructionAfterNew = vModelAfterNewInstruction[0].instructions;
           console.log("📝 First instruction after adding new one:", firstInstructionAfterNew);
-          
+
           const stillHasActionFormatAfterNew = /\[action\]\([^)]+\)/.test(firstInstructionAfterNew);
-          
+
           if (stillHasActionFormatAfterNew) {
             console.log("✅ SUCCESS: Action format preserved even after adding new instruction");
             expect(firstInstructionAfterNew).toMatch(/\[action\]\([^)]+\)/);
@@ -392,17 +340,22 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
             console.log("❌ BUG DETECTED: Action format lost when adding new instruction!");
             console.log("Expected first instruction to contain: [action](test-action-id)");
             console.log("Actual first instruction:", firstInstructionAfterNew);
-            
+
             // This is the main bug we're testing for - action format gets lost
             expect(firstInstructionAfterNew).toMatch(/\[action\]\([^)]+\)/);
           }
-          
+
           // Also check that we have multiple instructions now
           if (vModelAfterNewInstruction.length > 1) {
-            console.log(`✅ Successfully added new instruction - total count: ${vModelAfterNewInstruction.length}`);
+            console.log(
+              `✅ Successfully added new instruction - total count: ${vModelAfterNewInstruction.length}`,
+            );
             expect(vModelAfterNewInstruction[1].instructions).toContain("Second instruction");
           } else {
-            console.log("⚠️  Expected multiple instructions but only found:", vModelAfterNewInstruction.length);
+            console.log(
+              "⚠️  Expected multiple instructions but only found:",
+              vModelAfterNewInstruction.length,
+            );
           }
         } else {
           console.log("❌ Could not access v-model after adding new instruction");
@@ -435,9 +388,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
       const actionCount = await actionItems.count();
       const documentCount = await documentItems.count();
 
-      console.log(
-        `Found ${actionCount} actions and ${documentCount} documents`
-      );
+      console.log(`Found ${actionCount} actions and ${documentCount} documents`);
 
       if (actionCount > 0) {
         await page.keyboard.press("Enter");
@@ -467,16 +418,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
       // Check final state
       const finalVModel = await page.evaluate(() => {
-        const editorElement = document.querySelector(
-          '[data-testid="instructions-editor"]'
-        );
+        const editorElement = document.querySelector('[data-testid="instructions-editor"]');
         if (editorElement) {
           const vueInstance = (editorElement as any).__vueParentComponent;
           if (vueInstance && vueInstance.setupState) {
             return (
               vueInstance.setupState.instructions ||
-              (vueInstance.setupState.form &&
-                vueInstance.setupState.form.instructions)
+              (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
             );
           }
         }
@@ -484,64 +432,66 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
       });
 
       if (finalVModel && finalVModel.length > 0) {
-        console.log(
-          "📝 Final v-model after slash command insertion:",
-          finalVModel[0].instructions
-        );
+        console.log("📝 Final v-model after slash command insertion:", finalVModel[0].instructions);
 
         // Check if reference format is preserved (either [action] or [document])
         const hasReferenceFormat = /\[(action|document)\]\([^)]+\)/.test(
-          finalVModel[0].instructions
+          finalVModel[0].instructions,
         );
 
         if (!hasReferenceFormat) {
-          console.log(
-            "❌ BUG DETECTED: Reference format lost in v-model after focus change"
-          );
+          console.log("❌ BUG DETECTED: Reference format lost in v-model after focus change");
         } else {
           console.log("✅ Reference format preserved after focus change");
-          
+
           // CRITICAL TEST: Add new instruction via slash command approach too
           console.log("📝 CRITICAL TEST (slash approach): Adding new instruction to trigger bug");
-          
+
           // Press Enter to create new instruction
           await contentEditableElement.press("Enter");
           await page.waitForTimeout(500);
-          
+
           // Type in new instruction
           await page.keyboard.type("Second instruction via slash test");
           await page.waitForTimeout(500);
-          
+
           // Check final v-model state
           const vModelAfterSlashNewInstruction = await page.evaluate(() => {
-            const editorElement = document.querySelector(
-              '[data-testid="instructions-editor"]'
-            );
+            const editorElement = document.querySelector('[data-testid="instructions-editor"]');
             if (editorElement) {
               const vueInstance = (editorElement as any).__vueParentComponent;
               if (vueInstance && vueInstance.setupState) {
                 return (
                   vueInstance.setupState.instructions ||
-                  (vueInstance.setupState.form &&
-                    vueInstance.setupState.form.instructions)
+                  (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
                 );
               }
             }
             return null;
           });
-          
+
           if (vModelAfterSlashNewInstruction && vModelAfterSlashNewInstruction.length > 0) {
-            console.log("📝 Complete v-model after slash + new instruction:", vModelAfterSlashNewInstruction);
-            
+            console.log(
+              "📝 Complete v-model after slash + new instruction:",
+              vModelAfterSlashNewInstruction,
+            );
+
             const firstInstructionAfterSlashNew = vModelAfterSlashNewInstruction[0].instructions;
-            console.log("📝 First instruction after slash + new instruction:", firstInstructionAfterSlashNew);
-            
-            const stillHasReferenceFormat = /\[(action|document)\]\([^)]+\)/.test(firstInstructionAfterSlashNew);
-            
+            console.log(
+              "📝 First instruction after slash + new instruction:",
+              firstInstructionAfterSlashNew,
+            );
+
+            const stillHasReferenceFormat = /\[(action|document)\]\([^)]+\)/.test(
+              firstInstructionAfterSlashNew,
+            );
+
             if (stillHasReferenceFormat) {
               console.log("✅ SUCCESS: Reference format preserved after slash + new instruction");
             } else {
-              console.log("❌ BUG DETECTED: Reference format lost after adding new instruction (slash approach)!");
+              console.log(
+                "❌ BUG DETECTED: Reference format lost after adding new instruction (slash approach)!",
+              );
               console.log("Expected reference format [action](id) or [document](id)");
               console.log("Actual first instruction:", firstInstructionAfterSlashNew);
             }
@@ -558,24 +508,19 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     await page.goto("http://localhost:3000/playbooks/new");
     await page.waitForLoadState("networkidle");
 
-    const instructionsEditor = page.locator(
-      '[data-testid="instructions-editor"]'
-    );
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
     await expect(instructionsEditor).toBeVisible();
 
     // Helper function to get v-model data
     const getVModelData = async () => {
       return await page.evaluate(() => {
-        const editorElement = document.querySelector(
-          '[data-testid="instructions-editor"]'
-        );
+        const editorElement = document.querySelector('[data-testid="instructions-editor"]');
         if (editorElement) {
           const vueInstance = (editorElement as any).__vueParentComponent;
           if (vueInstance && vueInstance.setupState) {
             return (
               vueInstance.setupState.instructions ||
-              (vueInstance.setupState.form &&
-                vueInstance.setupState.form.instructions)
+              (vueInstance.setupState.form && vueInstance.setupState.form.instructions)
             );
           }
         }
@@ -586,13 +531,19 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     // Helper function to get current DOM structure for debugging
     const getDOMStructure = async () => {
       return await page.evaluate(() => {
-        const items = Array.from(document.querySelectorAll('.instruction-item, .rich-instruction-input'));
+        const items = Array.from(
+          document.querySelectorAll(".instruction-item, .rich-instruction-input"),
+        );
         return items.map((item, index) => ({
           index,
-          text: item.textContent?.trim() || '',
+          text: item.textContent?.trim() || "",
           classes: item.className,
-          level: item.getAttribute('data-level') || 'no-level',
-          hasIndentClass: item.classList.contains('indented') || item.classList.contains('indent-1') || item.classList.contains('ml-4') || item.classList.contains('pl-4')
+          level: item.getAttribute("data-level") || "no-level",
+          hasIndentClass:
+            item.classList.contains("indented") ||
+            item.classList.contains("indent-1") ||
+            item.classList.contains("ml-4") ||
+            item.classList.contains("pl-4"),
         }));
       });
     };
@@ -601,9 +552,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Step 1: Click anywhere on the empty editor to focus first line item
     console.log("📝 Step 1: Focus on the editor");
-    const firstContentEditable = page
-      .locator(".instruction-content[contenteditable]")
-      .first();
+    const firstContentEditable = page.locator(".instruction-content[contenteditable]").first();
     await expect(firstContentEditable).toBeVisible();
     await firstContentEditable.click();
 
@@ -656,12 +605,12 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     if (vModelData && vModelData.length >= 2) {
       expect(vModelData[1].instructions).toContain("b");
       console.log("✅ Second instruction contains 'b'");
-      
+
       // Check if indentation level is tracked in v-model
-      if (vModelData[1].hasOwnProperty('level') || vModelData[1].hasOwnProperty('indent')) {
+      if (vModelData[1].hasOwnProperty("level") || vModelData[1].hasOwnProperty("indent")) {
         console.log("📝 Second instruction indentation data:", {
           level: vModelData[1].level,
-          indent: vModelData[1].indent
+          indent: vModelData[1].indent,
         });
       }
     }
@@ -687,10 +636,10 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     // Try Enter first (some editors use double enter to outdent)
     await page.keyboard.press("Enter");
     await page.waitForTimeout(300);
-    
+
     domStructure = await getDOMStructure();
     console.log("📝 DOM structure after third Enter:", domStructure);
-    
+
     // If that didn't work, try Backspace to outdent
     const thirdStepIndented = domStructure.length > 2 && domStructure[2].hasIndentClass;
     if (thirdStepIndented) {
@@ -712,21 +661,23 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Final verification: Expected structure
     console.log("📝 FINAL VERIFICATION: Checking expected structure");
-    
+
     if (vModelData && vModelData.length >= 3) {
       console.log("📝 Final v-model structure:");
       vModelData.forEach((item, index) => {
-        console.log(`  ${index + 1}. "${item.instructions}" (level: ${item.level || item.indent || 'none'})`);
+        console.log(
+          `  ${index + 1}. "${item.instructions}" (level: ${item.level || item.indent || "none"})`,
+        );
       });
 
       // Expected final structure:
       // 1. a (level 0)
-      // 1.1. b (level 1) 
+      // 1.1. b (level 1)
       // 2. c (level 0)
-      
+
       // Verify content
       expect(vModelData[0].instructions).toContain("a");
-      expect(vModelData[1].instructions).toContain("b"); 
+      expect(vModelData[1].instructions).toContain("b");
       expect(vModelData[2].instructions).toContain("c");
       console.log("✅ Content verification passed: a, b, c");
 
@@ -739,7 +690,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
       // Expected: first=0, second=1, third=0
       expect(Number(firstLevel)).toBe(0);
-      expect(Number(secondLevel)).toBe(1); 
+      expect(Number(secondLevel)).toBe(1);
       expect(Number(thirdLevel)).toBe(0);
       console.log("✅ Indentation verification passed: 0, 1, 0");
 
@@ -749,7 +700,11 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
         const secondIndented = domStructure[1].hasIndentClass;
         const thirdIndented = domStructure[2].hasIndentClass;
 
-        console.log("📝 DOM indentation classes:", { firstIndented, secondIndented, thirdIndented });
+        console.log("📝 DOM indentation classes:", {
+          firstIndented,
+          secondIndented,
+          thirdIndented,
+        });
 
         // Expected: first=false, second=true, third=false
         expect(firstIndented).toBe(false);
@@ -760,7 +715,6 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
       console.log("✅ INDENTATION WORKFLOW TEST PASSED");
       console.log("✅ Final structure: 1. a, 1.1. b, 2. c");
-      
     } else {
       console.log("❌ INDENTATION WORKFLOW TEST FAILED");
       console.log(`❌ Expected 3+ instructions, got: ${vModelData?.length || 0}`);
@@ -775,9 +729,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     await page.goto("http://localhost:3000/playbooks/new");
     await page.waitForLoadState("networkidle");
 
-    const instructionsEditor = page.locator(
-      '[data-testid="instructions-editor"]'
-    );
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
     await expect(instructionsEditor).toBeVisible();
 
     // Helper function to get cursor position within a contenteditable element
@@ -786,43 +738,47 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
-          
+
           // Check if the element is focused and the range is within it
-          if (el === document.activeElement || el.contains(range.commonAncestorContainer) || range.commonAncestorContainer === el) {
-            const text = el.textContent || '';
-            
+          if (
+            el === document.activeElement ||
+            el.contains(range.commonAncestorContainer) ||
+            range.commonAncestorContainer === el
+          ) {
+            const text = el.textContent || "";
+
             // For empty elements, check if we have a collapsed range at position 0
             if (text.length === 0 && range.collapsed) {
               return {
                 start: 0,
                 end: 0,
-                text: '',
+                text: "",
                 isAtEnd: true,
-                isAtStart: true
+                isAtStart: true,
               };
             }
-            
+
             return {
               start: range.startOffset,
               end: range.endOffset,
               text: text,
               isAtEnd: range.startOffset === text.length,
-              isAtStart: range.startOffset === 0
+              isAtStart: range.startOffset === 0,
             };
           }
         }
-        
+
         // Fallback: if element is focused but no range detected, assume cursor at start of empty element
         if (el === document.activeElement && (!el.textContent || el.textContent.length === 0)) {
           return {
             start: 0,
             end: 0,
-            text: '',
+            text: "",
             isAtEnd: true,
-            isAtStart: true
+            isAtStart: true,
           };
         }
-        
+
         return null;
       });
     };
@@ -831,11 +787,11 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     const getFocusedElement = async () => {
       return await page.evaluate(() => {
         const focused = document.activeElement;
-        if (focused && focused.classList.contains('instruction-content')) {
+        if (focused && focused.classList.contains("instruction-content")) {
           return {
             text: focused.textContent,
             classList: Array.from(focused.classList),
-            dataTestId: focused.closest('[data-testid]')?.getAttribute('data-testid')
+            dataTestId: focused.closest("[data-testid]")?.getAttribute("data-testid"),
           };
         }
         return null;
@@ -851,10 +807,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Test 1: Enter key creates new line and positions cursor correctly
     console.log("📝 Test 1: Enter key behavior");
-    
-    const firstContentEditable = page
-      .locator(".instruction-content[contenteditable]")
-      .first();
+
+    const firstContentEditable = page.locator(".instruction-content[contenteditable]").first();
     await expect(firstContentEditable).toBeVisible();
     await firstContentEditable.click();
 
@@ -865,7 +819,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     let cursorPos = await getCursorPosition(firstContentEditable);
     console.log("📝 Cursor position after typing:", cursorPos);
-    
+
     // Verify cursor is at the end of the text
     expect(cursorPos?.isAtEnd).toBe(true);
     expect(cursorPos?.text).toContain("First instruction");
@@ -885,17 +839,15 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     console.log("📝 Currently focused element:", focusedElement);
 
     // The new instruction should be focused and cursor should be at the beginning
-    const secondContentEditable = page
-      .locator(".instruction-content[contenteditable]")
-      .nth(1);
+    const secondContentEditable = page.locator(".instruction-content[contenteditable]").nth(1);
     await expect(secondContentEditable).toBeFocused();
 
     // Give a moment for the cursor to be properly positioned
     await page.waitForTimeout(200);
-    
+
     let secondCursorPos = await getCursorPosition(secondContentEditable);
     console.log("📝 Cursor position in new instruction:", secondCursorPos);
-    
+
     // Cursor should be at the start of the new (empty) instruction
     expect(secondCursorPos?.isAtStart).toBe(true);
     expect(secondCursorPos?.text?.trim()).toBe("");
@@ -905,7 +857,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     await secondContentEditable.click(); // Ensure focus
     await secondContentEditable.type("Second instruction");
     await page.waitForTimeout(500); // Give more time for Vue to update
-    
+
     // Check the actual content in the DOM
     const actualContent = await secondContentEditable.textContent();
     console.log("📝 Actual content in second instruction:", actualContent);
@@ -917,7 +869,7 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Test 2: Delete behavior - delete the second instruction and check cursor positioning
     console.log("📝 Test 2: Delete behavior");
-    
+
     // Clear the second instruction completely
     await secondContentEditable.selectText();
     await page.keyboard.press("Delete");
@@ -931,22 +883,27 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
       // If the instruction was removed, cursor should be at the end of the previous instruction
       console.log("📝 Instruction was removed, checking cursor position in first instruction");
       await expect(firstContentEditable).toBeFocused();
-      
+
       const firstCursorPosAfterDelete = await getCursorPosition(firstContentEditable);
-      console.log("📝 Cursor position in first instruction after delete:", firstCursorPosAfterDelete);
-      
+      console.log(
+        "📝 Cursor position in first instruction after delete:",
+        firstCursorPosAfterDelete,
+      );
+
       // Cursor should be at the end of the first instruction
       expect(firstCursorPosAfterDelete?.isAtEnd).toBe(true);
       expect(firstCursorPosAfterDelete?.text).toContain("First instruction");
-      
     } else if (instructionCountAfterDelete === 2) {
       // If the instruction was just cleared, cursor should remain in the second instruction
       console.log("📝 Instruction was cleared but not removed, checking cursor position");
       await expect(secondContentEditable).toBeFocused();
-      
+
       const secondCursorPosAfterDelete = await getCursorPosition(secondContentEditable);
-      console.log("📝 Cursor position in second instruction after delete:", secondCursorPosAfterDelete);
-      
+      console.log(
+        "📝 Cursor position in second instruction after delete:",
+        secondCursorPosAfterDelete,
+      );
+
       // Cursor should be at the start of the now-empty second instruction
       expect(secondCursorPosAfterDelete?.isAtStart).toBe(true);
       expect(secondCursorPosAfterDelete?.text?.trim()).toBe("");
@@ -954,17 +911,15 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
 
     // Test 3: Backspace behavior at beginning of line
     console.log("📝 Test 3: Backspace at beginning of line behavior");
-    
+
     // Ensure we have two instructions again
     if (instructionCountAfterDelete === 1) {
       console.log("📝 Creating second instruction again for backspace test");
       await firstContentEditable.focus();
       await page.keyboard.press("Enter");
       await page.waitForTimeout(300);
-      
-      const newSecondContentEditable = page
-        .locator(".instruction-content[contenteditable]")
-        .nth(1);
+
+      const newSecondContentEditable = page.locator(".instruction-content[contenteditable]").nth(1);
       await newSecondContentEditable.type("Second instruction again");
       await page.waitForTimeout(300);
     }
@@ -973,13 +928,13 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     const currentSecondContentEditable = page
       .locator(".instruction-content[contenteditable]")
       .nth(1);
-    
+
     await currentSecondContentEditable.focus();
-    
+
     // Move cursor to the beginning of the second instruction
     await page.keyboard.press("Home");
     await page.waitForTimeout(200);
-    
+
     let cursorAtBeginning = await getCursorPosition(currentSecondContentEditable);
     console.log("📝 Cursor position at beginning of second line:", cursorAtBeginning);
     expect(cursorAtBeginning?.isAtStart).toBe(true);
@@ -996,24 +951,21 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
     if (instructionCountAfterBackspace === 1) {
       // Lines were merged, cursor should be at the junction point
       console.log("📝 Lines were merged, checking cursor position");
-      const mergedContentEditable = page
-        .locator(".instruction-content[contenteditable]")
-        .first();
-      
+      const mergedContentEditable = page.locator(".instruction-content[contenteditable]").first();
+
       await expect(mergedContentEditable).toBeFocused();
-      
+
       const mergedCursorPos = await getCursorPosition(mergedContentEditable);
       console.log("📝 Cursor position after merge:", mergedCursorPos);
-      
+
       // Cursor should be positioned between the original first instruction and the merged content
       const expectedJunctionPosition = "First instruction".length;
       expect(mergedCursorPos?.start).toBe(expectedJunctionPosition);
-      
     } else {
       // Second instruction was removed, cursor should be at end of first instruction
       console.log("📝 Second instruction was removed, checking cursor in first instruction");
       await expect(firstContentEditable).toBeFocused();
-      
+
       const finalCursorPos = await getCursorPosition(firstContentEditable);
       console.log("📝 Final cursor position:", finalCursorPos);
       expect(finalCursorPos?.isAtEnd).toBe(true);

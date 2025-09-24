@@ -174,8 +174,3 @@ Copy `.env.example` to `.env` and configure:
 - Plugins are loaded dynamically and should be built on-demand when needed.
 - Plugins are loaded from the `plugins/` directory.
 - The core source code should NEVER know previously about the existence of plugins, if it does, it should be removed. That means that we should never prepare to use some specific plugin, we should only use the plugin manager service to load and use plugins. For new APIs or pages we should always have a way to dinamically load the plugin and use it - never hardcode the plugin ID in the source code.
-
-I need you to analyse the codebase and make sure that the above conventions are followed.
-Our most advance plugin so far is the cloud plugin. This plugin will help us do the billing and usage tracking on the cloud managed version of Hay. So we really can NOT have any hardcoded references to the cloud plugin in the core source code - although this apply to all plugins.
-We need to verify that this is also true for the database migrations. Plugins can create new tables and migrations, but we should never put those tables previously in the core source code. (I'm not sure but I think the plugin/cloud has tables in the core source code)
-Once you identified all the issues, please provide a detailed report with the issues and the proposed solutions.

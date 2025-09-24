@@ -7,8 +7,6 @@
         <CardDescription class="mt-2"> Get started with your Hay organization </CardDescription>
       </div>
 
-      {{ form }}
-
       <!-- Social Signup -->
       <!-- <div class="space-y-3">
         <SocialButton
@@ -187,11 +185,11 @@ const authStore = useAuthStore();
 
 // Form state
 const form = reactive({
-  organizationName: "Teste",
-  email: "teste@teste.com",
-  fullName: "Teste",
-  password: "Allonsy42@",
-  confirmPassword: "Allonsy42@",
+  organizationName: "",
+  email: "",
+  fullName: "",
+  password: "",
+  confirmPassword: "",
   acceptTerms: true,
   acceptMarketing: true,
 });

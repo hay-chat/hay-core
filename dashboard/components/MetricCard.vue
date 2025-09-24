@@ -1,9 +1,15 @@
 <template>
   <Card>
-    <CardHeader class="flex !flex-row items-center gap-2 pb-2">
-      <component :is="icon" class="h-4 w-4 text-neutral-muted" />
-      <div class="text-sm font-medium !mt-0">
-        {{ title }}
+    <CardHeader class="flex !flex-row items-center justify-between gap-2 pb-2">
+      <div class="flex items-center gap-2">
+        <component :is="icon" class="h-4 w-4 text-neutral-muted" />
+        <div class="text-sm font-medium !mt-0">
+          {{ title }}
+        </div>
+      </div>
+      <div v-if="showCacheIndicator && cacheAge" class="text-xs text-neutral-muted">
+        <Clock class="h-3 w-3 inline mr-1" />
+        {{ cacheAge }}
       </div>
     </CardHeader>
     <CardContent class="!pt-0">
@@ -23,6 +29,7 @@ import { computed, type Component } from "vue";
 import Card from "@/components/ui/Card.vue";
 import CardContent from "@/components/ui/CardContent.vue";
 import CardHeader from "@/components/ui/CardHeader.vue";
+import { Clock } from "lucide-vue-next";
 
 interface Props {
   title: string;
@@ -32,11 +39,14 @@ interface Props {
   subtitleSuffix?: string;
   subtitleColor?: "green" | "red" | "default";
   formatMetric?: boolean;
+  showCacheIndicator?: boolean;
+  cacheAge?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   subtitleColor: "default",
   formatMetric: true,
+  showCacheIndicator: false,
 });
 
 const formattedMetric = computed(() => {

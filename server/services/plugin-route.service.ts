@@ -5,8 +5,7 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { environmentManagerService } from "./environment-manager.service";
-import type { WebhookRequest, WebhookResponse } from "../../plugins/base";
-import type { HayPluginManifest } from "../../plugins/base/types";
+import type { WebhookRequest, WebhookResponse, HayPluginManifest } from "@server/types/plugin.types";
 
 interface RateLimitEntry {
   count: number;

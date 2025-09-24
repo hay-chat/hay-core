@@ -111,3 +111,24 @@ export interface HayPluginManifest {
     templates?: Record<string, string>;
   };
 }
+
+export interface PublicAsset {
+  path: string;
+  content: string | Buffer;
+  contentType: string;
+  cache?: boolean;
+}
+
+export interface WebhookRequest {
+  method: string;
+  path: string;
+  headers: Record<string, string>;
+  body: any;
+  query: Record<string, string>;
+}
+
+export interface WebhookResponse {
+  status: number;
+  headers?: Record<string, string>;
+  body?: any;
+}

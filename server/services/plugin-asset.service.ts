@@ -2,8 +2,7 @@ import { Request, Response } from "express";
 import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import type { PublicAsset } from "../../plugins/base";
-import type { HayPluginManifest } from "../../plugins/base/types";
+import type { PublicAsset, HayPluginManifest } from "@server/types/plugin.types";
 
 interface AssetCache {
   content: string | Buffer;
