@@ -9,9 +9,9 @@ require("module-alias/register");
 // Add path aliases for compiled code
 const moduleAlias = require("module-alias");
 moduleAlias.addAliases({
-  "@server": path.join(__dirname, "dist/server"),
-  "@plugins": path.join(__dirname, "dist/plugins"),
+  "@server": path.join(__dirname, "dist"),
+  "@plugins": path.join(__dirname, "../plugins"),
 });
 
 // Start the server
-require("./dist/server/main");
+require("./dist/main");
