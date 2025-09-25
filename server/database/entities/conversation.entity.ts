@@ -184,6 +184,7 @@ export class Conversation {
     // Handle different instruction formats
     let instructionText = "";
     let referencedActions: string[] = [];
+    let referencedDocuments: string[] = [];
 
     if (playbook.instructions) {
       if (typeof playbook.instructions === "string") {
@@ -192,7 +193,18 @@ export class Conversation {
         const analysis = analyzeInstructions(playbook.instructions);
         instructionText = analysis.formattedText;
         referencedActions = analysis.actions;
+        referencedDocuments = analysis.documents;
       }
+    }
+
+    // Log playbook addition with embedded references (only logs once per conversation per playbook)
+    if (this.playbook_id !== playbookId) {
+      console.log("[Orchestrator] Playbook added to conversation", {
+        conversationId: this.id,
+        playbookName: playbook.title,
+        referencedActions: referencedActions,
+        referencedDocuments: referencedDocuments,
+      });
     }
 
     // Get tool schemas from plugin manager service
@@ -294,6 +306,37 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     this.playbook_id = playbookId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
+
+    // Attach documents referenced in the playbook
+    if (referencedDocuments.length > 0) {
+      console.log(
+        `[Conversation] Playbook references ${referencedDocuments.length} documents, attempting to attach them`,
+      );
+
+      for (const documentId of referencedDocuments) {
+        try {
+          // Verify the document exists and belongs to this organization
+          const document = await documentRepository.findById(documentId);
+
+          if (document && document.organizationId === this.organization_id) {
+            console.log(
+              `[Conversation] Attaching document "${document.title}" (${documentId}) from playbook`,
+            );
+
+            // addDocument already handles deduplication
+            await this.addDocument(documentId);
+          } else if (document) {
+            console.warn(
+              `[Conversation] Document ${documentId} belongs to different organization, skipping`,
+            );
+          } else {
+            console.warn(`[Conversation] Document ${documentId} referenced in playbook not found`);
+          }
+        } catch (error) {
+          console.error(`[Conversation] Error attaching document "${documentId}":`, error);
+        }
+      }
+    }
   }
 
   async addDocument(documentId: string): Promise<void> {

@@ -16,12 +16,8 @@ export const runConversation = async (conversationId: string) => {
     throw new Error("Conversation not found");
   }
 
-  console.log(
-    "[Orchestrator] Running conversation",
-    conversationId,
-    conversation?.needs_processing,
-    conversation?.processing_locked_until,
-  );
+  if (conversation?.needs_processing)
+    console.log("[Orchestrator] Running conversation", conversationId);
 
   try {
     // 00. Intialize
