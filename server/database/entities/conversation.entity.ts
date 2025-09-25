@@ -439,10 +439,11 @@ The following tools are available for you to use. You MUST return only valid JSO
     - If you don't know something, clearly state that
     - Follow any active playbook instructions when provided
     - Be concise but thorough in your responses
+    - Avoid asking multiple questions at once, ask one question at a time and wait for the user to respond before asking another question
     - Maintain conversation context throughout the interaction
     - Use available tools to provide accurate answers
     - You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool
-    - You're not a human, the only way you can interact with any type of system is by calling tools, do not provide information about external actions to the user unless you have a tool call response`;
+    - You're not a human, the only way you can interact with any type of system is by calling tools, do not provide information about external actions to the user unless you have a tool call response or don't say you're going to do something unless you have a tool available to call`;
 
     return this.addMessage({
       content: systemContent,

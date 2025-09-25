@@ -1,12 +1,9 @@
 <template>
-  <!-- <div class="space-y-6">
-
+  <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Insights</h1>
-        <p class="text-neutral-muted">
-          AI-generated insights to improve your chatbot performance
-        </p>
+        <p class="text-neutral-muted">AI-generated insights to improve your chatbot performance</p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm">
@@ -20,7 +17,6 @@
       </div>
     </div>
 
-    <!-- Filters ->
     <div class="flex items-center space-x-4 p-4 bg-background-secondary rounded-lg">
       <div class="flex items-center space-x-2">
         <Filter class="h-4 w-4 text-neutral-muted" />
@@ -63,7 +59,6 @@
       </div>
     </div>
 
-    
     <div class="space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Pending Insights</h2>
@@ -162,7 +157,6 @@
       </div>
     </div>
 
-    
     <div class="space-y-4">
       <h2 class="text-xl font-semibold">Accepted Insights</h2>
 
@@ -213,7 +207,7 @@
         </CardContent>
       </Card>
     </div>
-  </div> -->
+  </div>
   <div>
     <h1>Insights</h1>
     <svg
@@ -233,41 +227,6 @@
 </template>
 
 <script setup lang="ts">
-import {
-  Lightbulb,
-  Filter,
-  RefreshCcw,
-  Settings,
-  MoreHorizontal,
-  MessageSquare,
-  Bot,
-  TrendingUp,
-  Eye,
-  X,
-  Check,
-  CheckCircle,
-  Download,
-  BarChart3,
-  ExternalLink,
-} from "lucide-vue-next";
-
-// TODO: Import actual Badge component when available
-const Badge = ({ variant = "default", ...props }: { variant?: string; [key: string]: unknown }) =>
-  h("span", {
-    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === "outline"
-        ? "border border-gray-300 text-gray-700"
-        : variant === "secondary"
-          ? "bg-blue-100 text-blue-800"
-          : variant === "destructive"
-            ? "bg-red-100 text-red-800"
-            : variant === "success"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-    }`,
-    ...props,
-  });
-
 // Reactive state
 const loading = ref(true);
 const selectedType = ref("");
@@ -382,8 +341,13 @@ const getInsightTypeLabel = (type: string) => {
   return labels[type as keyof typeof labels] || type;
 };
 
-const getInsightTypeVariant = (type: string) => {
-  const variants = {
+const getInsightTypeVariant = (
+  type: string,
+): "default" | "destructive" | "outline" | "secondary" | "success" => {
+  const variants: Record<
+    string,
+    "default" | "destructive" | "outline" | "secondary" | "success"
+  > = {
     "new-playbook": "default",
     improvement: "secondary",
     pattern: "success",

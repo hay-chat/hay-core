@@ -263,23 +263,6 @@ import {
   FileText,
 } from "lucide-vue-next";
 
-// TODO: Import actual Badge component when available
-const Badge = ({ variant = "default", ...props }) =>
-  h("span", {
-    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      variant === "outline"
-        ? "border border-gray-300 text-gray-700"
-        : variant === "secondary"
-          ? "bg-blue-100 text-blue-800"
-          : variant === "destructive"
-            ? "bg-red-100 text-red-800"
-            : variant === "success"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-    }`,
-    ...props,
-  });
-
 import { useRouter } from "vue-router";
 import { useToast } from "~/composables/useToast";
 import type { Playbook } from "~/types/playbook";
@@ -355,8 +338,13 @@ const _getCategoryLabel = (category: string) => {
   return labels[category as keyof typeof labels] || category;
 };
 
-const getStatusVariant = (status: string) => {
-  const variants = {
+const getStatusVariant = (
+  status: string,
+): "default" | "destructive" | "outline" | "secondary" | "success" => {
+  const variants: Record<
+    string,
+    "default" | "destructive" | "outline" | "secondary" | "success"
+  > = {
     active: "success",
     archived: "secondary",
     draft: "outline",
