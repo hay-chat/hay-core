@@ -1,6 +1,7 @@
 import pdfParse from "pdf-parse";
 import { BaseProcessor } from "./base.processor";
 import type { ProcessedDocument } from "./base.processor";
+import { sanitizeContent } from "../utils/sanitize";
 
 export class PdfProcessor extends BaseProcessor {
   supportedTypes = ["pdf", "application/pdf"];
@@ -9,7 +10,7 @@ export class PdfProcessor extends BaseProcessor {
     const data = await pdfParse(buffer);
 
     return {
-      content: data.text,
+      content: sanitizeContent(data.text),
       metadata: {
         fileName,
         fileType: "pdf",

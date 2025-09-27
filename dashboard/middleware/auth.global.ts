@@ -19,8 +19,13 @@ export default defineNuxtRouteMiddleware(
       return;
     }
 
-    // Check if auth is still initializing
-    if (!authStore.isInitialized) {
+    // Check if auth is still initializing - only on client side
+    if (process.client && !authStore.isInitialized) {
+      // For client-side navigation, wait for auth initialization
+      // but immediately redirect if we know there's no token
+      if (!authStore.tokens?.accessToken) {
+        return navigateTo("/login");
+      }
       return; // Let AuthProvider handle the loading state
     }
 

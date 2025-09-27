@@ -58,7 +58,7 @@ export class WebScraperService extends EventEmitter {
         this.urlQueue = sitemapUrls;
         this.totalUrlsDiscovered = sitemapUrls.length; // Set initial count from sitemap
         this.hasSitemap = true; // Mark that we have a sitemap
-        console.log(`Found ${sitemapUrls.length} URLs in sitemap`);
+        console.log(`Found ${sitemapUrls.length} total URLs from sitemap(s)`);
 
         // Immediately emit progress showing all URLs found in sitemap
         this.emit("discovery-progress", {
@@ -67,6 +67,7 @@ export class WebScraperService extends EventEmitter {
           processed: 0, // None processed yet
           total: this.totalUrlsDiscovered, // Total expected
           currentUrl: "Processing sitemap URLs...",
+          discoveredPages: [], // Initial empty array
         });
       } else {
         // Step 2: Crawl the website to discover URLs
@@ -129,7 +130,7 @@ export class WebScraperService extends EventEmitter {
 
       if (sitemapUrls.length > 0) {
         this.urlQueue = sitemapUrls;
-        console.log(`Found ${sitemapUrls.length} URLs in sitemap`);
+        console.log(`Found ${sitemapUrls.length} total URLs from sitemap(s)`);
       } else {
         // Step 2: Crawl the website starting from the base URL
         console.log("No sitemap found, crawling from base URL");
@@ -183,7 +184,7 @@ export class WebScraperService extends EventEmitter {
         });
 
         if (response.status === 200) {
-          const urls = this.parseSitemap(response.data);
+          const urls = await this.parseSitemap(response.data, sitemapUrl);
           if (urls.length > 0) {
             return urls;
           }
@@ -197,25 +198,78 @@ export class WebScraperService extends EventEmitter {
     return sitemapUrls;
   }
 
-  private parseSitemap(content: string): string[] {
+  private async parseSitemap(content: string, sitemapUrl: string): Promise<string[]> {
     const urls: string[] = [];
     const $ = cheerio.load(content, { xmlMode: true });
 
-    // Parse XML sitemap
-    $("url > loc").each((_: number, element: any) => {
-      const url = $(element).text().trim();
-      if (url && this.isSameDomain(url)) {
-        urls.push(url);
-      }
-    });
+    // Check if this is a sitemap index file (contains <sitemap> elements)
+    const sitemapElements = $("sitemap > loc");
+    if (sitemapElements.length > 0) {
+      console.log(`Found sitemap index with ${sitemapElements.length} sub-sitemaps at ${sitemapUrl}`);
+      
+      // This is a sitemap index, recursively fetch and parse sub-sitemaps
+      const subSitemapUrls: string[] = [];
+      sitemapElements.each((_: number, element: any) => {
+        const url = $(element).text().trim();
+        if (url) {
+          subSitemapUrls.push(url);
+        }
+      });
 
-    // Parse sitemap index
-    $("sitemap > loc").each((_: number, element: any) => {
-      const url = $(element).text().trim();
-      if (url && this.isSameDomain(url)) {
-        urls.push(url);
+      // Process sub-sitemaps in parallel (but limit concurrency)
+      const concurrencyLimit = 5;
+      for (let i = 0; i < subSitemapUrls.length; i += concurrencyLimit) {
+        const batch = subSitemapUrls.slice(i, i + concurrencyLimit);
+        const batchPromises = batch.map(async (subSitemapUrl) => {
+          try {
+            console.log(`Fetching sub-sitemap: ${subSitemapUrl}`);
+            const response = await axios.get(subSitemapUrl, {
+              timeout: 10000,
+              maxContentLength: 5 * 1024 * 1024,
+            });
+            
+            if (response.status === 200) {
+              // Recursively parse the sub-sitemap
+              const subUrls = await this.parseSitemap(response.data, subSitemapUrl);
+              console.log(`Found ${subUrls.length} URLs in sub-sitemap: ${subSitemapUrl}`);
+              return subUrls;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch sub-sitemap ${subSitemapUrl}:`, error);
+          }
+          return [];
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        for (const subUrls of batchResults) {
+          urls.push(...subUrls);
+        }
+
+        // Stop if we've already found enough URLs
+        if (urls.length >= this.maxPages) {
+          break;
+        }
       }
-    });
+      
+      // If this was a sitemap index and we found URLs, return them
+      if (urls.length > 0) {
+        console.log(`Total URLs from sitemap index: ${urls.length}`);
+        return urls.slice(0, this.maxPages);
+      }
+    }
+
+    // Parse regular sitemap (contains <url> elements)
+    const urlElements = $("url > loc");
+    if (urlElements.length > 0) {
+      console.log(`Found regular sitemap with ${urlElements.length} URLs at ${sitemapUrl}`);
+      urlElements.each((_: number, element: any) => {
+        const url = $(element).text().trim();
+        // Always check if URL is from same domain
+        if (url && this.isSameDomain(url)) {
+          urls.push(url);
+        }
+      });
+    }
 
     // Parse text sitemap (one URL per line)
     if (urls.length === 0 && !content.includes("<")) {
@@ -228,6 +282,7 @@ export class WebScraperService extends EventEmitter {
       }
     }
 
+    console.log(`Returning ${urls.length} URLs from ${sitemapUrl}`);
     return urls.slice(0, this.maxPages);
   }
 
@@ -428,6 +483,7 @@ export class WebScraperService extends EventEmitter {
         processed: 0, // Successfully fetched and validated pages
         total: this.totalUrlsDiscovered, // Expected total
         currentUrl: this.baseUrl.href,
+        discoveredPages: [], // Initial empty array
       });
     }
 
@@ -441,13 +497,14 @@ export class WebScraperService extends EventEmitter {
       this.visitedUrls.add(url);
       processedCount++;
 
-      // Emit detailed progress with discovered count
+      // Emit detailed progress with discovered count and pages
       this.emit("discovery-progress", {
         status: "discovering",
         found: this.totalUrlsDiscovered, // Use stable counter
         processed: this.discoveredPages.length, // Successfully processed pages with metadata
         total: this.totalUrlsDiscovered, // Total remains stable for sitemap case
         currentUrl: url,
+        discoveredPages: [...this.discoveredPages], // Include discovered pages so far
       });
 
       this.emitProgress(

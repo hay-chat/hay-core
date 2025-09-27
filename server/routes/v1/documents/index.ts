@@ -4,6 +4,7 @@ import { DocumentProcessorFactory } from "@server/processors";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
+import { sanitizeContent } from "@server/utils/sanitize";
 import {
   DocumentationType,
   DocumentationStatus,
@@ -96,10 +97,13 @@ export const documentsRouter = t.router({
         metadata = processed.metadata;
       }
 
+      // Sanitize content to remove null bytes before saving
+      const sanitizedContent = sanitizeContent(processedContent);
+      
       // Save document to database first
       const document = await documentRepository.create({
-        title: input.title,
-        content: processedContent,
+        title: sanitizeContent(input.title),
+        content: sanitizedContent,
         type: input.type || DocumentationType.ARTICLE,
         status: input.status || DocumentationStatus.DRAFT,
         visibility: input.visibility || DocumentVisibility.PRIVATE,
@@ -112,7 +116,7 @@ export const documentsRouter = t.router({
       }
 
       // Split content into chunks for better retrieval
-      const chunks = splitTextIntoChunks(processedContent, {
+      const chunks = splitTextIntoChunks(sanitizedContent, {
         chunkSize: 1000,
         chunkOverlap: 200,
       });
@@ -686,7 +690,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 
     // Initialize scraper
     const scraper = new WebScraperService();
-    const discoveredPages: DiscoveredPage[] = [];
+    let discoveredPages: DiscoveredPage[] = [];
 
     // Listen for discovery progress events
     scraper.on(
@@ -698,6 +702,11 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
         currentUrl?: string;
         discoveredPages?: DiscoveredPage[];
       }) => {
+        // Update discovered pages from event
+        if (progress.discoveredPages) {
+          discoveredPages = progress.discoveredPages;
+        }
+        
         // Update job with progress
         await jobRepository.update(jobId, organizationId, {
           data: {
@@ -706,7 +715,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
             progress: {
               status: "discovering",
               pagesFound: progress.found,
-              pagesProcessed: 0, // No pages processed during discovery
+              pagesProcessed: progress.discoveredPages?.length || 0, // Use actual discovered pages count
               totalEstimated: progress.total,
               currentUrl: progress.currentUrl,
               discoveredPages: discoveredPages,
@@ -718,9 +727,9 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 
     // Discover URLs
     const pages = await scraper.discoverUrls(url);
-
-    // Store discovered pages
-    discoveredPages.push(...pages);
+    
+    // Pages are already stored from progress events, update final result
+    discoveredPages = pages;
 
     // Update job as completed with results
     await jobRepository.update(jobId, organizationId, {

@@ -2,7 +2,6 @@ import { defineStore } from "pinia";
 import type { Organization } from "./user";
 
 export const useOrganizationStore = defineStore("organization", {
-  persist: true,
   state: () => ({
     current: null as Organization | null,
     available: [] as Organization[],
@@ -12,4 +11,5 @@ export const useOrganizationStore = defineStore("organization", {
       this.current = organization;
     },
   },
+  persist: true,
 });

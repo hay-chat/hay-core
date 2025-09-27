@@ -1,0 +1,201 @@
+/* Shepherd Tour Styles - Complete Custom Theme Matching App Design System */
+
+/* Base Shepherd Element Styles */
+.shepherd-element {
+  position: absolute;
+  z-index: 9999 !important;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif !important;
+  max-width: 400px;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.3s,
+    visibility 0.3s;
+}
+
+.shepherd-element.shepherd-centered {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.shepherd-enabled.shepherd-element {
+  opacity: 1;
+  visibility: visible;
+}
+
+.shepherd-element[data-popper-reference-hidden]:not(.shepherd-centered) {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* Modal Overlay */
+.shepherd-modal-overlay-container {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 0;
+  width: 100vw;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 9998 !important;
+  transition:
+    all 0.3s ease-out,
+    height 0s 0.3s,
+    opacity 0.3s 0s;
+  opacity: 0;
+}
+
+.shepherd-modal-overlay-container.shepherd-modal-is-visible {
+  height: 100vh;
+  opacity: 0.5;
+  transition:
+    all 0.3s ease-out,
+    height 0s 0s,
+    opacity 0.3s 0s;
+  pointer-events: auto;
+}
+
+.dark .shepherd-modal-overlay-container.shepherd-modal-is-visible {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.shepherd-modal-overlay-container.shepherd-modal-is-visible path {
+  pointer-events: all;
+}
+
+.shepherd-content {
+  @apply bg-background border border-border text-foreground rounded-md;
+  padding: 0 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+.shepherd-text {
+  @apply p-4 text-sm leading-relaxed;
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+.shepherd-header {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+.shepherd-title {
+  @apply text-base font-semibold text-foreground;
+}
+
+.shepherd-cancel-icon {
+  @apply text-neutral-muted hover:text-foreground transition-colors;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1.5rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shepherd-footer {
+  @apply border-t border-border px-4 py-3 bg-background rounded-b-md;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Match app's button styles exactly */
+.shepherd-button {
+  @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium;
+  @apply ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2;
+  @apply focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  @apply h-10 px-4 py-2;
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  margin-right: 0 !important;
+}
+
+.shepherd-button-secondary {
+  @apply bg-background border border-input text-foreground;
+  @apply hover:bg-accent;
+}
+
+.shepherd-button:last-child {
+  margin-right: 0 !important;
+}
+
+/* Arrow Styles */
+.shepherd-arrow,
+.shepherd-arrow:before {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  z-index: -1;
+}
+
+.shepherd-arrow {
+  border-color: transparent !important;
+}
+
+.shepherd-arrow::before {
+  content: "";
+  transform: rotate(45deg);
+  @apply bg-background border border-border;
+}
+
+/* Arrow positioning based on placement */
+.shepherd-element[data-popper-placement^="top"] > .shepherd-arrow {
+  bottom: -8px;
+}
+
+.shepherd-element[data-popper-placement^="bottom"] > .shepherd-arrow {
+  top: -8px;
+}
+
+.shepherd-element[data-popper-placement^="left"] > .shepherd-arrow {
+  right: -8px;
+}
+
+.shepherd-element[data-popper-placement^="right"] > .shepherd-arrow {
+  left: -8px;
+}
+
+.shepherd-element.shepherd-centered > .shepherd-arrow {
+  opacity: 0;
+}
+
+/* Target highlighting */
+.shepherd-target-click-disabled.shepherd-enabled.shepherd-target,
+.shepherd-target-click-disabled.shepherd-enabled.shepherd-target * {
+  pointer-events: none;
+}
+
+/* Animation */
+.shepherd-enabled {
+  transition: all 0.3s ease;
+}
+
+.shepherd-element.shepherd-open {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Ensure proper box-sizing */
+.shepherd-element,
+.shepherd-element *,
+.shepherd-element *:after,
+.shepherd-element *:before {
+  box-sizing: border-box;
+}

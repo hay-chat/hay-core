@@ -163,11 +163,6 @@ export default defineNuxtConfig({
     transpile: ["@headlessui/vue"],
   },
 
-  // Tailwind CSS configuration
-  tailwindcss: {
-    cssPath: "@/assets/css/main.css",
-  },
-
   // Vite configuration for additional auto-imports
   vite: {
     optimizeDeps: {

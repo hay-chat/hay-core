@@ -9,7 +9,6 @@ interface Tokens {
 }
 
 export const useAuthStore = defineStore("auth", {
-  persist: true,
   state: () => ({
     tokens: null as Tokens | null,
     isAuthenticated: false,
@@ -159,4 +158,5 @@ export const useAuthStore = defineStore("auth", {
       }
     },
   },
+  persist: true,
 });

@@ -27,7 +27,6 @@ interface AppState {
 }
 
 export const useAppStore = defineStore("app", {
-  persist: true,
   state: (): AppState => ({
     openConversationsCount: 0,
     lastUpdated: null,
@@ -180,6 +179,7 @@ export const useAppStore = defineStore("app", {
       }
     },
   },
+  persist: true,
 });
 
 export type AppStore = ReturnType<typeof useAppStore>;

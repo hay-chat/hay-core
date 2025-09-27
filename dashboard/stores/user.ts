@@ -20,7 +20,6 @@ export interface User {
 }
 
 export const useUserStore = defineStore("user", {
-  persist: true,
   state: () => ({
     user: null as User | null,
     activeOrganizationId: null as string | null,
@@ -81,4 +80,5 @@ export const useUserStore = defineStore("user", {
       this.organizations = [];
     },
   },
+  persist: true,
 });

@@ -360,11 +360,13 @@ import {
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
+import { useToast } from "@/composables/useToast";
 
 // Route and router
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const toast = useToast();
 
 // Plugin ID from route
 const pluginId = computed(() => route.params.pluginId as string);
@@ -515,7 +517,6 @@ const fetchPlugin = async () => {
 
 const saveConfiguration = async () => {
   saving.value = true;
-  const toast = useToast();
 
   try {
     // Build configuration to send to server

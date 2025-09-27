@@ -12,7 +12,6 @@ interface WidgetLoadingState {
 }
 
 export const useAnalyticsStore = defineStore("analytics", {
-  persist: true,
   state: () => ({
     widgetData: {} as Record<string, WidgetData>,
     loadingStates: {} as Record<string, WidgetLoadingState>,
@@ -139,4 +138,5 @@ export const useAnalyticsStore = defineStore("analytics", {
       return "Just now";
     },
   },
+  persist: true,
 });

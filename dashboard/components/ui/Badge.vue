@@ -32,7 +32,7 @@ const emit = defineEmits<{
 
 const componentTag = computed(() => (props.href ? "a" : "span"));
 
-const isInteractive = computed(() => !!props.href || !!props.onClick || !!emit.click);
+const isInteractive = computed(() => !!props.href || !!props.onClick);
 
 const onClick = (event: MouseEvent) => {
   if (props.onClick) {

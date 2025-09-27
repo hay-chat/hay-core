@@ -1,6 +1,7 @@
 import { BaseProcessor } from "./base.processor";
 import type { ProcessedDocument } from "./base.processor";
 import OpenAI from "openai";
+import { sanitizeContent } from "../utils/sanitize";
 
 export class HtmlProcessor extends BaseProcessor {
   supportedTypes = ["text/html", "application/xhtml+xml"];
@@ -24,7 +25,7 @@ export class HtmlProcessor extends BaseProcessor {
       const markdownContent = await this.convertToMarkdown(htmlContent);
 
       return {
-        content: markdownContent,
+        content: sanitizeContent(markdownContent),
         metadata: {
           fileName: fileName || "web-content.html",
           fileType: "text/html",
@@ -38,7 +39,7 @@ export class HtmlProcessor extends BaseProcessor {
 
       // Fallback to basic text extraction
       return {
-        content: textContent,
+        content: sanitizeContent(textContent),
         metadata: {
           fileName: fileName || "web-content.html",
           fileType: "text/html",
@@ -108,6 +109,6 @@ Output only the Markdown content, no explanations.`,
       throw new Error("LLM returned empty response");
     }
 
-    return markdownContent;
+    return sanitizeContent(markdownContent);
   }
 }

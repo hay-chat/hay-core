@@ -24,14 +24,22 @@
         <ChevronRight class="h-4 w-4" />
         <span>Import</span>
       </div>
-      <h1 class="text-3xl font-bold text-foreground">Import Document</h1>
-      <p class="mt-2 text-neutral-muted">
-        Add new documents to your knowledge base from various sources.
-      </p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-foreground">Import Document</h1>
+          <p class="mt-2 text-neutral-muted">
+            Add new documents to your knowledge base from various sources.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" @click="startTutorial">
+          <HelpCircle class="h-4 w-4 mr-2" />
+          Tutorial
+        </Button>
+      </div>
     </div>
 
     <!-- Import Steps Progress -->
-    <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center justify-between mb-8" data-tour="progress-steps">
       <template v-for="(step, index) in steps" :key="index">
         <div class="flex items-center gap-2">
           <div
@@ -61,15 +69,19 @@
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div class="grid gap-4">
+        <div class="grid gap-4" data-tour="import-sources">
           <!-- Upload Files Option -->
           <div
             class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
             :class="{ 'border-primary bg-primary/5': importType === 'upload' }"
+            data-tour="upload-option"
             @click="selectImportType('upload')"
           >
             <div class="flex items-start gap-4">
-              <div class="p-3 bg-background-tertiary rounded-lg">
+              <div
+                class="p-3 rounded-lg"
+                :class="importType === 'upload' ? 'bg-white' : 'bg-background-tertiary'"
+              >
                 <Upload class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
@@ -88,10 +100,14 @@
           <div
             class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
             :class="{ 'border-primary bg-primary/5': importType === 'web' }"
+            data-tour="web-option"
             @click="selectImportType('web')"
           >
             <div class="flex items-start gap-4">
-              <div class="p-3 bg-background-tertiary rounded-lg">
+              <div
+                class="p-3 rounded-lg"
+                :class="importType === 'web' ? 'bg-white' : 'bg-background-tertiary'"
+              >
                 <Globe class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
@@ -120,7 +136,12 @@
               @click="selectImportType(`plugin:${plugin.id}`)"
             >
               <div class="flex items-start gap-4">
-                <div class="p-3 bg-background-tertiary rounded-lg">
+                <div
+                  class="p-3 rounded-lg"
+                  :class="
+                    importType === `plugin:${plugin.id}` ? 'bg-white' : 'bg-background-tertiary'
+                  "
+                >
                   <Package class="h-6 w-6 text-neutral-muted" />
                 </div>
                 <div class="flex-1">
@@ -379,9 +400,7 @@
             <div class="flex items-center space-x-2">
               <Checkbox
                 :checked="discoveredPages.every((p) => p.selected)"
-                @update:checked="
-                  (checked) => discoveredPages.forEach((p) => (p.selected = checked))
-                "
+                @update:checked="toggleSelectAll"
               />
               <Label class="text-sm font-medium">
                 Select All ({{ discoveredPages.filter((p) => p.selected).length }}
@@ -401,7 +420,11 @@
               :key="index"
               class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
             >
-              <Checkbox v-model="page.selected" class="mt-1" />
+              <Checkbox
+                :checked="page.selected"
+                @update:checked="(checked: boolean) => togglePageSelection(index, checked)"
+                class="mt-1"
+              />
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate">
                   {{ page.title || "Untitled Page" }}
@@ -616,16 +639,6 @@
                 />
               </div>
 
-              <div>
-                <Label :for="`tags-${index}`">Tags</Label>
-                <Input
-                  :id="`tags-${index}`"
-                  v-model="file.tags"
-                  placeholder="Enter tags separated by commas"
-                />
-                <p class="text-xs text-neutral-muted mt-1">e.g., customer-support, billing, api</p>
-              </div>
-
               <div class="flex items-center space-x-2">
                 <Checkbox :id="`active-${index}`" v-model="file.isActive" />
                 <Label :for="`active-${index}`" class="text-sm font-normal">
@@ -813,11 +826,15 @@ import {
   Globe,
   Package,
   ExternalLink,
+  HelpCircle,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Button from "@/components/ui/Button.vue";
+import { useDocumentImportTour } from "@/composables/useDocumentImportTour";
 
 const router = useRouter();
+const { startTour, shouldShowTour } = useDocumentImportTour();
 
 interface UploadFile extends File {
   documentName?: string;
@@ -933,15 +950,25 @@ onMounted(async () => {
   document.addEventListener("dragover", handleGlobalDragOver);
   document.addEventListener("dragleave", handleGlobalDragLeave);
   document.addEventListener("drop", handleGlobalDrop);
+
+  // Auto-start tutorial if first time
+  if (shouldShowTour()) {
+    setTimeout(() => startTour(), 500);
+  }
 });
 
 // Clean up polling interval on unmount
 onBeforeUnmount(() => {
-  if ((window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval) {
+  if (
+    (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+      .__discoveryPollInterval
+  ) {
     clearInterval(
-      (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval,
+      (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+        .__discoveryPollInterval,
     );
-    delete (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval;
+    delete (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+      .__discoveryPollInterval;
   }
 
   // Remove global drag and drop listeners
@@ -999,7 +1026,13 @@ const discoverPages = async () => {
 
         // Update progress based on job status
         if (jobStatus.progress) {
-          const progress = jobStatus.progress as any;
+          const progress = jobStatus.progress as {
+            pagesFound?: number;
+            pagesProcessed?: number;
+            totalEstimated?: number;
+            status?: string;
+            currentUrl?: string;
+          };
           discoveryProgress.value = {
             found: progress.pagesFound || 0,
             processed: progress.pagesProcessed || 0,
@@ -1015,7 +1048,7 @@ const discoverPages = async () => {
 
           // Extract discovered pages from job result
           if (jobStatus.result?.pages) {
-            discoveredPages.value = (jobStatus.result.pages as any[]).map(
+            discoveredPages.value = (jobStatus.result.pages as DiscoveredPage[]).map(
               (page: DiscoveredPage) => ({
                 ...page,
                 selected: page.selected !== false, // Default to true unless explicitly false
@@ -1060,7 +1093,9 @@ const discoverPages = async () => {
     }, 5000); // Poll every 5 seconds
 
     // Store interval ID for cleanup if needed
-    (window as Window & { __discoveryPollInterval?: any }).__discoveryPollInterval = pollInterval;
+    (
+      window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> }
+    ).__discoveryPollInterval = pollInterval;
   } catch (error) {
     console.error("Failed to start page discovery:", error);
     isDiscovering.value = false;
@@ -1071,11 +1106,16 @@ const discoverPages = async () => {
 
 const cancelDiscovery = () => {
   // Clear any existing polling interval
-  if ((window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval) {
+  if (
+    (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+      .__discoveryPollInterval
+  ) {
     clearInterval(
-      (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval,
+      (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+        .__discoveryPollInterval,
     );
-    delete (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval;
+    delete (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
+      .__discoveryPollInterval;
   }
 
   isDiscovering.value = false;
@@ -1400,6 +1440,29 @@ const resetImport = () => {
   websiteUrl.value = "";
   webImportJob.value = null;
   webImportProgress.value = null;
+};
+
+const toggleSelectAll = (checked: boolean) => {
+  discoveredPages.value = discoveredPages.value.map((page) => ({
+    ...page,
+    selected: checked,
+  }));
+};
+
+const togglePageSelection = (index: number, checked: boolean) => {
+  discoveredPages.value = [
+    ...discoveredPages.value.slice(0, index),
+    { ...discoveredPages.value[index], selected: checked },
+    ...discoveredPages.value.slice(index + 1),
+  ];
+};
+
+const startTutorial = () => {
+  // Reset to step 1 if needed
+  if (currentStep.value !== 1) {
+    currentStep.value = 1;
+  }
+  startTour();
 };
 
 // SEO
