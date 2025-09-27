@@ -11,9 +11,11 @@
       "@plugins/*": ["../plugins/*"]
     }
   },
-  "include": ["./**/*.ts", "./**/*.vue", "./.nuxt/**/*"],
+  "include": ["./**/*.ts", "./**/*.vue"],
+  "skipLibCheck": true,
   "exclude": [
     "node_modules",
+    ".nuxt",
     "../server/**/*",
     "../plugins/**/*",
     "../**/*.spec.ts",

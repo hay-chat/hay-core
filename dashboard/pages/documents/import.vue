@@ -1,5 +1,22 @@
 <template>
-  <div class="max-w-4xl mx-auto space-y-8">
+  <div class="max-w-4xl mx-auto space-y-8 relative">
+    <!-- Global Drop Overlay for Step 1 -->
+    <div
+      v-if="currentStep === 1 && isDragging"
+      class="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
+      @drop="handleGlobalDrop"
+      @dragover.prevent="handleGlobalDragOver"
+      @dragleave.prevent="handleGlobalDragLeave"
+    >
+      <div
+        class="bg-primary/10 border-4 border-dashed border-primary rounded-lg p-12 max-w-lg text-center pointer-events-none"
+      >
+        <Upload class="mx-auto h-20 w-20 text-primary mb-4 animate-pulse" />
+        <h3 class="text-2xl font-bold mb-2">Drop files to upload</h3>
+        <p class="text-neutral-muted">Release to start importing your documents</p>
+      </div>
+    </div>
+
     <!-- Page Header -->
     <div>
       <div class="flex items-center gap-2 text-sm text-neutral-muted mb-4">
@@ -911,6 +928,11 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load importers:", error);
   }
+
+  // Add global drag and drop listeners for step 1
+  document.addEventListener("dragover", handleGlobalDragOver);
+  document.addEventListener("dragleave", handleGlobalDragLeave);
+  document.addEventListener("drop", handleGlobalDrop);
 });
 
 // Clean up polling interval on unmount
@@ -921,6 +943,11 @@ onBeforeUnmount(() => {
     );
     delete (window as Window & { __discoveryPollInterval?: number }).__discoveryPollInterval;
   }
+
+  // Remove global drag and drop listeners
+  document.removeEventListener("dragover", handleGlobalDragOver);
+  document.removeEventListener("dragleave", handleGlobalDragLeave);
+  document.removeEventListener("drop", handleGlobalDrop);
 });
 
 // Methods
@@ -1187,6 +1214,45 @@ const addFiles = (files: File[]) => {
 
     selectedFiles.value.push(uploadFile);
   });
+};
+
+// Global drag and drop handlers for step 1
+const handleGlobalDragOver = (e: DragEvent) => {
+  if (currentStep.value === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    isDragging.value = true;
+  }
+};
+
+const handleGlobalDragLeave = (e: DragEvent) => {
+  if (currentStep.value === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're leaving the window
+    if (e.clientX === 0 && e.clientY === 0) {
+      isDragging.value = false;
+    }
+  }
+};
+
+const handleGlobalDrop = (e: DragEvent) => {
+  if (currentStep.value === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    isDragging.value = false;
+
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      // Select upload type automatically
+      selectImportType("upload");
+
+      // Add the files
+      addFiles(Array.from(e.dataTransfer.files));
+
+      // Proceed to file selection step
+      currentStep.value = 2;
+    }
+  }
 };
 
 const removeFile = (index: number) => {
