@@ -1,0 +1,105 @@
+<!-- subject: {{notificationTitle}} -->
+<div style="margin-bottom: 30px;">
+    {{#if notificationIcon}}
+    <div style="text-align: center; margin-bottom: 20px;">
+        <div style="display: inline-block; width: 60px; height: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; line-height: 60px; text-align: center; color: white; font-size: 24px;">
+            {{notificationIcon}}
+        </div>
+    </div>
+    {{/if}}
+    
+    <h2 style="color: #667eea; text-align: center; margin-bottom: 10px;">{{notificationTitle}}</h2>
+    
+    {{#if notificationSubtitle}}
+    <p style="font-size: 16px; color: #666; text-align: center;">{{notificationSubtitle}}</p>
+    {{/if}}
+</div>
+
+<div style="margin: 30px 0;">
+    {{#if userName}}
+    <p>Hi {{userName}},</p>
+    {{/if}}
+    
+    <div style="margin: 20px 0;">
+        {{notificationMessage}}
+    </div>
+    
+    {{#if actionRequired}}
+    <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px; padding: 15px; margin: 30px 0;">
+        <p style="margin: 0; color: #0c5460;">
+            <strong>Action Required:</strong> {{actionMessage}}
+        </p>
+    </div>
+    {{/if}}
+    
+    {{#if details}}
+    <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin: 30px 0;">
+        <h3 style="color: #333; margin-top: 0;">Details</h3>
+        {{#each details}}
+        <p style="margin: 5px 0;">
+            <strong>{{this.label}}:</strong> {{this.value}}
+        </p>
+        {{/each}}
+    </div>
+    {{/if}}
+    
+    {{#if actionButton}}
+    <div style="text-align: center; margin: 40px 0;">
+        <a href="{{actionButton.url}}" class="button" style="display: inline-block; padding: 14px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+            {{actionButton.text}}
+        </a>
+    </div>
+    {{/if}}
+    
+    {{#if additionalInfo}}
+    <div style="margin: 30px 0;">
+        {{additionalInfo}}
+    </div>
+    {{/if}}
+    
+    {{#if relatedItems}}
+    <div style="margin-top: 40px;">
+        <h3 style="color: #333;">Related Items</h3>
+        <ul style="line-height: 2;">
+            {{#each relatedItems}}
+            <li>
+                {{#if this.url}}
+                <a href="{{this.url}}" style="color: #667eea;">{{this.text}}</a>
+                {{else}}
+                {{this.text}}
+                {{/if}}
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+    {{/if}}
+    
+    {{#if notificationSettings}}
+    <div style="border-top: 1px solid #e9ecef; margin: 40px 0; padding-top: 20px;">
+        <p style="font-size: 14px; color: #666;">
+            You're receiving this notification because {{notificationReason}}. 
+            <a href="{{notificationSettings.url}}" style="color: #667eea;">Manage notification preferences</a>
+        </p>
+    </div>
+    {{/if}}
+    
+    {{#if supportContact}}
+    <p style="margin-top: 30px;">
+        If you have any questions, please contact us at 
+        <a href="mailto:{{supportEmail}}" style="color: #667eea;">{{supportEmail}}</a>
+    </p>
+    {{/if}}
+    
+    <p style="margin-top: 30px;">
+        Best regards,<br>
+        The {{companyName}} Team
+    </p>
+</div>
+
+{{#if timestamp}}
+<div style="background-color: #f8f9fa; border-radius: 5px; padding: 15px; margin-top: 40px; text-align: center;">
+    <p style="margin: 0; color: #666; font-size: 12px;">
+        Sent on {{timestamp}}
+    </p>
+</div>
+{{/if}}

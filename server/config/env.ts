@@ -108,6 +108,21 @@ export const config = {
       },
     },
   },
+
+  smtp: {
+    host: process.env.SMTP_HOST || "localhost",
+    port: parseInt(process.env.SMTP_PORT || "587", 10),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_AUTH_USER || "",
+      pass: process.env.SMTP_AUTH_PASS || "",
+    },
+    from: {
+      email: process.env.SMTP_FROM_EMAIL || "noreply@updates.hay.chat",
+      name: process.env.SMTP_FROM_NAME || "Hay",
+    },
+    enabled: process.env.SMTP_ENABLED === "true",
+  },
 } as const;
 
 export type Config = typeof config;

@@ -1,0 +1,74 @@
+{
+  "templates": [
+    {
+      "id": "welcome",
+      "name": "Welcome Email",
+      "description": "Sent to new users after registration",
+      "category": "onboarding",
+      "variables": [
+        "userName",
+        "userEmail",
+        "companyName",
+        "dashboardUrl",
+        "helpCenterUrl",
+        "documentationUrl",
+        "supportEmail",
+        "verificationRequired",
+        "socialLinks"
+      ]
+    },
+    {
+      "id": "reset-password",
+      "name": "Password Reset",
+      "description": "Sent when user requests password reset",
+      "category": "security",
+      "variables": [
+        "userName",
+        "userEmail",
+        "companyName",
+        "resetLink",
+        "expirationHours",
+        "requestTime",
+        "requestIP",
+        "requestBrowser",
+        "requestLocation",
+        "supportEmail"
+      ]
+    },
+    {
+      "id": "notification",
+      "name": "Generic Notification",
+      "description": "Flexible template for various notifications",
+      "category": "notifications",
+      "variables": [
+        "notificationTitle",
+        "notificationSubtitle",
+        "notificationIcon",
+        "notificationMessage",
+        "userName",
+        "actionRequired",
+        "actionMessage",
+        "actionButton",
+        "details",
+        "additionalInfo",
+        "relatedItems",
+        "notificationSettings",
+        "notificationReason",
+        "supportEmail",
+        "companyName",
+        "timestamp"
+      ]
+    }
+  ],
+  "defaultVariables": {
+    "companyName": "Hay Platform",
+    "companyAddress": "123 Main Street, Tech City, TC 12345",
+    "websiteUrl": "https://hay.chat",
+    "supportEmail": "support@hay.chat",
+    "helpCenterUrl": "https://help.hay.chat",
+    "documentationUrl": "https://docs.hay.chat",
+    "unsubscribeUrl": "https://hay.chat/unsubscribe",
+    "preferencesUrl": "https://hay.chat/preferences",
+    "currentYear": "2025"
+  }
+}
