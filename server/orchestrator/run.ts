@@ -48,7 +48,10 @@ export const runConversation = async (conversationId: string) => {
     const perceptionLayer = new PerceptionLayer();
 
     // 01.1. Get Intent and Sentiment
-    const { intent, sentiment } = await perceptionLayer.perceive(lastCustomerMessage);
+    const { intent, sentiment } = await perceptionLayer.perceive(
+      lastCustomerMessage,
+      conversation.organization_id
+    );
     await lastCustomerMessage.savePerception({
       intent: intent.label,
       sentiment: sentiment.label,
@@ -71,6 +74,7 @@ export const runConversation = async (conversationId: string) => {
         publicMessages,
         intent.label,
         conversation.playbook_id !== null,
+        conversation.organization_id
       );
 
       shouldClose = closureValidation.shouldClose;
@@ -130,6 +134,7 @@ export const runConversation = async (conversationId: string) => {
       const agentCandidate = await perceptionLayer.getAgentCandidate(
         lastCustomerMessage,
         activeAgents,
+        conversation.organization_id
       );
       if (agentCandidate) {
         conversation.updateAgent(agentCandidate.id);
@@ -151,6 +156,7 @@ export const runConversation = async (conversationId: string) => {
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
       activePlaybooks,
+      conversation.organization_id
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {

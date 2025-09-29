@@ -4,10 +4,12 @@ import { MessageType } from "@server/database/entities/message.entity";
 import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
+import { PromptService } from "@server/services/prompt.service";
 
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
 const llmService = new LLMService();
+const promptService = PromptService.getInstance();
 
 /**
  * Generate a conversation title using AI based on conversation content
@@ -43,21 +45,14 @@ export async function generateConversationTitle(
       .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
       .join("\n");
 
-    const systemPrompt = `You are a conversation title generator. Create a concise, descriptive title (3-6 words) that captures the main topic or request.
-
-Examples:
-- "Password Reset Help"
-- "Billing Question"
-- "Product Feature Request"
-- "Technical Support Issue"
-
-Return only the title, no quotes or extra text.`;
+    const prompt = await promptService.getPrompt(
+      "conversation/title-generation",
+      { conversationContext },
+      { organizationId }
+    );
 
     const response = await llmService.invoke({
-      history:
-        systemPrompt +
-        "\n\nUser: " +
-        `Generate a title for this conversation:\n\n${conversationContext}`,
+      prompt
     });
 
     const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
@@ -102,21 +97,14 @@ export async function sendInactivityWarning(
       .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
       .join("\n");
 
-    const systemPrompt = `You are a helpful assistant checking in on a conversation that has been inactive.
-Generate a friendly, contextual message asking if the user still needs help with their issue.
-The message should:
-- Reference the specific topic they were discussing
-- Ask if they've resolved their issue or need further assistance
-- Be warm and helpful, not robotic
-- Be concise (1-2 sentences)
-
-Do not include any system-like language about "automatic closure" or timeouts.`;
+    const prompt = await promptService.getPrompt(
+      "conversation/inactivity-check",
+      { conversationContext },
+      { organizationId }
+    );
 
     const response = await llmService.invoke({
-      history:
-        systemPrompt +
-        "\n\nUser: " +
-        `Based on this conversation, generate a check-in message:\n\n${conversationContext}`,
+      prompt
     });
 
     // Add the warning message to the conversation
@@ -179,17 +167,14 @@ export async function closeInactiveConversation(
           .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
           .join("\n");
 
-        const systemPrompt = `You are closing an inactive conversation. Generate a brief, friendly closing message that:
-- Acknowledges the conversation topic
-- Mentions you're closing due to inactivity
-- Invites them to start a new conversation if needed
-Keep it to 1-2 sentences.`;
+        const prompt = await promptService.getPrompt(
+          "conversation/closure-message",
+          { conversationContext },
+          { organizationId }
+        );
 
         closureMessage = await llmService.invoke({
-          history:
-            systemPrompt +
-            "\n\nUser: " +
-            `Generate a closing message for this conversation:\n\n${conversationContext}`,
+          prompt
         });
       }
 
@@ -270,6 +255,7 @@ export async function validateConversationClosure(
   publicMessages: any[],
   detectedIntent: string,
   hasActivePlaybook: boolean,
+  organizationId?: string,
 ): Promise<{ shouldClose: boolean; reason: string }> {
   try {
     // Create conversation transcript for analysis
@@ -280,32 +266,15 @@ export async function validateConversationClosure(
       })
       .join("\n");
 
-    const validationPrompt = `Analyze this conversation to determine if it should be closed.
-
-CONVERSATION TRANSCRIPT:
-${transcript}
-
-CURRENT SITUATION:
-- The system detected a potential closure intent: "${detectedIntent}"
-- There is ${hasActivePlaybook ? "an active playbook/workflow" : "no active playbook"}
-- The last message from the customer triggered this closure check
-
-VALIDATION TASK:
-Determine if this conversation should ACTUALLY be closed. Consider:
-
-1. Is the customer explicitly indicating they want to END the conversation?
-2. Or are they just providing information/feedback as part of an ongoing dialogue?
-3. If there's an active playbook (like a cancellation flow), is the customer trying to exit it, or are they responding to questions within it?
-
-IMPORTANT GUIDELINES:
-- "It's too expensive" when asked "why do you want to cancel?" is NOT a closure - it's providing requested information
-- "Not interested" or "No thanks" might decline an offer but doesn't necessarily mean end conversation
-- Only mark for closure if the customer is clearly done with the entire interaction
-- When a playbook is active, assume the customer wants to complete it unless they explicitly say otherwise
-
-Respond with a JSON object containing:
-- shouldClose: boolean (true only if conversation should definitely end)
-- reason: string (brief explanation of your decision)`;
+    const validationPrompt = await promptService.getPrompt(
+      "conversation/closure-validation",
+      {
+        transcript,
+        detectedIntent,
+        hasActivePlaybook
+      },
+      { organizationId }
+    );
 
     const response = await llmService.invoke({
       prompt: validationPrompt,

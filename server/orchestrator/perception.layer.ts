@@ -1,6 +1,7 @@
 import { Message, MessageIntent, MessageSentiment } from "@server/database/entities/message.entity";
 import { Agent } from "@server/database/entities/agent.entity";
 import { LLMService } from "../services/core/llm.service";
+import { PromptService } from "../services/prompt.service";
 
 export interface Perception {
   intent: { label: MessageIntent; score: number; rationale?: string };
@@ -9,30 +10,21 @@ export interface Perception {
 
 export class PerceptionLayer {
   private llmService: LLMService;
+  private promptService: PromptService;
 
   constructor() {
     // console.log("PerceptionLayer initialized");
     this.llmService = new LLMService();
+    this.promptService = PromptService.getInstance();
   }
 
-  async perceive(message: Message): Promise<Perception> {
-    const perceptionPrompt = `Analyze the following user message and determine:
-1. The intent (what the user wants to accomplish)
-2. The sentiment (emotional tone of the message)
-
-IMPORTANT RULES FOR INTENT CLASSIFICATION:
-- Only use "close_satisfied" or "close_unsatisfied" when the user EXPLICITLY indicates they want to END the conversation
-- Examples of CLOSURE language: "goodbye", "bye", "that's all", "I'm done", "no more questions", "close this", "end conversation"
-- Examples that are NOT closure (classify as "request" or "other"):
-  * "it's too expensive" - This is providing a reason/complaint, not asking to close
-  * "I don't like it" - This is feedback, not a closure request
-  * "not interested" - This could be declining an offer, not necessarily ending conversation
-  * "cancel my subscription" - This is a service request, not conversation closure
-- When the user is responding to a question (like "why do you want to cancel?"), their answer should be classified based on the content, NOT as closure
-- When in doubt, prefer "request", "question", or "other" over closure intents
-- Closure intents should have confidence > 0.8 to be valid
-
-User message: "${message.content}"`;
+  async perceive(message: Message, organizationId?: string): Promise<Perception> {
+    // Get prompt from PromptService with organization's language
+    const perceptionPrompt = await this.promptService.getPrompt(
+      "perception/intent-analysis",
+      { message: message.content },
+      { organizationId }
+    );
 
     const perceptionSchema = {
       type: "object",
@@ -71,7 +63,7 @@ User message: "${message.content}"`;
     return JSON.parse(perception) as Perception;
   }
 
-  async getAgentCandidate(message: Message, agents: Agent[]): Promise<Agent | null> {
+  async getAgentCandidate(message: Message, agents: Agent[], organizationId?: string): Promise<Agent | null> {
     if (agents.length === 0) {
       return null;
     }
@@ -86,22 +78,20 @@ User message: "${message.content}"`;
       return agents[0];
     }
 
-    const candidatePrompt = `Given the user message below, score how relevant each agent is (0-1 scale).
-Consider the trigger phrases, descriptions, and overall context match.
-
-User message: "${message.content}"
-
-Available agents:
-${agentsWithTriggers
-  .map(
-    (a) =>
-      `- ID: ${a.id}, Name: "${a.name}", Trigger: "${
-        a.trigger
-      }", Description: "${a.description || "No description"}"`,
-  )
-  .join("\n")}
-
-For each agent, provide a relevance score and brief rationale.`;
+    // Get agent selection prompt from PromptService
+    const candidatePrompt = await this.promptService.getPrompt(
+      "perception/agent-selection",
+      {
+        message: message.content,
+        agents: agentsWithTriggers.map((a) => ({
+          id: a.id,
+          name: a.name,
+          trigger: a.trigger,
+          description: a.description,
+        })),
+      },
+      { organizationId }
+    );
 
     const candidateSchema = {
       type: "object",

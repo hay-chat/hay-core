@@ -1,5 +1,6 @@
 import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
+import { PromptService } from "../services/prompt.service";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -20,10 +21,12 @@ export interface ExecutionResult {
 
 export class ExecutionLayer {
   private llmService: LLMService;
+  private promptService: PromptService;
   private plannerSchema: object;
 
   constructor() {
     this.llmService = new LLMService();
+    this.promptService = PromptService.getInstance();
 
     this.plannerSchema = {
       type: "object",
@@ -71,21 +74,16 @@ export class ExecutionLayer {
   async execute(conversation: Conversation): Promise<ExecutionResult | null> {
     try {
       const messages = await conversation.getMessages();
-      // Create the prompt for generating a response
-      let responsePrompt = `
-        Please provide a helpful response or next step to the customer's last message that can be:
-          ASK - To gather more information
-          RESPOND - To provide a helpful response
-          HANDOFF - To handoff the conversation to a human agent
-          CLOSE - To close the conversation`;
-
-      if (conversation.enabled_tools && conversation.enabled_tools.length > 0) {
-        responsePrompt += `
-            CALL_TOOL - To call a tool to get more information/Handle an action in the playbook. You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool. Available tools: ${conversation.enabled_tools?.join(
-              ", ",
-            )}.
-          `;
-      }
+      
+      // Get the prompt from PromptService
+      const responsePrompt = await this.promptService.getPrompt(
+        "execution/planner",
+        {
+          hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
+          tools: conversation.enabled_tools?.join(", ")
+        },
+        { organizationId: conversation.organization_id }
+      );
 
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string

@@ -2,6 +2,7 @@ import { Message } from "@server/database/entities/message.entity";
 import { Playbook } from "@server/database/entities/playbook.entity";
 import { LLMService } from "../services/core/llm.service";
 import { vectorStoreService } from "@server/services/vector-store.service";
+import { PromptService } from "../services/prompt.service";
 
 interface Document {
   id: string;
@@ -10,34 +11,34 @@ interface Document {
 
 export class RetrievalLayer {
   private llmService: LLMService;
+  private promptService: PromptService;
 
   constructor() {
     this.llmService = new LLMService();
+    this.promptService = PromptService.getInstance();
   }
 
-  async getPlaybookCandidate(messages: Message[], playbooks: Playbook[]): Promise<Playbook | null> {
+  async getPlaybookCandidate(messages: Message[], playbooks: Playbook[], organizationId?: string): Promise<Playbook | null> {
     if (playbooks.length === 0) {
       return null;
     }
 
     const conversationContext = messages.map((msg) => msg.content).join(" ");
 
-    const candidatePrompt = `Given the conversation context below, score how relevant each playbook is (0-1 scale).
-      Consider the trigger phrases, descriptions, and overall context match.
-
-      Conversation context: "${conversationContext}"
-
-      Available playbooks:
-      ${playbooks
-        .map(
-          (p) =>
-            `- ID: ${p.id}, Title: "${p.title}", Trigger: "${
-              p.trigger
-            }", Description: "${p.description || "No description"}"`,
-        )
-        .join("\n")}
-
-      For each playbook, provide a relevance score and brief rationale.`;
+    // Get playbook selection prompt from PromptService
+    const candidatePrompt = await this.promptService.getPrompt(
+      "retrieval/playbook-selection",
+      {
+        conversationContext,
+        playbooks: playbooks.map(p => ({
+          id: p.id,
+          title: p.title,
+          trigger: p.trigger,
+          description: p.description
+        }))
+      },
+      { organizationId }
+    );
 
     const candidateSchema = {
       type: "object",

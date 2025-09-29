@@ -4,6 +4,7 @@ import { User } from "./user.entity";
 import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
+import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
 
 @Entity("organizations")
 @Index("idx_organizations_slug", ["slug"])
@@ -41,6 +42,13 @@ export class Organization extends BaseEntity {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   contactEmail?: string;
+
+  @Column({
+    type: "enum",
+    enum: SupportedLanguage,
+    default: DEFAULT_LANGUAGE,
+  })
+  defaultLanguage!: SupportedLanguage;
 
   // Relationships
   @OneToMany(() => User, (user) => user.organization)

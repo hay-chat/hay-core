@@ -120,13 +120,12 @@
     </Card>
 
     <!-- Notification Preferences -->
-    <Card>
+    <!-- <Card>
       <CardHeader>
         <CardTitle>Notification Preferences</CardTitle>
         <CardDescription> Control how and when you receive notifications </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
-        <!-- Email Notifications -->
         <div>
           <h3 class="font-medium mb-3">Email Notifications</h3>
           <div class="space-y-3">
@@ -170,7 +169,6 @@
           </div>
         </div>
 
-        <!-- In-App Notifications -->
         <div>
           <h3 class="font-medium mb-3">In-App Notifications</h3>
           <div class="space-y-3">
@@ -202,7 +200,6 @@
           </div>
         </div>
 
-        <!-- Notification Timing -->
         <div>
           <h3 class="font-medium mb-3">Notification Timing</h3>
           <div class="grid gap-4 md:grid-cols-2">
@@ -230,10 +227,10 @@
           </p>
         </div>
       </CardContent>
-    </Card>
+    </Card> -->
 
     <!-- Webhook Configuration -->
-    <Card>
+    <!-- <Card>
       <CardHeader>
         <CardTitle>Webhook Configuration</CardTitle>
         <CardDescription> Configure external webhook endpoints for notifications </CardDescription>
@@ -294,10 +291,10 @@
           </Button>
         </div>
       </CardContent>
-    </Card>
+    </Card> -->
 
     <!-- Data Retention -->
-    <Card>
+    <!-- <Card>
       <CardHeader>
         <CardTitle>Data Retention</CardTitle>
         <CardDescription> Configure how long different types of data are kept </CardDescription>
@@ -379,7 +376,7 @@
           </div>
         </div>
       </CardContent>
-    </Card>
+    </Card> -->
   </div>
 </template>
 

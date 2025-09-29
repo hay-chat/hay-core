@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "defaultLanguage": "en",
+  "supportedLanguages": [
+    "en",
+    "es", 
+    "fr",
+    "de",
+    "pt",
+    "it",
+    "nl",
+    "ru",
+    "zh",
+    "ja",
+    "ko",
+    "ar",
+    "hi",
+    "tr",
+    "pl",
+    "sv",
+    "da",
+    "no",
+    "fi",
+    "el",
+    "he",
+    "th",
+    "vi",
+    "id",
+    "ms",
+    "cs",
+    "sk",
+    "hu",
+    "ro",
+    "bg",
+    "uk",
+    "ca",
+    "hr"
+  ],
+  "categories": [
+    {
+      "id": "perception",
+      "name": "Perception Layer",
+      "description": "Prompts for understanding user intent and context"
+    },
+    {
+      "id": "orchestrator", 
+      "name": "Orchestrator",
+      "description": "System prompts for conversation orchestration"
+    },
+    {
+      "id": "playbooks",
+      "name": "Playbooks",
+      "description": "Prompts for playbook execution"
+    }
+  ]
+}
