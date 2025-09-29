@@ -2,6 +2,7 @@ import { PdfProcessor } from "./pdf.processor";
 import { TextProcessor } from "./text.processor";
 import { HtmlProcessor } from "./html.processor";
 import { WordProcessor } from "./word.processor";
+import { PptxProcessor } from "./pptx.processor";
 import { BaseProcessor } from "./base.processor";
 
 export class DocumentProcessorFactory {
@@ -10,6 +11,7 @@ export class DocumentProcessorFactory {
     new TextProcessor(),
     new HtmlProcessor(),
     new WordProcessor(),
+    new PptxProcessor(),
   ];
 
   getProcessor(mimeType: string): BaseProcessor | null {

@@ -183,8 +183,8 @@
       <CardHeader>
         <CardTitle>Select Files</CardTitle>
         <CardDescription>
-          Choose one or more documents to upload. Supported formats: PDF, TXT, MD, DOC, DOCX, HTML,
-          JSON, CSV
+          Choose one or more documents to upload. Supported formats: PDF, TXT, MD, DOC, DOCX, PPT,
+          PPTX, HTML, JSON, CSV
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -935,7 +935,7 @@ const steps = computed(() => {
   }
 });
 
-const uploadFormats = ["PDF", "TXT", "MD", "DOC", "DOCX", "HTML", "JSON", "CSV"];
+const uploadFormats = ["PDF", "TXT", "MD", "DOC", "DOCX", "PPT", "PPTX", "HTML", "JSON", "CSV"];
 
 // Load available importers
 onMounted(async () => {
@@ -1181,7 +1181,13 @@ const pollJobStatus = async (jobId: string) => {
 
 const getFileIcon = (type: string) => {
   const mimeType = type.toLowerCase();
-  if (mimeType.includes("pdf") || mimeType.includes("doc")) return FileText;
+  if (
+    mimeType.includes("pdf") ||
+    mimeType.includes("doc") ||
+    mimeType.includes("ppt") ||
+    mimeType.includes("presentation")
+  )
+    return FileText;
   if (mimeType.includes("json")) return FileJson;
   if (mimeType.includes("text") || mimeType.includes("markdown")) return FileCode;
   return File;
@@ -1204,7 +1210,7 @@ const selectFiles = () => {
   const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
-  input.accept = ".pdf,.txt,.md,.doc,.docx,.html,.json,.csv";
+  input.accept = ".pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.html,.json,.csv";
   input.onchange = (e) => {
     const target = e.target as HTMLInputElement;
     if (target.files) {
@@ -1232,7 +1238,7 @@ const addFiles = (files: File[]) => {
     }
 
     // Check file type
-    const validTypes = ["pdf", "txt", "md", "doc", "docx", "html", "json", "csv"];
+    const validTypes = ["pdf", "txt", "md", "doc", "docx", "ppt", "pptx", "html", "json", "csv"];
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (!extension || !validTypes.includes(extension)) {
       console.error(`File ${file.name} has unsupported format`);
