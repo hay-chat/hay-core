@@ -9,6 +9,7 @@ import { customersRouter } from "./customers";
 import { pluginsRouter } from "./plugins";
 import { webConversationsRouter } from "./web-conversations";
 import { analyticsRouter } from "./analytics";
+import { organizationsRouter } from "./organizations";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
 // Core routers - always available
@@ -23,6 +24,7 @@ const coreRouters = {
   plugins: pluginsRouter,
   webConversations: webConversationsRouter,
   analytics: analyticsRouter,
+  organizations: organizationsRouter,
 };
 
 // Create v1Router with core + plugin routers

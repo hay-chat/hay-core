@@ -9,10 +9,13 @@
         </main>
       </div>
     </div>
+    <!-- Toast Container for all pages -->
+    <ToastContainer />
   </SidebarProvider>
 </template>
 
 <script setup lang="ts">
 import AppSidebar from "@/components/layout/AppSidebar.vue";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import ToastContainer from "@/components/ui/ToastContainer.vue";
 </script>

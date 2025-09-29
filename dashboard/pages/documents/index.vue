@@ -246,9 +246,6 @@
       @items-per-page-change="handleItemsPerPageChange"
     />
 
-    <!-- Toast Container -->
-    <ToastContainer />
-
     <!-- Search Results -->
     <div v-if="searchResults.length > 0" class="space-y-4">
       <h3 class="text-lg font-semibold">Search Results</h3>
@@ -349,7 +346,6 @@
 <script setup lang="ts">
 import { HayApi } from "@/utils/api";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
-import ToastContainer from "@/components/ui/ToastContainer.vue";
 import DataPagination from "@/components/DataPagination.vue";
 import { useToast } from "@/composables/useToast";
 

@@ -5,6 +5,14 @@ import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
+import {
+  DateFormat,
+  TimeFormat,
+  Timezone,
+  DEFAULT_DATE_FORMAT,
+  DEFAULT_TIME_FORMAT,
+  DEFAULT_TIMEZONE,
+} from "../types/organization-settings.types";
 
 @Entity("organizations")
 @Index("idx_organizations_slug", ["slug"])
@@ -49,6 +57,27 @@ export class Organization extends BaseEntity {
     default: DEFAULT_LANGUAGE,
   })
   defaultLanguage!: SupportedLanguage;
+
+  @Column({
+    type: "enum",
+    enum: DateFormat,
+    default: DEFAULT_DATE_FORMAT,
+  })
+  dateFormat!: DateFormat;
+
+  @Column({
+    type: "enum",
+    enum: TimeFormat,
+    default: DEFAULT_TIME_FORMAT,
+  })
+  timeFormat!: TimeFormat;
+
+  @Column({
+    type: "enum",
+    enum: Timezone,
+    default: DEFAULT_TIMEZONE,
+  })
+  timezone!: Timezone;
 
   // Relationships
   @OneToMany(() => User, (user) => user.organization)

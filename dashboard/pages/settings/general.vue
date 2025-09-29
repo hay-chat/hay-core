@@ -54,15 +54,16 @@
               v-model="settings.timezone"
               class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
             >
-              <option value="UTC">UTC (Coordinated Universal Time)</option>
-              <option value="America/New_York">Eastern Time (ET)</option>
-              <option value="America/Chicago">Central Time (CT)</option>
-              <option value="America/Denver">Mountain Time (MT)</option>
-              <option value="America/Los_Angeles">Pacific Time (PT)</option>
-              <option value="Europe/London">London (GMT)</option>
-              <option value="Europe/Paris">Paris (CET)</option>
-              <option value="Asia/Tokyo">Tokyo (JST)</option>
-              <option value="Australia/Sydney">Sydney (AEDT)</option>
+              <template v-for="group in TIMEZONE_GROUPS" :key="group.label">
+                <optgroup v-if="group.options.length > 1" :label="group.label">
+                  <option v-for="tz in group.options" :key="tz.value" :value="tz.value">
+                    {{ tz.label }}
+                  </option>
+                </optgroup>
+                <option v-else-if="group.options.length === 1" :value="group.options[0].value">
+                  {{ group.options[0].label }}
+                </option>
+              </template>
             </select>
             <p class="text-xs text-neutral-muted mt-1">
               Used for displaying timestamps and scheduling reports
@@ -381,11 +382,28 @@
 </template>
 
 <script setup lang="ts">
-import { Save, RotateCcw, Zap, FileText, AlertTriangle } from "lucide-vue-next";
+import { Save, RotateCcw } from "lucide-vue-next";
+import { Hay } from "@/utils/api";
+import { useToast } from "@/composables/useToast";
+import { TIMEZONE_GROUPS } from "@/utils/timezones";
+
+const toast = useToast();
+
+// Import types for proper typing
+type PlatformSettings = {
+  defaultLanguage: string;
+  timezone: string;
+  dateFormat: string;
+  timeFormat: string;
+  defaultAgent: string;
+  notifications: any;
+  webhooks: any;
+  dataRetention: any;
+};
 
 // Reactive state
-const originalSettings = ref({});
-const settings = ref({
+const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
+const settings = ref<PlatformSettings>({
   defaultLanguage: "en",
   timezone: "UTC",
   dateFormat: "MM/DD/YYYY",
@@ -493,17 +511,23 @@ const toggleWebhookEvent = (eventId: string) => {
 
 const saveSettings = async () => {
   try {
-    // TODO: Save settings to API
-    console.log("Saving settings:", settings.value);
+    // Save platform settings to API
+    const response = await Hay.organizations.updateSettings.mutate({
+      defaultLanguage: settings.value.defaultLanguage as any,
+      timezone: settings.value.timezone as any,
+      dateFormat: settings.value.dateFormat as any,
+      timeFormat: settings.value.timeFormat as any,
+    });
 
-    // Update original settings to new saved state
-    originalSettings.value = JSON.parse(JSON.stringify(settings.value));
+    if (response.success) {
+      // Update original settings to new saved state
+      originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
-    // TODO: Show success toast
-    console.log("Settings saved successfully");
+      toast.success("Settings saved successfully");
+    }
   } catch (error) {
-    // TODO: Show error toast
     console.error("Failed to save settings:", error);
+    toast.error("Failed to save settings. Please try again.");
   }
 };
 
@@ -566,12 +590,22 @@ const viewWebhookLogs = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // TODO: Load current settings from API
-  // const currentSettings = await fetchSettings()
-  // settings.value = currentSettings
+  try {
+    // Load current platform settings from API
+    const orgSettings = await Hay.organizations.getSettings.query();
 
-  // Store original settings for change detection
-  originalSettings.value = JSON.parse(JSON.stringify(settings.value));
+    // Update only platform settings, keep other settings as mock for now
+    settings.value.defaultLanguage = orgSettings.defaultLanguage;
+    settings.value.timezone = orgSettings.timezone;
+    settings.value.dateFormat = orgSettings.dateFormat;
+    settings.value.timeFormat = orgSettings.timeFormat;
+
+    // Store original settings for change detection
+    originalSettings.value = JSON.parse(JSON.stringify(settings.value));
+  } catch (error) {
+    console.error("Failed to load settings:", error);
+    toast.error("Error", "Failed to load settings");
+  }
 });
 
 // Set page meta

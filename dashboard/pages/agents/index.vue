@@ -289,9 +289,6 @@
       @items-per-page-change="handleItemsPerPageChange"
     />
 
-    <!-- Toast Container -->
-    <ToastContainer />
-
     <!-- Confirm Delete Dialog -->
     <ConfirmDialog
       v-model:open="showDeleteDialog"
@@ -321,7 +318,6 @@ import {
 import { useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
-import ToastContainer from "@/components/ui/ToastContainer.vue";
 import { HayApi } from "@/utils/api";
 
 interface AgentData {
