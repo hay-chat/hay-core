@@ -78,6 +78,19 @@ async function startServer() {
     });
   });
 
+  // Plugin public directory route - serve any file from plugin's public folder
+  server.get(/^\/plugins\/public\/([^/]+)\/(.*)$/, (req, res) => {
+    // Set params manually for regex routes
+    req.params = {
+      pluginName: req.params[0],
+      filePath: req.params[1],
+    };
+    pluginAssetService.servePublicFile(req, res).catch((error) => {
+      console.error("Public file serving error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    });
+  });
+
   // Plugin webhook routes - handle incoming webhooks from external services
   server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
     // Set params manually for regex routes

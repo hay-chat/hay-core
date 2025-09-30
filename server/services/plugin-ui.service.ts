@@ -50,12 +50,23 @@ export class PluginUIService {
       const pluginDir = path.join(
         process.cwd(),
         "plugins",
-        plugin.pluginId.replace("hay-plugin-", ""),
+        plugin.pluginPath, // Use the stored plugin directory name
       );
+
+      // First try to load from public directory
+      const publicTemplatePath = path.join(pluginDir, "public", manifest.ui.configuration);
       const templatePath = path.join(pluginDir, manifest.ui.configuration);
 
       try {
-        const content = await fs.readFile(templatePath, "utf-8");
+        let content: string;
+        try {
+          // Try public directory first
+          content = await fs.readFile(publicTemplatePath, "utf-8");
+        } catch {
+          // Fallback to root plugin directory for backward compatibility
+          content = await fs.readFile(templatePath, "utf-8");
+        }
+
         const template: UITemplate = {
           name: "configuration",
           content,
@@ -335,13 +346,23 @@ const saveConfiguration = async () => {
       const pluginDir = path.join(
         process.cwd(),
         "plugins",
-        plugin.pluginId.replace("hay-plugin-", ""),
+        plugin.pluginPath, // Use the stored plugin directory name
       );
 
       for (const [name, filePath] of Object.entries(manifest.ui.templates)) {
         try {
+          // First try public directory
+          const publicPath = path.join(pluginDir, "public", filePath as string);
           const fullPath = path.join(pluginDir, filePath as string);
-          const content = await fs.readFile(fullPath, "utf-8");
+
+          let content: string;
+          try {
+            // Try public directory first
+            content = await fs.readFile(publicPath, "utf-8");
+          } catch {
+            // Fallback to root plugin directory for backward compatibility
+            content = await fs.readFile(fullPath, "utf-8");
+          }
 
           templates[name] = {
             name,
@@ -381,6 +402,60 @@ const saveConfiguration = async () => {
     for (const key of this.templateCache.keys()) {
       if (key.startsWith(`${pluginId}:`)) {
         this.templateCache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Get Vue component file content for plugin settings extensions
+   */
+  async getPluginComponent(pluginId: string, componentPath: string): Promise<string | null> {
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found`);
+    }
+
+    // Sanitize the component path to prevent directory traversal
+    const sanitizedPath = componentPath.replace(/\.\./g, "");
+
+    // The plugins directory is at ../plugins from the server directory
+    const pluginDir = path.join(
+      __dirname, // Start from current file location
+      "..", // Go to server root
+      "..", // Go to project root
+      "plugins",
+      plugin.pluginPath, // Use the stored plugin directory name
+    );
+
+    // First try to load from public directory
+    const publicPath = path.join(pluginDir, "public", sanitizedPath);
+
+    // Ensure the path is within the plugin directory
+    if (!publicPath.startsWith(pluginDir)) {
+      throw new Error("Invalid component path");
+    }
+
+    try {
+      // Try public directory first
+      const content = await fs.readFile(publicPath, "utf-8");
+      return content;
+    } catch (error) {
+      // If not found in public, try root plugin directory (for backward compatibility)
+      const fullPath = path.join(pluginDir, sanitizedPath);
+
+      if (!fullPath.startsWith(pluginDir)) {
+        throw new Error("Invalid component path");
+      }
+
+      try {
+        const content = await fs.readFile(fullPath, "utf-8");
+        return content;
+      } catch (fallbackError) {
+        console.error(
+          `Failed to load component ${componentPath} for ${plugin.name}:`,
+          fallbackError,
+        );
+        return null;
       }
     }
   }

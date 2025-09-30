@@ -64,11 +64,26 @@ export class PluginPagesService {
     }
 
     const pluginDir = path.join(process.cwd(), "..", "plugins", pluginDirName);
+    // First check public/pages, then fallback to root pages directory
+    const pluginPublicPagesDir = path.join(pluginDir, "public", "pages");
     const pluginPagesDir = path.join(pluginDir, "pages");
 
     try {
-      // Check if plugin has pages directory
-      const pagesExist = await fs.access(pluginPagesDir).then(() => true).catch(() => false);
+      // Check if plugin has pages directory (try public first)
+      let actualPagesDir = pluginPublicPagesDir;
+      let pagesExist = await fs
+        .access(pluginPublicPagesDir)
+        .then(() => true)
+        .catch(() => false);
+
+      // If not in public, check root directory
+      if (!pagesExist) {
+        actualPagesDir = pluginPagesDir;
+        pagesExist = await fs
+          .access(pluginPagesDir)
+          .then(() => true)
+          .catch(() => false);
+      }
 
       if (!pagesExist) {
         return;
@@ -79,12 +94,12 @@ export class PluginPagesService {
       await fs.mkdir(dashboardPluginDir, { recursive: true });
 
       // Read all pages from plugin
-      const pages = await fs.readdir(pluginPagesDir);
-      const vuePages = pages.filter(f => f.endsWith('.vue'));
+      const pages = await fs.readdir(actualPagesDir);
+      const vuePages = pages.filter((f) => f.endsWith(".vue"));
 
       // Create symlinks for each page
       for (const page of vuePages) {
-        const sourcePath = path.join(pluginPagesDir, page);
+        const sourcePath = path.join(actualPagesDir, page);
         const targetPath = path.join(dashboardPluginDir, page);
 
         // Remove existing symlink if it exists
@@ -93,10 +108,7 @@ export class PluginPagesService {
         } catch {}
 
         // Create new symlink
-        await fs.symlink(
-          path.relative(path.dirname(targetPath), sourcePath),
-          targetPath
-        );
+        await fs.symlink(path.relative(path.dirname(targetPath), sourcePath), targetPath);
       }
 
       // Track pages for this plugin

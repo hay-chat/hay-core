@@ -361,6 +361,37 @@
           }
         }
       }
+    },
+    "settingsExtensions": {
+      "type": "array",
+      "description": "Plugin settings page UI extensions",
+      "items": {
+        "type": "object",
+        "required": ["slot", "component"],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": ["before-settings", "after-settings", "tab"],
+            "description": "Slot location for the extension. 'tab' creates a new tab in the plugin settings"
+          },
+          "component": {
+            "type": "string",
+            "description": "Path to the Vue component file relative to plugin directory"
+          },
+          "template": {
+            "type": "string",
+            "description": "Inline HTML template (for backward compatibility)"
+          },
+          "tabName": {
+            "type": "string",
+            "description": "Display name for the tab (required when slot is 'tab')"
+          },
+          "tabOrder": {
+            "type": "number",
+            "description": "Order of the tab (optional, defaults to order in array)"
+          }
+        }
+      }
     }
   }
 }

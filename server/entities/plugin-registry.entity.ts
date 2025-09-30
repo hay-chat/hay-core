@@ -23,6 +23,9 @@ export class PluginRegistry {
   @Column({ type: "varchar", length: 50 })
   version!: string;
 
+  @Column({ type: "varchar", length: 255, nullable: false })
+  pluginPath!: string;
+
   @Column({ type: "jsonb" })
   manifest!: HayPluginManifest;
 

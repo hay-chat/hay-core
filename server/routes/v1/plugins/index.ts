@@ -8,6 +8,7 @@ import {
   configurePlugin,
   getPluginConfiguration,
   getPluginUITemplate,
+  getPluginComponent,
   getMCPTools,
   getMenuItems,
 } from "./plugins.handler";
@@ -21,6 +22,7 @@ export const pluginsRouter = t.router({
   configure: configurePlugin,
   getConfiguration: getPluginConfiguration,
   getUITemplate: getPluginUITemplate,
+  getPluginComponent: getPluginComponent,
   getMCPTools: getMCPTools,
   getMenuItems: getMenuItems,
 });

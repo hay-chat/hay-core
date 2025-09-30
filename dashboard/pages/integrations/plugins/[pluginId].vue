@@ -72,6 +72,251 @@
         </CardHeader>
       </Card>
 
+      <!-- Plugin Settings Extensions - Before Settings Slot -->
+      <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+        <CardContent>
+          <component
+            :is="ext.component"
+            :plugin="plugin"
+            :config="formData"
+            :api-base-url="apiBaseUrl"
+            @update:config="
+              (newConfig: any) => {
+                formData = { ...formData, ...newConfig };
+              }
+            "
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Tabs Section: Show tabs if there are any tab extensions -->
+      <Card v-if="tabExtensions.length > 0">
+        <CardContent class="p-0">
+          <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
+            <TabsList class="w-full justify-start rounded-none border-b">
+              <!-- Settings Tab (shown when there's configuration and tabs) -->
+              <TabsTrigger v-if="hasConfiguration" value="settings">Settings</TabsTrigger>
+              <!-- Custom Tab Extensions -->
+              <TabsTrigger v-for="tab in sortedTabExtensions" :key="tab.id" :value="tab.id">
+                {{ tab.name }}
+              </TabsTrigger>
+            </TabsList>
+
+            <!-- Settings Tab Content -->
+            <TabsContent v-if="hasConfiguration" value="settings" class="p-6">
+              <!-- Custom Template (if available) -->
+              <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
+
+              <!-- Auto-generated Form -->
+              <form v-else @submit.prevent="saveConfiguration" class="space-y-4">
+                <div v-for="(field, key) in configSchema" :key="key" class="space-y-2">
+                  <!-- Text Input -->
+                  <template v-if="field.type === 'string' && !field.options">
+                    <Label :for="key" :required="field.required">
+                      {{ field.label || key }}
+                      <Lock
+                        v-if="field.encrypted"
+                        class="inline-block h-3 w-3 ml-1 text-neutral-muted"
+                      />
+                    </Label>
+                    <p v-if="field.description" class="text-sm text-neutral-muted">
+                      {{ field.description }}
+                    </p>
+
+                    <!-- Encrypted field with edit mode -->
+                    <div
+                      v-if="
+                        field.encrypted &&
+                        originalFormData[key] &&
+                        /^\*+$/.test(originalFormData[key])
+                      "
+                      class="space-y-2"
+                    >
+                      <div
+                        v-if="!editingEncryptedFields.has(key)"
+                        class="flex items-center space-x-2"
+                      >
+                        <Input
+                          :id="key"
+                          value="••••••••"
+                          type="password"
+                          disabled
+                          class="flex-1 bg-muted"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          @click="
+                            () => {
+                              editingEncryptedFields.add(key);
+                              formData[key] = ''; // Clear the masked value
+                              editingEncryptedFields = new Set(editingEncryptedFields);
+                            }
+                          "
+                        >
+                          <Edit3 class="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+
+                      <div v-else class="flex items-center space-x-2">
+                        <Input
+                          :id="key"
+                          v-model="formData[key]"
+                          type="password"
+                          :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
+                          :required="field.required"
+                          class="flex-1"
+                          autofocus
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          @click="
+                            () => {
+                              editingEncryptedFields.delete(key);
+                              formData[key] = originalFormData[key]; // Restore masked value
+                              editingEncryptedFields = new Set(editingEncryptedFields);
+                            }
+                          "
+                        >
+                          <X class="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p class="text-xs text-neutral-muted">
+                        This value is encrypted and stored securely. Click edit to update it.
+                      </p>
+                    </div>
+
+                    <!-- Regular input or new encrypted field -->
+                    <div v-else>
+                      <Input
+                        :id="key"
+                        v-model="formData[key]"
+                        :type="field.encrypted ? 'password' : 'text'"
+                        :placeholder="
+                          field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
+                        "
+                        :required="field.required"
+                      />
+                      <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
+                        This value will be encrypted and stored securely.
+                      </p>
+                    </div>
+                  </template>
+
+                  <!-- Select -->
+                  <template v-else-if="field.type === 'select' || field.options">
+                    <Label :for="key" :required="field.required">
+                      {{ field.label || key }}
+                    </Label>
+                    <p v-if="field.description" class="text-sm text-neutral-muted">
+                      {{ field.description }}
+                    </p>
+                    <select
+                      :id="key"
+                      v-model="formData[key]"
+                      class="w-full px-3 py-2 text-sm border border-input rounded-md"
+                      :required="field.required"
+                    >
+                      <option value="">Select {{ (field.label || key).toLowerCase() }}</option>
+                      <option
+                        v-for="option in field.options"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </template>
+
+                  <!-- Boolean -->
+                  <template v-else-if="field.type === 'boolean'">
+                    <div class="flex items-center justify-between space-x-2">
+                      <div class="space-y-0.5">
+                        <Label :for="key">{{ field.label || key }}</Label>
+                        <p v-if="field.description" class="text-sm text-neutral-muted">
+                          {{ field.description }}
+                        </p>
+                      </div>
+                      <Switch :id="key" v-model="formData[key]" />
+                    </div>
+                  </template>
+
+                  <!-- Textarea -->
+                  <template v-else-if="field.type === 'textarea'">
+                    <Label :for="key" :required="field.required">
+                      {{ field.label || key }}
+                    </Label>
+                    <p v-if="field.description" class="text-sm text-neutral-muted">
+                      {{ field.description }}
+                    </p>
+                    <Textarea
+                      :id="key"
+                      v-model="formData[key]"
+                      :placeholder="
+                        field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
+                      "
+                      :rows="4"
+                      :required="field.required"
+                    />
+                  </template>
+
+                  <!-- Number -->
+                  <template v-else-if="field.type === 'number'">
+                    <Label :for="key" :required="field.required">
+                      {{ field.label || key }}
+                    </Label>
+                    <p v-if="field.description" class="text-sm text-neutral-muted">
+                      {{ field.description }}
+                    </p>
+                    <Input
+                      :id="key"
+                      v-model.number="formData[key]"
+                      type="number"
+                      :placeholder="
+                        field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
+                      "
+                      :required="field.required"
+                    />
+                  </template>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" @click="resetForm"> Reset </Button>
+                  <Button type="submit" :disabled="saving">
+                    <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
+                    Save Configuration
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+
+            <!-- Custom Tab Contents -->
+            <TabsContent
+              v-for="tab in sortedTabExtensions"
+              :key="tab.id"
+              :value="tab.id"
+              class="p-6"
+            >
+              <component
+                :is="tab.component"
+                :plugin="plugin"
+                :config="formData"
+                :api-base-url="apiBaseUrl"
+                @update:config="
+                  (newConfig: any) => {
+                    formData = { ...formData, ...newConfig };
+                  }
+                "
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
       <!-- Embed Code for channels -->
       <Card
         v-if="
@@ -112,8 +357,8 @@
         </CardContent>
       </Card>
 
-      <!-- Configuration Form -->
-      <Card v-if="hasConfiguration">
+      <!-- Configuration Form (shown when no tabs are present) -->
+      <Card v-if="hasConfiguration && tabExtensions.length === 0">
         <CardHeader>
           <CardTitle>Configuration</CardTitle>
           <CardDescription>
@@ -127,7 +372,7 @@
 
           <!-- Auto-generated Form -->
           <form v-else @submit.prevent="saveConfiguration" class="space-y-4">
-            <div v-for="(field, key) in configSchema" :key="key" class="space-y-2">
+            <div v-for="(field, key) in configSchema" :key="key" class="space-y-2" :id="key">
               <!-- Text Input -->
               <template v-if="field.type === 'string' && !field.options">
                 <Label :for="key" :required="field.required">
@@ -336,11 +581,29 @@
           </div>
         </CardContent>
       </Card>
+
+      <!-- Plugin Settings Extensions - After Settings Slot -->
+      <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
+        <CardContent>
+          <component
+            :is="ext.component"
+            :plugin="plugin"
+            :config="formData"
+            :api-base-url="apiBaseUrl"
+            @update:config="
+              (newConfig: any) => {
+                formData = { ...formData, ...newConfig };
+              }
+            "
+          />
+        </CardContent>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { markRaw, defineAsyncComponent, computed } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
@@ -358,6 +621,8 @@ import {
   X,
   Lock,
 } from "lucide-vue-next";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import Switch from "@/components/ui/Switch.vue";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
@@ -367,9 +632,17 @@ const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 const toast = useToast();
+const runtimeConfig = useRuntimeConfig();
 
 // Plugin ID from route
 const pluginId = computed(() => route.params.pluginId as string);
+
+// API Base URL from runtime config with fallback
+const apiBaseUrl = computed(() => {
+  const url = runtimeConfig.public.apiBaseUrl || "http://localhost:3001";
+  console.log("API Base URL for plugin components:", url);
+  return url;
+});
 
 // State
 const loading = ref(true);
@@ -390,8 +663,25 @@ const formData = ref<Record<string, any>>({});
 const templateHtml = ref<string | null>(null);
 // Track which encrypted fields are being edited
 const editingEncryptedFields = ref<Set<string>>(new Set());
+
+// Plugin Extensions for slots
+const beforeSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
+const afterSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
+const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
 // Track original values to detect changes
 const originalFormData = ref<Record<string, any>>({});
+
+// Computed property to sort tab extensions by order
+const sortedTabExtensions = computed(() => {
+  return [...tabExtensions.value].sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
+    if (a.order !== undefined) return -1;
+    if (b.order !== undefined) return 1;
+    return 0;
+  });
+});
 
 // Embed code for channels
 const embedCode = computed(() => {
@@ -417,6 +707,49 @@ const embedCode = computed(() => {
 
   return snippet;
 });
+
+// Helper function to create a Vue component from SFC string
+const createComponentFromSFC = async (sfcContent: string) => {
+  // Parse the SFC content to extract template, script, and style sections
+  const templateMatch = sfcContent.match(/<template>([\s\S]*?)<\/template>/);
+  const scriptMatch = sfcContent.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+  const styleMatch = sfcContent.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+
+  const template = templateMatch ? templateMatch[1].trim() : "";
+
+  // Create a simple component object with the template
+  // Note: This is a simplified approach. In production, you might want to use
+  // a proper SFC compiler or load components differently
+  const component = {
+    name: `plugin-extension-${pluginId.value}`,
+    template: template,
+    props: ["plugin", "config"],
+    emits: ["update:config"],
+    setup(props: any, { emit }: any) {
+      // Basic setup - just expose props
+      // The actual component logic would be in the SFC's script section
+      // but for simplicity, we're just passing through the props
+      return {
+        plugin: props.plugin,
+        config: props.config,
+        updateConfig: (newConfig: any) => emit("update:config", newConfig),
+      };
+    },
+  };
+
+  // Add styles if present (as a simple inline style tag)
+  if (styleMatch) {
+    const styleId = `plugin-style-${pluginId.value}-${Date.now()}`;
+    if (!document.getElementById(styleId)) {
+      const styleElement = document.createElement("style");
+      styleElement.id = styleId;
+      styleElement.textContent = styleMatch[1];
+      document.head.appendChild(styleElement);
+    }
+  }
+
+  return component;
+};
 
 // Methods
 const getPluginIcon = (types: string[]) => {
@@ -457,6 +790,98 @@ const handleThumbnailError = (event: Event) => {
   imgElement.style.display = "none";
   if (fallbackElement) {
     fallbackElement.style.display = "flex";
+  }
+};
+
+const loadPluginExtensions = async () => {
+  // Load settings extensions from plugin manifest if defined
+  console.log("Loading extensions for plugin:", plugin.value);
+
+  if (!plugin.value?.manifest?.settingsExtensions) {
+    console.log("No settingsExtensions found in manifest");
+    return;
+  }
+
+  console.log("Found settingsExtensions:", plugin.value.manifest.settingsExtensions);
+
+  for (const ext of plugin.value.manifest.settingsExtensions) {
+    try {
+      // Determine which slot array to use
+      let targetExtensions: any = null;
+      if (ext.slot === "before-settings") {
+        targetExtensions = beforeSettingsExtensions;
+      } else if (ext.slot === "after-settings") {
+        targetExtensions = afterSettingsExtensions;
+      } else if (ext.slot === "tab") {
+        targetExtensions = tabExtensions;
+      } else {
+        console.warn(`Unknown slot: ${ext.slot}`);
+        continue;
+      }
+
+      // Check if the extension has a component file path
+      if (ext.component) {
+        console.log(`Loading component for slot: ${ext.slot} from ${ext.component}`);
+
+        // Fetch the component file from the server
+        const componentData = await Hay.plugins.getPluginComponent.query({
+          pluginId: pluginId.value,
+          componentPath: ext.component,
+        });
+
+        if (componentData?.component) {
+          console.log(`Creating component from file for slot: ${ext.slot}`);
+
+          // Parse the Vue SFC and create a component
+          const componentModule = await createComponentFromSFC(componentData.component);
+
+          if (ext.slot === "tab") {
+            targetExtensions.value.push({
+              id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
+              component: markRaw(componentModule),
+              name: ext.tabName || "Tab",
+              order: ext.tabOrder,
+            });
+          } else {
+            targetExtensions.value.push({
+              id: `${pluginId.value}-${ext.slot}`,
+              component: markRaw(componentModule),
+            });
+          }
+          console.log(`Added component extension to ${ext.slot} slot`);
+        }
+      }
+      // Fallback to inline template if provided (for backward compatibility)
+      else if (ext.template) {
+        console.log(`Creating inline component for slot: ${ext.slot}`);
+        const inlineComponent = markRaw({
+          name: `${pluginId.value}-${ext.slot}`,
+          template: ext.template,
+          props: ["plugin", "config"],
+          emits: ["update:config"],
+          setup(props: any, { emit }: any) {
+            return { plugin: props.plugin, config: props.config };
+          },
+        });
+
+        if (ext.slot === "tab") {
+          targetExtensions.value.push({
+            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
+            component: inlineComponent,
+            name: ext.tabName || "Tab",
+            order: ext.tabOrder,
+          });
+        } else {
+          targetExtensions.value.push({
+            id: `${pluginId.value}-${ext.slot}`,
+            component: inlineComponent,
+          });
+        }
+        console.log(`Added inline extension to ${ext.slot} slot`);
+      }
+    } catch (err) {
+      console.error(`Failed to load extension for slot ${ext.slot}:`, err);
+    }
   }
 };
 
@@ -507,6 +932,9 @@ const fetchPlugin = async () => {
         console.log("No custom template, using auto-generated form");
       }
     }
+
+    // Load plugin extensions after plugin is loaded
+    await loadPluginExtensions();
   } catch (err) {
     console.error("Failed to fetch plugin:", err);
     error.value = "Failed to load plugin details";

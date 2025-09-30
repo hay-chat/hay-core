@@ -133,11 +133,15 @@ export class PluginManagerService {
       // Calculate checksum of plugin files
       const checksum = await this.calculatePluginChecksum(pluginPath);
 
+      // Extract the plugin directory name from the full path
+      const pluginDirName = path.basename(pluginPath);
+
       // Upsert plugin in registry
       const plugin = await pluginRegistryRepository.upsertPlugin({
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
+        pluginPath: pluginDirName, // Store the actual directory name
         manifest: manifest as any,
         checksum,
       });
@@ -203,7 +207,7 @@ export class PluginManagerService {
 
     try {
       console.log(`📦 Installing plugin ${plugin.name}...`);
-      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
+      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
 
       execSync(installCommand, {
         cwd: pluginPath,
@@ -243,7 +247,7 @@ export class PluginManagerService {
 
     try {
       console.log(`🔨 Building plugin ${plugin.name}...`);
-      const pluginPath = path.join(this.pluginsDir, pluginId.replace("hay-plugin-", ""));
+      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
 
       execSync(buildCommand, {
         cwd: pluginPath,
@@ -315,14 +319,8 @@ export class PluginManagerService {
 
       if (manifest.autoActivate && manifest.trpcRouter) {
         try {
-          // Dynamically import the plugin's router
-          // The pluginId might be like "hay-plugin-cloud" or just "cloud"
-          let pluginDirName = plugin.pluginId;
-          if (plugin.pluginId.startsWith("hay-plugin-")) {
-            pluginDirName = plugin.pluginId.replace("hay-plugin-", "");
-          }
-
-          const routerPath = path.join(this.pluginsDir, pluginDirName, manifest.trpcRouter);
+          // Dynamically import the plugin's router using the stored plugin path
+          const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
           console.log(`Loading router from: ${routerPath}`);
           const routerModule = await import(routerPath);
           const pluginRouter = routerModule.default || routerModule.router;
@@ -331,7 +329,9 @@ export class PluginManagerService {
             // Register with the manifest ID, not the directory name
             const registerId = manifest.id || plugin.pluginId;
             pluginRouterRegistry.registerRouter(registerId, pluginRouter);
-            console.log(`✅ Auto-activated router for plugin: ${plugin.name} with ID: ${registerId}`);
+            console.log(
+              `✅ Auto-activated router for plugin: ${plugin.name} with ID: ${registerId}`,
+            );
           }
         } catch (error) {
           console.warn(`⚠️ Could not load router for plugin ${plugin.name}:`, error);

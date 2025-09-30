@@ -1539,5 +1539,11 @@
   "ui": {
     "auth": "oauth2",
     "settings": true
-  }
+  },
+  "settingsExtensions": [
+    {
+      "slot": "after-settings",
+      "component": "components/settings/AfterSettings.vue"
+    }
+  ]
 }

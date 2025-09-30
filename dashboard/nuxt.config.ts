@@ -16,9 +16,10 @@ export default defineNuxtConfig({
     public: {
       baseDomain: process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.chat",
       apiBaseUrl:
-        process.env["NODE_ENV"] === "development"
+        process.env["API_BASE_URL"] ||
+        (process.env["NODE_ENV"] === "development"
           ? "http://localhost:3001"
-          : "https://api.hay.chat",
+          : "https://api.hay.chat"),
     },
   },
 
@@ -168,5 +169,25 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: ["vue", "vue-router", "@vueuse/core"],
     },
+    resolve: {
+      alias: {
+        // Enable runtime compilation for inline templates
+        vue: "vue/dist/vue.esm-bundler.js",
+      },
+    },
+    define: {
+      // Enable Vue runtime compilation
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false,
+    },
+  },
+
+  // Enable Vue runtime compilation
+  vue: {
+    compilerOptions: {
+      // This allows runtime compilation of templates
+      isCustomElement: (_tag: string) => false,
+    },
+    runtimeCompiler: true,
   },
 });
