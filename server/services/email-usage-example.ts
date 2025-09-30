@@ -31,6 +31,7 @@ async function sendWelcomeEmail(userName: string, userEmail: string) {
 
   const result = await emailService.sendTemplateEmail({
     to: userEmail,
+    subject: "Welcome to Hay Platform",
     template: "welcome",
     variables: {
       userName,
@@ -78,6 +79,7 @@ async function sendPasswordResetEmail(
 
   const result = await emailService.sendTemplateEmail({
     to: userEmail,
+    subject: "Reset Your Password",
     template: "reset-password",
     variables: {
       userName,
@@ -115,6 +117,7 @@ async function sendNotificationEmail(
 
   const result = await emailService.sendTemplateEmail({
     to: userEmail,
+    subject: notificationType,
     template: "notification",
     variables: {
       notificationTitle: notificationType,
@@ -254,6 +257,7 @@ export async function sendBatchEmails(recipients: Array<{
       } else if (recipient.type === "notification") {
         return sendNotificationEmail(recipient.email, "Update", recipient.data);
       }
+      throw new Error(`Unknown recipient type: ${recipient.type}`);
     })
   );
   
