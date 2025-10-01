@@ -11,7 +11,7 @@ import type {
 } from "../types/prompt.types";
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
 import { Organization } from "../entities/organization.entity";
-import { getRepository } from "typeorm";
+import { AppDataSource } from "../database/data-source";
 
 export class PromptService {
   private static instance: PromptService;
@@ -130,7 +130,7 @@ export class PromptService {
     
     if (options?.organizationId) {
       try {
-        const organizationRepo = getRepository(Organization);
+        const organizationRepo = AppDataSource.getRepository(Organization);
         const org = await organizationRepo.findOne({
           where: { id: options.organizationId },
           select: ["defaultLanguage"],
