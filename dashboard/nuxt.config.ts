@@ -26,7 +26,7 @@ export default defineNuxtConfig({
   // Enable TypeScript
   typescript: {
     strict: true,
-    typeCheck: true,
+    typeCheck: process.env["NODE_ENV"] !== "production", // Disable type check in production builds
     tsConfig: {
       compilerOptions: {
         experimentalDecorators: true,

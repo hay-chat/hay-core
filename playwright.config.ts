@@ -78,7 +78,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: "cd dashboard && PORT=3000 npm run dev", 
+      command: "cd dashboard && PORT=3000 npm run dev",
       url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,
     },

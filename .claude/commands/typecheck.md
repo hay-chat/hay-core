@@ -1,0 +1,3 @@
+- Run `npm run typecheck`
+- If there are any errors, fix them
+- If there are no errors, say "No errors found"

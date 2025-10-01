@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { config } from "@server/config/env";
-import { appRouter } from "@server/routes";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import "reflect-metadata";
@@ -186,7 +185,6 @@ async function startServer() {
         // Note: Plugins will now be started on-demand when needed
         // This improves scalability and resource usage
         console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
-
       } catch (error) {
         console.error("Failed to initialize plugin system:", error);
       }
