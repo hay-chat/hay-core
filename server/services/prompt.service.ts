@@ -17,7 +17,7 @@ export class PromptService {
   private static instance: PromptService;
   private cache: Map<string, PromptCache> = new Map();
   private config: PromptConfig;
-  
+
   private constructor() {
     this.config = {
       supportedLanguages: Object.values(SupportedLanguage),
@@ -40,17 +40,17 @@ export class PromptService {
   async getPrompt(
     promptId: string,
     variables: Record<string, PromptVariableType>,
-    options?: Partial<PromptOptions>
+    options?: Partial<PromptOptions>,
   ): Promise<string> {
     // Determine language
     const language = await this.determineLanguage(options);
-    
+
     // Load prompt content with fallback
     const promptContent = await this.loadPromptWithFallback(promptId, language);
-    
+
     // Apply variable substitution
     const renderedContent = VariableEngine.render(promptContent.content, variables);
-    
+
     return renderedContent;
   }
 
@@ -59,7 +59,7 @@ export class PromptService {
    */
   async getPromptMetadata(
     promptId: string,
-    language?: SupportedLanguage
+    language?: SupportedLanguage,
   ): Promise<PromptContent | null> {
     const lang = language || DEFAULT_LANGUAGE;
     return this.loadPromptWithFallback(promptId, lang);
@@ -71,7 +71,7 @@ export class PromptService {
   async listPrompts(language?: SupportedLanguage): Promise<PromptContent[]> {
     const lang = language || DEFAULT_LANGUAGE;
     const promptsDir = path.join(this.config.promptsDirectory, lang);
-    
+
     try {
       const prompts: PromptContent[] = [];
       await this.scanDirectory(promptsDir, "", prompts);
@@ -87,12 +87,10 @@ export class PromptService {
    */
   validateVariables(
     promptContent: PromptContent,
-    providedVariables: Record<string, PromptVariableType>
+    providedVariables: Record<string, PromptVariableType>,
   ): { valid: boolean; missing: string[] } {
-    const missing = promptContent.variables.filter(
-      (varName) => !(varName in providedVariables)
-    );
-    
+    const missing = promptContent.variables.filter((varName) => !(varName in providedVariables));
+
     return {
       valid: missing.length === 0,
       missing,
@@ -127,7 +125,7 @@ export class PromptService {
     if (options?.language && this.isValidLanguage(options.language)) {
       return options.language as SupportedLanguage;
     }
-    
+
     if (options?.organizationId) {
       try {
         const organizationRepo = AppDataSource.getRepository(Organization);
@@ -135,7 +133,7 @@ export class PromptService {
           where: { id: options.organizationId },
           select: ["defaultLanguage"],
         });
-        
+
         if (org?.defaultLanguage) {
           return org.defaultLanguage;
         }
@@ -143,7 +141,7 @@ export class PromptService {
         console.error("Error fetching organization language:", error);
       }
     }
-    
+
     return DEFAULT_LANGUAGE;
   }
 
@@ -152,21 +150,23 @@ export class PromptService {
    */
   private async loadPromptWithFallback(
     promptId: string,
-    language: SupportedLanguage
+    language: SupportedLanguage,
   ): Promise<PromptContent> {
     // Try to load in requested language
     let content = await this.loadPrompt(promptId, language);
-    
+
     // Fallback to English if not found and language is not English
     if (!content && language !== DEFAULT_LANGUAGE) {
-      console.warn(`Prompt ${promptId} not found in ${language}, falling back to ${DEFAULT_LANGUAGE}`);
+      console.warn(
+        `Prompt ${promptId} not found in ${language}, falling back to ${DEFAULT_LANGUAGE}`,
+      );
       content = await this.loadPrompt(promptId, DEFAULT_LANGUAGE);
     }
-    
+
     if (!content) {
       throw new Error(`Prompt not found: ${promptId}`);
     }
-    
+
     return content;
   }
 
@@ -175,25 +175,25 @@ export class PromptService {
    */
   private async loadPrompt(
     promptId: string,
-    language: SupportedLanguage
+    language: SupportedLanguage,
   ): Promise<PromptContent | null> {
     const cacheKey = this.getCacheKey(promptId, language);
-    
+
     // Check cache
     const cached = this.getFromCache(cacheKey);
     if (cached) {
       return cached;
     }
-    
+
     // Load from filesystem
     const filePath = this.getPromptPath(promptId, language);
-    
+
     try {
       const content = await PromptParser.parsePromptFile(filePath);
-      
+
       // Cache the result
       this.addToCache(cacheKey, content);
-      
+
       return content;
     } catch (error) {
       // File doesn't exist or parse error
@@ -207,24 +207,22 @@ export class PromptService {
   private async scanDirectory(
     dir: string,
     relativePath: string,
-    prompts: PromptContent[]
+    prompts: PromptContent[],
   ): Promise<void> {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
-        
+
         if (entry.isDirectory()) {
-          const newRelativePath = relativePath 
-            ? `${relativePath}/${entry.name}`
-            : entry.name;
+          const newRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
           await this.scanDirectory(fullPath, newRelativePath, prompts);
         } else if (entry.name.endsWith(".md")) {
           const promptId = relativePath
             ? `${relativePath}/${entry.name.replace(".md", "")}`
             : entry.name.replace(".md", "");
-          
+
           try {
             const content = await PromptParser.parsePromptFile(fullPath);
             prompts.push(content);
@@ -259,11 +257,11 @@ export class PromptService {
    */
   private getFromCache(key: string): PromptContent | null {
     const cached = this.cache.get(key);
-    
+
     if (!cached) {
       return null;
     }
-    
+
     // Check if cache is still valid
     if (this.config.cacheTTL > 0) {
       const age = Date.now() - cached.timestamp;
@@ -272,7 +270,7 @@ export class PromptService {
         return null;
       }
     }
-    
+
     return cached.content;
   }
 

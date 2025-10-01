@@ -21,6 +21,7 @@ export const runConversation = async (conversationId: string) => {
 
   try {
     // 00. Intialize
+    console.log("[Orchestrator] Initializing conversation", conversationId);
     await conversation.lock();
 
     // 00.1. Add Initial System Message
@@ -50,7 +51,7 @@ export const runConversation = async (conversationId: string) => {
     // 01.1. Get Intent and Sentiment
     const { intent, sentiment } = await perceptionLayer.perceive(
       lastCustomerMessage,
-      conversation.organization_id
+      conversation.organization_id,
     );
     await lastCustomerMessage.savePerception({
       intent: intent.label,
@@ -74,7 +75,7 @@ export const runConversation = async (conversationId: string) => {
         publicMessages,
         intent.label,
         conversation.playbook_id !== null,
-        conversation.organization_id
+        conversation.organization_id,
       );
 
       shouldClose = closureValidation.shouldClose;
@@ -134,7 +135,7 @@ export const runConversation = async (conversationId: string) => {
       const agentCandidate = await perceptionLayer.getAgentCandidate(
         lastCustomerMessage,
         activeAgents,
-        conversation.organization_id
+        conversation.organization_id,
       );
       if (agentCandidate) {
         conversation.updateAgent(agentCandidate.id);
@@ -156,7 +157,7 @@ export const runConversation = async (conversationId: string) => {
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
       activePlaybooks,
-      conversation.organization_id
+      conversation.organization_id,
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
@@ -196,8 +197,10 @@ export const runConversation = async (conversationId: string) => {
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
+    console.error("[Orchestrator] Error in conversation", error);
   } finally {
     await conversation.unlock();
+    console.log("[Orchestrator] Conversation unlocked", conversationId);
   }
 };
 
