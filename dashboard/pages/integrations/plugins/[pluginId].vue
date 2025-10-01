@@ -99,7 +99,11 @@
           <component
             :is="ext.component"
             :plugin="plugin"
-            :config="formData"
+            :config="{
+              ...formData,
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId
+            }"
             :api-base-url="apiBaseUrl"
             @update:config="
               (newConfig: any) => {
@@ -325,7 +329,11 @@
               <component
                 :is="tab.component"
                 :plugin="plugin"
-                :config="formData"
+                :config="{
+                  ...formData,
+                  instanceId: instanceId,
+                  organizationId: userStore.activeOrganizationId
+                }"
                 :api-base-url="apiBaseUrl"
                 @update:config="
                   (newConfig: any) => {
@@ -335,46 +343,6 @@
               />
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
-
-      <!-- Embed Code for channels -->
-      <Card
-        v-if="
-          plugin &&
-          (Array.isArray(plugin.type)
-            ? plugin.type.includes('channel')
-            : plugin.type === 'channel') &&
-          enabled
-        "
-      >
-        <CardHeader>
-          <CardTitle>Installation</CardTitle>
-          <CardDescription>
-            Add this code to your website to enable the chat widget
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-4">
-            <div>
-              <Label>Embed Code</Label>
-              <div class="relative">
-                <Textarea :value="embedCode" readonly class="font-mono text-xs" :rows="4" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  class="absolute top-2 right-2"
-                  @click="copyEmbedCode"
-                >
-                  <Copy class="h-3 w-3 mr-1" />
-                  {{ copied ? "Copied!" : "Copy" }}
-                </Button>
-              </div>
-            </div>
-            <div class="text-sm text-neutral-muted">
-              Place this code before the closing &lt;/body&gt; tag on your website.
-            </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -609,7 +577,11 @@
           <component
             :is="ext.component"
             :plugin="plugin"
-            :config="formData"
+            :config="{
+              ...formData,
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId
+            }"
             :api-base-url="apiBaseUrl"
             @update:config="
               (newConfig: any) => {
@@ -628,7 +600,6 @@ import { markRaw, defineAsyncComponent, computed } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
-  Copy,
   Loader2,
   CheckCircle,
   XCircle,
@@ -662,9 +633,13 @@ const pluginId = computed(() => route.params.pluginId as string);
 // API Base URL from runtime config with fallback
 const apiBaseUrl = computed(() => {
   const url = runtimeConfig.public.apiBaseUrl || "http://localhost:3001";
-  console.log("API Base URL for plugin components:", url);
   return url;
 });
+
+// Vite glob imports for automatic plugin component discovery
+// Use relative path from this file to plugins directory (4 levels up)
+// @ts-ignore - Vite glob import not recognized by TypeScript in Nuxt
+const pluginComponents = import.meta.glob<any>('../../../../plugins/*/src/ui/**/*.vue');
 
 // State
 const loading = ref(true);
@@ -673,7 +648,6 @@ const plugin = ref<any>(null);
 const enabled = ref(false);
 const saving = ref(false);
 const testing = ref(false);
-const copied = ref(false);
 const disabling = ref(false);
 const showDisableConfirm = ref(false);
 const testResult = ref<{ success: boolean; message?: string } | null>(null);
@@ -707,72 +681,22 @@ const sortedTabExtensions = computed(() => {
   });
 });
 
-// Embed code for channels
-const embedCode = computed(() => {
-  // Check if plugin is loaded and has embedSnippet
-  if (!plugin.value) return "";
+// Helper function to load plugin component dynamically using Vite's glob imports
+const loadPluginComponent = async (componentPath: string) => {
+  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix if present)
+  const pluginName = pluginId.value.replace('hay-plugin-', '');
 
-  const embedSnippet = plugin.value.manifest?.capabilities?.chat_connector?.embedSnippet;
-  if (!embedSnippet) return "";
+  // Build the full path from plugin name and componentPath
+  // The glob pattern is '../../../../plugins/*/src/ui/**/*.vue' so we need to match that
+  const fullPath = `../../../../plugins/${pluginName}/${componentPath}`;
 
-  // Check if we have all required data
-  if (!userStore.activeOrganizationId || !plugin.value?.id || !instanceId.value) {
-    return ""; // Will retry when data loads
+  // Check if the component exists in our discovered components
+  if (pluginComponents[fullPath]) {
+    // Use defineAsyncComponent for proper async loading
+    return defineAsyncComponent(pluginComponents[fullPath]);
   }
 
-  const baseUrl = window.location.origin.replace("5173", "3001");
-
-  // Replace placeholders in the embed snippet
-  let snippet = embedSnippet
-    .replace(/{{ORGANIZATION_ID}}/g, userStore.activeOrganizationId)
-    .replace(/{{INSTANCE_ID}}/g, instanceId.value)
-    .replace(/{{PLUGIN_ID}}/g, plugin.value.id)
-    .replace(/{{BASE_URL}}/g, baseUrl);
-
-  return snippet;
-});
-
-// Helper function to create a Vue component from SFC string
-const createComponentFromSFC = async (sfcContent: string) => {
-  // Parse the SFC content to extract template, script, and style sections
-  const templateMatch = sfcContent.match(/<template>([\s\S]*?)<\/template>/);
-  const scriptMatch = sfcContent.match(/<script[^>]*>([\s\S]*?)<\/script>/);
-  const styleMatch = sfcContent.match(/<style[^>]*>([\s\S]*?)<\/style>/);
-
-  const template = templateMatch ? templateMatch[1].trim() : "";
-
-  // Create a simple component object with the template
-  // Note: This is a simplified approach. In production, you might want to use
-  // a proper SFC compiler or load components differently
-  const component = {
-    name: `plugin-extension-${pluginId.value}`,
-    template: template,
-    props: ["plugin", "config"],
-    emits: ["update:config"],
-    setup(props: any, { emit }: any) {
-      // Basic setup - just expose props
-      // The actual component logic would be in the SFC's script section
-      // but for simplicity, we're just passing through the props
-      return {
-        plugin: props.plugin,
-        config: props.config,
-        updateConfig: (newConfig: any) => emit("update:config", newConfig),
-      };
-    },
-  };
-
-  // Add styles if present (as a simple inline style tag)
-  if (styleMatch) {
-    const styleId = `plugin-style-${pluginId.value}-${Date.now()}`;
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement("style");
-      styleElement.id = styleId;
-      styleElement.textContent = styleMatch[1];
-      document.head.appendChild(styleElement);
-    }
-  }
-
-  return component;
+  throw new Error(`Component not found: ${fullPath}. Available: ${Object.keys(pluginComponents).join(', ')}`);
 };
 
 // Methods
@@ -819,14 +743,9 @@ const handleThumbnailError = (event: Event) => {
 
 const loadPluginExtensions = async () => {
   // Load settings extensions from plugin manifest if defined
-  console.log("Loading extensions for plugin:", plugin.value);
-
   if (!plugin.value?.manifest?.settingsExtensions) {
-    console.log("No settingsExtensions found in manifest");
     return;
   }
-
-  console.log("Found settingsExtensions:", plugin.value.manifest.settingsExtensions);
 
   for (const ext of plugin.value.manifest.settingsExtensions) {
     try {
@@ -845,39 +764,25 @@ const loadPluginExtensions = async () => {
 
       // Check if the extension has a component file path
       if (ext.component) {
-        console.log(`Loading component for slot: ${ext.slot} from ${ext.component}`);
+        // Load component using Vite's dynamic imports
+        const componentModule = await loadPluginComponent(ext.component);
 
-        // Fetch the component file from the server
-        const componentData = await Hay.plugins.getPluginComponent.query({
-          pluginId: pluginId.value,
-          componentPath: ext.component,
-        });
-
-        if (componentData?.component) {
-          console.log(`Creating component from file for slot: ${ext.slot}`);
-
-          // Parse the Vue SFC and create a component
-          const componentModule = await createComponentFromSFC(componentData.component);
-
-          if (ext.slot === "tab") {
-            targetExtensions.value.push({
-              id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
-              component: markRaw(componentModule),
-              name: ext.tabName || "Tab",
-              order: ext.tabOrder,
-            });
-          } else {
-            targetExtensions.value.push({
-              id: `${pluginId.value}-${ext.slot}`,
-              component: markRaw(componentModule),
-            });
-          }
-          console.log(`Added component extension to ${ext.slot} slot`);
+        if (ext.slot === "tab") {
+          targetExtensions.value.push({
+            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
+            component: markRaw(componentModule),
+            name: ext.tabName || "Tab",
+            order: ext.tabOrder,
+          });
+        } else {
+          targetExtensions.value.push({
+            id: `${pluginId.value}-${ext.slot}`,
+            component: markRaw(componentModule),
+          });
         }
       }
       // Fallback to inline template if provided (for backward compatibility)
       else if (ext.template) {
-        console.log(`Creating inline component for slot: ${ext.slot}`);
         const inlineComponent = markRaw({
           name: `${pluginId.value}-${ext.slot}`,
           template: ext.template,
@@ -901,7 +806,6 @@ const loadPluginExtensions = async () => {
             component: inlineComponent,
           });
         }
-        console.log(`Added inline extension to ${ext.slot} slot`);
       }
     } catch (err) {
       console.error(`Failed to load extension for slot ${ext.slot}:`, err);
@@ -1054,18 +958,6 @@ const testConnection = async () => {
     };
   } finally {
     testing.value = false;
-  }
-};
-
-const copyEmbedCode = async () => {
-  try {
-    await navigator.clipboard.writeText(embedCode.value);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch (err) {
-    console.error("Failed to copy:", err);
   }
 };
 

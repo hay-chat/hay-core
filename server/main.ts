@@ -64,19 +64,6 @@ async function startServer() {
     });
   });
 
-  // Plugin asset routes - serve public assets like widget scripts
-  server.get(/^\/plugins\/assets\/([^/]+)\/(.*)$/, (req, res) => {
-    // Set params manually for regex routes
-    req.params = {
-      pluginName: req.params[0],
-      assetPath: req.params[1],
-    };
-    pluginAssetService.serveAsset(req, res).catch((error) => {
-      console.error("Asset serving error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    });
-  });
-
   // Plugin public directory route - serve any file from plugin's public folder
   server.get(/^\/plugins\/public\/([^/]+)\/(.*)$/, (req, res) => {
     // Set params manually for regex routes

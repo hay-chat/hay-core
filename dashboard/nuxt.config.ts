@@ -31,6 +31,7 @@ export default defineNuxtConfig({
       compilerOptions: {
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
+        types: ["vite/client"],
         paths: {
           "@server/*": ["../server/*"],
           "@/*": ["./*"],
@@ -173,6 +174,14 @@ export default defineNuxtConfig({
       alias: {
         // Enable runtime compilation for inline templates
         vue: "vue/dist/vue.esm-bundler.js",
+        // Add alias for plugins directory
+        "@plugins": "../plugins",
+      },
+    },
+    server: {
+      fs: {
+        // Allow serving files from one level up to access plugins directory
+        allow: [".."],
       },
     },
     define: {

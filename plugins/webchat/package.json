@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "mkdir -p dist/widget dist/ui && cp src/widget/* dist/widget/ 2>/dev/null || true && cp src/ui/* dist/ui/ 2>/dev/null || true",
+    "copy-assets": "mkdir -p dist/ui public && cp src/widget/* public/ 2>/dev/null || true && cp src/ui/* dist/ui/ 2>/dev/null || true",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist public",
     "start": "node dist/index.js"
   },
   "keywords": [

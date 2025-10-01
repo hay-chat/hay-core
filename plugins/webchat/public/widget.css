@@ -1,0 +1,413 @@
+/* Hay Webchat Widget Styles */
+:root {
+  --hay-primary: #3b82f6;
+  --hay-primary-dark: #2563eb;
+  --hay-primary-light: #60a5fa;
+  --hay-widget-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --hay-widget-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Widget Container */
+.hay-widget {
+  position: fixed;
+  bottom: 20px;
+  z-index: 99999;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.hay-widget.hay-position-right {
+  right: 20px;
+}
+
+.hay-widget.hay-position-left {
+  left: 20px;
+}
+
+/* Widget Button */
+.hay-widget-button {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--hay-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--hay-widget-shadow-lg);
+  transition: all 0.3s ease;
+}
+
+.hay-widget-button:hover {
+  background: var(--hay-primary-dark);
+  transform: scale(1.05);
+}
+
+.hay-widget-icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* Unread Badge */
+.hay-widget-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: white;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 0 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Widget Window */
+.hay-widget-window {
+  position: absolute;
+  bottom: 80px;
+  width: 380px;
+  height: 600px;
+  max-height: calc(100vh - 100px);
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--hay-widget-shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+.hay-position-right .hay-widget-window {
+  right: 0;
+}
+
+.hay-position-left .hay-widget-window {
+  left: 0;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Widget Header */
+.hay-widget-header {
+  background: var(--hay-primary);
+  color: white;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.hay-widget-header-content {
+  flex: 1;
+}
+
+.hay-widget-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.hay-widget-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.hay-widget-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.hay-widget-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hay-widget-close svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Messages Area */
+.hay-widget-messages {
+  flex: 1;
+  overflow-y: auto;
+  background: #f9fafb;
+}
+
+.hay-widget-messages-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Message Bubbles */
+.hay-message {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hay-message-user {
+  justify-content: flex-end;
+}
+
+.hay-message-agent {
+  justify-content: flex-start;
+}
+
+.hay-message-system {
+  justify-content: center;
+}
+
+.hay-message-bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  word-wrap: break-word;
+}
+
+.hay-message-user .hay-message-bubble {
+  background: var(--hay-primary);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.hay-message-agent .hay-message-bubble {
+  background: white;
+  color: #1f2937;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.hay-message-system .hay-message-bubble {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+.hay-message-text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.hay-message-time {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Typing Indicator */
+.hay-typing-indicator {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.hay-typing-dots {
+  background: white;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  display: flex;
+  gap: 4px;
+}
+
+.hay-typing-dots span {
+  width: 8px;
+  height: 8px;
+  background: #9ca3af;
+  border-radius: 50%;
+  animation: typing 1.4s infinite;
+}
+
+.hay-typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.hay-typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Closure message styles */
+.hay-message-closure .hay-message-bubble {
+  background: #f0f0f0;
+  border: 1px solid #d0d0d0;
+}
+
+.hay-closure-indicator {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: 600;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Input Area */
+.hay-widget-input {
+  padding: 16px;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.hay-widget-input form {
+  display: flex;
+  gap: 8px;
+}
+
+.hay-widget-input input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 24px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.hay-widget-input input:focus {
+  border-color: var(--hay-primary);
+}
+
+.hay-widget-send {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: var(--hay-primary);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.hay-widget-send:hover {
+  background: var(--hay-primary-dark);
+  transform: scale(1.05);
+}
+
+.hay-widget-send:active {
+  transform: scale(0.95);
+}
+
+.hay-widget-send svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .hay-widget {
+    bottom: 0;
+    right: 0;
+    left: 0;
+  }
+
+  .hay-widget-window {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    bottom: 0;
+    border-radius: 0;
+  }
+
+  .hay-widget-button {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .hay-position-left .hay-widget-button {
+    left: auto;
+    right: 20px;
+  }
+}
+
+/* Theme Variations */
+.hay-theme-green {
+  --hay-primary: #10b981;
+  --hay-primary-dark: #059669;
+  --hay-primary-light: #34d399;
+}
+
+.hay-theme-purple {
+  --hay-primary: #8b5cf6;
+  --hay-primary-dark: #7c3aed;
+  --hay-primary-light: #a78bfa;
+}
+
+.hay-theme-black {
+  --hay-primary: #000000;
+  --hay-primary-dark: #171717;
+  --hay-primary-light: #404040;
+}
+
+/* Scrollbar Styling */
+.hay-widget-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hay-widget-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hay-widget-messages::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.hay-widget-messages::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

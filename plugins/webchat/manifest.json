@@ -20,18 +20,7 @@
           "verificationToken": false
         }
       ],
-      "publicAssets": [
-        {
-          "path": "widget.js",
-          "file": "src/widget/widget.js",
-          "type": "script"
-        },
-        {
-          "path": "widget.css",
-          "file": "src/widget/widget.css",
-          "type": "stylesheet"
-        }
-      ],
+      "publicDirectory": "public",
       "realtime": {
         "type": "websocket",
         "path": "/ws"
@@ -40,62 +29,70 @@
         "fileUpload": true,
         "typing": true,
         "readReceipts": true
-      },
-      "embedSnippet": "<script>\n  window.HayChat = window.HayChat || {};\n  window.HayChat.config = {\n    organizationId: '{{ORGANIZATION_ID}}',\n    instanceId: '{{INSTANCE_ID}}',\n    pluginId: '{{PLUGIN_ID}}',\n    baseUrl: '{{BASE_URL}}'\n  };\n</script>\n<script src=\"{{BASE_URL}}/plugins/assets/{{PLUGIN_ID}}/widget.js\" async></script>\n<link rel=\"stylesheet\" href=\"{{BASE_URL}}/plugins/assets/{{PLUGIN_ID}}/widget.css\">"
+      }
     }
   },
-  "config": {
-    "schema": {
-      "type": "object",
-      "properties": {
-        "widgetTitle": {
-          "type": "string",
-          "description": "The title displayed in the chat widget header",
-          "default": "Chat with us"
-        },
-        "widgetSubtitle": {
-          "type": "string",
-          "description": "The subtitle displayed below the title",
-          "default": "We typically reply within minutes"
-        },
-        "position": {
-          "type": "string",
-          "description": "Where the chat widget appears on the page",
-          "enum": ["right", "left"],
-          "default": "right"
-        },
-        "theme": {
-          "type": "string",
-          "description": "The color theme for the chat widget",
-          "enum": ["blue", "green", "purple", "black"],
-          "default": "blue"
-        },
-        "showGreeting": {
-          "type": "boolean",
-          "description": "Show a greeting message when the chat opens",
-          "default": true
-        },
-        "greetingMessage": {
-          "type": "string",
-          "description": "The greeting message to display",
-          "default": "Hello! How can we help you today?"
-        },
-        "allowedDomains": {
-          "type": "string",
-          "description": "List of domains where the widget can be embedded (one per line)",
-          "default": "*"
-        }
-      },
-      "required": ["widgetTitle", "position", "theme"]
+  "configSchema": {
+    "widgetTitle": {
+      "type": "string",
+      "label": "Widget Title",
+      "description": "The title displayed in the chat widget header",
+      "default": "Chat with us",
+      "required": true
     },
-    "defaults": {
-      "widgetTitle": "Chat with us",
-      "widgetSubtitle": "We typically reply within minutes",
-      "position": "right",
-      "theme": "blue",
-      "showGreeting": true,
-      "greetingMessage": "Hello! How can we help you today?",
-      "allowedDomains": "*"
+    "widgetSubtitle": {
+      "type": "string",
+      "label": "Widget Subtitle",
+      "description": "The subtitle displayed below the title",
+      "default": "We typically reply within minutes"
+    },
+    "position": {
+      "type": "select",
+      "label": "Position",
+      "description": "Where the chat widget appears on the page",
+      "options": [
+        { "label": "Right", "value": "right" },
+        { "label": "Left", "value": "left" }
+      ],
+      "default": "right",
+      "required": true
+    },
+    "theme": {
+      "type": "select",
+      "label": "Theme",
+      "description": "The color theme for the chat widget",
+      "options": [
+        { "label": "Blue", "value": "blue" },
+        { "label": "Green", "value": "green" },
+        { "label": "Purple", "value": "purple" },
+        { "label": "Black", "value": "black" }
+      ],
+      "default": "blue",
+      "required": true
+    },
+    "showGreeting": {
+      "type": "boolean",
+      "label": "Show Greeting",
+      "description": "Show a greeting message when the chat opens",
+      "default": true
+    },
+    "greetingMessage": {
+      "type": "string",
+      "label": "Greeting Message",
+      "description": "The greeting message to display",
+      "default": "Hello! How can we help you today?"
+    },
+    "allowedDomains": {
+      "type": "textarea",
+      "label": "Allowed Domains",
+      "description": "List of domains where the widget can be embedded (one per line)",
+      "default": "*"
     }
-  }
+  },
+  "settingsExtensions": [
+    {
+      "slot": "before-settings",
+      "component": "src/ui/installation.vue"
+    }
+  ]
 }

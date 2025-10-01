@@ -334,34 +334,6 @@ export const getPluginUITemplate = authenticatedProcedure
     };
   });
 
-/**
- * Get Vue component file for plugin settings extensions
- */
-export const getPluginComponent = authenticatedProcedure
-  .input(
-    z.object({
-      pluginId: z.string(),
-      componentPath: z.string(),
-    }),
-  )
-  .query(async ({ input }) => {
-    const component = await pluginUIService.getPluginComponent(
-      input.pluginId,
-      input.componentPath,
-    );
-
-    if (!component) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Component ${input.componentPath} not found for plugin ${input.pluginId}`,
-      });
-    }
-
-    return {
-      component,
-      type: "vue",
-    };
-  });
 
 /**
  * Get all available MCP tools from enabled plugins

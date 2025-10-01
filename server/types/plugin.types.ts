@@ -65,11 +65,7 @@ export interface HayPluginManifest {
         verificationToken?: boolean;
         signatureHeader?: string;
       }>;
-      publicAssets?: Array<{
-        path: string;
-        file: string;
-        type: "script" | "stylesheet" | "image";
-      }>;
+      publicDirectory?: string;
       realtime?: {
         type: "websocket" | "sse";
         path?: string;
@@ -110,13 +106,6 @@ export interface HayPluginManifest {
     configuration?: string;
     templates?: Record<string, string>;
   };
-}
-
-export interface PublicAsset {
-  path: string;
-  content: string | Buffer;
-  contentType: string;
-  cache?: boolean;
 }
 
 export interface WebhookRequest {
