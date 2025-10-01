@@ -93,30 +93,58 @@ const errorLink: TRPCLink<AppRouter> = () => {
           observer.next(value);
         },
         error(err) {
-          // Check if the error is due to token expiration
+          // Check if the error is due to authentication failure
           if (err instanceof TRPCClientError) {
             const message = err.message?.toLowerCase();
             const data = err.data;
 
-            // Check for token expiration in various formats
+            // Debug logging
+            console.log("[API Error Link] Error detected:", {
+              message: err.message,
+              messageLower: message,
+              code: data?.code,
+              httpStatus: data?.httpStatus,
+              fullData: data,
+            });
+
+            // Check for authentication errors in various formats
             if (
               message?.includes("token has expired") ||
               message?.includes("token expired") ||
               message?.includes("jwt expired") ||
+              message?.includes("authentication required") ||
+              message?.includes("not authenticated") ||
+              message?.includes("unauthorized") ||
               data?.code === "UNAUTHORIZED" ||
-              (data?.httpStatus === 401 && message?.includes("expired"))
+              data?.httpStatus === 401
             ) {
-              // Token has expired, trigger logout
+              // Authentication failed, trigger logout
               const authStore = useAuthStore();
 
-              // Only logout if we're authenticated (to avoid loops)
-              if (authStore.isAuthenticated) {
-                console.log("[API] Token expired, logging out user");
+              console.log(
+                "[API Error Link] Auth error detected, isAuthenticated:",
+                authStore.isAuthenticated,
+                "hasTokens:",
+                !!authStore.tokens,
+              );
+
+              // Logout if we have tokens or are marked as authenticated
+              // This handles cases where auth failed but tokens still exist in storage
+              if (authStore.isAuthenticated || authStore.tokens?.accessToken) {
+                console.log("[API] Authentication failed, logging out user");
 
                 // Use setTimeout to ensure we're not in a reactive context
                 if (typeof window !== "undefined") {
                   setTimeout(() => {
                     authStore.logout("token_expired");
+                  }, 0);
+                }
+              } else {
+                // No tokens and not authenticated, just redirect to login
+                console.log("[API] No valid auth state, redirecting to login");
+                if (typeof window !== "undefined") {
+                  setTimeout(() => {
+                    navigateTo("/login");
                   }, 0);
                 }
               }

@@ -12,32 +12,28 @@
 import { type VariantProps, cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-background-secondary text-secondary-foreground hover:bg-background-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
-      },
+const buttonVariants = cva("btn-base", {
+  variants: {
+    variant: {
+      default: "btn-default",
+      destructive: "btn-destructive",
+      outline: "btn-outline",
+      secondary: "btn-secondary",
+      ghost: "btn-ghost",
+      link: "btn-link",
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
+    size: {
+      default: "btn-size-default",
+      sm: "btn-size-sm",
+      lg: "btn-size-lg",
+      icon: "btn-size-icon",
     },
   },
-);
+  defaultVariants: {
+    variant: "default",
+    size: "default",
+  },
+});
 
 export interface ButtonProps {
   variant?: VariantProps<typeof buttonVariants>["variant"];
@@ -52,3 +48,108 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   disabled: false,
 });
 </script>
+
+<style scoped lang="scss">
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-ring);
+  }
+
+  &:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+}
+
+/* Variants */
+.btn-default {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color-primary) 90%, transparent);
+  }
+}
+
+.btn-destructive {
+  background-color: var(--color-destructive);
+  color: var(--color-destructive-foreground);
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color-destructive) 90%, transparent);
+  }
+}
+
+.btn-outline {
+  border: 1px solid var(--color-input);
+  background-color: var(--color-background);
+
+  &:hover {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+}
+
+.btn-secondary {
+  background-color: var(--color-background-secondary);
+  color: var(--color-secondary-foreground);
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color-background-secondary) 80%, transparent);
+  }
+}
+
+.btn-ghost {
+  &:hover {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+}
+
+.btn-link {
+  color: var(--color-primary);
+  text-underline-offset: 4px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/* Sizes */
+.btn-size-default {
+  height: 2.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-size-sm {
+  height: 2.25rem;
+  border-radius: 0.375rem;
+  padding: 0 0.75rem;
+}
+
+.btn-size-lg {
+  height: 2.75rem;
+  border-radius: 0.375rem;
+  padding: 0 2rem;
+}
+
+.btn-size-icon {
+  height: 2.5rem;
+  width: 2.5rem;
+}
+</style>

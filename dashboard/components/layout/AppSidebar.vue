@@ -4,7 +4,7 @@
     v-bind="$attrs"
     class="border-r border-border bg-background text-lg font-semibold mb-2"
   >
-    <SidebarHeader class="pb-2">
+    <SidebarHeader id="sidebar-header" class="pb-2">
       <OrgSwitcher />
     </SidebarHeader>
     <SidebarContent>
@@ -108,12 +108,6 @@ const navMain = computed(() => [
     isActive: isPathActive("/conversations"),
   },
   {
-    title: "Agents",
-    url: "/agents",
-    icon: Users,
-    isActive: isPathActive("/agents"),
-  },
-  {
     title: "Documents",
     url: "/documents",
     icon: FileText,
@@ -162,6 +156,11 @@ const navMain = computed(() => [
     icon: Settings,
     isActive: isPathActive("/settings"),
     items: [
+      {
+        title: "Agents",
+        url: "/agents",
+        isActive: isPathActive("/agents"),
+      },
       {
         title: "General",
         url: "/settings/general",

@@ -8,7 +8,28 @@
           Back to Marketplace
         </Button>
       </div>
+      <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          @click="showDisableConfirm = true"
+          :disabled="disabling"
+        >
+          <Loader2 v-if="disabling" class="h-4 w-4 mr-2 animate-spin" />
+          {{ disabling ? "Disabling..." : "Disable Plugin" }}
+        </Button>
+      </div>
     </div>
+
+    <!-- Disable Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showDisableConfirm"
+      title="Disable Plugin?"
+      :description="`Are you sure you want to disable ${plugin?.name || getPluginDisplayName(pluginId)}? This will stop the plugin from being used in your organization.`"
+      confirm-text="Disable"
+      destructive
+      @confirm="handleDisablePlugin"
+    />
 
     <!-- Loading State -->
     <div v-if="loading" class="space-y-4">
@@ -623,6 +644,7 @@ import {
 } from "lucide-vue-next";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Switch from "@/components/ui/Switch.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
@@ -652,6 +674,8 @@ const enabled = ref(false);
 const saving = ref(false);
 const testing = ref(false);
 const copied = ref(false);
+const disabling = ref(false);
+const showDisableConfirm = ref(false);
 const testResult = ref<{ success: boolean; message?: string } | null>(null);
 const instanceId = ref<string | null>(null);
 
@@ -1042,6 +1066,28 @@ const copyEmbedCode = async () => {
     }, 2000);
   } catch (err) {
     console.error("Failed to copy:", err);
+  }
+};
+
+const handleDisablePlugin = async () => {
+  disabling.value = true;
+
+  try {
+    await Hay.plugins.disable.mutate({
+      pluginId: pluginId.value,
+    });
+
+    toast.success("Plugin disabled successfully");
+
+    // Redirect back to marketplace after disabling
+    router.push("/integrations/marketplace");
+  } catch (err: any) {
+    console.error("Failed to disable plugin:", err);
+
+    const errorMessage = err?.message || err?.data?.message || "Failed to disable plugin";
+    toast.error(errorMessage);
+  } finally {
+    disabling.value = false;
   }
 };
 

@@ -5,7 +5,17 @@
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <div class="flex h-8 w-8 items-center justify-center rounded-full bg-background-tertiary">
-          <User2 class="h-4 w-4" />
+          <span class="text-sm font-medium text-foreground">
+            {{
+              (() => {
+                if (!user.name) return "";
+                const parts = user.name.trim().split(" ").filter(Boolean);
+                if (parts.length === 0) return "";
+                if (parts.length === 1) return parts[0][0]?.toUpperCase() || "";
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+              })()
+            }}
+          </span>
         </div>
         <div class="flex-1 text-left">
           <p class="font-medium">

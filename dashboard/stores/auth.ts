@@ -32,8 +32,12 @@ export const useAuthStore = defineStore("auth", {
         this.isInitialized = true;
         this.updateActivity();
       } catch (error) {
+        console.log("[Auth] Failed to initialize auth, clearing tokens");
+        // Clear auth state if initialization fails
+        this.tokens = null;
         this.isAuthenticated = false;
         this.isInitialized = true;
+        throw error; // Re-throw to let AuthProvider handle the redirect
       }
     },
 
@@ -54,8 +58,6 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async logout(reason?: string) {
-      const router = useRouter();
-
       // Only try to call logout API if we have a valid token
       if (this.tokens?.accessToken) {
         try {
@@ -83,9 +85,9 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // Navigate to login page
+      // Navigate to login page using navigateTo for proper Nuxt navigation
       if (process.client) {
-        await router.push("/login");
+        await navigateTo("/login");
       }
     },
 
