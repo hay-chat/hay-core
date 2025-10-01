@@ -19,11 +19,26 @@ export class PromptService {
   private config: PromptConfig;
 
   private constructor() {
+    // In production (compiled), __dirname is in dist/, but prompts are in server/prompts
+    // Try environment variable first, then check if we're in dist/ and adjust path accordingly
+    let promptsDir = process.env.PROMPTS_DIR;
+
+    if (!promptsDir) {
+      // Check if we're running from dist/ (compiled) or source
+      if (__dirname.includes("/dist/")) {
+        // Running compiled code: /workspace/server/dist/services -> /workspace/server/prompts
+        promptsDir = path.join(__dirname, "../../prompts");
+      } else {
+        // Running from source: /workspace/server/services -> /workspace/server/prompts
+        promptsDir = path.join(__dirname, "../prompts");
+      }
+    }
+
     this.config = {
       supportedLanguages: Object.values(SupportedLanguage),
       defaultLanguage: DEFAULT_LANGUAGE,
       cacheTTL: process.env.NODE_ENV === "production" ? 3600000 : 0, // 1 hour in prod, no cache in dev
-      promptsDirectory: path.join(__dirname, "../prompts"),
+      promptsDirectory: promptsDir,
     };
   }
 
