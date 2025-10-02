@@ -53,12 +53,24 @@
   </div>
 </template>
 
-<script setup lang="ts">
-const props = defineProps<{
-  config: Record<string, any>;
-  theme: string;
-  position: string;
-}>();
+<script>
+// NOTE: This component is loaded dynamically by the plugin system
+export default {
+  props: {
+    config: {
+      type: Object,
+      required: true,
+    },
+    theme: {
+      type: String,
+      required: true,
+    },
+    position: {
+      type: String,
+      required: true,
+    },
+  },
+};
 </script>
 
 <style scoped>

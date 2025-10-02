@@ -197,86 +197,87 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { MessageSquare, Loader2, Copy, Check } from 'lucide-vue-next';
-import WidgetPreview from './WidgetPreview.vue';
-
-const props = defineProps<{
-  instanceId: string;
-  organizationId: string;
-  configuration: Record<string, any>;
-}>();
-
-const emit = defineEmits<{
-  save: [config: Record<string, any>];
-  cancel: [];
-}>();
-
-const formData = ref<Record<string, any>>({
-  widgetTitle: 'Chat with us',
-  widgetSubtitle: 'We typically reply within minutes',
-  position: 'right',
-  theme: 'blue',
-  showGreeting: true,
-  greetingMessage: 'Hello! How can we help you today?',
-  allowedDomains: '*',
-  ...props.configuration,
-});
-
-const errors = ref<Record<string, string>>({});
-const saving = ref(false);
-const copied = ref(false);
-
-const isValid = computed(() => {
-  return formData.value.widgetTitle && 
-         formData.value.position && 
-         formData.value.theme &&
-         Object.keys(errors.value).length === 0;
-});
-
-const embedCode = computed(() => {
-  const baseUrl = window.location.origin.replace(':5173', ':3000');
-  return `<!-- Hay Webchat Widget -->
 <script>
-  (function(h,a,y){
-    var s=a.createElement('script');
-    s.src='${baseUrl}/plugins/embed/${props.organizationId}/${props.instanceId}';
-    s.async=true;
-    a.head.appendChild(s);
-  })(window,document);
-</script>
-<!-- End Hay Webchat Widget -->`;
-});
+// NOTE: This component is loaded dynamically by the plugin system
+// All UI components and Vue APIs are provided by the parent component loader
+export default {
+  props: {
+    instanceId: String,
+    organizationId: String,
+    configuration: Object,
+  },
+  emits: ['save', 'cancel'],
+  setup(props, { emit }) {
+    const formData = ref({
+      widgetTitle: 'Chat with us',
+      widgetSubtitle: 'We typically reply within minutes',
+      position: 'right',
+      theme: 'blue',
+      showGreeting: true,
+      greetingMessage: 'Hello! How can we help you today?',
+      allowedDomains: '*',
+      ...props.configuration,
+    });
 
-const copyEmbedCode = async () => {
-  try {
-    await navigator.clipboard.writeText(embedCode.value);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch (error) {
-    console.error('Failed to copy:', error);
-  }
-};
+    const errors = ref({});
+    const saving = ref(false);
+    const copied = ref(false);
 
-const saveConfiguration = async () => {
-  if (!isValid.value) return;
-  
-  saving.value = true;
-  try {
-    await emit('save', formData.value);
-  } finally {
-    saving.value = false;
-  }
+    const isValid = computed(() => {
+      return formData.value.widgetTitle &&
+             formData.value.position &&
+             formData.value.theme &&
+             Object.keys(errors.value).length === 0;
+    });
+
+    const embedCode = computed(() => {
+      const baseUrl = window.location.origin.replace(':5173', ':3000').replace(':3001', ':3000');
+      return '<!-- Hay Webchat Widget -->\n' +
+        '<' + 'script>\n' +
+        '  (function(h,a,y){\n' +
+        '    var s=a.createElement(\'script\');\n' +
+        `    s.src='${baseUrl}/plugins/embed/${props.organizationId}/${props.instanceId}';\n` +
+        '    s.async=true;\n' +
+        '    a.head.appendChild(s);\n' +
+        '  })(window,document);\n' +
+        '</' + 'script>\n' +
+        '<!-- End Hay Webchat Widget -->';
+    });
+
+    const copyEmbedCode = async () => {
+      try {
+        await navigator.clipboard.writeText(embedCode.value);
+        copied.value = true;
+        setTimeout(() => {
+          copied.value = false;
+        }, 2000);
+      } catch (error) {
+        console.error('Failed to copy:', error);
+      }
+    };
+
+    const saveConfiguration = async () => {
+      if (!isValid.value) return;
+
+      saving.value = true;
+      try {
+        emit('save', formData.value);
+      } finally {
+        saving.value = false;
+      }
+    };
+
+    return {
+      formData,
+      errors,
+      saving,
+      copied,
+      isValid,
+      embedCode,
+      copyEmbedCode,
+      saveConfiguration,
+    };
+  },
 };
 </script>
 
