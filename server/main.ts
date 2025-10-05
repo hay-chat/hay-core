@@ -37,15 +37,21 @@ async function startServer() {
 
   // Add permissive CORS middleware for publicConversations endpoints
   // This allows the widget to be embedded on any domain
-  server.use(/^\/v1\/publicConversations\./, cors({
-    origin: true, // Allow all origins
-    credentials: false,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-organization-id"],
-    exposedHeaders: ["Content-Range", "X-Total-Count"],
-    maxAge: 86400,
-    optionsSuccessStatus: 204,
-  }));
+  server.use((req, res, next) => {
+    // Check if the path starts with /v1/publicConversations
+    if (req.path.startsWith("/v1/publicConversations")) {
+      return cors({
+        origin: true, // Allow all origins
+        credentials: false,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "x-organization-id"],
+        exposedHeaders: ["Content-Range", "X-Total-Count"],
+        maxAge: 86400,
+        optionsSuccessStatus: 204,
+      })(req, res, next);
+    }
+    next();
+  });
 
   // Add CORS middleware with proper configuration for other endpoints
   server.use(
