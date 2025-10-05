@@ -94,8 +94,9 @@ export const authRouter = t.router({
       });
     }
 
-    // Update last login time
+    // Update last login time and last seen
     user.lastLoginAt = new Date();
+    user.updateLastSeen();
     await userRepository.save(user);
 
     // Generate tokens
@@ -119,6 +120,7 @@ export const authRouter = t.router({
         ...user.toJSON(),
         organizations,
         activeOrganizationId: user.organizationId,
+        onlineStatus: user.getOnlineStatus(),
       },
       ...tokens,
     };
@@ -197,6 +199,8 @@ export const authRouter = t.router({
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
 
+      // Update last seen on registration
+      user.updateLastSeen();
       await userRepository.save(user);
 
       // Generate tokens
@@ -220,6 +224,7 @@ export const authRouter = t.router({
           ...user.toJSON(),
           organizations,
           activeOrganizationId: user.organizationId,
+          onlineStatus: user.getOnlineStatus(),
         },
         ...tokens,
       };
@@ -295,6 +300,9 @@ export const authRouter = t.router({
       lastName: user.lastName,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
+      lastSeenAt: user.lastSeenAt,
+      status: user.status,
+      onlineStatus: user.getOnlineStatus(),
       authMethod: ctx.user!.authMethod,
       organizations,
       activeOrganizationId: user.organizationId,
@@ -437,5 +445,46 @@ export const authRouter = t.router({
       await userRepository.save(user);
 
       return { success: true };
+    }),
+
+  // Online status endpoints
+  heartbeat: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    user.updateLastSeen();
+    await userRepository.save(user);
+
+    return { success: true, lastSeenAt: user.lastSeenAt };
+  }),
+
+  updateStatus: protectedProcedure
+    .input(z.object({ status: z.enum(["available", "away"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      user.status = input.status;
+      await userRepository.save(user);
+
+      return { success: true, status: user.status };
     }),
 });

@@ -6,6 +6,7 @@ import { Organization } from "./organization.entity";
 @Index("idx_users_email", ["email"])
 @Index("idx_users_is_active", ["isActive"])
 @Index("idx_users_organization", ["organizationId"])
+@Index("idx_users_last_seen_at", ["lastSeenAt"])
 export class User extends BaseEntity {
   @Column({ type: "varchar", length: 255, unique: true })
   email!: string;
@@ -24,6 +25,12 @@ export class User extends BaseEntity {
 
   @Column({ type: "timestamptz", nullable: true })
   lastLoginAt?: Date;
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastSeenAt?: Date;
+
+  @Column({ type: "varchar", length: 20, default: "available" })
+  status!: "available" | "away";
 
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;
@@ -87,5 +94,38 @@ export class User extends BaseEntity {
       return `${this.firstName} ${this.lastName}`;
     }
     return this.firstName || this.lastName || this.email;
+  }
+
+  /**
+   * Check if user is currently online
+   * User is online if: lastSeenAt < 120 seconds ago AND status = 'available'
+   */
+  isOnline(): boolean {
+    if (!this.lastSeenAt || this.status !== "available") {
+      return false;
+    }
+    const now = new Date();
+    const timeDiff = now.getTime() - this.lastSeenAt.getTime();
+    return timeDiff < 120000; // 120 seconds in milliseconds
+  }
+
+  /**
+   * Update last seen timestamp to now
+   */
+  updateLastSeen(): void {
+    this.lastSeenAt = new Date();
+  }
+
+  /**
+   * Get user's online status
+   * - 'online': lastSeenAt < 120 seconds AND status = 'available'
+   * - 'away': status = 'away' (regardless of lastSeenAt)
+   * - 'offline': lastSeenAt > 120 seconds
+   */
+  getOnlineStatus(): "online" | "away" | "offline" {
+    if (this.status === "away") {
+      return "away";
+    }
+    return this.isOnline() ? "online" : "offline";
   }
 }

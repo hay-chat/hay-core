@@ -48,6 +48,7 @@
     "postinstall": "cd dashboard && nuxt prepare"
   },
   "dependencies": {
+    "@floating-ui/vue": "^1.1.9",
     "@headlessui/vue": "^1.7.16",
     "@heroicons/vue": "^2.0.18",
     "@langchain/community": "^0.3.53",
@@ -85,8 +86,8 @@
     "pgvector": "^0.2.1",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.5.0",
-    "radix-vue": "^1.2.3",
     "reflect-metadata": "^0.2.2",
+    "reka-ui": "^2.5.1",
     "shadcn-nuxt": "^0.10.4",
     "superjson": "^2.2.2",
     "tailwind-merge": "^2.0.0",

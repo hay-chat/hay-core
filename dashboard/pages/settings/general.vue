@@ -26,97 +26,60 @@
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="grid gap-6 md:grid-cols-2">
-          <div>
-            <Label for="default-language">Default Language</Label>
-            <select
-              id="default-language"
-              v-model="settings.defaultLanguage"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="en">English</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="it">Italian</option>
-              <option value="pt">Portuguese</option>
-              <option value="zh">Chinese</option>
-              <option value="ja">Japanese</option>
-            </select>
-            <p class="text-xs text-neutral-muted mt-1">
-              Default language for new conversations and system messages
-            </p>
-          </div>
+          <Input
+            v-model="settings.defaultLanguage"
+            type="select"
+            label="Default Language"
+            :options="[
+              { label: 'English', value: 'en' },
+              { label: 'Portuguese', value: 'pt' },
+            ]"
+            helper-text="Default language for new conversations and system messages"
+          />
 
-          <div>
-            <Label for="timezone">Timezone</Label>
-            <select
-              id="timezone"
-              v-model="settings.timezone"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <template v-for="group in TIMEZONE_GROUPS" :key="group.label">
-                <optgroup v-if="group.options.length > 1" :label="group.label">
-                  <option v-for="tz in group.options" :key="tz.value" :value="tz.value">
-                    {{ tz.label }}
-                  </option>
-                </optgroup>
-                <option v-else-if="group.options.length === 1" :value="group.options[0].value">
-                  {{ group.options[0].label }}
-                </option>
-              </template>
-            </select>
-            <p class="text-xs text-neutral-muted mt-1">
-              Used for displaying timestamps and scheduling reports
-            </p>
-          </div>
+          <Input
+            v-model="settings.timezone"
+            type="select"
+            label="Timezone"
+            :options="timezoneOptions"
+            helper-text="Used for displaying timestamps and scheduling reports"
+          />
         </div>
 
         <div class="grid gap-6 md:grid-cols-2">
-          <div>
-            <Label for="date-format">Date Format</Label>
-            <select
-              id="date-format"
-              v-model="settings.dateFormat"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="MM/DD/YYYY">MM/DD/YYYY (US)</option>
-              <option value="DD/MM/YYYY">DD/MM/YYYY (EU)</option>
-              <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
-              <option value="DD MMM YYYY">DD MMM YYYY</option>
-            </select>
-            <p class="text-xs text-neutral-muted mt-1">Preview: {{ formatDatePreview() }}</p>
-          </div>
+          <Input
+            v-model="settings.dateFormat"
+            type="select"
+            label="Date Format"
+            :options="[
+              { label: 'MM/DD/YYYY (US)', value: 'MM/DD/YYYY' },
+              { label: 'DD/MM/YYYY (EU)', value: 'DD/MM/YYYY' },
+              { label: 'YYYY-MM-DD (ISO)', value: 'YYYY-MM-DD' },
+              { label: 'DD MMM YYYY', value: 'DD MMM YYYY' },
+            ]"
+            :helper-text="`Preview: ${formatDatePreview()}`"
+          />
 
-          <div>
-            <Label for="time-format">Time Format</Label>
-            <select
-              id="time-format"
-              v-model="settings.timeFormat"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="12h">12-hour (AM/PM)</option>
-              <option value="24h">24-hour</option>
-            </select>
-            <p class="text-xs text-neutral-muted mt-1">Preview: {{ formatTimePreview() }}</p>
-          </div>
+          <Input
+            v-model="settings.timeFormat"
+            type="select"
+            label="Time Format"
+            :options="[
+              { label: '12-hour (AM/PM)', value: '12h' },
+              { label: '24-hour', value: '24h' },
+            ]"
+            :helper-text="`Preview: ${formatTimePreview()}`"
+          />
         </div>
 
-        <div>
-          <Label for="default-agent">Default Agent</Label>
-          <select
-            id="default-agent"
-            v-model="settings.defaultAgent"
-            class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-          >
-            <option value="">No default agent</option>
-            <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-              {{ agent.name }}
-            </option>
-          </select>
-          <p class="text-xs text-neutral-muted mt-1">
-            Agent to handle conversations when no specific agent is assigned
-          </p>
-        </div>
+        <Input
+          v-model="settings.defaultAgent"
+          type="select"
+          label="Default Agent"
+          :options="agentOptions"
+          placeholder="No default agent"
+          helper-text="Agent to handle conversations when no specific agent is assigned"
+        />
       </CardContent>
     </Card>
 
@@ -204,24 +167,16 @@
         <div>
           <h3 class="font-medium mb-3">Notification Timing</h3>
           <div class="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label for="quiet-hours-start">Quiet Hours Start</Label>
-              <Input
-                id="quiet-hours-start"
-                v-model="settings.notifications.quietHours.start"
-                type="time"
-                class="mt-1"
-              />
-            </div>
-            <div>
-              <Label for="quiet-hours-end">Quiet Hours End</Label>
-              <Input
-                id="quiet-hours-end"
-                v-model="settings.notifications.quietHours.end"
-                type="time"
-                class="mt-1"
-              />
-            </div>
+            <Input
+              v-model="settings.notifications.quietHours.start"
+              label="Quiet Hours Start"
+              type="time"
+            />
+            <Input
+              v-model="settings.notifications.quietHours.end"
+              label="Quiet Hours End"
+              type="time"
+            />
           </div>
           <p class="text-xs text-neutral-muted mt-1">
             No notifications will be sent during quiet hours (except critical alerts)
@@ -458,6 +413,23 @@ const webhookEvents = [
 // Computed properties
 const hasChanges = computed(() => {
   return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
+});
+
+const timezoneOptions = computed(() => {
+  const options: { label: string; value: string }[] = [];
+  TIMEZONE_GROUPS.forEach((group) => {
+    group.options.forEach((tz) => {
+      options.push({ label: tz.label, value: tz.value });
+    });
+  });
+  return options;
+});
+
+const agentOptions = computed(() => {
+  return agents.value.map((agent) => ({
+    label: agent.name,
+    value: agent.id,
+  }));
 });
 
 // Methods

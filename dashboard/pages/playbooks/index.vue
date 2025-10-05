@@ -103,7 +103,7 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredPlaybooks.length === 0" class="text-center py-12">
-      <img src="/bale/playbook.png" class="h-32 w-32 mx-auto" />
+      <img src="/bale/playbook.svg" class="h-32 w-32 mx-auto" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No playbooks found" : "No playbooks created yet" }}
       </h3>
@@ -341,14 +341,12 @@ const _getCategoryLabel = (category: string) => {
 const getStatusVariant = (
   status: string,
 ): "default" | "destructive" | "outline" | "secondary" | "success" => {
-  const variants: Record<
-    string,
-    "default" | "destructive" | "outline" | "secondary" | "success"
-  > = {
-    active: "success",
-    archived: "secondary",
-    draft: "outline",
-  };
+  const variants: Record<string, "default" | "destructive" | "outline" | "secondary" | "success"> =
+    {
+      active: "success",
+      archived: "secondary",
+      draft: "outline",
+    };
   return variants[status as keyof typeof variants] || "default";
 };
 

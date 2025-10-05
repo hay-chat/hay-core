@@ -17,9 +17,13 @@
 
 <script setup lang="ts">
 import { useAuthStore } from "@/stores/auth";
+import { useHeartbeat } from "@/composables/useHeartbeat";
 
 const authStore = useAuthStore();
 const route = useRoute();
+
+// Initialize heartbeat for authenticated users
+const { startHeartbeat, stopHeartbeat } = useHeartbeat();
 
 // Initialize auth on mount if not already done
 onMounted(async () => {
@@ -43,6 +47,10 @@ onMounted(async () => {
 
     try {
       await authStore.initializeAuth();
+      // Start heartbeat after successful auth initialization
+      if (authStore.isAuthenticated) {
+        startHeartbeat();
+      }
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);
       // Only logout and redirect if we're not on a public page
@@ -54,11 +62,14 @@ onMounted(async () => {
         authStore.isAuthenticated = false;
       }
     }
+  } else if (authStore.isAuthenticated) {
+    // Auth already initialized and authenticated, start heartbeat
+    startHeartbeat();
   }
 });
 
 // Cleanup on unmount
 onUnmounted(() => {
-  // No cleanup needed for now
+  stopHeartbeat();
 });
 </script>

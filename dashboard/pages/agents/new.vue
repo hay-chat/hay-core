@@ -97,16 +97,12 @@
             </div>
           </div>
 
-          <div>
-            <Label html-for="description">Description</Label>
-            <textarea
-              id="description"
-              v-model="agentForm.description"
-              placeholder="Describe what this agent does and how it helps customers..."
-              rows="3"
-              class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
+          <Input
+            v-model="agentForm.description"
+            label="Description"
+            type="textarea"
+            placeholder="Describe what this agent does and how it helps customers..."
+          />
 
           <div class="grid gap-4 md:grid-cols-2">
             <div>
@@ -355,19 +351,13 @@
             </div>
           </div>
 
-          <div>
-            <Label html-for="customInstructions">Custom Instructions</Label>
-            <textarea
-              id="customInstructions"
-              v-model="agentForm.customInstructions"
-              placeholder="Add specific instructions for how the agent should behave, what it should prioritize, or any special guidelines..."
-              rows="4"
-              class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <p class="text-xs text-neutral-muted mt-1">
-              These instructions will guide the agent's behavior in all conversations.
-            </p>
-          </div>
+          <Input
+            v-model="agentForm.customInstructions"
+            label="Custom Instructions"
+            type="textarea"
+            placeholder="Add specific instructions for how the agent should behave, what it should prioritize, or any special guidelines..."
+            helper-text="These instructions will guide the agent's behavior in all conversations."
+          />
 
           <div class="grid gap-4 md:grid-cols-2">
             <div>

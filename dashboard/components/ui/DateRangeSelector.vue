@@ -11,29 +11,15 @@
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" class="w-48">
-        <DropdownMenuItem @click="selectPreset('last7')">
-          Last 7 days
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="selectPreset('last30')">
-          Last 30 days
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="selectPreset('last90')">
-          Last 90 days
-        </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('last7')"> Last 7 days </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('last30')"> Last 30 days </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('last90')"> Last 90 days </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem @click="selectPreset('thisWeek')">
-          This week
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="selectPreset('thisMonth')">
-          This month
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="selectPreset('thisYear')">
-          This year
-        </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('thisWeek')"> This week </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('thisMonth')"> This month </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('thisYear')"> This year </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem @click="selectPreset('custom')">
-          Custom range...
-        </DropdownMenuItem>
+        <DropdownMenuItem @click="selectPreset('custom')"> Custom range... </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
 
@@ -57,15 +43,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { Calendar, ChevronDown } from 'lucide-vue-next';
+import { ref, computed, watch } from "vue";
+import { Calendar, ChevronDown } from "lucide-vue-next";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface DateRange {
   startDate: string;
@@ -77,26 +63,26 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: DateRange];
-  'change': [value: DateRange];
+  "update:modelValue": [value: DateRange];
+  change: [value: DateRange];
 }>();
 
-type PresetType = 'last7' | 'last30' | 'last90' | 'thisWeek' | 'thisMonth' | 'thisYear' | 'custom';
+type PresetType = "last7" | "last30" | "last90" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 
-const selectedPreset = ref<PresetType>('last7');
+const selectedPreset = ref<PresetType>("last7");
 const customDates = ref<DateRange>({
-  startDate: '',
-  endDate: ''
+  startDate: "",
+  endDate: "",
 });
 
 const presetLabels: Record<PresetType, string> = {
-  last7: 'Last 7 days',
-  last30: 'Last 30 days',
-  last90: 'Last 90 days',
-  thisWeek: 'This week',
-  thisMonth: 'This month',
-  thisYear: 'This year',
-  custom: 'Custom range'
+  last7: "Last 7 days",
+  last30: "Last 30 days",
+  last90: "Last 90 days",
+  thisWeek: "This week",
+  thisMonth: "This month",
+  thisYear: "This year",
+  custom: "Custom range",
 };
 
 const displayText = computed(() => {
@@ -110,31 +96,31 @@ const calculateDatesForPreset = (preset: PresetType): DateRange => {
   let endDate: Date = today;
 
   switch (preset) {
-    case 'last7':
+    case "last7":
       startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 6);
       break;
-    case 'last30':
+    case "last30":
       startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 29);
       break;
-    case 'last90':
+    case "last90":
       startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 89);
       break;
-    case 'thisWeek':
+    case "thisWeek":
       const dayOfWeek = today.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       startDate = new Date(today);
       startDate.setDate(today.getDate() - daysToMonday);
       break;
-    case 'thisMonth':
+    case "thisMonth":
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       break;
-    case 'thisYear':
+    case "thisYear":
       startDate = new Date(today.getFullYear(), 0, 1);
       break;
-    case 'custom':
+    case "custom":
       return customDates.value;
     default:
       startDate = new Date(today);
@@ -142,45 +128,49 @@ const calculateDatesForPreset = (preset: PresetType): DateRange => {
   }
 
   return {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0]
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0],
   };
 };
 
 const selectPreset = (preset: PresetType) => {
   selectedPreset.value = preset;
 
-  if (preset !== 'custom') {
+  if (preset !== "custom") {
     const dates = calculateDatesForPreset(preset);
-    emit('update:modelValue', dates);
-    emit('change', dates);
+    emit("update:modelValue", dates);
+    emit("change", dates);
   }
 };
 
-const updateCustomDate = (field: 'startDate' | 'endDate', value: string) => {
+const updateCustomDate = (field: "startDate" | "endDate", value: string) => {
   customDates.value[field] = value;
 
   if (customDates.value.startDate && customDates.value.endDate) {
-    emit('update:modelValue', customDates.value);
-    emit('change', customDates.value);
+    emit("update:modelValue", customDates.value);
+    emit("change", customDates.value);
   }
 };
 
 // Initialize with last 7 days
 onMounted(() => {
   if (!props.modelValue) {
-    selectPreset('last7');
+    selectPreset("last7");
   } else {
     // Try to detect which preset matches the current dates
     customDates.value = props.modelValue;
-    selectedPreset.value = 'custom';
+    selectedPreset.value = "custom";
   }
 });
 
 // Watch for external changes to modelValue
-watch(() => props.modelValue, (newValue) => {
-  if (newValue && selectedPreset.value === 'custom') {
-    customDates.value = newValue;
-  }
-}, { deep: true });
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue && selectedPreset.value === "custom") {
+      customDates.value = newValue;
+    }
+  },
+  { deep: true },
+);
 </script>

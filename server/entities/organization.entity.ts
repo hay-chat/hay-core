@@ -115,6 +115,11 @@ export class Organization extends BaseEntity {
     return currentApiKeyCount < this.limits.maxApiKeys;
   }
 
+  hasOnlineUsers(): boolean {
+    if (!this.users || this.users.length === 0) return false;
+    return this.users.some((user) => user.isOnline());
+  }
+
   toJSON(): any {
     const {
       users: _users,

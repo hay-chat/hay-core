@@ -46,7 +46,7 @@ export class PluginAssetService {
       // If no plugin found, fallback to using pluginName as directory (for backward compatibility)
       const pluginDir = path.join(process.cwd(), "..", "plugins", pluginName);
       const thumbnailPath = path.join(pluginDir, "thumbnail.jpg");
-      
+
       try {
         const content = await fs.readFile(thumbnailPath);
         const etag = this.generateETag(content);
@@ -86,13 +86,13 @@ export class PluginAssetService {
         return;
       }
     }
-    
+
     // Build path to plugin thumbnail using the stored pluginPath
     const pluginDir = path.join(
       process.cwd(),
       "..",
       "plugins",
-      plugin.pluginPath  // Use the actual directory name stored in DB
+      plugin.pluginPath, // Use the actual directory name stored in DB
     );
     const thumbnailPath = path.join(pluginDir, "thumbnail.jpg");
 
@@ -190,7 +190,7 @@ export class PluginAssetService {
 
     // Find the plugin
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
-    
+
     if (!plugin) {
       res.status(404).json({ error: "Plugin not found" });
       return;
@@ -198,13 +198,13 @@ export class PluginAssetService {
 
     // Sanitize the file path to prevent directory traversal
     const sanitizedPath = filePath.replace(/\.\./g, "");
-    
+
     // Build path to plugin public directory
     const pluginDir = path.join(
       process.cwd(),
       "..",
       "plugins",
-      plugin.pluginPath,  // Use the actual directory name stored in DB
+      plugin.pluginPath, // Use the actual directory name stored in DB
     );
     const publicDir = path.join(pluginDir, "public");
     const fullPath = path.join(publicDir, sanitizedPath);

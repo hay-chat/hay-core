@@ -20,9 +20,7 @@
     <svg
       v-if="isChecked"
       class="absolute pointer-events-none h-3 w-3 text-primary-foreground"
-      :class="[
-        'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
-      ]"
+      :class="['left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2']"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="none"
@@ -37,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 import { cn } from "@/lib/utils";
 
 export interface CheckboxProps {
@@ -70,7 +68,7 @@ const isChecked = computed(() => {
 const handleChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const newValue = target.checked;
-  
+
   // Emit for v-model
   emit("update:modelValue", newValue);
   // Emit for :checked pattern

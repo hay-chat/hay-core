@@ -17,6 +17,9 @@ export interface User {
   role?: "owner" | "admin" | "member" | "viewer";
   organizations?: Organization[];
   activeOrganizationId?: string;
+  lastSeenAt?: Date;
+  status?: "available" | "away";
+  onlineStatus?: "online" | "away" | "offline";
 }
 
 export const useUserStore = defineStore("user", {
@@ -52,6 +55,9 @@ export const useUserStore = defineStore("user", {
         isActive: userData.isActive,
         isAdmin: userData.isAdmin,
         role: userData.role,
+        lastSeenAt: userData.lastSeenAt,
+        status: userData.status,
+        onlineStatus: userData.onlineStatus,
       };
 
       // Set organizations if provided
@@ -65,6 +71,19 @@ export const useUserStore = defineStore("user", {
       } else if (this.organizations.length > 0) {
         // Default to first organization if no active one is set
         this.activeOrganizationId = this.organizations[0].id;
+      }
+    },
+
+    updateStatus(status: "available" | "away") {
+      if (this.user) {
+        this.user.status = status;
+        // Update onlineStatus based on new status
+        if (status === "away") {
+          this.user.onlineStatus = "away";
+        } else {
+          // Will be "online" if lastSeenAt is recent
+          this.user.onlineStatus = "online";
+        }
       }
     },
 

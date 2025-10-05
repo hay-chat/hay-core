@@ -4,7 +4,9 @@
       <button
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
-        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-background-tertiary">
+        <div
+          class="relative flex h-8 w-8 items-center justify-center rounded-full bg-background-tertiary"
+        >
           <span class="text-sm font-medium text-foreground">
             {{
               (() => {
@@ -16,6 +18,15 @@
               })()
             }}
           </span>
+          <!-- Online status indicator -->
+          <div
+            class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background"
+            :class="{
+              'bg-green-500': onlineStatus === 'online',
+              'bg-yellow-500': onlineStatus === 'away',
+              'bg-gray-400': onlineStatus === 'offline',
+            }"
+          ></div>
         </div>
         <div class="flex-1 text-left">
           <p class="font-medium">
@@ -29,6 +40,19 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width]" align="start" side="top">
+      <DropdownMenuItem class="text-xs text-muted-foreground" disabled>Status</DropdownMenuItem>
+      <DropdownMenuItem :disabled="currentStatus === 'available'" @click="setStatus('available')">
+        <div class="mr-2 h-2 w-2 rounded-full bg-green-500"></div>
+        Available
+        <Check v-if="currentStatus === 'available'" class="ml-auto h-4 w-4" />
+      </DropdownMenuItem>
+      <DropdownMenuItem :disabled="currentStatus === 'away'" @click="setStatus('away')">
+        <div class="mr-2 h-2 w-2 rounded-full bg-yellow-500"></div>
+        Away
+        <Check v-if="currentStatus === 'away'" class="ml-auto h-4 w-4" />
+      </DropdownMenuItem>
+
+      <DropdownMenuSeparator />
       <DropdownMenuItem>
         <User2 class="mr-2 h-4 w-4" />
         Profile
@@ -51,9 +75,14 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronsUpDown, LogOut, Settings, User2, Bell } from "lucide-vue-next";
+import { computed } from "vue";
+import { ChevronsUpDown, LogOut, Settings, User2, Bell, Check } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
+import { useUserStore } from "@/stores/user";
+import { Hay } from "@/utils/api";
+
 const authStore = useAuthStore();
+const userStore = useUserStore();
 
 interface User {
   name: string;
@@ -66,4 +95,18 @@ interface Props {
 }
 
 defineProps<Props>();
+
+// Get online status from user store
+const onlineStatus = computed(() => userStore.user?.onlineStatus || "offline");
+const currentStatus = computed(() => userStore.user?.status || "available");
+
+// Set user status
+const setStatus = async (status: "available" | "away") => {
+  try {
+    await Hay.auth.updateStatus.mutate({ status });
+    userStore.updateStatus(status);
+  } catch (error) {
+    console.error("Failed to update status:", error);
+  }
+};
 </script>

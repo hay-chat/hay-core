@@ -139,7 +139,7 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredConversations.length === 0" class="text-center py-12">
-      <img src="/bale/conversation.png" class="h-32 w-32 mx-auto" />
+      <img src="/bale/conversation.svg" class="h-32 w-32 mx-auto" />
       <h3 class="text-lg font-medium mb-2">
         {{ searchQuery ? "No conversations found" : "No conversations yet" }}
       </h3>

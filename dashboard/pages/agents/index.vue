@@ -231,7 +231,7 @@
 
     <!-- Empty State -->
     <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
-      <img src="/bale/agent.png" class="h-32 w-32 mx-auto" />
+      <img src="/bale/agent.svg" class="h-32 w-32 mx-auto" />
       <h3 class="text-lg font-medium text-foreground">
         {{ searchQuery || statusFilter || typeFilter ? "No agents found" : "No agents yet" }}
       </h3>
