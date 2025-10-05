@@ -1,214 +1,430 @@
 <template>
-  <div class="container mx-auto px-4 py-8 max-w-2xl">
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-2">Edit Agent</h1>
-      <p class="text-neutral-muted">Update your AI agent configuration</p>
+  <Page title="Agent" description="Configure a new AI agent for your organization" width="max">
+    <template #header>
+      <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/agents')">
+        <ArrowLeft class="h-4 w-4 mr-2" />
+        Back to list
+      </Button>
+    </template>
+
+    <div v-if="loading" class="text-center py-12">
+      <Loading label="Loading agent..." />
     </div>
 
-    <form v-if="agent" class="space-y-6" @submit.prevent="handleSubmit">
-      <div>
-        <label for="name" class="block text-sm font-medium mb-2">Name</label>
-        <input
-          id="name"
-          v-model="form.name"
-          type="text"
-          required
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Enter agent name"
-        />
-      </div>
+    <template v-else-if="!isEditMode || agent">
+      <form data-testid="agent-form" class="space-y-6" @submit.prevent="handleSubmit">
+        <Card>
+          <CardContent class="space-y-6">
+            <!-- Name Field -->
+            <Input
+              id="name"
+              v-model="form.name"
+              label="Name"
+              placeholder="e.g., Customer Support Agent"
+              :class="errors.name ? 'border-red-500' : ''"
+              :helper-text="errors.name"
+              required
+            />
+            <!-- Description Field -->
+            <Input
+              id="description"
+              v-model="form.description"
+              type="textarea"
+              label="Description"
+              helper-text="This is an internal description and it won't be visible to the user nor the agent."
+              placeholder="Describe what this agent does..."
+            />
+            <!-- Instructions Field -->
+            <InstructionsEditor
+              v-model="form.instructions"
+              label="Instructions"
+              :loading="loadingInstructions"
+              hint="Define the general agent's behavior and how it should respond to users. DO NOT include any specific instructions for the agent to follow - use the Playbooks to define that."
+              :error="errors.instructions"
+            />
+            <!-- Tone Field -->
+            <div>
+              <Label cla>Tone</Label>
+              <div class="gap-4 mb-4 mt-2 grid grid-cols-3">
+                <OptionCard
+                  :image="'/bale/professional.svg'"
+                  label="Professional"
+                  :checked="selectedTone === 'professional'"
+                  @click="setTone('professional')"
+                />
+                <OptionCard
+                  :image="'/bale/casual.svg'"
+                  label="Casual"
+                  :checked="selectedTone === 'casual'"
+                  @click="setTone('casual')"
+                />
+                <OptionCard
+                  :image="'/bale/enthusiastic.svg'"
+                  label="Enthusiastic"
+                  :checked="selectedTone === 'enthusiastic'"
+                  @click="setTone('enthusiastic')"
+                />
+              </div>
+              <Input
+                id="tone"
+                v-model="form.tone"
+                type="textarea"
+                placeholder="Describe the communication tone (e.g., professional, friendly, casual)..."
+              />
+            </div>
+            <!-- Things to Avoid Field -->
+            <Input
+              id="avoid"
+              v-model="form.avoid"
+              type="textarea"
+              label="Things to Avoid"
+              placeholder="List things the agent should avoid (e.g., technical jargon, certain topics)..."
+            />
+            <!-- Trigger Field -->
+            <Input
+              id="trigger"
+              v-model="form.trigger"
+              type="textarea"
+              label="Trigger Conditions"
+              placeholder="Define when this agent should be triggered (e.g., specific keywords, conditions)..."
+            />
+            <!-- Enabled Field -->
+            <div class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <Checkbox id="enabled" v-model:checked="form.enabled" />
+                <label for="enabled" class="text-sm font-medium">Enable agent</label>
+              </div>
+            </div>
+            <!-- Metadata (only in edit mode) -->
+            <div v-if="isEditMode && agent" class="space-y-2 text-sm text-neutral-muted">
+              <div>Created: {{ formatDate(agent.created_at) }}</div>
+              <div>Last updated: {{ formatDate(agent.updated_at) }}</div>
+            </div>
+          </CardContent>
+        </Card>
 
-      <div>
-        <label for="description" class="block text-sm font-medium mb-2">Description</label>
-        <textarea
-          id="description"
-          v-model="form.description"
-          rows="3"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Describe what this agent does"
-        />
-      </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Human handoff</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-6">
+            <Input
+              label="If any human agent is available"
+              type="select"
+              :options="[
+                { label: 'Handoff to human', value: 'handoff_to_human' },
+                { label: 'Fallback', value: 'fallback' },
+              ]"
+            ></Input>
 
-      <div>
-        <label for="instructions" class="block text-sm font-medium mb-2">Instructions</label>
-        <textarea
-          id="instructions"
-          v-model="form.instructions"
-          rows="6"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-          placeholder="Enter agent instructions and behavior..."
-        />
-      </div>
+            <InstructionsEditor
+              label="If all human agents are unavailable"
+              hint="Define the instructions for the agent to follow when the human is not available."
+              :error="errors.instructions"
+            />
+          </CardContent>
+        </Card>
 
-      <div>
-        <label for="tone" class="block text-sm font-medium mb-2">Tone</label>
-        <textarea
-          id="tone"
-          v-model="form.tone"
-          rows="3"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Describe the communication tone (e.g., professional, friendly, casual)..."
-        />
-      </div>
+        <Card>
+          <CardContent>
+            <!-- Form Actions -->
+            <div class="flex justify-between">
+              <Button
+                v-if="isEditMode"
+                type="button"
+                variant="destructive"
+                :disabled="isSubmitting"
+                @click="handleDelete"
+              >
+                <Trash2 class="h-4 w-4 mr-2" />
+                Delete Agent
+              </Button>
+              <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  :disabled="isSubmitting"
+                  @click="handleCancel"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" :disabled="isSubmitting || !form.name">
+                  <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
+                  {{
+                    isSubmitting
+                      ? isEditMode
+                        ? "Saving..."
+                        : "Creating..."
+                      : isEditMode
+                        ? "Save Changes"
+                        : "Create Agent"
+                  }}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </template>
 
-      <div>
-        <label for="avoid" class="block text-sm font-medium mb-2">Things to Avoid</label>
-        <textarea
-          id="avoid"
-          v-model="form.avoid"
-          rows="3"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="List things the agent should avoid (e.g., technical jargon, certain topics)..."
-        />
-      </div>
-
-      <div>
-        <label for="trigger" class="block text-sm font-medium mb-2">Trigger Conditions</label>
-        <textarea
-          id="trigger"
-          v-model="form.trigger"
-          rows="3"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Define when this agent should be triggered (e.g., specific keywords, conditions)..."
-        />
-      </div>
-
-      <div class="flex items-center space-x-2">
-        <input
-          id="enabled"
-          v-model="form.enabled"
-          type="checkbox"
-          class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-        />
-        <label for="enabled" class="text-sm font-medium">Enable agent</label>
-      </div>
-
-      <div class="flex gap-4">
-        <button
-          type="submit"
-          :disabled="isLoading"
-          class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {{ isLoading ? "Saving..." : "Save Changes" }}
-        </button>
-        <NuxtLink to="/agents" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
-          Cancel
-        </NuxtLink>
-      </div>
-    </form>
-
-    <div v-else-if="loading" class="space-y-4">
-      <div class="h-10 bg-background-tertiary rounded animate-pulse" />
-      <div class="h-24 bg-background-tertiary rounded animate-pulse" />
-      <div class="h-32 bg-background-tertiary rounded animate-pulse" />
+    <div v-else-if="isEditMode && !loading" class="text-center py-12">
+      <Error label="Agent not found" />
     </div>
 
-    <div v-else class="text-center py-12">
-      <p class="text-neutral-muted">Agent not found</p>
-      <NuxtLink to="/agents" class="text-primary hover:underline mt-2 inline-block">
-        Back to agents
-      </NuxtLink>
-    </div>
-  </div>
+    <!-- Delete Confirmation Dialog -->
+    <ConfirmDialog
+      v-if="isEditMode"
+      v-model:open="showDeleteDialog"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-text="Delete"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
+  </Page>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useToast } from "@/composables/useToast";
+import { ref, onMounted, computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
+import type { Agent } from "~/types/playbook";
+import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
 
-interface Agent {
-  id: string;
-  name: string;
-  description?: string | null;
-  instructions?: string | null;
-  tone?: string | null;
-  avoid?: string | null;
-  trigger?: string | null;
-  enabled: boolean;
-}
+const router = useRouter();
+const route = useRoute();
+const toast = useToast();
+const loadingInstructions = ref(false);
 
-definePageMeta({
-  // Auth is handled by global middleware
+// Determine if we're in edit mode based on route
+const isEditMode = computed(() => {
+  const id = route.params.id;
+  const idValue = Array.isArray(id) ? id[0] : id;
+  return idValue !== "new";
 });
 
-const route = useRoute();
-const router = useRouter();
-const toast = useToast();
+const agentId = computed(() => {
+  const id = route.params.id;
+  const idValue = Array.isArray(id) ? id[0] : id;
+  return idValue === "new" ? null : idValue;
+});
 
-const loading = ref(true);
-const isLoading = ref(false);
-const agent = ref<Agent | null>(null);
+// Tone presets
+const tonePresets = {
+  professional: `Your tone is professional, calm, and concise. You communicate clearly, use complete sentences, and avoid slang or emojis. You sound confident but approachable — like a well-trained support specialist who respects the customer's time. You empathize when appropriate, but always keep focus on solving the issue efficiently.
+
+Example: "I understand how that could be frustrating. Let's take a look at your order status together. Could you please confirm your order number?"`,
+  casual: `You sound like a real person chatting over text — relaxed, warm, and approachable. Use contractions, simple phrasing, and occasional emojis when it fits the vibe. Keep answers helpful but conversational, like a teammate helping out a friend.
+
+Example: "Hey there! Totally get it — that happens sometimes 😅 Let me check your order real quick so we can sort this out."`,
+  enthusiastic: `You make every customer interaction feel exciting and positive. You use exclamation marks moderately, express enthusiasm for helping, and celebrate small wins. You make the customer feel heard and valued while keeping replies short and impactful.
+
+Example: "Great question! Let's get this sorted out right away 🎉 I just need your email to find your order!"`,
+};
+
+// Form state
 const form = ref({
   name: "",
   description: "",
-  instructions: "",
+  instructions: [] as any,
   tone: "",
   avoid: "",
   trigger: "",
   enabled: true,
 });
 
-const loadAgent = async () => {
-  loading.value = true;
-  try {
-    const agents = await HayApi.agents.list.query();
-    const foundAgent = agents.find((a: Agent) => a.id === route.params.id);
+// UI state
+const loading = ref(false);
+const isSubmitting = ref(false);
+const agent = ref<Agent | null>(null);
+const errors = ref<Record<string, string>>({});
+const selectedTone = ref<string | null>(null);
 
-    if (foundAgent) {
-      agent.value = foundAgent;
+// Format date
+const formatDate = (date: string | Date) => {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date));
+};
+
+// Load data on mount
+onMounted(async () => {
+  try {
+    // Load agent if in edit mode
+    if (isEditMode.value && agentId.value) {
+      loading.value = true;
+      loadingInstructions.value = true;
+      const agentResponse = await HayApi.agents.get.query({
+        id: agentId.value,
+      });
+
+      if (!agentResponse) {
+        toast.error("Agent not found");
+        await router.push("/agents");
+        return;
+      }
+
+      agent.value = agentResponse;
+
+      // Populate form
       form.value = {
-        name: foundAgent.name,
-        description: foundAgent.description || "",
-        instructions: foundAgent.instructions || "",
-        tone: foundAgent.tone || "",
-        avoid: foundAgent.avoid || "",
-        trigger: foundAgent.trigger || "",
-        enabled: foundAgent.enabled,
+        name: agentResponse.name,
+        description: agentResponse.description || "",
+        instructions: agentResponse.instructions || [],
+        tone: agentResponse.tone || "",
+        avoid: agentResponse.avoid || "",
+        trigger: agentResponse.trigger || "",
+        enabled: agentResponse.enabled ?? true,
       };
+
+      // Detect which tone preset is selected
+      if (agentResponse.tone) {
+        for (const [key, value] of Object.entries(tonePresets)) {
+          if (value === agentResponse.tone) {
+            selectedTone.value = key;
+            break;
+          }
+        }
+      }
+
+      loadingInstructions.value = false;
     }
   } catch (error) {
-    console.error("Failed to load agent:", error);
-    toast.error((error as Error).message || "Failed to load agent");
+    console.error("Failed to load data:", error);
+    if (isEditMode.value) {
+      toast.error("Failed to load agent");
+      await router.push("/agents");
+    }
   } finally {
     loading.value = false;
   }
+});
+
+// Validate form
+const validateForm = () => {
+  errors.value = {};
+
+  if (!form.value.name || form.value.name.trim().length === 0) {
+    errors.value.name = "Agent name is required";
+    return false;
+  }
+
+  if (form.value.name.length > 255) {
+    errors.value.name = "Agent name must be less than 255 characters";
+    return false;
+  }
+
+  return true;
 };
 
+// Handle form submission
 const handleSubmit = async () => {
-  if (!form.value.name.trim()) {
-    toast.error("Agent name is required");
+  if (!validateForm()) {
     return;
   }
 
-  isLoading.value = true;
-
   try {
-    await HayApi.agents.update.mutate({
-      id: route.params.id as string,
-      data: {
-        name: form.value.name,
-        description: form.value.description || undefined,
-        instructions: form.value.instructions || undefined,
-        tone: form.value.tone || undefined,
-        avoid: form.value.avoid || undefined,
-        trigger: form.value.trigger || undefined,
-        enabled: form.value.enabled,
-      },
-    });
+    isSubmitting.value = true;
 
-    toast.success("Agent updated successfully");
+    const payload = {
+      name: form.value.name,
+      description: form.value.description || undefined,
+      instructions: form.value.instructions,
+      tone: form.value.tone || undefined,
+      avoid: form.value.avoid || undefined,
+      trigger: form.value.trigger || undefined,
+      enabled: form.value.enabled,
+    };
+
+    if (isEditMode.value && agentId.value) {
+      // Update existing agent
+      await HayApi.agents.update.mutate({
+        id: agentId.value,
+        data: payload,
+      });
+      toast.success("Agent updated successfully");
+    } else {
+      // Create new agent
+      const response = await HayApi.agents.create.mutate(payload);
+      toast.success("Agent created successfully");
+
+      // Navigate to the edit page after creation
+      await router.push(`/agents/${response.id}`);
+      return;
+    }
+
     await router.push("/agents");
   } catch (error) {
-    console.error("Failed to update agent:", error);
-    toast.error((error as Error).message || "Failed to update agent");
+    console.error("Failed to save agent:", error);
+    toast.error(`Failed to ${isEditMode.value ? "update" : "create"} agent. Please try again.`);
   } finally {
-    isLoading.value = false;
+    isSubmitting.value = false;
   }
 };
 
-onMounted(() => {
-  loadAgent();
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const deleteDialogTitle = ref("Delete Agent");
+const deleteDialogDescription = ref("");
+
+// Handle delete
+const handleDelete = () => {
+  if (!agent.value) return;
+  deleteDialogDescription.value = `Are you sure you want to delete "${agent.value.name}"? This action cannot be undone.`;
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!agentId.value) return;
+
+  try {
+    isSubmitting.value = true;
+
+    await HayApi.agents.delete.mutate({ id: agentId.value });
+
+    toast.success("Agent deleted successfully");
+
+    await router.push("/agents");
+  } catch (error) {
+    console.error("Failed to delete agent:", error);
+    toast.error("Failed to delete agent. Please try again.");
+  } finally {
+    isSubmitting.value = false;
+    showDeleteDialog.value = false;
+  }
+};
+
+// Handle tone selection
+const setTone = (tone: string) => {
+  selectedTone.value = tone;
+  form.value.tone = tonePresets[tone as keyof typeof tonePresets];
+};
+
+// Handle cancel
+const handleCancel = () => {
+  router.push("/agents");
+};
+
+// Set page meta
+definePageMeta({
+  layout: "default",
+});
+
+// Head management
+useHead({
+  title: computed(() => `${isEditMode.value ? "Edit" : "Create"} Agent - Hay Dashboard`),
+  meta: [
+    {
+      name: "description",
+      content: computed(() =>
+        isEditMode.value ? "Edit your AI agent configuration" : "Create a new AI agent",
+      ),
+    },
+  ],
 });
 </script>

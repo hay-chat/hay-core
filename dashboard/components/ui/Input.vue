@@ -41,9 +41,8 @@
       :id="inputId"
       ref="textareaRef"
       :value="modelValue ?? ''"
-      :class="props.class"
+      :class="[props.class, 'input', 'textarea']"
       :placeholder="placeholder"
-      class="input textarea"
       v-bind="$attrs"
       @input="handleInput"
     />
@@ -52,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, type Component } from "vue";
+import { ref, computed, nextTick, onMounted, watch, type Component } from "vue";
 import Select from "./Select.vue";
 import SelectTrigger from "./SelectTrigger.vue";
 import SelectValue from "./SelectValue.vue";
@@ -124,6 +123,15 @@ const handleInput = (event: Event) => {
     adjustTextareaHeight();
   });
 };
+
+// Watch for value changes to adjust textarea height
+watch(() => props.modelValue, () => {
+  if (props.type === "textarea") {
+    nextTick(() => {
+      adjustTextareaHeight();
+    });
+  }
+});
 
 onMounted(() => {
   if (props.type === "textarea") {

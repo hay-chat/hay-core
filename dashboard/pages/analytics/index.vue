@@ -93,7 +93,7 @@
     </div>
 
     <!-- Charts Section -->
-    <div class="grid gap-6 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2">
       <!-- Conversation Volume Chart -->
       <Card>
         <CardHeader>
@@ -134,7 +134,7 @@
     </div>
 
     <!-- Response Time Distribution & Top Issues -->
-    <div class="grid gap-6 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2">
       <!-- Response Time Distribution -->
       <Card>
         <CardHeader>

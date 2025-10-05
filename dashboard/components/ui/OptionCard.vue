@@ -5,7 +5,7 @@
         'relative rounded-lg border bg-background text-neutral shadow-sm flex p-1 items-center gap-3 cursor-pointer transition-colors',
         'hover:bg-gray-50',
         'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
-        isChecked && 'border-primary',
+        isChecked && 'border-primary border-2',
         $props.class,
       )
     "
@@ -21,14 +21,7 @@
       @change="handleChange"
     />
 
-    <div
-      :class="
-        cn(
-          'h-5 w-5 flex-shrink-0 rounded-sm border-2 flex items-center justify-center transition-all',
-          isChecked ? 'border-primary bg-primary' : 'border-input',
-        )
-      "
-    >
+    <div :class="cn('h-5 w-5 flex-shrink-0  flex items-center justify-center transition-all')">
       <svg
         v-if="isChecked"
         xmlns="http://www.w3.org/2000/svg"
@@ -38,7 +31,7 @@
         stroke-width="3"
         stroke-linecap="round"
         stroke-linejoin="round"
-        class="h-4 w-4 text-primary-foreground"
+        class="h-4 w-4 text-primary"
       >
         <polyline points="20 6 9 17 4 12" />
       </svg>

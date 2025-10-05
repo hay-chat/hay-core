@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col -m-4 md:-m-6">
+  <div class="h-screen flex flex-col">
     <!-- Header -->
     <div
       class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"

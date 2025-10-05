@@ -1,11 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <Page title="General Settings" description="Manage your platform preferences and configuration">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">General Settings</h1>
-        <p class="text-neutral-muted">Manage your platform preferences and configuration</p>
-      </div>
+    <template #header>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="resetToDefaults">
           <RotateCcw class="h-4 w-4 mr-2" />
@@ -16,7 +12,7 @@
           Save Changes
         </Button>
       </div>
-    </div>
+    </template>
 
     <!-- Platform Settings -->
     <Card>
@@ -25,7 +21,7 @@
         <CardDescription>Configure basic platform preferences</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
-        <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-2">
           <Input
             v-model="settings.defaultLanguage"
             type="select"
@@ -46,7 +42,7 @@
           />
         </div>
 
-        <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-2">
           <Input
             v-model="settings.dateFormat"
             type="select"
@@ -333,7 +329,7 @@
         </div>
       </CardContent>
     </Card> -->
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
@@ -394,12 +390,8 @@ const settings = ref<PlatformSettings>({
   },
 });
 
-// Mock data - TODO: Replace with actual API calls
-const agents = ref([
-  { id: "1", name: "Customer Support Agent" },
-  { id: "2", name: "Sales Assistant" },
-  { id: "3", name: "Technical Support" },
-]);
+// Agents data
+const agents = ref<any[]>([]);
 
 const webhookEvents = [
   { id: "conversation.started", name: "Conversation Started" },
@@ -563,6 +555,10 @@ const viewWebhookLogs = () => {
 // Lifecycle
 onMounted(async () => {
   try {
+    // Load agents
+    const agentsResponse = await Hay.agents.list.query();
+    agents.value = agentsResponse || [];
+
     // Load current platform settings from API
     const orgSettings = await Hay.organizations.getSettings.query();
 

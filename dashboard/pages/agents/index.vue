@@ -1,13 +1,10 @@
 <template>
-  <div class="space-y-8">
+  <Page
+    title="AI Agents"
+    description="Create and manage your AI agents to automate customer interactions."
+  >
     <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">AI Agents</h1>
-        <p class="mt-1 text-sm text-neutral-muted">
-          Create and manage your AI agents to automate customer interactions.
-        </p>
-      </div>
+    <template #header>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
@@ -18,46 +15,45 @@
           Create Agent
         </Button>
       </div>
-    </div>
+    </template>
 
     <!-- Search and Filter -->
     <div class="flex flex-col sm:flex-row gap-4">
       <div class="flex-1">
-        <div class="relative">
-          <Search
-            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-muted"
-          />
-          <Input
-            v-model="searchQuery"
-            placeholder="Search agents..."
-            class="pl-10"
-            @input="handleSearch"
-          />
-        </div>
+        <Input
+          v-model="searchQuery"
+          placeholder="Search agents..."
+          :icon-start="Search"
+          @input="handleSearch"
+        />
       </div>
       <div class="flex gap-2">
-        <select
+        <Input
           v-model="statusFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="training">Training</option>
-          <option value="error">Error</option>
-        </select>
-        <select
+          type="select"
+          placeholder="All Status"
+          :options="[
+            { label: 'All Status', value: '' },
+            { label: 'Active', value: 'active' },
+            { label: 'Inactive', value: 'inactive' },
+            { label: 'Training', value: 'training' },
+            { label: 'Error', value: 'error' },
+          ]"
+          @update:model-value="applyFilters"
+        />
+        <Input
           v-model="typeFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">All Types</option>
-          <option value="customer-support">Customer Support</option>
-          <option value="sales">Sales</option>
-          <option value="technical">Technical</option>
-          <option value="general">General</option>
-        </select>
+          type="select"
+          placeholder="All Types"
+          :options="[
+            { label: 'All Types', value: '' },
+            { label: 'Customer Support', value: 'customer-support' },
+            { label: 'Sales', value: 'sales' },
+            { label: 'Technical', value: 'technical' },
+            { label: 'General', value: 'general' },
+          ]"
+          @update:model-value="applyFilters"
+        />
       </div>
     </div>
 
@@ -88,7 +84,7 @@
     <!-- Agents Grid -->
     <div
       v-if="!loading && filteredAgents.length > 0"
-      class="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
+      class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
     >
       <Card
         v-for="agent in paginatedAgents"
@@ -231,26 +227,21 @@
 
     <!-- Empty State -->
     <div v-else-if="!loading && filteredAgents.length === 0" class="text-center py-12">
-      <img src="/bale/agent.svg" class="h-32 w-32 mx-auto" />
-      <h3 class="text-lg font-medium text-foreground">
-        {{ searchQuery || statusFilter || typeFilter ? "No agents found" : "No agents yet" }}
-      </h3>
-      <p class="mt-2 text-sm text-neutral-muted">
-        {{
+      <EmptyState
+        :title="searchQuery || statusFilter || typeFilter ? 'No agents found' : 'No agents yet'"
+        :illustration="'/bale/agent.svg'"
+        :action="searchQuery || statusFilter || typeFilter ? 'Clear Filters' : 'Create Agent'"
+        :description="
           searchQuery || statusFilter || typeFilter
-            ? "Try adjusting your search or filters."
-            : "Get started by creating your first AI agent."
-        }}
-      </p>
-      <div class="mt-6">
-        <Button @click="searchQuery || statusFilter || typeFilter ? clearFilters() : createAgent()">
-          {{ searchQuery || statusFilter || typeFilter ? "Clear Filters" : "Create Agent" }}
-        </Button>
-      </div>
+            ? 'Try adjusting your search or filters.'
+            : 'Get started by creating your first AI agent.'
+        "
+        @click="searchQuery || statusFilter || typeFilter ? clearFilters() : createAgent()"
+      />
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div v-if="loading" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card v-for="i in 6" :key="i" class="animate-pulse">
         <CardHeader>
           <div class="flex items-start space-x-3">
@@ -298,7 +289,7 @@
       :destructive="true"
       @confirm="confirmDelete"
     />
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
@@ -488,7 +479,7 @@ const toggleAgentSelection = (agentId: string) => {
 };
 
 const createAgent = () => {
-  router.push("/agents/create");
+  router.push("/agents/new");
 };
 
 const viewAgent = (id: string) => {

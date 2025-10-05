@@ -1,5 +1,8 @@
 <template>
-  <div class="max-w-4xl mx-auto space-y-8 relative">
+  <Page
+    title="Import Document"
+    description="Add new documents to your knowledge base from various sources."
+  >
     <!-- Global Drop Overlay for Step 1 -->
     <div
       v-if="currentStep === 1 && isDragging"
@@ -18,25 +21,12 @@
     </div>
 
     <!-- Page Header -->
-    <div>
-      <div class="flex items-center gap-2 text-sm text-neutral-muted mb-4">
-        <NuxtLink to="/documents" class="hover:text-foreground"> Documents </NuxtLink>
-        <ChevronRight class="h-4 w-4" />
-        <span>Import</span>
-      </div>
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-foreground">Import Document</h1>
-          <p class="mt-2 text-neutral-muted">
-            Add new documents to your knowledge base from various sources.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" @click="startTutorial">
-          <HelpCircle class="h-4 w-4 mr-2" />
-          Tutorial
-        </Button>
-      </div>
-    </div>
+    <template #header>
+      <Button variant="outline" size="sm" @click="startTutorial">
+        <HelpCircle class="h-4 w-4 mr-2" />
+        Tutorial
+      </Button>
+    </template>
 
     <!-- Import Steps Progress -->
     <div class="flex items-center justify-between mb-8" data-tour="progress-steps">
@@ -807,7 +797,7 @@
         </div>
       </CardContent>
     </Card>
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">

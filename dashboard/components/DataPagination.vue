@@ -2,17 +2,19 @@
   <div class="flex items-center justify-between px-2">
     <!-- Items per page selector on the left -->
     <div class="flex items-center space-x-2">
-      <p class="text-sm font-medium">Rows per page</p>
-      <Select
+      <p class="text-sm font-medium whitespace-nowrap">Rows per page</p>
+      <Input
         :model-value="itemsPerPage"
-        class="h-8 w-[70px]"
+        type="select"
+        class="h-8"
+        :options="[
+          { label: '10', value: 10 },
+          { label: '20', value: 20 },
+          { label: '50', value: 50 },
+          { label: '100', value: 100 },
+        ]"
         @update:model-value="handleItemsPerPageChange"
-      >
-        <option :value="10">10</option>
-        <option :value="20">20</option>
-        <option :value="50">50</option>
-        <option :value="100">100</option>
-      </Select>
+      />
     </div>
 
     <!-- Pagination controls on the right -->
@@ -59,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import Select from "@/components/ui/Select.vue";
+import Input from "@/components/ui/Input.vue";
 import Pagination from "@/components/ui/pagination/Pagination.vue";
 import PaginationContent from "@/components/ui/pagination/PaginationContent.vue";
 import PaginationItem from "@/components/ui/pagination/PaginationItem.vue";
@@ -93,7 +95,7 @@ const handlePageChange = (page: number) => {
 };
 
 const handleItemsPerPageChange = (value: string | number | bigint | Record<string, any> | null) => {
-  if (value === null || typeof value === 'object') return;
+  if (value === null || typeof value === "object") return;
   const itemsPerPage = Number(value);
   emit("items-per-page-change", itemsPerPage);
 };

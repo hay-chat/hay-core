@@ -1,11 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <Page title="Playbooks" description="Automated conversation flows and responses for your agents">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">Playbooks</h1>
-        <p class="text-neutral-muted">Automated conversation flows and responses for your agents</p>
-      </div>
+    <template #header>
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm">
           <FileText class="h-4 w-4 mr-2" />
@@ -16,7 +12,7 @@
           Create Playbook
         </Button>
       </div>
-    </div>
+    </template>
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
@@ -121,7 +117,7 @@
     </div>
 
     <!-- Playbooks Grid View -->
-    <div v-else-if="viewMode === 'grid'" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else-if="viewMode === 'grid'" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card
         v-for="playbook in paginatedPlaybooks"
         :key="playbook.id"
@@ -243,7 +239,7 @@
       :destructive="true"
       @confirm="confirmDelete"
     />
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">

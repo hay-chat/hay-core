@@ -1,13 +1,7 @@
 <template>
-  <div class="space-y-8">
+  <Page title="Documents" description="Manage your knowledge base documents for AI agents.">
     <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">Documents</h1>
-        <p class="mt-1 text-sm text-neutral-muted">
-          Manage your knowledge base documents for AI agents.
-        </p>
-      </div>
+    <template #header>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
@@ -20,7 +14,7 @@
           </Button>
         </NuxtLink>
       </div>
-    </div>
+    </template>
 
     <!-- Search and Filter -->
     <div class="flex flex-col sm:flex-row gap-4">
@@ -340,7 +334,7 @@
         </div>
       </DialogContent>
     </Dialog>
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">

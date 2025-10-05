@@ -24,6 +24,7 @@ interface AppState {
   plugins: Plugin[];
   pluginsLastUpdated: number | null;
   pluginsLoading: boolean;
+  rowsPerPage: number;
 }
 
 export const useAppStore = defineStore("app", {
@@ -34,6 +35,7 @@ export const useAppStore = defineStore("app", {
     plugins: [],
     pluginsLastUpdated: null,
     pluginsLoading: false,
+    rowsPerPage: 10,
   }),
 
   getters: {
@@ -177,6 +179,11 @@ export const useAppStore = defineStore("app", {
         plugin.enabled = enabled;
         this.pluginsLastUpdated = Date.now();
       }
+    },
+
+    // Update rows per page preference
+    setRowsPerPage(rows: number) {
+      this.rowsPerPage = rows;
     },
   },
   persist: true,

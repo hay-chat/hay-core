@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <Page>
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
@@ -102,7 +102,7 @@
             :config="{
               ...formData,
               instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId
+              organizationId: userStore.activeOrganizationId,
             }"
             :api-base-url="apiBaseUrl"
             @update:config="
@@ -332,7 +332,7 @@
                 :config="{
                   ...formData,
                   instanceId: instanceId,
-                  organizationId: userStore.activeOrganizationId
+                  organizationId: userStore.activeOrganizationId,
                 }"
                 :api-base-url="apiBaseUrl"
                 @update:config="
@@ -580,7 +580,7 @@
             :config="{
               ...formData,
               instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId
+              organizationId: userStore.activeOrganizationId,
             }"
             :api-base-url="apiBaseUrl"
             @update:config="
@@ -592,7 +592,7 @@
         </CardContent>
       </Card>
     </div>
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
@@ -639,7 +639,7 @@ const apiBaseUrl = computed(() => {
 // Vite glob imports for automatic plugin component discovery
 // Use relative path from this file to plugins directory (4 levels up)
 // @ts-ignore - Vite glob import not recognized by TypeScript in Nuxt
-const pluginComponents = import.meta.glob<any>('../../../../plugins/*/src/ui/**/*.vue');
+const pluginComponents = import.meta.glob<any>("../../../../plugins/*/src/ui/**/*.vue");
 
 // State
 const loading = ref(true);
@@ -684,7 +684,7 @@ const sortedTabExtensions = computed(() => {
 // Helper function to load plugin component dynamically using Vite's glob imports
 const loadPluginComponent = async (componentPath: string) => {
   // Extract plugin name from pluginId (remove 'hay-plugin-' prefix if present)
-  const pluginName = pluginId.value.replace('hay-plugin-', '');
+  const pluginName = pluginId.value.replace("hay-plugin-", "");
 
   // Build the full path from plugin name and componentPath
   // The glob pattern is '../../../../plugins/*/src/ui/**/*.vue' so we need to match that
@@ -696,7 +696,9 @@ const loadPluginComponent = async (componentPath: string) => {
     return defineAsyncComponent(pluginComponents[fullPath]);
   }
 
-  throw new Error(`Component not found: ${fullPath}. Available: ${Object.keys(pluginComponents).join(', ')}`);
+  throw new Error(
+    `Component not found: ${fullPath}. Available: ${Object.keys(pluginComponents).join(", ")}`,
+  );
 };
 
 // Methods

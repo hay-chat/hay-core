@@ -1,25 +1,17 @@
 <template>
-  <div class="space-y-8">
-    <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p class="mt-1 text-sm text-neutral-muted">
-          Welcome back! Here's what's happening with your AI agents.
-        </p>
-      </div>
-      <div class="mt-4 sm:mt-0 flex space-x-3">
-        <!-- Date Range Selector -->
+  <Page title="Dashboard" description="Welcome back! Here's what's happening with your AI agents.">
+    <template #header>
+      <div class="flex gap-4">
         <DateRangeSelector v-model="dateRange" @change="refreshData" />
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           Refresh
         </Button>
       </div>
-    </div>
+    </template>
 
     <!-- Key Metrics Cards -->
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 mb-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         title="Active Agents"
         :icon="Bot"
@@ -67,7 +59,7 @@
     </div>
 
     <!-- Charts and Activity -->
-    <div class="grid gap-6 md:grid-cols-2">
+    <div class="grid gap-4 mb-4 md:grid-cols-2">
       <!-- Activity Chart -->
       <Card>
         <CardHeader>
@@ -330,7 +322,7 @@
         </div>
       </CardContent>
     </Card>
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
@@ -364,11 +356,11 @@ const analyticsStore = useAnalyticsStore();
 
 // Cache keys for different widgets
 const CACHE_KEYS = {
-  AGENTS: 'dashboard_agents',
-  CONVERSATIONS: 'dashboard_conversations',
-  ACTIVITY: 'dashboard_activity',
-  SENTIMENT: 'dashboard_sentiment',
-  METRICS: 'dashboard_metrics'
+  AGENTS: "dashboard_agents",
+  CONVERSATIONS: "dashboard_conversations",
+  ACTIVITY: "dashboard_activity",
+  SENTIMENT: "dashboard_sentiment",
+  METRICS: "dashboard_metrics",
 };
 
 // TTL values in milliseconds
@@ -377,7 +369,7 @@ const CACHE_TTL = {
   CONVERSATIONS: 1 * 60 * 1000, // 1 minute for recent conversations
   ACTIVITY: 3 * 60 * 1000, // 3 minutes for activity chart
   SENTIMENT: 5 * 60 * 1000, // 5 minutes for sentiment data
-  METRICS: 2 * 60 * 1000 // 2 minutes for conversation metrics
+  METRICS: 2 * 60 * 1000, // 2 minutes for conversation metrics
 };
 
 // Date range for analytics
@@ -626,36 +618,36 @@ const fetchDashboardData = async (forceRefresh = false) => {
     const [agentsData, conversationsData, analyticsData, sentimentAnalysis, metricsData] =
       await Promise.all([
         // Agents data with caching
-        analyticsStore.fetchData(
-          CACHE_KEYS.AGENTS,
-          () => HayApi.agents.list.query(),
-          { ttl: CACHE_TTL.AGENTS, forceRefresh }
-        ),
+        analyticsStore.fetchData(CACHE_KEYS.AGENTS, () => HayApi.agents.list.query(), {
+          ttl: CACHE_TTL.AGENTS,
+          forceRefresh,
+        }),
         // Conversations data with shorter cache for recent updates
         analyticsStore.fetchData(
           CACHE_KEYS.CONVERSATIONS,
-          () => HayApi.conversations.list.query({
-            pagination: { page: 1, limit: 10 },
-          }),
-          { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh }
+          () =>
+            HayApi.conversations.list.query({
+              pagination: { page: 1, limit: 10 },
+            }),
+          { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh },
         ),
         // Activity chart data
         analyticsStore.fetchData(
           CACHE_KEYS.ACTIVITY,
           () => HayApi.analytics.conversationActivity.query(dateFilters),
-          { ttl: CACHE_TTL.ACTIVITY, forceRefresh }
+          { ttl: CACHE_TTL.ACTIVITY, forceRefresh },
         ),
         // Sentiment analysis data
         analyticsStore.fetchData(
           CACHE_KEYS.SENTIMENT,
           () => HayApi.analytics.sentimentAnalysis.query(dateFilters),
-          { ttl: CACHE_TTL.SENTIMENT, forceRefresh }
+          { ttl: CACHE_TTL.SENTIMENT, forceRefresh },
         ),
         // Conversation metrics
         analyticsStore.fetchData(
           CACHE_KEYS.METRICS,
           () => HayApi.analytics.conversationMetrics.query(dateFilters),
-          { ttl: CACHE_TTL.METRICS, forceRefresh }
+          { ttl: CACHE_TTL.METRICS, forceRefresh },
         ),
       ]);
 
@@ -722,7 +714,7 @@ const refreshData = async () => {
 };
 
 const createAgent = () => {
-  router.push("/agents/create");
+  router.push("/agents/new");
 };
 
 const viewAllAgents = () => {
@@ -753,12 +745,12 @@ const scrollToTop = () => {
 
 // Computed property to check if any data is being loaded
 const isAnyDataLoading = computed(() => {
-  return Object.values(CACHE_KEYS).some(key => analyticsStore.isWidgetLoading(key));
+  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetLoading(key));
 });
 
 // Computed property to check if any data is being refreshed
 const isAnyDataRefreshing = computed(() => {
-  return Object.values(CACHE_KEYS).some(key => analyticsStore.isWidgetRefreshing(key));
+  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetRefreshing(key));
 });
 
 // Lifecycle

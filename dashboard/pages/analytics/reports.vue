@@ -19,7 +19,7 @@
     </div>
 
     <!-- Report Builder -->
-    <div class="grid gap-6 lg:grid-cols-3">
+    <div class="grid gap-4 lg:grid-cols-3">
       <!-- Left Panel: Configuration -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Basic Information -->

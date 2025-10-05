@@ -416,7 +416,7 @@
     </Card>
 
     <!-- Login Attempts & Security Logs -->
-    <div class="grid gap-6 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2">
       <!-- Recent Login Attempts -->
       <Card>
         <CardHeader>

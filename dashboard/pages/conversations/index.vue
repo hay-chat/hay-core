@@ -1,11 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <Page title="Conversations" description="Monitor and manage all customer conversations">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">Conversations</h1>
-        <p class="text-neutral-muted">Monitor and manage all customer conversations</p>
-      </div>
+    <template #header>
       <div class="flex items-center space-x-2">
         <Button size="sm" @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
@@ -20,7 +16,7 @@
           Refresh
         </Button>
       </div>
-    </div>
+    </template>
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
@@ -265,7 +261,7 @@
       @page-change="handlePageChange"
       @items-per-page-change="handleItemsPerPageChange"
     />
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">

@@ -166,11 +166,6 @@ const navMain = computed(() => [
         url: "/settings/general",
         isActive: route.path === "/settings/general",
       },
-      {
-        title: "Security",
-        url: "/settings/security",
-        isActive: route.path === "/settings/security",
-      },
       // Add plugin menu items for settings
       ...pluginMenuItems.value
         .filter((item) => item.parent === "settings")

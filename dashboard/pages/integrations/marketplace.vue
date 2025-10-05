@@ -1,20 +1,15 @@
 <template>
-  <div class="space-y-6">
+  <Page
+    title="Plugin Marketplace"
+    description="Discover and install plugins to extend your platform capabilities"
+  >
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">Plugin Marketplace</h1>
-        <p class="text-neutral-muted">
-          Discover and install plugins to extend your platform capabilities
-        </p>
-      </div>
-      <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" @click="refreshPlugins">
-          <RefreshCcw class="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-    </div>
+    <template #header>
+      <Button variant="outline" size="sm" @click="refreshPlugins">
+        <RefreshCcw class="h-4 w-4 mr-2" />
+        Refresh
+      </Button>
+    </template>
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
@@ -71,7 +66,7 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div v-for="i in 6" :key="i" class="animate-pulse">
         <Card>
           <CardHeader>
@@ -100,7 +95,7 @@
     </div>
 
     <!-- Plugins Grid -->
-    <div v-else class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card
         v-for="plugin in filteredPlugins"
         :key="plugin.id"
@@ -200,7 +195,7 @@
         </CardContent>
       </Card>
     </div>
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
