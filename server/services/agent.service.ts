@@ -18,10 +18,20 @@ export class AgentService {
       tone?: string;
       avoid?: string;
       trigger?: string;
+      humanHandoffAvailableInstructions?: unknown[];
+      humanHandoffUnavailableInstructions?: unknown[];
     },
   ): Promise<Agent> {
     return await this.agentRepository.create({
-      ...data,
+      name: data.name,
+      description: data.description,
+      enabled: data.enabled,
+      instructions: data.instructions,
+      tone: data.tone,
+      avoid: data.avoid,
+      trigger: data.trigger,
+      human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
+      human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
       organization_id: organizationId,
     });
   }
@@ -49,9 +59,21 @@ export class AgentService {
       tone?: string;
       avoid?: string;
       trigger?: string;
+      humanHandoffAvailableInstructions?: unknown[];
+      humanHandoffUnavailableInstructions?: unknown[];
     },
   ): Promise<Agent | null> {
-    return await this.agentRepository.update(agentId, organizationId, data);
+    return await this.agentRepository.update(agentId, organizationId, {
+      name: data.name,
+      description: data.description,
+      enabled: data.enabled,
+      instructions: data.instructions,
+      tone: data.tone,
+      avoid: data.avoid,
+      trigger: data.trigger,
+      human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
+      human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
+    });
   }
 
   async deleteAgent(organizationId: string, agentId: string): Promise<boolean> {

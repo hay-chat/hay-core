@@ -108,19 +108,16 @@
             <CardTitle>Human handoff</CardTitle>
           </CardHeader>
           <CardContent class="space-y-6">
-            <Input
+            <InstructionsEditor
+              v-model="form.humanHandoffAvailableInstructions"
               label="If any human agent is available"
-              type="select"
-              :options="[
-                { label: 'Handoff to human', value: 'handoff_to_human' },
-                { label: 'Fallback', value: 'fallback' },
-              ]"
-            ></Input>
+              hint="Define the instructions for the agent to follow when a human agent is available. Leave empty to simply change status to 'pending-human'."
+            />
 
             <InstructionsEditor
+              v-model="form.humanHandoffUnavailableInstructions"
               label="If all human agents are unavailable"
-              hint="Define the instructions for the agent to follow when the human is not available."
-              :error="errors.instructions"
+              hint="Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email)."
             />
           </CardContent>
         </Card>
@@ -232,6 +229,8 @@ const form = ref({
   avoid: "",
   trigger: "",
   enabled: true,
+  humanHandoffAvailableInstructions: [] as any,
+  humanHandoffUnavailableInstructions: [] as any,
 });
 
 // UI state
@@ -280,6 +279,8 @@ onMounted(async () => {
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
         enabled: agentResponse.enabled ?? true,
+        humanHandoffAvailableInstructions: (agentResponse as any).human_handoff_available_instructions || [],
+        humanHandoffUnavailableInstructions: (agentResponse as any).human_handoff_unavailable_instructions || [],
       };
 
       // Detect which tone preset is selected
@@ -339,6 +340,8 @@ const handleSubmit = async () => {
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
+      humanHandoffAvailableInstructions: form.value.humanHandoffAvailableInstructions,
+      humanHandoffUnavailableInstructions: form.value.humanHandoffUnavailableInstructions,
     };
 
     if (isEditMode.value && agentId.value) {

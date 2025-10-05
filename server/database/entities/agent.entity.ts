@@ -37,6 +37,12 @@ export class Agent {
   @Column({ type: "text", nullable: true })
   trigger!: string | null;
 
+  @Column({ type: "jsonb", nullable: true })
+  human_handoff_available_instructions!: unknown[] | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  human_handoff_unavailable_instructions!: unknown[] | null;
+
   @Column({ type: "uuid" })
   organization_id!: string;
 

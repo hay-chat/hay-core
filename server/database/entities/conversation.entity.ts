@@ -339,6 +339,154 @@ The following tools are available for you to use. You MUST return only valid JSO
     }
   }
 
+  async addHandoffInstructions(
+    instructions: unknown[],
+    handoffType: "available" | "unavailable"
+  ): Promise<void> {
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+
+    // Initialize enabled tools array
+    const enabledToolIds: string[] = [];
+
+    // Analyze instructions to extract actions and documents
+    let instructionText = "";
+    let referencedActions: string[] = [];
+    let referencedDocuments: string[] = [];
+
+    if (Array.isArray(instructions) && instructions.length > 0) {
+      const analysis = analyzeInstructions(instructions as any);
+      instructionText = analysis.formattedText;
+      referencedActions = analysis.actions;
+      referencedDocuments = analysis.documents;
+    }
+
+    console.log("[Conversation] Adding handoff instructions", {
+      conversationId: this.id,
+      handoffType,
+      referencedActions,
+      referencedDocuments,
+    });
+
+    // Get tool schemas from plugin manager service
+    const toolSchemas: Array<Record<string, unknown>> = [];
+    try {
+      const { pluginManagerService } = await import("../../services/plugin-manager.service");
+      const allPlugins = pluginManagerService.getAllPlugins();
+
+      for (const plugin of allPlugins) {
+        const manifest = plugin.manifest as any;
+        if (manifest?.capabilities?.mcp?.tools) {
+          toolSchemas.push(...manifest.capabilities.mcp.tools);
+        }
+      }
+    } catch (error) {
+      console.warn("Could not fetch tool schemas:", error);
+    }
+
+    let content = `From this message forward you should follow these handoff instructions:
+
+**Handoff Context:** ${handoffType === "available" ? "Human agents are available" : "No human agents available"}
+
+**Instructions:**
+${instructionText}`;
+
+    // Add referenced actions with tool schemas if available
+    if (referencedActions.length > 0 && toolSchemas && toolSchemas.length > 0) {
+      content += `\n\n**Referenced Actions:**
+The following tools are available for you to use. You MUST return only valid JSON when calling tools, with no additional text:`;
+
+      const actionDetails = referencedActions.map((actionName) => {
+        let toolSchema = toolSchemas.find((schema) => schema.name === actionName);
+
+        if (!toolSchema && actionName.includes(":")) {
+          const parts = actionName.split(":");
+          if (parts.length >= 2) {
+            const toolName = parts[parts.length - 1];
+            toolSchema = toolSchemas.find((schema) => schema.name === toolName);
+
+            if (!toolSchema) {
+              const toolNameSuffix = parts.slice(1).join(":");
+              toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
+            }
+          }
+        }
+
+        if (toolSchema) {
+          // Add tool ID to enabled_tools list
+          if (!enabledToolIds.includes(toolSchema.name as string)) {
+            enabledToolIds.push(toolSchema.name as string);
+          }
+
+          const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
+          const requiredFields =
+            inputSchema.required &&
+            Array.isArray(inputSchema.required) &&
+            inputSchema.required.length > 0
+              ? ` (Required: ${(inputSchema.required as string[]).join(", ")})`
+              : "";
+
+          return `- **${actionName}**: ${
+            toolSchema.description
+          }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
+        } else {
+          return `- **${actionName}**: Action not found in available tools`;
+        }
+      });
+
+      content += `\n${actionDetails.join("\n\n")}`;
+    } else if (referencedActions.length > 0) {
+      content += `\n\n**Referenced Actions:**\n`;
+      content += referencedActions.map((action) => `- ${action}`).join("\n");
+    }
+
+    await this.addMessage({
+      content,
+      type: "System",
+      metadata: {
+        isHandoffInstructions: true,
+        handoffType,
+        referencedActions,
+        referencedDocuments,
+      },
+    });
+
+    // Update conversation with enabled tools
+    if (enabledToolIds.length > 0) {
+      await conversationRepository.update(this.id, this.organization_id, {
+        enabled_tools: enabledToolIds,
+      });
+      this.enabled_tools = enabledToolIds;
+    }
+
+    // Attach documents referenced in the handoff instructions
+    if (referencedDocuments.length > 0) {
+      console.log(
+        `[Conversation] Handoff references ${referencedDocuments.length} documents, attempting to attach them`,
+      );
+
+      for (const documentId of referencedDocuments) {
+        try {
+          const document = await documentRepository.findById(documentId);
+
+          if (document && document.organizationId === this.organization_id) {
+            console.log(
+              `[Conversation] Attaching document "${document.title}" (${documentId}) from handoff instructions`,
+            );
+            await this.addDocument(documentId);
+          } else if (document) {
+            console.warn(
+              `[Conversation] Document ${documentId} belongs to different organization, skipping`,
+            );
+          } else {
+            console.warn(`[Conversation] Document ${documentId} referenced in handoff not found`);
+          }
+        } catch (error) {
+          console.error(`[Conversation] Error attaching document "${documentId}":`, error);
+        }
+      }
+    }
+  }
+
   async addDocument(documentId: string): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 

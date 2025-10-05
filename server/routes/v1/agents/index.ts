@@ -13,6 +13,8 @@ const createAgentSchema = z.object({
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
+  humanHandoffAvailableInstructions: z.any().optional(),
+  humanHandoffUnavailableInstructions: z.any().optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -23,6 +25,8 @@ const updateAgentSchema = z.object({
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
+  humanHandoffAvailableInstructions: z.any().optional(),
+  humanHandoffUnavailableInstructions: z.any().optional(),
 });
 
 export const agentsRouter = t.router({

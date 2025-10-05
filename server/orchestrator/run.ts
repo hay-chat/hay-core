@@ -9,6 +9,8 @@ import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { ConversationContext } from "./types";
+import { userRepository } from "@server/repositories/user.repository";
+import { LLMService } from "@server/services/core/llm.service";
 
 export const runConversation = async (conversationId: string) => {
   const conversation = await conversationRepository.findById(conversationId);
@@ -197,7 +199,12 @@ export const runConversation = async (conversationId: string) => {
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
-    console.error("[Orchestrator] Error in conversation", error);
+    if (
+      error instanceof Error &&
+      !error.message.includes("Conversation does not need processing")
+    ) {
+      console.error("[Orchestrator] Error in conversation", error.message);
+    }
   } finally {
     await conversation.unlock();
     console.log("[Orchestrator] Conversation unlocked", conversationId);
@@ -213,6 +220,7 @@ async function handleExecutionLoop(conversation: Conversation) {
   const toolExecutionService = new ToolExecutionService();
   const maxIterations = 5; // Prevent infinite loops
   let iterations = 0;
+  let handoffProcessed = false; // Track if handoff has been processed
 
   while (iterations < maxIterations) {
     iterations++;
@@ -277,6 +285,131 @@ async function handleExecutionLoop(conversation: Conversation) {
         console.log("[Orchestrator] Tool execution failed, continuing execution loop...");
         // Continue the loop to let LLM handle the error
       }
+    } else if (executionResult.step === "HANDOFF") {
+      // Handle human handoff
+      console.log("[Orchestrator] HANDOFF step detected");
+
+      // Check if we've already processed handoff to avoid duplicates
+      if (handoffProcessed) {
+        console.log("[Orchestrator] Handoff already processed, skipping duplicate");
+        continue;
+      }
+
+      handoffProcessed = true; // Mark as processed
+
+      // Get agent configuration
+      const agent = await agentRepository.findById(conversation.agent_id!);
+      if (!agent) {
+        console.warn("[Orchestrator] No agent found for handoff, using default behavior");
+        await conversationRepository.update(conversation.id, conversation.organization_id, {
+          status: "pending-human",
+        });
+        await conversation.addMessage({
+          content: "I'm transferring you to a human agent. Someone will be with you shortly.",
+          type: MessageType.BOT_AGENT,
+          metadata: {
+            isHandoffMessage: true,
+          },
+        });
+        break;
+      }
+
+      // Check if there are online human agents
+      const onlineHumans = await userRepository.findOnlineByOrganization(
+        conversation.organization_id,
+      );
+      console.log(`[Orchestrator] Found ${onlineHumans.length} online human agents`);
+
+      if (onlineHumans.length > 0) {
+        // Humans are available
+        const availableInstructions = agent.human_handoff_available_instructions;
+
+        if (
+          availableInstructions &&
+          Array.isArray(availableInstructions) &&
+          availableInstructions.length > 0
+        ) {
+          // Execute custom instructions for when humans are available
+          console.log("[Orchestrator] Executing handoff instructions for available humans");
+          await conversation.addHandoffInstructions(availableInstructions, "available");
+          // Continue loop to process the handoff instructions
+          continue;
+        } else {
+          // Default behavior: update status and send message
+          console.log("[Orchestrator] No custom instructions, using default handoff");
+          await conversationRepository.update(conversation.id, conversation.organization_id, {
+            status: "pending-human",
+          });
+
+          // Generate natural handoff message
+          const llmService = new LLMService();
+          const messages = await conversation.getMessages();
+          try {
+            const handoffMessage = await llmService.invoke({
+              history: messages,
+              prompt:
+                "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
+            });
+
+            await conversation.addMessage({
+              content: handoffMessage,
+              type: MessageType.BOT_AGENT,
+              metadata: {
+                isHandoffMessage: true,
+                handoffType: "available",
+              },
+            });
+          } catch (error) {
+            console.error("[Orchestrator] Error generating handoff message:", error);
+            await conversation.addMessage({
+              content: "I'm connecting you with a human agent who will be with you shortly.",
+              type: MessageType.BOT_AGENT,
+              metadata: {
+                isHandoffMessage: true,
+                handoffType: "available",
+              },
+            });
+          }
+          break;
+        }
+      } else {
+        // No humans available
+        const unavailableInstructions = agent.human_handoff_unavailable_instructions;
+
+        if (
+          unavailableInstructions &&
+          Array.isArray(unavailableInstructions) &&
+          unavailableInstructions.length > 0
+        ) {
+          // Execute custom instructions for when humans are not available
+          console.log("[Orchestrator] Executing handoff instructions for unavailable humans");
+          await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
+          // Continue loop to process the handoff instructions
+          continue;
+        } else {
+          // Default fallback message
+          console.log("[Orchestrator] No custom fallback, using default message");
+          await conversation.addMessage({
+            content: "I apologize, but no human agents are currently available.",
+            type: MessageType.BOT_AGENT,
+            metadata: {
+              isHandoffMessage: true,
+              handoffType: "unavailable",
+            },
+          });
+          break;
+        }
+      }
+    } else if (executionResult.step === "CLOSE") {
+      // Handle conversation closure
+      console.log("[Orchestrator] CLOSE step detected");
+      if (executionResult.userMessage) {
+        await conversation.addMessage({
+          content: executionResult.userMessage,
+          type: MessageType.BOT_AGENT,
+        });
+      }
+      break;
     } else {
       // Regular response (not a tool call) - end the loop
       if (executionResult.userMessage) {
