@@ -58,6 +58,7 @@ export class WebSocketService {
   private wss?: WebSocketServer;
   private clients = new Map<string, WebSocketClient>();
   private conversationClients = new Map<string, Set<string>>();
+  private organizationClients = new Map<string, Set<string>>();
 
   /**
    * Initialize WebSocket server
@@ -113,6 +114,14 @@ export class WebSocketService {
     // Authenticate if token provided
     if (token) {
       this.authenticateClient(clientId, token);
+
+      // Add to organization clients if authenticated
+      if (client.authenticated && client.organizationId) {
+        if (!this.organizationClients.has(client.organizationId)) {
+          this.organizationClients.set(client.organizationId, new Set());
+        }
+        this.organizationClients.get(client.organizationId)!.add(clientId);
+      }
     }
 
     // Set up event handlers
@@ -147,7 +156,7 @@ export class WebSocketService {
 
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
-      client.organizationId = decoded.organizationId || '';
+      client.organizationId = decoded.organizationId || "";
       client.authenticated = true;
       return true;
     } catch (error) {
@@ -431,6 +440,17 @@ export class WebSocketService {
       }
     }
 
+    // Remove from organization clients
+    if (client.organizationId) {
+      const orgClients = this.organizationClients.get(client.organizationId);
+      if (orgClients) {
+        orgClients.delete(clientId);
+        if (orgClients.size === 0) {
+          this.organizationClients.delete(client.organizationId);
+        }
+      }
+    }
+
     // Remove client
     this.clients.delete(clientId);
   }
@@ -501,6 +521,24 @@ export class WebSocketService {
   }
 
   /**
+   * Send message to all clients in an organization
+   */
+  sendToOrganization(organizationId: string, message: Record<string, unknown>): number {
+    const clientIds = this.organizationClients.get(organizationId);
+    if (!clientIds) return 0;
+
+    let sent = 0;
+    for (const clientId of clientIds) {
+      if (this.sendToClient(clientId, message)) {
+        sent++;
+      }
+    }
+
+    console.log(`[WebSocket] Sent message to ${sent} clients in organization ${organizationId}`);
+    return sent;
+  }
+
+  /**
    * Generate unique client ID
    */
   private generateClientId(): string {
@@ -533,6 +571,7 @@ export class WebSocketService {
     // Clear maps
     this.clients.clear();
     this.conversationClients.clear();
+    this.organizationClients.clear();
 
     // Close server
     if (this.wss) {

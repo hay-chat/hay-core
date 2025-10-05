@@ -18,4 +18,19 @@
 import AppSidebar from "@/components/layout/AppSidebar.vue";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import ToastContainer from "@/components/ui/ToastContainer.vue";
+import { useWebSocket } from "@/composables/useWebSocket";
+import { useNotifications } from "@/composables/useNotifications";
+import { onMounted } from "vue";
+
+// Initialize WebSocket connection for real-time updates
+const websocket = useWebSocket();
+const notifications = useNotifications();
+
+onMounted(() => {
+  // Request notification permission on mount
+  notifications.requestPermission();
+
+  // Connect to WebSocket
+  websocket.connect();
+});
 </script>

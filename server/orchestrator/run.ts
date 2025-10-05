@@ -304,6 +304,18 @@ async function handleExecutionLoop(conversation: Conversation) {
         await conversationRepository.update(conversation.id, conversation.organization_id, {
           status: "pending-human",
         });
+
+        // Notify organization via WebSocket
+        const { websocketService } = await import("../services/websocket.service");
+        websocketService.sendToOrganization(conversation.organization_id, {
+          type: "conversation_status_changed",
+          payload: {
+            conversationId: conversation.id,
+            status: "pending-human",
+            title: conversation.title,
+          },
+        });
+
         await conversation.addMessage({
           content: "I'm transferring you to a human agent. Someone will be with you shortly.",
           type: MessageType.BOT_AGENT,
@@ -339,6 +351,17 @@ async function handleExecutionLoop(conversation: Conversation) {
           console.log("[Orchestrator] No custom instructions, using default handoff");
           await conversationRepository.update(conversation.id, conversation.organization_id, {
             status: "pending-human",
+          });
+
+          // Notify organization via WebSocket
+          const { websocketService } = await import("../services/websocket.service");
+          websocketService.sendToOrganization(conversation.organization_id, {
+            type: "conversation_status_changed",
+            payload: {
+              conversationId: conversation.id,
+              status: "pending-human",
+              title: conversation.title,
+            },
           });
 
           // Generate natural handoff message
