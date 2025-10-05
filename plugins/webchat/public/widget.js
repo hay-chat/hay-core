@@ -394,7 +394,7 @@
         const { privateKey, publicKey, publicJwk } = await this.generateKeypair();
 
         // Create conversation with public key
-        const response = await fetch(`${this.config.baseUrl}/v1/webConversations.create`, {
+        const response = await fetch(`${this.config.baseUrl}/v1/publicConversations.create`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -456,7 +456,7 @@
 
         // Create DPoP proof
         const method = "POST";
-        const url = `${this.config.baseUrl}/v1/webConversations.getMessages`;
+        const url = `${this.config.baseUrl}/v1/publicConversations.getMessages`;
         const proof = await this.createDPoPProof(
           keypair.privateKey,
           keypair.publicJwk,
@@ -539,7 +539,7 @@
 
         // Create DPoP proof
         const method = "POST";
-        const url = `${this.config.baseUrl}/v1/webConversations.getMessages`;
+        const url = `${this.config.baseUrl}/v1/publicConversations.getMessages`;
         const proof = await this.createDPoPProof(
           keypair.privateKey,
           keypair.publicJwk,
@@ -684,7 +684,7 @@
 
         // Create DPoP proof
         const method = "POST";
-        const url = `${this.config.baseUrl}/v1/webConversations.sendMessage`;
+        const url = `${this.config.baseUrl}/v1/publicConversations.sendMessage`;
         const proof = await this.createDPoPProof(
           keypair.privateKey,
           keypair.publicJwk,

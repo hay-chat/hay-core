@@ -8,8 +8,8 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 
 const conversationService = new ConversationService();
 
-// Schema for creating a web conversation with public JWK
-const createWebConversationSchema = z.object({
+// Schema for creating a public conversation with public JWK
+const createPublicConversationSchema = z.object({
   publicJwk: z.object({
     kty: z.string(),
     crv: z.string().optional(),
@@ -42,11 +42,11 @@ const getMessagesSchema = z.object({
   offset: z.number().optional().default(0),
 });
 
-export const webConversationsRouter = t.router({
-  // Create a new web conversation with public key registration
-  create: publicProcedure.input(createWebConversationSchema).mutation(async ({ input }) => {
+export const publicConversationsRouter = t.router({
+  // Create a new public conversation with public key registration
+  create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input }) => {
     try {
-      // Use default organization for web conversations
+      // Use default organization for public conversations
       const organizationId = process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
 
       // Validate the JWK is for ES256
@@ -88,7 +88,7 @@ export const webConversationsRouter = t.router({
         createdAt: conversation.created_at,
       };
     } catch (error) {
-      console.error("Error creating web conversation:", error);
+      console.error("Error creating public conversation:", error);
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to create conversation",

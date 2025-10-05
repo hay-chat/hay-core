@@ -154,7 +154,7 @@ async function initialize() {
     const { privateKey, publicKey, publicJwk } = await generateKeypair();
 
     // Create conversation via tRPC
-    const response = await fetch(`${props.apiUrl}/v1/webConversations.create`, {
+    const response = await fetch(`${props.apiUrl}/v1/publicConversations.create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -213,7 +213,7 @@ async function fetchMessages() {
   try {
     isLoading.value = true;
 
-    const { data, nonce } = await dpopClient.value.request(`/v1/webConversations.getMessages`, {
+    const { data, nonce } = await dpopClient.value.request(`/v1/publicConversations.getMessages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -221,7 +221,7 @@ async function fetchMessages() {
       body: JSON.stringify({
         conversationId: conversationId.value,
         method: "POST",
-        url: `${props.apiUrl}/v1/webConversations.getMessages`,
+        url: `${props.apiUrl}/v1/publicConversations.getMessages`,
         limit: 50,
       }),
     });
@@ -262,7 +262,7 @@ async function sendMessage() {
   try {
     isSending.value = true;
 
-    const { data, nonce } = await dpopClient.value.request(`/v1/webConversations.sendMessage`, {
+    const { data, nonce } = await dpopClient.value.request(`/v1/publicConversations.sendMessage`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -271,7 +271,7 @@ async function sendMessage() {
         conversationId: conversationId.value,
         content,
         method: "POST",
-        url: `${props.apiUrl}/v1/webConversations.sendMessage`,
+        url: `${props.apiUrl}/v1/publicConversations.sendMessage`,
       }),
     });
 

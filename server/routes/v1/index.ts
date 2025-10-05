@@ -7,7 +7,7 @@ import { conversationsRouter } from "./conversations";
 import { embeddingsRouter } from "./embeddings";
 import { customersRouter } from "./customers";
 import { pluginsRouter } from "./plugins";
-import { webConversationsRouter } from "./web-conversations";
+import { publicConversationsRouter } from "./public-conversations";
 import { analyticsRouter } from "./analytics";
 import { organizationsRouter } from "./organizations";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
@@ -22,7 +22,7 @@ const coreRouters = {
   embeddings: embeddingsRouter,
   customers: customersRouter,
   plugins: pluginsRouter,
-  webConversations: webConversationsRouter,
+  publicConversations: publicConversationsRouter,
   analytics: analyticsRouter,
   organizations: organizationsRouter,
 };
