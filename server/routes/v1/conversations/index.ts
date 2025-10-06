@@ -18,14 +18,14 @@ const createConversationSchema = z.object({
   agentId: z.string().uuid().optional(),
 
   metadata: z.record(z.any()).optional(),
-  status: z.enum(["open", "processing", "pending-human", "resolved", "closed"]).optional(),
+  status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
 });
 
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  status: z.enum(["open", "processing", "pending-human", "resolved", "closed"]).optional(),
+  status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
   metadata: z.record(z.any()).optional(),
   customer_id: z.string().uuid().optional(),
 });
@@ -261,7 +261,7 @@ export const conversationsRouter = t.router({
     return response;
   }),
 
-  sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ input }) => {
+  sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {
     const conversation = await conversationRepository.findById(input.conversationId);
 
     if (!conversation) {
@@ -271,8 +271,18 @@ export const conversationsRouter = t.router({
       });
     }
 
-    // Add the message
-    const messageType = input.role === "assistant" ? MessageType.BOT_AGENT : MessageType.CUSTOMER;
+    // Determine message type based on role and takeover status
+    let messageType: MessageType;
+    if (input.role === "assistant") {
+      // If conversation is taken over by current user, it's a human agent message
+      const isTakenOverByCurrentUser =
+        conversation.status === "human-took-over" &&
+        conversation.assigned_user_id === ctx.user?.id;
+
+      messageType = isTakenOverByCurrentUser ? MessageType.HUMAN_AGENT : MessageType.BOT_AGENT;
+    } else {
+      messageType = MessageType.CUSTOMER;
+    }
 
     // The addMessage method now handles cooldown logic for Customer messages
     const message = await conversation.addMessage({
@@ -280,9 +290,210 @@ export const conversationsRouter = t.router({
       type: messageType,
       metadata: {
         sender: input.role || "user",
+        sentByUserId: ctx.user?.id,
       },
     });
 
     return message;
   }),
+
+  takeover: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        force: z.boolean().optional().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      // Verify organization access
+      if (conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this conversation",
+        });
+      }
+
+      // Check if conversation can be taken over
+      if (!["pending-human", "human-took-over"].includes(conversation.status)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Conversation cannot be taken over in current status",
+        });
+      }
+
+      // Check if already taken over by another user
+      if (
+        conversation.status === "human-took-over" &&
+        conversation.assigned_user_id &&
+        conversation.assigned_user_id !== ctx.user?.id &&
+        !input.force
+      ) {
+        // Return current owner info for confirmation dialog
+        const { userRepository } = await import("../../../repositories/user.repository");
+        const currentOwner = await userRepository.findById(conversation.assigned_user_id);
+
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Conversation is already taken over by another user",
+          cause: {
+            currentOwner: {
+              id: currentOwner?.id,
+              name: currentOwner?.getFullName(),
+              email: currentOwner?.email,
+            },
+          },
+        });
+      }
+
+      const previousOwnerId = conversation.assigned_user_id;
+
+      // Assign to current user
+      await conversation.assignToUser(ctx.user!.id);
+
+      // Add system message
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const user = await userRepository.findById(ctx.user!.id);
+      await conversation.addMessage({
+        content: `${user?.getFullName() || "User"} took over this conversation`,
+        type: MessageType.SYSTEM,
+        metadata: {
+          isTakeoverMessage: true,
+          userId: ctx.user!.id,
+          userName: user?.getFullName(),
+        },
+      });
+
+      // Emit WebSocket event
+      const { websocketService } = await import("../../../services/websocket.service");
+      websocketService.sendToOrganization(ctx.organizationId!, {
+        type: "conversation_taken_over",
+        payload: {
+          conversationId: conversation.id,
+          userId: ctx.user!.id,
+          userName: user?.getFullName(),
+          previousOwnerId,
+        },
+      });
+
+      return conversation;
+    }),
+
+  release: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        returnToMode: z.enum(["ai", "queue"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      // Verify organization access
+      if (conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this conversation",
+        });
+      }
+
+      // Verify user is the one who took over
+      if (conversation.assigned_user_id !== ctx.user!.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You can only release conversations assigned to you",
+        });
+      }
+
+      // Release conversation
+      await conversation.releaseFromUser(input.returnToMode);
+
+      // Add system message
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const user = await userRepository.findById(ctx.user!.id);
+      const releaseMessage =
+        input.returnToMode === "ai"
+          ? `${user?.getFullName() || "User"} returned this conversation to AI`
+          : `${user?.getFullName() || "User"} returned this conversation to the queue`;
+
+      await conversation.addMessage({
+        content: releaseMessage,
+        type: MessageType.SYSTEM,
+        metadata: {
+          isReleaseMessage: true,
+          userId: ctx.user!.id,
+          userName: user?.getFullName(),
+          returnToMode: input.returnToMode,
+        },
+      });
+
+      // Emit WebSocket event
+      const { websocketService } = await import("../../../services/websocket.service");
+      websocketService.sendToOrganization(ctx.organizationId!, {
+        type: "conversation_released",
+        payload: {
+          conversationId: conversation.id,
+          newStatus: conversation.status,
+          releasedBy: ctx.user!.id,
+          userName: user?.getFullName(),
+          returnToMode: input.returnToMode,
+        },
+      });
+
+      return conversation;
+    }),
+
+  getAssignedUser: authenticatedProcedure
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      // Verify organization access
+      if (conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this conversation",
+        });
+      }
+
+      if (!conversation.assigned_user_id) {
+        return null;
+      }
+
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const user = await userRepository.findById(conversation.assigned_user_id);
+
+      if (!user) {
+        return null;
+      }
+
+      return {
+        id: user.id,
+        name: user.getFullName(),
+        email: user.email,
+        assignedAt: conversation.assigned_at,
+      };
+    }),
 });

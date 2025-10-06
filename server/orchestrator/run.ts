@@ -396,7 +396,22 @@ async function handleExecutionLoop(conversation: Conversation) {
           break;
         }
       } else {
-        // No humans available
+        // No humans available - still set status to pending-human for queue
+        await conversationRepository.update(conversation.id, conversation.organization_id, {
+          status: "pending-human",
+        });
+
+        // Notify organization via WebSocket
+        const { websocketService } = await import("../services/websocket.service");
+        websocketService.sendToOrganization(conversation.organization_id, {
+          type: "conversation_status_changed",
+          payload: {
+            conversationId: conversation.id,
+            status: "pending-human",
+            title: conversation.title,
+          },
+        });
+
         const unavailableInstructions = agent.human_handoff_unavailable_instructions;
 
         if (

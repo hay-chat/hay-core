@@ -10,6 +10,7 @@ const conversationService = new ConversationService();
 
 // Schema for creating a public conversation with public JWK
 const createPublicConversationSchema = z.object({
+  organizationId: z.string().uuid(),
   publicJwk: z.object({
     kty: z.string(),
     crv: z.string().optional(),
@@ -46,8 +47,7 @@ export const publicConversationsRouter = t.router({
   // Create a new public conversation with public key registration
   create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input }) => {
     try {
-      // Use default organization for public conversations
-      const organizationId = process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
+      const organizationId = input.organizationId;
 
       // Validate the JWK is for ES256
       if (input.publicJwk.kty !== "EC" || input.publicJwk.crv !== "P-256") {

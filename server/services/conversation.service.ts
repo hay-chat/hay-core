@@ -24,7 +24,7 @@ export class ConversationService {
       agentId?: string | null;
       playbook_id?: string | null;
       metadata?: Record<string, unknown>;
-      status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
+      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
       customer_id?: string | null;
     },
   ): Promise<Conversation> {
@@ -85,7 +85,7 @@ export class ConversationService {
     organizationId: string,
     data: {
       title?: string;
-      status?: "open" | "processing" | "pending-human" | "resolved" | "closed";
+      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
       needs_processing?: boolean;
       last_processed_at?: Date | null;
       agent_id?: string | null;
@@ -109,7 +109,19 @@ export class ConversationService {
     if (data.status === "closed" || data.status === "resolved") {
       updateData.closed_at = getUTCNow();
     }
-    return await this.conversationRepository.update(conversationId, organizationId, updateData);
+
+    const result = await this.conversationRepository.update(conversationId, organizationId, updateData);
+
+    // Generate conversation title when status changes to pending-human
+    if (data.status === "pending-human") {
+      import("../orchestrator/conversation-utils").then(({ generateConversationTitle }) => {
+        generateConversationTitle(conversationId, organizationId, false).catch((error) => {
+          console.error("Error generating title for pending-human conversation:", error);
+        });
+      });
+    }
+
+    return result;
   }
 
   async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {

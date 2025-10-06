@@ -116,6 +116,14 @@ export function useWebSocket() {
         handleConversationStatusChanged(message.payload as any);
         break;
 
+      case "conversation_taken_over":
+        handleConversationTakenOver(message.payload as any);
+        break;
+
+      case "conversation_released":
+        handleConversationReleased(message.payload as any);
+        break;
+
       case "message_received":
         // Could handle new message notifications here
         break;
@@ -148,6 +156,58 @@ export function useWebSocket() {
         title: payload.title,
         customerName: payload.customerName,
       });
+    }
+  };
+
+  /**
+   * Handle conversation taken over event
+   */
+  const handleConversationTakenOver = async (payload: {
+    conversationId: string;
+    userId: string;
+    userName: string;
+    previousOwnerId?: string;
+  }) => {
+    console.log("Conversation taken over:", payload);
+
+    // Get current user from user store
+    const { useUserStore } = await import("@/stores/user");
+    const userStore = useUserStore();
+    const currentUserId = userStore.user?.id;
+
+    // If the previous owner was the current user, show notification
+    if (payload.previousOwnerId === currentUserId) {
+      const { useToast } = await import("@/composables/useToast");
+      const toast = useToast();
+      toast.warning(
+        "Conversation Taken Over",
+        `${payload.userName} has taken over the conversation you were handling`,
+        10000
+      );
+    }
+  };
+
+  /**
+   * Handle conversation released event
+   */
+  const handleConversationReleased = async (payload: {
+    conversationId: string;
+    newStatus: string;
+    releasedBy: string;
+    userName: string;
+    returnToMode: "ai" | "queue";
+  }) => {
+    console.log("Conversation released:", payload);
+
+    // If released back to queue, notify available agents
+    if (payload.returnToMode === "queue" && payload.newStatus === "pending-human") {
+      const { useToast } = await import("@/composables/useToast");
+      const toast = useToast();
+      toast.info(
+        "Conversation Available",
+        `${payload.userName} returned a conversation to the queue`,
+        5000
+      );
     }
   };
 

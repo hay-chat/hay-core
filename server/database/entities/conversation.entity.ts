@@ -36,10 +36,10 @@ export class Conversation {
 
   @Column({
     type: "enum",
-    enum: ["open", "processing", "pending-human", "resolved", "closed"],
+    enum: ["open", "processing", "pending-human", "human-took-over", "resolved", "closed"],
     default: "open",
   })
-  status!: "open" | "processing" | "pending-human" | "resolved" | "closed";
+  status!: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
 
   @Column({ type: "timestamptz", nullable: true })
   cooldown_until!: Date | null;
@@ -113,6 +113,15 @@ export class Conversation {
 
   @Column({ type: "text", array: true, nullable: true })
   enabled_tools!: string[] | null;
+
+  @Column({ type: "uuid", nullable: true })
+  assigned_user_id!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  assigned_at!: Date | null;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  previous_status!: string | null;
 
   @OneToMany(() => Message, (message) => message.conversation)
   messages!: Message[];
@@ -631,5 +640,76 @@ The following tools are available for you to use. You MUST return only valid JSO
       // Update local instance
       this.needs_processing = true;
     }
+  }
+
+  /**
+   * Assign conversation to a user (takeover)
+   */
+  async assignToUser(userId: string): Promise<void> {
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+
+    // Store previous status for restoration
+    const previousStatus = this.status;
+
+    await conversationRepository.update(this.id, this.organization_id, {
+      assigned_user_id: userId,
+      assigned_at: new Date(),
+      previous_status: previousStatus,
+      status: "human-took-over",
+    });
+
+    // Update local instance
+    this.assigned_user_id = userId;
+    this.assigned_at = new Date();
+    this.previous_status = previousStatus;
+    this.status = "human-took-over";
+  }
+
+  /**
+   * Release conversation from user (return to AI or queue)
+   */
+  async releaseFromUser(returnToMode: "ai" | "queue"): Promise<void> {
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+
+    const newStatus = returnToMode === "ai"
+      ? "open" // Always return to "open" when returning to AI
+      : "pending-human";
+
+    const updates: any = {
+      assigned_user_id: null,
+      assigned_at: null,
+      status: newStatus,
+    };
+
+    // If returning to AI, mark as needing processing
+    if (returnToMode === "ai") {
+      updates.needs_processing = true;
+      updates.previous_status = null;
+    }
+
+    await conversationRepository.update(this.id, this.organization_id, updates);
+
+    // Update local instance
+    this.assigned_user_id = null;
+    this.assigned_at = null;
+    this.status = newStatus;
+    if (returnToMode === "ai") {
+      this.needs_processing = true;
+      this.previous_status = null;
+    }
+  }
+
+  /**
+   * Check if conversation is currently taken over by a user
+   */
+  isTakenOver(): boolean {
+    return this.status === "human-took-over" && !!this.assigned_user_id;
+  }
+
+  /**
+   * Check if conversation is taken over by a specific user
+   */
+  isTakenOverBy(userId: string): boolean {
+    return this.isTakenOver() && this.assigned_user_id === userId;
   }
 }

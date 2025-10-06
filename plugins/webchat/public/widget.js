@@ -400,9 +400,9 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            organizationId: this.config.organizationId,
             publicJwk,
             metadata: {
-              organizationId: this.config.organizationId,
               source: "web-embed",
               url: window.location.href,
               referrer: document.referrer,

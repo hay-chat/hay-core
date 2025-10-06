@@ -343,6 +343,11 @@ const avatarIcon = computed(() => {
   --bubble-fg: var(--color-neutral);
 }
 
+.chat-message--HumanAgent {
+  --bubble-bg: var(--color-yellow-100);
+  --bubble-fg: var(--color-yellow-700);
+}
+
 .chat-message--System {
   --bubble-bg: #ecf3fe;
   --bubble-fg: var(--foreground);

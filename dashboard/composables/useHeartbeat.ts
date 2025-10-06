@@ -1,7 +1,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { Hay } from "@/utils/api";
 
-const HEARTBEAT_INTERVAL = 10_000; // 10 seconds
+const HEARTBEAT_INTERVAL = 30_000;
 let heartbeatInterval: NodeJS.Timeout | null = null;
 let visibilityChangeHandler: (() => void) | null = null;
 const isActive = ref(false);
