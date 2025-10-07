@@ -8,7 +8,7 @@
           variant: isActive ? 'outline' : 'ghost',
           size: size,
         }),
-        isActive && 'border-primary',
+        isActive && 'border shadow-sm pointer-events-none',
         props.class,
       )
     "

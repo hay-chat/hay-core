@@ -18,6 +18,12 @@ export const runConversation = async (conversationId: string) => {
     throw new Error("Conversation not found");
   }
 
+  // Skip processing for conversations taken over by humans
+  if (conversation.status === "human-took-over") {
+    console.log("[Orchestrator] Skipping - conversation taken over by human", conversationId);
+    return;
+  }
+
   if (conversation?.needs_processing)
     console.log("[Orchestrator] Running conversation", conversationId);
 

@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
+import { User } from "../../entities/user.entity";
 import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
@@ -116,6 +117,10 @@ export class Conversation {
 
   @Column({ type: "uuid", nullable: true })
   assigned_user_id!: string | null;
+
+  @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn()
+  assignedUser!: User | null;
 
   @Column({ type: "timestamptz", nullable: true })
   assigned_at!: Date | null;

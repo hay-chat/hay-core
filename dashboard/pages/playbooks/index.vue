@@ -49,34 +49,44 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="relative">
-          <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
-          <Input v-model="searchQuery" placeholder="Search playbooks..." class="pl-8 w-[300px]" />
+          <Input
+            v-model="searchQuery"
+            placeholder="Search playbooks..."
+            class="pl-8 min-w-[300px]"
+            :icon-start="Search"
+          />
         </div>
 
-        <select v-model="selectedCategory" class="px-3 py-2 text-sm border border-input rounded-md">
-          <option value="">All Categories</option>
-          <option value="customer-support">Customer Support</option>
-          <option value="sales">Sales</option>
-          <option value="technical">Technical</option>
-          <option value="custom">Custom</option>
-        </select>
+        <Input
+          v-model="selectedCategory"
+          type="select"
+          placeholder="All Categories"
+          :options="[
+            { label: 'All Categories', value: '' },
+            { label: 'Customer Support', value: 'customer-support' },
+            { label: 'Sales', value: 'sales' },
+            { label: 'Technical', value: 'technical' },
+            { label: 'Custom', value: 'custom' },
+          ]"
+        />
 
-        <select v-model="selectedStatus" class="px-3 py-2 text-sm border border-input rounded-md">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
-          <option value="draft">Draft</option>
-        </select>
+        <Input
+          v-model="selectedStatus"
+          type="select"
+          placeholder="All Status"
+          :options="[
+            { label: 'All Status', value: '' },
+            { label: 'Active', value: 'active' },
+            { label: 'Archived', value: 'archived' },
+            { label: 'Draft', value: 'draft' },
+          ]"
+        />
       </div>
 
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm" @click="toggleView">
           <LayoutGrid v-if="viewMode === 'table'" class="h-4 w-4" />
           <List v-else class="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm">
-          <Filter class="h-4 w-4 mr-2" />
-          More Filters
         </Button>
       </div>
     </div>

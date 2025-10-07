@@ -94,14 +94,23 @@
             </div>
 
             <!-- Messages -->
-            <template v-for="message in conversation?.messages" :key="message.id">
+            <TransitionGroup
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="transform scale-95 opacity-0"
+              enter-to-class="transform scale-100 opacity-100"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="transform scale-100 opacity-100"
+              leave-to-class="transform scale-95 opacity-0"
+            >
               <ChatMessage
+                v-for="message in conversation?.messages"
+                :key="message.id"
                 :message="message"
                 @approve="message.needsApproval ? approveMessage(message.id) : undefined"
                 @edit="message.needsApproval ? editMessage(message.id) : undefined"
                 @reject="message.needsApproval ? rejectMessage(message.id) : undefined"
               />
-            </template>
+            </TransitionGroup>
 
             <!-- Typing indicator -->
             <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
@@ -130,31 +139,30 @@
         </div>
 
         <!-- Human Takeover Panel -->
-        <div v-if="humanTakeover" class="border-t bg-yellow-50 p-4">
+        <div v-if="isTakenOverByCurrentUser" class="border-t bg-blue-50 p-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <AlertTriangle class="h-4 w-4 text-yellow-600" />
-              <span class="text-sm font-medium text-yellow-800"
-                >You are now handling this conversation</span
+              <UserCheck class="h-4 w-4 text-blue-600" />
+              <span class="text-sm font-medium text-blue-800"
+                >You are handling this conversation</span
               >
             </div>
-            <Button variant="outline" size="sm" @click="endTakeover"> End Takeover </Button>
+            <Button variant="outline" size="sm" @click="endTakeover"> Release Conversation </Button>
           </div>
         </div>
 
-        <!-- Message Input (when human takeover is active) -->
-        <div v-if="humanTakeover" class="border-t p-4">
-          <div class="flex space-x-3">
+        <!-- Message Input (when conversation is taken over by current user) -->
+        <div v-if="isTakenOverByCurrentUser" class="border-t p-4">
+          <form @submit.prevent="sendMessage" class="flex space-x-3">
             <Input
               v-model="newMessage"
               placeholder="Type your message..."
               class="flex-1"
-              @keyup.enter="sendMessage"
             />
-            <Button :disabled="!newMessage.trim()" @click="sendMessage">
+            <Button type="submit" :disabled="!newMessage.trim() || isSendingMessage">
               <Send class="h-4 w-4" />
             </Button>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -302,6 +310,54 @@
         </div>
       </div>
     </div>
+
+    <!-- Release Dialog -->
+    <Dialog v-model:open="showReleaseDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Release Conversation</DialogTitle>
+          <DialogDescription>
+            How would you like to handle this conversation after releasing it?
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-4">
+          <div class="flex items-start space-x-3">
+            <input
+              id="release-ai"
+              v-model="releaseMode"
+              type="radio"
+              value="ai"
+              class="mt-1"
+            />
+            <label for="release-ai" class="flex-1 cursor-pointer">
+              <div class="font-medium">Return to AI</div>
+              <div class="text-sm text-neutral-muted">
+                The AI will continue processing this conversation automatically
+              </div>
+            </label>
+          </div>
+          <div class="flex items-start space-x-3">
+            <input
+              id="release-queue"
+              v-model="releaseMode"
+              type="radio"
+              value="queue"
+              class="mt-1"
+            />
+            <label for="release-queue" class="flex-1 cursor-pointer">
+              <div class="font-medium">Return to Queue</div>
+              <div class="text-sm text-neutral-muted">
+                Another agent can take over this conversation
+              </div>
+            </label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="showReleaseDialog = false"> Cancel </Button>
+          <Button @click="confirmRelease"> Release </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -326,6 +382,12 @@ import {
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import DialogContent from "@/components/ui/DialogContent.vue";
+import DialogDescription from "@/components/ui/DialogDescription.vue";
+import DialogFooter from "@/components/ui/DialogFooter.vue";
+import DialogHeader from "@/components/ui/DialogHeader.vue";
+import DialogTitle from "@/components/ui/DialogTitle.vue";
 
 import { MessageType } from "~/types/message";
 
@@ -391,6 +453,22 @@ const conversation = ref<any>(null);
 
 const previousConversations = ref<PreviousConversation[]>([]);
 const relatedArticles = ref<RelatedArticle[]>([]);
+
+// Takeover state
+const { useUserStore } = await import("@/stores/user");
+const userStore = useUserStore();
+const currentUserId = computed(() => userStore.user?.id);
+const assignedUser = ref<any>(null);
+const showReleaseDialog = ref(false);
+const releaseMode = ref<"ai" | "queue">("queue");
+
+// Check if conversation is taken over by current user
+const isTakenOverByCurrentUser = computed(() => {
+  return (
+    conversation.value?.status === "human-took-over" &&
+    assignedUser.value?.id === currentUserId.value
+  );
+});
 
 const goBack = () => {
   navigateTo("/conversations");
@@ -465,36 +543,73 @@ const toggleSupervisionMode = () => {
   console.log("Supervision mode:", supervisionMode.value);
 };
 
-const takeOverConversation = () => {
-  humanTakeover.value = true;
-  supervisionMode.value = false;
-  // TODO: Implement conversation takeover
-  console.log("Take over conversation");
+const takeOverConversation = async () => {
+  try {
+    await HayApi.conversations.takeover.mutate({
+      conversationId,
+    });
+    humanTakeover.value = true;
+    supervisionMode.value = false;
+    // Refresh conversation and assigned user
+    await fetchConversation();
+    assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId });
+  } catch (error) {
+    console.error("Failed to take over conversation:", error);
+  }
 };
 
 const endTakeover = () => {
-  humanTakeover.value = false;
-  // TODO: End conversation takeover
-  console.log("End takeover");
+  // Show dialog to choose release mode
+  showReleaseDialog.value = true;
 };
 
+const confirmRelease = async () => {
+  try {
+    await HayApi.conversations.release.mutate({
+      conversationId,
+      returnToMode: releaseMode.value,
+    });
+    humanTakeover.value = false;
+    assignedUser.value = null;
+    showReleaseDialog.value = false;
+    // Refresh conversation to get updated status
+    await fetchConversation();
+  } catch (error) {
+    console.error("Failed to release conversation:", error);
+  }
+};
+
+// Track if message is being sent to prevent duplicate sends
+const isSendingMessage = ref(false);
+
 const sendMessage = async () => {
-  if (!newMessage.value.trim()) return;
+  if (!newMessage.value.trim() || isSendingMessage.value) return;
+
+  isSendingMessage.value = true;
+  const messageContent = newMessage.value;
+  newMessage.value = ""; // Clear immediately to prevent double-send
 
   try {
     // Send message via API
+    // When conversation is taken over by current user, send as assistant (human agent)
+    const role = isTakenOverByCurrentUser.value ? "assistant" : "user";
+    const messageType = isTakenOverByCurrentUser.value ? MessageType.HUMAN_AGENT : MessageType.CUSTOMER;
+
     const result = await HayApi.conversations.sendMessage.mutate({
       conversationId,
-      content: newMessage.value,
-      role: "user",
+      content: messageContent,
+      role,
     });
+
+    // Play message sent sound
+    playSound("/sounds/message-sent.mp3");
 
     // Add message to local list
     if (conversation.value && conversation.value.messages) {
       conversation.value.messages.push({
         id: result.id,
-        content: newMessage.value,
-        type: MessageType.CUSTOMER,
+        content: messageContent,
+        type: messageType,
         created_at: new Date().toISOString(),
         conversation_id: conversationId,
         updated_at: new Date().toISOString(),
@@ -502,13 +617,18 @@ const sendMessage = async () => {
       });
     }
 
-    newMessage.value = "";
     scrollToBottom();
 
-    // Refresh messages after a short delay to get any AI response
-    setTimeout(() => fetchConversation(), 2000);
+    // Refresh messages after a short delay to get any AI response (skip if taken over)
+    if (!isTakenOverByCurrentUser.value) {
+      setTimeout(() => fetchConversation(), 2000);
+    }
   } catch (error) {
     console.error("Failed to send message:", error);
+    // Restore message on error
+    newMessage.value = messageContent;
+  } finally {
+    isSendingMessage.value = false;
   }
 };
 
@@ -549,17 +669,61 @@ const scrollToBottom = () => {
   });
 };
 
+// Track previous message count to detect new messages
+const previousMessageCount = ref(0);
+
 // Fetch conversation data
 const fetchConversation = async () => {
   try {
     loading.value = true;
     const result = await HayApi.conversations.get.query({ id: conversationId });
+
+    // Check if new messages were received
+    const currentMessageCount = result.messages?.length || 0;
+    if (previousMessageCount.value > 0 && currentMessageCount > previousMessageCount.value) {
+      // Get the new messages
+      const newMessagesCount = currentMessageCount - previousMessageCount.value;
+      const newMessages = result.messages?.slice(-newMessagesCount) || [];
+
+      // Check if any new message is from user (customer)
+      const hasNewUserMessage = newMessages.some(
+        (msg) => msg.type === MessageType.CUSTOMER
+      );
+
+      if (hasNewUserMessage) {
+        playSound("/sounds/message-received.mp3");
+      }
+    }
+    previousMessageCount.value = currentMessageCount;
+
     conversation.value = result;
+
+    // Fetch assigned user info if conversation is taken over
+    if (result.status === "human-took-over") {
+      assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId });
+      humanTakeover.value = assignedUser.value?.id === currentUserId.value;
+    } else {
+      assignedUser.value = null;
+      humanTakeover.value = false;
+    }
   } catch (error) {
     console.error("Failed to fetch conversation:", error);
     // Show error toast or redirect
   } finally {
     loading.value = false;
+  }
+};
+
+// Helper function to play sounds
+const playSound = (soundPath: string) => {
+  try {
+    const audio = new Audio(soundPath);
+    audio.volume = 0.5;
+    audio.play().catch((error) => {
+      console.error("Failed to play sound:", error);
+    });
+  } catch (error) {
+    console.error("Error creating audio:", error);
   }
 };
 

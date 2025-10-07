@@ -155,99 +155,96 @@
     <!-- Conversations Table -->
     <Card v-else>
       <CardContent class="!p-0">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="border-b">
-              <tr>
-                <th v-if="bulkMode" class="text-left py-3 px-4 w-12">
-                  <Checkbox
-                    :checked="
-                      selectedConversations.length > 0 &&
-                      selectedConversations.length === paginatedConversations.length
-                    "
-                    @update:checked="toggleSelectAll"
-                  />
-                </th>
-                <th class="text-left py-3 px-4 font-medium">Customer</th>
-                <th class="text-left py-3 px-4 font-medium">Status</th>
-                <th class="text-left py-3 px-4 font-medium">Duration</th>
-                <th class="text-left py-3 px-4 font-medium">Satisfaction</th>
-                <th class="text-left py-3 px-4 font-medium">Updated</th>
-                <th class="text-left py-3 px-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="conversation in paginatedConversations"
-                :key="conversation.id"
-                class="border-b hover:bg-background-secondary cursor-pointer"
-                @click="!bulkMode && viewConversation(conversation.id)"
-              >
-                <td v-if="bulkMode" class="py-3 px-4" @click.stop>
-                  <Checkbox
-                    :checked="selectedConversations.includes(conversation.id)"
-                    @update:checked="toggleConversationSelection(conversation.id)"
-                  />
-                </td>
-                <td class="py-3 px-4">
-                  <div class="flex items-center space-x-3">
-                    <div>
-                      <div class="font-medium">
-                        {{ conversation.title || "Untitled Conversation" }}
-                      </div>
-                      <div class="text-xs text-neutral-muted">
-                        {{ conversation.id.slice(0, 8) }}...
-                      </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead v-if="bulkMode" class="w-12">
+                <Checkbox
+                  :checked="
+                    selectedConversations.length > 0 &&
+                    selectedConversations.length === paginatedConversations.length
+                  "
+                  @update:checked="toggleSelectAll"
+                />
+              </TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Satisfaction</TableHead>
+              <TableHead>Updated</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow
+              v-for="conversation in paginatedConversations"
+              :key="conversation.id"
+              class="cursor-pointer"
+              @click="!bulkMode && viewConversation(conversation.id)"
+            >
+              <TableCell v-if="bulkMode" @click.stop>
+                <Checkbox
+                  :checked="selectedConversations.includes(conversation.id)"
+                  @update:checked="toggleConversationSelection(conversation.id)"
+                />
+              </TableCell>
+              <TableCell>
+                <div class="flex items-center space-x-3">
+                  <div>
+                    <div class="font-medium">
+                      {{ conversation.title || "Untitled Conversation" }}
+                    </div>
+                    <div class="text-xs text-neutral-muted">
+                      {{ conversation.id.slice(0, 8) }}...
                     </div>
                   </div>
-                </td>
-                <td class="py-3 px-4">
-                  <Badge :variant="getStatusVariant(conversation?.status)">
-                    <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
-                    {{ formatStatus(conversation?.status) }}
-                  </Badge>
-                </td>
-
-                <td class="py-3 px-4 text-sm">
-                  {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
-                </td>
-                <td class="py-3 px-4">
-                  <div
-                    v-if="conversation.metadata?.satisfaction"
-                    class="flex items-center space-x-1"
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge :variant="getStatusVariant(conversation?.status)">
+                  <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
+                  {{ formatStatus(conversation?.status) }}
+                </Badge>
+              </TableCell>
+              <TableCell class="text-sm">
+                {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
+              </TableCell>
+              <TableCell>
+                <div
+                  v-if="conversation.metadata?.satisfaction"
+                  class="flex items-center space-x-1"
+                >
+                  <Star class="h-4 w-4 text-yellow-500 fill-current" />
+                  <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
+                </div>
+                <span v-else class="text-xs text-neutral-muted">Not rated</span>
+              </TableCell>
+              <TableCell class="text-sm text-neutral-muted">
+                {{ formatRelativeTime(conversation.updated_at) }}
+              </TableCell>
+              <TableCell @click.stop>
+                <div class="flex items-center space-x-2">
+                  <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
+                    <Eye class="h-4 w-4" />
+                  </Button>
+                  <Button
+                    v-if="
+                      conversation.status === 'open' || conversation.status === 'pending-human'
+                    "
+                    variant="ghost"
+                    size="sm"
+                    @click="takeOverConversation(conversation.id)"
                   >
-                    <Star class="h-4 w-4 text-yellow-500 fill-current" />
-                    <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
-                  </div>
-                  <span v-else class="text-xs text-neutral-muted">Not rated</span>
-                </td>
-                <td class="py-3 px-4 text-sm text-neutral-muted">
-                  {{ formatRelativeTime(conversation.updated_at) }}
-                </td>
-                <td class="py-3 px-4" @click.stop>
-                  <div class="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
-                      <Eye class="h-4 w-4" />
-                    </Button>
-                    <Button
-                      v-if="
-                        conversation.status === 'open' || conversation.status === 'pending-human'
-                      "
-                      variant="ghost"
-                      size="sm"
-                      @click="takeOverConversation(conversation.id)"
-                    >
-                      <UserCheck class="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" @click="showMoreActions(conversation.id)">
-                      <MoreHorizontal class="h-4 w-4" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                    <UserCheck class="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" @click="showMoreActions(conversation.id)">
+                    <MoreHorizontal class="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
 

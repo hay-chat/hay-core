@@ -30,7 +30,7 @@ const props = defineProps<{
   @apply p-4 md:p-6 mx-auto;
 }
 .page-header {
-  @apply flex mb-4 justify-between;
+  @apply flex mb-4 justify-between gap-4;
 }
 
 .page-content {
@@ -43,6 +43,7 @@ const props = defineProps<{
 
 .page-description {
   @apply text-neutral-muted;
+  text-wrap: balance;
 }
 
 .page-max {

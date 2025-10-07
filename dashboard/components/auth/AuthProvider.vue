@@ -6,6 +6,9 @@
       class="flex items-center justify-center h-screen gap-2 flex-col"
     >
       <Loading />
+      <div v-if="showRefreshMessage" class="text-sm text-gray-500">
+        This is taking longer than expected. <a href="" @click="refresh">Refresh the page</a>.
+      </div>
     </div>
 
     <!-- Show content once auth is initialized -->
@@ -21,12 +24,23 @@ import { useHeartbeat } from "@/composables/useHeartbeat";
 
 const authStore = useAuthStore();
 const route = useRoute();
+const showRefreshMessage = ref(false);
+let refreshTimer: NodeJS.Timeout | null = null;
 
 // Initialize heartbeat for authenticated users
 const { startHeartbeat, stopHeartbeat } = useHeartbeat();
 
+const refresh = (e: Event) => {
+  e.preventDefault();
+  window.location.reload();
+};
+
 // Initialize auth on mount if not already done
 onMounted(async () => {
+  // Start timer to show refresh message after 5 seconds
+  refreshTimer = setTimeout(() => {
+    showRefreshMessage.value = true;
+  }, 5000);
   // Define public paths that don't require authentication
   const publicPaths = new Set(["/login", "/signup", "/forgot-password"]);
   const isPublicPath = publicPaths.has(route.path);
@@ -71,5 +85,8 @@ onMounted(async () => {
 // Cleanup on unmount
 onUnmounted(() => {
   stopHeartbeat();
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+  }
 });
 </script>

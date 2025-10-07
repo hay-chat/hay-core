@@ -11,7 +11,7 @@ export function getWebSocketUrl(): string {
     return "wss://ws.hay.chat/ws";
   } else {
     // In development, use localhost with the WebSocket port
-    return "ws://localhost:3002/ws";
+    return "ws://localhost:3001/ws";
   }
 }
 

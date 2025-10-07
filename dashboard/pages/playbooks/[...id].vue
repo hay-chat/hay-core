@@ -1,21 +1,19 @@
 <template>
-  <div class="container mx-auto max-w-4xl py-8">
-    <div class="mb-8 flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold mb-2">{{ isEditMode ? "Edit" : "Create New" }} Playbook</h1>
-        <p class="text-neutral-muted">
-          {{
-            isEditMode
-              ? "Update your playbook configuration"
-              : "Define automated conversation flows for your agents"
-          }}
-        </p>
-      </div>
+  <Page
+    :title="isEditMode ? 'Edit' : 'Create New'"
+    :description="
+      isEditMode
+        ? ' Update your playbook configuration'
+        : 'Define automated conversation flows for your agents'
+    "
+    width="max"
+  >
+    <template #header>
       <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
         <ArrowLeft class="h-4 w-4 mr-2" />
         Back to list
       </Button>
-    </div>
+    </template>
 
     <div v-if="loading" class="text-center py-12">
       <Loading label="Loading playbook..." />
@@ -183,14 +181,14 @@
       :destructive="true"
       @confirm="confirmDelete"
     />
-  </div>
+  </Page>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
-import type { PlaybookStatus, InstructionItem, Agent, Playbook } from "~/types/playbook";
+import type { PlaybookStatus, Agent, Playbook } from "~/types/playbook";
 
 type InstructionData = {
   id: string;
