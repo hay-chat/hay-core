@@ -7,10 +7,6 @@
           <Plus class="h-4 w-4 mr-2" />
           Conversation Playground
         </Button>
-        <Button variant="outline" size="sm">
-          <Download class="h-4 w-4 mr-2" />
-          Export
-        </Button>
         <Button variant="outline" size="sm" @click="refreshConversations">
           <RefreshCcw class="h-4 w-4 mr-2" />
           Refresh
@@ -210,10 +206,7 @@
                 {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
               </TableCell>
               <TableCell>
-                <div
-                  v-if="conversation.metadata?.satisfaction"
-                  class="flex items-center space-x-1"
-                >
+                <div v-if="conversation.metadata?.satisfaction" class="flex items-center space-x-1">
                   <Star class="h-4 w-4 text-yellow-500 fill-current" />
                   <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                 </div>
@@ -228,9 +221,7 @@
                     <Eye class="h-4 w-4" />
                   </Button>
                   <Button
-                    v-if="
-                      conversation.status === 'open' || conversation.status === 'pending-human'
-                    "
+                    v-if="conversation.status === 'open' || conversation.status === 'pending-human'"
                     variant="ghost"
                     size="sm"
                     @click="takeOverConversation(conversation.id)"

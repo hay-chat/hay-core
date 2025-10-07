@@ -69,10 +69,6 @@
             <Power class="mr-2 h-4 w-4" />
             Toggle Status
           </Button>
-          <Button variant="outline" size="sm" @click="bulkExport">
-            <Download class="mr-2 h-4 w-4" />
-            Export
-          </Button>
           <Button variant="destructive" size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
             Delete

@@ -16,27 +16,6 @@
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <!-- Playbook Selector -->
-          <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium">Playbook:</label>
-            <select
-              v-model="selectedPlaybookId"
-              class="px-3 py-1 text-sm border border-input rounded-md"
-              :disabled="!!conversation"
-              title="Playbook can only be set when creating a new test"
-            >
-              <option value="">No playbook (free chat)</option>
-              <option v-for="playbook in playbooks" :key="playbook.id" :value="playbook.id">
-                {{ playbook.name }}
-              </option>
-            </select>
-          </div>
-
-          <Badge :variant="getStatusVariant(conversation?.status)">
-            <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
-            {{ formatStatus(conversation?.status) }}
-          </Badge>
-
           <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
             <RefreshCw class="h-4 w-4 mr-2" />
             New Test

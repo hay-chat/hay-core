@@ -112,10 +112,10 @@
                   Clear Session
                 </Button>
                 <Button
-                  @click="exportKeypair"
                   variant="outline"
                   size="sm"
                   :disabled="!sessionInfo.hasKeypair"
+                  @click="exportKeypair"
                 >
                   <Download class="w-4 h-4 mr-2" />
                   Export Keys
