@@ -142,14 +142,9 @@ export class Conversation {
     return conversationRepository.getLastHumanMessage(this.id);
   }
 
-  async lock(): Promise<void> {
+  async lock(): Promise<boolean> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
-    const lockDuration = 15_000; // 15 seconds
-    const lockUntil = new Date(Date.now() + lockDuration);
-    await conversationRepository.update(this.id, this.organization_id, {
-      processing_locked_until: lockUntil,
-      processing_locked_by: "orchestrator-v2",
-    });
+    return await conversationRepository.acquireLock(this.id, this.organization_id);
   }
 
   async unlock(): Promise<void> {
@@ -355,7 +350,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
   async addHandoffInstructions(
     instructions: unknown[],
-    handoffType: "available" | "unavailable"
+    handoffType: "available" | "unavailable",
   ): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
@@ -558,29 +553,80 @@ The following tools are available for you to use. You MUST return only valid JSO
       const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
       cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
 
+      // Determine new status based on current state
+      let newStatus: typeof this.status = "open";
+
+      // If conversation is currently taken over by a human
+      if (this.status === "human-took-over") {
+        // Check if there are any human agent messages
+        const messages = await this.getMessages();
+        const hasHumanAgentMessages = messages.some((msg) => msg.type === MessageType.HUMAN_AGENT);
+
+        // Only keep it as human-took-over if a human agent has actually responded
+        newStatus = hasHumanAgentMessages ? "human-took-over" : "open";
+      }
+
       // Update conversation with cooldown and processing status
       await conversationRepository.update(this.id, this.organization_id, {
-        status: "open",
-        needs_processing: true,
+        status: newStatus,
+        needs_processing: newStatus === "open", // Only process if returning to open
         cooldown_until: cooldownUntil,
         lastMessageAt: new Date(),
       });
 
       // Update local instance
       this.cooldown_until = cooldownUntil;
-      this.needs_processing = true;
+      this.needs_processing = newStatus === "open";
       this.lastMessageAt = new Date();
-      this.status = "open";
+      this.status = newStatus;
     }
 
     // Create the message
-    return messageRepository.create({
+    const message = await messageRepository.create({
       conversation_id: this.id,
       content: messageData.content,
       type: messageData.type as MessageType,
       metadata: messageData.metadata,
       sender: messageData.sender,
     });
+
+    // Publish event to Redis for cross-server WebSocket broadcasting
+    try {
+      const { redisService } = await import("../../services/redis.service");
+
+      if (redisService.isConnected()) {
+        await redisService.publish("websocket:events", {
+          type: "message_received",
+          organizationId: this.organization_id,
+          payload: {
+            conversationId: this.id,
+            messageId: message.id,
+            messageType: message.type,
+          },
+        });
+        console.log(
+          `[Conversation] Published message_received event to Redis for conversation ${this.id}`,
+        );
+      } else {
+        // Fallback to direct WebSocket if Redis not available
+        const { websocketService } = await import("../../services/websocket.service");
+        const sent = websocketService.sendToOrganization(this.organization_id, {
+          type: "message_received",
+          payload: {
+            conversationId: this.id,
+            messageId: message.id,
+            messageType: message.type,
+          },
+        });
+        console.log(
+          `[Conversation] Sent message_received directly to ${sent} local clients (Redis not available)`,
+        );
+      }
+    } catch (error) {
+      console.error("[Conversation] Failed to publish message event:", error);
+    }
+
+    return message;
   }
 
   async getSystemMessages(): Promise<Message[]> {
@@ -594,18 +640,14 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async addInitialSystemMessage(): Promise<Message> {
-    const systemContent = `You are a helpful AI assistant. You should provide accurate, helpful responses based on available context and documentation. Always be professional and courteous.
+    const { PromptService } = await import("../../services/prompt.service");
+    const promptService = PromptService.getInstance();
 
-    Key behaviors:
-    - Use available documentation and context to provide accurate answers
-    - If you don't know something, clearly state that
-    - Follow any active playbook instructions when provided
-    - Be concise but thorough in your responses
-    - Avoid asking multiple questions at once, ask one question at a time and wait for the user to respond before asking another question
-    - Maintain conversation context throughout the interaction
-    - Use available tools to provide accurate answers
-    - You can call tools iteratively if needed, you're going to get the response from the tool call in the next step and be asked to continue with the conversation or call another tool
-    - You're not a human, the only way you can interact with any type of system is by calling tools, do not provide information about external actions to the user unless you have a tool call response or don't say you're going to do something unless you have a tool available to call`;
+    const systemContent = await promptService.getPrompt(
+      "conversation/system-instructions",
+      {},
+      { organizationId: this.organization_id },
+    );
 
     return this.addMessage({
       content: systemContent,
@@ -676,9 +718,10 @@ The following tools are available for you to use. You MUST return only valid JSO
   async releaseFromUser(returnToMode: "ai" | "queue"): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
-    const newStatus = returnToMode === "ai"
-      ? "open" // Always return to "open" when returning to AI
-      : "pending-human";
+    const newStatus =
+      returnToMode === "ai"
+        ? "open" // Always return to "open" when returning to AI
+        : "pending-human";
 
     const updates: any = {
       assigned_user_id: null,

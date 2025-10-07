@@ -463,10 +463,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }): Promise<number> {
     const queryBuilder = this.getRepository()
       .createQueryBuilder("conversation")
-      .where("conversation.organization_id = :organizationId", { organizationId: filters.organizationId });
+      .where("conversation.organization_id = :organizationId", {
+        organizationId: filters.organizationId,
+      });
 
     if (filters.startDate) {
-      queryBuilder.andWhere("conversation.created_at >= :startDate", { startDate: filters.startDate });
+      queryBuilder.andWhere("conversation.created_at >= :startDate", {
+        startDate: filters.startDate,
+      });
     }
 
     if (filters.endDate) {
@@ -478,6 +482,32 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     }
 
     return await queryBuilder.getCount();
+  }
+
+  /**
+   * Atomically acquire a processing lock on a conversation
+   * Returns true if lock was acquired, false if conversation is already locked
+   */
+  async acquireLock(conversationId: string, organizationId: string): Promise<boolean> {
+    const lockDuration = 15_000; // 15 seconds
+    const lockUntil = new Date(Date.now() + lockDuration);
+    const now = new Date();
+
+    // Atomic compare-and-set: only update if not currently locked
+    const result = await this.getRepository()
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({
+        processing_locked_until: lockUntil,
+        processing_locked_by: "orchestrator-v2",
+      })
+      .where("id = :id", { id: conversationId })
+      .andWhere("organization_id = :organizationId", { organizationId })
+      .andWhere("(processing_locked_until IS NULL OR processing_locked_until < :now)", { now })
+      .execute();
+
+    // If affected rows = 1, we successfully acquired the lock
+    return (result.affected ?? 0) > 0;
   }
 }
 

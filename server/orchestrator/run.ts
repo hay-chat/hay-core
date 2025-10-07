@@ -12,6 +12,45 @@ import { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 
+/**
+ * Helper function to publish conversation status changes via Redis/WebSocket
+ */
+async function publishStatusChange(
+  organizationId: string,
+  conversationId: string,
+  status: string,
+  title?: string,
+): Promise<void> {
+  try {
+    const { redisService } = await import("@server/services/redis.service");
+
+    if (redisService.isConnected()) {
+      await redisService.publish("websocket:events", {
+        type: "conversation_status_changed",
+        organizationId,
+        payload: {
+          conversationId,
+          status,
+          title,
+        },
+      });
+    } else {
+      // Fallback to direct WebSocket if Redis not available
+      const { websocketService } = await import("@server/services/websocket.service");
+      websocketService.sendToOrganization(organizationId, {
+        type: "conversation_status_changed",
+        payload: {
+          conversationId,
+          status,
+          title,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("[Orchestrator] Failed to publish status change:", error);
+  }
+}
+
 export const runConversation = async (conversationId: string) => {
   const conversation = await conversationRepository.findById(conversationId);
   if (!conversation) {
@@ -30,7 +69,14 @@ export const runConversation = async (conversationId: string) => {
   try {
     // 00. Intialize
     console.log("[Orchestrator] Initializing conversation", conversationId);
-    await conversation.lock();
+    const locked = await conversation.lock();
+    if (!locked) {
+      console.log(
+        "[Orchestrator] Could not acquire lock, conversation already being processed",
+        conversationId,
+      );
+      return;
+    }
 
     // 00.1. Add Initial System Message
     const systemMessages = await conversation.getSystemMessages();
@@ -311,16 +357,13 @@ async function handleExecutionLoop(conversation: Conversation) {
           status: "pending-human",
         });
 
-        // Notify organization via WebSocket
-        const { websocketService } = await import("../services/websocket.service");
-        websocketService.sendToOrganization(conversation.organization_id, {
-          type: "conversation_status_changed",
-          payload: {
-            conversationId: conversation.id,
-            status: "pending-human",
-            title: conversation.title,
-          },
-        });
+        // Notify organization via WebSocket/Redis
+        await publishStatusChange(
+          conversation.organization_id,
+          conversation.id,
+          "pending-human",
+          conversation.title,
+        );
 
         await conversation.addMessage({
           content: "I'm transferring you to a human agent. Someone will be with you shortly.",
@@ -359,16 +402,13 @@ async function handleExecutionLoop(conversation: Conversation) {
             status: "pending-human",
           });
 
-          // Notify organization via WebSocket
-          const { websocketService } = await import("../services/websocket.service");
-          websocketService.sendToOrganization(conversation.organization_id, {
-            type: "conversation_status_changed",
-            payload: {
-              conversationId: conversation.id,
-              status: "pending-human",
-              title: conversation.title,
-            },
-          });
+          // Notify organization via WebSocket/Redis
+          await publishStatusChange(
+            conversation.organization_id,
+            conversation.id,
+            "pending-human",
+            conversation.title,
+          );
 
           // Generate natural handoff message
           const llmService = new LLMService();
@@ -407,16 +447,13 @@ async function handleExecutionLoop(conversation: Conversation) {
           status: "pending-human",
         });
 
-        // Notify organization via WebSocket
-        const { websocketService } = await import("../services/websocket.service");
-        websocketService.sendToOrganization(conversation.organization_id, {
-          type: "conversation_status_changed",
-          payload: {
-            conversationId: conversation.id,
-            status: "pending-human",
-            title: conversation.title,
-          },
-        });
+        // Notify organization via WebSocket/Redis
+        await publishStatusChange(
+          conversation.organization_id,
+          conversation.id,
+          "pending-human",
+          conversation.title,
+        );
 
         const unavailableInstructions = agent.human_handoff_unavailable_instructions;
 

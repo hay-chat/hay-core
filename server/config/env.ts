@@ -74,6 +74,14 @@ export const config = {
     connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || "60000", 10),
   },
 
+  redis: {
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6379", 10),
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: parseInt(process.env.REDIS_DB || "0", 10),
+    tls: process.env.REDIS_TLS === "true" ? {} : undefined,
+  },
+
   jwt: {
     secret: process.env.JWT_SECRET || "default-secret-change-in-production",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",

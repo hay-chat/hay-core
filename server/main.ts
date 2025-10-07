@@ -19,6 +19,14 @@ async function startServer() {
     console.warn("⚠️  Starting server without database connection");
   }
 
+  // Initialize Redis service
+  const { redisService } = await import("@server/services/redis.service");
+  try {
+    await redisService.initialize();
+  } catch (error) {
+    console.warn("⚠️  Starting server without Redis connection");
+  }
+
   // Import services after database initialization to avoid circular dependency issues
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
@@ -145,9 +153,9 @@ async function startServer() {
   // Initialize WebSocket server
   // If WS_PORT is different from PORT, run WebSocket on separate port
   if (config.server.wsPort !== config.server.port) {
-    // websocketService.initialize(config.server.wsPort);
+    // await websocketService.initialize(config.server.wsPort);
   } else {
-    websocketService.initialize(httpServer);
+    await websocketService.initialize(httpServer);
   }
 
   interface ServerError extends Error {

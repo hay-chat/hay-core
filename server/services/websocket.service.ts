@@ -59,12 +59,13 @@ export class WebSocketService {
   private clients = new Map<string, WebSocketClient>();
   private conversationClients = new Map<string, Set<string>>();
   private organizationClients = new Map<string, Set<string>>();
+  private redisInitialized = false;
 
   /**
    * Initialize WebSocket server
    * Can run on the same HTTP server or on a separate port
    */
-  initialize(serverOrPort: Server | number): void {
+  async initialize(serverOrPort: Server | number): Promise<void> {
     if (typeof serverOrPort === "number") {
       // Standalone WebSocket server on a separate port
       this.wss = new WebSocketServer({
@@ -86,6 +87,51 @@ export class WebSocketService {
     this.wss.on("connection", (ws, req) => {
       this.handleConnection(ws, req);
     });
+
+    // Initialize Redis for cross-server event broadcasting
+    await this.initializeRedis();
+  }
+
+  /**
+   * Initialize Redis pub/sub for broadcasting events across server instances
+   */
+  private async initializeRedis(): Promise<void> {
+    if (this.redisInitialized) {
+      return;
+    }
+
+    try {
+      const { redisService } = await import("./redis.service");
+
+      // Subscribe to WebSocket events channel
+      await redisService.subscribe("websocket:events", (event) => {
+        this.handleRedisEvent(event);
+      });
+
+      this.redisInitialized = true;
+      console.log("[WebSocket] Redis pub/sub initialized for cross-server broadcasting");
+    } catch (error) {
+      console.error("[WebSocket] Failed to initialize Redis:", error);
+      console.warn(
+        "[WebSocket] Running without Redis - events will not be broadcast across server instances",
+      );
+    }
+  }
+
+  /**
+   * Handle incoming Redis event and broadcast to local WebSocket clients
+   */
+  private handleRedisEvent(event: any): void {
+    const { type, organizationId, payload } = event;
+
+    if (!type || !organizationId) {
+      console.error("[WebSocket] Invalid Redis event:", event);
+      return;
+    }
+
+    // Broadcast to local clients in the organization
+    const sent = this.sendToOrganization(organizationId, { type, payload });
+    console.log(`[WebSocket] Broadcasted ${type} from Redis to ${sent} local clients`);
   }
 
   /**
@@ -113,7 +159,10 @@ export class WebSocketService {
 
     // Authenticate if token provided
     if (token) {
-      this.authenticateClient(clientId, token);
+      const authenticated = this.authenticateClient(clientId, token);
+      console.log(
+        `[WebSocket] Client ${clientId} authentication: ${authenticated}, org: ${client.organizationId}`,
+      );
 
       // Add to organization clients if authenticated
       if (client.authenticated && client.organizationId) {
@@ -121,6 +170,13 @@ export class WebSocketService {
           this.organizationClients.set(client.organizationId, new Set());
         }
         this.organizationClients.get(client.organizationId)!.add(clientId);
+        console.log(
+          `[WebSocket] Added client ${clientId} to organization ${client.organizationId}`,
+        );
+      } else {
+        console.log(
+          `[WebSocket] Client ${clientId} NOT added to organization (authenticated: ${client.authenticated}, org: ${client.organizationId})`,
+        );
       }
     }
 
@@ -156,7 +212,10 @@ export class WebSocketService {
 
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
-      client.organizationId = decoded.organizationId || "";
+      // Keep the organizationId from query params if not in token
+      if (decoded.organizationId) {
+        client.organizationId = decoded.organizationId;
+      }
       client.authenticated = true;
       return true;
     } catch (error) {

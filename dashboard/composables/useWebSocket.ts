@@ -98,9 +98,12 @@ export function useWebSocket() {
    * Handle incoming WebSocket message
    */
   const handleMessage = (message: WebSocketMessage) => {
+    console.log("[WebSocket] Received message:", message.type, message);
+
     // Emit to registered event handlers
     const handlers = eventHandlers.get(message.type);
     if (handlers) {
+      console.log(`[WebSocket] Found ${handlers.size} handlers for ${message.type}`);
       handlers.forEach((handler) => {
         try {
           handler(message.payload);
@@ -108,6 +111,8 @@ export function useWebSocket() {
           console.error(`Error in WebSocket event handler for ${message.type}:`, error);
         }
       });
+    } else {
+      console.log(`[WebSocket] No handlers registered for ${message.type}`);
     }
 
     // Handle built-in events

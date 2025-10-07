@@ -154,11 +154,7 @@
         <!-- Message Input (when conversation is taken over by current user) -->
         <div v-if="isTakenOverByCurrentUser" class="border-t p-4">
           <form @submit.prevent="sendMessage" class="flex space-x-3">
-            <Input
-              v-model="newMessage"
-              placeholder="Type your message..."
-              class="flex-1"
-            />
+            <Input v-model="newMessage" placeholder="Type your message..." class="flex-1" />
             <Button type="submit" :disabled="!newMessage.trim() || isSendingMessage">
               <Send class="h-4 w-4" />
             </Button>
@@ -322,13 +318,7 @@
         </DialogHeader>
         <div class="space-y-4 py-4">
           <div class="flex items-start space-x-3">
-            <input
-              id="release-ai"
-              v-model="releaseMode"
-              type="radio"
-              value="ai"
-              class="mt-1"
-            />
+            <input id="release-ai" v-model="releaseMode" type="radio" value="ai" class="mt-1" />
             <label for="release-ai" class="flex-1 cursor-pointer">
               <div class="font-medium">Return to AI</div>
               <div class="text-sm text-neutral-muted">
@@ -593,7 +583,9 @@ const sendMessage = async () => {
     // Send message via API
     // When conversation is taken over by current user, send as assistant (human agent)
     const role = isTakenOverByCurrentUser.value ? "assistant" : "user";
-    const messageType = isTakenOverByCurrentUser.value ? MessageType.HUMAN_AGENT : MessageType.CUSTOMER;
+    const messageType = isTakenOverByCurrentUser.value
+      ? MessageType.HUMAN_AGENT
+      : MessageType.CUSTOMER;
 
     const result = await HayApi.conversations.sendMessage.mutate({
       conversationId,
@@ -613,7 +605,7 @@ const sendMessage = async () => {
         created_at: new Date().toISOString(),
         conversation_id: conversationId,
         updated_at: new Date().toISOString(),
-        status: "pending",
+        status: "approved",
       });
     }
 
@@ -675,7 +667,10 @@ const previousMessageCount = ref(0);
 // Fetch conversation data
 const fetchConversation = async () => {
   try {
-    loading.value = true;
+    // Only show loading skeleton on initial load
+    if (!conversation.value) {
+      loading.value = true;
+    }
     const result = await HayApi.conversations.get.query({ id: conversationId });
 
     // Check if new messages were received
@@ -686,9 +681,7 @@ const fetchConversation = async () => {
       const newMessages = result.messages?.slice(-newMessagesCount) || [];
 
       // Check if any new message is from user (customer)
-      const hasNewUserMessage = newMessages.some(
-        (msg) => msg.type === MessageType.CUSTOMER
-      );
+      const hasNewUserMessage = newMessages.some((msg) => msg.type === MessageType.CUSTOMER);
 
       if (hasNewUserMessage) {
         playSound("/sounds/message-received.mp3");
@@ -727,17 +720,51 @@ const playSound = (soundPath: string) => {
   }
 };
 
+// WebSocket setup
+const { useWebSocket } = await import("@/composables/useWebSocket");
+const websocket = useWebSocket();
+let unsubscribeMessageReceived: (() => void) | null = null;
+let unsubscribeStatusChanged: (() => void) | null = null;
+
 // Lifecycle
 onMounted(async () => {
   // Fetch conversation and messages in parallel
   await Promise.all([fetchConversation()]);
 
-  // TODO: Setup WebSocket connection for real-time updates
+  // Setup WebSocket connection for real-time updates
+  websocket.connect();
+
+  // Listen for new messages
+  unsubscribeMessageReceived = websocket.on("message_received", async (payload: any) => {
+    console.log("[WebSocket] Received message_received event", payload);
+    if (payload.conversationId === conversationId) {
+      // Skip refresh only if in takeover mode AND the message is from a human agent (our sent message)
+      if (isTakenOverByCurrentUser.value && payload.messageType === MessageType.HUMAN_AGENT) {
+        console.log("[WebSocket] In takeover mode, skipping refresh for human agent message");
+        return;
+      }
+      console.log("[WebSocket] New message for current conversation, refreshing");
+      await fetchConversation();
+      scrollToBottom();
+    } else {
+      console.log(`[WebSocket] Message for different conversation (current: ${conversationId}, received: ${payload.conversationId})`);
+    }
+  });
+
+  // Listen for status changes
+  unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
+    if (payload.conversationId === conversationId) {
+      console.log("[WebSocket] Conversation status changed, refreshing");
+      await fetchConversation();
+    }
+  });
 });
 
 // eslint-disable-next-line no-undef
 onUnmounted(() => {
-  // TODO: Cleanup WebSocket connections
+  // Cleanup WebSocket event handlers
+  if (unsubscribeMessageReceived) unsubscribeMessageReceived();
+  if (unsubscribeStatusChanged) unsubscribeStatusChanged();
 });
 
 // Set page meta
