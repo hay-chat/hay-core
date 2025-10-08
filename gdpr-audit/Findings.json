@@ -1,0 +1,429 @@
+{
+  "repo": "hay",
+  "scanned_at": "2025-10-08",
+  "overall_risk": "high",
+  "findings": [
+    {
+      "id": "GDPR-001",
+      "title": "Missing DSAR endpoints for data export and erasure",
+      "category": "DSAR",
+      "gdpr_refs": ["Art.15", "Art.17", "Art.20"],
+      "severity": "critical",
+      "confidence": "high",
+      "affected_components": ["api"],
+      "evidence": [
+        {
+          "path": "server/routes/v1/index.ts",
+          "line": 1,
+          "code": "grep -r 'export.*data|dsar|erasure|right.*access' server/routes/ returned no matches"
+        }
+      ],
+      "explanation": "No API endpoints exist for data subjects to request export of their personal data (Art.15), request erasure (Art.17), or exercise data portability rights (Art.20). This violates core GDPR data subject rights and could result in fines up to 4% of annual turnover. Both end-users (customers chatting) and tenant users (dashboard users) are affected.",
+      "exploit_scenarios": [
+        "Data subject requests export of conversation history; controller has no automated way to comply within 30 days",
+        "User requests deletion; manual process required, increasing risk of incomplete deletion",
+        "Regulatory audit finds no DSAR tooling; demonstrates non-compliance with Art.12 facilitation requirements"
+      ],
+      "data_categories": ["ChatContent", "Identifiers", "Contact", "Device/Net"],
+      "recommendation": "Implement /v1/privacy/export, /v1/privacy/delete, and /v1/privacy/rectify endpoints authenticated by email/phone + verification code or secure link. Export should traverse: customers, conversations, messages, embeddings, documents. Delete must cascade and include soft-delete option for legal holds.",
+      "sample_patch": "```typescript\n// server/routes/v1/privacy/index.ts\nexport const privacyRouter = router({\n  export: authenticatedProcedure\n    .input(z.object({ email: z.string().email() }))\n    .mutation(async ({ input, ctx }) => {\n      // Verify identity, gather all data, return ZIP\n    }),\n  delete: authenticatedProcedure\n    .input(z.object({ email: z.string().email(), confirm: z.literal(true) }))\n    .mutation(async ({ input, ctx }) => {\n      // Cascade delete: messages, embeddings, conversations, customer record\n      await vectorStoreService.deleteByCustomerEmail(input.email);\n      await conversationRepository.deleteByCustomer(customerId);\n      await customerRepository.delete(customerId);\n    }),\n});\n```",
+      "test_plan": "1. Integration test: create customer, conversation, messages, embeddings. 2. Call export API, verify ZIP contains all data. 3. Call delete API, verify all records gone including embeddings. 4. Unit test: verify audit log entry created for each DSAR action.",
+      "owner": "backend",
+      "eta_complexity": "L"
+    },
+    {
+      "id": "GDPR-002",
+      "title": "No retention policy or TTL for conversation messages and embeddings",
+      "category": "StorageLimitation",
+      "gdpr_refs": ["Art.5(1)(e)", "Art.25"],
+      "severity": "high",
+      "confidence": "high",
+      "affected_components": ["api", "embeddings", "worker"],
+      "evidence": [
+        {
+          "path": "server/database/entities/conversation.entity.ts",
+          "line": 1,
+          "code": "No TTL or expiry fields found in Conversation entity"
+        },
+        {
+          "path": "server/database/entities/message.entity.ts",
+          "line": 1,
+          "code": "No TTL or expiry fields found in Message entity"
+        },
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 87,
+          "code": "async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {\n  // No TTL parameter or default expiry"
+        }
+      ],
+      "explanation": "Conversation messages, customer PII, and vector embeddings are stored indefinitely with no automatic cleanup. Art.5(1)(e) requires data be kept only as long as necessary. Without configurable retention, tenants cannot comply with their own data retention obligations, and Hay accumulates unbounded PII liability.",
+      "exploit_scenarios": [
+        "5-year-old conversation with credit card fragments in messages remains queryable",
+        "Tenant's GDPR policy requires 90-day chat retention; Hay has no mechanism to enforce this",
+        "Data breach exposes years of unnecessary historical data, increasing damages"
+      ],
+      "data_categories": ["ChatContent", "Identifiers", "Contact", "PaymentMeta"],
+      "recommendation": "Add retention_days field to organizations table, default 90 days. Add TTL worker that soft-deletes conversations/messages older than retention period. For embeddings, add deleted_at filter in search queries and hard-delete job. Expose retention config in Admin UI. Provide legal-hold flag to exempt specific conversations.",
+      "sample_patch": "```typescript\n// server/workers/retention.worker.ts\nimport { conversationRepository } from '@server/repositories/conversation.repository';\nimport { vectorStoreService } from '@server/services/vector-store.service';\n\nexport async function runRetentionCleanup() {\n  const orgs = await organizationRepository.findAll();\n  for (const org of orgs) {\n    const retentionDays = org.settings?.retention_days || 90;\n    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);\n    const expiredConversations = await conversationRepository.find({\n      where: { organization_id: org.id, closed_at: LessThan(cutoff), legal_hold: false }\n    });\n    for (const conv of expiredConversations) {\n      await vectorStoreService.deleteByConversationId(org.id, conv.id);\n      await conversationRepository.softDelete(conv.id);\n    }\n  }\n}\n```",
+      "test_plan": "1. Set org retention to 7 days. 2. Create conversation, close it, backdate closed_at to 8 days ago. 3. Run retention worker. 4. Verify conversation soft-deleted and embeddings removed. 5. Test legal_hold=true exempts conversation.",
+      "owner": "backend",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-003",
+      "title": "Default JWT secrets in configuration expose tokens to brute-force",
+      "category": "Security",
+      "gdpr_refs": ["Art.32"],
+      "severity": "high",
+      "confidence": "high",
+      "affected_components": ["api"],
+      "evidence": [
+        {
+          "path": "server/config/env.ts",
+          "line": 86,
+          "code": "jwt: {\n  secret: process.env.JWT_SECRET || 'default-secret-change-in-production',\n  refreshSecret: process.env.JWT_REFRESH_SECRET || 'default-refresh-secret-change-in-production',"
+        }
+      ],
+      "explanation": "Weak default JWT secrets could be committed to production if .env not properly configured. Compromised JWTs allow attacker to impersonate any user, access all conversations/PII. Art.32 requires appropriate technical measures including access control; weak secrets violate this. Affects all user authentication.",
+      "exploit_scenarios": [
+        "Developer deploys without setting JWT_SECRET; attacker uses default to forge admin token",
+        "Attacker brute-forces short default secret offline, generates valid tokens for any user",
+        "Compromised token used to export all customer data via API"
+      ],
+      "data_categories": ["AuthTokens", "Identifiers", "ChatContent"],
+      "recommendation": "Remove defaults entirely; fail fast at startup if JWT_SECRET not set. Add startup validation: secrets must be >=32 chars, high entropy. Document in README and deployment guide. Consider using asymmetric RS256 for better security. Add secret rotation mechanism.",
+      "sample_patch": "```typescript\n// server/config/env.ts\nif (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {\n  throw new Error('JWT_SECRET must be set and at least 32 characters. Generate with: openssl rand -base64 32');\n}\nif (!process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET.length < 32) {\n  throw new Error('JWT_REFRESH_SECRET must be set and at least 32 characters.');\n}\nexport const config = {\n  jwt: {\n    secret: process.env.JWT_SECRET,\n    refreshSecret: process.env.JWT_REFRESH_SECRET,\n    // ...\n  }\n};\n```",
+      "test_plan": "1. Unset JWT_SECRET, verify server fails to start with clear error. 2. Set JWT_SECRET='short', verify validation rejects. 3. Set valid 32+ char secret, verify startup succeeds. 4. Add CI check to prevent default secrets in code.",
+      "owner": "backend",
+      "eta_complexity": "S"
+    },
+    {
+      "id": "GDPR-004",
+      "title": "Webhook signature verification lacks timestamp validation for replay attack protection",
+      "category": "Security",
+      "gdpr_refs": ["Art.32"],
+      "severity": "medium",
+      "confidence": "high",
+      "affected_components": ["api", "integrations/shopify", "integrations/zendesk"],
+      "evidence": [
+        {
+          "path": "server/services/plugin-route.service.ts",
+          "line": 146,
+          "code": "if (headerName.toLowerCase().includes('stripe')) {\n  // Stripe format: t=timestamp,v1=signature\n  const timestamp = elements.find((e) => e.startsWith('t='))?.substring(2);\n  // ... validates timestamp\n} else if (headerName.toLowerCase().includes('github')) {\n  // GitHub format: sha256=signature\n  const expectedSig = 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  return signature === expectedSig;\n} else {\n  // Default: plain HMAC\n  const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');\n  return signature === expectedSig; // <-- NO TIMESTAMP CHECK\n}"
+        }
+      ],
+      "explanation": "For non-Stripe webhooks (including Shopify, Zendesk, WhatsApp, Instagram), signature verification uses plain HMAC without timestamp or nonce validation. This allows replay attacks: attacker captures valid webhook, replays it hours/days later. Could trigger duplicate actions, incorrect billing, or manipulate conversation state. Art.32 requires protection against unauthorized processing.",
+      "exploit_scenarios": [
+        "Attacker intercepts Shopify order.created webhook, replays it 100 times to spam support with duplicate tickets",
+        "WhatsApp message webhook replayed to manipulate conversation history or billing counters",
+        "Zendesk ticket webhook replayed to create fake support interactions"
+      ],
+      "data_categories": ["ChatContent", "PaymentMeta"],
+      "recommendation": "Add timestamp header to all webhook configs. Validate timestamp is within 5-minute window. Store nonce/message-id in Redis with 10-min TTL to prevent replay within window. For plugins without timestamp headers, require migration or add server-side deduplication based on webhook payload hash.",
+      "sample_patch": "```typescript\n// server/services/plugin-route.service.ts\nprivate verifySignature(body: unknown, signature: string, secret: string, headerName: string, timestamp?: string): boolean {\n  const payload = typeof body === 'string' ? body : JSON.stringify(body);\n  \n  // Validate timestamp if provided\n  if (timestamp) {\n    const ts = parseInt(timestamp);\n    const now = Math.floor(Date.now() / 1000);\n    if (Math.abs(now - ts) > 300) { // 5 minute window\n      console.warn('Webhook timestamp outside tolerance:', { ts, now });\n      return false;\n    }\n  } else if (!headerName.toLowerCase().includes('github')) {\n    // Require timestamp for security (except GitHub legacy)\n    console.error('Webhook missing timestamp header for replay protection');\n    return false;\n  }\n  \n  // ... existing HMAC validation\n}\n```",
+      "test_plan": "1. Send webhook with old timestamp, verify rejection. 2. Send webhook twice with same nonce, verify second rejected. 3. Send webhook with fresh timestamp, verify acceptance. 4. Integration test with Shopify/Zendesk plugins.",
+      "owner": "backend",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-005",
+      "title": "No incident response or breach notification workflow",
+      "category": "Incidents",
+      "gdpr_refs": ["Art.33", "Art.34"],
+      "severity": "high",
+      "confidence": "high",
+      "affected_components": ["api", "observability"],
+      "evidence": [
+        {
+          "path": "server/**/*",
+          "line": 1,
+          "code": "grep -r 'breach|incident|notification' server/ returned no relevant code paths"
+        }
+      ],
+      "explanation": "No code or process detected for detecting, assessing, and notifying data breaches within Art.33's 72-hour requirement. Without breach detection (e.g., failed auth spike, mass data export), assessment tooling (impact calculator), or notification templates, Hay cannot comply with mandatory breach reporting. Affects both Hay as processor and controllers (tenants).",
+      "exploit_scenarios": [
+        "Attacker exports 10,000 customer records via compromised API key; no alert triggered, breach discovered weeks later",
+        "Database backup leaked; no impact assessment tool to determine which data subjects affected",
+        "Supervisory authority requests breach notification timeline; Hay has no audit trail"
+      ],
+      "data_categories": ["ChatContent", "Identifiers", "Contact", "PaymentMeta"],
+      "recommendation": "Implement: 1) Security event logging (failed auth, mass deletes, privilege escalation). 2) Anomaly detection alerts (threshold-based or ML). 3) Breach assessment workflow (data subject count, categories, impact). 4) Notification templates for Art.33 (to authority) and Art.34 (to data subjects). 5) Incident log entity to track timeline for audit. 6) Runbook documentation.",
+      "sample_patch": "```typescript\n// server/services/incident.service.ts\nimport { sendEmail } from './email.service';\n\nexport async function reportBreach(incident: {\n  description: string;\n  affectedDataSubjects: number;\n  dataCategories: string[];\n  detectedAt: Date;\n  mitigatedAt?: Date;\n}) {\n  // Log incident\n  await incidentRepository.create({ ...incident, status: 'reported' });\n  \n  // Notify DPO/security team\n  await sendEmail({\n    to: config.security.dpoEmail,\n    subject: `[URGENT] Data Breach Detected: ${incident.description}`,\n    template: 'breach-notification',\n    variables: incident,\n  });\n  \n  // If high severity, notify authority (Art.33)\n  if (incident.affectedDataSubjects > 100) {\n    // Generate Art.33 report\n  }\n}\n```",
+      "test_plan": "1. Trigger test breach (e.g., 50 failed logins in 1 min), verify alert sent. 2. Create breach record, verify notification template renders correctly. 3. Test Art.33 report generation with sample data. 4. Verify incident log queryable for audits.",
+      "owner": "backend, infra",
+      "eta_complexity": "L"
+    },
+    {
+      "id": "GDPR-006",
+      "title": "No data residency or region filtering for international transfers",
+      "category": "InternationalTransfers",
+      "gdpr_refs": ["Chapter V", "Art.44-50"],
+      "severity": "medium",
+      "confidence": "high",
+      "affected_components": ["api", "llm-adapter", "embeddings"],
+      "evidence": [
+        {
+          "path": "server/config/env.ts",
+          "line": 1,
+          "code": "No REGION, DATA_RESIDENCY, or AWS_REGION config found"
+        },
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 63,
+          "code": "const postgresConnectionOptions: DataSourceOptions = {\n  host: config.database.host, // Could be non-EEA"
+        }
+      ],
+      "explanation": "No mechanism to enforce data residency in specific regions (e.g., EU-only). OpenAI API calls (embeddings, chat) may route data to US without Standard Contractual Clauses (SCCs) or adequacy decision. Database host, Redis, and LLM provider locations not region-locked. Violates Chapter V transfer requirements if EEA data processed outside EEA.",
+      "exploit_scenarios": [
+        "EU customer's chat routed to OpenAI US endpoint, triggering GDPR transfer violation",
+        "Database hosted in US region without SCCs, exposing customer data to CLOUD Act access",
+        "Tenant believes data is EU-only, but embeddings processed globally"
+      ],
+      "data_categories": ["ChatContent", "Identifiers", "Contact"],
+      "recommendation": "Add REGION config (eu, us, global). For eu mode: 1) Use OpenAI EU endpoints if available, or local LLM. 2) Validate DB_HOST resolves to EU region. 3) Add region tag to organizations, enforce region affinity in queries. 4) Document SCCs with OpenAI. 5) Provide tenant-level region selection in UI.",
+      "sample_patch": "```typescript\n// server/config/env.ts\nexport const config = {\n  region: process.env.REGION || 'global', // 'eu', 'us', 'global'\n  dataResidency: {\n    enforceEU: process.env.ENFORCE_EU_RESIDENCY === 'true',\n  },\n};\n\n// server/services/embedding.service.ts\nif (config.dataResidency.enforceEU && org.region === 'eu') {\n  // Use EU-specific OpenAI endpoint or local model\n  this.embeddings = new OpenAIEmbeddings({\n    configuration: { baseURL: 'https://api.openai.com/v1/eu' },\n  });\n}\n```",
+      "test_plan": "1. Set ENFORCE_EU_RESIDENCY=true, org.region=eu, verify embeddings use EU endpoint. 2. Set org.region=us, verify US endpoint allowed. 3. Test DB connection rejects non-EU host when enforced. 4. Document SCCs in compliance checklist.",
+      "owner": "backend, compliance",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-007",
+      "title": "Vector embeddings not deleted on conversation/document deletion",
+      "category": "DSAR",
+      "gdpr_refs": ["Art.17", "Art.5(1)(c)"],
+      "severity": "high",
+      "confidence": "medium",
+      "affected_components": ["embeddings", "api"],
+      "evidence": [
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 188,
+          "code": "async deleteByDocumentId(orgId: string, docId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND \"document_id\" = $2`,\n    [orgId, docId],\n  );\n  return result[1];\n}"
+        },
+        {
+          "path": "server/routes/v1/conversations/index.ts",
+          "line": 1,
+          "code": "No evidence of vectorStoreService.deleteByConversationId() called on conversation delete"
+        }
+      ],
+      "explanation": "When a conversation or document is deleted, associated embeddings in the vector store may not be cascaded. deleteByDocumentId exists but no code path calls it from conversation deletion. Embeddings contain fragments of message content (PII). Orphaned embeddings violate Art.17 erasure and Art.5(1)(c) minimization. Could surface in similarity searches even after source deleted.",
+      "exploit_scenarios": [
+        "User exercises right to erasure; conversation deleted but embeddings remain, still searchable",
+        "Document deleted from UI, embeddings persist, leaking content in future RAG queries",
+        "Data export after deletion includes orphaned embeddings, proving incomplete erasure"
+      ],
+      "data_categories": ["ChatContent", "Identifiers"],
+      "recommendation": "Add ON DELETE CASCADE or explicit deletion hooks. When conversation deleted, call vectorStoreService.deleteByConversationId() (implement this method). When document deleted, ensure deleteByDocumentId is called. Add database trigger or app-level hook. Verify with test that deletes conversation and confirms embeddings table has 0 rows for that ID.",
+      "sample_patch": "```typescript\n// server/services/vector-store.service.ts\nasync deleteByConversationId(orgId: string, conversationId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND metadata->>'conversationId' = $2`,\n    [orgId, conversationId]\n  );\n  return result[1];\n}\n\n// server/repositories/conversation.repository.ts\nasync delete(id: string, orgId: string): Promise<void> {\n  // Delete embeddings first\n  await vectorStoreService.deleteByConversationId(orgId, id);\n  // Delete conversation (cascades messages)\n  await this.getRepository().delete({ id, organization_id: orgId });\n}\n```",
+      "test_plan": "1. Create conversation with messages, verify embeddings created. 2. Delete conversation, verify embeddings table row count is 0 for that conversation. 3. Test document delete, verify associated embeddings removed. 4. Add unit test for deleteByConversationId.",
+      "owner": "backend",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-008",
+      "title": "No documented subprocessor list or OpenAI DPA tracking",
+      "category": "ProcessorDuties",
+      "gdpr_refs": ["Art.28"],
+      "severity": "medium",
+      "confidence": "high",
+      "affected_components": ["llm-adapter", "embeddings"],
+      "evidence": [
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 38,
+          "code": "this.embeddings = new OpenAIEmbeddings({\n  openAIApiKey: config.openai.apiKey,"
+        },
+        {
+          "path": "server/config/env.ts",
+          "line": 101,
+          "code": "openai: {\n  apiKey: process.env.OPENAI_API_KEY || '',"
+        },
+        {
+          "path": "docs/**/*",
+          "line": 1,
+          "code": "No SUBPROCESSORS.md or DPA documentation found"
+        }
+      ],
+      "explanation": "OpenAI is used for embeddings and chat completion, processing customer message content (PII). Art.28(3)(a) requires written contract with subprocessors. Art.28(2) prohibits subprocessor engagement without controller approval. No evidence of: 1) OpenAI DPA signed/documented, 2) Subprocessor list exposed to tenants, 3) Notification mechanism for new subprocessors. Affects all tenants relying on Hay for compliance.",
+      "exploit_scenarios": [
+        "Tenant's GDPR audit asks for subprocessor list; Hay cannot provide",
+        "OpenAI changes terms or adds sub-subprocessors; tenants not notified, violating Art.28(2)",
+        "Regulatory inquiry into data flows; no DPA evidence available"
+      ],
+      "data_categories": ["ChatContent", "Identifiers"],
+      "recommendation": "1) Document OpenAI DPA (available at openai.com/enterprise-privacy) in docs/SUBPROCESSORS.md. 2) Create subprocessor registry table (entity: SubprocessorLog) tracking name, purpose, DPA link, added date. 3) Expose /v1/subprocessors API endpoint listing active subprocessors. 4) Add UI in Admin settings showing subprocessors. 5) Implement email notification to org admins when new subprocessor added.",
+      "sample_patch": "```markdown\n<!-- docs/SUBPROCESSORS.md -->\n# Hay Subprocessors\n\nLast updated: 2025-10-08\n\n| Subprocessor | Purpose | Data Processed | DPA Link | Region |\n|-------------|---------|----------------|----------|--------|\n| OpenAI LLC | LLM embeddings, chat completion | Message content, metadata | [OpenAI DPA](https://openai.com/enterprise-privacy) | US (with SCCs) |\n| AWS RDS | Database hosting | All data | [AWS GDPR](https://aws.amazon.com/compliance/gdpr-center/) | Configurable |\n| Redis Labs | Cache, pub/sub | Session data, temporary message cache | [Redis DPA](https://redis.io/legal/dpa/) | Configurable |\n\n## Notification Policy\nCustomers will be notified 30 days before any new subprocessor is added via email to organization admins.\n```",
+      "test_plan": "1. Create SUBPROCESSORS.md with OpenAI, AWS, Redis. 2. Add /v1/subprocessors endpoint returning list. 3. Test API returns correct subprocessors. 4. Verify DPA links accessible. 5. Add to compliance documentation.",
+      "owner": "compliance, backend",
+      "eta_complexity": "S"
+    },
+    {
+      "id": "GDPR-009",
+      "title": "Backup retention may persist deleted data indefinitely",
+      "category": "Backups",
+      "gdpr_refs": ["Art.17", "Art.5(1)(e)"],
+      "severity": "medium",
+      "confidence": "medium",
+      "affected_components": ["backups", "infra"],
+      "evidence": [
+        {
+          "path": "infra/**/*",
+          "line": 1,
+          "code": "No backup strategy, retention policy, or purge-on-delete found in repository"
+        },
+        {
+          "path": "server/**/*",
+          "line": 1,
+          "code": "No backup exclusion logic or post-deletion backup cleanup detected"
+        }
+      ],
+      "explanation": "Database backups likely retain deleted data indefinitely (standard for point-in-time recovery). When data subject exercises right to erasure, deletion from live DB doesn't purge backups. Art.17 requires erasure; backups as archival copies may be exempted (Recital 65) but only if not used for other purposes. Without documented backup retention (e.g., 30 days) and purge policy, Hay retains erased data in backups, violating minimization and erasure principles.",
+      "exploit_scenarios": [
+        "User requests deletion, data removed from live DB but remains in backups for years",
+        "Backup restored for recovery, deleted user data re-appears in production",
+        "Regulator requests proof of erasure; backup retention undermines compliance claim"
+      ],
+      "data_categories": ["ChatContent", "Identifiers", "Contact"],
+      "recommendation": "1) Document backup retention policy (e.g., 30-day rolling backups). 2) After 30 days, backups eligible for hard delete. 3) Implement post-deletion backup scan: for critical erasure requests, flag backups for scrubbing or ensure backups not restored without re-applying deletions. 4) Add legal hold flag to exempt certain deletions. 5) Communicate backup retention in privacy policy.",
+      "sample_patch": "```yaml\n# infra/backup-policy.yml\nbackup_retention:\n  daily: 7 days\n  weekly: 4 weeks\n  monthly: 12 months\n  \nerasure_policy:\n  # Backups older than 30 days are purged after deletion request\n  backup_purge_after_days: 30\n  # For legal holds, backups retained but flagged\n  legal_hold_retention: unlimited\n\n# Backup restoration process:\n# 1. Restore from backup\n# 2. Re-apply deletion log (audit trail) to remove erased records\n# 3. Verify data subject not present before promoting to production\n```",
+      "test_plan": "1. Document backup policy in infra docs. 2. Test backup restore, verify deletion log exists. 3. Simulate restore, confirm deleted records not re-introduced. 4. Add backup retention to privacy policy.",
+      "owner": "infra, compliance",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-010",
+      "title": "No tenant-level consent management for sessionStorage use in web chat",
+      "category": "Cookies",
+      "gdpr_refs": ["ePrivacy Directive 2002/58/EC", "Art.7"],
+      "severity": "low",
+      "confidence": "high",
+      "affected_components": ["webchat-sdk"],
+      "evidence": [
+        {
+          "path": "plugins/webchat/src/widget/widget.js",
+          "line": 29,
+          "code": "getConversationId() {\n  return sessionStorage.getItem(CONVERSATION_KEY);\n}"
+        },
+        {
+          "path": "plugins/webchat/src/widget/widget.js",
+          "line": 37,
+          "code": "saveConversationId(conversationId) {\n  sessionStorage.setItem(CONVERSATION_KEY, conversationId);\n}"
+        }
+      ],
+      "explanation": "Web chat widget uses sessionStorage (conversation ID, keypair) without consent banner. While sessionStorage is ephemeral (session-scoped, not persistent), ePrivacy Directive still applies to storage that is not 'strictly necessary'. Conversation ID tracking could be argued as strictly necessary for chat functionality, but DPoP keypair storage may not be. Some EU member states (e.g., Germany, France) interpret ePrivacy strictly. Low severity as sessionStorage is less privacy-invasive than cookies.",
+      "exploit_scenarios": [
+        "French DPA audit finds sessionStorage use without consent, issues warning",
+        "Tenant's website uses Hay widget without consent banner, tenant fined for ePrivacy violation",
+        "User complains about tracking without consent, even though session-only"
+      ],
+      "data_categories": ["Device/Net", "Identifiers"],
+      "recommendation": "1) Add optional consent mode to widget config: { consent: 'strict' | 'default' }. In strict mode, delay sessionStorage writes until user sends first message (implied consent). 2) Document that conversation ID storage is strictly necessary for chat continuity. 3) Provide tenant-facing consent banner sample code in docs. 4) For DPoP keypair, consider in-memory-only mode if consent not given (degrades to no proof-of-possession but avoids storage).",
+      "sample_patch": "```javascript\n// plugins/webchat/src/widget/widget.js\nclass HayWebchat {\n  constructor(config) {\n    this.config = config;\n    this.consentGiven = config.consent !== 'strict'; // Default: assume consent\n  }\n  \n  saveConversationId(conversationId) {\n    if (!this.consentGiven) {\n      // Store in memory only until consent\n      this.conversationId = conversationId;\n      return;\n    }\n    sessionStorage.setItem(CONVERSATION_KEY, conversationId);\n  }\n  \n  onUserSendMessage() {\n    // Implied consent when user interacts\n    if (!this.consentGiven) {\n      this.consentGiven = true;\n      if (this.conversationId) {\n        sessionStorage.setItem(CONVERSATION_KEY, this.conversationId);\n      }\n    }\n  }\n}\n```",
+      "test_plan": "1. Load widget with consent: 'strict', verify no sessionStorage writes. 2. Send message, verify consent triggered and sessionStorage written. 3. Test default mode, verify sessionStorage works immediately. 4. Document consent options in widget README.",
+      "owner": "frontend",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-011",
+      "title": "No OpenAI training opt-out enforcement or API flag verification",
+      "category": "ProcessorDuties",
+      "gdpr_refs": ["Art.28", "Art.25"],
+      "severity": "medium",
+      "confidence": "medium",
+      "affected_components": ["llm-adapter"],
+      "evidence": [
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 38,
+          "code": "this.embeddings = new OpenAIEmbeddings({\n  openAIApiKey: config.openai.apiKey,\n  modelName: config.openai.models.embedding.model || 'text-embedding-3-small',\n  // No training opt-out flag"
+        },
+        {
+          "path": "server/services/core/llm.service.ts",
+          "line": 1,
+          "code": "No evidence of training opt-out headers or API flags"
+        }
+      ],
+      "explanation": "OpenAI's API allows training on user data unless explicitly opted out via API headers or enterprise agreement. No code ensures training opt-out is enforced. If OpenAI trains models on Hay customer conversations, this constitutes unauthorized further processing (Art.5(1)(b)) and violates controller-processor relationship (Art.28). OpenAI's current policy (as of 2024) is that API data is not used for training by default, but this should be verified in code.",
+      "exploit_scenarios": [
+        "OpenAI changes policy to opt-in training; Hay doesn't update code, customer data used for training",
+        "Tenant assumes data not used for training; audit finds no technical enforcement",
+        "Regulatory inquiry requires proof of training opt-out; no code evidence available"
+      ],
+      "data_categories": ["ChatContent"],
+      "recommendation": "1) Verify OpenAI Enterprise agreement or API tier includes training opt-out. 2) Add code comment documenting opt-out status. 3) If using non-enterprise API, add header or flag to explicitly opt out (check OpenAI docs for current method). 4) Add startup check or unit test verifying training opt-out configured. 5) Document in SUBPROCESSORS.md.",
+      "sample_patch": "```typescript\n// server/services/vector-store.service.ts\nthis.embeddings = new OpenAIEmbeddings({\n  openAIApiKey: config.openai.apiKey,\n  modelName: config.openai.models.embedding.model || 'text-embedding-3-small',\n  configuration: {\n    // OpenAI API tier: Enterprise (training disabled by default per DPA)\n    // Verified: https://openai.com/enterprise-privacy\n    // If using non-enterprise, add: headers: { 'OpenAI-Training-Eligible': 'false' }\n  },\n});\n\n// Add startup validation\nif (!config.openai.enterpriseTier && !config.openai.trainingOptOut) {\n  throw new Error('OpenAI training opt-out must be configured for GDPR compliance');\n}\n```",
+      "test_plan": "1. Review OpenAI agreement, confirm training opt-out. 2. Add config flag OPENAI_TRAINING_OPT_OUT=true. 3. Test startup validation rejects if not set. 4. Document in compliance docs.",
+      "owner": "backend, compliance",
+      "eta_complexity": "S"
+    },
+    {
+      "id": "GDPR-012",
+      "title": "Console logging may expose message content and PII in error traces",
+      "category": "Logging",
+      "gdpr_refs": ["Art.5(1)(c)", "Art.32"],
+      "severity": "low",
+      "confidence": "medium",
+      "affected_components": ["api", "orchestrator"],
+      "evidence": [
+        {
+          "path": "server/orchestrator/run.ts",
+          "line": 258,
+          "code": "console.error('[Orchestrator] Error in conversation', error.message);"
+        },
+        {
+          "path": "server/routes/v1/public-conversations/index.ts",
+          "line": 232,
+          "code": "console.error('Error sending message:', error);"
+        },
+        {
+          "path": "server/services/email-usage-example.ts",
+          "line": 209,
+          "code": "console.error(`Failed to send welcome email to ${user.email}:`, result.error);"
+        }
+      ],
+      "explanation": "Multiple console.error calls log error objects that may include message content, email addresses, or other PII. If logs are exported to observability platforms (DataDog, Sentry) or stored long-term, this violates data minimization (Art.5(1)(c)) and increases security risk (Art.32). Most instances log error.message or structured errors, which is lower risk, but potential exists for full error stack with user data.",
+      "exploit_scenarios": [
+        "Error stack includes customer message content, logged to CloudWatch, retained 1 year",
+        "Email address logged in error message, exported to DataDog, shared with third party",
+        "Log aggregation search exposes PII from error messages"
+      ],
+      "data_categories": ["ChatContent", "Contact", "Identifiers"],
+      "recommendation": "1) Implement centralized logger with PII redaction (mask emails, phone numbers, content previews). 2) Use structured logging (Winston, Pino) with configurable log levels. 3) Add beforeSend filter in observability exports to scrub sensitive fields. 4) Replace console.error with logger.error, configure to redact by default. 5) Set production log retention to 30 days max.",
+      "sample_patch": "```typescript\n// server/lib/logger.ts\nimport winston from 'winston';\n\nconst redactPII = winston.format((info) => {\n  const redacted = JSON.stringify(info).replace(\n    /\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b/g,\n    '[REDACTED_EMAIL]'\n  );\n  return JSON.parse(redacted);\n})();\n\nexport const logger = winston.createLogger({\n  format: winston.format.combine(redactPII, winston.format.json()),\n  transports: [new winston.transports.Console()],\n});\n\n// Replace in code:\n// console.error('Error sending message:', error);\nlogger.error('Error sending message', { error: error.message, conversationId });\n```",
+      "test_plan": "1. Log error with email, verify output shows [REDACTED_EMAIL]. 2. Log error with message content, verify truncated/redacted. 3. Test observability export (if configured), confirm PII scrubbed. 4. Add ESLint rule to ban console.error in production code.",
+      "owner": "backend",
+      "eta_complexity": "M"
+    },
+    {
+      "id": "GDPR-013",
+      "title": "Multi-tenant isolation appears properly enforced with organization_id filtering",
+      "category": "RBAC",
+      "gdpr_refs": ["Art.32"],
+      "severity": "low",
+      "confidence": "high",
+      "affected_components": ["api"],
+      "evidence": [
+        {
+          "path": "server/repositories/conversation.repository.ts",
+          "line": 52,
+          "code": "override async findByOrganization(organizationId: string): Promise<Conversation[]> {\n  return await this.getRepository().find({\n    where: { organization_id: organizationId },"
+        },
+        {
+          "path": "server/services/vector-store.service.ts",
+          "line": 134,
+          "code": "async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {\n  // ... WHERE \"organization_id\" = $2"
+        }
+      ],
+      "explanation": "Positive finding: Repositories correctly filter by organization_id in queries. Vector store search scoped to orgId. Base repository pattern enforces tenant isolation. No evidence of cross-tenant data leakage in code. This is a strength for Art.32 security and Art.5(1)(f) integrity. Recommend ongoing testing to maintain this.",
+      "exploit_scenarios": [
+        "N/A - This is a positive finding"
+      ],
+      "data_categories": ["All"],
+      "recommendation": "Maintain current practice. Add integration tests for tenant isolation: 1) Create data in Org A, attempt access from Org B, verify 403/404. 2) Test vector search doesn't return results from other orgs. 3) Add SQL query audit in CI to detect missing organization_id filters. 4) Consider row-level security (RLS) in Postgres as defense-in-depth.",
+      "sample_patch": "```sql\n-- Optional: Postgres RLS for defense-in-depth\nALTER TABLE conversations ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY org_isolation ON conversations\n  USING (organization_id = current_setting('app.current_org_id')::uuid);\n\n-- Set in connection:\n-- SET app.current_org_id = '<org-id>';\n```",
+      "test_plan": "1. Create conversation in Org A. 2. Attempt GET from Org B context, verify not returned. 3. Test vector search, confirm no cross-org results. 4. Add regression test suite for tenant isolation.",
+      "owner": "backend",
+      "eta_complexity": "S"
+    }
+  ]
+}

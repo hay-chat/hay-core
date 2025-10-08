@@ -1,0 +1,45 @@
+Subprocessor,Purpose,Personal Data Categories,Data Flow,Detected In Code,Region/Location,DPA Available,GDPR Adequacy,SCCs Required,Risk Level,Compliance Status
+OpenAI LLC,LLM embeddings and chat completion,Message content|Conversation metadata,API calls from server,server/services/vector-store.service.ts:38 (OpenAIEmbeddings),US (California),Yes - https://openai.com/enterprise-privacy,No (US),Yes,High,Action Required - Verify DPA signed
+OpenAI LLC,Chat model inference,Message content|System prompts,API calls from orchestrator,server/orchestrator/run.ts (assumed - LLMService),US (California),Yes - https://openai.com/enterprise-privacy,No (US),Yes,High,Action Required - Verify training opt-out
+Amazon Web Services (AWS),Database hosting (PostgreSQL/RDS),All database tables - customers|conversations|messages|embeddings|users,Database connection,server/config/env.ts:63-69 (DB_HOST),Configurable (default unknown),Yes - https://aws.amazon.com/compliance/gdpr-center/,Adequate (if EU region),Only if non-EU,Medium,Action Required - Document region choice
+Amazon Web Services (AWS),Object storage (S3 - inferred),Document uploads|DSAR exports,File uploads (assumed),server/processors/*.processor.ts (file processing),Configurable (default unknown),Yes - https://aws.amazon.com/compliance/gdpr-center/,Adequate (if EU region),Only if non-EU,Medium,Action Required - Confirm S3 usage and region
+Redis Labs / Self-hosted Redis,Cache and pub/sub messaging,Session data|Temporary message cache|WebSocket events,Redis connection,server/config/env.ts:77-83 (REDIS_HOST),Configurable (default unknown),Depends on deployment,Unknown,Unknown,Low,Action Required - Clarify hosting model
+Stripe (inferred),Payment processing (if cloud billing plugin active),Payment metadata|Customer billing info,Webhook integration,plugins/cloud/services/stripe.service.ts,US / EU (dual region),Yes - https://stripe.com/privacy-center/legal,Adequate (EU operations),No (if EU Stripe),Low,Conditional - Only if billing plugin used
+TypeORM Community (LangChain),Vector store driver,None (library only - no data sent externally),npm package,package.json|server/services/vector-store.service.ts:11,N/A (local library),N/A,N/A,N/A,None,Compliant - Local library only
+Email Provider (unknown),Transactional email (SMTP),Email addresses|User names|Verification codes,SMTP connection,server/config/env.ts:120-132 (SMTP_*),Unknown (SMTP_HOST not set in code),Unknown,Unknown,Unknown,Medium,Action Required - Identify and document email provider
+
+Evidence_Source,Finding
+server/services/vector-store.service.ts:38,OpenAIEmbeddings instantiated with API key
+server/config/env.ts:102,OPENAI_API_KEY environment variable
+server/services/plugin-route.service.ts:146,Stripe webhook signature verification logic
+plugins/cloud/services/stripe.service.ts,Stripe service for billing (cloud plugin)
+server/config/env.ts:120,SMTP configuration for email service
+server/config/env.ts:77,Redis connection configuration
+server/database/data-source.ts,PostgreSQL database connection via TypeORM
+
+Subprocessor_Risk_Assessment,OpenAI,AWS,Redis,Stripe,Email_Provider
+Personal Data Volume,High,High,Medium,Low,Low
+Data Sensitivity,High (chat content),High (all data),Low (cache only),Medium (payment),Low (identifiers)
+Transfer Mechanism,API,Infrastructure,Infrastructure,API/Webhook,SMTP
+Cross-Border Transfer Risk,High (US),Medium (configurable),Low (unknown),Low (EU available),Unknown
+DPA Documentation Status,Not verified in code,Not documented,Not applicable (unknown hosting),Available,Unknown provider
+Training/Secondary Use Risk,Medium (need opt-out verification),None,None,None,None
+DSAR Support,Limited (via DPA request),Via AWS Support,N/A,Via Stripe API,Unknown
+
+Required_Actions,Priority,Owner,Due_Date
+Verify OpenAI Enterprise DPA signed and training opt-out enforced,P0,Compliance,2025-10-15
+Document AWS region selection (database and S3) in SUBPROCESSORS.md,P0,Engineering + Compliance,2025-10-15
+Clarify Redis hosting model (self-hosted vs Redis Labs) and region,P1,Engineering,2025-10-22
+Identify SMTP email provider and obtain DPA,P1,Engineering + Compliance,2025-10-22
+Add Stripe to SUBPROCESSORS.md if cloud billing plugin is production-ready,P2,Compliance,2025-10-29
+Create public-facing subprocessor list at /v1/subprocessors API endpoint,P2,Engineering,2025-11-05
+Implement subprocessor change notification (email to org admins 30 days prior),P2,Engineering,2025-11-12
+Audit all npm packages for external data transmission (e.g. analytics SDKs),P3,Engineering,2025-11-19
+
+Subprocessor_Inventory_Summary,Count,Notes
+Total Subprocessors Identified,5,"OpenAI, AWS (DB), AWS (S3 - inferred), Redis, Email provider"
+High-Risk Subprocessors,2,OpenAI (US + training risk) and AWS (if non-EU)
+Subprocessors with Verified DPA,0,None verified in code - all require documentation
+Subprocessors with EU Presence,3,AWS (EU regions available)|Stripe (EU operations)|Redis (depends)
+Subprocessors Requiring SCCs,2-4,OpenAI (US)|AWS/Redis (if non-EU)
+Undocumented Subprocessors,5,No SUBPROCESSORS.md file exists
