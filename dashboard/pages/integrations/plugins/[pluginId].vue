@@ -639,7 +639,9 @@ const apiBaseUrl = computed(() => {
 // Vite glob imports for automatic plugin component discovery
 // Use relative path from this file to plugins directory (4 levels up)
 // @ts-ignore - Vite glob import not recognized by TypeScript in Nuxt
-const pluginComponents = import.meta.glob<any>("../../../../plugins/*/src/ui/**/*.vue");
+const pluginComponents = import.meta.glob<any>("../../../../plugins/**/*.vue", {
+  eager: false,
+});
 
 // State
 const loading = ref(true);
@@ -687,7 +689,7 @@ const loadPluginComponent = async (componentPath: string) => {
   const pluginName = pluginId.value.replace("hay-plugin-", "");
 
   // Build the full path from plugin name and componentPath
-  // The glob pattern is '../../../../plugins/*/src/ui/**/*.vue' so we need to match that
+  // The glob pattern is '../../../../plugins/**/*.vue' so we need to match that
   const fullPath = `../../../../plugins/${pluginName}/${componentPath}`;
 
   // Check if the component exists in our discovered components
