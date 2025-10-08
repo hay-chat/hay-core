@@ -130,7 +130,7 @@
 
         <div v-else-if="!jobs.length" class="p-8 text-center">
           <Inbox class="mx-auto h-12 w-12 text-neutral-muted" />
-          <h3 class="mt-2 text-sm font-semibold text-foreground">No jobs found</h3>
+          <h3 class="mt-2 text-sm text-foreground">No jobs found</h3>
           <p class="mt-1 text-sm text-neutral-muted">There are no jobs matching your filters.</p>
         </div>
 

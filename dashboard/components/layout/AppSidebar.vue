@@ -2,7 +2,7 @@
   <Sidebar
     collapsible="icon"
     v-bind="$attrs"
-    class="border-r border-border bg-background text-lg font-semibold mb-2"
+    class="border-r border-border bg-background text-lg mb-2"
   >
     <SidebarHeader id="sidebar-header" class="pb-2">
       <OrgSwitcher />

@@ -43,7 +43,7 @@ withDefaults(
 }
 
 .page-title {
-  @apply text-2xl font-bold;
+  @apply text-2xl;
 }
 
 .page-description {

@@ -86,7 +86,7 @@
 }
 
 .shepherd-title {
-  @apply text-base font-semibold text-foreground;
+  @apply text-base text-foreground;
 }
 
 .shepherd-cancel-icon {

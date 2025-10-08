@@ -75,7 +75,7 @@
                 <Upload class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
-                <h3 class="font-semibold mb-1">Upload Files</h3>
+                <h3 class="mb-1">Upload Files</h3>
                 <p class="text-sm text-neutral-muted mb-2">Upload documents from your computer</p>
                 <div class="flex flex-wrap gap-2">
                   <Badge v-for="format in uploadFormats" :key="format" variant="outline">
@@ -101,7 +101,7 @@
                 <Globe class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
-                <h3 class="font-semibold mb-1">Import from Website</h3>
+                <h3 class="mb-1">Import from Website</h3>
                 <p class="text-sm text-neutral-muted mb-2">
                   Crawl and import documentation from any website
                 </p>
@@ -135,7 +135,7 @@
                   <Package class="h-6 w-6 text-neutral-muted" />
                 </div>
                 <div class="flex-1">
-                  <h3 class="font-semibold mb-1">
+                  <h3 class="mb-1">
                     {{ plugin.name }}
                   </h3>
                   <p class="text-sm text-neutral-muted mb-2">
@@ -188,7 +188,7 @@
           @dragenter.prevent
         >
           <Upload class="mx-auto h-16 w-16 text-neutral-muted mb-4" />
-          <h3 class="text-lg font-semibold mb-2">
+          <h3 class="text-lg mb-2">
             {{ isDragging ? "Drop files here" : "Click to upload or drag and drop" }}
           </h3>
           <p class="text-sm text-neutral-muted mb-4">Support for multiple files up to 10MB each</p>

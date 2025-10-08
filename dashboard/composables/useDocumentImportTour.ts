@@ -19,7 +19,7 @@ export const useDocumentImportTour = () => {
       id: "welcome",
       text: `
         <div class="space-y-3">
-          <h3 class="text-base font-semibold text-foreground">Welcome to Document Import!</h3>
+          <h3 class="text-base text-foreground">Welcome to Document Import!</h3>
           <p class="text-sm text-neutral-muted">Let's walk through how to import documents into your knowledge base.</p>
         </div>
       `,
@@ -39,7 +39,7 @@ export const useDocumentImportTour = () => {
       id: "import-source",
       text: `
         <div class="space-y-3">
-          <h3 class="text-base font-semibold text-foreground">Choose Import Source</h3>
+          <h3 class="text-base text-foreground">Choose Import Source</h3>
           <p class="text-sm text-neutral-muted">Select how you want to import documents:</p>
           <ul class="text-sm text-foreground list-disc list-inside space-y-1">
             <li><strong class="font-medium">Upload Files:</strong> Import from your computer</li>
@@ -67,7 +67,7 @@ export const useDocumentImportTour = () => {
       id: "upload-option",
       text: `
         <div class="space-y-3">
-          <h3 class="text-base font-semibold text-foreground">Upload Files</h3>
+          <h3 class="text-base text-foreground">Upload Files</h3>
           <p class="text-sm text-neutral-muted">Click here to upload documents from your computer. You can also drag and drop files anywhere on the page!</p>
           <p class="text-sm text-neutral-400">Supported formats: PDF, TXT, MD, DOC, DOCX, HTML, JSON, CSV</p>
         </div>
@@ -91,7 +91,7 @@ export const useDocumentImportTour = () => {
       id: "web-import-option",
       text: `
         <div class="space-y-3">
-          <h3 class="text-base font-semibold text-foreground">Import from Website</h3>
+          <h3 class="text-base text-foreground">Import from Website</h3>
           <p class="text-sm text-neutral-muted">Use this option to automatically crawl and import documentation from any website.</p>
           <p class="text-sm text-neutral-400">Perfect for importing API docs, guides, or knowledge bases.</p>
         </div>
@@ -115,7 +115,7 @@ export const useDocumentImportTour = () => {
       id: "progress-steps",
       text: `
         <div class="space-y-3">
-          <h3 class="text-base font-semibold text-foreground">Track Your Progress</h3>
+          <h3 class="text-base text-foreground">Track Your Progress</h3>
           <p class="text-sm text-neutral-muted">This progress indicator shows you where you are in the import process.</p>
           <p class="text-sm text-neutral-400">Each import type has its own set of steps to guide you through.</p>
         </div>

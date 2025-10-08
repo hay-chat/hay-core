@@ -3,7 +3,7 @@
     :is="componentTag"
     :href="href"
     :class="[
-      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors',
+      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs transition-colors font-semibold',
       variantClasses,
       isInteractive && 'cursor-pointer',
     ]"

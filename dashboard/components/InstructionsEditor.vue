@@ -6,7 +6,7 @@
       </label>
       <div class="text-xs text-neutral-muted">
         Press
-        <kbd class="px-1.5 py-0.5 text-xs font-semibold bg-background-tertiary rounded">/</kbd>
+        <kbd class="px-1.5 py-0.5 text-xs bg-background-tertiary rounded">/</kbd>
         to mention Actions or Documents
       </div>
     </div>

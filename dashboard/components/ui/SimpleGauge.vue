@@ -14,15 +14,15 @@
     <!-- Sentiment breakdown if provided -->
     <div v-if="showBreakdown && counts" class="mt-6 grid grid-cols-3 gap-4 text-center w-full">
       <div>
-        <div class="text-2xl font-semibold text-green-600">{{ counts.pos }}</div>
+        <div class="text-2xl text-green-600">{{ counts.pos }}</div>
         <div class="text-xs text-muted-foreground">Positive</div>
       </div>
       <div>
-        <div class="text-2xl font-semibold text-gray-500">{{ counts.neu }}</div>
+        <div class="text-2xl text-gray-500">{{ counts.neu }}</div>
         <div class="text-xs text-muted-foreground">Neutral</div>
       </div>
       <div>
-        <div class="text-2xl font-semibold text-red-600">{{ counts.neg }}</div>
+        <div class="text-2xl text-red-600">{{ counts.neg }}</div>
         <div class="text-xs text-muted-foreground">Negative</div>
       </div>
     </div>

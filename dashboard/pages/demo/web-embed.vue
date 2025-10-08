@@ -53,7 +53,7 @@
       <div class="grid gap-8 lg:grid-cols-2">
         <!-- Info -->
         <div>
-          <h2 class="text-lg font-semibold mb-4">Try the chat widget</h2>
+          <h2 class="text-lg mb-4">Try the chat widget</h2>
           <Card>
             <CardContent class="pt-6">
               <p class="text-sm text-gray-600 mb-4">
@@ -80,7 +80,7 @@
 
         <!-- Controls -->
         <div class="space-y-4">
-          <h2 class="text-lg font-semibold mb-4">Session Management</h2>
+          <h2 class="text-lg mb-4">Session Management</h2>
 
           <Card>
             <CardHeader>

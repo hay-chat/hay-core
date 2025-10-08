@@ -1,7 +1,7 @@
 <template>
   <div class="px-3">
     <div class="mb-2 flex items-center justify-between px-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-muted">Projects</h2>
+      <h2 class="text-xs uppercase tracking-wider text-neutral-muted">Projects</h2>
       <button class="text-neutral-muted hover:text-foreground">
         <Plus class="h-4 w-4" />
       </button>
