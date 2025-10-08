@@ -16,13 +16,18 @@
 </template>
 
 <script setup lang="ts">
-import { cn } from "@/lib/utils";
-
-const props = defineProps<{
-  title: string;
-  description: string;
-  width: { type: "max" | "full"; default: "full" };
-}>();
+withDefaults(
+  defineProps<{
+    title?: string;
+    description?: string;
+    width?: "max" | "full";
+  }>(),
+  {
+    title: "",
+    description: "",
+    width: "full",
+  },
+);
 </script>
 
 <style lang="postcss">
