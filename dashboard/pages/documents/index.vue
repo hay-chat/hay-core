@@ -86,18 +86,21 @@
     </div>
 
     <!-- Documents Table -->
-    <div v-if="!loading && filteredDocuments.length > 0" class="bg-background rounded-lg border">
-      <Table>
+    <div
+      v-if="!loading && filteredDocuments.length > 0"
+      class="bg-background rounded-lg border overflow-x-auto"
+    >
+      <Table class="table-fixed w-full">
         <TableHeader>
           <TableRow>
             <TableHead class="w-12">
               <Checkbox :checked="allSelected" @update:checked="toggleAllSelection" />
             </TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last Modified</TableHead>
-            <TableHead class="text-right" />
+            <TableHead class="w-auto">Name</TableHead>
+            <TableHead class="w-24">Type</TableHead>
+            <TableHead class="w-32">Status</TableHead>
+            <TableHead class="w-44">Last Modified</TableHead>
+            <TableHead class="w-12 text-right" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -112,20 +115,20 @@
                 @update:checked="toggleDocumentSelection(document.id)"
               />
             </TableCell>
-            <TableCell class="font-medium">
-              <div class="flex items-center gap-2">
+            <TableCell class="font-medium max-w-0">
+              <div class="flex items-center gap-2 min-w-0">
                 <component
                   :is="getFileIcon(document.type)"
-                  class="h-4 w-4 min-w-4 text-neutral-muted"
+                  class="h-4 w-4 min-w-4 flex-shrink-0 text-neutral-muted"
                 />
-                <div class="truncate" :title="document.title || document.name">
+                <span class="truncate block" :title="document.title || document.name">
                   {{ document.title || document.name }}
-                </div>
+                </span>
               </div>
             </TableCell>
             <TableCell>
               <span
-                class="inline-flex items-center px-2 py-1 rounded-md bg-background-tertiary text-xs"
+                class="inline-flex items-center px-2 py-1 rounded-md bg-background-tertiary text-xs whitespace-nowrap"
               >
                 {{ document.type ? document.type.toUpperCase() : "DOC" }}
               </span>
@@ -133,14 +136,16 @@
             <TableCell>
               <div
                 :class="[
-                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap',
                   document.status === 'published'
                     ? 'bg-green-100 text-green-800'
                     : document.status === 'processing'
                       ? 'bg-blue-100 text-blue-800'
-                      : document.status === 'archived'
-                        ? 'bg-gray-100 text-gray-800'
-                        : 'bg-red-100 text-red-800',
+                      : document.status === 'draft'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : document.status === 'archived'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-red-100 text-red-800',
                 ]"
               >
                 <div
@@ -150,15 +155,19 @@
                       ? 'bg-green-600'
                       : document.status === 'processing'
                         ? 'bg-blue-600 animate-pulse'
-                        : document.status === 'archived'
-                          ? 'bg-gray-600'
-                          : 'bg-red-600',
+                        : document.status === 'draft'
+                          ? 'bg-yellow-600 animate-pulse'
+                          : document.status === 'archived'
+                            ? 'bg-gray-600'
+                            : 'bg-red-600',
                   ]"
                 />
-                {{ document.status }}
+                {{ document.status === "draft" ? "Processing" : document.status }}
               </div>
             </TableCell>
-            <TableCell>{{ formatDate(document.updatedAt) }}</TableCell>
+            <TableCell class="whitespace-nowrap">
+              {{ formatDate(document.updatedAt) }}
+            </TableCell>
             <TableCell class="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>

@@ -416,13 +416,16 @@
                 class="mt-1"
               />
               <div class="flex-1 min-w-0">
-                <p class="font-medium text-sm truncate">
+                <p class="font-medium text-sm truncate max-w-[100ch]">
                   {{ page.title || "Untitled Page" }}
                 </p>
-                <p class="text-xs text-neutral-muted truncate">
+                <p class="text-xs text-neutral-muted truncate max-w-[100ch]">
                   {{ page.url }}
                 </p>
-                <p v-if="page.description" class="text-xs text-neutral-muted mt-1 line-clamp-2">
+                <p
+                  v-if="page.description"
+                  class="text-xs text-neutral-muted mt-1 line-clamp-2 max-w-[100ch]"
+                >
                   {{ page.description }}
                 </p>
               </div>
@@ -507,39 +510,6 @@
               <option value="internal">Internal</option>
               <option value="public">Public</option>
             </select>
-          </div>
-
-          <div>
-            <Label for="web-doc-tags">Tags</Label>
-            <Input
-              id="web-doc-tags"
-              v-model="webMetadata.tagsString"
-              placeholder="Enter tags separated by commas"
-              class="mt-2"
-              @input="
-                webMetadata.tags = ($event.target as HTMLInputElement).value
-                  .split(',')
-                  .map((t) => t.trim())
-                  .filter((t) => t)
-              "
-            />
-            <p class="text-xs text-neutral-muted mt-1">e.g., documentation, api, reference</p>
-          </div>
-
-          <div>
-            <Label for="web-doc-categories">Categories</Label>
-            <Input
-              id="web-doc-categories"
-              v-model="webMetadata.categoriesString"
-              placeholder="Enter categories separated by commas"
-              class="mt-2"
-              @input="
-                webMetadata.categories = ($event.target as HTMLInputElement).value
-                  .split(',')
-                  .map((c) => c.trim())
-                  .filter((c) => c)
-              "
-            />
           </div>
 
           <!-- Preview of selected pages -->
@@ -717,8 +687,49 @@
               <p v-if="webImportProgress?.currentUrl" class="text-xs text-neutral-muted truncate">
                 Processing: {{ webImportProgress.currentUrl }}
               </p>
+              <!-- Show success/failure stats if available -->
+              <div
+                v-if="
+                  webImportProgress?.successfulPages !== undefined ||
+                  webImportProgress?.failedPages !== undefined
+                "
+                class="flex gap-4 text-xs mt-2"
+              >
+                <span v-if="webImportProgress.successfulPages" class="text-green-600">
+                  ✓ {{ webImportProgress.successfulPages }} successful
+                </span>
+                <span v-if="webImportProgress.failedPages" class="text-red-600">
+                  ✗ {{ webImportProgress.failedPages }} failed
+                </span>
+              </div>
             </div>
           </div>
+
+          <!-- Helpful message for user -->
+          <Alert v-if="webImportJob.status === 'processing'">
+            <AlertTitle class="flex items-center gap-2">
+              <Loader2 class="h-4 w-4 animate-spin" />
+              Processing in Progress
+            </AlertTitle>
+            <AlertDescription class="space-y-3">
+              <p>
+                This may take a while depending on the number of pages. Feel free to leave this page
+                now - you'll see all documents on your Documents page once they're fully processed.
+                Documents will appear with a "Processing" status initially, then change to
+                "Published" when ready.
+              </p>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="text-destructive hover:text-destructive"
+                  @click="cancelImport"
+                >
+                  Cancel Import
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
         </div>
 
         <!-- Upload Progress -->
@@ -822,6 +833,11 @@ import { Hay } from "@/utils/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Button from "@/components/ui/Button.vue";
 import { useDocumentImportTour } from "@/composables/useDocumentImportTour";
+import {
+  createAuthenticatedWebSocket,
+  parseWebSocketMessage,
+  type WebSocketMessage,
+} from "@/utils/websocket";
 
 const router = useRouter();
 const { startTour, shouldShowTour } = useDocumentImportTour();
@@ -907,12 +923,18 @@ enum DocumentVisibility {
 const webMetadata = ref({
   type: DocumentationType.ARTICLE,
   status: DocumentationStatus.PUBLISHED,
-  visibility: DocumentVisibility.PRIVATE,
+  visibility: DocumentVisibility.PUBLIC,
   tags: [] as string[],
   categories: [] as string[],
   tagsString: "",
   categoriesString: "",
 });
+
+// WebSocket connection
+const ws = ref<WebSocket | null>(null);
+const currentJobId = ref<string | null>(null);
+const wsConnected = ref(false);
+const pollInterval = ref<ReturnType<typeof setInterval> | null>(null);
 
 // Computed steps based on import type
 const steps = computed(() => {
@@ -945,29 +967,229 @@ onMounted(async () => {
   if (shouldShowTour()) {
     setTimeout(() => startTour(), 500);
   }
+
+  // Initialize WebSocket connection
+  setupWebSocket();
 });
 
-// Clean up polling interval on unmount
-onBeforeUnmount(() => {
-  if (
-    (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-      .__discoveryPollInterval
-  ) {
-    clearInterval(
-      (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-        .__discoveryPollInterval,
-    );
-    delete (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-      .__discoveryPollInterval;
+// Clean up on unmount
+onBeforeUnmount(async () => {
+  // Cancel active job if still processing
+  if (currentJobId.value && (isDiscovering.value || isProcessing.value)) {
+    try {
+      console.log("Cancelling job on unmount:", currentJobId.value);
+      await Hay.documents.cancelJob.mutate({ jobId: currentJobId.value });
+    } catch (error) {
+      console.error("Failed to cancel job:", error);
+    }
+  }
+
+  // Clear polling interval
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value);
+    pollInterval.value = null;
   }
 
   // Remove global drag and drop listeners
   document.removeEventListener("dragover", handleGlobalDragOver);
   document.removeEventListener("dragleave", handleGlobalDragLeave);
   document.removeEventListener("drop", handleGlobalDrop);
+
+  // Close WebSocket connection
+  if (ws.value) {
+    ws.value.close();
+    ws.value = null;
+  }
 });
 
 // Methods
+
+// Setup WebSocket connection for real-time updates
+const setupWebSocket = () => {
+  const socket = createAuthenticatedWebSocket();
+  if (!socket) {
+    console.warn("Failed to create WebSocket connection - will use polling fallback");
+    wsConnected.value = false;
+    return;
+  }
+
+  ws.value = socket;
+
+  socket.onopen = () => {
+    console.log("WebSocket connected");
+    wsConnected.value = true;
+  };
+
+  socket.onmessage = (event) => {
+    const message = parseWebSocketMessage(event.data);
+    if (!message) return;
+
+    handleWebSocketMessage(message);
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    wsConnected.value = false;
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket connection closed");
+    wsConnected.value = false;
+  };
+};
+
+// Handle incoming WebSocket messages
+const handleWebSocketMessage = (message: WebSocketMessage) => {
+  // Handle job progress updates
+  if (message.type === "job:progress" && message.jobId === currentJobId.value) {
+    const progress = message.progress as Record<string, unknown>;
+    const status = message.status as string;
+
+    // Update discovery progress
+    if (progress?.pagesFound !== undefined && isDiscovering.value) {
+      discoveryProgress.value = {
+        found: (progress.pagesFound as number) || 0,
+        processed: (progress.pagesProcessed as number) || 0,
+        total: (progress.totalEstimated as number) || 0,
+        status: (progress.status as string) || status,
+        currentUrl: progress.currentUrl as string,
+      };
+
+      // Update discovered pages if available
+      if (progress.discoveredPages) {
+        discoveredPages.value = progress.discoveredPages as DiscoveredPage[];
+      }
+
+      // Check if discovery completed
+      if (status === "completed" && message.result) {
+        const result = message.result as Record<string, unknown>;
+        if (result.pages) {
+          discoveredPages.value = result.pages as DiscoveredPage[];
+        }
+        isDiscovering.value = false;
+        discoveryProgress.value = null;
+      }
+    }
+
+    // Update import progress
+    if (progress?.processedPages !== undefined && webImportJob.value) {
+      webImportProgress.value = {
+        processedPages: (progress.processedPages as number) || 0,
+        totalPages: (progress.totalPages as number) || 0,
+        currentUrl: progress.currentUrl as string,
+      };
+
+      webImportJob.value.status = status || "processing";
+
+      // Check if import completed
+      if (status === "completed") {
+        isProcessing.value = false;
+      } else if (status === "failed") {
+        isProcessing.value = false;
+        webImportJob.value.status = "failed";
+      }
+    }
+  }
+};
+
+// Polling fallback for when WebSocket is not connected
+const startPollingFallback = async (jobId: string) => {
+  // Clear any existing interval
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value);
+  }
+
+  console.log("Starting polling fallback for job:", jobId);
+
+  const pollJobStatus = async () => {
+    try {
+      const jobStatus = await Hay.documents.getDiscoveryJob.query({ jobId });
+
+      // Update progress based on job status
+      if (jobStatus.progress) {
+        const progress = jobStatus.progress as Record<string, unknown>;
+
+        // Update discovery progress
+        if (progress?.pagesFound !== undefined && isDiscovering.value) {
+          discoveryProgress.value = {
+            found: (progress.pagesFound as number) || 0,
+            processed: (progress.pagesProcessed as number) || 0,
+            total: (progress.totalEstimated as number) || 0,
+            status: (progress.status as string) || "discovering",
+            currentUrl: progress.currentUrl as string,
+          };
+
+          if (progress.discoveredPages) {
+            discoveredPages.value = progress.discoveredPages as DiscoveredPage[];
+          }
+        }
+
+        // Update import progress
+        if (progress?.processedPages !== undefined && webImportJob.value) {
+          webImportProgress.value = {
+            processedPages: (progress.processedPages as number) || 0,
+            totalPages: (progress.totalPages as number) || 0,
+            currentUrl: progress.currentUrl as string,
+          };
+        }
+      }
+
+      // Check if job completed or failed
+      if (jobStatus.status === "completed") {
+        if (pollInterval.value) {
+          clearInterval(pollInterval.value);
+          pollInterval.value = null;
+        }
+
+        // Handle discovery completion
+        if (isDiscovering.value && jobStatus.result) {
+          const result = jobStatus.result as Record<string, unknown>;
+          if (result.pages) {
+            discoveredPages.value = (result.pages as DiscoveredPage[]).map((page) => ({
+              ...page,
+              selected: page.selected !== false,
+            }));
+          }
+          isDiscovering.value = false;
+          discoveryProgress.value = null;
+        }
+
+        // Handle import completion
+        if (webImportJob.value) {
+          webImportJob.value.status = "completed";
+          isProcessing.value = false;
+        }
+      } else if (jobStatus.status === "failed") {
+        if (pollInterval.value) {
+          clearInterval(pollInterval.value);
+          pollInterval.value = null;
+        }
+
+        console.error("Job failed:", jobStatus.error);
+
+        if (isDiscovering.value) {
+          isDiscovering.value = false;
+          discoveryProgress.value = null;
+          currentStep.value = 2;
+        }
+
+        if (webImportJob.value) {
+          webImportJob.value.status = "failed";
+          isProcessing.value = false;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to poll job status:", error);
+    }
+  };
+
+  // Initial poll
+  await pollJobStatus();
+
+  // Poll every 10 seconds
+  pollInterval.value = setInterval(pollJobStatus, 10000);
+};
+
 const selectImportType = (type: string) => {
   importType.value = type;
 };
@@ -1007,115 +1229,44 @@ const discoverPages = async () => {
       url: websiteUrl.value,
     });
 
-    // Poll for job status every 5 seconds
-    const pollInterval = setInterval(async () => {
-      try {
-        const jobStatus = await Hay.documents.getDiscoveryJob.query({
-          jobId: jobId,
-        });
+    // Store job ID for WebSocket updates
+    currentJobId.value = jobId;
 
-        // Update progress based on job status
-        if (jobStatus.progress) {
-          const progress = jobStatus.progress as {
-            pagesFound?: number;
-            pagesProcessed?: number;
-            totalEstimated?: number;
-            status?: string;
-            currentUrl?: string;
-          };
-          discoveryProgress.value = {
-            found: progress.pagesFound || 0,
-            processed: progress.pagesProcessed || 0,
-            total: progress.totalEstimated || 0,
-            status: progress.status || "discovering",
-            currentUrl: progress.currentUrl,
-          };
-        }
-
-        // Check if job is completed or failed
-        if (jobStatus.status === "completed") {
-          clearInterval(pollInterval);
-
-          // Extract discovered pages from job result
-          if (jobStatus.result?.pages) {
-            discoveredPages.value = (jobStatus.result.pages as DiscoveredPage[]).map(
-              (page: DiscoveredPage) => ({
-                ...page,
-                selected: page.selected !== false, // Default to true unless explicitly false
-              }),
-            );
-
-            // Final progress update
-            discoveryProgress.value = {
-              found: discoveredPages.value.length,
-              processed: discoveredPages.value.length,
-              total: discoveredPages.value.length,
-              status: "completed",
-            };
-
-            // Small delay to show completion before hiding loading
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-
-          isDiscovering.value = false;
-          discoveryProgress.value = null;
-        } else if (jobStatus.status === "failed") {
-          clearInterval(pollInterval);
-          console.error("Discovery job failed:", jobStatus.error);
-
-          discoveryProgress.value = {
-            found: 0,
-            processed: 0,
-            total: 0,
-            status: "error",
-          };
-
-          // Small delay before hiding error state
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          isDiscovering.value = false;
-          discoveryProgress.value = null;
-          currentStep.value = 2; // Go back to URL input
-        }
-      } catch (error) {
-        console.error("Failed to poll job status:", error);
-      }
-    }, 5000); // Poll every 5 seconds
-
-    // Store interval ID for cleanup if needed
-    (
-      window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> }
-    ).__discoveryPollInterval = pollInterval;
+    // Use WebSocket for real-time updates if connected, otherwise fall back to polling
+    if (wsConnected.value) {
+      console.log("Using WebSocket for real-time updates");
+    } else {
+      console.log("WebSocket not connected, using polling fallback");
+      await startPollingFallback(jobId);
+    }
   } catch (error) {
     console.error("Failed to start page discovery:", error);
     isDiscovering.value = false;
     discoveryProgress.value = null;
     currentStep.value = 2;
+    currentJobId.value = null;
   }
 };
 
 const cancelDiscovery = () => {
-  // Clear any existing polling interval
-  if (
-    (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-      .__discoveryPollInterval
-  ) {
-    clearInterval(
-      (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-        .__discoveryPollInterval,
-    );
-    delete (window as Window & { __discoveryPollInterval?: ReturnType<typeof setInterval> })
-      .__discoveryPollInterval;
+  // Clear polling interval
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value);
+    pollInterval.value = null;
   }
 
   isDiscovering.value = false;
   discoveryProgress.value = null;
+  currentJobId.value = null;
   currentStep.value = 2; // Go back to URL input
 };
 
 const startWebImport = async () => {
   currentStep.value = 5; // Processing step
   isProcessing.value = true;
+
+  // Log metadata being sent
+  console.log("Starting import with metadata:", webMetadata.value);
 
   try {
     const response = await Hay.documents.importFromWeb.mutate({
@@ -1129,45 +1280,67 @@ const startWebImport = async () => {
       status: "processing",
     };
 
-    // Poll for job status
-    pollJobStatus(response.jobId);
+    // Store job ID for WebSocket updates
+    currentJobId.value = response.jobId;
+
+    // Initialize progress
+    webImportProgress.value = {
+      totalPages: discoveredPages.value.filter((p) => p.selected).length,
+      processedPages: 0,
+    };
+
+    // Use WebSocket for real-time updates if connected, otherwise fall back to polling
+    if (wsConnected.value) {
+      console.log("Using WebSocket for real-time import updates");
+    } else {
+      console.log("WebSocket not connected, using polling fallback for import");
+      await startPollingFallback(response.jobId);
+    }
   } catch (error) {
     console.error("Failed to start web import:", error);
     webImportJob.value = { id: "", status: "failed" };
     isProcessing.value = false;
+    currentJobId.value = null;
   }
 };
 
-const pollJobStatus = async (jobId: string) => {
-  const checkStatus = async () => {
-    try {
-      // TODO: Add job status endpoint
-      // const job = await Hay.jobs.get.query({ id: jobId });
-      // webImportJob.value = job;
-      // if (job.data?.progress) {
-      //   webImportProgress.value = job.data.progress;
-      // }
-      // if (job.status === 'completed' || job.status === 'failed') {
-      //   isProcessing.value = false;
-      // } else {
-      //   setTimeout(checkStatus, 2000);
-      // }
-      console.log("Using jobId:", jobId); // Avoid unused parameter warning
+const cancelImport = async () => {
+  if (!currentJobId.value) return;
 
-      // For now, simulate completion after some time
-      setTimeout(() => {
-        webImportJob.value = { id: jobId, status: "completed" };
-        webImportProgress.value = { totalPages: 10, processedPages: 10 };
-        isProcessing.value = false;
-      }, 5000);
-    } catch (error) {
-      console.error("Failed to check job status:", error);
-      isProcessing.value = false;
+  try {
+    await Hay.documents.cancelJob.mutate({ jobId: currentJobId.value });
+
+    // Update UI state
+    if (webImportJob.value) {
+      webImportJob.value.status = "cancelled";
     }
-  };
+    isProcessing.value = false;
+    isDiscovering.value = false;
 
-  checkStatus();
+    // Clear polling interval
+    if (pollInterval.value) {
+      clearInterval(pollInterval.value);
+      pollInterval.value = null;
+    }
+
+    // Show success message
+    const { useToast } = await import("@/composables/useToast");
+    const toast = useToast();
+    toast.success("Import cancelled", "The import job has been cancelled successfully.");
+
+    // Navigate back to documents
+    setTimeout(() => {
+      router.push("/documents");
+    }, 2000);
+  } catch (error) {
+    console.error("Failed to cancel import:", error);
+    const { useToast } = await import("@/composables/useToast");
+    const toast = useToast();
+    toast.error("Failed to cancel import", "Please try again.");
+  }
 };
+
+// pollJobStatus is no longer needed - WebSocket handles real-time updates
 
 const getFileIcon = (type: string) => {
   const mimeType = type.toLowerCase();

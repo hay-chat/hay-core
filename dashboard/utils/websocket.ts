@@ -52,6 +52,11 @@ export interface WebSocketMessage {
   error?: string;
   conversationId?: string;
   clientId?: string;
+  // Job-related fields
+  jobId?: string;
+  status?: string;
+  progress?: Record<string, unknown>;
+  result?: Record<string, unknown>;
 }
 
 /**

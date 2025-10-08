@@ -112,7 +112,8 @@ export function useWebSocket() {
         }
       });
     } else {
-      console.log(`[WebSocket] No handlers registered for ${message.type}`);
+      // Use debug level for unknown message types to reduce noise
+      console.debug(`[WebSocket] No handlers registered for ${message.type}`);
     }
 
     // Handle built-in events
