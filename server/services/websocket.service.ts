@@ -108,6 +108,11 @@ export class WebSocketService {
         this.handleRedisEvent(event);
       });
 
+      // Subscribe to job updates channel for real-time progress
+      await redisService.subscribe("job:updates", (event) => {
+        this.handleJobUpdate(event);
+      });
+
       this.redisInitialized = true;
       console.log("[WebSocket] Redis pub/sub initialized for cross-server broadcasting");
     } catch (error) {
@@ -132,6 +137,30 @@ export class WebSocketService {
     // Broadcast to local clients in the organization
     const sent = this.sendToOrganization(organizationId, { type, payload });
     console.log(`[WebSocket] Broadcasted ${type} from Redis to ${sent} local clients`);
+  }
+
+  /**
+   * Handle job update event from Redis and broadcast to clients
+   */
+  private handleJobUpdate(event: any): void {
+    const { jobId, organizationId, status, progress, result, error } = event;
+
+    if (!jobId || !organizationId) {
+      console.error("[WebSocket] Invalid job update event:", event);
+      return;
+    }
+
+    // Broadcast job update to all clients in the organization
+    const sent = this.sendToOrganization(organizationId, {
+      type: "job:progress",
+      jobId,
+      status,
+      progress,
+      result,
+      error,
+    });
+
+    console.log(`[WebSocket] Broadcasted job update for ${jobId} to ${sent} clients`);
   }
 
   /**

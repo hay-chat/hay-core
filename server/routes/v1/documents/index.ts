@@ -18,6 +18,7 @@ import { HtmlProcessor } from "@server/processors/html.processor";
 import { jobRepository } from "@server/repositories/job.repository";
 import { JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Document } from "@server/entities/document.entity";
+import { jobQueueService } from "@server/services/job-queue.service";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -427,6 +428,30 @@ export const documentsRouter = t.router({
       };
     }),
 
+  cancelJob: authenticatedProcedure
+    .input(
+      z.object({
+        jobId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new Error("Organization ID is required");
+      }
+
+      const job = await jobQueueService.cancelJob(input.jobId, ctx.organizationId);
+
+      if (!job) {
+        throw new Error("Job not found or already completed");
+      }
+
+      return {
+        success: true,
+        jobId: job.id,
+        status: job.status,
+      };
+    }),
+
   importFromWeb: authenticatedProcedure
     .input(
       z.object({
@@ -572,10 +597,33 @@ async function processWebImport(
   metadata?: Record<string, unknown>,
 ) {
   try {
+    // Log received metadata for debugging
+    console.log("[Web Import] Received metadata:", metadata);
+
     // Update job status to processing
-    await jobRepository.update(jobId, organizationId, {
+    await jobQueueService.updateJobStatus(jobId, organizationId, {
       status: JobStatus.PROCESSING,
     });
+
+    // Create placeholder documents immediately so users can see them
+    const placeholderDocuments = [];
+    for (const page of selectedPages) {
+      const doc = await documentRepository.create({
+        title: page.title || new URL(page.url).pathname,
+        content: `Processing content from ${page.url}...`,
+        type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
+        status: DocumentationStatus.DRAFT, // Start as draft while processing
+        visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
+        tags: metadata?.tags as string[] | undefined,
+        categories: metadata?.categories as string[] | undefined,
+        importMethod: ImportMethod.WEB,
+        sourceUrl: page.url,
+        organizationId,
+      });
+      placeholderDocuments.push(doc);
+    }
+
+    console.log(`Created ${placeholderDocuments.length} placeholder documents`);
 
     // Initialize scraper
     const scraper = new WebScraperService();
@@ -583,14 +631,9 @@ async function processWebImport(
 
     // Track progress
     scraper.on("progress", async (progress) => {
-      await jobRepository.update(jobId, organizationId, {
-        data: {
-          type: "web_import",
-          url,
-          pages: selectedPages,
-          metadata,
-          progress,
-        },
+      await jobQueueService.updateJobProgress(jobId, organizationId, {
+        ...progress,
+        totalPages: selectedPages.length, // Use actual selected page count
       });
     });
 
@@ -601,70 +644,146 @@ async function processWebImport(
       throw new Error("No pages found to import");
     }
 
-    // Process each page and create documents
+    // Process each page and update documents with error tracking
     const documents = [];
-    for (const page of pages) {
-      // Convert HTML to markdown
-      const processed = await htmlProcessor.process(Buffer.from(page.html), page.title);
+    const failedPages: Array<{ url: string; error: string }> = [];
+    const successfulPages: string[] = [];
 
-      // Create document
-      const document = await documentRepository.create({
-        title: page.title || (metadata?.title as string) || "Untitled",
-        content: processed.content,
-        type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
-        status: (metadata?.status as DocumentationStatus) || DocumentationStatus.PUBLISHED,
-        visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
-        tags: metadata?.tags as string[] | undefined,
-        categories: metadata?.categories as string[] | undefined,
-        importMethod: ImportMethod.WEB,
-        sourceUrl: page.url,
-        lastCrawledAt: page.crawledAt,
-        organizationId,
-      });
-
-      // Create embeddings
-      if (!vectorStoreService.initialized) {
-        await vectorStoreService.initialize();
+    for (let i = 0; i < pages.length; i++) {
+      // Check if job was cancelled
+      const currentJob = await jobRepository.findById(jobId);
+      if (currentJob?.status === JobStatus.CANCELLED) {
+        console.log(`[Web Import] Job ${jobId} was cancelled, stopping processing`);
+        break;
       }
 
-      const chunks = splitTextIntoChunks(processed.content, {
-        chunkSize: 1000,
-        chunkOverlap: 200,
-      });
+      const page = pages[i];
 
-      const vectorChunks = chunks.map((content, index) => ({
-        content,
-        metadata: createChunkMetadata(index, chunks.length, {
-          documentId: document.id,
-          documentTitle: document.title,
-          documentType: document.type,
-          sourceUrl: page.url,
-        }),
-      }));
+      try {
+        // Find the corresponding placeholder document
+        const placeholderDoc = placeholderDocuments.find((d) => d.sourceUrl === page.url);
+        if (!placeholderDoc) {
+          console.error(`No placeholder document found for ${page.url}`);
+          failedPages.push({ url: page.url, error: "Placeholder document not found" });
+          continue;
+        }
 
-      await vectorStoreService.addChunks(organizationId, document.id, vectorChunks);
+        // Update progress for current page
+        await jobQueueService.updateJobProgress(jobId, organizationId, {
+          processedPages: i,
+          totalPages: pages.length,
+          currentUrl: page.url,
+          successfulPages: successfulPages.length,
+          failedPages: failedPages.length,
+        });
 
-      documents.push(document);
+        // Convert HTML to markdown with timeout
+        const processed = await Promise.race([
+          htmlProcessor.process(Buffer.from(page.html), page.title),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Processing timeout")), 30000)
+          ),
+        ]) as { content: string; metadata: Record<string, unknown> };
+
+        // Update placeholder document with actual content and metadata
+        const document = await documentRepository.update(placeholderDoc.id, organizationId, {
+          title: page.title || placeholderDoc.title,
+          content: processed.content,
+          type: (metadata?.type as DocumentationType) || placeholderDoc.type,
+          status: (metadata?.status as DocumentationStatus) || DocumentationStatus.PUBLISHED,
+          visibility: (metadata?.visibility as DocumentVisibility) || placeholderDoc.visibility,
+          tags: metadata?.tags as string[] | undefined,
+          categories: metadata?.categories as string[] | undefined,
+          lastCrawledAt: page.crawledAt,
+        });
+
+        if (!document) {
+          console.error(`Failed to update document ${placeholderDoc.id}`);
+          failedPages.push({ url: page.url, error: "Failed to update document in database" });
+          continue;
+        }
+
+        // Create embeddings with error handling
+        try {
+          if (!vectorStoreService.initialized) {
+            await vectorStoreService.initialize();
+          }
+
+          const chunks = splitTextIntoChunks(processed.content, {
+            chunkSize: 1000,
+            chunkOverlap: 200,
+          });
+
+          const vectorChunks = chunks.map((content, index) => ({
+            content,
+            metadata: createChunkMetadata(index, chunks.length, {
+              documentId: document.id,
+              documentTitle: document.title,
+              documentType: document.type,
+              sourceUrl: page.url,
+            }),
+          }));
+
+          await vectorStoreService.addChunks(organizationId, document.id, vectorChunks);
+        } catch (embeddingError) {
+          console.error(`Failed to create embeddings for ${page.url}:`, embeddingError);
+          // Document is saved but without embeddings - mark as partial success
+          await documentRepository.update(document.id, organizationId, {
+            content: `${document.content}\n\n_Note: Vector embeddings failed to generate. Search may be limited for this document._`,
+          });
+        }
+
+        documents.push(document);
+        successfulPages.push(page.url);
+
+        // Update progress after page completion
+        await jobQueueService.updateJobProgress(jobId, organizationId, {
+          processedPages: i + 1,
+          totalPages: pages.length,
+          currentUrl: page.url,
+          successfulPages: successfulPages.length,
+          failedPages: failedPages.length,
+        });
+      } catch (pageError) {
+        const errorMessage = pageError instanceof Error ? pageError.message : "Unknown error";
+        console.error(`Failed to process page ${page.url}:`, errorMessage);
+        failedPages.push({ url: page.url, error: errorMessage });
+
+        // Update placeholder document to show error
+        const placeholderDoc = placeholderDocuments.find((d) => d.sourceUrl === page.url);
+        if (placeholderDoc) {
+          await documentRepository.update(placeholderDoc.id, organizationId, {
+            content: `Failed to import content from ${page.url}\n\nError: ${errorMessage}`,
+            status: DocumentationStatus.DRAFT, // Keep as draft to indicate issue
+          });
+        }
+
+        // Continue processing other pages instead of failing entire job
+        continue;
+      }
     }
 
-    // Update job as completed
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.COMPLETED,
-      result: {
-        documentsCreated: documents.length,
-        documentIds: documents.map((d) => d.id),
-      },
-    });
+    // Update job as completed (even if some pages failed)
+    const jobResult = {
+      documentsCreated: documents.length,
+      documentIds: documents.map((d) => d.id),
+      successfulPages: successfulPages.length,
+      failedPages: failedPages.length,
+      totalPages: selectedPages.length,
+      failures: failedPages.length > 0 ? failedPages : undefined,
+      status: failedPages.length > 0 ? "completed_with_errors" : "completed",
+    };
+
+    await jobQueueService.completeJob(jobId, organizationId, jobResult);
   } catch (error) {
     console.error("Web import error:", error);
 
     // Update job as failed
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.FAILED,
-      result: {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
+    await jobQueueService.failJob(
+      jobId,
+      organizationId,
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 }
 
@@ -672,7 +791,7 @@ async function processWebImport(
 async function processPageDiscovery(organizationId: string, jobId: string, url: string) {
   try {
     // Update job status to processing
-    await jobRepository.update(jobId, organizationId, {
+    await jobQueueService.updateJobStatus(jobId, organizationId, {
       status: JobStatus.PROCESSING,
       data: {
         type: "page_discovery",
@@ -706,61 +825,39 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
         if (progress.discoveredPages) {
           discoveredPages = progress.discoveredPages;
         }
-        
-        // Update job with progress
-        await jobRepository.update(jobId, organizationId, {
-          data: {
-            type: "page_discovery",
-            url,
-            progress: {
-              status: "discovering",
-              pagesFound: progress.found,
-              pagesProcessed: progress.discoveredPages?.length || 0, // Use actual discovered pages count
-              totalEstimated: progress.total,
-              currentUrl: progress.currentUrl,
-              discoveredPages: discoveredPages,
-            },
-          },
+
+        // Update job with progress via job queue service (publishes to Redis)
+        await jobQueueService.updateJobProgress(jobId, organizationId, {
+          status: "discovering",
+          pagesFound: progress.found,
+          pagesProcessed: progress.discoveredPages?.length || 0, // Use actual discovered pages count
+          totalEstimated: progress.total,
+          currentUrl: progress.currentUrl,
+          discoveredPages: discoveredPages,
         });
       },
     );
 
     // Discover URLs
     const pages = await scraper.discoverUrls(url);
-    
+
     // Pages are already stored from progress events, update final result
     discoveredPages = pages;
 
     // Update job as completed with results
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.COMPLETED,
-      data: {
-        type: "page_discovery",
-        url,
-        progress: {
-          status: "completed",
-          pagesFound: pages.length,
-          pagesProcessed: pages.length,
-          totalEstimated: pages.length,
-          currentUrl: null,
-          discoveredPages: pages,
-        },
-      },
-      result: {
-        pages,
-        totalFound: pages.length,
-      },
+    await jobQueueService.completeJob(jobId, organizationId, {
+      pages,
+      totalFound: pages.length,
     });
   } catch (error) {
     console.error("Error in page discovery:", error);
 
     // Update job as failed
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.FAILED,
-      result: {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
+    await jobQueueService.failJob(
+      jobId,
+      organizationId,
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 }
 
@@ -768,7 +865,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 async function processWebRecrawl(organizationId: string, jobId: string, document: Document) {
   try {
     // Update job status to processing
-    await jobRepository.update(jobId, organizationId, {
+    await jobQueueService.updateJobStatus(jobId, organizationId, {
       status: JobStatus.PROCESSING,
     });
 
@@ -828,23 +925,19 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     );
 
     // Update job as completed
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.COMPLETED,
-      result: {
-        documentId: document.id,
-        embeddingsCreated: embeddingIds.length,
-        chunksCreated: chunks.length,
-      },
+    await jobQueueService.completeJob(jobId, organizationId, {
+      documentId: document.id,
+      embeddingsCreated: embeddingIds.length,
+      chunksCreated: chunks.length,
     });
   } catch (error) {
     console.error("Recrawl error:", error);
 
     // Update job as failed
-    await jobRepository.update(jobId, organizationId, {
-      status: JobStatus.FAILED,
-      result: {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
+    await jobQueueService.failJob(
+      jobId,
+      organizationId,
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 }

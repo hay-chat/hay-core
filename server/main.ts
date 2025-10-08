@@ -27,6 +27,14 @@ async function startServer() {
     console.warn("⚠️  Starting server without Redis connection");
   }
 
+  // Initialize Job Queue service (depends on Redis)
+  const { jobQueueService } = await import("@server/services/job-queue.service");
+  try {
+    await jobQueueService.initialize();
+  } catch (error) {
+    console.warn("⚠️  Starting server without Job Queue service");
+  }
+
   // Import services after database initialization to avoid circular dependency issues
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");

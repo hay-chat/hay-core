@@ -3,7 +3,7 @@
     :class="['relative w-full rounded-lg border p-4 flex gap-4', variantStyles[variant]]"
     role="alert"
   >
-    <AlertCircle class="h-4 w-4" />
+    <AlertCircle class="min-h-4 min-w-4" />
     <div>
       <slot />
     </div>
