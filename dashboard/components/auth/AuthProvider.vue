@@ -7,7 +7,10 @@
     >
       <Loading />
       <div v-if="showRefreshMessage" class="text-sm text-gray-500">
-        This is taking longer than expected. <a href="" @click="refresh">Refresh the page</a>.
+        This is taking longer than expected.
+        <a href="javascript:void(0)" class="text-blue-500 underline" @click="refresh"
+          >Refresh the page</a
+        >.
       </div>
     </div>
 

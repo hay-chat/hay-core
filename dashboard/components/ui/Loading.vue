@@ -1,5 +1,5 @@
 <template>
-  <div class="flex justify-center items-center flex-col m-auto p-4 gap-4">
+  <div class="flex justify-center items-center flex-col mx-auto p-4 gap-4">
     <svg
       width="278"
       height="253"

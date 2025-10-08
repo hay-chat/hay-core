@@ -165,6 +165,7 @@
               </TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Assigned To</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Satisfaction</TableHead>
               <TableHead>Updated</TableHead>
@@ -201,6 +202,17 @@
                   <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
                   {{ formatStatus(conversation?.status) }}
                 </Badge>
+              </TableCell>
+              <TableCell class="text-sm">
+                <div v-if="conversation.assignedUser" class="flex items-center space-x-2">
+                  <div
+                    class="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium"
+                  >
+                    {{ getInitials(conversation.assignedUser) }}
+                  </div>
+                  <span>{{ getFullName(conversation.assignedUser) }}</span>
+                </div>
+                <span v-else class="text-neutral-muted">-</span>
               </TableCell>
               <TableCell class="text-sm">
                 {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
@@ -277,6 +289,7 @@ import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
+import { useConversationTakeover } from "@/composables/useConversationTakeover";
 import Badge from "@/components/ui/Badge.vue";
 import DataPagination from "@/components/DataPagination.vue";
 import MetricCard from "@/components/MetricCard.vue";
@@ -311,6 +324,12 @@ interface Conversation {
   ended_at?: string;
   metadata?: {
     satisfaction?: number;
+  };
+  assignedUser?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
   };
 }
 
@@ -416,6 +435,28 @@ const formatStatus = (status: string) => {
   return labels[status as keyof typeof labels] || status;
 };
 
+const getFullName = (user: any) => {
+  if (!user) return "";
+  if (user.firstName && user.lastName) {
+    return `${user.firstName} ${user.lastName}`;
+  }
+  return user.firstName || user.lastName || user.email || "Unknown";
+};
+
+const getInitials = (user: any) => {
+  if (!user) return "";
+  if (user.firstName && user.lastName) {
+    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  }
+  if (user.firstName) {
+    return user.firstName[0].toUpperCase();
+  }
+  if (user.email) {
+    return user.email[0].toUpperCase();
+  }
+  return "?";
+};
+
 const toggleBulkMode = () => {
   bulkMode.value = !bulkMode.value;
   if (!bulkMode.value) {
@@ -444,9 +485,13 @@ const viewConversation = (id: string) => {
   router.push(`/conversations/${id}`);
 };
 
-const takeOverConversation = (id: string) => {
-  // TODO: Implement conversation takeover
-  console.log("Take over conversation:", id);
+const takeOverConversation = async (id: string) => {
+  const { takeover } = useConversationTakeover();
+  const success = await takeover(id);
+  if (success) {
+    // Refresh conversations list to show updated assigned user
+    await fetchConversations();
+  }
 };
 
 const showMoreActions = (id: string) => {
@@ -466,6 +511,7 @@ const fetchConversations = async () => {
     const response = await HayApi.conversations.list.query({
       pagination: { page: currentPage.value, limit: pageSize.value },
       sorting: { orderBy: "created_at", orderDirection: "desc" },
+      include: ["assignedUser"],
     });
 
     conversations.value = response.items as any;

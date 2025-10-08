@@ -289,6 +289,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         case "organization":
           queryBuilder.leftJoinAndSelect("entity.organization", "organization");
           break;
+        case "assignedUser":
+          queryBuilder.leftJoinAndSelect("entity.assignedUser", "assignedUser");
+          break;
         default:
           // Try to apply generic relation
           try {

@@ -167,7 +167,7 @@ export default <Partial<Config>>{
       },
       fontFamily: {
         primary: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        secondary: ["europa", "sans-serif"],
+        secondary: ["Gabarito", "sans-serif"],
       },
     },
   },
