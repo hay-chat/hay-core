@@ -495,8 +495,11 @@ const formatStatus = (status: string | undefined) => {
   if (!status) return "Unknown";
   const labels = {
     open: "Open",
-    "pending-human": "Pending Human",
+    processing: "Processing",
+    "pending-human": "Needs Attention",
+    "human-took-over": "Manual Control",
     resolved: "Resolved",
+    closed: "Closed",
   };
   return labels[status as keyof typeof labels] || status;
 };
@@ -747,7 +750,9 @@ onMounted(async () => {
       await fetchConversation();
       scrollToBottom();
     } else {
-      console.log(`[WebSocket] Message for different conversation (current: ${conversationId}, received: ${payload.conversationId})`);
+      console.log(
+        `[WebSocket] Message for different conversation (current: ${conversationId}, received: ${payload.conversationId})`,
+      );
     }
   });
 

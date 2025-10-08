@@ -428,7 +428,8 @@ const formatStatus = (status: string) => {
   const labels = {
     open: "Open",
     processing: "Processing",
-    "pending-human": "Pending Human",
+    "pending-human": "Pending Agent",
+    "human-took-over": "Manual Control",
     resolved: "Resolved",
     closed: "Closed",
   };
