@@ -4,7 +4,7 @@
       <!-- Success State -->
       <div v-if="emailSent" class="text-center space-y-4">
         <div class="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-green-100">
-          <CheckCircleIcon class="w-6 h-6 text-green-600" />
+          <CheckCircle class="w-6 h-6 text-green-600" />
         </div>
 
         <div>
@@ -58,17 +58,24 @@
 
         <!-- Reset Form -->
         <form class="space-y-4" @submit.prevent="handleSubmit">
-          <FormField
-            id="email"
-            v-model="form.email"
-            label="Email address"
-            type="email"
-            placeholder="Enter your email"
-            required
-            :error-message="errors.email"
-            description="We'll send a reset link to this email address"
-            @blur="validateField('email')"
-          />
+          <div class="space-y-2">
+            <Input
+              id="email"
+              v-model="form.email"
+              label="Email address"
+              type="email"
+              placeholder="Enter your email"
+              required
+              :class="errors.email ? 'border-red-500' : ''"
+              @blur="validateField('email')"
+            />
+            <p v-if="errors.email" class="text-sm text-red-600">
+              {{ errors.email }}
+            </p>
+            <p v-else class="text-sm text-gray-500">
+              We'll send a reset link to this email address
+            </p>
+          </div>
 
           <!-- Submit Button -->
           <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
@@ -93,7 +100,7 @@
             to="/login"
             class="text-sm text-primary hover:text-primary/80 font-medium flex items-center justify-center space-x-1"
           >
-            <ArrowLeftIcon class="w-4 h-4" />
+            <ArrowLeft class="w-4 h-4" />
             <span>Back to sign in</span>
           </NuxtLink>
         </div>
@@ -118,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { CheckCircleIcon, ArrowLeftIcon } from "@heroicons/vue/24/outline";
+import { CheckCircle, ArrowLeft } from "lucide-vue-next";
 import { validateEmail } from "@/lib/utils";
 
 // TODO: Import authentication composable/store

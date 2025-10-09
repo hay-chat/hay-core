@@ -5,6 +5,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Organization } from "@server/entities/organization.entity";
+import { Not, IsNull } from "typeorm";
 import {
   hashPassword,
   verifyPassword,
@@ -15,6 +16,9 @@ import {
 import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
 import { protectedProcedure, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
 import type { ApiKeyResponse } from "@server/types/auth.types";
+import { auditLogService } from "@server/services/audit-log.service";
+import { emailService } from "@server/services/email.service";
+import * as crypto from "crypto";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -349,8 +353,407 @@ export const authRouter = t.router({
       user.password = await hashPassword(input.newPassword, "argon2");
       await userRepository.save(user);
 
+      // Log password change
+      try {
+        await auditLogService.logPasswordChange(user.id, {
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+
+        // Send email notification
+        await emailService.initialize();
+        await emailService.sendTemplateEmail({
+          to: user.email,
+          subject: "Your Password Has Been Changed",
+          template: "password-changed",
+          variables: {
+            userName: user.getFullName(),
+            userEmail: user.email,
+            companyName: "Hay",
+            changedAt: new Date().toLocaleString(),
+            ipAddress: ctx.ipAddress || "Unknown",
+            browser: ctx.userAgent || "Unknown",
+            location: "Unknown", // TODO: Add geolocation lookup
+            supportUrl: "https://hay.chat/support",
+            currentYear: new Date().getFullYear().toString(),
+            companyAddress: "Hay Platform",
+            websiteUrl: "https://hay.chat",
+            preferencesUrl: "https://hay.chat/settings",
+            recipientEmail: user.email,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to log password change or send email:", error);
+        // Don't fail the password change if logging/email fails
+      }
+
       return { success: true };
     }),
+
+  verifyPassword: protectedProcedure
+    .input(
+      z.object({
+        password: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      // Verify password
+      const isValidPassword = await verifyPassword(input.password, user.password);
+
+      if (!isValidPassword) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Password is incorrect",
+        });
+      }
+
+      return { success: true };
+    }),
+
+  updateProfile: protectedProcedure
+    .input(
+      z.object({
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      const changes: Record<string, any> = {};
+
+      if (input.firstName !== undefined && input.firstName !== user.firstName) {
+        changes.firstName = { old: user.firstName, new: input.firstName };
+        user.firstName = input.firstName;
+      }
+
+      if (input.lastName !== undefined && input.lastName !== user.lastName) {
+        changes.lastName = { old: user.lastName, new: input.lastName };
+        user.lastName = input.lastName;
+      }
+
+      if (Object.keys(changes).length > 0) {
+        await userRepository.save(user);
+
+        // Log profile update
+        try {
+          await auditLogService.logProfileUpdate(user.id, changes, {
+            ipAddress: ctx.ipAddress,
+            userAgent: ctx.userAgent,
+          });
+        } catch (error) {
+          console.error("Failed to log profile update:", error);
+        }
+      }
+
+      return {
+        success: true,
+        user: user.toJSON(),
+      };
+    }),
+
+  updateEmail: protectedProcedure
+    .input(
+      z.object({
+        newEmail: z.string().email(),
+        currentPassword: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      // Verify current password for re-authentication
+      const isValidPassword = await verifyPassword(input.currentPassword, user.password);
+      if (!isValidPassword) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Current password is incorrect",
+        });
+      }
+
+      // Check if new email is already in use
+      const existingUser = await userRepository.findOne({
+        where: { email: input.newEmail.toLowerCase() },
+      });
+
+      if (existingUser && existingUser.id !== user.id) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Email address is already in use",
+        });
+      }
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = await hashPassword(verificationToken, "argon2");
+
+      // Store pending email and token
+      const oldEmail = user.email;
+      user.pendingEmail = input.newEmail.toLowerCase();
+      user.emailVerificationTokenHash = tokenHash;
+      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      await userRepository.save(user);
+
+      // Send verification emails
+      try {
+        console.log("📧 [updateEmail] Initializing email service...");
+        await emailService.initialize();
+        console.log("✅ [updateEmail] Email service initialized");
+
+        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+
+        console.log("🔗 [updateEmail] Verification URL:", verificationUrl);
+        console.log("📬 [updateEmail] Sending to NEW email:", input.newEmail.toLowerCase());
+        console.log("📬 [updateEmail] Sending to OLD email:", oldEmail);
+
+        const commonVariables = {
+          userName: user.getFullName(),
+          oldEmail,
+          newEmail: input.newEmail.toLowerCase(),
+          companyName: "Hay",
+          requestTime: new Date().toLocaleString(),
+          ipAddress: ctx.ipAddress || "Unknown",
+          browser: ctx.userAgent || "Unknown",
+          location: "Unknown", // TODO: Add geolocation lookup
+          supportUrl: `${baseUrl}/support`,
+          cancelUrl: `${baseUrl}/settings/profile`,
+          currentYear: new Date().getFullYear().toString(),
+          companyAddress: "Hay Platform",
+          websiteUrl: "https://hay.chat",
+          preferencesUrl: `${baseUrl}/settings`,
+        };
+
+        // Send verification email to NEW email
+        console.log("📤 [updateEmail] Sending verification email to NEW address...");
+        const result1 = await emailService.sendTemplateEmail({
+          to: input.newEmail.toLowerCase(),
+          subject: "Verify Your New Email Address",
+          template: "verify-email-change",
+          variables: {
+            ...commonVariables,
+            verificationUrl,
+            recipientEmail: input.newEmail.toLowerCase(),
+          },
+        });
+        console.log("📨 [updateEmail] Verification email result:", result1);
+
+        // Send notification to OLD email
+        console.log("📤 [updateEmail] Sending notification to OLD address...");
+        const result2 = await emailService.sendTemplateEmail({
+          to: oldEmail,
+          subject: "Email Change Pending Verification",
+          template: "email-change-pending",
+          variables: {
+            ...commonVariables,
+            recipientEmail: oldEmail,
+          },
+        });
+        console.log("📨 [updateEmail] Notification email result:", result2);
+
+        console.log("✅ [updateEmail] All emails sent successfully");
+      } catch (error) {
+        console.error("❌ [updateEmail] Failed to send verification emails:", error);
+        console.error("❌ [updateEmail] Error stack:", error instanceof Error ? error.stack : "No stack");
+        // Rollback the pending email change
+        user.clearEmailVerification();
+        await userRepository.save(user);
+        console.log("🔄 [updateEmail] Rolled back pending email change");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to send verification email. Please try again.",
+        });
+      }
+
+      return {
+        success: true,
+        message: "Verification email sent. Please check your new email address to complete the change.",
+        pendingEmail: user.pendingEmail,
+      };
+    }),
+
+  getRecentSecurityEvents: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().optional().default(10),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const events = await auditLogService.getRecentSecurityEvents(ctx.user!.id, input.limit);
+      return events;
+    }),
+
+  verifyEmailChange: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const userRepository = AppDataSource.getRepository(User);
+
+      // Find all users with pending email changes (shouldn't be many)
+      const usersWithPending = await userRepository.find({
+        where: {
+          emailVerificationTokenHash: Not(IsNull()),
+        },
+      });
+
+      // Find the user with the matching token
+      let user: User | null = null;
+      for (const u of usersWithPending) {
+        if (u.emailVerificationTokenHash) {
+          const isValid = await verifyPassword(input.token, u.emailVerificationTokenHash);
+          if (isValid) {
+            user = u;
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired verification token",
+        });
+      }
+
+      // Check if token has expired
+      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
+        user.clearEmailVerification();
+        await userRepository.save(user);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Verification token has expired. Please request a new email change.",
+        });
+      }
+
+      if (!user.pendingEmail) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No pending email change found",
+        });
+      }
+
+      // Update email
+      const oldEmail = user.email;
+      const newEmail = user.pendingEmail;
+      user.email = newEmail;
+      user.clearEmailVerification();
+      await userRepository.save(user);
+
+      // Log email change
+      try {
+        await auditLogService.logEmailChange(user.id, oldEmail, newEmail, {
+          metadata: { verificationMethod: "email_token" },
+        });
+
+        // Send confirmation emails
+        await emailService.initialize();
+
+        const emailVariables = {
+          userName: user.getFullName(),
+          userEmail: newEmail,
+          oldEmail,
+          newEmail,
+          companyName: "Hay",
+          changedAt: new Date().toLocaleString(),
+          ipAddress: "Unknown",
+          location: "Unknown",
+          supportUrl: "https://hay.chat/support",
+          currentYear: new Date().getFullYear().toString(),
+          companyAddress: "Hay Platform",
+          websiteUrl: "https://hay.chat",
+          preferencesUrl: "https://hay.chat/settings",
+          recipientEmail: newEmail,
+        };
+
+        // Notify both old and new email
+        await emailService.sendTemplateEmail({
+          to: oldEmail,
+          subject: "Your Email Address Has Been Changed",
+          template: "email-changed",
+          variables: { ...emailVariables, recipientEmail: oldEmail },
+        });
+
+        await emailService.sendTemplateEmail({
+          to: newEmail,
+          subject: "Your Email Address Has Been Changed",
+          template: "email-changed",
+          variables: emailVariables,
+        });
+      } catch (error) {
+        console.error("Failed to send confirmation emails:", error);
+        // Don't fail the verification if email sending fails
+      }
+
+      return {
+        success: true,
+        message: "Email address successfully updated",
+      };
+    }),
+
+  cancelEmailChange: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    if (!user.pendingEmail) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No pending email change found",
+      });
+    }
+
+    // Clear pending email change
+    user.clearEmailVerification();
+    await userRepository.save(user);
+
+    return {
+      success: true,
+      message: "Email change cancelled successfully",
+    };
+  }),
 
   // API Key management
   createApiKey: protectedProcedure

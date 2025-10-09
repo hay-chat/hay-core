@@ -58,6 +58,93 @@
         "companyName",
         "timestamp"
       ]
+    },
+    {
+      "id": "verify-email-change",
+      "name": "Verify Email Change",
+      "description": "Sent to new email address for verification",
+      "category": "security",
+      "variables": [
+        "userName",
+        "oldEmail",
+        "newEmail",
+        "verificationUrl",
+        "requestTime",
+        "ipAddress",
+        "browser",
+        "location",
+        "supportUrl",
+        "cancelUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "email-change-pending",
+      "name": "Email Change Pending",
+      "description": "Sent to old email when change is requested",
+      "category": "security",
+      "variables": [
+        "userName",
+        "oldEmail",
+        "newEmail",
+        "cancelUrl",
+        "requestTime",
+        "ipAddress",
+        "browser",
+        "location",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "email-changed",
+      "name": "Email Changed",
+      "description": "Sent to old email after successful change",
+      "category": "security",
+      "variables": [
+        "userName",
+        "oldEmail",
+        "newEmail",
+        "requestTime",
+        "ipAddress",
+        "browser",
+        "location",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "password-changed",
+      "name": "Password Changed",
+      "description": "Sent after password change",
+      "category": "security",
+      "variables": [
+        "userName",
+        "userEmail",
+        "requestTime",
+        "ipAddress",
+        "browser",
+        "location",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "profile-updated",
+      "name": "Profile Updated",
+      "description": "Sent after profile information is updated",
+      "category": "security",
+      "variables": [
+        "userName",
+        "userEmail",
+        "changedFields",
+        "requestTime",
+        "ipAddress",
+        "browser",
+        "location",
+        "supportUrl",
+        "companyName"
+      ]
     }
   ],
   "defaultVariables": {

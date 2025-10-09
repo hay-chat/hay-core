@@ -87,8 +87,17 @@ export class EmailService {
    * Send an email
    */
   async sendEmail(options: EmailOptions): Promise<EmailResult> {
+    console.log("📧 [EmailService] sendEmail called with:", {
+      to: options.to,
+      subject: options.subject,
+      from: options.from,
+      smtpEnabled: config.smtp.enabled,
+    });
+
     if (!config.smtp.enabled) {
-      console.log("SMTP disabled. Would send email:", options);
+      console.log("⚠️ [EmailService] SMTP disabled. Would send email to:", options.to);
+      console.log("📝 [EmailService] Email subject:", options.subject);
+      console.log("📄 [EmailService] Email preview (first 200 chars):", options.html?.substring(0, 200));
       return {
         success: true,
         messageId: `mock-${uuidv4()}`,
@@ -97,6 +106,7 @@ export class EmailService {
     }
 
     if (!this.transporter) {
+      console.error("❌ [EmailService] Email service not initialized");
       throw new Error("Email service not initialized");
     }
 
@@ -117,7 +127,13 @@ export class EmailService {
     };
 
     try {
+      console.log("📤 [EmailService] Sending email via SMTP...");
       const info = await this.transporter.sendMail(mailOptions);
+      console.log("✅ [EmailService] Email sent successfully:", {
+        messageId: info.messageId,
+        response: info.response,
+        to: options.to,
+      });
       return {
         success: true,
         messageId: info.messageId,
@@ -125,11 +141,17 @@ export class EmailService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("Failed to send email:", errorMessage);
-      
+      console.error("❌ [EmailService] Failed to send email:", {
+        error: errorMessage,
+        to: options.to,
+        subject: options.subject,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       // Add to retry queue
       const queueItem = this.addToQueue(options);
-      
+      console.log("🔄 [EmailService] Added to retry queue:", queueItem.id);
+
       return {
         success: false,
         error: errorMessage,
@@ -141,7 +163,16 @@ export class EmailService {
    * Send an email using a template
    */
   async sendTemplateEmail(options: EmailTemplateOptions): Promise<EmailResult> {
+    console.log("📝 [EmailService] sendTemplateEmail called:", {
+      template: options.template,
+      to: options.to,
+      subject: options.subject,
+      variablesProvided: !!options.variables,
+      variableKeys: options.variables ? Object.keys(options.variables) : [],
+    });
+
     try {
+      console.log("🎨 [EmailService] Rendering template:", options.template);
       const { html, text } = await this.templateService.render({
         template: options.template,
         variables: options.variables || {},
@@ -149,12 +180,14 @@ export class EmailService {
         stripComments: true,
         minify: true,
       });
+      console.log("✅ [EmailService] Template rendered successfully");
 
       // Get template to extract subject
       const template = this.templateService.getTemplate(options.template);
       let subject = options.subject;
-      
+
       if (!subject && template) {
+        console.log("📋 [EmailService] Using template subject:", template.subject);
         // Replace variables in subject
         subject = template.subject;
         if (options.variables) {
@@ -171,9 +204,15 @@ export class EmailService {
         text,
       };
 
+      console.log("📨 [EmailService] Sending template email with subject:", subject);
       return await this.sendEmail(emailOptions);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("❌ [EmailService] Template email failed:", {
+        error: errorMessage,
+        template: options.template,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return {
         success: false,
         error: `Template email failed: ${errorMessage}`,

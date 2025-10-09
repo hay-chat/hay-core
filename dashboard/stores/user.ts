@@ -20,6 +20,8 @@ export interface User {
   lastSeenAt?: Date;
   status?: "available" | "away";
   onlineStatus?: "online" | "away" | "offline";
+  pendingEmail?: string;
+  emailVerificationExpiresAt?: Date;
 }
 
 export const useUserStore = defineStore("user", {

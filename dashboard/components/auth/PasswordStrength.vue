@@ -16,28 +16,28 @@
       <p class="text-sm text-gray-600">Password must contain:</p>
       <ul class="space-y-1">
         <li :class="requirementClass(validation.hasMinLength)">
-          <CheckIcon v-if="validation.hasMinLength" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <Check v-if="validation.hasMinLength" class="h-3 w-3" />
+          <X v-else class="h-3 w-3" />
           At least 8 characters
         </li>
         <li :class="requirementClass(validation.hasUpperCase)">
-          <CheckIcon v-if="validation.hasUpperCase" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <Check v-if="validation.hasUpperCase" class="h-3 w-3" />
+          <X v-else class="h-3 w-3" />
           One uppercase letter
         </li>
         <li :class="requirementClass(validation.hasLowerCase)">
-          <CheckIcon v-if="validation.hasLowerCase" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <Check v-if="validation.hasLowerCase" class="h-3 w-3" />
+          <X v-else class="h-3 w-3" />
           One lowercase letter
         </li>
         <li :class="requirementClass(validation.hasNumber)">
-          <CheckIcon v-if="validation.hasNumber" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <Check v-if="validation.hasNumber" class="h-3 w-3" />
+          <X v-else class="h-3 w-3" />
           One number
         </li>
         <li :class="requirementClass(validation.hasSpecialChar)">
-          <CheckIcon v-if="validation.hasSpecialChar" class="h-3 w-3" />
-          <XMarkIcon v-else class="h-3 w-3" />
+          <Check v-if="validation.hasSpecialChar" class="h-3 w-3" />
+          <X v-else class="h-3 w-3" />
           One special character
         </li>
       </ul>
@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { Check, X } from "lucide-vue-next";
 import { validatePassword } from "@/lib/utils";
 
 export interface PasswordStrengthProps {
