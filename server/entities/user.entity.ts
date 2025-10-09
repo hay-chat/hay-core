@@ -155,8 +155,8 @@ export class User extends BaseEntity {
    * Clear email verification fields
    */
   clearEmailVerification(): void {
-    this.pendingEmail = undefined;
-    this.emailVerificationTokenHash = undefined;
-    this.emailVerificationExpiresAt = undefined;
+    this.pendingEmail = null as any;
+    this.emailVerificationTokenHash = null as any;
+    this.emailVerificationExpiresAt = null as any;
   }
 }

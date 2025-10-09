@@ -300,6 +300,7 @@ export const authRouter = t.router({
     return {
       id: user.id,
       email: user.email,
+      pendingEmail: user.pendingEmail,
       firstName: user.firstName,
       lastName: user.lastName,
       isActive: user.isActive,
@@ -588,8 +589,11 @@ export const authRouter = t.router({
         console.error("❌ [updateEmail] Failed to send verification emails:", error);
         console.error("❌ [updateEmail] Error stack:", error instanceof Error ? error.stack : "No stack");
         // Rollback the pending email change
-        user.clearEmailVerification();
-        await userRepository.save(user);
+        await userRepository.update(user.id, {
+          pendingEmail: null as any,
+          emailVerificationTokenHash: null as any,
+          emailVerificationExpiresAt: null as any,
+        });
         console.log("🔄 [updateEmail] Rolled back pending email change");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -652,8 +656,11 @@ export const authRouter = t.router({
 
       // Check if token has expired
       if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
-        user.clearEmailVerification();
-        await userRepository.save(user);
+        await userRepository.update(user.id, {
+          pendingEmail: null as any,
+          emailVerificationTokenHash: null as any,
+          emailVerificationExpiresAt: null as any,
+        });
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Verification token has expired. Please request a new email change.",
@@ -667,12 +674,19 @@ export const authRouter = t.router({
         });
       }
 
-      // Update email
+      // Update email and clear verification fields
       const oldEmail = user.email;
       const newEmail = user.pendingEmail;
-      user.email = newEmail;
-      user.clearEmailVerification();
-      await userRepository.save(user);
+
+      await userRepository.update(user.id, {
+        email: newEmail,
+        pendingEmail: null as any,
+        emailVerificationTokenHash: null as any,
+        emailVerificationExpiresAt: null as any,
+      });
+
+      // Reload user to get updated data
+      user = (await userRepository.findOne({ where: { id: user.id } }))!;
 
       // Log email change
       try {
@@ -746,12 +760,93 @@ export const authRouter = t.router({
     }
 
     // Clear pending email change
-    user.clearEmailVerification();
-    await userRepository.save(user);
+    await userRepository.update(user.id, {
+      pendingEmail: null as any,
+      emailVerificationTokenHash: null as any,
+      emailVerificationExpiresAt: null as any,
+    });
 
     return {
       success: true,
       message: "Email change cancelled successfully",
+    };
+  }),
+
+  resendEmailVerification: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    if (!user.pendingEmail) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No pending email change found",
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = await hashPassword(verificationToken, "argon2");
+
+    // Update token and expiry
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await userRepository.save(user);
+
+    // Send verification email
+    try {
+      await emailService.initialize();
+
+      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+
+      const commonVariables = {
+        userName: user.getFullName(),
+        oldEmail: user.email,
+        newEmail: user.pendingEmail,
+        companyName: "Hay",
+        requestTime: new Date().toLocaleString(),
+        ipAddress: ctx.ipAddress || "Unknown",
+        browser: ctx.userAgent || "Unknown",
+        location: "Unknown",
+        supportUrl: `${baseUrl}/support`,
+        cancelUrl: `${baseUrl}/settings/profile`,
+        currentYear: new Date().getFullYear().toString(),
+        companyAddress: "Hay Platform",
+        websiteUrl: "https://hay.chat",
+        preferencesUrl: `${baseUrl}/settings`,
+      };
+
+      // Send verification email to new email address
+      await emailService.sendTemplateEmail({
+        to: user.pendingEmail,
+        subject: "Verify Your New Email Address",
+        template: "verify-email-change",
+        variables: {
+          ...commonVariables,
+          verificationUrl,
+          recipientEmail: user.pendingEmail,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to resend verification email:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to resend verification email. Please try again.",
+      });
+    }
+
+    return {
+      success: true,
+      message: "Verification email resent successfully",
     };
   }),
 

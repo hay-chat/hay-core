@@ -2,11 +2,7 @@
   <component
     :is="componentTag"
     :href="href"
-    :class="[
-      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs transition-colors font-semibold',
-      variantClasses,
-      isInteractive && 'cursor-pointer',
-    ]"
+    :class="['badge', `badge--${variant}`, isInteractive && 'badge--interactive']"
     @click="onClick"
   >
     <slot />
@@ -40,27 +36,69 @@ const onClick = (event: MouseEvent) => {
   }
   emit("click", event);
 };
-
-const variantClasses = computed(() => {
-  const baseVariants = {
-    default: "bg-primary text-primary-foreground",
-    secondary: "bg-background-secondary text-secondary-foreground",
-    destructive: "bg-destructive text-destructive-foreground",
-    outline: "border border-input bg-background",
-    success: "bg-green-100 text-green-800",
-  };
-
-  const hoverVariants = {
-    default: "hover:bg-primary/80",
-    secondary: "hover:bg-background-secondary/80",
-    destructive: "hover:bg-destructive/80",
-    outline: "hover:bg-accent hover:text-accent-foreground",
-    success: "hover:bg-green-200",
-  };
-
-  const baseClass = baseVariants[props.variant];
-  const hoverClass = isInteractive.value ? hoverVariants[props.variant] : "";
-
-  return `${baseClass} ${hoverClass}`.trim();
-});
 </script>
+
+<style lang="scss">
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  white-space: nowrap;
+
+  &--default {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  &--secondary {
+    background-color: var(--color-neutral-50);
+    color: var(--color-neutral-700);
+  }
+
+  &--destructive {
+    background-color: var(--color-destructive);
+    color: var(--color-destructive-foreground);
+  }
+
+  &--outline {
+    border: 1px solid var(--color-input);
+    background-color: var(--color-background);
+  }
+
+  &--success {
+    background-color: rgb(220, 252, 231);
+    color: rgb(22, 101, 52);
+  }
+
+  &--interactive {
+    cursor: pointer;
+
+    &.badge--default:hover {
+      background-color: var(--color-primary) / 0.8;
+    }
+
+    &.badge--secondary:hover {
+      background-color: var(--color-background-secondary) / 0.8;
+    }
+
+    &.badge--destructive:hover {
+      background-color: var(--color-destructive) / 0.8;
+    }
+
+    &.badge--outline:hover {
+      background-color: var(--color-accent);
+      color: var(--color-accent-foreground);
+    }
+
+    &.badge--success:hover {
+      background-color: rgb(187, 247, 208);
+    }
+  }
+}
+</style>

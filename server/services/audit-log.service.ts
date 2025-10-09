@@ -168,16 +168,16 @@ export class AuditLogService {
     const queryBuilder = this.auditLogRepository
       .createQueryBuilder("audit_log")
       .leftJoinAndSelect("audit_log.user", "user")
-      .orderBy("audit_log.createdAt", "DESC");
+      .orderBy("audit_log.created_at", "DESC");
 
     if (options.userId) {
-      queryBuilder.andWhere("audit_log.user_id = :userId", {
+      queryBuilder.andWhere("audit_log.userId = :userId", {
         userId: options.userId,
       });
     }
 
     if (options.organizationId) {
-      queryBuilder.andWhere("audit_log.organization_id = :organizationId", {
+      queryBuilder.andWhere("audit_log.organizationId = :organizationId", {
         organizationId: options.organizationId,
       });
     }
@@ -189,13 +189,13 @@ export class AuditLogService {
     }
 
     if (options.startDate) {
-      queryBuilder.andWhere("audit_log.created_at >= :startDate", {
+      queryBuilder.andWhere("audit_log.createdAt >= :startDate", {
         startDate: options.startDate,
       });
     }
 
     if (options.endDate) {
-      queryBuilder.andWhere("audit_log.created_at <= :endDate", {
+      queryBuilder.andWhere("audit_log.createdAt <= :endDate", {
         endDate: options.endDate,
       });
     }

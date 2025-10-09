@@ -1,5 +1,5 @@
 <template>
-  <Page>
+  <Page width="max">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">

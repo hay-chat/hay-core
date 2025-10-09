@@ -52,39 +52,28 @@
     <!-- Filters and Search -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
-        <div class="relative">
-          <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
-          <Input
-            v-model="searchQuery"
-            placeholder="Search conversations..."
-            class="pl-8 w-[300px]"
-          />
-        </div>
+        <Input
+          v-model="searchQuery"
+          placeholder="Search conversations..."
+          :icon-start="Search"
+          class="w-[300px]"
+        />
 
-        <select v-model="selectedStatus" class="px-3 py-2 text-sm border border-input rounded-md">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="resolved">Resolved</option>
-          <option value="escalated">Escalated</option>
-          <option value="closed">Closed</option>
-        </select>
+        <Input
+          v-model="selectedStatus"
+          type="select"
+          :options="statusOptions"
+          placeholder="All Status"
+        />
 
-        <select v-model="selectedAgent" class="px-3 py-2 text-sm border border-input rounded-md">
-          <option value="">All Agents</option>
-          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-            {{ agent.name }}
-          </option>
-        </select>
+        <Input
+          v-model="selectedAgent"
+          type="select"
+          :options="agentOptions"
+          placeholder="All Agents"
+        />
 
-        <select
-          v-model="selectedTimeframe"
-          class="px-3 py-2 text-sm border border-input rounded-md"
-        >
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="all">All Time</option>
-        </select>
+        <Input v-model="selectedTimeframe" type="select" :options="timeframeOptions" />
       </div>
 
       <div class="flex items-center space-x-2">
@@ -163,13 +152,12 @@
                   @update:checked="toggleSelectAll"
                 />
               </TableHead>
-              <TableHead>Customer</TableHead>
+              <TableHead>Conversation</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Assigned To</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Satisfaction</TableHead>
               <TableHead>Updated</TableHead>
-              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -226,24 +214,6 @@
               </TableCell>
               <TableCell class="text-sm text-neutral-muted">
                 {{ formatRelativeTime(conversation.updated_at) }}
-              </TableCell>
-              <TableCell @click.stop>
-                <div class="flex items-center space-x-2">
-                  <Button variant="ghost" size="sm" @click="viewConversation(conversation.id)">
-                    <Eye class="h-4 w-4" />
-                  </Button>
-                  <Button
-                    v-if="conversation.status === 'open' || conversation.status === 'pending-human'"
-                    variant="ghost"
-                    size="sm"
-                    @click="takeOverConversation(conversation.id)"
-                  >
-                    <UserCheck class="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" @click="showMoreActions(conversation.id)">
-                    <MoreHorizontal class="h-4 w-4" />
-                  </Button>
-                </div>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -373,6 +343,27 @@ const agents = ref([
   { id: "2", name: "Sales Assistant" },
   { id: "3", name: "Technical Support" },
 ]);
+
+// Select options
+const statusOptions = [
+  { label: "All Status", value: "" },
+  { label: "Active", value: "active" },
+  { label: "Resolved", value: "resolved" },
+  { label: "Escalated", value: "escalated" },
+  { label: "Closed", value: "closed" },
+];
+
+const agentOptions = computed(() => [
+  { label: "All Agents", value: "" },
+  ...agents.value.map((agent) => ({ label: agent.name, value: agent.id })),
+]);
+
+const timeframeOptions = [
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "week" },
+  { label: "This Month", value: "month" },
+  { label: "All Time", value: "all" },
+];
 
 // For now, we'll use the conversations directly from API (already paginated)
 // In the future, we should pass filters to the API

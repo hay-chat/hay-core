@@ -2,17 +2,8 @@
   <Page
     title="Profile Settings"
     description="Manage your personal information and account security"
+    width="max"
   >
-    <!-- Header -->
-    <template #header>
-      <div class="flex items-center space-x-2">
-        <Button :disabled="!hasProfileChanges" @click="saveProfile">
-          <Save class="h-4 w-4 mr-2" />
-          Save Changes
-        </Button>
-      </div>
-    </template>
-
     <!-- Profile Information -->
     <Card>
       <CardHeader>
@@ -21,24 +12,24 @@
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
-          <div class="space-y-2">
-            <Label for="firstName">First Name</Label>
-            <Input
-              id="firstName"
-              v-model="profileForm.firstName"
-              placeholder="Enter your first name"
-            />
-          </div>
+          <Input
+            id="firstName"
+            v-model="profileForm.firstName"
+            label="First Name"
+            placeholder="Enter your first name"
+          />
 
-          <div class="space-y-2">
-            <Label for="lastName">Last Name</Label>
-            <Input
-              id="lastName"
-              v-model="profileForm.lastName"
-              placeholder="Enter your last name"
-            />
-          </div>
+          <Input
+            id="lastName"
+            v-model="profileForm.lastName"
+            label="Last Name"
+            placeholder="Enter your last name"
+          />
         </div>
+        <Button :disabled="!hasProfileChanges" @click="saveProfile">
+          <Save class="h-4 w-4 mr-2" />
+          Save Changes
+        </Button>
       </CardContent>
     </Card>
 
@@ -51,49 +42,59 @@
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
-        <div class="space-y-2">
-          <Label for="currentEmail">Current Email</Label>
-          <div class="flex items-center space-x-2">
-            <Input id="currentEmail" :value="currentUser?.email" disabled class="flex-1" />
-            <Badge variant="secondary">Verified</Badge>
-          </div>
+        <div class="flex items-center space-x-2">
+          <Input
+            id="currentEmail"
+            :value="currentUser?.email"
+            label="Current Email"
+            disabled
+            class="flex-1"
+          />
+          <Badge variant="secondary" class="mt-6">Verified</Badge>
         </div>
 
-        <!-- Pending Email Change Notice -->
-        <Alert v-if="currentUser?.pendingEmail" variant="warning">
-          <AlertTriangle class="h-4 w-4" />
-          <AlertTitle>Email Change Pending Verification</AlertTitle>
-          <AlertDescription>
-            <p>
-              A verification email has been sent to <strong>{{ currentUser.pendingEmail }}</strong
-              >.
-            </p>
-            <p class="mt-2 text-sm">
-              Please check your new email inbox and click the verification link to complete the
-              change. The link will expire in 24 hours.
-            </p>
-            <div class="mt-3">
-              <Button variant="outline" size="sm" @click="cancelEmailChange">
-                Cancel Change
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
+        <!-- Pending Email -->
+        <div v-if="currentUser?.pendingEmail" class="space-y-2">
+          <div class="flex items-center space-x-2">
+            <Input
+              id="pendingEmail"
+              :value="currentUser?.pendingEmail"
+              label="Pending Email (Awaiting Verification)"
+              disabled
+              class="flex-1"
+            />
+            <Badge variant="destructive" class="mt-6">Pending</Badge>
+          </div>
+          <div class="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="resendingEmail"
+              @click="resendVerificationEmail"
+            >
+              <Mail class="h-4 w-4 mr-2" />
+              {{ resendingEmail ? "Sending..." : "Resend Verification" }}
+            </Button>
+            <Button variant="outline" size="sm" @click="cancelEmailChange"> Cancel Change </Button>
+          </div>
+          <p class="text-sm text-muted-foreground">
+            Please check your new email inbox and click the verification link to complete the
+            change. The link will expire in 24 hours.
+          </p>
+        </div>
 
         <Separator />
 
-        <div v-if="!currentUser?.pendingEmail" class="space-y-2">
-          <Label for="newEmail">New Email Address</Label>
+        <div v-if="!currentUser?.pendingEmail">
           <Input
             id="newEmail"
             v-model="emailForm.newEmail"
             type="email"
+            label="New Email Address"
             placeholder="Enter new email address"
+            :error="emailError"
             @input="validateEmail"
           />
-          <p v-if="emailError" class="text-sm text-destructive">
-            {{ emailError }}
-          </p>
         </div>
 
         <Alert
@@ -127,52 +128,42 @@
         <CardDescription> Update your password to keep your account secure </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
-        <div class="space-y-2">
-          <Label for="currentPassword">Current Password</Label>
-          <Input
-            id="currentPassword"
-            v-model="passwordForm.currentPassword"
-            type="password"
-            placeholder="Enter current password"
-            autocomplete="current-password"
-          />
-        </div>
+        <Input
+          id="currentPassword"
+          v-model="passwordForm.currentPassword"
+          type="password"
+          label="Current Password"
+          placeholder="Enter current password"
+          autocomplete="current-password"
+        />
 
-        <div class="space-y-2">
-          <Label for="newPassword">New Password</Label>
-          <Input
-            id="newPassword"
-            v-model="passwordForm.newPassword"
-            type="password"
-            placeholder="Enter new password"
-            autocomplete="new-password"
-          />
-        </div>
+        <Input
+          id="newPassword"
+          v-model="passwordForm.newPassword"
+          type="password"
+          label="New Password"
+          placeholder="Enter new password"
+          autocomplete="new-password"
+        />
 
         <PasswordStrength v-if="passwordForm.newPassword" :password="passwordForm.newPassword" />
 
-        <div class="space-y-2">
-          <Label for="confirmPassword">Confirm New Password</Label>
-          <Input
-            id="confirmPassword"
-            v-model="passwordForm.confirmPassword"
-            type="password"
-            placeholder="Confirm new password"
-            autocomplete="new-password"
-          />
-          <p
-            v-if="
-              passwordForm.confirmPassword &&
-              passwordForm.newPassword !== passwordForm.confirmPassword
-            "
-            class="text-sm text-destructive"
-          >
-            Passwords do not match
-          </p>
-        </div>
+        <Input
+          id="confirmPassword"
+          v-model="passwordForm.confirmPassword"
+          type="password"
+          label="Confirm New Password"
+          placeholder="Confirm new password"
+          autocomplete="new-password"
+          :error="
+            passwordForm.confirmPassword &&
+            passwordForm.newPassword !== passwordForm.confirmPassword
+              ? 'Passwords do not match'
+              : undefined
+          "
+        />
 
-        <Alert variant="info">
-          <Shield class="h-4 w-4" />
+        <Alert variant="info" :icon="Shield">
           <AlertTitle>Password Requirements</AlertTitle>
           <AlertDescription>
             Your password must be at least 8 characters and include uppercase, lowercase, number,
@@ -233,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { Save, Mail, Lock, Shield, AlertTriangle, Key, UserX } from "lucide-vue-next";
+import { Save, Mail, Lock, Shield, Key, UserX } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
@@ -269,6 +260,7 @@ const emailForm = reactive({
 });
 
 const emailError = ref("");
+const resendingEmail = ref(false);
 
 const validateEmail = () => {
   if (!emailForm.newEmail) {
@@ -310,8 +302,27 @@ const loadingEvents = ref(false);
 const showReauthModal = ref(false);
 const pendingAction = ref<"email" | null>(null);
 
+// Refresh user data from server
+const refreshUserData = async () => {
+  try {
+    const userData = await Hay.auth.me.query();
+    // Convert date strings to Date objects
+    const userDataWithDates = {
+      ...userData,
+      lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
+      lastLoginAt: userData.lastLoginAt ? new Date(userData.lastLoginAt) : undefined,
+    };
+    userStore.setUser(userDataWithDates);
+  } catch (error) {
+    console.error("Failed to refresh user data:", error);
+  }
+};
+
 // Load user data
 onMounted(async () => {
+  // Refresh user data from server to get latest info including pendingEmail
+  await refreshUserData();
+
   if (currentUser.value) {
     profileForm.firstName = currentUser.value.firstName || "";
     profileForm.lastName = currentUser.value.lastName || "";
@@ -364,13 +375,20 @@ const executeEmailChange = async (password: string) => {
       currentPassword: password,
     });
 
+    console.log("📧 Email change response:", response);
+
     if (response.success) {
+      console.log("✅ Email change successful, pending email:", response.pendingEmail);
+
       // Update user in store with pending email
       if (currentUser.value) {
-        userStore.setUser({
+        const updatedUser = {
           ...currentUser.value,
           pendingEmail: response.pendingEmail,
-        });
+        };
+        console.log("🔄 Updating user in store:", updatedUser);
+        userStore.setUser(updatedUser);
+        console.log("✅ User store updated, currentUser now:", currentUser.value);
       }
       emailForm.newEmail = "";
 
@@ -401,6 +419,23 @@ const cancelEmailChange = async () => {
   } catch (error: any) {
     console.error("Failed to cancel email change:", error);
     toast.error(error.message || "Failed to cancel email change");
+  }
+};
+
+// Resend email verification
+const resendVerificationEmail = async () => {
+  resendingEmail.value = true;
+  try {
+    const response = await Hay.auth.resendEmailVerification.mutate();
+
+    if (response.success) {
+      toast.success("Verification email resent successfully. Please check your inbox.");
+    }
+  } catch (error: any) {
+    console.error("Failed to resend verification email:", error);
+    toast.error(error.message || "Failed to resend verification email");
+  } finally {
+    resendingEmail.value = false;
   }
 };
 

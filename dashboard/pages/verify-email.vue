@@ -75,10 +75,12 @@
 import { CheckCircle, XCircle, Mail } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useUserStore } from "@/stores/user";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const userStore = useUserStore();
 
 // Extract token from URL
 const token = ref((route.query.token as string) || "");
@@ -137,6 +139,19 @@ const verifyEmail = async () => {
     if (response.success) {
       verificationStatus.value = "success";
       toast.success(response.message || "Email verified successfully!");
+
+      // Refresh user data to clear pendingEmail from the store
+      try {
+        const userData = await Hay.auth.me.query();
+        const userDataWithDates = {
+          ...userData,
+          lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
+          lastLoginAt: userData.lastLoginAt ? new Date(userData.lastLoginAt) : undefined,
+        };
+        userStore.setUser(userDataWithDates);
+      } catch (error) {
+        console.error("Failed to refresh user data after verification:", error);
+      }
     }
   } catch (error: any) {
     console.error("Email verification failed:", error);

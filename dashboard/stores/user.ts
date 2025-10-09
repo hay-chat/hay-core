@@ -60,6 +60,8 @@ export const useUserStore = defineStore("user", {
         lastSeenAt: userData.lastSeenAt,
         status: userData.status,
         onlineStatus: userData.onlineStatus,
+        pendingEmail: userData.pendingEmail,
+        emailVerificationExpiresAt: userData.emailVerificationExpiresAt,
       };
 
       // Set organizations if provided
