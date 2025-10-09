@@ -58,6 +58,12 @@ const emit = defineEmits<{
   "close-slash-menu": [];
   keydown: [event: KeyboardEvent];
   "paste-multiline": [lines: string[]];
+  "paste-hierarchical": [
+    items: Array<{
+      instructions: string;
+      level: number;
+    }>,
+  ];
 }>();
 
 const editorRef = ref<HTMLElement | null>(null);
@@ -400,7 +406,17 @@ const setCursorPosition = (element: HTMLElement, position: number) => {
 
 const handlePaste = (e: ClipboardEvent) => {
   e.preventDefault();
+  const html = e.clipboardData?.getData("text/html") || "";
   const text = e.clipboardData?.getData("text/plain") || "";
+
+  // Check if we have HTML list structure
+  if (html && (html.includes("<ol") || html.includes("<ul"))) {
+    const hierarchicalItems = parseHtmlList(html);
+    if (hierarchicalItems.length > 0) {
+      emit("paste-hierarchical", hierarchicalItems);
+      return;
+    }
+  }
 
   // Check if this is a multiline paste
   const lines = text.split("\n").filter((line) => line.trim() !== "");
@@ -428,6 +444,63 @@ const handlePaste = (e: ClipboardEvent) => {
   }
 
   handleInput();
+};
+
+// Parse HTML list structure to extract hierarchical items
+const parseHtmlList = (
+  html: string,
+): Array<{
+  instructions: string;
+  level: number;
+}> => {
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = html;
+
+  const items: Array<{ instructions: string; level: number }> = [];
+
+  const processListItem = (li: Element, level: number) => {
+    // Get the direct text content of the li, excluding nested lists
+    let textContent = "";
+    for (const node of li.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        textContent += node.textContent?.trim() || "";
+      } else if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        (node as Element).tagName !== "OL" &&
+        (node as Element).tagName !== "UL"
+      ) {
+        textContent += (node.textContent?.trim() || "") + " ";
+      }
+    }
+
+    textContent = textContent.trim();
+    if (textContent) {
+      items.push({ instructions: textContent, level });
+    }
+
+    // Process nested lists
+    const nestedLists = li.querySelectorAll(":scope > ol, :scope > ul");
+    nestedLists.forEach((nestedList) => {
+      const nestedItems = nestedList.querySelectorAll(":scope > li");
+      nestedItems.forEach((nestedLi) => {
+        processListItem(nestedLi, level + 1);
+      });
+    });
+  };
+
+  // Find all top-level lists
+  const topLevelLists = tempDiv.querySelectorAll("ol, ul");
+  topLevelLists.forEach((list) => {
+    // Only process if this is a top-level list (not nested inside another list item)
+    if (!list.parentElement?.closest("li")) {
+      const listItems = list.querySelectorAll(":scope > li");
+      listItems.forEach((li) => {
+        processListItem(li, 0);
+      });
+    }
+  });
+
+  return items;
 };
 
 const handleFocus = () => {

@@ -551,4 +551,542 @@ Fourth instruction line`;
 
     console.log("✅ Arrow key navigation at line boundaries works correctly!");
   });
+
+  test("should preserve multi-level list formatting when pasting", async ({ page }) => {
+    console.log("📝 Test: Paste multi-level list preserves hierarchy");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Define multi-level list text to paste with HTML formatting
+    const multiLevelListHTML = `<ol>
+  <li>Level one item
+    <ol>
+      <li>Sub level one</li>
+      <li>Sub level two</li>
+    </ol>
+  </li>
+  <li>Level two item</li>
+</ol>`;
+
+    console.log("📝 Pasting multi-level list HTML");
+
+    // Paste the HTML with structure information
+    await contentEditableElement.evaluate((el, html) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/html", html);
+      // Also set plain text fallback
+      dataTransfer.setData(
+        "text/plain",
+        "1. Level one item\n  1.1. Sub level one\n  1.2. Sub level two\n2. Level two item",
+      );
+
+      const pasteEvent = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      el.dispatchEvent(pasteEvent);
+    }, multiLevelListHTML);
+
+    await page.waitForTimeout(1000);
+
+    // Check the JSON output to verify hierarchical structure was preserved
+    const outputElement = page.locator('[data-testid="instructions-output"]');
+    const outputText = await outputElement.textContent();
+    console.log("📝 JSON output:", outputText);
+
+    const instructions = JSON.parse(outputText || "[]");
+    console.log("📝 Parsed instructions:", JSON.stringify(instructions, null, 2));
+
+    // Verify that the hierarchical structure was created
+    // Should have 4 instructions total (flattened with levels)
+    expect(instructions.length).toBe(4);
+
+    // First item at level 0
+    expect(instructions[0].instructions).toBe("Level one item");
+    expect(instructions[0].level).toBe(0);
+
+    // Nested items at level 1
+    expect(instructions[1].instructions).toBe("Sub level one");
+    expect(instructions[1].level).toBe(1);
+
+    expect(instructions[2].instructions).toBe("Sub level two");
+    expect(instructions[2].level).toBe(1);
+
+    // Second root-level item at level 0
+    expect(instructions[3].instructions).toBe("Level two item");
+    expect(instructions[3].level).toBe(0);
+
+    console.log("✅ Multi-level list structure preserved successfully!");
+  });
+
+  test("should preserve multi-level bullet list formatting when pasting", async ({ page }) => {
+    console.log("📝 Test: Paste multi-level bullet list preserves hierarchy");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Define multi-level bullet list HTML
+    const multiLevelBulletHTML = `<ul>
+  <li>First bullet point
+    <ul>
+      <li>Nested point A</li>
+      <li>Nested point B</li>
+    </ul>
+  </li>
+  <li>Second bullet point</li>
+</ul>`;
+
+    console.log("📝 Pasting multi-level bullet list HTML");
+
+    await contentEditableElement.evaluate((el, html) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/html", html);
+      dataTransfer.setData(
+        "text/plain",
+        "• First bullet point\n  • Nested point A\n  • Nested point B\n• Second bullet point",
+      );
+
+      const pasteEvent = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      el.dispatchEvent(pasteEvent);
+    }, multiLevelBulletHTML);
+
+    await page.waitForTimeout(1000);
+
+    // Check the JSON output to verify hierarchical structure
+    const outputElement = page.locator('[data-testid="instructions-output"]');
+    const outputText = await outputElement.textContent();
+    console.log("📝 JSON output:", outputText);
+
+    const instructions = JSON.parse(outputText || "[]");
+    console.log("📝 Parsed instructions:", JSON.stringify(instructions, null, 2));
+
+    // Verify hierarchical structure (flat with levels)
+    expect(instructions.length).toBe(4);
+
+    // First item at level 0
+    expect(instructions[0].instructions).toBe("First bullet point");
+    expect(instructions[0].level).toBe(0);
+
+    // Nested items at level 1
+    expect(instructions[1].instructions).toBe("Nested point A");
+    expect(instructions[1].level).toBe(1);
+
+    expect(instructions[2].instructions).toBe("Nested point B");
+    expect(instructions[2].level).toBe(1);
+
+    // Second root-level item at level 0
+    expect(instructions[3].instructions).toBe("Second bullet point");
+    expect(instructions[3].level).toBe(0);
+
+    console.log("✅ Multi-level bullet list structure preserved successfully!");
+  });
+
+  test("should delete entire line when selecting all content and pressing backspace", async ({
+    page,
+  }) => {
+    console.log("📝 Test: Selecting entire line and pressing backspace deletes the line");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Paste multi-line text
+    const multiLineText = `First instruction line
+Second instruction line
+Third instruction line
+Fourth instruction line`;
+
+    console.log("📝 Pasting multi-line text:");
+    console.log(multiLineText);
+
+    await contentEditableElement.evaluate((el, text) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/plain", text);
+      const pasteEvent = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      el.dispatchEvent(pasteEvent);
+    }, multiLineText);
+
+    await page.waitForTimeout(1000);
+
+    // Verify that 4 separate instruction objects were created
+    let outputElement = page.locator('[data-testid="instructions-output"]');
+    let outputText = await outputElement.textContent();
+    let instructions = JSON.parse(outputText || "[]");
+
+    console.log(`📝 Instructions after paste: ${instructions.length}`);
+    expect(instructions.length).toBe(4);
+
+    // Navigate to the second instruction and select all its content
+    const secondContentEditable = page.locator(".instruction-content[contenteditable]").nth(1);
+    await secondContentEditable.click();
+    await page.waitForTimeout(200);
+
+    console.log("📝 Selecting all content in the second instruction...");
+
+    // Select all content using Cmd+A (Mac) or Ctrl+A (Windows/Linux)
+    await page.keyboard.press("Meta+a");
+    await page.waitForTimeout(200);
+
+    console.log("📝 Pressing backspace to delete selected content...");
+
+    // Press backspace to delete the selected content
+    await page.keyboard.press("Backspace");
+    await page.waitForTimeout(1000);
+
+    // Get updated JSON output
+    outputElement = page.locator('[data-testid="instructions-output"]');
+    outputText = await outputElement.textContent();
+    instructions = JSON.parse(outputText || "[]");
+
+    console.log("📝 Final instructions structure:", JSON.stringify(instructions, null, 2));
+
+    // When all content is selected and deleted, the instruction should be removed (not joined with previous)
+    // This is actually the desired behavior - selecting all and deleting should remove the line
+    expect(instructions.length).toBe(3);
+
+    // First instruction should remain unchanged
+    expect(instructions[0].instructions).toBe("First instruction line");
+
+    // Second instruction should now be the third line (since the second was deleted)
+    expect(instructions[1].instructions).toBe("Third instruction line");
+
+    // Third instruction should now be the fourth line
+    expect(instructions[2].instructions).toBe("Fourth instruction line");
+
+    console.log("✅ Selected content was deleted and instruction removed - no line joining occurred!");
+  });
+
+  test("should focus last line when clicking on container but not on a line", async ({ page }) => {
+    console.log("📝 Test: Clicking container focuses last line at end position");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Paste multi-line text
+    const multiLineText = `First instruction line
+Second instruction line
+Third instruction line
+Fourth instruction line`;
+
+    console.log("📝 Pasting multi-line text:");
+    console.log(multiLineText);
+
+    await contentEditableElement.evaluate((el, text) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/plain", text);
+      const pasteEvent = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      el.dispatchEvent(pasteEvent);
+    }, multiLineText);
+
+    await page.waitForTimeout(1000);
+
+    // Verify that 4 separate instruction objects were created
+    const outputElement = page.locator('[data-testid="instructions-output"]');
+    const outputText = await outputElement.textContent();
+    const instructions = JSON.parse(outputText || "[]");
+
+    console.log(`📝 Instructions after paste: ${instructions.length}`);
+    expect(instructions.length).toBe(4);
+
+    // Click on the container area (not on a line)
+    const container = page.locator(".instructions-editor-container");
+
+    // Click at the bottom of the container, which should be empty space
+    const containerBox = await container.boundingBox();
+    if (containerBox) {
+      // Click near the bottom-left of the container (in empty space)
+      await page.mouse.click(containerBox.x + 10, containerBox.y + containerBox.height - 20);
+      await page.waitForTimeout(500);
+    }
+
+    // Verify that the last line is now focused
+    const fourthContentEditable = page.locator(".instruction-content[contenteditable]").nth(3);
+    const isFocused = await fourthContentEditable.evaluate((el) => el === document.activeElement);
+
+    console.log(`📝 Fourth line is focused: ${isFocused}`);
+    expect(isFocused).toBe(true);
+
+    // Verify cursor is at the end of the last line
+    const cursorAtEnd = await fourthContentEditable.evaluate(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const el = document.activeElement as HTMLElement;
+
+        // Check if the cursor is at the end
+        const testRange = range.cloneRange();
+        testRange.selectNodeContents(el);
+        testRange.collapse(false); // Collapse to end
+
+        // Compare the two ranges
+        return range.compareBoundaryPoints(Range.END_TO_END, testRange) === 0;
+      }
+      return false;
+    });
+
+    console.log(`📝 Cursor is at end of line: ${cursorAtEnd}`);
+    expect(cursorAtEnd).toBe(true);
+
+    console.log("✅ Clicking container focuses last line with cursor at end!");
+  });
+
+  test("should place cursor at beginning of new line when pressing Enter in the middle of a line", async ({
+    page,
+  }) => {
+    console.log("📝 Test: Enter in middle of line places cursor at beginning of new line");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Type some text
+    const testText = "This is a test line with content";
+    await contentEditableElement.type(testText);
+    await page.waitForTimeout(500);
+
+    console.log(`📝 Typed text: "${testText}"`);
+
+    // Move cursor to the middle of the line (after "test ")
+    await contentEditableElement.evaluate((el) => {
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        // Find the text node
+        const textNode = el.firstChild;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          // Position cursor after "This is a test " (15 characters)
+          range.setStart(textNode, 15);
+          range.setEnd(textNode, 15);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    });
+
+    await page.waitForTimeout(200);
+
+    console.log("📝 Moved cursor to middle of line (after 'This is a test ')");
+
+    // Press Enter to split the line
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1000);
+
+    // Get the JSON output to verify the split
+    const outputElement = page.locator('[data-testid="instructions-output"]');
+    const outputText = await outputElement.textContent();
+    const instructions = JSON.parse(outputText || "[]");
+
+    console.log("📝 Instructions after Enter:", JSON.stringify(instructions, null, 2));
+
+    // Should have 2 instructions now
+    expect(instructions.length).toBe(2);
+
+    // First instruction should have the text before the cursor
+    expect(instructions[0].instructions).toBe("This is a test ");
+
+    // Second instruction should have the text after the cursor
+    expect(instructions[1].instructions).toBe("line with content");
+
+    // Verify that the second line is now focused
+    const secondContentEditable = page.locator(".instruction-content[contenteditable]").nth(1);
+    const isFocused = await secondContentEditable.evaluate((el) => el === document.activeElement);
+
+    console.log(`📝 Second line is focused: ${isFocused}`);
+    expect(isFocused).toBe(true);
+
+    // Verify cursor is at the BEGINNING of the second line (not the end)
+    const cursorInfo = await secondContentEditable.evaluate(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const el = document.activeElement as HTMLElement;
+
+        // Get the text offset from the beginning of the contenteditable
+        let textOffset = 0;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        let currentNode;
+        while ((currentNode = walker.nextNode())) {
+          if (currentNode === range.startContainer) {
+            textOffset += range.startOffset;
+            break;
+          }
+          textOffset += currentNode.textContent?.length || 0;
+        }
+
+        return {
+          isAtStart: textOffset === 0,
+          textOffset,
+          contentLength: el.textContent?.length || 0,
+          startOffset: range.startOffset,
+          endOffset: range.endOffset,
+        };
+      }
+      return { isAtStart: false, textOffset: -1, contentLength: 0, startOffset: -1, endOffset: -1 };
+    });
+
+    console.log(
+      `📝 Cursor position - isAtStart: ${cursorInfo.isAtStart}, textOffset: ${cursorInfo.textOffset}, contentLength: ${cursorInfo.contentLength}, startOffset: ${cursorInfo.startOffset}, endOffset: ${cursorInfo.endOffset}`,
+    );
+    expect(cursorInfo.isAtStart).toBe(true);
+
+    console.log("✅ Enter in middle of line splits correctly with cursor at start of new line!");
+  });
+
+  test("should create new empty line and move cursor when pressing Enter at end of line", async ({
+    page,
+  }) => {
+    console.log("📝 Test: Enter at end of line creates new empty line with cursor positioned");
+
+    const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
+    await expect(instructionsEditor).toBeVisible({ timeout: 10000 });
+
+    const contentEditableElement = page.locator(".instruction-content[contenteditable]").first();
+    await expect(contentEditableElement).toBeVisible({ timeout: 5000 });
+    await contentEditableElement.click();
+
+    // Paste multi-line text
+    const multiLineText = `First instruction line
+Second instruction line
+Third instruction line
+Fourth instruction line`;
+
+    console.log("📝 Pasting multi-line text:");
+    console.log(multiLineText);
+
+    await contentEditableElement.evaluate((el, text) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/plain", text);
+      const pasteEvent = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      el.dispatchEvent(pasteEvent);
+    }, multiLineText);
+
+    await page.waitForTimeout(1000);
+
+    // Verify that 4 separate instruction objects were created
+    let outputElement = page.locator('[data-testid="instructions-output"]');
+    let outputText = await outputElement.textContent();
+    let instructions = JSON.parse(outputText || "[]");
+
+    console.log(`📝 Instructions after paste: ${instructions.length}`);
+    expect(instructions.length).toBe(4);
+
+    // Verify cursor is at the end of the 4th line (which happens after paste)
+    const fourthContentEditable = page.locator(".instruction-content[contenteditable]").nth(3);
+    const isFourthFocused = await fourthContentEditable.evaluate(
+      (el) => el === document.activeElement,
+    );
+
+    console.log(`📝 Fourth line is focused after paste: ${isFourthFocused}`);
+    expect(isFourthFocused).toBe(true);
+
+    console.log("📝 Pressing Enter at the end of line 4...");
+
+    // Press Enter to create a new line
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1000);
+
+    // Note: Empty instructions are filtered out from the JSON output by design
+    // So we need to check the DOM instead of the JSON
+    const instructionCount = await page.locator(".instruction-item-wrapper").count();
+    console.log(`📝 Number of instruction items in DOM: ${instructionCount}`);
+
+    // Should have 5 instructions in the DOM now (including the empty one)
+    expect(instructionCount).toBe(5);
+
+    // Verify the JSON still has 4 (empty ones are filtered out)
+    outputElement = page.locator('[data-testid="instructions-output"]');
+    outputText = await outputElement.textContent();
+    instructions = JSON.parse(outputText || "[]");
+
+    console.log("📝 Instructions after Enter (empty filtered out):", JSON.stringify(instructions, null, 2));
+
+    // JSON should still have 4 (empty instruction is filtered out)
+    expect(instructions.length).toBe(4);
+
+    // Verify that the fifth (new) line is now focused
+    const fifthContentEditable = page.locator(".instruction-content[contenteditable]").nth(4);
+    const isFifthFocused = await fifthContentEditable.evaluate(
+      (el) => el === document.activeElement,
+    );
+
+    console.log(`📝 Fifth (new) line is focused: ${isFifthFocused}`);
+    expect(isFifthFocused).toBe(true);
+
+    // Verify cursor is at the beginning of the new empty line
+    const cursorInfo = await fifthContentEditable.evaluate(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const el = document.activeElement as HTMLElement;
+
+        // Get the text offset from the beginning of the contenteditable
+        let textOffset = 0;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        let currentNode;
+        while ((currentNode = walker.nextNode())) {
+          if (currentNode === range.startContainer) {
+            textOffset += range.startOffset;
+            break;
+          }
+          textOffset += currentNode.textContent?.length || 0;
+        }
+
+        return {
+          textOffset,
+          contentLength: el.textContent?.length || 0,
+          startOffset: range.startOffset,
+          endOffset: range.endOffset,
+        };
+      }
+      return { textOffset: -1, contentLength: 0, startOffset: -1, endOffset: -1 };
+    });
+
+    console.log(
+      `📝 Cursor position in new line - textOffset: ${cursorInfo.textOffset}, contentLength: ${cursorInfo.contentLength}, startOffset: ${cursorInfo.startOffset}, endOffset: ${cursorInfo.endOffset}`,
+    );
+
+    // For an empty line, cursor should be at position 0
+    expect(cursorInfo.textOffset).toBe(0);
+    expect(cursorInfo.contentLength).toBe(0);
+
+    console.log("✅ Enter at end of line creates new empty line with cursor correctly positioned!");
+  });
 });
