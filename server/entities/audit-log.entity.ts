@@ -1,5 +1,14 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
-import { BaseEntity } from "./base.entity";
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  BaseEntity as TypeOrmBaseEntity,
+} from "typeorm";
 import { User } from "./user.entity";
 import { Organization } from "./organization.entity";
 
@@ -19,7 +28,16 @@ export type AuditAction =
 @Index("idx_audit_logs_organization", ["organizationId"])
 @Index("idx_audit_logs_action", ["action"])
 @Index("idx_audit_logs_created_at", ["createdAt"])
-export class AuditLog extends BaseEntity {
+export class AuditLog extends TypeOrmBaseEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ type: "timestamptz" })
+  updatedAt!: Date;
+
   @Column({ type: "uuid" })
   userId!: string;
 

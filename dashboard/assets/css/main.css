@@ -10,6 +10,8 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Inter", sans-serif;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   h1,
@@ -20,5 +22,10 @@
   h6 {
     font-family: "Gabarito", sans-serif;
     font-weight: 500;
+    @apply leading-none tracking-tight;
+  }
+
+  h2 {
+    @apply text-xl;
   }
 }

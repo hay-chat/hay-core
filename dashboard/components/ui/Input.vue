@@ -5,7 +5,7 @@
     <!-- Select Type -->
     <div v-if="type === 'select'" class="select-wrapper">
       <Select v-model="selectValue">
-        <SelectTrigger :class="props.class">
+        <SelectTrigger :class="[props.class, { 'has-error': error }]">
           <SelectValue :placeholder="placeholder" />
         </SelectTrigger>
         <SelectContent>
@@ -29,7 +29,11 @@
         :type="actualInputType"
         :class="[
           props.class,
-          { 'has-icon-start': iconStart, 'has-icon-end': iconEnd || type === 'password' },
+          {
+            'has-icon-start': iconStart,
+            'has-icon-end': iconEnd || type === 'password',
+            'has-error': error,
+          },
         ]"
         :placeholder="placeholder"
         class="input"
@@ -54,12 +58,13 @@
       :id="inputId"
       ref="textareaRef"
       :value="modelValue ?? ''"
-      :class="[props.class, 'input', 'textarea']"
+      :class="[props.class, 'input', 'textarea', { 'has-error': error }]"
       :placeholder="placeholder"
       v-bind="$attrs"
       @input="handleInput"
     />
-    <p v-if="helperText" class="helper-text">{{ helperText }}</p>
+    <p v-if="error" class="error-text">{{ error }}</p>
+    <p v-else-if="hint" class="hint-text">{{ hint }}</p>
   </div>
 </template>
 
@@ -80,7 +85,8 @@ export interface InputProps {
   modelValue?: string | number | undefined;
   type?: "text" | "textarea" | "select" | "password" | "email";
   label?: string;
-  helperText?: string;
+  hint?: string;
+  error?: string;
   iconStart?: Component;
   iconEnd?: Component;
   options?: SelectOption[];
@@ -266,12 +272,29 @@ onMounted(() => {
     cursor: not-allowed;
     opacity: 0.5;
   }
+
+  &.has-error {
+    border-color: var(--color-destructive);
+
+    &:focus-visible {
+      box-shadow:
+        0 0 0 2px var(--color-background),
+        0 0 0 4px var(--color-destructive);
+    }
+  }
 }
 
-.helper-text {
+.hint-text {
   font-size: 0.75rem;
   line-height: 1rem;
   color: var(--color-neutral-muted);
+  margin: 0;
+}
+
+.error-text {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-destructive);
   margin: 0;
 }
 

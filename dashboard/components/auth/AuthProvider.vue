@@ -28,7 +28,7 @@ import { useHeartbeat } from "@/composables/useHeartbeat";
 const authStore = useAuthStore();
 const route = useRoute();
 const showRefreshMessage = ref(false);
-let refreshTimer: NodeJS.Timeout | null = null;
+let refreshTimer: any = null;
 
 // Initialize heartbeat for authenticated users
 const { startHeartbeat, stopHeartbeat } = useHeartbeat();
@@ -40,21 +40,31 @@ const refresh = (e: Event) => {
 
 // Initialize auth on mount if not already done
 onMounted(async () => {
-  // Start timer to show refresh message after 5 seconds
-  refreshTimer = setTimeout(() => {
-    showRefreshMessage.value = true;
-    window.location.reload();
-  }, 5000);
   // Define public paths that don't require authentication
   const publicPaths = new Set(["/login", "/signup", "/forgot-password"]);
   const isPublicPath = publicPaths.has(route.path);
 
   if (!authStore.isInitialized) {
+    // Start timer to show refresh message after 5 seconds
+    refreshTimer = setTimeout(() => {
+      showRefreshMessage.value = true;
+      // Auto-refresh 3 seconds after showing the message (total 8 seconds)
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+    }, 5000);
+
     // Check if we have tokens before trying to initialize
     if (!authStore.tokens?.accessToken) {
       // No tokens, mark as initialized but not authenticated
       authStore.isInitialized = true;
       authStore.isAuthenticated = false;
+
+      // Clear the refresh timer since we handled this case
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
 
       // Only redirect to login if we're not already on a public page
       if (!isPublicPath) {
@@ -65,12 +75,26 @@ onMounted(async () => {
 
     try {
       await authStore.initializeAuth();
+
+      // Clear the refresh timer on successful initialization
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
       // Start heartbeat after successful auth initialization
       if (authStore.isAuthenticated) {
         startHeartbeat();
       }
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);
+
+      // Clear the refresh timer before handling the error
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
       // Only logout and redirect if we're not on a public page
       if (!isPublicPath) {
         authStore.logout();
@@ -83,6 +107,12 @@ onMounted(async () => {
   } else if (authStore.isAuthenticated) {
     // Auth already initialized and authenticated, start heartbeat
     startHeartbeat();
+
+    // Clear the refresh timer since auth is already initialized
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
   }
 });
 
