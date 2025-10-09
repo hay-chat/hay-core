@@ -15,6 +15,7 @@
         @slash-command="handleSlashCommand"
         @close-slash-menu="emit('close-slash-menu')"
         @keydown="handleKeyDown"
+        @paste-multiline="handlePasteMultiline"
       />
     </div>
   </div>
@@ -68,6 +69,8 @@ const emit = defineEmits<{
   outdent: [];
   "navigate-up": [];
   "navigate-down": [];
+  "navigate-left": [];
+  "navigate-right": [];
   "slash-command": [
     data: {
       query: string;
@@ -77,6 +80,7 @@ const emit = defineEmits<{
     },
   ];
   "close-slash-menu": [];
+  "paste-multiline": [lines: string[]];
 }>();
 
 const editorRef = ref<InstanceType<typeof RichInstructionInput> | null>(null);
@@ -102,6 +106,11 @@ const handleSlashCommand = (data: {
   mode?: string;
 }) => {
   emit("slash-command", data);
+};
+
+// Handle multiline paste from RichInstructionInput
+const handlePasteMultiline = (lines: string[]) => {
+  emit("paste-multiline", lines);
 };
 
 // Handle keyboard events from RichInstructionInput
@@ -254,12 +263,50 @@ const handleKeyDown = (e: KeyboardEvent) => {
       }
     });
   } else if (e.key === "Backspace") {
-    if (cursorPosition === 0 && textValue === "") {
-      e.preventDefault();
-      if (props.level > 0) {
-        emit("outdent");
+    if (cursorPosition === 0) {
+      if (textValue === "") {
+        // Empty line - outdent or delete
+        e.preventDefault();
+        if (props.level > 0) {
+          emit("outdent");
+        } else if (props.index > 0) {
+          emit("delete");
+        }
       } else if (props.index > 0) {
-        emit("delete");
+        // Line has content and cursor is at beginning - join with previous line
+        e.preventDefault();
+
+        // Find the previous editor
+        const prevEditor = findPreviousEditor(editor);
+        if (prevEditor) {
+          // Get current content as markdown
+          const richInputComponent = editorRef.value;
+          let currentMarkdownContent = "";
+          if (richInputComponent && richInputComponent.convertToMarkdown) {
+            currentMarkdownContent = richInputComponent.convertToMarkdown(editor.innerHTML);
+          } else {
+            currentMarkdownContent = textValue;
+          }
+
+          // Get previous editor's content length for cursor positioning
+          const prevContentLength = prevEditor.textContent?.length || 0;
+
+          // Append current content to previous editor
+          prevEditor.textContent = (prevEditor.textContent || "") + currentMarkdownContent;
+
+          // Trigger input event to update the model
+          const inputEvent = new Event("input", { bubbles: true });
+          prevEditor.dispatchEvent(inputEvent);
+
+          // Delete current instruction
+          emit("delete");
+
+          // Focus previous editor and position cursor at the join point
+          nextTick(() => {
+            prevEditor.focus();
+            setCursorPosition(prevEditor, prevContentLength);
+          });
+        }
       }
     }
   } else if (e.key === "Tab") {
@@ -316,6 +363,26 @@ const handleKeyDown = (e: KeyboardEvent) => {
     // Move to next item
     e.preventDefault();
     emit("navigate-down");
+  } else if (e.key === "ArrowLeft" && cursorPosition === 0) {
+    // Check if slash command menu is open
+    if (isMenuOpen) {
+      // Menu is open, let the parent handle arrow keys for menu navigation
+      return;
+    }
+
+    // Move to previous item at end of line
+    e.preventDefault();
+    emit("navigate-left");
+  } else if (e.key === "ArrowRight" && cursorPosition === textValue.length) {
+    // Check if slash command menu is open
+    if (isMenuOpen) {
+      // Menu is open, let the parent handle arrow keys for menu navigation
+      return;
+    }
+
+    // Move to next item at beginning of line
+    e.preventDefault();
+    emit("navigate-right");
   }
 };
 
@@ -483,6 +550,39 @@ const findNextEditor = (currentElement: HTMLElement): HTMLElement | null => {
       parentWrapper = parentInstructionWrapper?.parentElement || null;
     } else {
       break;
+    }
+  }
+
+  return null;
+};
+
+// Find the previous contenteditable element in the entire instruction tree
+const findPreviousEditor = (currentElement: HTMLElement): HTMLElement | null => {
+  const currentWrapper = currentElement.closest(".instruction-item-wrapper");
+  if (!currentWrapper) return null;
+
+  // Check for previous sibling
+  const prevSibling = currentWrapper.previousElementSibling;
+  if (prevSibling) {
+    // Find the last contenteditable in the previous sibling's tree
+    const editors = prevSibling.querySelectorAll("[contenteditable]");
+    if (editors.length > 0) {
+      return editors[editors.length - 1] as HTMLElement;
+    }
+  }
+
+  // If no previous sibling, check if we're in a children container
+  const parentWrapper = currentWrapper.parentElement;
+  if (parentWrapper && parentWrapper.classList.contains("children")) {
+    // Get the parent instruction's editor
+    const parentInstructionWrapper = parentWrapper.parentElement;
+    if (parentInstructionWrapper) {
+      const parentEditor = parentInstructionWrapper.querySelector(
+        ":scope > .instruction-item [contenteditable]",
+      );
+      if (parentEditor) {
+        return parentEditor as HTMLElement;
+      }
     }
   }
 

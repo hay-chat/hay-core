@@ -41,8 +41,11 @@
           @outdent="outdent(index)"
           @navigate-up="navigateUp(index)"
           @navigate-down="navigateDown(index)"
+          @navigate-left="navigateUp(index)"
+          @navigate-right="navigateDown(index)"
           @slash-command="handleSlashCommand"
           @close-slash-menu="hideMenu"
+          @paste-multiline="(lines) => handlePasteMultiline(index, lines)"
         />
       </div>
 
@@ -99,11 +102,15 @@ interface Props {
   hint?: string;
   error?: string;
   placeholder?: string;
+  disableApi?: boolean; // Disable API calls for testing/demo mode
+  mockDocuments?: DocumentItem[]; // Mock documents for testing
+  mockTools?: MCPTool[]; // Mock tools for testing
 }
 
 const props = withDefaults(defineProps<Props>(), {
   label: "Instructions",
   placeholder: "Start typing your instructions...",
+  disableApi: false,
 });
 
 const emit = defineEmits<{
@@ -197,6 +204,12 @@ const emitChange = () => {
 
 // Fetch MCP tools from the API
 const fetchMCPTools = async () => {
+  if (props.disableApi) {
+    // Use mock tools if provided, otherwise empty array
+    mcpTools.value = props.mockTools || [];
+    return;
+  }
+
   try {
     const tools = await HayApi.plugins.getMCPTools.query();
     mcpTools.value = tools;
@@ -208,6 +221,12 @@ const fetchMCPTools = async () => {
 
 // Fetch documents from the API
 const fetchDocuments = async () => {
+  if (props.disableApi) {
+    // Use mock documents if provided, otherwise empty array
+    documents.value = props.mockDocuments || [];
+    return;
+  }
+
   try {
     const result = await HayApi.documents.list.query({
       pagination: { page: 1, limit: 100 },
@@ -304,6 +323,46 @@ const addChild = (index: number) => {
     level: currentLevel + 1,
   });
   emitChange();
+};
+
+const handlePasteMultiline = (index: number, lines: string[]) => {
+  const currentLevel = instructions.value[index]?.level || 0;
+
+  // Set the first line to the current instruction
+  instructions.value[index].instructions = lines[0];
+
+  // Add the remaining lines as new sibling instructions
+  for (let i = 1; i < lines.length; i++) {
+    instructions.value.splice(index + i, 0, {
+      id: generateId(),
+      instructions: lines[i],
+      level: currentLevel,
+    });
+  }
+
+  emitChange();
+
+  // Focus the last created instruction
+  nextTick(() => {
+    const lastIndex = index + lines.length - 1;
+    const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
+    const targetElement = instructionElements[lastIndex];
+    if (targetElement) {
+      const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
+      if (editor) {
+        editor.focus();
+        // Position cursor at end
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false); // Collapse to end
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  });
 };
 
 const moveUp = (index: number) => {

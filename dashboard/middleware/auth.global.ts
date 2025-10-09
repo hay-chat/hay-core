@@ -9,15 +9,20 @@ export default defineNuxtRouteMiddleware(
       return;
     }
 
-    const authStore = useAuthStore();
-    const userStore = useUserStore();
-
-    const publicPaths = new Set(["/login", "/signup", "/forgot-password"]);
-
-    // Skip auth check for public paths
-    if (publicPaths.has(to.path)) {
+    // Check if the page is marked as public via page metadata
+    if (to.meta.public === true) {
+      console.log("[Auth Middleware] Public page detected:", to.path);
       return;
     }
+
+    // Allow test pages without auth
+    if (to.path.startsWith("/test/")) {
+      console.log("[Auth Middleware] Test page detected:", to.path);
+      return;
+    }
+
+    const authStore = useAuthStore();
+    const userStore = useUserStore();
 
     // Check if auth is still initializing - only on client side
     if (process.client && !authStore.isInitialized) {

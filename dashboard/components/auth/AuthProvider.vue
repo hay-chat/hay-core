@@ -40,9 +40,14 @@ const refresh = (e: Event) => {
 
 // Initialize auth on mount if not already done
 onMounted(async () => {
-  // Define public paths that don't require authentication
-  const publicPaths = new Set(["/login", "/signup", "/forgot-password"]);
-  const isPublicPath = publicPaths.has(route.path);
+  // Check if the current route is marked as public
+  const isPublicPath = route.meta.public === true;
+
+  // Skip auth initialization entirely on public pages
+  if (isPublicPath) {
+    authStore.isInitialized = true;
+    return;
+  }
 
   if (!authStore.isInitialized) {
     // Start timer to show refresh message after 5 seconds

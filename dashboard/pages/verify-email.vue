@@ -188,7 +188,7 @@ const goToLogin = () => {
 // Set page meta
 definePageMeta({
   layout: "auth",
-  // No auth required - users might be logged out when clicking the verification link
+  public: true, // No auth required - users might be logged out when clicking the verification link
 });
 
 // Head management

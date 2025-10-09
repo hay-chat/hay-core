@@ -7,6 +7,8 @@ let visibilityChangeHandler: (() => void) | null = null;
 const isActive = ref(false);
 
 export function useHeartbeat() {
+  const route = useRoute();
+
   const sendHeartbeat = async () => {
     try {
       await Hay.auth.heartbeat.mutate();
@@ -16,6 +18,11 @@ export function useHeartbeat() {
   };
 
   const startHeartbeat = () => {
+    // Skip heartbeat on public pages
+    if (route.meta.public === true) {
+      return;
+    }
+
     if (isActive.value) return;
 
     isActive.value = true;

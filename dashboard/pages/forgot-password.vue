@@ -133,7 +133,7 @@ import { validateEmail } from "@/lib/utils";
 
 definePageMeta({
   layout: false,
-  // TODO: Add route middleware to redirect if already authenticated
+  public: true,
 });
 
 // Form state
