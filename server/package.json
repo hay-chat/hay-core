@@ -24,12 +24,12 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/mjml": "^4.7.4",
     "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
     "@stripe/stripe-js": "^7.9.0",
     "@types/bcrypt": "^5.0.2",
+    "@types/mjml": "^4.7.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/ioredis": "^5.0.0",
