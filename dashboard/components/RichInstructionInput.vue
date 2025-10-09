@@ -57,6 +57,7 @@ const emit = defineEmits<{
   ];
   "close-slash-menu": [];
   keydown: [event: KeyboardEvent];
+  "paste-multiline": [lines: string[]];
 }>();
 
 const editorRef = ref<HTMLElement | null>(null);
@@ -401,12 +402,26 @@ const handlePaste = (e: ClipboardEvent) => {
   e.preventDefault();
   const text = e.clipboardData?.getData("text/plain") || "";
 
-  // Insert plain text only
+  // Check if this is a multiline paste
+  const lines = text.split("\n").filter((line) => line.trim() !== "");
+
+  if (lines.length > 1) {
+    // Multiline paste - emit event to parent to handle creating multiple instructions
+    emit("paste-multiline", lines);
+    return;
+  }
+
+  // Single line paste - handle normally
   const selection = window.getSelection();
   if (selection && selection.rangeCount > 0) {
     const range = selection.getRangeAt(0);
     range.deleteContents();
-    range.insertNode(document.createTextNode(text));
+
+    // Insert the text content
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+
+    // Position cursor at the end of inserted content
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
@@ -468,25 +483,20 @@ const insertReference = (type: "action" | "document", item: MCPTool | DocumentIt
       if (currentOffset + nodeLength > slashIndex) {
         // This text node contains the slash
         const nodeSlashIndex = slashIndex - currentOffset;
-        const _beforeSlash = currentNode.textContent?.slice(0, nodeSlashIndex) || "";
-        const afterQuery =
-          currentNode.textContent?.slice(nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1)) ||
-          "";
 
-        // Replace the text node content
+        // Calculate the length of text to delete (from slash to cursor position)
+        const queryLength = cursorOffset - slashIndex;
+
+        // Create a range that encompasses only the slash command (slash + query text)
         const newRange = document.createRange();
         newRange.setStart(currentNode, nodeSlashIndex);
-        newRange.setEnd(currentNode, nodeSlashIndex + 1 + (cursorOffset - slashIndex - 1));
+        newRange.setEnd(currentNode, nodeSlashIndex + queryLength);
+
+        // Delete the slash command text
         newRange.deleteContents();
 
-        // Insert the tag
+        // Insert the tag at the deletion point
         newRange.insertNode(tagElement);
-
-        // Insert any remaining text after
-        if (afterQuery) {
-          const textNode = document.createTextNode(afterQuery);
-          tagElement.parentNode?.insertBefore(textNode, tagElement.nextSibling);
-        }
 
         // Position cursor after the tag
         const newRange2 = document.createRange();

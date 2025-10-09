@@ -357,4 +357,9 @@ onBeforeUnmount(() => {
     widget.remove();
   }
 });
+
+// No auth required for demo page
+definePageMeta({
+  public: true,
+});
 </script>

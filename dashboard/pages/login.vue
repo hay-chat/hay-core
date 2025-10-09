@@ -123,6 +123,7 @@ import { useAuthStore } from "@/stores/auth";
 
 definePageMeta({
   layout: false,
+  public: true,
 });
 
 // Navigation
