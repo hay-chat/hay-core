@@ -16,6 +16,7 @@
       class="instructions-editor-container"
       :class="{ 'instructions-editor-error': error }"
       @slash-command="handleSlashCommand"
+      @click="handleContainerClick"
     >
       <div
         class="instructions-list"
@@ -46,6 +47,7 @@
           @slash-command="handleSlashCommand"
           @close-slash-menu="hideMenu"
           @paste-multiline="(lines) => handlePasteMultiline(index, lines)"
+          @paste-hierarchical="(items) => handlePasteHierarchical(index, items)"
         />
       </div>
 
@@ -345,6 +347,50 @@ const handlePasteMultiline = (index: number, lines: string[]) => {
   // Focus the last created instruction
   nextTick(() => {
     const lastIndex = index + lines.length - 1;
+    const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
+    const targetElement = instructionElements[lastIndex];
+    if (targetElement) {
+      const editor = targetElement.querySelector("[contenteditable]") as HTMLElement;
+      if (editor) {
+        editor.focus();
+        // Position cursor at end
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false); // Collapse to end
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  });
+};
+
+const handlePasteHierarchical = (
+  index: number,
+  items: Array<{ instructions: string; level: number }>,
+) => {
+  if (items.length === 0) return;
+
+  // Set the first item to the current instruction
+  instructions.value[index].instructions = items[0].instructions;
+  instructions.value[index].level = items[0].level;
+
+  // Add the remaining items as new instructions with their respective levels
+  for (let i = 1; i < items.length; i++) {
+    instructions.value.splice(index + i, 0, {
+      id: generateId(),
+      instructions: items[i].instructions,
+      level: items[i].level,
+    });
+  }
+
+  emitChange();
+
+  // Focus the last created instruction
+  nextTick(() => {
+    const lastIndex = index + items.length - 1;
     const instructionElements = document.querySelectorAll(".instruction-item-wrapper");
     const targetElement = instructionElements[lastIndex];
     if (targetElement) {
@@ -800,31 +846,49 @@ function handleListClick(e: MouseEvent) {
   const isOnEmptySpace = !target.closest(".instruction-item-wrapper");
 
   if (isOnListContainer || isOnEmptySpace) {
-    // Focus the last instruction item
-    if (instructions.value.length > 0) {
-      const lastIndex = instructions.value.length - 1;
-      nextTick(() => {
-        // Find the last instruction item's editor
-        const lastInstructionWrapper = document.querySelectorAll(".instruction-item-wrapper")[
-          lastIndex
-        ];
-        if (lastInstructionWrapper) {
-          const editor = lastInstructionWrapper.querySelector("[contenteditable]") as HTMLElement;
-          if (editor) {
-            editor.focus();
-            // Place cursor at end
-            const selection = window.getSelection();
-            if (selection) {
-              const range = document.createRange();
-              range.selectNodeContents(editor);
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            }
+    focusLastLineAtEnd();
+  }
+}
+
+// Handle clicks on the container area
+function handleContainerClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+
+  // Check if the click was on the container itself or its empty space
+  // (not on an instruction item or its children)
+  const isOnContainer = target.classList.contains("instructions-editor-container");
+  const isOnEmptySpace = !target.closest(".instruction-item-wrapper");
+
+  if (isOnContainer || isOnEmptySpace) {
+    focusLastLineAtEnd();
+  }
+}
+
+// Focus the last instruction line and place cursor at the end
+function focusLastLineAtEnd() {
+  if (instructions.value.length > 0) {
+    const lastIndex = instructions.value.length - 1;
+    nextTick(() => {
+      // Find the last instruction item's editor
+      const lastInstructionWrapper = document.querySelectorAll(".instruction-item-wrapper")[
+        lastIndex
+      ];
+      if (lastInstructionWrapper) {
+        const editor = lastInstructionWrapper.querySelector("[contenteditable]") as HTMLElement;
+        if (editor) {
+          editor.focus();
+          // Place cursor at end
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
           }
         }
-      });
-    }
+      }
+    });
   }
 }
 

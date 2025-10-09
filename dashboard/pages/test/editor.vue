@@ -18,8 +18,12 @@
               Copy the following text and paste it into the editor below:
             </p>
             <ol class="list-decimal list-inside space-y-1">
-              <li>First instruction line</li>
-              <li>Second instruction line</li>
+              <li>
+                First instruction line
+                <ul class="list-decimal list-inside space-y-1">
+                  <li>Second instruction line</li>
+                </ul>
+              </li>
               <li>Third instruction line</li>
               <li>Fourth instruction line</li>
             </ol>
@@ -38,9 +42,8 @@
               After selecting a document, the text "and provide feedback" should NOT be duplicated.
             </p>
           </div>
-        </CardContent> </Card
-      >First instruction line Second instruction line Third instruction line Fourth instruction line
-
+        </CardContent>
+      </Card>
       <!-- Instructions Editor -->
       <Card>
         <CardHeader>

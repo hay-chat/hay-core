@@ -16,6 +16,7 @@
         @close-slash-menu="emit('close-slash-menu')"
         @keydown="handleKeyDown"
         @paste-multiline="handlePasteMultiline"
+        @paste-hierarchical="handlePasteHierarchical"
       />
     </div>
   </div>
@@ -81,6 +82,12 @@ const emit = defineEmits<{
   ];
   "close-slash-menu": [];
   "paste-multiline": [lines: string[]];
+  "paste-hierarchical": [
+    items: Array<{
+      instructions: string;
+      level: number;
+    }>,
+  ];
 }>();
 
 const editorRef = ref<InstanceType<typeof RichInstructionInput> | null>(null);
@@ -111,6 +118,11 @@ const handleSlashCommand = (data: {
 // Handle multiline paste from RichInstructionInput
 const handlePasteMultiline = (lines: string[]) => {
   emit("paste-multiline", lines);
+};
+
+// Handle hierarchical paste from RichInstructionInput
+const handlePasteHierarchical = (items: Array<{ instructions: string; level: number }>) => {
+  emit("paste-hierarchical", items);
 };
 
 // Handle keyboard events from RichInstructionInput
@@ -252,18 +264,18 @@ const handleKeyDown = (e: KeyboardEvent) => {
         // Focus the next textarea
         nextEditor.focus();
 
-        // Set cursor position
-        if (afterCursor.trim()) {
-          // Position cursor at start if we added content
+        // Position cursor at start of new line after content has been set
+        // Use nextTick to ensure the input event has been fully processed
+        nextTick(() => {
           setCursorPosition(nextEditor, 0);
-        } else {
-          // Position cursor at end if empty
-          setCursorPosition(nextEditor, nextEditor.textContent?.length || 0);
-        }
+        });
       }
     });
   } else if (e.key === "Backspace") {
-    if (cursorPosition === 0) {
+    // Check if there's a selection (text is selected)
+    const hasSelection = selection && !selection.isCollapsed;
+
+    if (cursorPosition === 0 && !hasSelection) {
       if (textValue === "") {
         // Empty line - outdent or delete
         e.preventDefault();
@@ -273,7 +285,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
           emit("delete");
         }
       } else if (props.index > 0) {
-        // Line has content and cursor is at beginning - join with previous line
+        // Line has content and cursor is at beginning (with no selection) - join with previous line
         e.preventDefault();
 
         // Find the previous editor
@@ -309,6 +321,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
         }
       }
     }
+    // If hasSelection is true, let the default backspace behavior delete the selected text
   } else if (e.key === "Tab") {
     // Check if slash command menu is open
     if (isMenuOpen) {
