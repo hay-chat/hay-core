@@ -43,6 +43,7 @@ onMounted(async () => {
   // Start timer to show refresh message after 5 seconds
   refreshTimer = setTimeout(() => {
     showRefreshMessage.value = true;
+    window.location.reload();
   }, 5000);
   // Define public paths that don't require authentication
   const publicPaths = new Set(["/login", "/signup", "/forgot-password"]);

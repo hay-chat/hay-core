@@ -45,6 +45,7 @@ export interface EmailTemplate {
   variables: string[];
   description?: string;
   category?: string;
+  isMjml?: boolean;
 }
 
 export interface EmailQueueItem {

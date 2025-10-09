@@ -1,15 +1,20 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import mjml2html from "mjml";
 import type { EmailTemplate, TemplateRenderOptions } from "../types/email.types";
 
 export class TemplateService {
   private templateCache: Map<string, EmailTemplate> = new Map();
   private templateDir: string;
   private baseTemplatePath: string;
+  private baseMjmlPath: string;
+  private contentDir: string;
 
   constructor() {
     this.templateDir = path.join(__dirname, "../templates/email");
     this.baseTemplatePath = path.join(this.templateDir, "base.template.html");
+    this.baseMjmlPath = path.join(this.templateDir, "base.mjml");
+    this.contentDir = path.join(this.templateDir, "content");
   }
 
   /**
@@ -55,12 +60,22 @@ export class TemplateService {
    */
   private async loadTemplate(templateId: string): Promise<EmailTemplate | null> {
     try {
+      // First check if MJML content template exists
+      const mjmlContentPath = path.join(this.contentDir, `${templateId}.mjml`);
+      const mjmlContentExists = await this.fileExists(mjmlContentPath);
+
+      if (mjmlContentExists) {
+        // Load MJML content template
+        return await this.loadMjmlTemplate(templateId);
+      }
+
+      // Fall back to legacy HTML template
       const htmlPath = path.join(this.templateDir, `${templateId}.template.html`);
       const textPath = path.join(this.templateDir, `${templateId}.template.txt`);
 
       const htmlExists = await this.fileExists(htmlPath);
       if (!htmlExists) {
-        console.warn(`Template HTML file not found: ${templateId}`);
+        console.warn(`Template file not found: ${templateId}`);
         return null;
       }
 
@@ -84,6 +99,33 @@ export class TemplateService {
       };
     } catch (error) {
       console.error(`Error loading template ${templateId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Load and compile MJML template
+   */
+  private async loadMjmlTemplate(templateId: string): Promise<EmailTemplate | null> {
+    try {
+      const contentPath = path.join(this.contentDir, `${templateId}.mjml`);
+      const contentMjml = await fs.readFile(contentPath, "utf-8");
+
+      // Extract variables from MJML content before compilation
+      const variables = this.extractVariables(contentMjml);
+
+      // Store raw MJML content for later rendering with variables
+      return {
+        id: templateId,
+        name: templateId.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        subject: this.extractSubject(contentMjml) || "",
+        htmlContent: contentMjml, // Store MJML, will compile during render
+        textContent: undefined,
+        variables,
+        isMjml: true, // Flag to indicate this is MJML
+      };
+    } catch (error) {
+      console.error(`Error loading MJML template ${templateId}:`, error);
       return null;
     }
   }
@@ -133,7 +175,7 @@ export class TemplateService {
     const { template: templateId, variables = {} } = options;
 
     let template = this.templateCache.get(templateId);
-    
+
     if (!template && !options.useCache) {
       const loadedTemplate = await this.loadTemplate(templateId);
       if (loadedTemplate) {
@@ -146,16 +188,54 @@ export class TemplateService {
       throw new Error(`Template not found: ${templateId}`);
     }
 
-    let html = this.replaceVariables(template.htmlContent, variables);
-    let text = template.textContent
-      ? this.replaceVariables(template.textContent, variables)
-      : this.htmlToText(html);
+    let html: string;
+    let text: string | undefined;
 
-    // Apply base template if exists
-    const baseExists = await this.fileExists(this.baseTemplatePath);
-    if (baseExists && templateId !== "base") {
-      const baseContent = await fs.readFile(this.baseTemplatePath, "utf-8");
-      html = this.applyBaseTemplate(baseContent, html, variables);
+    // Check if this is an MJML template
+    if ((template as any).isMjml) {
+      // Render MJML template
+      const mjmlContent = template.htmlContent;
+
+      // First replace variables in the MJML content
+      const contentWithVars = this.replaceVariables(mjmlContent, variables);
+
+      // Load base MJML template
+      const baseMjmlExists = await this.fileExists(this.baseMjmlPath);
+      if (!baseMjmlExists) {
+        throw new Error("Base MJML template not found");
+      }
+
+      const baseMjml = await fs.readFile(this.baseMjmlPath, "utf-8");
+
+      // Inject content into base template and replace all variables
+      const fullMjml = baseMjml.replace("{{content}}", contentWithVars);
+      const mjmlWithVars = this.replaceVariables(fullMjml, variables);
+
+      // Compile MJML to HTML
+      const result = mjml2html(mjmlWithVars, {
+        keepComments: false,
+        validationLevel: "soft",
+      });
+
+      if (result.errors.length > 0) {
+        console.warn("MJML compilation warnings:", result.errors);
+      }
+
+      html = result.html;
+      text = this.htmlToText(html);
+    } else {
+      // Legacy HTML template rendering
+      html = this.replaceVariables(template.htmlContent, variables);
+      text = template.textContent
+        ? this.replaceVariables(template.textContent, variables)
+        : this.htmlToText(html);
+
+      // Apply base template if exists
+      const baseExists = await this.fileExists(this.baseTemplatePath);
+      if (baseExists && templateId !== "base") {
+        const baseContent = await fs.readFile(this.baseTemplatePath, "utf-8");
+        html = this.applyBaseTemplate(baseContent, html, variables);
+      }
     }
 
     if (options.stripComments) {

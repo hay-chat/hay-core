@@ -1,0 +1,49 @@
+<!-- Email Change Pending Notification Content -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="20px" font-weight="600" color="#333333" padding="0 0 20px 0">
+      Email Change Requested
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      We're writing to inform you that a request was made to change the email address associated with your account from <strong>{{oldEmail}}</strong> to <strong>{{newEmail}}</strong>.
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      A verification email has been sent to the new email address. The change will only take effect after the new email is verified.
+    </mj-text>
+
+    <mj-divider border-color="#e0e0e0" border-width="1px" padding="20px 0" />
+
+    <mj-text color="#d9534f" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>Didn't request this change?</strong>
+    </mj-text>
+
+    <mj-text color="#555555" font-size="13px" line-height="20px" padding="0 0 15px 0">
+      If you didn't initiate this email change, please secure your account immediately by clicking the button below:
+    </mj-text>
+
+    <mj-button background-color="#d9534f" color="#ffffff" font-size="14px" font-weight="600" border-radius="4px" padding="10px 0" href="{{cancelUrl}}">
+      Cancel Email Change
+    </mj-button>
+  </mj-column>
+</mj-section>
+
+<!-- Security Details -->
+<mj-section background-color="#f9f9f9" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Security Details
+    </mj-text>
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      <strong>Time:</strong> {{requestTime}}<br/>
+      <strong>IP Address:</strong> {{ipAddress}}<br/>
+      <strong>Browser:</strong> {{browser}}<br/>
+      <strong>Location:</strong> {{location}}
+    </mj-text>
+  </mj-column>
+</mj-section>
