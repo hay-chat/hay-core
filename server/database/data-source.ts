@@ -13,6 +13,7 @@ import { Message } from "./entities/message.entity";
 import { Customer } from "./entities/customer.entity";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
+import { AuditLog } from "../entities/audit-log.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import "reflect-metadata";
@@ -42,6 +43,7 @@ export const AppDataSource = new DataSource({
     Customer,
     PluginRegistry,
     PluginInstance,
+    AuditLog,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

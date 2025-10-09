@@ -41,28 +41,37 @@
 
       <!-- Login Form -->
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <FormField
-          id="email"
-          v-model="form.email"
-          label="Email address"
-          type="email"
-          placeholder="Enter your email"
-          required
-          :error-message="errors.email"
-          @blur="validateField('email')"
-        />
+        <div class="space-y-2">
+          <Input
+            id="email"
+            v-model="form.email"
+            label="Email address"
+            type="email"
+            placeholder="Enter your email"
+            required
+            :class="errors.email ? 'border-red-500' : ''"
+            @blur="validateField('email')"
+          />
+          <p v-if="errors.email" class="text-sm text-red-600">
+            {{ errors.email }}
+          </p>
+        </div>
 
-        <FormField
-          id="password"
-          v-model="form.password"
-          label="Password"
-          type="password"
-          placeholder="Enter your password"
-          required
-          show-password-toggle
-          :error-message="errors.password"
-          @blur="validateField('password')"
-        />
+        <div class="space-y-2">
+          <Input
+            id="password"
+            v-model="form.password"
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            required
+            :class="errors.password ? 'border-red-500' : ''"
+            @blur="validateField('password')"
+          />
+          <p v-if="errors.password" class="text-sm text-red-600">
+            {{ errors.password }}
+          </p>
+        </div>
 
         <!-- Remember me and Forgot password -->
         <div class="flex items-center justify-between">

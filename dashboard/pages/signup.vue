@@ -42,71 +42,98 @@
       <!-- Signup Form -->
       <form class="space-y-4" @submit.prevent="handleSubmit">
         <!-- Organization Name -->
-        <FormField
-          id="organizationName"
-          v-model="form.organizationName"
-          label="Organization name"
-          type="text"
-          placeholder="Enter your organization name"
-          required
-          :error-message="errors.organizationName"
-          description="This will be used to identify your workspace"
-          @blur="() => nextTick(() => validateField('organizationName'))"
-        />
+        <div class="space-y-2">
+          <Input
+            id="organizationName"
+            v-model="form.organizationName"
+            label="Organization name"
+            type="text"
+            placeholder="Enter your organization name"
+            required
+            :class="errors.organizationName ? 'border-red-500' : ''"
+            @blur="() => nextTick(() => validateField('organizationName'))"
+          />
+          <p v-if="errors.organizationName" class="text-sm text-red-600">
+            {{ errors.organizationName }}
+          </p>
+          <p v-else class="text-sm text-gray-500">
+            This will be used to identify your workspace
+          </p>
+        </div>
 
         <!-- Admin Email -->
-        <FormField
-          id="email"
-          v-model="form.email"
-          label="Admin email address"
-          type="email"
-          placeholder="Enter your email"
-          required
-          :error-message="errors.email"
-          description="This will be your admin account email"
-          @blur="() => nextTick(() => validateField('email'))"
-        />
+        <div class="space-y-2">
+          <Input
+            id="email"
+            v-model="form.email"
+            label="Admin email address"
+            type="email"
+            placeholder="Enter your email"
+            required
+            :class="errors.email ? 'border-red-500' : ''"
+            @blur="() => nextTick(() => validateField('email'))"
+          />
+          <p v-if="errors.email" class="text-sm text-red-600">
+            {{ errors.email }}
+          </p>
+          <p v-else class="text-sm text-gray-500">
+            This will be your admin account email
+          </p>
+        </div>
 
         <!-- Admin Full Name -->
-        <FormField
-          id="fullName"
-          v-model="form.fullName"
-          label="Full name"
-          type="text"
-          placeholder="Enter your full name"
-          required
-          :error-message="errors.fullName"
-          @blur="() => nextTick(() => validateField('fullName'))"
-        />
+        <div class="space-y-2">
+          <Input
+            id="fullName"
+            v-model="form.fullName"
+            label="Full name"
+            type="text"
+            placeholder="Enter your full name"
+            required
+            :class="errors.fullName ? 'border-red-500' : ''"
+            @blur="() => nextTick(() => validateField('fullName'))"
+          />
+          <p v-if="errors.fullName" class="text-sm text-red-600">
+            {{ errors.fullName }}
+          </p>
+        </div>
 
         <!-- Password -->
-        <FormField
-          id="password"
-          v-model="form.password"
-          label="Password"
-          type="password"
-          placeholder="Create a strong password"
-          required
-          show-password-toggle
-          :error-message="errors.password"
-          @blur="() => nextTick(() => validateField('password'))"
-        />
+        <div class="space-y-2">
+          <Input
+            id="password"
+            v-model="form.password"
+            label="Password"
+            type="password"
+            placeholder="Create a strong password"
+            required
+            :class="errors.password ? 'border-red-500' : ''"
+            @blur="() => nextTick(() => validateField('password'))"
+          />
+          <p v-if="errors.password" class="text-sm text-red-600">
+            {{ errors.password }}
+          </p>
+        </div>
 
         <!-- Password Strength Indicator -->
         <PasswordStrength :password="form.password" />
 
         <!-- Confirm Password -->
-        <FormField
-          id="confirmPassword"
-          v-model="form.confirmPassword"
-          label="Confirm password"
-          type="password"
-          placeholder="Confirm your password"
-          required
-          show-password-toggle
-          :error-message="errors.confirmPassword"
-          @blur="() => nextTick(() => validateField('confirmPassword'))"
-        />
+        <div class="space-y-2">
+          <Input
+            id="confirmPassword"
+            v-model="form.confirmPassword"
+            label="Confirm password"
+            type="password"
+            placeholder="Confirm your password"
+            required
+            :class="errors.confirmPassword ? 'border-red-500' : ''"
+            @blur="() => nextTick(() => validateField('confirmPassword'))"
+          />
+          <p v-if="errors.confirmPassword" class="text-sm text-red-600">
+            {{ errors.confirmPassword }}
+          </p>
+        </div>
 
         <!-- Terms and Privacy Agreement -->
         <div class="space-y-3">

@@ -26,13 +26,26 @@
       <input
         :id="inputId"
         :value="modelValue ?? ''"
-        :class="[props.class, { 'has-icon-start': iconStart, 'has-icon-end': iconEnd }]"
+        :type="actualInputType"
+        :class="[
+          props.class,
+          { 'has-icon-start': iconStart, 'has-icon-end': iconEnd || type === 'password' },
+        ]"
         :placeholder="placeholder"
         class="input"
         v-bind="$attrs"
-        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+        @input="handleInputChange"
       />
-      <component :is="iconEnd" v-if="iconEnd" class="input-icon icon-end" />
+      <component :is="iconEnd" v-if="iconEnd && type !== 'password'" class="input-icon icon-end" />
+      <button
+        v-if="type === 'password'"
+        type="button"
+        class="password-toggle"
+        @click="togglePasswordVisibility"
+      >
+        <Eye v-if="showPassword" class="w-5 h-5" />
+        <EyeOff v-else class="w-5 h-5" />
+      </button>
     </div>
 
     <!-- Textarea -->
@@ -52,6 +65,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch, type Component } from "vue";
+import { Eye, EyeOff } from "lucide-vue-next";
 import Select from "./Select.vue";
 import SelectTrigger from "./SelectTrigger.vue";
 import SelectValue from "./SelectValue.vue";
@@ -64,7 +78,7 @@ export type SelectOption = string | { label: string; value: string | number };
 export interface InputProps {
   class?: string;
   modelValue?: string | number | undefined;
-  type?: "text" | "textarea" | "select";
+  type?: "text" | "textarea" | "select" | "password" | "email";
   label?: string;
   helperText?: string;
   iconStart?: Component;
@@ -86,6 +100,32 @@ const emit = defineEmits<{
 // Refs
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const inputId = Math.random().toString(36).substring(7);
+const showPassword = ref(false);
+
+// Password toggle
+const actualInputType = computed(() => {
+  if (props.type === "password") {
+    return showPassword.value ? "text" : "password";
+  }
+  return props.type;
+});
+
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value;
+};
+
+// Input handler for email trimming
+const handleInputChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  let value = target.value;
+
+  // Trim whitespace for email fields
+  if (props.type === "email") {
+    value = value.trim();
+  }
+
+  emit("update:modelValue", value);
+};
 
 // Select helpers
 const getOptionValue = (option: SelectOption): string | number => {
@@ -125,13 +165,16 @@ const handleInput = (event: Event) => {
 };
 
 // Watch for value changes to adjust textarea height
-watch(() => props.modelValue, () => {
-  if (props.type === "textarea") {
-    nextTick(() => {
-      adjustTextareaHeight();
-    });
-  }
-});
+watch(
+  () => props.modelValue,
+  () => {
+    if (props.type === "textarea") {
+      nextTick(() => {
+        adjustTextareaHeight();
+      });
+    }
+  },
+);
 
 onMounted(() => {
   if (props.type === "textarea") {
@@ -234,5 +277,28 @@ onMounted(() => {
 
 .select-wrapper {
   width: 100%;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-neutral-muted);
+  transition: color 0.2s;
+  pointer-events: auto;
+
+  &:hover {
+    color: var(--color-foreground);
+  }
+
+  &:focus {
+    outline: none;
+  }
 }
 </style>

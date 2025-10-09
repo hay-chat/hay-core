@@ -41,6 +41,16 @@ export class User extends BaseEntity {
   @Column({ type: "jsonb", nullable: true })
   permissions?: string[];
 
+  // Email verification fields
+  @Column({ type: "varchar", length: 255, nullable: true })
+  pendingEmail?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  emailVerificationTokenHash?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  emailVerificationExpiresAt?: Date;
+
   // Relationships
   @ManyToOne(() => Organization, (organization) => organization.users, {
     nullable: true,
@@ -127,5 +137,26 @@ export class User extends BaseEntity {
       return "away";
     }
     return this.isOnline() ? "online" : "offline";
+  }
+
+  /**
+   * Check if user has a pending email change that can be verified
+   */
+  hasPendingEmailChange(): boolean {
+    return (
+      !!this.pendingEmail &&
+      !!this.emailVerificationTokenHash &&
+      !!this.emailVerificationExpiresAt &&
+      this.emailVerificationExpiresAt > new Date()
+    );
+  }
+
+  /**
+   * Clear email verification fields
+   */
+  clearEmailVerification(): void {
+    this.pendingEmail = undefined;
+    this.emailVerificationTokenHash = undefined;
+    this.emailVerificationExpiresAt = undefined;
   }
 }

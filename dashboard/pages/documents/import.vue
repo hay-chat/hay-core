@@ -869,6 +869,8 @@ interface WebImportProgress {
   processedPages: number;
   totalPages: number;
   currentUrl?: string;
+  successfulPages?: number;
+  failedPages?: number;
 }
 
 interface PluginImporter {

@@ -157,6 +157,11 @@ const navMain = computed(() => [
     isActive: isPathActive("/settings"),
     items: [
       {
+        title: "Profile",
+        url: "/settings/profile",
+        isActive: route.path === "/settings/profile",
+      },
+      {
         title: "Agents",
         url: "/agents",
         isActive: isPathActive("/agents"),

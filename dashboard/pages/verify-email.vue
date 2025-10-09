@@ -1,0 +1,204 @@
+<template>
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
+    <Card class="w-full max-w-md">
+      <CardHeader>
+        <div class="flex justify-center mb-4">
+          <div
+            class="w-16 h-16 rounded-full flex items-center justify-center"
+            :class="statusColor"
+          >
+            <component :is="statusIcon" class="h-8 w-8 text-white" />
+          </div>
+        </div>
+        <CardTitle class="text-center">{{ title }}</CardTitle>
+        <CardDescription class="text-center">{{ description }}</CardDescription>
+      </CardHeader>
+
+      <CardContent class="space-y-4">
+        <!-- Loading State -->
+        <div v-if="isVerifying" class="text-center py-8">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p class="mt-4 text-sm text-neutral-muted">Verifying your email address...</p>
+        </div>
+
+        <!-- Success State -->
+        <div v-else-if="verificationStatus === 'success'" class="text-center space-y-4">
+          <Alert variant="default" class="border-green-200 bg-green-50">
+            <AlertDescription class="text-green-800">
+              Your email address has been successfully verified and updated!
+            </AlertDescription>
+          </Alert>
+
+          <p class="text-sm text-neutral-muted">
+            You can now use your new email address to log in to your account.
+          </p>
+
+          <div class="flex flex-col gap-2 pt-4">
+            <Button @click="goToProfile" class="w-full">
+              Go to Profile
+            </Button>
+            <Button @click="goToLogin" variant="outline" class="w-full">
+              Go to Login
+            </Button>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="verificationStatus === 'error'" class="text-center space-y-4">
+          <Alert variant="destructive">
+            <AlertDescription>
+              {{ errorMessage }}
+            </AlertDescription>
+          </Alert>
+
+          <p class="text-sm text-neutral-muted">
+            {{ errorHint }}
+          </p>
+
+          <div class="flex flex-col gap-2 pt-4">
+            <Button @click="goToProfile" class="w-full">
+              Go to Profile
+            </Button>
+            <Button @click="retry" variant="outline" class="w-full" v-if="token">
+              Try Again
+            </Button>
+          </div>
+        </div>
+
+        <!-- No Token State -->
+        <div v-else class="text-center space-y-4">
+          <Alert variant="destructive">
+            <AlertDescription>
+              No verification token provided. Please check your email for the verification link.
+            </AlertDescription>
+          </Alert>
+
+          <Button @click="goToProfile" class="w-full">
+            Go to Profile
+          </Button>
+        </div>
+      </CardContent>
+
+      <CardFooter class="flex justify-center">
+        <p class="text-xs text-neutral-muted">
+          Need help? <a href="/support" class="text-primary hover:underline">Contact Support</a>
+        </p>
+      </CardFooter>
+    </Card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { CheckCircle, XCircle, Mail } from "lucide-vue-next";
+import { Hay } from "@/utils/api";
+import { useToast } from "@/composables/useToast";
+
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+
+// Extract token from URL
+const token = ref(route.query.token as string || "");
+
+// State
+const isVerifying = ref(false);
+const verificationStatus = ref<"pending" | "success" | "error">("pending");
+const errorMessage = ref("");
+const errorHint = ref("");
+
+// Computed properties
+const title = computed(() => {
+  if (isVerifying.value) return "Verifying Email";
+  if (verificationStatus.value === "success") return "Email Verified!";
+  if (verificationStatus.value === "error") return "Verification Failed";
+  return "Email Verification";
+});
+
+const description = computed(() => {
+  if (isVerifying.value) return "Please wait while we verify your new email address...";
+  if (verificationStatus.value === "success") return "Your email has been successfully updated";
+  if (verificationStatus.value === "error") return "We couldn't verify your email address";
+  return "Complete your email change";
+});
+
+const statusIcon = computed(() => {
+  if (isVerifying.value) return Mail;
+  if (verificationStatus.value === "success") return CheckCircle;
+  return XCircle;
+});
+
+const statusColor = computed(() => {
+  if (isVerifying.value) return "bg-blue-500";
+  if (verificationStatus.value === "success") return "bg-green-500";
+  return "bg-red-500";
+});
+
+// Verify email on mount
+onMounted(async () => {
+  if (token.value) {
+    await verifyEmail();
+  }
+});
+
+const verifyEmail = async () => {
+  if (!token.value) return;
+
+  isVerifying.value = true;
+  verificationStatus.value = "pending";
+
+  try {
+    const response = await Hay.auth.verifyEmailChange.mutate({
+      token: token.value,
+    });
+
+    if (response.success) {
+      verificationStatus.value = "success";
+      toast.success(response.message || "Email verified successfully!");
+    }
+  } catch (error: any) {
+    console.error("Email verification failed:", error);
+    verificationStatus.value = "error";
+    errorMessage.value = error.message || "Failed to verify email address";
+
+    // Provide helpful hints based on error
+    if (error.message?.includes("expired")) {
+      errorHint.value = "The verification link has expired. Please request a new email change from your profile settings.";
+    } else if (error.message?.includes("Invalid")) {
+      errorHint.value = "The verification link is invalid. Please check your email or request a new verification link.";
+    } else {
+      errorHint.value = "Please try again or contact support if the problem persists.";
+    }
+  } finally {
+    isVerifying.value = false;
+  }
+};
+
+const retry = async () => {
+  await verifyEmail();
+};
+
+const goToProfile = () => {
+  router.push("/settings/profile");
+};
+
+const goToLogin = () => {
+  router.push("/login");
+};
+
+// Set page meta
+definePageMeta({
+  layout: "default",
+  middleware: ["auth"], // Require authentication
+});
+
+// Head management
+useHead({
+  title: "Verify Email - Hay Dashboard",
+  meta: [
+    {
+      name: "description",
+      content: "Verify your new email address",
+    },
+  ],
+});
+</script>

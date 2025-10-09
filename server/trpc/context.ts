@@ -10,6 +10,8 @@ export interface Context {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   listParams?: ListParams; // Added by pagination middleware
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 interface RequestWithAuthError extends Request {
@@ -45,11 +47,23 @@ export const createContext = async ({
   // Extract organizationId from header
   const organizationId = (req.headers["x-organization-id"] as string | null) || null;
 
+  // Extract IP address (consider proxies)
+  const ipAddress =
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    (req.headers["x-real-ip"] as string) ||
+    req.socket.remoteAddress ||
+    "Unknown";
+
+  // Extract user agent
+  const userAgent = (req.headers["user-agent"] as string) || "Unknown";
+
   const context: Context = {
     user,
     organizationId,
     req,
     res,
+    ipAddress,
+    userAgent,
   };
 
   return context;
