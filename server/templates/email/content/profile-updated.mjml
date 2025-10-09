@@ -1,0 +1,67 @@
+<!-- Profile Updated Confirmation Content -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="20px" font-weight="600" color="#333333" padding="0 0 20px 0">
+      Profile Information Updated
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      This is to confirm that your profile information has been updated.
+    </mj-text>
+
+    <mj-text color="#5cb85c" font-size="14px" line-height="22px" padding="10px 0">
+      ✓ Your changes have been saved successfully.
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<!-- Changed Fields -->
+<mj-section background-color="#f9f9f9" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Updated Fields
+    </mj-text>
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      {{changedFields}}
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<!-- Security Note -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-divider border-color="#e0e0e0" border-width="1px" padding="0 0 20px 0" />
+
+    <mj-text color="#d9534f" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>Didn't make this change?</strong>
+    </mj-text>
+
+    <mj-text color="#555555" font-size="13px" line-height="20px" padding="0 0 15px 0">
+      If you didn't authorize these changes, please contact our support team immediately to secure your account.
+    </mj-text>
+
+    <mj-button background-color="#007bff" color="#ffffff" font-size="14px" font-weight="600" border-radius="4px" padding="10px 0" href="{{supportUrl}}">
+      Contact Support
+    </mj-button>
+  </mj-column>
+</mj-section>
+
+<!-- Security Details -->
+<mj-section background-color="#f9f9f9" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Security Details
+    </mj-text>
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      <strong>Email:</strong> {{userEmail}}<br/>
+      <strong>Time:</strong> {{requestTime}}<br/>
+      <strong>IP Address:</strong> {{ipAddress}}<br/>
+      <strong>Browser:</strong> {{browser}}<br/>
+      <strong>Location:</strong> {{location}}
+    </mj-text>
+  </mj-column>
+</mj-section>

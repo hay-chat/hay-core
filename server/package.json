@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/mjml": "^4.7.4",
     "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "jose": "^6.1.0",
     "jszip": "^3.10.1",
     "mammoth": "^1.11.0",
+    "mjml": "^4.16.1",
     "module-alias": "^2.2.3",
     "stripe": "^18.5.0",
     "word-extractor": "^1.0.4",

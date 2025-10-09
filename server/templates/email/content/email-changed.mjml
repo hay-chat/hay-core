@@ -1,0 +1,49 @@
+<!-- Email Changed Confirmation Content -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="20px" font-weight="600" color="#333333" padding="0 0 20px 0">
+      Email Address Changed
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      This is to confirm that the email address for your account has been successfully changed from <strong>{{oldEmail}}</strong> to <strong>{{newEmail}}</strong>.
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      All future account-related emails will be sent to your new email address.
+    </mj-text>
+
+    <mj-divider border-color="#e0e0e0" border-width="1px" padding="20px 0" />
+
+    <mj-text color="#d9534f" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>Didn't make this change?</strong>
+    </mj-text>
+
+    <mj-text color="#555555" font-size="13px" line-height="20px">
+      If you didn't authorize this email change, please contact our support team immediately to secure your account.
+    </mj-text>
+
+    <mj-button background-color="#007bff" color="#ffffff" font-size="14px" font-weight="600" border-radius="4px" padding="15px 0" href="{{supportUrl}}">
+      Contact Support
+    </mj-button>
+  </mj-column>
+</mj-section>
+
+<!-- Security Details -->
+<mj-section background-color="#f9f9f9" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Security Details
+    </mj-text>
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      <strong>Time:</strong> {{requestTime}}<br/>
+      <strong>IP Address:</strong> {{ipAddress}}<br/>
+      <strong>Browser:</strong> {{browser}}<br/>
+      <strong>Location:</strong> {{location}}
+    </mj-text>
+  </mj-column>
+</mj-section>

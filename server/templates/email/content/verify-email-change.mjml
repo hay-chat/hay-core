@@ -1,0 +1,54 @@
+<!-- Email Change Verification Content -->
+<mj-section mj-class="section-white">
+  <mj-column>
+    <mj-text mj-class="h2" padding="0 0 20px 0">
+      Verify Your New Email Address
+    </mj-text>
+
+    <mj-text mj-class="text-body">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text mj-class="text-body" padding="10px 0">
+      We received a request to change the email address for your account from <strong>{{oldEmail}}</strong> to <strong>{{newEmail}}</strong>.
+    </mj-text>
+
+    <mj-text mj-class="text-body">
+      To complete this change, please verify your new email address by clicking the button below:
+    </mj-text>
+
+    <mj-button mj-class="btn-primary" href="{{verificationUrl}}">
+      Verify Email Address
+    </mj-button>
+
+    <mj-text mj-class="text-small" padding="10px 0">
+      Or copy and paste this link into your browser:<br/>
+      <a href="{{verificationUrl}}" class="link-primary word-break">{{verificationUrl}}</a>
+    </mj-text>
+
+    <mj-divider padding="20px 0" />
+
+    <mj-text mj-class="text-danger" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>Important:</strong> This verification link will expire in 24 hours.
+    </mj-text>
+
+    <mj-text mj-class="text-small">
+      If you didn't request this change, please ignore this email or contact our support team immediately.
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<!-- Security Details -->
+<mj-section mj-class="section-gray">
+  <mj-column>
+    <mj-text mj-class="h3" padding="0 0 10px 0">
+      Security Details
+    </mj-text>
+    <mj-text mj-class="text-small">
+      <strong>Time:</strong> {{requestTime}}<br/>
+      <strong>IP Address:</strong> {{ipAddress}}<br/>
+      <strong>Browser:</strong> {{browser}}<br/>
+      <strong>Location:</strong> {{location}}
+    </mj-text>
+  </mj-column>
+</mj-section>
