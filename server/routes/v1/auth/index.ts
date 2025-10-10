@@ -19,6 +19,7 @@ import type { ApiKeyResponse } from "@server/types/auth.types";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
+import { getDashboardUrl } from "@server/config/env";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -375,11 +376,11 @@ export const authRouter = t.router({
             ipAddress: ctx.ipAddress || "Unknown",
             browser: ctx.userAgent || "Unknown",
             location: "Unknown", // TODO: Add geolocation lookup
-            supportUrl: "https://hay.chat/support",
+            supportUrl: `${getDashboardUrl()}/support`,
             currentYear: new Date().getFullYear().toString(),
             companyAddress: "Hay Platform",
-            websiteUrl: "https://hay.chat",
-            preferencesUrl: "https://hay.chat/settings",
+            websiteUrl: getDashboardUrl(),
+            preferencesUrl: `${getDashboardUrl()}/settings`,
             recipientEmail: user.email,
           },
         });
@@ -553,7 +554,7 @@ export const authRouter = t.router({
           cancelUrl: `${baseUrl}/settings/profile`,
           currentYear: new Date().getFullYear().toString(),
           companyAddress: "Hay Platform",
-          websiteUrl: "https://hay.chat",
+          websiteUrl: getDashboardUrl(),
           preferencesUrl: `${baseUrl}/settings`,
         };
 
@@ -706,11 +707,11 @@ export const authRouter = t.router({
           changedAt: new Date().toLocaleString(),
           ipAddress: "Unknown",
           location: "Unknown",
-          supportUrl: "https://hay.chat/support",
+          supportUrl: `${getDashboardUrl()}/support`,
           currentYear: new Date().getFullYear().toString(),
           companyAddress: "Hay Platform",
-          websiteUrl: "https://hay.chat",
-          preferencesUrl: "https://hay.chat/settings",
+          websiteUrl: getDashboardUrl(),
+          preferencesUrl: `${getDashboardUrl()}/settings`,
           recipientEmail: newEmail,
         };
 
