@@ -83,8 +83,6 @@
           </p>
         </div>
 
-        <Separator />
-
         <div v-if="!currentUser?.pendingEmail">
           <Input
             id="newEmail"

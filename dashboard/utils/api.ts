@@ -192,7 +192,7 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   };
 };
 
-// Get API base URL from runtime config
+// Get API base URL from runtime config (lazy getter)
 function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
     // Client-side: use runtime config
@@ -205,41 +205,66 @@ function getApiBaseUrl(): string {
     : "http://localhost:3001/v1";
 }
 
-const API_BASE_URL = getApiBaseUrl();
+// Lazy client singletons
+let _hayAuthApi: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
+let _hayApi: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
 
-// Create a base client without token refresh for auth endpoints
-export const HayAuthApi = createTRPCClient<AppRouter>({
-  links: [
-    errorLink, // Handle errors including expired tokens
-    httpLink({
-      url: API_BASE_URL,
-      // You can pass any HTTP headers you wish here
-      async headers() {
-        return {
-          authorization: getAuthToken(),
-          "x-organization-id": getOrganizationId(),
-        };
-      },
-    }),
-  ],
+// Create a base client without token refresh for auth endpoints (lazy)
+function createHayAuthApi() {
+  if (!_hayAuthApi) {
+    _hayAuthApi = createTRPCClient<AppRouter>({
+      links: [
+        errorLink, // Handle errors including expired tokens
+        httpLink({
+          url: getApiBaseUrl(),
+          // You can pass any HTTP headers you wish here
+          async headers() {
+            return {
+              authorization: getAuthToken(),
+              "x-organization-id": getOrganizationId(),
+            };
+          },
+        }),
+      ],
+    });
+  }
+  return _hayAuthApi;
+}
+
+// Main API client with token refresh middleware (lazy)
+function createHayApi() {
+  if (!_hayApi) {
+    _hayApi = createTRPCClient<AppRouter>({
+      links: [
+        tokenRefreshLink, // Check token before requests
+        errorLink, // Handle errors including expired tokens
+        httpLink({
+          url: getApiBaseUrl(),
+          // You can pass any HTTP headers you wish here
+          async headers() {
+            return {
+              authorization: getAuthToken(),
+              "x-organization-id": getOrganizationId(),
+            };
+          },
+        }),
+      ],
+    });
+  }
+  return _hayApi;
+}
+
+// Export lazy getters
+export const HayAuthApi = new Proxy({} as ReturnType<typeof createTRPCClient<AppRouter>>, {
+  get(_target, prop) {
+    return createHayAuthApi()[prop as keyof ReturnType<typeof createTRPCClient<AppRouter>>];
+  },
 });
 
-// Main API client with token refresh middleware
-export const HayApi = createTRPCClient<AppRouter>({
-  links: [
-    tokenRefreshLink, // Check token before requests
-    errorLink, // Handle errors including expired tokens
-    httpLink({
-      url: API_BASE_URL,
-      // You can pass any HTTP headers you wish here
-      async headers() {
-        return {
-          authorization: getAuthToken(),
-          "x-organization-id": getOrganizationId(),
-        };
-      },
-    }),
-  ],
+export const HayApi = new Proxy({} as ReturnType<typeof createTRPCClient<AppRouter>>, {
+  get(_target, prop) {
+    return createHayApi()[prop as keyof ReturnType<typeof createTRPCClient<AppRouter>>];
+  },
 });
 
 // Export main API client with dynamic plugin support

@@ -53,18 +53,18 @@
       </DropdownMenuItem>
 
       <DropdownMenuSeparator />
-      <DropdownMenuItem>
+      <DropdownMenuItem @click="router.push('/settings/profile')">
         <User2 class="mr-2 h-4 w-4" />
         Profile
       </DropdownMenuItem>
-      <DropdownMenuItem>
+      <!-- <DropdownMenuItem>
         <Settings class="mr-2 h-4 w-4" />
         Settings
-      </DropdownMenuItem>
-      <DropdownMenuItem>
+      </DropdownMenuItem> -->
+      <!-- <DropdownMenuItem>
         <Bell class="mr-2 h-4 w-4" />
         Notifications
-      </DropdownMenuItem>
+      </DropdownMenuItem> -->
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="authStore.logout()">
         <LogOut class="mr-2 h-4 w-4" />
@@ -76,11 +76,13 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ChevronsUpDown, LogOut, Settings, User2, Bell, Check } from "lucide-vue-next";
+import { ChevronsUpDown, LogOut, User2, Check } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
+import { useRouter } from "vue-router";
 
+const router = useRouter();
 const authStore = useAuthStore();
 const userStore = useUserStore();
 
