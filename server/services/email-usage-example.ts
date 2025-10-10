@@ -1,11 +1,12 @@
 /**
  * Email Service Usage Examples
- * 
+ *
  * This file demonstrates how to use the email service in the Hay platform.
  * These examples can be integrated into various parts of the application.
  */
 
 import { emailService } from "./email.service";
+import { getDashboardUrl, getCdnUrl } from "../config/env";
 
 /**
  * Example 1: Send a simple email
@@ -37,9 +38,9 @@ async function sendWelcomeEmail(userName: string, userEmail: string) {
       userName,
       userEmail,
       companyName: "Hay Platform",
-      dashboardUrl: "https://app.hay.chat/dashboard",
-      helpCenterUrl: "https://help.hay.chat",
-      documentationUrl: "https://docs.hay.chat",
+      dashboardUrl: `${getDashboardUrl()}/dashboard`,
+      helpCenterUrl: `${getDashboardUrl()}/help`,
+      documentationUrl: `${getDashboardUrl()}/docs`,
       supportEmail: "support@hay.chat",
       verificationRequired: false,
       socialLinks: {
@@ -49,9 +50,9 @@ async function sendWelcomeEmail(userName: string, userEmail: string) {
       // Base template variables
       currentYear: new Date().getFullYear().toString(),
       companyAddress: "123 Tech Street, San Francisco, CA 94105",
-      websiteUrl: "https://hay.chat",
-      unsubscribeUrl: "https://hay.chat/unsubscribe",
-      preferencesUrl: "https://hay.chat/preferences",
+      websiteUrl: getDashboardUrl(),
+      unsubscribeUrl: `${getDashboardUrl()}/unsubscribe`,
+      preferencesUrl: `${getDashboardUrl()}/preferences`,
       recipientEmail: userEmail,
     },
   });
@@ -74,7 +75,7 @@ async function sendPasswordResetEmail(
 ) {
   await emailService.initialize();
 
-  const resetLink = `https://hay.chat/reset-password?token=${resetToken}`;
+  const resetLink = `${getDashboardUrl()}/reset-password?token=${resetToken}`;
   const requestTime = new Date().toLocaleString();
 
   const result = await emailService.sendTemplateEmail({
@@ -95,9 +96,9 @@ async function sendPasswordResetEmail(
       // Base template variables
       currentYear: new Date().getFullYear().toString(),
       companyAddress: "123 Tech Street, San Francisco, CA 94105",
-      websiteUrl: "https://hay.chat",
-      unsubscribeUrl: "https://hay.chat/unsubscribe",
-      preferencesUrl: "https://hay.chat/preferences",
+      websiteUrl: getDashboardUrl(),
+      unsubscribeUrl: `${getDashboardUrl()}/unsubscribe`,
+      preferencesUrl: `${getDashboardUrl()}/preferences`,
       recipientEmail: userEmail,
     },
   });
@@ -137,7 +138,7 @@ async function sendNotificationEmail(
       })),
       notificationReason: "you have notifications enabled for this type of activity",
       notificationSettings: {
-        url: "https://hay.chat/settings/notifications",
+        url: `${getDashboardUrl()}/settings/notifications`,
       },
       supportEmail: "support@hay.chat",
       companyName: "Hay Platform",
@@ -145,9 +146,9 @@ async function sendNotificationEmail(
       // Base template variables
       currentYear: new Date().getFullYear().toString(),
       companyAddress: "123 Tech Street, San Francisco, CA 94105",
-      websiteUrl: "https://hay.chat",
-      unsubscribeUrl: "https://hay.chat/unsubscribe",
-      preferencesUrl: "https://hay.chat/preferences",
+      websiteUrl: getDashboardUrl(),
+      unsubscribeUrl: `${getDashboardUrl()}/unsubscribe`,
+      preferencesUrl: `${getDashboardUrl()}/preferences`,
       recipientEmail: userEmail,
     },
   });

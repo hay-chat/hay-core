@@ -192,9 +192,20 @@ const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   };
 };
 
-// Get API base URL - this will be replaced at build time by Nuxt
-const API_BASE_URL =
-  process.env.NODE_ENV === "development" ? "http://localhost:3001/v1" : "https://api.hay.chat/v1";
+// Get API base URL from runtime config
+function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    // Client-side: use runtime config
+    const config = useRuntimeConfig();
+    return `${config.public.apiBaseUrl}/v1`;
+  }
+  // Server-side fallback (shouldn't be used since SSR is disabled)
+  return process.env.NODE_ENV === "development"
+    ? "http://localhost:3001/v1"
+    : "http://localhost:3001/v1";
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Create a base client without token refresh for auth endpoints
 export const HayAuthApi = createTRPCClient<AppRouter>({

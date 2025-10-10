@@ -150,12 +150,7 @@
   "defaultVariables": {
     "companyName": "Hay Platform",
     "companyAddress": "123 Main Street, Tech City, TC 12345",
-    "websiteUrl": "https://hay.chat",
-    "supportEmail": "support@hay.chat",
-    "helpCenterUrl": "https://help.hay.chat",
-    "documentationUrl": "https://docs.hay.chat",
-    "unsubscribeUrl": "https://hay.chat/unsubscribe",
-    "preferencesUrl": "https://hay.chat/preferences",
-    "currentYear": "2025"
-  }
+    "supportEmail": "support@hay.chat"
+  },
+  "note": "Dynamic variables like websiteUrl, logoUrl, helpCenterUrl, documentationUrl, unsubscribeUrl, preferencesUrl, and currentYear are automatically injected by the email service based on environment configuration"
 }

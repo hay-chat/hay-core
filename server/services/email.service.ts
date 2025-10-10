@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
-import { config } from "../config/env";
+import { config, getCdnUrl, getDashboardUrl } from "../config/env";
 import { TemplateService } from "./template.service";
 import type {
   EmailOptions,
@@ -173,9 +173,23 @@ export class EmailService {
 
     try {
       console.log("🎨 [EmailService] Rendering template:", options.template);
+
+      // Inject default variables for all templates
+      const defaultVariables = {
+        logoUrl: `${getCdnUrl()}/logos/logo.png`,
+        websiteUrl: getDashboardUrl(),
+        currentYear: new Date().getFullYear().toString(),
+      };
+
+      // Merge with provided variables (provided variables take precedence)
+      const mergedVariables = {
+        ...defaultVariables,
+        ...(options.variables || {}),
+      };
+
       const { html, text } = await this.templateService.render({
         template: options.template,
-        variables: options.variables || {},
+        variables: mergedVariables,
         useCache: true,
         stripComments: true,
         minify: true,

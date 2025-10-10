@@ -26,21 +26,43 @@ export const config = {
       process.env.BASE_DOMAIN ||
       (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat"),
     protocol: process.env.APP_PROTOCOL || "http",
+    // Service-specific domains
+    api: process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat"),
+    dashboard: process.env.DASHBOARD_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat"),
+    cdn: process.env.CDN_DOMAIN || "cdn.hay.chat",
+    useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "http://localhost:5173",
-      "http://127.0.0.1:3000",
-      "http://127.0.0.1:3001",
-      "http://127.0.0.1:5173",
-      "https://hay.chat",
-      "https://app.hay.chat",
-      "https://api.hay.chat",
-      "https://ws.hay.chat",
-    ],
+    origin: process.env.CORS_ORIGIN?.split(",") || (() => {
+      const useSSL = process.env.USE_SSL === "true" || process.env.NODE_ENV === "production";
+      const protocol = useSSL ? "https" : "http";
+      const apiDomain = process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat");
+      const dashboardDomain = process.env.DASHBOARD_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat");
+      const baseDomain = process.env.BASE_DOMAIN || (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat");
+
+      // Build dynamic CORS origins
+      const origins = [
+        // Development localhost origins
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:5173",
+      ];
+
+      // Add production/configured domains
+      if (process.env.NODE_ENV !== "development") {
+        origins.push(
+          `${protocol}://${baseDomain}`,
+          `${protocol}://${dashboardDomain}`,
+          `${protocol}://${apiDomain}`,
+        );
+      }
+
+      return origins;
+    })(),
     credentials: true,
   },
 
@@ -134,3 +156,30 @@ export const config = {
 } as const;
 
 export type Config = typeof config;
+
+/**
+ * Helper functions to get full URLs for services
+ */
+export function getProtocol(): "http" | "https" {
+  return config.domain.useSSL ? "https" : "http";
+}
+
+export function getWebSocketProtocol(): "ws" | "wss" {
+  return config.domain.useSSL ? "wss" : "ws";
+}
+
+export function getApiUrl(): string {
+  return `${getProtocol()}://${config.domain.api}`;
+}
+
+export function getWebSocketUrl(): string {
+  return `${getWebSocketProtocol()}://${config.domain.api}/ws`;
+}
+
+export function getDashboardUrl(): string {
+  return `${getProtocol()}://${config.domain.dashboard}`;
+}
+
+export function getCdnUrl(): string {
+  return `${getProtocol()}://${config.domain.cdn}`;
+}

@@ -15,11 +15,21 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       baseDomain: process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.chat",
+      apiDomain:
+        process.env["API_DOMAIN"] ||
+        (process.env["NODE_ENV"] === "development" ? "localhost:3001" : "api.hay.chat"),
+      useSSL: process.env["USE_SSL"] === "true" || process.env["NODE_ENV"] === "production",
       apiBaseUrl:
         process.env["API_BASE_URL"] ||
-        (process.env["NODE_ENV"] === "development"
-          ? "http://localhost:3001"
-          : "https://api.hay.chat"),
+        (() => {
+          const useSSL =
+            process.env["USE_SSL"] === "true" || process.env["NODE_ENV"] === "production";
+          const apiDomain =
+            process.env["API_DOMAIN"] ||
+            (process.env["NODE_ENV"] === "development" ? "localhost:3001" : "api.hay.chat");
+          const protocol = useSSL ? "https" : "http";
+          return `${protocol}://${apiDomain}`;
+        })(),
     },
   },
 

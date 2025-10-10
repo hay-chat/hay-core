@@ -5,14 +5,15 @@ import { useUserStore } from "@/stores/user";
  * Get the WebSocket URL based on the environment
  */
 export function getWebSocketUrl(): string {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (isProduction) {
-    return "wss://ws.hay.chat/ws";
-  } else {
-    // In development, use localhost with the WebSocket port
-    return "ws://localhost:3001/ws";
+  if (typeof window !== "undefined") {
+    // Client-side: use runtime config
+    const config = useRuntimeConfig();
+    const protocol = config.public.useSSL ? "wss" : "ws";
+    const apiDomain = config.public.apiDomain;
+    return `${protocol}://${apiDomain}/ws`;
   }
+  // Server-side fallback (shouldn't be used since SSR is disabled)
+  return "ws://localhost:3001/ws";
 }
 
 /**
