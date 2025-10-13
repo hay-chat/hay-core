@@ -15,6 +15,7 @@ const createAgentSchema = z.object({
   trigger: z.string().optional(),
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
+  testMode: z.boolean().nullable().optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -27,6 +28,7 @@ const updateAgentSchema = z.object({
   trigger: z.string().optional(),
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
+  testMode: z.boolean().nullable().optional(),
 });
 
 export const agentsRouter = t.router({

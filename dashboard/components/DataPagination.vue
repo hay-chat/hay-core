@@ -94,8 +94,8 @@ const handlePageChange = (page: number) => {
   }
 };
 
-const handleItemsPerPageChange = (value: string | number | bigint | Record<string, any> | null) => {
-  if (value === null || typeof value === "object") return;
+const handleItemsPerPageChange = (value: string | number | boolean) => {
+  if (typeof value === "boolean") return;
   const itemsPerPage = Number(value);
   emit("items-per-page-change", itemsPerPage);
 };

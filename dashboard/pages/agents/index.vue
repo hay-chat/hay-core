@@ -97,11 +97,6 @@
                 :checked="selectedAgents.includes(agent.id)"
                 @update:checked="toggleAgentSelection(agent.id)"
               />
-              <div
-                class="h-12 w-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
-              >
-                <Bot class="h-6 w-6 text-white" />
-              </div>
               <div class="flex-1">
                 <CardTitle class="text-lg">
                   {{ agent.name }}

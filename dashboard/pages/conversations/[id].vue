@@ -25,13 +25,12 @@
             {{ formatStatus(conversation?.status) }}
           </Badge>
           <Badge
-            v-if="
-              conversation?.cooldown_until && new Date(conversation.cooldown_until) > new Date()
-            "
-            variant="destructive"
+            v-if="isTestMode"
+            :variant="isTestMode ? 'default' : 'secondary'"
+            class="bg-orange-100 text-orange-700 hover:bg-orange-200"
           >
-            <Clock class="h-3 w-3 mr-1" />
-            Cooldown {{ formatCountdown(conversation.cooldown_until) }}
+            <ShieldAlert class="h-3 w-3 mr-1" />
+            Test Mode: {{ isTestMode ? "ON" : "OFF" }}
           </Badge>
           <Button variant="outline" size="sm" @click="exportConversation">
             <Download class="h-4 w-4 mr-2" />
@@ -106,9 +105,11 @@
                 v-for="message in conversation?.messages"
                 :key="message.id"
                 :message="message"
-                @approve="message.needsApproval ? approveMessage(message.id) : undefined"
-                @edit="message.needsApproval ? editMessage(message.id) : undefined"
-                @reject="message.needsApproval ? rejectMessage(message.id) : undefined"
+                :show-feedback="true"
+                :show-approval="isTestMode"
+                @message-approved="handleMessageApproved"
+                @message-blocked="handleMessageBlocked"
+                @feedback-submitted="handleFeedbackSubmitted"
               />
             </TransitionGroup>
 
@@ -369,6 +370,7 @@ import {
   CheckCircle,
   XCircle,
   User,
+  ShieldAlert,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
@@ -459,6 +461,34 @@ const isTakenOverByCurrentUser = computed(() => {
     assignedUser.value?.id === currentUserId.value
   );
 });
+
+// Check if test mode is enabled for this conversation
+const isTestMode = computed(() => {
+  const agent = conversation.value?.agent;
+  if (!agent) return false;
+
+  // Check agent's testMode setting
+  // If agent has explicit setting, use it; otherwise check org default
+  return agent.testMode ?? false; // TODO: Fetch org default from settings
+});
+
+// Message approval handlers
+const handleMessageApproved = async (messageId: string) => {
+  console.log("Message approved:", messageId);
+  // Reload conversation to get updated messages
+  await fetchConversation();
+};
+
+const handleMessageBlocked = async (messageId: string) => {
+  console.log("Message blocked:", messageId);
+  // Reload conversation to get updated messages
+  await fetchConversation();
+};
+
+const handleFeedbackSubmitted = () => {
+  console.log("Feedback submitted");
+  // Optional: Show toast or update UI
+};
 
 const goBack = () => {
   navigateTo("/conversations");

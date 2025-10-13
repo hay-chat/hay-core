@@ -11,8 +11,17 @@
             Exit Playground
           </Button>
           <div>
-            <h1 class="text-xl font-semibold">Conversation Playground</h1>
-            <p class="text-sm text-neutral-muted">Test conversations with AI Assistant</p>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl font-semibold">Conversation Playground</h1>
+              <Badge variant="outline" class="text-xs">
+                <Info class="h-3 w-3 mr-1" />
+                Auto-sends
+              </Badge>
+            </div>
+            <p class="text-sm text-neutral-muted">
+              Test conversations with AI • Messages auto-send • Use
+              <ThumbsUp class="icon" />/<ThumbsDown class="icon" /> to rate quality
+            </p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -54,6 +63,7 @@
               :key="message.id"
               :message="message"
               :inverted="true"
+              :show-feedback="true"
             />
 
             <!-- Typing indicator -->
@@ -229,6 +239,8 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
@@ -363,7 +375,7 @@ const createTestConversation = async () => {
     const response = await HayApi.conversations.create.mutate({
       title: "Playground Test - " + new Date().toLocaleTimeString(),
       metadata: {
-        source: "playground",
+        sourceId: "playground", // Set source to playground
         test_mode: true,
         playbookId: selectedPlaybookId.value || undefined,
       },
