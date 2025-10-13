@@ -97,8 +97,13 @@
             <!-- Enabled Field -->
             <div class="space-y-2">
               <div class="flex items-center space-x-2">
-                <Checkbox id="enabled" v-model:checked="form.enabled" />
-                <label for="enabled" class="text-sm font-medium">Enable agent</label>
+                <Input
+                  id="enabled"
+                  v-model="form.enabled"
+                  type="switch"
+                  label="Enable agent"
+                  helper-text="Enable the agent to start receiving messages from customers."
+                />
               </div>
             </div>
 

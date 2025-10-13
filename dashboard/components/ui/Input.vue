@@ -1,6 +1,6 @@
 <template>
   <div class="input-wrapper">
-    <Label v-if="label" :for="inputId">{{ label }}</Label>
+    <Label v-if="label && type !== 'switch'" :for="inputId">{{ label }}</Label>
 
     <!-- Select Type -->
     <div v-if="type === 'select'" class="select-wrapper">
@@ -22,7 +22,16 @@
 
     <!-- Switch Type -->
     <div v-else-if="type === 'switch'" class="switch-wrapper">
-      <Switch :model-value="!!modelValue" @update:model-value="handleSwitchChange" />
+      <Switch
+        :id="inputId"
+        :model-value="Boolean(modelValue)"
+        :disabled="disabledAttr"
+        :name="nameAttr"
+        :required="requiredAttr"
+        :class="props.class"
+        @update:model-value="handleSwitchChange"
+      />
+      <Label v-if="label" :for="inputId">{{ label }}</Label>
     </div>
 
     <!-- Regular Input -->
@@ -74,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch, type Component } from "vue";
+import { ref, computed, nextTick, onMounted, watch, useAttrs, type Component } from "vue";
 import { Eye, EyeOff } from "lucide-vue-next";
 import Select from "./Select.vue";
 import SelectTrigger from "./SelectTrigger.vue";
@@ -164,6 +173,14 @@ const selectValue = computed({
 const handleSwitchChange = (value: boolean) => {
   emit("update:modelValue", value);
 };
+
+// Get attrs
+const attrs = useAttrs();
+
+// Computed properties for attrs
+const disabledAttr = computed(() => attrs.disabled as boolean | undefined);
+const nameAttr = computed(() => attrs.name as string | undefined);
+const requiredAttr = computed(() => attrs.required as boolean | undefined);
 
 // Textarea helpers
 const adjustTextareaHeight = () => {
@@ -339,5 +356,11 @@ onMounted(() => {
   &:focus {
     outline: none;
   }
+}
+
+.switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style>

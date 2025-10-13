@@ -19,7 +19,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { Home, MessageSquare, FileText, Users, Settings, BookOpen, Puzzle } from "lucide-vue-next";
+import {
+  Sparkles,
+  MessageSquare,
+  FileText,
+  AreaChart,
+  Settings,
+  BookOpen,
+  Puzzle,
+} from "lucide-vue-next";
 
 import {
   Sidebar,
@@ -72,8 +80,8 @@ const user = computed(() => {
 
 // Helper function to check if a path is active
 const isPathActive = (path: string): boolean => {
-  if (path === "/") {
-    return route.path === "/";
+  if (path === "/dashboard") {
+    return route.path === "/" || route.path === "/dashboard";
   }
   return route.path.startsWith(path);
 };
@@ -93,95 +101,111 @@ onMounted(async () => {
 });
 
 // Make navMain reactive to route changes
-const navMain = computed(() => [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: Home,
-    isActive: isPathActive("/"),
-  },
-  {
-    title: "Conversations",
-    url: "/conversations",
-    icon: MessageSquare,
-    badge: conversationsBadge.value,
-    isActive: isPathActive("/conversations"),
-  },
-  {
-    title: "Documents",
-    url: "/documents",
-    icon: FileText,
-    isActive: isPathActive("/documents"),
-  },
-  // {
-  //   title: "Queue",
-  //   url: "/queue",
-  //   icon: ListTodo,
-  //   isActive: isPathActive("/queue"),
-  // },
-  {
-    title: "Playbooks",
-    url: "/playbooks",
-    icon: BookOpen,
-    isActive: isPathActive("/playbooks"),
-  },
-  // {
-  //   title: "Insights",
-  //   url: "/insights",
-  //   icon: BarChart,
-  //   isActive: isPathActive("/insights"),
-  // },
-  {
-    title: "Integrations",
-    url: "#",
-    icon: Puzzle,
-    isActive: isPathActive("/integrations"),
-    items: [
-      {
-        title: "Marketplace",
-        url: "/integrations/marketplace",
-        isActive: route.path === "/integrations/marketplace",
-      },
-      // Add enabled plugins dynamically
-      ...appStore.enabledPlugins.map((plugin) => ({
-        title: plugin.name,
-        url: `/integrations/plugins/${plugin.id}`,
-        isActive: route.path === `/integrations/plugins/${plugin.id}`,
-      })),
-    ],
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-    isActive: isPathActive("/settings"),
-    items: [
-      {
-        title: "Profile",
-        url: "/settings/profile",
-        isActive: route.path === "/settings/profile",
-      },
-      {
-        title: "Agents",
-        url: "/agents",
-        isActive: isPathActive("/agents"),
-      },
-      {
-        title: "General",
-        url: "/settings/general",
-        isActive: route.path === "/settings/general",
-      },
-      // Add plugin menu items for settings
-      ...pluginMenuItems.value
-        .filter((item) => item.parent === "settings")
-        .map((item) => ({
-          title: item.title,
-          url: item.url,
-          isActive: route.path === item.url,
+const navMain = computed(() => {
+  const items = [];
+
+  // Only show "Getting Started" if onboarding is not completed
+  if (!appStore.onboardingCompleted) {
+    items.push({
+      title: "Getting Started",
+      url: "/getting-started",
+      icon: Sparkles,
+      isActive: isPathActive("/getting-started"),
+    });
+  }
+
+  items.push(
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: AreaChart,
+      isActive: isPathActive("/dashboard"),
+    },
+    {
+      title: "Conversations",
+      url: "/conversations",
+      icon: MessageSquare,
+      badge: conversationsBadge.value,
+      isActive: isPathActive("/conversations"),
+    },
+    {
+      title: "Documents",
+      url: "/documents",
+      icon: FileText,
+      isActive: isPathActive("/documents"),
+    },
+    // {
+    //   title: "Queue",
+    //   url: "/queue",
+    //   icon: ListTodo,
+    //   isActive: isPathActive("/queue"),
+    // },
+    {
+      title: "Playbooks",
+      url: "/playbooks",
+      icon: BookOpen,
+      isActive: isPathActive("/playbooks"),
+    },
+    // {
+    //   title: "Insights",
+    //   url: "/insights",
+    //   icon: BarChart,
+    //   isActive: isPathActive("/insights"),
+    // },
+    {
+      title: "Integrations",
+      url: "#",
+      icon: Puzzle,
+      isActive: isPathActive("/integrations"),
+      items: [
+        {
+          title: "Marketplace",
+          url: "/integrations/marketplace",
+          isActive: route.path === "/integrations/marketplace",
+        },
+        // Add enabled plugins dynamically
+        ...appStore.enabledPlugins.map((plugin) => ({
+          title: plugin.name,
+          url: `/integrations/plugins/${plugin.id}`,
+          isActive: route.path === `/integrations/plugins/${plugin.id}`,
         })),
-    ],
-  },
-]);
+      ],
+    },
+    {
+      title: "Settings",
+      url: "#",
+      icon: Settings,
+      isActive: isPathActive("/settings"),
+      items: [
+        {
+          title: "Profile",
+          url: "/settings/profile",
+          isActive: route.path === "/settings/profile",
+        },
+        {
+          title: "Agents",
+          url: "/agents",
+          isActive: isPathActive("/agents"),
+        },
+        {
+          title: "General",
+          url: "/settings/general",
+          isActive: route.path === "/settings/general",
+        },
+        // Add plugin menu items for settings
+        ...pluginMenuItems.value
+          .filter((item) => item.parent === "settings")
+          .map((item) => ({
+            title: item.title,
+            url: item.url,
+            isActive: route.path === item.url,
+          })),
+      ],
+    },
+  );
+
+  return items;
+});
 
 // Fetch plugin menu items
 onMounted(async () => {

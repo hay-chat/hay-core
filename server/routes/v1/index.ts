@@ -12,6 +12,7 @@ import { analyticsRouter } from "./analytics";
 import { organizationsRouter } from "./organizations";
 import { sourcesRouter } from "./sources";
 import { messageFeedbackRouter } from "./message-feedback";
+import { onboardingRouter } from "./onboarding";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
 // Core routers - always available
@@ -29,6 +30,7 @@ const coreRouters = {
   organizations: organizationsRouter,
   sources: sourcesRouter,
   messageFeedback: messageFeedbackRouter,
+  onboarding: onboardingRouter,
 };
 
 // Create v1Router with core + plugin routers

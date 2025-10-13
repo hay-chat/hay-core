@@ -68,7 +68,7 @@ export const runConversation = async (conversationId: string) => {
 
   try {
     // 00. Intialize
-    console.log("[Orchestrator] Initializing conversation", conversationId);
+    // console.log("[Orchestrator] Initializing conversation", conversationId);
     const locked = await conversation.lock();
     if (!locked) {
       console.log(
@@ -253,13 +253,14 @@ export const runConversation = async (conversationId: string) => {
   } catch (error: Error | unknown) {
     if (
       error instanceof Error &&
-      !error.message.includes("Conversation does not need processing")
+      !error.message.includes("Conversation does not need processing") &&
+      !error.message.includes("Last customer message not found")
     ) {
       console.error("[Orchestrator] Error in conversation", error.message);
     }
   } finally {
     await conversation.unlock();
-    console.log("[Orchestrator] Conversation unlocked", conversationId);
+    // console.log("[Orchestrator] Conversation unlocked", conversationId);
   }
 };
 

@@ -25,6 +25,7 @@ interface AppState {
   pluginsLastUpdated: number | null;
   pluginsLoading: boolean;
   rowsPerPage: number;
+  onboardingCompleted: boolean;
 }
 
 export const useAppStore = defineStore("app", {
@@ -36,6 +37,7 @@ export const useAppStore = defineStore("app", {
     pluginsLastUpdated: null,
     pluginsLoading: false,
     rowsPerPage: 10,
+    onboardingCompleted: false,
   }),
 
   getters: {
@@ -184,6 +186,11 @@ export const useAppStore = defineStore("app", {
     // Update rows per page preference
     setRowsPerPage(rows: number) {
       this.rowsPerPage = rows;
+    },
+
+    // Onboarding management
+    setOnboardingCompleted(completed: boolean) {
+      this.onboardingCompleted = completed;
     },
   },
   persist: true,
