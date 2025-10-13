@@ -89,33 +89,135 @@
                 }}</CardDescription>
               </div>
             </div>
+            <!-- Enable Button (when not enabled) -->
+            <div v-if="!enabled">
+              <Button @click="handleEnablePlugin" :disabled="enabling" size="lg">
+                <Loader2 v-if="enabling" class="h-4 w-4 mr-2 animate-spin" />
+                {{ enabling ? "Enabling..." : "Enable Plugin" }}
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
 
-      <!-- Plugin Settings Extensions - Before Settings Slot -->
-      <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
-        <CardContent>
-          <component
-            :is="ext.component"
-            :plugin="plugin"
-            :config="{
-              ...formData,
-              instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId,
-            }"
-            :api-base-url="apiBaseUrl"
-            @update:config="
-              (newConfig: any) => {
-                formData = { ...formData, ...newConfig };
-              }
-            "
-          />
-        </CardContent>
-      </Card>
+      <!-- Plugin Not Enabled - Show Overview -->
+      <template v-if="!enabled">
+        <!-- Description Card -->
+        <Card v-if="plugin.manifest?.description">
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-muted-foreground">{{ plugin.manifest.description }}</p>
+          </CardContent>
+        </Card>
 
-      <!-- Tabs Section: Show tabs if there are any tab extensions -->
-      <Card v-if="tabExtensions.length > 0">
+        <!-- Capabilities Card -->
+        <Card v-if="plugin.manifest?.capabilities">
+          <CardHeader>
+            <CardTitle>Capabilities</CardTitle>
+            <CardDescription>What this plugin can do</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-4">
+              <!-- Chat Connector Capabilities -->
+              <div v-if="plugin.manifest.capabilities.chat_connector" class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <MessageSquare class="h-5 w-5 text-primary" />
+                  <h4 class="font-medium">Chat Connector</h4>
+                </div>
+                <div class="pl-7 space-y-2 text-sm text-muted-foreground">
+                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.send_message">
+                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
+                    Send messages
+                  </div>
+                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.receive_message">
+                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
+                    Receive messages
+                  </div>
+                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations">
+                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
+                    List conversations
+                  </div>
+                </div>
+              </div>
+
+              <!-- MCP Connector Capabilities -->
+              <div v-if="plugin.manifest.capabilities.mcp" class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <Cpu class="h-5 w-5 text-primary" />
+                  <h4 class="font-medium">MCP Connector</h4>
+                </div>
+                <p class="pl-7 text-sm text-muted-foreground">
+                  Provides AI tools and resources through Model Context Protocol
+                </p>
+              </div>
+
+              <!-- Document Importer Capabilities -->
+              <div v-if="plugin.manifest.capabilities.document_importer" class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <FileText class="h-5 w-5 text-primary" />
+                  <h4 class="font-medium">Document Importer</h4>
+                </div>
+                <p class="pl-7 text-sm text-muted-foreground">
+                  Import and process documents from external sources
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Available Actions Card (for MCP plugins) -->
+        <Card v-if="plugin.manifest?.capabilities?.mcp?.tools && plugin.manifest.capabilities.mcp.tools.length > 0">
+          <CardHeader>
+            <CardTitle>Available Actions</CardTitle>
+            <CardDescription>{{ plugin.manifest.capabilities.mcp.tools.length }} tools available</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="grid gap-3">
+              <div
+                v-for="tool in plugin.manifest.capabilities.mcp.tools"
+                :key="tool.name"
+                class="flex items-start gap-3 p-3 rounded-lg border border-border"
+              >
+                <div class="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Zap class="h-4 w-4 text-primary" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-medium text-sm">{{ tool.label || tool.name }}</h4>
+                  <p class="text-xs text-muted-foreground mt-1">{{ tool.description }}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </template>
+
+      <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
+      <template v-if="enabled">
+        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <component
+              :is="ext.component"
+              :plugin="plugin"
+              :config="{
+                ...formData,
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+              @update:config="
+                (newConfig: any) => {
+                  formData = { ...formData, ...newConfig };
+                }
+              "
+            />
+          </CardContent>
+        </Card>
+      </template>
+
+      <!-- Tabs Section: Show tabs if there are any tab extensions (only when enabled) -->
+      <Card v-if="enabled && tabExtensions.length > 0">
         <CardContent class="p-0">
           <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
             <TabsList class="w-full justify-start rounded-none border-b">
@@ -346,8 +448,8 @@
         </CardContent>
       </Card>
 
-      <!-- Configuration Form (shown when no tabs are present) -->
-      <Card v-if="hasConfiguration && tabExtensions.length === 0">
+      <!-- Configuration Form (shown when no tabs are present and enabled) -->
+      <Card v-if="enabled && hasConfiguration && tabExtensions.length === 0">
         <CardHeader>
           <CardTitle>Configuration</CardTitle>
           <CardDescription>
@@ -534,8 +636,8 @@
         </CardContent>
       </Card>
 
-      <!-- Test Connection for Connectors -->
-      <Card v-if="plugin.type.includes('connector')">
+      <!-- Test Connection for Connectors (only when enabled) -->
+      <Card v-if="enabled && plugin.type.includes('connector')">
         <CardHeader>
           <CardTitle>Connection Test</CardTitle>
           <CardDescription>
@@ -571,26 +673,28 @@
         </CardContent>
       </Card>
 
-      <!-- Plugin Settings Extensions - After Settings Slot -->
-      <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
-        <CardContent>
-          <component
-            :is="ext.component"
-            :plugin="plugin"
-            :config="{
-              ...formData,
-              instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId,
-            }"
-            :api-base-url="apiBaseUrl"
-            @update:config="
-              (newConfig: any) => {
-                formData = { ...formData, ...newConfig };
-              }
-            "
-          />
-        </CardContent>
-      </Card>
+      <!-- Plugin Settings Extensions - After Settings Slot (only when enabled) -->
+      <template v-if="enabled">
+        <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <component
+              :is="ext.component"
+              :plugin="plugin"
+              :config="{
+                ...formData,
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+              @update:config="
+                (newConfig: any) => {
+                  formData = { ...formData, ...newConfig };
+                }
+              "
+            />
+          </CardContent>
+        </Card>
+      </template>
     </div>
   </Page>
 </template>
@@ -612,6 +716,7 @@ import {
   Edit3,
   X,
   Lock,
+  Check,
 } from "lucide-vue-next";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Switch from "@/components/ui/Switch.vue";
@@ -650,6 +755,7 @@ const plugin = ref<any>(null);
 const enabled = ref(false);
 const saving = ref(false);
 const testing = ref(false);
+const enabling = ref(false);
 const disabling = ref(false);
 const showDisableConfirm = ref(false);
 const testResult = ref<{ success: boolean; message?: string } | null>(null);
@@ -962,6 +1068,29 @@ const testConnection = async () => {
     };
   } finally {
     testing.value = false;
+  }
+};
+
+const handleEnablePlugin = async () => {
+  enabling.value = true;
+
+  try {
+    await Hay.plugins.configure.mutate({
+      pluginId: pluginId.value,
+      configuration: {},
+    });
+
+    toast.success("Plugin enabled successfully");
+
+    // Reload plugin data to show settings
+    await fetchPlugin();
+  } catch (err: any) {
+    console.error("Failed to enable plugin:", err);
+
+    const errorMessage = err?.message || err?.data?.message || "Failed to enable plugin";
+    toast.error(errorMessage);
+  } finally {
+    enabling.value = false;
   }
 };
 

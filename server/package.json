@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:base && npm run migration:ensure && tsc",
+    "build": "npm run build:base && npm run migration:ensure && tsc && npm run copy:templates",
+    "copy:templates": "cp -r templates dist/",
     "build:base": "cd ../plugins/base && npm run build",
     "start": "node -r module-alias/register dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",

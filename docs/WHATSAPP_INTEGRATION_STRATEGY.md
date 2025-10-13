@@ -7,6 +7,7 @@ This document outlines the strategy for integrating WhatsApp Business Platform i
 ## Strategy Overview
 
 ### Phase 1: Tech Provider with Embedded Signup (Launch Phase)
+
 - **Goal**: Simplify WhatsApp setup to < 5 minutes with 1-click experience
 - **Approach**: Become a Meta Tech Provider and implement Embedded Signup
 - **Billing**: Customers billed directly by Meta for WhatsApp usage
@@ -14,6 +15,7 @@ This document outlines the strategy for integrating WhatsApp Business Platform i
 - **Risk**: Low (no financial liability, proven approach)
 
 ### Phase 2: Solution Partner with Managed Billing (Scale Phase)
+
 - **Goal**: Unified billing and revenue from WhatsApp usage markup
 - **Approach**: Upgrade to Solution Partner status
 - **Billing**: Hay manages line of credit and bills customers with markup
@@ -23,6 +25,7 @@ This document outlines the strategy for integrating WhatsApp Business Platform i
 ## Why Embedded Signup?
 
 ### Current Pain Point (DIY Setup)
+
 ```
 Customer must:
 1. Go to Meta Business Manager (30+ min setup)
@@ -37,6 +40,7 @@ Customer must:
 ```
 
 ### With Embedded Signup
+
 ```
 Customer experience:
 1. Click "Enable WhatsApp" in Hay dashboard
@@ -45,6 +49,7 @@ Customer experience:
 ```
 
 ### Benefits
+
 - ✅ **Simplified onboarding**: 1-click instead of 9+ steps
 - ✅ **Faster time-to-value**: Minutes instead of hours
 - ✅ **Reduced support burden**: No manual credential setup
@@ -57,6 +62,7 @@ Customer experience:
 ### Multi-Tenant Design
 
 Each organization gets their own:
+
 - WhatsApp Business Account (WABA)
 - Phone number from Meta
 - Access tokens (encrypted in DB)
@@ -65,17 +71,17 @@ Each organization gets their own:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    Hay Platform                      │
+│                     Hay Platform                    │
 ├─────────────────────────────────────────────────────┤
-│                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐ │
-│  │   Org A      │  │   Org B      │  │  Org C    │ │
-│  │              │  │              │  │           │ │
-│  │  WABA: 123   │  │  WABA: 456   │  │ WABA: 789 │ │
-│  │  Phone: +1   │  │  Phone: +44  │  │ Phone: +1 │ │
-│  │  Token: ***  │  │  Token: ***  │  │ Token: **│ │
-│  └──────────────┘  └──────────────┘  └───────────┘ │
-│                                                      │
+│                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
+│  │   Org A      │  │   Org B      │  │  Org C     │ │
+│  │              │  │              │  │            │ │
+│  │  WABA: 123   │  │  WABA: 456   │  │ WABA: 789  │ │
+│  │  Phone: +1   │  │  Phone: +44  │  │ Phone: +1  │ │
+│  │  Token: ***  │  │  Token: ***  │  │ Token: *** │ │
+│  └──────────────┘  └──────────────┘  └────────────┘ │
+│                                                     │
 └─────────────────────────────────────────────────────┘
                          │
                          ▼
@@ -132,6 +138,7 @@ WhatsApp User receives response
 ### Prerequisites
 
 #### 1. Become a Meta Tech Provider
+
 - [ ] Create Meta Business Account for Hay
 - [ ] Create Meta Developer Account
 - [ ] Apply for Tech Provider status through a BSP partner
@@ -141,6 +148,7 @@ WhatsApp User receives response
   - `whatsapp_business_messaging`
 
 #### 2. Setup Meta App Configuration
+
 - [ ] Create Meta App for Hay
 - [ ] Add WhatsApp Product
 - [ ] Configure OAuth redirect URIs
@@ -265,29 +273,21 @@ plugins/whatsapp/
       <p>Set up WhatsApp in under 5 minutes with our 1-click integration</p>
 
       <div class="setup-steps">
-        <div class="step">
-          <CheckCircle /> <span>Authenticate with Facebook</span>
-        </div>
+        <div class="step"><CheckCircle /> <span>Authenticate with Facebook</span></div>
         <div class="step">
           <CheckCircle /> <span>Select or create WhatsApp Business Account</span>
         </div>
-        <div class="step">
-          <CheckCircle /> <span>Get phone number from Meta</span>
-        </div>
-        <div class="step">
-          <CheckCircle /> <span>Done! Start messaging</span>
-        </div>
+        <div class="step"><CheckCircle /> <span>Get phone number from Meta</span></div>
+        <div class="step"><CheckCircle /> <span>Done! Start messaging</span></div>
       </div>
 
-      <Button @click="startEmbeddedSignup" size="lg">
-        Connect WhatsApp Business
-      </Button>
+      <Button @click="startEmbeddedSignup" size="lg"> Connect WhatsApp Business </Button>
 
       <Alert>
         <AlertCircle />
         <AlertDescription>
-          You'll be billed directly by Meta for WhatsApp usage.
-          Pricing starts at $0.005/conversation.
+          You'll be billed directly by Meta for WhatsApp usage. Pricing starts at
+          $0.005/conversation.
         </AlertDescription>
       </Alert>
     </div>
@@ -299,8 +299,8 @@ plugins/whatsapp/
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Hay } from '@/utils/api';
+import { ref } from "vue";
+import { Hay } from "@/utils/api";
 
 const configured = ref(false);
 
@@ -309,15 +309,11 @@ async function startEmbeddedSignup() {
   const { url } = await Hay.plugins.whatsapp.getEmbeddedSignupUrl.query();
 
   // Open OAuth popup
-  const popup = window.open(
-    url,
-    'WhatsApp Setup',
-    'width=600,height=800,scrollbars=yes'
-  );
+  const popup = window.open(url, "WhatsApp Setup", "width=600,height=800,scrollbars=yes");
 
   // Listen for completion
-  window.addEventListener('message', async (event) => {
-    if (event.data.type === 'whatsapp-setup-complete') {
+  window.addEventListener("message", async (event) => {
+    if (event.data.type === "whatsapp-setup-complete") {
       popup?.close();
       configured.value = true;
       // Refresh plugin configuration
@@ -333,7 +329,7 @@ async function startEmbeddedSignup() {
 **File: `src/handlers/embedded-signup.handler.ts`**
 
 ```typescript
-import crypto from 'crypto';
+import crypto from "crypto";
 
 interface EmbeddedSignupConfig {
   appId: string;
@@ -354,12 +350,12 @@ export class EmbeddedSignupHandler {
       client_id: this.config.appId,
       redirect_uri: this.config.redirectUri,
       state: state,
-      scope: 'whatsapp_business_management,whatsapp_business_messaging',
+      scope: "whatsapp_business_management,whatsapp_business_messaging",
       extras: JSON.stringify({
         setup: {
-          channel: 'whatsapp'
-        }
-      })
+          channel: "whatsapp",
+        },
+      }),
     });
 
     return `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`;
@@ -384,19 +380,16 @@ export class EmbeddedSignupHandler {
       phoneNumberId: accountInfo.phone_number_id,
       accessToken: tokenResponse.access_token,
       businessAccountId: accountInfo.business_id,
-      webhookVerifyToken: crypto.randomBytes(32).toString('hex')
+      webhookVerifyToken: crypto.randomBytes(32).toString("hex"),
     });
 
     // Subscribe to webhooks
-    await this.subscribeToWebhooks(
-      accountInfo.waba_id,
-      tokenResponse.access_token
-    );
+    await this.subscribeToWebhooks(accountInfo.waba_id, tokenResponse.access_token);
 
     return {
       success: true,
       organizationId,
-      accountInfo
+      accountInfo,
     };
   }
 
@@ -406,10 +399,10 @@ export class EmbeddedSignupHandler {
   private async exchangeCodeForToken(code: string) {
     const response = await fetch(
       `https://graph.facebook.com/v18.0/oauth/access_token?` +
-      `client_id=${this.config.appId}&` +
-      `client_secret=${this.config.appSecret}&` +
-      `code=${code}&` +
-      `redirect_uri=${this.config.redirectUri}`
+        `client_id=${this.config.appId}&` +
+        `client_secret=${this.config.appSecret}&` +
+        `code=${code}&` +
+        `redirect_uri=${this.config.redirectUri}`,
     );
 
     return await response.json();
@@ -421,21 +414,21 @@ export class EmbeddedSignupHandler {
   private async getAccountInfo(accessToken: string) {
     const response = await fetch(
       `https://graph.facebook.com/v18.0/debug_token?` +
-      `input_token=${accessToken}&` +
-      `access_token=${this.config.appId}|${this.config.appSecret}`
+        `input_token=${accessToken}&` +
+        `access_token=${this.config.appId}|${this.config.appSecret}`,
     );
 
     const data = await response.json();
 
     // Extract WABA and phone number from granular scopes
     return {
-      waba_id: data.data.granular_scopes.find((s: any) =>
-        s.scope === 'whatsapp_business_management'
+      waba_id: data.data.granular_scopes.find(
+        (s: any) => s.scope === "whatsapp_business_management",
       )?.target_ids[0],
-      phone_number_id: data.data.granular_scopes.find((s: any) =>
-        s.scope === 'whatsapp_business_messaging'
+      phone_number_id: data.data.granular_scopes.find(
+        (s: any) => s.scope === "whatsapp_business_messaging",
       )?.target_ids[0],
-      business_id: data.data.app_id
+      business_id: data.data.app_id,
     };
   }
 
@@ -443,33 +436,28 @@ export class EmbeddedSignupHandler {
    * Subscribe to webhook events
    */
   private async subscribeToWebhooks(wabaId: string, accessToken: string) {
-    await fetch(
-      `https://graph.facebook.com/v18.0/${wabaId}/subscribed_apps`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        }
-      }
-    );
+    await fetch(`https://graph.facebook.com/v18.0/${wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
   }
 
   private generateState(organizationId: string): string {
     const data = JSON.stringify({
       organizationId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    return Buffer.from(data).toString('base64url');
+    return Buffer.from(data).toString("base64url");
   }
 
   private verifyState(state: string): string {
-    const data = JSON.parse(
-      Buffer.from(state, 'base64url').toString()
-    );
+    const data = JSON.parse(Buffer.from(state, "base64url").toString());
 
     // Verify timestamp is recent (within 10 minutes)
     if (Date.now() - data.timestamp > 10 * 60 * 1000) {
-      throw new Error('State expired');
+      throw new Error("State expired");
     }
 
     return data.organizationId;
@@ -484,37 +472,37 @@ export class EmbeddedSignupHandler {
 **File: `src/handlers/webhook.handler.ts`**
 
 ```typescript
-import { Request, Response } from 'express';
-import { WhatsAppClient } from '../client/whatsapp-client';
-import { MessageMapper } from '../utils/message-mapper';
+import { Request, Response } from "express";
+import { WhatsAppClient } from "../client/whatsapp-client";
+import { MessageMapper } from "../utils/message-mapper";
 
 export class WebhookHandler {
   constructor(
     private pluginInstanceRepository: any,
-    private orchestratorService: any
+    private orchestratorService: any,
   ) {}
 
   /**
    * Webhook verification (GET request)
    */
   async verify(req: Request, res: Response) {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
 
-    if (mode === 'subscribe') {
+    if (mode === "subscribe") {
       // Find which org this webhook belongs to by matching verify token
       const instance = await this.pluginInstanceRepository.findByConfig({
-        webhookVerifyToken: token
+        webhookVerifyToken: token,
       });
 
       if (instance) {
         res.status(200).send(challenge);
       } else {
-        res.status(403).send('Forbidden');
+        res.status(403).send("Forbidden");
       }
     } else {
-      res.status(400).send('Bad Request');
+      res.status(400).send("Bad Request");
     }
   }
 
@@ -525,7 +513,7 @@ export class WebhookHandler {
     const data = req.body;
 
     // Acknowledge receipt immediately
-    res.status(200).send('OK');
+    res.status(200).send("OK");
 
     // Process webhook asynchronously
     this.processWebhook(data).catch(console.error);
@@ -534,9 +522,9 @@ export class WebhookHandler {
   private async processWebhook(data: any) {
     for (const entry of data.entry || []) {
       for (const change of entry.changes || []) {
-        if (change.field === 'messages') {
+        if (change.field === "messages") {
           await this.handleIncomingMessage(change.value);
-        } else if (change.field === 'message_status') {
+        } else if (change.field === "message_status") {
           await this.handleMessageStatus(change.value);
         }
       }
@@ -550,11 +538,11 @@ export class WebhookHandler {
     // Identify organization by phone number ID
     const phoneNumberId = value.metadata.phone_number_id;
     const instance = await this.pluginInstanceRepository.findByConfig({
-      phoneNumberId
+      phoneNumberId,
     });
 
     if (!instance) {
-      console.error('No organization found for phone number:', phoneNumberId);
+      console.error("No organization found for phone number:", phoneNumberId);
       return;
     }
 
@@ -567,15 +555,11 @@ export class WebhookHandler {
     const contact = await this.getOrCreateContact(
       organizationId,
       message.from,
-      value.contacts?.[0]
+      value.contacts?.[0],
     );
 
     // Get or create conversation
-    const conversation = await this.getOrCreateConversation(
-      organizationId,
-      contact.id,
-      'whatsapp'
-    );
+    const conversation = await this.getOrCreateConversation(organizationId, contact.id, "whatsapp");
 
     // Save incoming message
     await this.saveMessage(conversation.id, hayMessage);
@@ -584,14 +568,11 @@ export class WebhookHandler {
     const response = await this.orchestratorService.processMessage({
       organizationId,
       conversationId: conversation.id,
-      message: hayMessage.content
+      message: hayMessage.content,
     });
 
     // Send response back via WhatsApp
-    const client = new WhatsAppClient(
-      instance.config.phoneNumberId,
-      instance.config.accessToken
-    );
+    const client = new WhatsAppClient(instance.config.phoneNumberId, instance.config.accessToken);
 
     await client.sendMessage(message.from, response.content);
   }
@@ -605,11 +586,7 @@ export class WebhookHandler {
     await this.updateMessageStatus(status.id, status.status);
   }
 
-  private async getOrCreateContact(
-    organizationId: string,
-    phoneNumber: string,
-    profile?: any
-  ) {
+  private async getOrCreateContact(organizationId: string, phoneNumber: string, profile?: any) {
     // Implementation to get/create contact
     // Store WhatsApp phone number as identifier
   }
@@ -617,7 +594,7 @@ export class WebhookHandler {
   private async getOrCreateConversation(
     organizationId: string,
     contactId: string,
-    channel: string
+    channel: string,
   ) {
     // Implementation to get/create conversation
   }
@@ -638,11 +615,11 @@ export class WebhookHandler {
 
 ```typescript
 export class WhatsAppClient {
-  private baseUrl = 'https://graph.facebook.com/v18.0';
+  private baseUrl = "https://graph.facebook.com/v18.0";
 
   constructor(
     private phoneNumberId: string,
-    private accessToken: string
+    private accessToken: string,
   ) {}
 
   /**
@@ -650,11 +627,11 @@ export class WhatsAppClient {
    */
   async sendMessage(to: string, text: string) {
     return this.request(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
       to: to,
-      type: 'text',
-      text: { body: text }
+      type: "text",
+      text: { body: text },
     });
   }
 
@@ -663,13 +640,13 @@ export class WhatsAppClient {
    */
   async sendMedia(to: string, type: string, mediaId: string, caption?: string) {
     return this.request(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
+      messaging_product: "whatsapp",
       to: to,
       type: type,
       [type]: {
         id: mediaId,
-        caption: caption
-      }
+        caption: caption,
+      },
     });
   }
 
@@ -678,14 +655,14 @@ export class WhatsAppClient {
    */
   async sendTemplate(to: string, templateName: string, language: string, components?: any[]) {
     return this.request(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
+      messaging_product: "whatsapp",
       to: to,
-      type: 'template',
+      type: "template",
       template: {
         name: templateName,
         language: { code: language },
-        components: components || []
-      }
+        components: components || [],
+      },
     });
   }
 
@@ -694,9 +671,9 @@ export class WhatsAppClient {
    */
   async markAsRead(messageId: string) {
     return this.request(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
-      status: 'read',
-      message_id: messageId
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
     });
   }
 
@@ -705,19 +682,16 @@ export class WhatsAppClient {
    */
   async uploadMedia(fileBuffer: Buffer, mimeType: string) {
     const formData = new FormData();
-    formData.append('messaging_product', 'whatsapp');
-    formData.append('file', new Blob([fileBuffer], { type: mimeType }));
+    formData.append("messaging_product", "whatsapp");
+    formData.append("file", new Blob([fileBuffer], { type: mimeType }));
 
-    const response = await fetch(
-      `${this.baseUrl}/${this.phoneNumberId}/media`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-        },
-        body: formData
-      }
-    );
+    const response = await fetch(`${this.baseUrl}/${this.phoneNumberId}/media`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: formData,
+    });
 
     return await response.json();
   }
@@ -736,8 +710,8 @@ export class WhatsAppClient {
   async downloadMedia(mediaUrl: string): Promise<Buffer> {
     const response = await fetch(mediaUrl, {
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-      }
+        Authorization: `Bearer ${this.accessToken}`,
+      },
     });
 
     return Buffer.from(await response.arrayBuffer());
@@ -745,20 +719,18 @@ export class WhatsAppClient {
 
   private async request(endpoint: string, body?: any) {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: body ? 'POST' : 'GET',
+      method: body ? "POST" : "GET",
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
       },
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(
-        `WhatsApp API error: ${data.error?.message || 'Unknown error'}`
-      );
+      throw new Error(`WhatsApp API error: ${data.error?.message || "Unknown error"}`);
     }
 
     return data;
@@ -780,70 +752,70 @@ export class MessageMapper {
       externalId: whatsappMessage.id,
       timestamp: new Date(parseInt(whatsappMessage.timestamp) * 1000),
       from: whatsappMessage.from,
-      channel: 'whatsapp'
+      channel: "whatsapp",
     };
 
     switch (whatsappMessage.type) {
-      case 'text':
+      case "text":
         return {
           ...baseMessage,
-          type: 'text',
-          content: whatsappMessage.text.body
+          type: "text",
+          content: whatsappMessage.text.body,
         };
 
-      case 'image':
+      case "image":
         return {
           ...baseMessage,
-          type: 'image',
-          content: whatsappMessage.image.caption || '',
+          type: "image",
+          content: whatsappMessage.image.caption || "",
           media: {
             id: whatsappMessage.image.id,
             mimeType: whatsappMessage.image.mime_type,
-            url: null // Will be fetched separately
-          }
+            url: null, // Will be fetched separately
+          },
         };
 
-      case 'document':
+      case "document":
         return {
           ...baseMessage,
-          type: 'document',
+          type: "document",
           content: whatsappMessage.document.caption || whatsappMessage.document.filename,
           media: {
             id: whatsappMessage.document.id,
             mimeType: whatsappMessage.document.mime_type,
             filename: whatsappMessage.document.filename,
-            url: null
-          }
+            url: null,
+          },
         };
 
-      case 'audio':
+      case "audio":
         return {
           ...baseMessage,
-          type: 'audio',
+          type: "audio",
           media: {
             id: whatsappMessage.audio.id,
             mimeType: whatsappMessage.audio.mime_type,
-            url: null
-          }
+            url: null,
+          },
         };
 
-      case 'location':
+      case "location":
         return {
           ...baseMessage,
-          type: 'location',
+          type: "location",
           location: {
             latitude: whatsappMessage.location.latitude,
             longitude: whatsappMessage.location.longitude,
             name: whatsappMessage.location.name,
-            address: whatsappMessage.location.address
-          }
+            address: whatsappMessage.location.address,
+          },
         };
 
       default:
         return {
           ...baseMessage,
-          type: 'unsupported',
-          content: `Unsupported message type: ${whatsappMessage.type}`
+          type: "unsupported",
+          content: `Unsupported message type: ${whatsappMessage.type}`,
         };
     }
   }
@@ -871,7 +843,7 @@ export const getEmbeddedSignupUrl = authenticatedProcedure.query(async ({ ctx })
   const handler = new EmbeddedSignupHandler({
     appId: process.env.META_APP_ID!,
     appSecret: process.env.META_APP_SECRET!,
-    redirectUri: `${process.env.APP_URL}/plugins/whatsapp/oauth/callback`
+    redirectUri: `${process.env.APP_URL}/plugins/whatsapp/oauth/callback`,
   });
 
   const url = handler.generateSignupUrl(ctx.organizationId!);
@@ -880,15 +852,17 @@ export const getEmbeddedSignupUrl = authenticatedProcedure.query(async ({ ctx })
 });
 
 export const handleOAuthCallback = authenticatedProcedure
-  .input(z.object({
-    code: z.string(),
-    state: z.string()
-  }))
+  .input(
+    z.object({
+      code: z.string(),
+      state: z.string(),
+    }),
+  )
   .mutation(async ({ input }) => {
     const handler = new EmbeddedSignupHandler({
       appId: process.env.META_APP_ID!,
       appSecret: process.env.META_APP_SECRET!,
-      redirectUri: `${process.env.APP_URL}/plugins/whatsapp/oauth/callback`
+      redirectUri: `${process.env.APP_URL}/plugins/whatsapp/oauth/callback`,
     });
 
     const result = await handler.handleCallback(input.code, input.state);
@@ -952,6 +926,7 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 ## Deployment Checklist
 
 ### Meta Configuration
+
 - [ ] Create Meta Business Account for Hay
 - [ ] Create Meta App
 - [ ] Add WhatsApp Product to app
@@ -961,6 +936,7 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 - [ ] Get approved as Tech Provider
 
 ### Infrastructure
+
 - [ ] Deploy webhook endpoint (must be HTTPS)
 - [ ] Configure SSL certificates
 - [ ] Set up environment variables
@@ -969,12 +945,14 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 - [ ] Set up monitoring and alerts
 
 ### Database
+
 - [ ] Run plugin installation
 - [ ] Verify encryption for sensitive fields
 - [ ] Test multi-tenant isolation
 - [ ] Set up backup procedures
 
 ### Documentation
+
 - [ ] Customer setup guide
 - [ ] Troubleshooting guide
 - [ ] API documentation
@@ -983,18 +961,21 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 ## Success Metrics
 
 ### Technical Metrics
+
 - Embedded Signup success rate: > 95%
 - Message delivery rate: > 99%
 - Webhook processing latency: < 500ms
 - API error rate: < 1%
 
 ### Business Metrics
+
 - Setup completion time: < 5 minutes
 - Customer adoption rate: Track % of orgs enabling WhatsApp
 - Support ticket volume: < 5% of users need help
 - Customer satisfaction: > 4.5/5 rating
 
 ### Performance Metrics
+
 - Concurrent message handling: 1000+ msgs/second
 - Database query optimization: < 100ms per lookup
 - Webhook processing: < 1 second end-to-end
@@ -1002,22 +983,26 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 ## Cost Analysis
 
 ### Development Costs (Phase 1)
+
 - Development time: 4-6 weeks (1 senior developer)
 - Meta approval process: 2-4 weeks
 - Testing & QA: 1-2 weeks
 - **Total**: ~8-12 weeks to launch
 
 ### Operational Costs
+
 - Infrastructure: Minimal (webhook endpoint only)
 - Meta fees: None (customers billed directly)
 - Support overhead: Low (1-click setup reduces tickets)
 
 ### Revenue Model (Phase 1: Tech Provider)
+
 - SaaS subscription revenue only
 - No WhatsApp usage markup (yet)
 - Value proposition: Simplified integration
 
 ### Revenue Model (Phase 2: Solution Partner)
+
 - SaaS subscription revenue
 - WhatsApp usage markup: 10-20%
 - Example: 10K conversations/mo @ $0.03 = $300 → charge $345 → $45 markup/customer
@@ -1026,30 +1011,34 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 ## Risk Mitigation
 
 ### Technical Risks
+
 - **Risk**: Meta API changes
-  - *Mitigation*: Follow Meta changelog, version APIs properly
+  - _Mitigation_: Follow Meta changelog, version APIs properly
 - **Risk**: Webhook downtime
-  - *Mitigation*: Redundant endpoints, retry logic, monitoring
+  - _Mitigation_: Redundant endpoints, retry logic, monitoring
 - **Risk**: Rate limiting
-  - *Mitigation*: Implement queuing, respect limits, cache responses
+  - _Mitigation_: Implement queuing, respect limits, cache responses
 
 ### Business Risks
+
 - **Risk**: Meta approval rejection
-  - *Mitigation*: Follow guidelines strictly, provide detailed docs
+  - _Mitigation_: Follow guidelines strictly, provide detailed docs
 - **Risk**: Low adoption
-  - *Mitigation*: In-app tutorials, customer success outreach
+  - _Mitigation_: In-app tutorials, customer success outreach
 - **Risk**: High support burden
-  - *Mitigation*: Comprehensive docs, automated troubleshooting
+  - _Mitigation_: Comprehensive docs, automated troubleshooting
 
 ### Compliance Risks
+
 - **Risk**: Data privacy violations
-  - *Mitigation*: Encrypt all tokens, follow GDPR/CCPA, audit regularly
+  - _Mitigation_: Encrypt all tokens, follow GDPR/CCPA, audit regularly
 - **Risk**: WhatsApp policy violations
-  - *Mitigation*: Implement message templates, respect opt-in/opt-out
+  - _Mitigation_: Implement message templates, respect opt-in/opt-out
 
 ## Future Enhancements (Phase 2+)
 
 ### Advanced Features
+
 - [ ] WhatsApp message templates management UI
 - [ ] Bulk messaging capabilities
 - [ ] WhatsApp catalog integration (products)
@@ -1060,6 +1049,7 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 - [ ] Analytics dashboard (specific to WhatsApp)
 
 ### Solution Partner Upgrade
+
 - [ ] Apply for Solution Partner status
 - [ ] Implement line of credit management
 - [ ] Build unified billing system
@@ -1067,6 +1057,7 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 - [ ] Migrate existing customers to managed billing
 
 ### Integrations
+
 - [ ] CRM sync (Salesforce, HubSpot)
 - [ ] E-commerce platforms (Shopify, WooCommerce)
 - [ ] Payment processors
@@ -1074,16 +1065,16 @@ WHATSAPP_WEBHOOK_URL=https://yourdomain.com/plugins/whatsapp/webhook
 
 ## Timeline Summary
 
-| Phase | Duration | Deliverable |
-|-------|----------|-------------|
-| Prerequisites | 2-4 weeks | Meta approval, app setup |
-| Core Plugin | 2 weeks | Plugin structure, manifest |
-| Embedded Signup | 1 week | OAuth flow, credentials storage |
-| Webhooks & Messaging | 1-2 weeks | Message handling, API client |
-| Message Mapping | 1 week | Format conversion |
-| Testing & QA | 1-2 weeks | Full test coverage |
-| **Total Phase 1** | **8-12 weeks** | **Production-ready WhatsApp integration** |
-| Phase 2 (Future) | 6-12 months | Solution Partner upgrade |
+| Phase                | Duration       | Deliverable                               |
+| -------------------- | -------------- | ----------------------------------------- |
+| Prerequisites        | 2-4 weeks      | Meta approval, app setup                  |
+| Core Plugin          | 2 weeks        | Plugin structure, manifest                |
+| Embedded Signup      | 1 week         | OAuth flow, credentials storage           |
+| Webhooks & Messaging | 1-2 weeks      | Message handling, API client              |
+| Message Mapping      | 1 week         | Format conversion                         |
+| Testing & QA         | 1-2 weeks      | Full test coverage                        |
+| **Total Phase 1**    | **8-12 weeks** | **Production-ready WhatsApp integration** |
+| Phase 2 (Future)     | 6-12 months    | Solution Partner upgrade                  |
 
 ## Conclusion
 
@@ -1097,6 +1088,7 @@ This strategy provides:
 ✅ **Professional UX**: Seamless like Slack/Stripe integrations
 
 **Next Steps:**
+
 1. Get Meta Tech Provider approval
 2. Implement Embedded Signup flow
 3. Build webhook infrastructure

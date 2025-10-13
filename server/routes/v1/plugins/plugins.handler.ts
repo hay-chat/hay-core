@@ -18,7 +18,13 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
   const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
   const enabledPluginIds = new Set(instances.filter((i) => i.enabled).map((i) => i.pluginId));
 
-  return plugins.map((plugin) => {
+  return plugins
+    .filter((plugin) => {
+      const manifest = plugin.manifest as HayPluginManifest;
+      // Filter out invisible plugins from the marketplace listing
+      return !manifest.invisible;
+    })
+    .map((plugin) => {
     const manifest = plugin.manifest as HayPluginManifest;
     const result = {
       id: plugin.pluginId, // Use pluginId as the identifier for frontend
