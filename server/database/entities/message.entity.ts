@@ -8,6 +8,9 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Conversation } from "./conversation.entity";
+import { Source } from "./source.entity";
+import { User } from "../../entities/user.entity";
+import { DeliveryState } from "../../types/message-feedback.types";
 
 export enum MessageType {
   CUSTOMER = "Customer",
@@ -115,6 +118,7 @@ export class Message {
     inactivity_duration_ms?: number;
     isClosureMessage?: boolean;
     closureReason?: string;
+    blockReason?: string;
   } | null;
 
   @Column({
@@ -152,6 +156,38 @@ export class Message {
     default: MessageStatus.APPROVED,
   })
   status!: MessageStatus;
+
+  @Column({ type: "varchar", length: 50, default: "webchat" })
+  sourceId!: string;
+
+  @ManyToOne(() => Source, (source) => source.messages, {
+    onDelete: "RESTRICT",
+  })
+  @JoinColumn()
+  source!: Source;
+
+  @Column({ type: "boolean", default: false })
+  reviewRequired!: boolean;
+
+  @Column({
+    type: "enum",
+    enum: DeliveryState,
+    default: DeliveryState.SENT,
+  })
+  deliveryState!: DeliveryState;
+
+  @Column({ type: "uuid", nullable: true })
+  approvedBy!: string | null;
+
+  @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "approved_by" })
+  approver!: User | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  approvedAt!: Date | null;
+
+  @Column({ type: "text", nullable: true })
+  originalContent!: string | null;
 
   async saveIntent(intent: MessageIntent): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");

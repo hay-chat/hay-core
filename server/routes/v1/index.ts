@@ -10,6 +10,8 @@ import { pluginsRouter } from "./plugins";
 import { publicConversationsRouter } from "./public-conversations";
 import { analyticsRouter } from "./analytics";
 import { organizationsRouter } from "./organizations";
+import { sourcesRouter } from "./sources";
+import { messageFeedbackRouter } from "./message-feedback";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
 // Core routers - always available
@@ -25,6 +27,8 @@ const coreRouters = {
   publicConversations: publicConversationsRouter,
   analytics: analyticsRouter,
   organizations: organizationsRouter,
+  sources: sourcesRouter,
+  messageFeedback: messageFeedbackRouter,
 };
 
 // Create v1Router with core + plugin routers

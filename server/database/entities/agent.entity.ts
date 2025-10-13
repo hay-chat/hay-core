@@ -53,6 +53,9 @@ export class Agent {
   @ManyToMany(() => Playbook, (playbook) => playbook.agents)
   playbooks!: Playbook[];
 
+  @Column({ type: "boolean", nullable: true })
+  testMode!: boolean | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

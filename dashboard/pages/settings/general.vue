@@ -76,6 +76,27 @@
           placeholder="No default agent"
           helper-text="Agent to handle conversations when no specific agent is assigned"
         />
+
+        <div class="space-y-2 pt-2 border-t">
+          <Label>Test Mode Default</Label>
+          <p class="text-sm text-neutral-muted mb-3">
+            When enabled, AI messages require approval before sending to customers. Individual
+            agents can override this setting.
+          </p>
+          <div class="flex items-center space-x-2">
+            <Checkbox
+              id="testModeDefault"
+              :checked="settings.testModeDefault"
+              @update:checked="settings.testModeDefault = $event"
+            />
+            <label for="testModeDefault" class="text-sm font-medium cursor-pointer">
+              Require approval for AI messages by default
+            </label>
+          </div>
+          <p class="text-xs text-neutral-muted mt-2">
+            ℹ️ Note: Playground conversations always auto-send regardless of this setting.
+          </p>
+        </div>
       </CardContent>
     </Card>
 
@@ -347,6 +368,7 @@ type PlatformSettings = {
   dateFormat: string;
   timeFormat: string;
   defaultAgent: string;
+  testModeDefault: boolean;
   notifications: any;
   webhooks: any;
   dataRetention: any;
@@ -360,6 +382,7 @@ const settings = ref<PlatformSettings>({
   dateFormat: "MM/DD/YYYY",
   timeFormat: "12h",
   defaultAgent: "",
+  testModeDefault: false,
   notifications: {
     email: {
       newConversations: true,
@@ -503,6 +526,7 @@ const resetToDefaults = () => {
       dateFormat: "MM/DD/YYYY",
       timeFormat: "12h",
       defaultAgent: "",
+      testModeDefault: false,
       notifications: {
         email: {
           newConversations: true,

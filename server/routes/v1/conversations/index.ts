@@ -9,9 +9,12 @@ import { generateConversationTitle } from "../../../orchestrator/conversation-ut
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
+import { MessageRepository } from "@server/repositories/message.repository";
+import { DeliveryState } from "@server/types/message-feedback.types";
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
+const messageRepository = new MessageRepository();
 
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
@@ -495,5 +498,89 @@ export const conversationsRouter = t.router({
         email: user.email,
         assignedAt: conversation.assigned_at,
       };
+    }),
+
+  approveMessage: authenticatedProcedure
+    .input(
+      z.object({
+        messageId: z.string().uuid(),
+        editedContent: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const message = await messageRepository.findById(input.messageId);
+
+      if (!message) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      }
+
+      // Verify message is in queued state
+      if (message.deliveryState !== DeliveryState.QUEUED) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Message is not in queued state",
+        });
+      }
+
+      // If content was edited, store original content
+      const updates: Partial<typeof message> = {
+        deliveryState: DeliveryState.SENT,
+        approvedBy: ctx.user!.id,
+        approvedAt: new Date(),
+      };
+
+      if (input.editedContent && input.editedContent !== message.content) {
+        updates.originalContent = message.content;
+        updates.content = input.editedContent;
+      }
+
+      const updatedMessage = await messageRepository.update(message.id, updates);
+
+      // TODO: Trigger actual message delivery to customer via WebSocket/plugin
+      // This would be handled by the orchestrator or messaging service
+
+      return updatedMessage;
+    }),
+
+  blockMessage: authenticatedProcedure
+    .input(
+      z.object({
+        messageId: z.string().uuid(),
+        reason: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const message = await messageRepository.findById(input.messageId);
+
+      if (!message) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      }
+
+      // Verify message is in queued state
+      if (message.deliveryState !== DeliveryState.QUEUED) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Message is not in queued state",
+        });
+      }
+
+      // Update message to blocked state
+      const updatedMessage = await messageRepository.update(message.id, {
+        deliveryState: DeliveryState.BLOCKED,
+        approvedBy: ctx.user!.id,
+        approvedAt: new Date(),
+        metadata: {
+          ...(message.metadata || {}),
+          blockReason: input.reason,
+        },
+      });
+
+      return updatedMessage;
     }),
 });

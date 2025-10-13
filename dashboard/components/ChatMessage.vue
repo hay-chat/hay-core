@@ -115,29 +115,47 @@
           <span>{{ attachment.name }}</span>
         </div>
       </div>
-      <div v-if="message.status === MessageStatus.PENDING" class="chat-message__actions">
-        <Button size="sm" variant="outline" @click="$emit('approve')">
-          <Check class="h-3 w-3 mr-1" />
-          Approve
-        </Button>
-        <Button size="sm" variant="outline" @click="$emit('edit')">
-          <Edit class="h-3 w-3 mr-1" />
-          Edit
-        </Button>
-        <Button size="sm" variant="destructive" @click="$emit('reject')">
-          <X class="h-3 w-3 mr-1" />
-          Reject
-        </Button>
+      <!-- Queued Message Actions (Test Mode) -->
+      <div v-if="isQueued && showApproval" class="chat-message__actions">
+        <Badge variant="outline" class="text-xs mb-2">
+          <Clock class="h-3 w-3 mr-1" />
+          Queued for Approval
+        </Badge>
+        <div class="flex gap-2">
+          <Button size="sm" variant="outline" @click="handleApproveClick">
+            <Check class="h-3 w-3 mr-1" />
+            Approve & Send
+          </Button>
+          <Button size="sm" variant="destructive" @click="handleBlockClick">
+            <Ban class="h-3 w-3 mr-1" />
+            Block
+          </Button>
+        </div>
       </div>
-      <div
-        v-else-if="message.metadata && message.type === 'BotAgent'"
-        class="chat-message__metadata"
-      >
-        <div v-if="message.metadata.confidence" class="chat-message__confidence">
-          Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
+
+      <!-- Sent Message Metadata & Feedback -->
+      <div v-else-if="message.type === 'BotAgent' && !isQueued" class="chat-message__metadata">
+        <div class="flex items-center gap-3 mt-1">
+          <div v-if="message.metadata?.confidence" class="chat-message__confidence">
+            Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
+          </div>
+          <MessageFeedbackControl
+            v-if="showFeedback"
+            :message-id="message.id"
+            @feedback-submitted="handleFeedbackSubmitted"
+          />
         </div>
       </div>
     </div>
+
+    <!-- Approval Dialog -->
+    <MessageApprovalDialog
+      v-model:open="showApprovalDialog"
+      :message-id="message.id"
+      :original-content="message.content"
+      @approved="handleMessageApproved"
+      @blocked="handleMessageBlocked"
+    />
   </div>
 </template>
 
@@ -148,8 +166,6 @@ import {
   Bot,
   Paperclip,
   Check,
-  Edit,
-  X,
   ChevronDown,
   ChevronUp,
   FileSearch,
@@ -159,23 +175,67 @@ import {
   Laugh,
   Zap,
   BrainCircuit,
+  Clock,
+  Ban,
 } from "lucide-vue-next";
 import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
+import MessageFeedbackControl from "@/components/MessageFeedbackControl.vue";
+import MessageApprovalDialog from "@/components/MessageApprovalDialog.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
 interface Props {
   message: Message;
   inverted?: boolean;
+  showFeedback?: boolean;
+  showApproval?: boolean;
 }
 
-const props = defineProps<Props>();
-defineEmits<{
+const props = withDefaults(defineProps<Props>(), {
+  showFeedback: false,
+  showApproval: false,
+});
+
+const emit = defineEmits<{
   approve: [];
   edit: [];
   reject: [];
+  feedbackSubmitted: [];
+  messageApproved: [messageId: string];
+  messageBlocked: [messageId: string];
 }>();
+
+// Approval dialog state
+const showApprovalDialog = ref(false);
+
+// Check if message is queued (delivery_state = 'queued')
+const isQueued = computed(() => {
+  return (
+    (props.message as any).deliveryState === "queued" ||
+    (props.message as any).delivery_state === "queued"
+  );
+});
+
+const handleApproveClick = () => {
+  showApprovalDialog.value = true;
+};
+
+const handleBlockClick = () => {
+  showApprovalDialog.value = true;
+};
+
+const handleMessageApproved = (messageId: string) => {
+  emit("messageApproved", messageId);
+};
+
+const handleMessageBlocked = (messageId: string) => {
+  emit("messageBlocked", messageId);
+};
+
+const handleFeedbackSubmitted = () => {
+  emit("feedbackSubmitted");
+};
 
 // System message collapse/expand logic
 const systemMessageRef = ref<HTMLElement | null>(null);
@@ -344,8 +404,8 @@ const avatarIcon = computed(() => {
 }
 
 .chat-message--HumanAgent {
-  --bubble-bg: var(--color-yellow-100);
-  --bubble-fg: var(--color-yellow-700);
+  --bubble-bg: var(--color-green-600);
+  --bubble-fg: var(--color-white);
 }
 
 .chat-message--System {

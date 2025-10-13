@@ -37,7 +37,10 @@ export class Organization extends BaseEntity {
   website?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  settings?: Record<string, unknown>;
+  settings?: {
+    testModeDefault?: boolean;
+    [key: string]: unknown;
+  };
 
   @Column({ type: "jsonb", nullable: true })
   limits?: {

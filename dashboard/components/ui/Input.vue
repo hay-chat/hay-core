@@ -20,12 +20,17 @@
       </Select>
     </div>
 
+    <!-- Switch Type -->
+    <div v-else-if="type === 'switch'" class="switch-wrapper">
+      <Switch :model-value="!!modelValue" @update:model-value="handleSwitchChange" />
+    </div>
+
     <!-- Regular Input -->
     <div v-else-if="type !== 'textarea'" class="input-container">
       <component :is="iconStart" v-if="iconStart" class="input-icon icon-start" />
       <input
         :id="inputId"
-        :value="modelValue ?? ''"
+        :value="typeof modelValue === 'boolean' ? '' : (modelValue ?? '')"
         :type="actualInputType"
         :class="[
           props.class,
@@ -57,7 +62,7 @@
       v-else
       :id="inputId"
       ref="textareaRef"
-      :value="modelValue ?? ''"
+      :value="typeof modelValue === 'boolean' ? '' : (modelValue ?? '')"
       :class="[props.class, 'input', 'textarea', { 'has-error': error }]"
       :placeholder="placeholder"
       v-bind="$attrs"
@@ -76,14 +81,15 @@ import SelectTrigger from "./SelectTrigger.vue";
 import SelectValue from "./SelectValue.vue";
 import SelectContent from "./SelectContent.vue";
 import SelectItem from "./SelectItem.vue";
+import Switch from "./Switch.vue";
 import Label from "./Label.vue";
 
 export type SelectOption = string | { label: string; value: string | number };
 
 export interface InputProps {
   class?: string;
-  modelValue?: string | number | undefined;
-  type?: "text" | "textarea" | "select" | "password" | "email";
+  modelValue?: string | number | boolean | undefined;
+  type?: "text" | "textarea" | "select" | "password" | "email" | "switch";
   label?: string;
   hint?: string;
   error?: string;
@@ -100,7 +106,7 @@ const props = withDefaults(defineProps<InputProps>(), {
 });
 
 const emit = defineEmits<{
-  "update:modelValue": [value: string | number];
+  "update:modelValue": [value: string | number | boolean];
 }>();
 
 // Refs
@@ -153,6 +159,11 @@ const selectValue = computed({
     }
   },
 });
+
+// Switch handler
+const handleSwitchChange = (value: boolean) => {
+  emit("update:modelValue", value);
+};
 
 // Textarea helpers
 const adjustTextareaHeight = () => {
@@ -300,6 +311,11 @@ onMounted(() => {
 
 .select-wrapper {
   width: 100%;
+}
+
+.switch-wrapper {
+  display: flex;
+  align-items: center;
 }
 
 .password-toggle {

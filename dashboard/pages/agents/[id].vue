@@ -14,6 +14,12 @@
     <template v-else-if="!isEditMode || agent">
       <form data-testid="agent-form" class="space-y-6" @submit.prevent="handleSubmit">
         <Card>
+          <CardHeader>
+            <CardTitle>Agent</CardTitle>
+            <CardDescription
+              >Define the agent's behavior and how it should respond to users.</CardDescription
+            >
+          </CardHeader>
           <CardContent class="space-y-6">
             <!-- Name Field -->
             <Input
@@ -95,6 +101,7 @@
                 <label for="enabled" class="text-sm font-medium">Enable agent</label>
               </div>
             </div>
+
             <!-- Metadata (only in edit mode) -->
             <div v-if="isEditMode && agent" class="space-y-2 text-sm text-neutral-muted">
               <div>Created: {{ formatDate(agent.created_at) }}</div>
@@ -103,9 +110,42 @@
           </CardContent>
         </Card>
 
+        <!-- Test Mode Field -->
         <Card>
           <CardHeader>
-            <CardTitle>Human handoff</CardTitle>
+            <CardTitle>Test Mode</CardTitle>
+            <CardDescription>Define the test mode for the agent.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-6">
+            <!-- Test Mode Field -->
+            <div class="space-y-2">
+              <Label>Test Mode</Label>
+              <p class="text-sm text-neutral-muted mb-3">
+                When enabled, AI messages require approval before sending to customers. Playground
+                always bypasses this.
+              </p>
+              <Input
+                id="testMode"
+                v-model="form.testMode"
+                type="select"
+                :options="[
+                  { label: 'Inherit from Organization', value: null },
+                  { label: 'On (Require Approval)', value: true },
+                  { label: 'Off (Auto-Send)', value: false },
+                ]"
+                helper-text="Set to 'Inherit' to use organization default, or override per agent"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Human escalation</CardTitle>
+            <CardDescription
+              >Define the instructions for the agent to follow when a human agent is available or
+              unavailable.</CardDescription
+            >
           </CardHeader>
           <CardContent class="space-y-6">
             <InstructionsEditor
@@ -229,6 +269,7 @@ const form = ref({
   avoid: "",
   trigger: "",
   enabled: true,
+  testMode: null as boolean | null,
   humanHandoffAvailableInstructions: [] as any,
   humanHandoffUnavailableInstructions: [] as any,
 });
@@ -278,9 +319,12 @@ onMounted(async () => {
         tone: agentResponse.tone || "",
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
+        testMode: (agentResponse as any).testMode ?? null,
         enabled: agentResponse.enabled ?? true,
-        humanHandoffAvailableInstructions: (agentResponse as any).human_handoff_available_instructions || [],
-        humanHandoffUnavailableInstructions: (agentResponse as any).human_handoff_unavailable_instructions || [],
+        humanHandoffAvailableInstructions:
+          (agentResponse as any).human_handoff_available_instructions || [],
+        humanHandoffUnavailableInstructions:
+          (agentResponse as any).human_handoff_unavailable_instructions || [],
       };
 
       // Detect which tone preset is selected

@@ -11,6 +11,8 @@ import { Playbook } from "./entities/playbook.entity";
 import { Conversation } from "./entities/conversation.entity";
 import { Message } from "./entities/message.entity";
 import { Customer } from "./entities/customer.entity";
+import { Source } from "./entities/source.entity";
+import { MessageFeedback } from "./entities/message-feedback.entity";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
 import { AuditLog } from "../entities/audit-log.entity";
@@ -41,6 +43,8 @@ export const AppDataSource = new DataSource({
     Conversation,
     Message,
     Customer,
+    Source,
+    MessageFeedback,
     PluginRegistry,
     PluginInstance,
     AuditLog,
