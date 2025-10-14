@@ -13,7 +13,7 @@
           <Download class="h-4 w-4 mr-2" />
           Security Report
         </Button>
-        <Button :disabled="!hasChanges" @click="saveSettings">
+        <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -504,6 +504,7 @@ import {
 
 // Reactive state
 const originalSettings = ref({});
+const isSaving = ref(false);
 const settings = ref({
   authentication: {
     passwordPolicy: {
@@ -714,6 +715,7 @@ const implementRecommendation = (recId: string) => {
 
 const saveSettings = async () => {
   try {
+    isSaving.value = true;
     // TODO: Save security settings to API
     console.log("Saving security settings:", settings.value);
 
@@ -725,6 +727,8 @@ const saveSettings = async () => {
   } catch (error) {
     // TODO: Show error toast
     console.error("Failed to save security settings:", error);
+  } finally {
+    isSaving.value = false;
   }
 };
 

@@ -88,12 +88,8 @@
         </div>
 
         <!-- Submit Button -->
-        <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
-          <div v-if="loading" class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-            <span>Signing in...</span>
-          </div>
-          <span v-else>Sign in</span>
+        <Button type="submit" size="lg" class="w-full" :loading="loading" :disabled="!isFormValid">
+          Sign in
         </Button>
 
         <!-- Error Message -->

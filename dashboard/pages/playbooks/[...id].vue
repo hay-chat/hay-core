@@ -133,7 +133,7 @@
               v-if="isEditMode"
               type="button"
               variant="destructive"
-              :disabled="isSubmitting"
+              :loading="isSubmitting"
               @click="handleDelete"
             >
               <Trash2 class="h-4 w-4 mr-2" />
@@ -149,17 +149,12 @@
               >
                 Cancel
               </Button>
-              <Button type="submit" :disabled="isSubmitting || !form.title || !form.trigger">
-                <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-                {{
-                  isSubmitting
-                    ? isEditMode
-                      ? "Saving..."
-                      : "Creating..."
-                    : isEditMode
-                      ? "Save Changes"
-                      : "Create Playbook"
-                }}
+              <Button
+                type="submit"
+                :loading="isSubmitting"
+                :disabled="!form.title || !form.trigger"
+              >
+                {{ isEditMode ? "Save Changes" : "Create Playbook" }}
               </Button>
             </div>
           </div>
@@ -187,7 +182,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
+import { ArrowLeft, Trash2 } from "lucide-vue-next";
 import type { PlaybookStatus, Agent, Playbook } from "~/types/playbook";
 
 type InstructionData = {
@@ -369,6 +364,13 @@ const handleSubmit = async () => {
       // Create new playbook
       const response = await HayApi.playbooks.create.mutate(payload);
       toast.success("Playbook created successfully");
+
+      // Check if there's a redirect parameter
+      const redirectPath = route.query.redirect as string;
+      if (redirectPath) {
+        await router.push(redirectPath);
+        return;
+      }
 
       // Navigate to the edit page after creation
       await router.push(`/playbooks/${response.id}`);

@@ -282,8 +282,12 @@
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button :disabled="!isValidUrl(websiteUrl) || isDiscovering" @click="discoverPages">
-            {{ isDiscovering ? "Discovering..." : "Discover Pages" }}
+          <Button
+            :loading="isDiscovering"
+            :disabled="!isValidUrl(websiteUrl)"
+            @click="discoverPages"
+          >
+            Discover Pages
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -528,7 +532,7 @@
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button @click="startWebImport">
+          <Button :loading="isProcessing" @click="startWebImport">
             <Upload class="mr-2 h-4 w-4" />
             Start Import
           </Button>
@@ -614,7 +618,7 @@
             <ChevronLeft class="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button @click="startUpload">
+          <Button :loading="isProcessing" @click="startUpload">
             <Upload class="mr-2 h-4 w-4" />
             Start Upload
           </Button>
@@ -801,9 +805,17 @@
           <Button variant="outline" :disabled="isProcessing" @click="resetImport">
             Import More Documents
           </Button>
-          <Button :disabled="isProcessing" @click="router.push('/documents')">
+          <Button
+            :disabled="isProcessing"
+            @click="
+              () => {
+                const redirectPath = route.query.redirect as string;
+                router.push(redirectPath || '/documents');
+              }
+            "
+          >
             <CheckCircle class="mr-2 h-4 w-4" />
-            View Documents
+            {{ route.query.redirect ? "Continue" : "View Documents" }}
           </Button>
         </div>
       </CardContent>
@@ -833,6 +845,7 @@ import { Hay } from "@/utils/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Button from "@/components/ui/Button.vue";
 import { useDocumentImportTour } from "@/composables/useDocumentImportTour";
+import { useToast } from "@/composables/useToast";
 import {
   createAuthenticatedWebSocket,
   parseWebSocketMessage,
@@ -840,6 +853,8 @@ import {
 } from "@/utils/websocket";
 
 const router = useRouter();
+const route = useRoute();
+const toast = useToast();
 const { startTour, shouldShowTour } = useDocumentImportTour();
 
 interface UploadFile extends File {
@@ -1326,8 +1341,6 @@ const cancelImport = async () => {
     }
 
     // Show success message
-    const { useToast } = await import("@/composables/useToast");
-    const toast = useToast();
     toast.success("Import cancelled", "The import job has been cancelled successfully.");
 
     // Navigate back to documents
@@ -1336,8 +1349,6 @@ const cancelImport = async () => {
     }, 2000);
   } catch (error) {
     console.error("Failed to cancel import:", error);
-    const { useToast } = await import("@/composables/useToast");
-    const toast = useToast();
     toast.error("Failed to cancel import", "Please try again.");
   }
 };
@@ -1524,11 +1535,21 @@ const startUpload = async () => {
 
     if (allSuccess) {
       console.log(`Successfully uploaded ${uploadedCount.value} document(s)`);
+      toast.success(
+        `Successfully uploaded ${uploadedCount.value} document${uploadedCount.value === 1 ? "" : "s"}`,
+      );
     } else {
       const failedCount = selectedFiles.value.filter((f) => f.uploadStatus === "error").length;
 
       if (failedCount > 0) {
         console.log(`${uploadedCount.value} succeeded, ${failedCount} failed`);
+        if (uploadedCount.value > 0) {
+          toast.warning(
+            `${uploadedCount.value} document${uploadedCount.value === 1 ? "" : "s"} uploaded successfully, ${failedCount} failed`,
+          );
+        } else {
+          toast.error(`Failed to upload ${failedCount} document${failedCount === 1 ? "" : "s"}`);
+        }
       }
     }
   } catch (error) {

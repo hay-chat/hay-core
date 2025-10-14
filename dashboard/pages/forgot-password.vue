@@ -28,14 +28,11 @@
               variant="outline"
               size="lg"
               class="w-full"
-              :disabled="resendLoading || resendCooldown > 0"
+              :loading="resendLoading"
+              :disabled="resendCooldown > 0"
               @click="resendEmail"
             >
-              <div v-if="resendLoading" class="flex items-center space-x-2">
-                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900" />
-                <span>Resending...</span>
-              </div>
-              <span v-else-if="resendCooldown > 0"> Resend in {{ resendCooldown }}s </span>
+              <span v-if="resendCooldown > 0">Resend in {{ resendCooldown }}s</span>
               <span v-else>Resend email</span>
             </Button>
 
@@ -78,12 +75,14 @@
           </div>
 
           <!-- Submit Button -->
-          <Button type="submit" size="lg" class="w-full" :disabled="loading || !isFormValid">
-            <div v-if="loading" class="flex items-center space-x-2">
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-              <span>Sending reset link...</span>
-            </div>
-            <span v-else>Send reset link</span>
+          <Button
+            type="submit"
+            size="lg"
+            class="w-full"
+            :loading="loading"
+            :disabled="!isFormValid"
+          >
+            Send reset link
           </Button>
 
           <!-- Error Message -->

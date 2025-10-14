@@ -7,7 +7,7 @@
           <RotateCcw class="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
-        <Button :disabled="!hasChanges" @click="saveSettings">
+        <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -376,6 +376,7 @@ type PlatformSettings = {
 
 // Reactive state
 const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
+const isSaving = ref(false);
 const settings = ref<PlatformSettings>({
   defaultLanguage: "en",
   timezone: "UTC",
@@ -498,6 +499,7 @@ const toggleWebhookEvent = (eventId: string) => {
 
 const saveSettings = async () => {
   try {
+    isSaving.value = true;
     // Save platform settings to API
     const response = await Hay.organizations.updateSettings.mutate({
       defaultLanguage: settings.value.defaultLanguage as any,
@@ -515,6 +517,8 @@ const saveSettings = async () => {
   } catch (error) {
     console.error("Failed to save settings:", error);
     toast.error("Failed to save settings. Please try again.");
+  } finally {
+    isSaving.value = false;
   }
 };
 

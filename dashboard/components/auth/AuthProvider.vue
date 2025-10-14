@@ -28,7 +28,7 @@ import { useHeartbeat } from "@/composables/useHeartbeat";
 const authStore = useAuthStore();
 const route = useRoute();
 const showRefreshMessage = ref(false);
-let refreshTimer: any = null;
+const refreshTimer = ref<number | null>(null);
 
 // Initialize heartbeat for authenticated users
 const { startHeartbeat, stopHeartbeat } = useHeartbeat();
@@ -38,41 +38,26 @@ const refresh = (e: Event) => {
   window.location.reload();
 };
 
-// Initialize auth on mount if not already done
-onMounted(async () => {
-  // Check if the current route is marked as public
-  const isPublicPath = route.meta.public === true;
+// Helper function to check if current route is public
+const isPublicPath = computed(() => route.meta.public === true);
 
+// Helper function to initialize auth
+const initializeAuth = async () => {
   // Skip auth initialization entirely on public pages
-  if (isPublicPath) {
+  if (isPublicPath.value) {
     authStore.isInitialized = true;
     return;
   }
 
   if (!authStore.isInitialized) {
-    // Start timer to show refresh message after 5 seconds
-    refreshTimer = setTimeout(() => {
-      showRefreshMessage.value = true;
-      // Auto-refresh 3 seconds after showing the message (total 8 seconds)
-      setTimeout(() => {
-        window.location.reload();
-      }, 3000);
-    }, 5000);
-
     // Check if we have tokens before trying to initialize
     if (!authStore.tokens?.accessToken) {
       // No tokens, mark as initialized but not authenticated
       authStore.isInitialized = true;
       authStore.isAuthenticated = false;
 
-      // Clear the refresh timer since we handled this case
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
-      }
-
       // Only redirect to login if we're not already on a public page
-      if (!isPublicPath) {
+      if (!isPublicPath.value) {
         await navigateTo("/login");
       }
       return;
@@ -81,12 +66,6 @@ onMounted(async () => {
     try {
       await authStore.initializeAuth();
 
-      // Clear the refresh timer on successful initialization
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
-      }
-
       // Start heartbeat after successful auth initialization
       if (authStore.isAuthenticated) {
         startHeartbeat();
@@ -94,14 +73,8 @@ onMounted(async () => {
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);
 
-      // Clear the refresh timer before handling the error
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
-      }
-
       // Only logout and redirect if we're not on a public page
-      if (!isPublicPath) {
+      if (!isPublicPath.value) {
         authStore.logout();
       } else {
         // Just mark as not authenticated but initialized
@@ -112,20 +85,56 @@ onMounted(async () => {
   } else if (authStore.isAuthenticated) {
     // Auth already initialized and authenticated, start heartbeat
     startHeartbeat();
-
-    // Clear the refresh timer since auth is already initialized
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-      refreshTimer = null;
-    }
   }
+};
+
+// Initialize auth on mount
+onMounted(async () => {
+  await initializeAuth();
 });
+
+// Watch for auth state changes after mount
+watch(
+  () => authStore.isInitialized,
+  async (newValue, oldValue) => {
+    // If auth was just initialized (from false to true), start heartbeat if authenticated
+    if (newValue && !oldValue && authStore.isAuthenticated) {
+      startHeartbeat();
+    }
+
+    // If auth was just de-initialized (from true to false), stop heartbeat and handle redirect
+    if (!newValue && oldValue) {
+      stopHeartbeat();
+
+      // If we're not on a public page, redirect to login
+      if (!isPublicPath.value) {
+        await navigateTo("/login");
+      }
+    }
+  },
+);
+
+// Watch for authentication status changes
+watch(
+  () => authStore.isAuthenticated,
+  (newValue, oldValue) => {
+    // If user just logged out (from true to false), stop heartbeat
+    if (!newValue && oldValue) {
+      stopHeartbeat();
+    }
+
+    // If user just logged in (from false to true), start heartbeat
+    if (newValue && !oldValue) {
+      startHeartbeat();
+    }
+  },
+);
 
 // Cleanup on unmount
 onUnmounted(() => {
   stopHeartbeat();
-  if (refreshTimer) {
-    clearTimeout(refreshTimer);
+  if (refreshTimer.value) {
+    clearTimeout(refreshTimer.value);
   }
 });
 </script>
