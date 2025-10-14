@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Guidelines
+
+1. Keep solutions minimal - avoid over-engineering and future-proofing
+2. This is a new product, prioritize simplicity over complexity
+3. Always check existing patterns in neighboring files before implementing new features
+4. Never commit secrets or API keys to the repository
+5. Follow existing code style and conventions in each part of the codebase
+6. This is a new application under development. Avoid keeping old functions for backwads-compatibility, we don't need that now, you should aim at removing unused, redundant or unnecessary code if you find any. If you find any opportunities for future improvement, feel free to leave a comment in the code with a "TODO:"
+7. Don't use `npm run dev` to run the application, assume the user is running the app already.
+
 ## Architecture Overview
 
 This is a full-stack TypeScript application with:
@@ -29,16 +39,6 @@ The database uses snake_case naming with TypeORM's SnakeNamingStrategy for autom
 
 ## Critical Development Commands
 
-### Running the Application
-
-```bash
-# Start both backend and frontend - Always use this for debugging
-npm run dev
-
-# Kill ports if needed
-npm run kill-ports
-```
-
 ### Database Management
 
 ```bash
@@ -64,10 +64,6 @@ cd dashboard
 npm run lint          # Run ESLint
 npm run lint:fix      # Fix ESLint issues
 npm run typecheck     # Run TypeScript type checking (nuxt typecheck)
-
-# Backend
-cd server
-npm run typecheck     # Type check TypeScript files
 ```
 
 ### Testing
@@ -158,16 +154,6 @@ Copy `.env.example` to `.env` and configure:
   - Models: `text-embedding-3-small` for embeddings, `gpt-4o` for chat
 - **CORS**: Configure allowed origins for frontend access
   - Default: `http://localhost:3001,http://localhost:5173`
-
-## General Guidelines
-
-1. Keep solutions minimal - avoid over-engineering and future-proofing
-2. This is a new product, prioritize simplicity over complexity
-3. Always check existing patterns in neighboring files before implementing new features
-4. Never commit secrets or API keys to the repository
-5. Follow existing code style and conventions in each part of the codebase
-
-- This is a new application under development. Avoid keeping old functions for backwads-compatibility, we don't need that now, you should aim at removing unused, redundant or unnecessary code if you find any. If you find any opportunities for future improvement, feel free to leave a comment in the code with a "TODO:"
 
 ## Plugins
 

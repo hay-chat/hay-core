@@ -89,16 +89,58 @@
                 }}</CardDescription>
               </div>
             </div>
+            <!-- Connection Status Badge (when enabled) -->
+            <div v-if="enabled && testResult" class="flex items-center space-x-2">
+              <div
+                :class="[
+                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                  testResult.success
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+                ]"
+              >
+                <div
+                  :class="[
+                    'w-2 h-2 rounded-full mr-1.5',
+                    testResult.success
+                      ? 'bg-green-600 dark:bg-green-400'
+                      : 'bg-red-600 dark:bg-red-400',
+                  ]"
+                ></div>
+                {{ testResult.success ? "Connected" : "Connection Failed" }}
+              </div>
+            </div>
+
             <!-- Enable Button (when not enabled) -->
             <div v-if="!enabled">
-              <Button @click="handleEnablePlugin" :disabled="enabling" size="lg">
-                <Loader2 v-if="enabling" class="h-4 w-4 mr-2 animate-spin" />
-                {{ enabling ? "Enabling..." : "Enable Plugin" }}
+              <Button
+                @click="handleEnablePlugin"
+                :disabled="enabling"
+                size="lg"
+                :loading="enabling"
+              >
+                Enable Plugin
               </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
+
+      <!-- Connection Error Alert (when enabled and failed) -->
+      <Alert
+        v-if="enabled && testResult && !testResult.success"
+        variant="danger"
+        :icon="AlertTriangle"
+      >
+        <AlertTitle>{{ testResult.message || "Connection failed" }}</AlertTitle>
+        <AlertDescription v-if="testResult.error">
+          <div
+            class="font-mono text-xs bg-red-100 dark:bg-red-900/30 p-3 rounded border border-red-200 dark:border-red-800 mt-2"
+          >
+            {{ testResult.error }}
+          </div>
+        </AlertDescription>
+      </Alert>
 
       <!-- Plugin Not Enabled - Show Overview -->
       <template v-if="!enabled">
@@ -135,7 +177,9 @@
                     <Check class="inline h-4 w-4 text-green-600 mr-2" />
                     Receive messages
                   </div>
-                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations">
+                  <div
+                    v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations"
+                  >
                     <Check class="inline h-4 w-4 text-green-600 mr-2" />
                     List conversations
                   </div>
@@ -168,10 +212,17 @@
         </Card>
 
         <!-- Available Actions Card (for MCP plugins) -->
-        <Card v-if="plugin.manifest?.capabilities?.mcp?.tools && plugin.manifest.capabilities.mcp.tools.length > 0">
+        <Card
+          v-if="
+            plugin.manifest?.capabilities?.mcp?.tools &&
+            plugin.manifest.capabilities.mcp.tools.length > 0
+          "
+        >
           <CardHeader>
             <CardTitle>Available Actions</CardTitle>
-            <CardDescription>{{ plugin.manifest.capabilities.mcp.tools.length }} tools available</CardDescription>
+            <CardDescription
+              >{{ plugin.manifest.capabilities.mcp.tools.length }} tools available</CardDescription
+            >
           </CardHeader>
           <CardContent>
             <div class="grid gap-3">
@@ -180,7 +231,9 @@
                 :key="tool.name"
                 class="flex items-start gap-3 p-3 rounded-lg border border-border"
               >
-                <div class="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div
+                  class="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0"
+                >
                   <Zap class="h-4 w-4 text-primary" />
                 </div>
                 <div class="flex-1 min-w-0">
@@ -413,8 +466,7 @@
 
                 <div class="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="outline" @click="resetForm"> Reset </Button>
-                  <Button type="submit" :disabled="saving">
-                    <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
+                  <Button type="submit" :disabled="saving" :loading="saving">
                     Save Configuration
                   </Button>
                 </div>
@@ -656,7 +708,11 @@
             <div
               v-if="testResult"
               class="p-4 rounded-lg"
-              :class="testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'"
+              :class="
+                testResult.success
+                  ? 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-200'
+                  : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
+              "
             >
               <div class="flex items-center space-x-2">
                 <CheckCircle v-if="testResult.success" class="h-5 w-5" />
@@ -667,6 +723,15 @@
               </div>
               <p v-if="testResult.message" class="mt-2 text-sm">
                 {{ testResult.message }}
+              </p>
+              <p
+                v-if="!testResult.success && testResult.error"
+                class="mt-2 text-sm font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800"
+              >
+                {{ testResult.error }}
+              </p>
+              <p v-if="!testResult.success" class="mt-2 text-xs opacity-75">
+                Please check your configuration and try again.
               </p>
             </div>
           </div>
@@ -704,6 +769,7 @@ import { markRaw, defineAsyncComponent, computed } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   CheckCircle,
   XCircle,
@@ -718,6 +784,9 @@ import {
   Lock,
   Check,
 } from "lucide-vue-next";
+import Alert from "@/components/ui/alert/Alert.vue";
+import AlertTitle from "@/components/ui/alert/AlertTitle.vue";
+import AlertDescription from "@/components/ui/alert/AlertDescription.vue";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Switch from "@/components/ui/Switch.vue";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
@@ -758,7 +827,7 @@ const testing = ref(false);
 const enabling = ref(false);
 const disabling = ref(false);
 const showDisableConfirm = ref(false);
-const testResult = ref<{ success: boolean; message?: string } | null>(null);
+const testResult = ref<{ success: boolean; message?: string; error?: string } | null>(null);
 const instanceId = ref<string | null>(null);
 
 // Configuration
@@ -1025,8 +1094,11 @@ const saveConfiguration = async () => {
     // Show success toast
     toast.success("Configuration saved successfully");
 
-    // Reload plugin data to refresh the UI
-    await fetchPlugin();
+    // Update original form data to reflect new saved state
+    originalFormData.value = { ...cleanedConfig };
+
+    // Test connection after saving
+    await testConnection();
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
 
@@ -1054,17 +1126,19 @@ const testConnection = async () => {
   testResult.value = null;
 
   try {
-    // TODO: Implement actual connection test endpoint
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const result = await Hay.plugins.testConnection.query({ pluginId: pluginId.value });
 
     testResult.value = {
-      success: true,
-      message: "Connection established successfully",
+      success: result.success,
+      message:
+        result.message ||
+        (result.success ? "Connection established successfully" : "Connection failed"),
+      error: result.error, // Include detailed error information
     };
-  } catch (err) {
+  } catch (err: any) {
     testResult.value = {
       success: false,
-      message: "Failed to establish connection. Please check your configuration.",
+      message: err?.message || "Failed to establish connection. Please check your configuration.",
     };
   } finally {
     testing.value = false;
