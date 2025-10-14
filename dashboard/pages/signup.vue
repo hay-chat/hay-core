@@ -204,6 +204,13 @@ const router = useRouter();
 // Auth composable - wrapped to handle SSR
 const authStore = useAuthStore();
 
+// Redirect to home if already logged in
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    router.push("/");
+  }
+});
+
 // Form state
 const form = reactive({
   organizationName: "",
