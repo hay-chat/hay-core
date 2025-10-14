@@ -103,8 +103,11 @@
                 </button>
               </div>
 
-              <div v-if="!integrations?.completed" class="flex gap-2">
-                <Button @click="navigateTo('/integrations/marketplace')">
+              <div class="flex gap-2">
+                <Button
+                  :variant="!integrations?.completed ? 'primary' : 'outline'"
+                  @click="navigateTo('/integrations/marketplace')"
+                >
                   Browse All Integrations
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
@@ -145,8 +148,14 @@
               </div>
 
               <div v-if="!agent?.completed">
-                <Button @click="navigateTo('/agents/new')">
+                <Button @click="navigateTo('/agents/new?redirect=/getting-started')">
                   Create Agent
+                  <ArrowRight class="w-3 h-3 ml-2" />
+                </Button>
+              </div>
+              <div v-else>
+                <Button variant="outline" @click="navigateTo('/agents')">
+                  View Agents
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -195,9 +204,18 @@
               <div v-if="!documents?.completed">
                 <Button
                   :disabled="isStepLocked('documents')"
-                  @click="navigateTo('/documents/import')"
+                  @click="navigateTo('/documents/import?redirect=/getting-started')"
                 >
                   Upload Documents
+                  <ArrowRight class="w-3 h-3 ml-2" />
+                </Button>
+                <p v-if="isStepLocked('documents')" class="text-sm text-neutral-muted mt-2">
+                  Finish the previous steps before doing this. Hay will work better this way.
+                </p>
+              </div>
+              <div v-else>
+                <Button variant="outline" @click="navigateTo('/documents')">
+                  View Documents
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -242,8 +260,20 @@
               </div>
 
               <div v-if="!playbook?.completed">
-                <Button :disabled="isStepLocked('playbook')" @click="navigateTo('/playbooks/new')">
+                <Button
+                  :disabled="isStepLocked('playbook')"
+                  @click="navigateTo('/playbooks/new?redirect=/getting-started')"
+                >
                   Create Playbook
+                  <ArrowRight class="w-3 h-3 ml-2" />
+                </Button>
+                <p v-if="isStepLocked('playbook')" class="text-sm text-neutral-muted mt-2">
+                  Finish the previous steps before doing this. Hay will work better this way.
+                </p>
+              </div>
+              <div v-else>
+                <Button variant="outline" @click="navigateTo('/playbooks')">
+                  View Playbooks
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -295,6 +325,15 @@
                   @click="navigateTo('/conversations')"
                 >
                   Start Playground Chat
+                  <ArrowRight class="w-3 h-3 ml-2" />
+                </Button>
+                <p v-if="isStepLocked('playground')" class="text-sm text-neutral-muted mt-2">
+                  Finish the previous steps before doing this. Hay will work better this way.
+                </p>
+              </div>
+              <div v-else>
+                <Button variant="outline" @click="navigateTo('/conversations')">
+                  View Conversations
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>

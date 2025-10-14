@@ -175,7 +175,7 @@
                 v-if="isEditMode"
                 type="button"
                 variant="destructive"
-                :disabled="isSubmitting"
+                :loading="isSubmitting"
                 @click="handleDelete"
               >
                 <Trash2 class="h-4 w-4 mr-2" />
@@ -190,17 +190,8 @@
                 >
                   Cancel
                 </Button>
-                <Button type="submit" :disabled="isSubmitting || !form.name">
-                  <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-                  {{
-                    isSubmitting
-                      ? isEditMode
-                        ? "Saving..."
-                        : "Creating..."
-                      : isEditMode
-                        ? "Save Changes"
-                        : "Create Agent"
-                  }}
+                <Button type="submit" :loading="isSubmitting" :disabled="!form.name">
+                  {{ isEditMode ? "Save Changes" : "Create Agent" }}
                 </Button>
               </div>
             </div>
@@ -229,7 +220,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { Loader2, ArrowLeft, Trash2 } from "lucide-vue-next";
+import { ArrowLeft, Trash2 } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
@@ -404,6 +395,13 @@ const handleSubmit = async () => {
       // Create new agent
       const response = await HayApi.agents.create.mutate(payload);
       toast.success("Agent created successfully");
+
+      // Check if there's a redirect parameter
+      const redirectPath = route.query.redirect as string;
+      if (redirectPath) {
+        await router.push(redirectPath);
+        return;
+      }
 
       // Navigate to the edit page after creation
       await router.push(`/agents/${response.id}`);

@@ -26,7 +26,7 @@
             placeholder="Enter your last name"
           />
         </div>
-        <Button :disabled="!hasProfileChanges" @click="saveProfile">
+        <Button :loading="isSavingProfile" :disabled="!hasProfileChanges" @click="saveProfile">
           <Save class="h-4 w-4 mr-2" />
           Save Changes
         </Button>
@@ -69,11 +69,11 @@
             <Button
               variant="outline"
               size="sm"
-              :disabled="resendingEmail"
+              :loading="resendingEmail"
               @click="resendVerificationEmail"
             >
               <Mail class="h-4 w-4 mr-2" />
-              {{ resendingEmail ? "Sending..." : "Resend Verification" }}
+              Resend Verification
             </Button>
             <Button variant="outline" size="sm" @click="cancelEmailChange"> Cancel Change </Button>
           </div>
@@ -108,6 +108,7 @@
 
         <Button
           v-if="!currentUser?.pendingEmail"
+          :loading="isChangingEmail"
           :disabled="
             !emailForm.newEmail || !!emailError || emailForm.newEmail === currentUser?.email
           "
@@ -169,7 +170,11 @@
           </AlertDescription>
         </Alert>
 
-        <Button @click="changePassword" :disabled="!canChangePassword">
+        <Button
+          :loading="isChangingPassword"
+          :disabled="!canChangePassword"
+          @click="changePassword"
+        >
           <Lock class="h-4 w-4 mr-2" />
           Update Password
         </Button>
@@ -300,6 +305,11 @@ const loadingEvents = ref(false);
 const showReauthModal = ref(false);
 const pendingAction = ref<"email" | null>(null);
 
+// Loading states
+const isSavingProfile = ref(false);
+const isChangingEmail = ref(false);
+const isChangingPassword = ref(false);
+
 // Refresh user data from server
 const refreshUserData = async () => {
   try {
@@ -334,6 +344,7 @@ onMounted(async () => {
 // Save profile changes
 const saveProfile = async () => {
   try {
+    isSavingProfile.value = true;
     const response = await Hay.auth.updateProfile.mutate({
       firstName: profileForm.firstName || undefined,
       lastName: profileForm.lastName || undefined,
@@ -350,6 +361,8 @@ const saveProfile = async () => {
   } catch (error: any) {
     console.error("Failed to update profile:", error);
     toast.error(error.message || "Failed to update profile");
+  } finally {
+    isSavingProfile.value = false;
   }
 };
 
@@ -368,6 +381,7 @@ const handleReauthConfirmed = async (password: string) => {
 
 const executeEmailChange = async (password: string) => {
   try {
+    isChangingEmail.value = true;
     const response = await Hay.auth.updateEmail.mutate({
       newEmail: emailForm.newEmail,
       currentPassword: password,
@@ -395,6 +409,8 @@ const executeEmailChange = async (password: string) => {
   } catch (error: any) {
     console.error("Failed to update email:", error);
     toast.error(error.message || "Failed to send verification email");
+  } finally {
+    isChangingEmail.value = false;
   }
 };
 
@@ -442,6 +458,7 @@ const changePassword = async () => {
   if (!canChangePassword.value) return;
 
   try {
+    isChangingPassword.value = true;
     await Hay.auth.changePassword.mutate({
       currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
@@ -459,6 +476,8 @@ const changePassword = async () => {
   } catch (error: any) {
     console.error("Failed to change password:", error);
     toast.error(error.message || "Failed to change password");
+  } finally {
+    isChangingPassword.value = false;
   }
 };
 

@@ -56,9 +56,7 @@
           <p v-if="errors.organizationName" class="text-sm text-red-600">
             {{ errors.organizationName }}
           </p>
-          <p v-else class="text-sm text-gray-500">
-            This will be used to identify your workspace
-          </p>
+          <p v-else class="text-sm text-gray-500">This will be used to identify your workspace</p>
         </div>
 
         <!-- Admin Email -->
@@ -76,9 +74,7 @@
           <p v-if="errors.email" class="text-sm text-red-600">
             {{ errors.email }}
           </p>
-          <p v-else class="text-sm text-gray-500">
-            This will be your admin account email
-          </p>
+          <p v-else class="text-sm text-gray-500">This will be your admin account email</p>
         </div>
 
         <!-- Admin Full Name -->
@@ -165,13 +161,10 @@
           type="submit"
           size="lg"
           class="w-full"
-          :disabled="authStore.isLoading || !isFormValid"
+          :loading="authStore.isLoading"
+          :disabled="!isFormValid"
         >
-          <div v-if="authStore.isLoading" class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-            <span>Creating account...</span>
-          </div>
-          <span v-else>Create account</span>
+          Create account
         </Button>
 
         <!-- Error Message -->

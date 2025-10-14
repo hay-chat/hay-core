@@ -68,10 +68,10 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // Clear all auth state
+      // Clear all auth state but keep isInitialized as true to prevent loading state
       this.tokens = null;
       this.isAuthenticated = false;
-      this.isInitialized = false;
+      // Don't set isInitialized = false as it causes infinite loading state
 
       // Clear user store
       const userStore = useUserStore();
