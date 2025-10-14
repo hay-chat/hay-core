@@ -5,8 +5,18 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
+import { processManagerService } from "@server/services/process-manager.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
+import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+
+interface PluginHealthCheckResult {
+  success: boolean;
+  status: "healthy" | "unhealthy" | "unconfigured";
+  message?: string;
+  error?: string;
+  testedAt: Date;
+}
 
 /**
  * Get all available plugins
@@ -25,27 +35,27 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
       return !manifest.invisible;
     })
     .map((plugin) => {
-    const manifest = plugin.manifest as HayPluginManifest;
-    const result = {
-      id: plugin.pluginId, // Use pluginId as the identifier for frontend
-      dbId: plugin.id, // Keep database ID for reference
-      name: plugin.name,
-      version: plugin.version,
-      type: manifest.type,
-      description: manifest.configSchema
-        ? Object.values(manifest.configSchema)[0]?.description
-        : `${plugin.name} plugin`,
-      installed: plugin.installed,
-      built: plugin.built,
-      enabled: enabledPluginIds.has(plugin.id),
-      hasConfiguration: !!manifest.configSchema,
-      hasCustomUI: !!manifest.ui?.configuration,
-      capabilities: manifest.capabilities,
-      features: manifest.capabilities?.chat_connector?.features || {},
-    };
+      const manifest = plugin.manifest as HayPluginManifest;
+      const result = {
+        id: plugin.pluginId, // Use pluginId as the identifier for frontend
+        dbId: plugin.id, // Keep database ID for reference
+        name: plugin.name,
+        version: plugin.version,
+        type: manifest.type,
+        description: manifest.configSchema
+          ? Object.values(manifest.configSchema)[0]?.description
+          : `${plugin.name} plugin`,
+        installed: plugin.installed,
+        built: plugin.built,
+        enabled: enabledPluginIds.has(plugin.id),
+        hasConfiguration: !!manifest.configSchema,
+        hasCustomUI: !!manifest.ui?.configuration,
+        capabilities: manifest.capabilities,
+        features: manifest.capabilities?.chat_connector?.features || {},
+      };
 
-    return result;
-  });
+      return result;
+    });
 });
 
 /**
@@ -340,7 +350,6 @@ export const getPluginUITemplate = authenticatedProcedure
     };
   });
 
-
 /**
  * Get all available MCP tools from enabled plugins
  */
@@ -440,3 +449,241 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
     items: menuItems,
   };
 });
+
+/**
+ * Test MCP connection for a plugin
+ */
+export const testConnection = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .query(async ({ ctx, input }): Promise<PluginHealthCheckResult> => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    const manifest = plugin.manifest as HayPluginManifest;
+
+    // Check if plugin has MCP capabilities
+    if (!manifest.capabilities?.mcp) {
+      return {
+        success: false,
+        status: "unhealthy",
+        message: "Plugin does not support MCP connections",
+        testedAt: new Date(),
+      };
+    }
+
+    // Check if plugin instance exists and has configuration
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
+
+    if (!instance || !instance.config) {
+      return {
+        success: false,
+        status: "unconfigured",
+        message: "Plugin configuration is missing",
+        testedAt: new Date(),
+      };
+    }
+
+    try {
+      // Get available MCP tools from manifest
+      const mcpTools = manifest.capabilities.mcp.tools || [];
+
+      // Determine which tool to use for health check (priority order)
+      let testTool = null;
+      let testArgs = {};
+
+      // Priority 1: Look for health check tools
+      const healthCheckTools = mcpTools.filter(
+        (tool) =>
+          tool.name.toLowerCase().includes("health") || tool.name.toLowerCase().includes("check"),
+      );
+      if (healthCheckTools.length > 0) {
+        testTool = healthCheckTools[0].name;
+      }
+
+      // Priority 2: Look for info/support tools
+      if (!testTool) {
+        const infoTools = mcpTools.filter(
+          (tool) =>
+            tool.name.toLowerCase().includes("info") || tool.name.toLowerCase().includes("support"),
+        );
+        if (infoTools.length > 0) {
+          testTool = infoTools[0].name;
+        }
+      }
+
+      // Priority 3: Look for list tools (with minimal parameters)
+      if (!testTool) {
+        const listTools = mcpTools.filter(
+          (tool) =>
+            tool.name.toLowerCase().startsWith("list") || tool.name.toLowerCase().startsWith("get"),
+        );
+        if (listTools.length > 0) {
+          testTool = listTools[0].name;
+          // Use minimal parameters for list tools
+          testArgs = { limit: 1 };
+        }
+      }
+
+      // Priority 4: Use initialize if no tools found
+      if (!testTool) {
+        testTool = "initialize";
+        testArgs = {};
+      }
+
+      // Prepare MCP request
+      const mcpRequest = {
+        jsonrpc: "2.0",
+        id: uuidv4(),
+        method: testTool === "initialize" ? "initialize" : "tools/call",
+        params:
+          testTool === "initialize"
+            ? {}
+            : {
+                name: testTool,
+                arguments: testArgs,
+              },
+      };
+
+      console.log(`[HealthCheck] Testing connection for ${input.pluginId} with tool: ${testTool}`);
+
+      // Send request with shorter timeout for health checks
+      const result = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Connection timeout - verify server is accessible"));
+        }, 10000); // 10 second timeout for health checks
+
+        processManagerService
+          .sendToPlugin(ctx.organizationId!, input.pluginId, "mcp_call", mcpRequest)
+          .then((response) => {
+            clearTimeout(timeout);
+            resolve(response);
+          })
+          .catch((error) => {
+            clearTimeout(timeout);
+            reject(error);
+          });
+      });
+
+      // Type the response properly
+      const mcpResponse = result as any;
+
+      console.log(`[HealthCheck] Received response for ${input.pluginId}:`, JSON.stringify(mcpResponse));
+
+      // Check if the response contains an error
+      if (mcpResponse && typeof mcpResponse === "object") {
+        // Check for JSON-RPC error response
+        if (mcpResponse.error) {
+          console.log(`[HealthCheck] MCP response contains error:`, mcpResponse.error);
+          return {
+            success: false,
+            status: "unhealthy",
+            message: mcpResponse.error.message || "MCP server returned an error",
+            error: mcpResponse.error.message || "Unknown MCP error",
+            testedAt: new Date(),
+          };
+        }
+
+        // Check for result with isError flag
+        if (mcpResponse.result && mcpResponse.result.isError) {
+          console.log(`[HealthCheck] MCP result indicates error:`, mcpResponse.result);
+          const errorText = mcpResponse.result.content?.[0]?.text || "Unknown MCP error";
+
+          // Check if it's an authentication error
+          const isAuthError =
+            errorText.includes("401") ||
+            errorText.includes("Couldn't authenticate") ||
+            errorText.includes("Authentication failed") ||
+            errorText.includes("Unauthorized");
+
+          return {
+            success: false,
+            status: isAuthError ? "unconfigured" : "unhealthy",
+            message: isAuthError ? "Authentication failed - check credentials" : "MCP server returned an error",
+            error: errorText,
+            testedAt: new Date(),
+          };
+        }
+
+        // Check for authentication errors in the content (for responses without isError flag)
+        if (mcpResponse.result && mcpResponse.result.content) {
+          const content = mcpResponse.result.content;
+          if (Array.isArray(content)) {
+            for (const item of content) {
+              if (item.type === "text" && item.text) {
+                // Check for common authentication error patterns
+                if (
+                  item.text.includes("401") ||
+                  item.text.includes("Couldn't authenticate") ||
+                  item.text.includes("Authentication failed") ||
+                  item.text.includes("Unauthorized")
+                ) {
+                  console.log(`[HealthCheck] Authentication error detected:`, item.text);
+                  return {
+                    success: false,
+                    status: "unconfigured",
+                    message: "Authentication failed - check credentials",
+                    error: item.text,
+                    testedAt: new Date(),
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        success: true,
+        status: "healthy",
+        message: `Connection successful using ${testTool}`,
+        testedAt: new Date(),
+      };
+    } catch (error) {
+      console.error(`[HealthCheck] Connection test failed for ${input.pluginId}:`, error);
+
+      let errorMessage = "Unknown error";
+      let status: "unhealthy" | "unconfigured" = "unhealthy";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Categorize error types
+        if (errorMessage.includes("timeout") || errorMessage.includes("Connection timeout")) {
+          errorMessage = "Connection timeout - verify server is accessible";
+        } else if (
+          errorMessage.includes("Authentication") ||
+          errorMessage.includes("401") ||
+          errorMessage.includes("403")
+        ) {
+          errorMessage = "Authentication failed - check credentials";
+          status = "unconfigured";
+        } else if (
+          errorMessage.includes("Failed to start") ||
+          errorMessage.includes("Process not available")
+        ) {
+          errorMessage = "Failed to start MCP server - check configuration";
+        }
+      }
+
+      return {
+        success: false,
+        status,
+        message: errorMessage,
+        error: errorMessage,
+        testedAt: new Date(),
+      };
+    }
+  });

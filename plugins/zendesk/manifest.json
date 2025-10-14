@@ -1461,15 +1461,6 @@
           }
         },
         {
-          "name": "support_info",
-          "label": "Support Info",
-          "description": "Get information about Zendesk Support configuration",
-          "input_schema": {
-            "type": "object",
-            "properties": {}
-          }
-        },
-        {
           "name": "get_talk_stats",
           "label": "Get Talk Stats",
           "description": "Get Zendesk Talk statistics",

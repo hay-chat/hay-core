@@ -10,6 +10,7 @@ import {
   getPluginUITemplate,
   getMCPTools,
   getMenuItems,
+  testConnection,
 } from "./plugins.handler";
 
 export const pluginsRouter = t.router({
@@ -23,4 +24,5 @@ export const pluginsRouter = t.router({
   getUITemplate: getPluginUITemplate,
   getMCPTools: getMCPTools,
   getMenuItems: getMenuItems,
+  testConnection: testConnection,
 });
