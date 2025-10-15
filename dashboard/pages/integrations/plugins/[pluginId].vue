@@ -288,189 +288,15 @@
               <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
 
               <!-- Auto-generated Form -->
-              <form v-else @submit.prevent="saveConfiguration" class="space-y-4">
-                <div v-for="(field, key) in configSchema" :key="key" class="space-y-2">
-                  <!-- Text Input -->
-                  <template v-if="field.type === 'string' && !field.options">
-                    <Label :for="key" :required="field.required">
-                      {{ field.label || key }}
-                      <Lock
-                        v-if="field.encrypted"
-                        class="inline-block h-3 w-3 ml-1 text-neutral-muted"
-                      />
-                    </Label>
-                    <p v-if="field.description" class="text-sm text-neutral-muted">
-                      {{ field.description }}
-                    </p>
-
-                    <!-- Encrypted field with edit mode -->
-                    <div
-                      v-if="
-                        field.encrypted &&
-                        originalFormData[key] &&
-                        /^\*+$/.test(originalFormData[key])
-                      "
-                      class="space-y-2"
-                    >
-                      <div
-                        v-if="!editingEncryptedFields.has(key)"
-                        class="flex items-center space-x-2"
-                      >
-                        <Input
-                          :id="key"
-                          value="••••••••"
-                          type="password"
-                          disabled
-                          class="flex-1 bg-muted"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          @click="
-                            () => {
-                              editingEncryptedFields.add(key);
-                              formData[key] = ''; // Clear the masked value
-                              editingEncryptedFields = new Set(editingEncryptedFields);
-                            }
-                          "
-                        >
-                          <Edit3 class="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-
-                      <div v-else class="flex items-center space-x-2">
-                        <Input
-                          :id="key"
-                          v-model="formData[key]"
-                          type="password"
-                          :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
-                          :required="field.required"
-                          class="flex-1"
-                          autofocus
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          @click="
-                            () => {
-                              editingEncryptedFields.delete(key);
-                              formData[key] = originalFormData[key]; // Restore masked value
-                              editingEncryptedFields = new Set(editingEncryptedFields);
-                            }
-                          "
-                        >
-                          <X class="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p class="text-xs text-neutral-muted">
-                        This value is encrypted and stored securely. Click edit to update it.
-                      </p>
-                    </div>
-
-                    <!-- Regular input or new encrypted field -->
-                    <div v-else>
-                      <Input
-                        :id="key"
-                        v-model="formData[key]"
-                        :type="field.encrypted ? 'password' : 'text'"
-                        :placeholder="
-                          field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
-                        "
-                        :required="field.required"
-                      />
-                      <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
-                        This value will be encrypted and stored securely.
-                      </p>
-                    </div>
-                  </template>
-
-                  <!-- Select -->
-                  <template v-else-if="field.type === 'select' || field.options">
-                    <Label :for="key" :required="field.required">
-                      {{ field.label || key }}
-                    </Label>
-                    <p v-if="field.description" class="text-sm text-neutral-muted">
-                      {{ field.description }}
-                    </p>
-                    <select
-                      :id="key"
-                      v-model="formData[key]"
-                      class="w-full px-3 py-2 text-sm border border-input rounded-md"
-                      :required="field.required"
-                    >
-                      <option value="">Select {{ (field.label || key).toLowerCase() }}</option>
-                      <option
-                        v-for="option in field.options"
-                        :key="option.value"
-                        :value="option.value"
-                      >
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </template>
-
-                  <!-- Boolean -->
-                  <template v-else-if="field.type === 'boolean'">
-                    <div class="flex items-center justify-between space-x-2">
-                      <div class="space-y-0.5">
-                        <Label :for="key">{{ field.label || key }}</Label>
-                        <p v-if="field.description" class="text-sm text-neutral-muted">
-                          {{ field.description }}
-                        </p>
-                      </div>
-                      <Switch :id="key" v-model="formData[key]" />
-                    </div>
-                  </template>
-
-                  <!-- Textarea -->
-                  <template v-else-if="field.type === 'textarea'">
-                    <Label :for="key" :required="field.required">
-                      {{ field.label || key }}
-                    </Label>
-                    <p v-if="field.description" class="text-sm text-neutral-muted">
-                      {{ field.description }}
-                    </p>
-                    <Textarea
-                      :id="key"
-                      v-model="formData[key]"
-                      :placeholder="
-                        field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
-                      "
-                      :rows="4"
-                      :required="field.required"
-                    />
-                  </template>
-
-                  <!-- Number -->
-                  <template v-else-if="field.type === 'number'">
-                    <Label :for="key" :required="field.required">
-                      {{ field.label || key }}
-                    </Label>
-                    <p v-if="field.description" class="text-sm text-neutral-muted">
-                      {{ field.description }}
-                    </p>
-                    <Input
-                      :id="key"
-                      v-model.number="formData[key]"
-                      type="number"
-                      :placeholder="
-                        field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
-                      "
-                      :required="field.required"
-                    />
-                  </template>
-                </div>
-
-                <div class="flex justify-end space-x-2 pt-4">
-                  <Button type="button" variant="outline" @click="resetForm"> Reset </Button>
-                  <Button type="submit" :disabled="saving" :loading="saving">
-                    Save Configuration
-                  </Button>
-                </div>
-              </form>
+              <PluginConfigForm
+                v-model:formData="formData"
+                v-model:editingEncryptedFields="editingEncryptedFields"
+                :configSchema="configSchema"
+                :originalFormData="originalFormData"
+                :saving="saving"
+                @submit="saveConfiguration"
+                @reset="resetForm"
+              />
             </TabsContent>
 
             <!-- Custom Tab Contents -->
@@ -514,177 +340,15 @@
           <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
 
           <!-- Auto-generated Form -->
-          <form v-else @submit.prevent="saveConfiguration" class="space-y-4">
-            <div v-for="(field, key) in configSchema" :key="key" class="space-y-2" :id="key">
-              <!-- Text Input -->
-              <template v-if="field.type === 'string' && !field.options">
-                <Label :for="key" :required="field.required">
-                  {{ field.label || key }}
-                  <Lock
-                    v-if="field.encrypted"
-                    class="inline-block h-3 w-3 ml-1 text-neutral-muted"
-                  />
-                </Label>
-                <p v-if="field.description" class="text-sm text-neutral-muted">
-                  {{ field.description }}
-                </p>
-
-                <!-- Encrypted field with edit mode -->
-                <div
-                  v-if="
-                    field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])
-                  "
-                  class="space-y-2"
-                >
-                  <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
-                    <Input
-                      :id="key"
-                      value="••••••••"
-                      type="password"
-                      disabled
-                      class="flex-1 bg-muted"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      @click="
-                        () => {
-                          editingEncryptedFields.add(key);
-                          formData[key] = ''; // Clear the masked value
-                          editingEncryptedFields = new Set(editingEncryptedFields);
-                        }
-                      "
-                    >
-                      <Edit3 class="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                  </div>
-
-                  <div v-else class="flex items-center space-x-2">
-                    <Input
-                      :id="key"
-                      v-model="formData[key]"
-                      type="password"
-                      :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
-                      :required="field.required"
-                      class="flex-1"
-                      autofocus
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      @click="
-                        () => {
-                          editingEncryptedFields.delete(key);
-                          formData[key] = originalFormData[key]; // Restore masked value
-                          editingEncryptedFields = new Set(editingEncryptedFields);
-                        }
-                      "
-                    >
-                      <X class="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p class="text-xs text-neutral-muted">
-                    This value is encrypted and stored securely. Click edit to update it.
-                  </p>
-                </div>
-
-                <!-- Regular input or new encrypted field -->
-                <div v-else>
-                  <Input
-                    :id="key"
-                    v-model="formData[key]"
-                    :type="field.encrypted ? 'password' : 'text'"
-                    :placeholder="
-                      field.placeholder || 'Enter ' + (field.label || key).toLowerCase()
-                    "
-                    :required="field.required"
-                  />
-                  <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
-                    This value will be encrypted and stored securely.
-                  </p>
-                </div>
-              </template>
-
-              <!-- Select -->
-              <template v-else-if="field.type === 'select' || field.options">
-                <Label :for="key" :required="field.required">
-                  {{ field.label || key }}
-                </Label>
-                <p v-if="field.description" class="text-sm text-neutral-muted">
-                  {{ field.description }}
-                </p>
-                <select
-                  :id="key"
-                  v-model="formData[key]"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md"
-                  :required="field.required"
-                >
-                  <option value="">Select {{ (field.label || key).toLowerCase() }}</option>
-                  <option v-for="option in field.options" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </template>
-
-              <!-- Boolean -->
-              <template v-else-if="field.type === 'boolean'">
-                <div class="flex items-center justify-between space-x-2">
-                  <div class="space-y-0.5">
-                    <Label :for="key">{{ field.label || key }}</Label>
-                    <p v-if="field.description" class="text-sm text-neutral-muted">
-                      {{ field.description }}
-                    </p>
-                  </div>
-                  <Switch :id="key" v-model="formData[key]" />
-                </div>
-              </template>
-
-              <!-- Textarea -->
-              <template v-else-if="field.type === 'textarea'">
-                <Label :for="key" :required="field.required">
-                  {{ field.label || key }}
-                </Label>
-                <p v-if="field.description" class="text-sm text-neutral-muted">
-                  {{ field.description }}
-                </p>
-                <Textarea
-                  :id="key"
-                  v-model="formData[key]"
-                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
-                  :rows="4"
-                  :required="field.required"
-                />
-              </template>
-
-              <!-- Number -->
-              <template v-else-if="field.type === 'number'">
-                <Label :for="key" :required="field.required">
-                  {{ field.label || key }}
-                </Label>
-                <p v-if="field.description" class="text-sm text-neutral-muted">
-                  {{ field.description }}
-                </p>
-                <Input
-                  :id="key"
-                  v-model.number="formData[key]"
-                  type="number"
-                  :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
-                  :required="field.required"
-                />
-              </template>
-            </div>
-
-            <div class="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" @click="resetForm"> Reset </Button>
-              <Button type="submit" :disabled="saving">
-                <Loader2 v-if="saving" class="mr-2 h-4 w-4 animate-spin" />
-                Save Configuration
-              </Button>
-            </div>
-          </form>
+          <PluginConfigForm
+            v-model:formData="formData"
+            v-model:editingEncryptedFields="editingEncryptedFields"
+            :configSchema="configSchema"
+            :originalFormData="originalFormData"
+            :saving="saving"
+            @submit="saveConfiguration"
+            @reset="resetForm"
+          />
         </CardContent>
       </Card>
 
@@ -779,16 +443,12 @@ import {
   FileText,
   Database,
   Package,
-  Edit3,
-  X,
-  Lock,
   Check,
 } from "lucide-vue-next";
 import Alert from "@/components/ui/alert/Alert.vue";
 import AlertTitle from "@/components/ui/alert/AlertTitle.vue";
 import AlertDescription from "@/components/ui/alert/AlertDescription.vue";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import Switch from "@/components/ui/Switch.vue";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
