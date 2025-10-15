@@ -442,7 +442,6 @@ export class ProcessManagerService {
 
       // Send JSON-RPC request to stdin
       const requestLine = JSON.stringify(request) + "\n";
-      console.log(`[ProcessManager] Sending to MCP stdin: ${requestLine.trim()}`);
 
       if (processInfo.process.stdin) {
         processInfo.process.stdin.write(requestLine);
