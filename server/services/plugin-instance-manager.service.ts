@@ -95,8 +95,16 @@ export class PluginInstanceManagerService {
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
-      console.error(`Failed to start plugin ${pluginId} for org ${organizationId}:`, error);
-      throw error;
+      console.error(`❌ Failed to start plugin ${pluginId} for org ${organizationId}:`, error);
+
+      // Extract meaningful error message
+      let errorMessage = "Failed to start plugin";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      // Throw a new error with clean message for the API layer
+      throw new Error(`Failed to start plugin: ${errorMessage}`);
     }
   }
 
