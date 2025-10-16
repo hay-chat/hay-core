@@ -253,6 +253,23 @@ export const configurePlugin = authenticatedProcedure
 
     await pluginInstanceRepository.updateConfig(instance.id, finalConfig);
 
+    // Restart the plugin if it's currently running to apply new configuration
+    if (processManagerService.isRunning(ctx.organizationId!, input.pluginId)) {
+      console.log(
+        `🔄 Configuration changed for ${plugin.name}, restarting plugin to apply new settings...`,
+      );
+      try {
+        await processManagerService.restartPlugin(ctx.organizationId!, input.pluginId);
+        console.log(`✅ Plugin ${plugin.name} restarted with new configuration`);
+      } catch (error) {
+        console.error(
+          `⚠️  Failed to restart ${plugin.name} after config change:`,
+          error instanceof Error ? error.message : String(error),
+        );
+        // Don't throw - config was saved successfully, restart failure is non-critical
+      }
+    }
+
     return {
       success: true,
       instance: { ...instance, config: finalConfig },
