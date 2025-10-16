@@ -85,10 +85,7 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // Navigate to login page using navigateTo for proper Nuxt navigation
-      if (process.client) {
-        await navigateTo("/login");
-      }
+      await navigateTo("/login");
     },
 
     updateActivity() {

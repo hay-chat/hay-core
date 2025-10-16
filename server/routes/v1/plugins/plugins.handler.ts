@@ -580,13 +580,12 @@ export const testConnection = authenticatedProcedure
       // Type the response properly
       const mcpResponse = result as any;
 
-      console.log(`[HealthCheck] Received response for ${input.pluginId}:`, JSON.stringify(mcpResponse));
+      console.log(`[HealthCheck] Received response for ${input.pluginId}`);
 
       // Check if the response contains an error
       if (mcpResponse && typeof mcpResponse === "object") {
         // Check for JSON-RPC error response
         if (mcpResponse.error) {
-          console.log(`[HealthCheck] MCP response contains error:`, mcpResponse.error);
           return {
             success: false,
             status: "unhealthy",
@@ -598,7 +597,6 @@ export const testConnection = authenticatedProcedure
 
         // Check for result with isError flag
         if (mcpResponse.result && mcpResponse.result.isError) {
-          console.log(`[HealthCheck] MCP result indicates error:`, mcpResponse.result);
           const errorText = mcpResponse.result.content?.[0]?.text || "Unknown MCP error";
 
           // Check if it's an authentication error
@@ -611,7 +609,9 @@ export const testConnection = authenticatedProcedure
           return {
             success: false,
             status: isAuthError ? "unconfigured" : "unhealthy",
-            message: isAuthError ? "Authentication failed - check credentials" : "MCP server returned an error",
+            message: isAuthError
+              ? "Authentication failed - check credentials"
+              : "MCP server returned an error",
             error: errorText,
             testedAt: new Date(),
           };
