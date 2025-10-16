@@ -105,7 +105,7 @@
 
               <div class="flex gap-2">
                 <Button
-                  :variant="!integrations?.completed ? 'primary' : 'outline'"
+                  :variant="!integrations?.completed ? 'default' : 'outline'"
                   @click="navigateTo('/integrations/marketplace')"
                 >
                   Browse All Integrations
