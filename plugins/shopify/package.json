@@ -1,0 +1,13 @@
+{
+  "name": "@hay/shopify-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP Server for Shopify GraphQL Admin API",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.1",
+    "dotenv": "^16.4.7",
+    "graphql-request": "^5.2.0",
+    "minimist": "^1.2.8",
+    "zod": "^3.24.2"
+  }
+}

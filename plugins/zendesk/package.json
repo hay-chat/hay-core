@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "description": "MCP Server for Zendesk API",
-  "main": "src/index.js",
+  "main": "mcp/index.js",
   "bin": {
-    "zendesk-mcp": "src/index.js"
+    "zendesk-mcp": "mcp/index.js"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
-    "inspect": "npx -y @modelcontextprotocol/inspector node src/index.js"
+    "start": "node mcp/index.js",
+    "dev": "node --watch mcp/index.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector node mcp/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
