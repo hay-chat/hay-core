@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Follow existing code style and conventions in each part of the codebase
 6. This is a new application under development. Avoid keeping old functions for backwads-compatibility, we don't need that now, you should aim at removing unused, redundant or unnecessary code if you find any. If you find any opportunities for future improvement, feel free to leave a comment in the code with a "TODO:"
 7. Don't use `npm run dev` to run the application, assume the user is running the app already.
+8. Always read the .claude/FRONTEND.md file before creating new frontend pages/elements.
 
 ## Architecture Overview
 

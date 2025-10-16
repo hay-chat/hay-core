@@ -90,8 +90,18 @@
               </div>
             </div>
             <!-- Connection Status Badge (when enabled) -->
-            <div v-if="enabled && testResult" class="flex items-center space-x-2">
+            <div v-if="enabled" class="flex items-center space-x-2">
+              <!-- Testing Badge -->
               <div
+                v-if="testing && !testResult"
+                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+              >
+                <Loader2 class="w-3 h-3 mr-1.5 animate-spin" />
+                Testing Connection
+              </div>
+              <!-- Result Badge -->
+              <div
+                v-else-if="testResult"
                 :class="[
                   'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
                   testResult.success
@@ -133,11 +143,17 @@
         :icon="AlertTriangle"
       >
         <AlertTitle>{{ testResult.message || "Connection failed" }}</AlertTitle>
-        <AlertDescription v-if="testResult.error">
+        <AlertDescription>
           <div
+            v-if="testResult.error"
             class="font-mono text-xs bg-red-100 dark:bg-red-900/30 p-3 rounded border border-red-200 dark:border-red-800 mt-2"
           >
             {{ testResult.error }}
+          </div>
+          <div class="mt-3">
+            <Button variant="outline" size="sm" @click="testConnection" :loading="testing">
+              Try Again
+            </Button>
           </div>
         </AlertDescription>
       </Alert>
@@ -707,6 +723,13 @@ const fetchPlugin = async () => {
     error.value = "Failed to load plugin details";
   } finally {
     loading.value = false;
+
+    // Auto-test connection asynchronously (don't block page load)
+    // We check configData here instead of enabled.value because loading.value = false happens after this
+    if (enabled.value && hasConfiguration.value && Object.keys(formData.value).length > 0) {
+      // Test connection automatically when settings exist (async, non-blocking)
+      testConnection();
+    }
   }
 };
 
@@ -783,7 +806,7 @@ const resetForm = async () => {
 
 const testConnection = async () => {
   testing.value = true;
-  testResult.value = null;
+  // Don't clear testResult immediately - keep showing previous result while testing
 
   try {
     const result = await Hay.plugins.testConnection.query({ pluginId: pluginId.value });
