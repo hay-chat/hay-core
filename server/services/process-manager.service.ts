@@ -10,8 +10,11 @@ interface ProcessInfo {
   pluginInstanceId: string;
   organizationId: string;
   pluginName: string;
+  pluginId: string;
   startedAt: Date;
   restartAttempts: number;
+  installRecoveryAttempted: boolean; // Track if we've already tried installing dependencies
+  lastErrorOutput: string; // Store stderr to detect dependency errors
 }
 
 export class ProcessManagerService {
@@ -115,8 +118,11 @@ export class ProcessManagerService {
         pluginInstanceId: instance.id,
         organizationId,
         pluginName: plugin.name,
+        pluginId: plugin.pluginId,
         startedAt: getUTCNow(),
         restartAttempts: 0,
+        installRecoveryAttempted: false,
+        lastErrorOutput: "",
       };
 
       this.processes.set(processKey, processInfo);
@@ -212,9 +218,18 @@ export class ProcessManagerService {
       console.log(`[${pluginName}:${organizationId}] ${data.toString()}`);
     });
 
-    // Handle stderr
+    // Handle stderr - capture errors to detect dependency issues
     process.stderr?.on("data", (data) => {
-      console.error(`[${pluginName}:${organizationId}] ERROR: ${data.toString()}`);
+      const errorOutput = data.toString();
+      console.error(`[${pluginName}:${organizationId}] ERROR: ${errorOutput}`);
+
+      // Store last error output for dependency detection
+      processInfo.lastErrorOutput += errorOutput;
+
+      // Keep only last 5000 chars to prevent memory issues
+      if (processInfo.lastErrorOutput.length > 5000) {
+        processInfo.lastErrorOutput = processInfo.lastErrorOutput.slice(-5000);
+      }
     });
 
     // Handle IPC messages
@@ -230,6 +245,34 @@ export class ProcessManagerService {
 
       this.processes.delete(processKey);
 
+      // Check if this was a dependency error and we haven't tried recovery yet
+      if (
+        code !== 0 &&
+        this.isDependencyError(processInfo.lastErrorOutput) &&
+        !processInfo.installRecoveryAttempted
+      ) {
+        console.log(`🔍 Dependency error detected for ${pluginName}, attempting recovery...`);
+
+        // Attempt recovery by running install command
+        const recoverySuccess = await this.attemptDependencyRecovery(processKey, processInfo);
+
+        if (recoverySuccess) {
+          // Retry starting the plugin after successful recovery
+          console.log(`🔄 Retrying plugin ${pluginName} after dependency recovery...`);
+          try {
+            await this.startPlugin(organizationId, processInfo.pluginId);
+            return; // Exit early - plugin restarted successfully
+          } catch (error) {
+            console.error(
+              `❌ Failed to restart ${pluginName} after recovery:`,
+              error instanceof Error ? error.message : String(error),
+            );
+            // Fall through to error handling below
+          }
+        }
+      }
+
+      // Normal restart logic for non-dependency errors
       if (code !== 0 && processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS) {
         // Schedule restart
         await this.scheduleRestart(processKey, processInfo);
@@ -338,6 +381,58 @@ export class ProcessManagerService {
     }
 
     return childProcess;
+  }
+
+  /**
+   * Check if error output indicates a dependency/module error
+   */
+  private isDependencyError(errorOutput: string): boolean {
+    const dependencyErrorPatterns = [
+      "ERR_MODULE_NOT_FOUND",
+      "Cannot find module",
+      "Cannot find package",
+      "Module not found",
+      "ENOENT.*node_modules",
+      "Error: Cannot resolve module",
+    ];
+
+    return dependencyErrorPatterns.some((pattern) => new RegExp(pattern, "i").test(errorOutput));
+  }
+
+  /**
+   * Attempt to recover from dependency error by running installCommand
+   */
+  private async attemptDependencyRecovery(
+    processKey: string,
+    processInfo: ProcessInfo,
+  ): Promise<boolean> {
+    // Don't attempt recovery if already tried
+    if (processInfo.installRecoveryAttempted) {
+      console.log(
+        `⚠️  Dependency recovery already attempted for ${processInfo.pluginName}, skipping`,
+      );
+      return false;
+    }
+
+    console.log(
+      `🔧 Detected dependency error for ${processInfo.pluginName}, attempting recovery...`,
+    );
+
+    // Mark as attempted to prevent loops
+    processInfo.installRecoveryAttempted = true;
+
+    try {
+      // Run the plugin's install command
+      await pluginManagerService.installPlugin(processInfo.pluginId);
+      console.log(`✅ Dependency recovery completed for ${processInfo.pluginName}`);
+      return true;
+    } catch (error) {
+      console.error(
+        `❌ Dependency recovery failed for ${processInfo.pluginName}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return false;
+    }
   }
 
   /**
