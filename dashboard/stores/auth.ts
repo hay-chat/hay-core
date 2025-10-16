@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { HayAuthApi } from "@/utils/api";
 import { useUserStore, type User } from "./user";
+import { useAppStore } from "./app";
 
 interface Tokens {
   accessToken: string;
@@ -76,6 +77,10 @@ export const useAuthStore = defineStore("auth", {
       // Clear user store
       const userStore = useUserStore();
       userStore.clearUser();
+
+      // Clear onboarding state (so new accounts trigger onboarding flow)
+      const appStore = useAppStore();
+      appStore.setOnboardingCompleted(false);
 
       // Show notification if there's a reason
       if (reason === "token_expired" && process.client) {
