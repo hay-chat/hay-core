@@ -1,6 +1,0 @@
-{
-  "name": "@hay/shopify-mcp",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "MCP Server for Shopify GraphQL Admin API"
-}

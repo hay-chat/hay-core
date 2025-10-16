@@ -389,6 +389,7 @@
       ],
       "transport": "sse|websocket|http",
       "auth": ["apiKey"],
+      "installCommand": "npm install",
       "startCommand": "node mcp/index.js"
     }
   },

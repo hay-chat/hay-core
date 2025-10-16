@@ -1,24 +1,9 @@
 {
-  "name": "woocommerce-mcp-server",
+  "name": "@hay/woocommerce-mcp",
   "version": "1.0.0",
   "type": "module",
-  "main": "build/index.js",
-  "scripts": {
-    "build": "tsc",
-    "start": "node build/index.js"
-  },
+  "description": "MCP Server for WooCommerce REST API",
   "dependencies": {
     "axios": "^1.7.9"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/techspawn/woocommerce-mcp-server.git"
-  },
-  "author": "techspawn",
-  "description": "MCP server for WooCommerce integration"
+  }
 }
