@@ -726,9 +726,7 @@
       ],
       "transport": "sse|websocket|http",
       "auth": ["apiKey"],
-      "installCommand": "cd woocommerce-mcp-server && npm install",
-      "buildCommand": "cd woocommerce-mcp-server && npm run build",
-      "startCommand": "cd woocommerce-mcp-server && npm run start"
+      "startCommand": "node mcp/index.js"
     }
   },
   "permissions": {

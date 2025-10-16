@@ -1490,8 +1490,7 @@
       ],
       "transport": "sse|websocket|http",
       "auth": ["oauth2", "jwt", "apiKey"],
-      "installCommand": "cd zendesk-mcp-server && npm install",
-      "startCommand": "cd zendesk-mcp-server && npm run start"
+      "startCommand": "node mcp/index.js"
     }
   },
   "permissions": {

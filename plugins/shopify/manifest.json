@@ -389,10 +389,7 @@
       ],
       "transport": "sse|websocket|http",
       "auth": ["apiKey"],
-      "serverPath": "./shopify-mcp/src/index.ts",
-      "installCommand": "cd shopify-mcp && npm install",
-      "buildCommand": "cd shopify-mcp && npm run build",
-      "startCommand": "cd shopify-mcp && npm run start"
+      "startCommand": "node mcp/index.js"
     }
   },
   "permissions": {

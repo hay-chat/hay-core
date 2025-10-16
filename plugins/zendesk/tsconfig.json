@@ -1,9 +1,0 @@
-{
-  "extends": "../base/tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "./",
-    "outDir": "./dist"
-  },
-  "include": ["*.ts", "manifest.json"],
-  "exclude": ["node_modules", "dist", "zendesk-mcp-server"]
-}

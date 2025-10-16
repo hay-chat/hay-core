@@ -304,74 +304,40 @@ export class ProcessManagerService {
   private spawnCommand(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
     console.log(`Executing command: ${command} in ${cwd}`);
 
-    // Parse the command to check if it needs shell execution
-    const [cmd] = command.split(" ");
+    // Simple command parsing - split on space
+    // For complex arguments, the manifest should use simple patterns
+    const parts = command.trim().split(/\s+/);
+    const executable = parts[0];
+    const args = parts.slice(1);
 
-    // For npm/npx/node commands or complex shell commands, use shell execution
-    if (
-      cmd === "npm" ||
-      cmd === "npx" ||
-      cmd === "node" ||
-      command.includes("&&") ||
-      command.includes("||")
-    ) {
-      // Use spawn with 'shell: true' option which handles cross-platform shell selection
-      // This is more reliable than manually specifying the shell path
-      const childProcess = spawn(command, {
-        cwd,
-        env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
-        shell: true, // Let Node.js handle shell selection (sh on Unix, cmd.exe on Windows)
-      });
+    console.log(`Spawning: ${executable} with args:`, args);
 
-      // Critical: Add error handler immediately to prevent uncaught errors from crashing the app
-      childProcess.on("error", (error) => {
-        console.error(`[ProcessManager] Failed to spawn command "${command}":`, error);
-        // Error will be handled by the 'exit' event handler in setupProcessHandlers
-      });
+    // Use spawn with args array for better reliability and security
+    const childProcess = spawn(executable, args, {
+      cwd,
+      env: { ...process.env, ...env },
+      stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
+    });
 
-      if (childProcess.pid) {
-        console.log(`Started process with PID: ${childProcess.pid}`);
-      }
+    // Critical: Add error handler immediately to prevent uncaught errors from crashing the app
+    childProcess.on("error", (error) => {
+      console.error(`[ProcessManager] Failed to spawn command "${command}":`, error);
+      // Error will be handled by the 'exit' event handler in setupProcessHandlers
+    });
 
-      // Pipe outputs for visibility
-      if (childProcess.stdout) {
-        childProcess.stdout.pipe(process.stdout);
-      }
-      if (childProcess.stderr) {
-        childProcess.stderr.pipe(process.stderr);
-      }
-
-      return childProcess;
-    } else {
-      // For simple commands, use spawn which gives us better control
-      const args = command.split(" ").slice(1);
-      const childProcess = spawn(cmd, args, {
-        cwd,
-        env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"], // stdin, stdout, stderr pipes for MCP communication
-      });
-
-      // Critical: Add error handler immediately to prevent uncaught errors from crashing the app
-      childProcess.on("error", (error) => {
-        console.error(`[ProcessManager] Failed to spawn command "${cmd}":`, error);
-        // Error will be handled by the 'exit' event handler in setupProcessHandlers
-      });
-
-      if (childProcess.pid) {
-        console.log(`Started process with PID: ${childProcess.pid}`);
-      }
-
-      // Pipe outputs
-      if (childProcess.stdout) {
-        childProcess.stdout.pipe(process.stdout);
-      }
-      if (childProcess.stderr) {
-        childProcess.stderr.pipe(process.stderr);
-      }
-
-      return childProcess;
+    if (childProcess.pid) {
+      console.log(`Started process with PID: ${childProcess.pid}`);
     }
+
+    // Pipe outputs for visibility
+    if (childProcess.stdout) {
+      childProcess.stdout.pipe(process.stdout);
+    }
+    if (childProcess.stderr) {
+      childProcess.stderr.pipe(process.stderr);
+    }
+
+    return childProcess;
   }
 
   /**
