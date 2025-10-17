@@ -13,7 +13,8 @@ import { User } from "../../entities/user.entity";
 import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
-import { MessageType } from "./message.entity";
+import { MessageType, MessageStatus } from "./message.entity";
+import { DeliveryState } from "../../types/message-feedback.types";
 import { analyzeInstructions } from "../../utils/instruction-formatter";
 import { documentRepository } from "../../repositories/document.repository";
 import { debugLog } from "@server/lib/debug-logger";
@@ -598,6 +599,36 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.status = newStatus;
     }
 
+    // Check if test mode is enabled for bot messages
+    let messageStatus = MessageStatus.APPROVED;
+    let reviewRequired = false;
+    let deliveryState = DeliveryState.SENT;
+
+    if (messageData.type === MessageType.BOT_AGENT) {
+      // Get agent and organization to check test mode
+      const { agentRepository } = await import("../../repositories/agent.repository");
+      const { organizationRepository } = await import("../../repositories/organization.repository");
+
+      const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
+      const organization = await organizationRepository.findById(this.organization_id);
+
+      // Determine if test mode is enabled
+      let testModeEnabled = false;
+      if (agent && agent.testMode !== null && agent.testMode !== undefined) {
+        // Agent has explicit test mode setting
+        testModeEnabled = agent.testMode;
+      } else if (organization && organization.settings?.testModeDefault) {
+        // Fall back to organization default
+        testModeEnabled = organization.settings.testModeDefault;
+      }
+
+      if (testModeEnabled) {
+        messageStatus = MessageStatus.PENDING;
+        reviewRequired = true;
+        deliveryState = DeliveryState.QUEUED;
+      }
+    }
+
     // Create the message
     const message = await messageRepository.create({
       conversation_id: this.id,
@@ -605,6 +636,9 @@ The following tools are available for you to use. You MUST return only valid JSO
       type: messageData.type as MessageType,
       metadata: messageData.metadata,
       sender: messageData.sender,
+      status: messageStatus,
+      reviewRequired,
+      deliveryState,
     });
 
     // Publish event to Redis for cross-server WebSocket broadcasting

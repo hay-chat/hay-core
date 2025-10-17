@@ -1,9 +1,9 @@
-import { Repository, SelectQueryBuilder, In } from "typeorm";
+import { Repository, SelectQueryBuilder, In, Not } from "typeorm";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
-import { Message, MessageType } from "@server/database/entities/message.entity";
+import { Message, MessageType, MessageStatus } from "@server/database/entities/message.entity";
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   private messageRepository!: Repository<Message>;
@@ -334,6 +334,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       where: {
         conversation_id: conversationId,
         type: In([MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT]),
+        status: Not(MessageStatus.PENDING), // Exclude pending messages (awaiting approval)
       },
       order: { created_at: "ASC" },
     });
