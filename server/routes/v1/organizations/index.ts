@@ -3,11 +3,7 @@ import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
-import {
-  DateFormat,
-  TimeFormat,
-  Timezone,
-} from "@server/types/organization-settings.types";
+import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
 
 const updateSettingsSchema = z.object({
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
@@ -15,6 +11,7 @@ const updateSettingsSchema = z.object({
   timeFormat: z.nativeEnum(TimeFormat).optional(),
   timezone: z.nativeEnum(Timezone).optional(),
   defaultAgentId: z.string().uuid().nullable().optional(),
+  testModeDefault: z.boolean().optional(),
 });
 
 export const organizationsRouter = t.router({
@@ -34,6 +31,7 @@ export const organizationsRouter = t.router({
       timeFormat: organization.timeFormat,
       timezone: organization.timezone,
       defaultAgentId: organization.defaultAgentId,
+      testModeDefault: organization.settings?.testModeDefault || false,
     };
   }),
 
@@ -49,9 +47,23 @@ export const organizationsRouter = t.router({
         });
       }
 
-      const updatedOrg = await organizationService.update(ctx.organizationId!, {
-        ...input,
-      });
+      // Extract testModeDefault from input as it goes into the settings JSONB field
+      const { testModeDefault, ...topLevelFields } = input;
+
+      // Prepare update payload
+      const updatePayload: any = {
+        ...topLevelFields,
+      };
+
+      // Handle testModeDefault in settings JSONB field
+      if (testModeDefault !== undefined) {
+        updatePayload.settings = {
+          ...(organization.settings || {}),
+          testModeDefault,
+        };
+      }
+
+      const updatedOrg = await organizationService.update(ctx.organizationId!, updatePayload);
 
       return {
         success: true,
@@ -62,6 +74,7 @@ export const organizationsRouter = t.router({
           timeFormat: updatedOrg.timeFormat,
           timezone: updatedOrg.timezone,
           defaultAgentId: updatedOrg.defaultAgentId,
+          testModeDefault: updatedOrg.settings?.testModeDefault || false,
         },
       };
     }),

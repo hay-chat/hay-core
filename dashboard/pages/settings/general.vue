@@ -507,6 +507,7 @@ const saveSettings = async () => {
       dateFormat: settings.value.dateFormat as any,
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
+      testModeDefault: settings.value.testModeDefault,
     });
 
     if (response.success) {
@@ -596,6 +597,11 @@ onMounted(async () => {
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;
     settings.value.timeFormat = orgSettings.timeFormat;
+    settings.value.defaultAgent = orgSettings.defaultAgentId || "";
+    settings.value.testModeDefault =
+      "testModeDefault" in orgSettings
+        ? ((orgSettings as Record<string, unknown>).testModeDefault as boolean)
+        : false;
 
     // Store original settings for change detection
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));
