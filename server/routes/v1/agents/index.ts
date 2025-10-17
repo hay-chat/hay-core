@@ -13,6 +13,7 @@ const createAgentSchema = z.object({
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
+  initialGreeting: z.string().optional(),
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
   testMode: z.boolean().nullable().optional(),
@@ -26,6 +27,7 @@ const updateAgentSchema = z.object({
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
+  initialGreeting: z.string().optional(),
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
   testMode: z.boolean().nullable().optional(),
@@ -59,6 +61,17 @@ export const agentsRouter = t.router({
 
   create: authenticatedProcedure.input(createAgentSchema).mutation(async ({ ctx, input }) => {
     const agent = await agentService.createAgent(ctx.organizationId!, input as any);
+
+    // Auto-set as default agent if this is the first agent for the organization
+    const { organizationRepository } = await import("../../../repositories/organization.repository");
+    const organization = await organizationRepository.findById(ctx.organizationId!);
+
+    if (organization && !organization.defaultAgentId) {
+      await organizationRepository.update(ctx.organizationId!, {
+        defaultAgentId: agent.id,
+      } as any);
+    }
+
     return agent;
   }),
 
@@ -101,6 +114,44 @@ export const agentsRouter = t.router({
       return {
         success: true,
         message: "Agent deleted successfully",
+      };
+    }),
+
+  setAsDefault: authenticatedProcedure
+    .input(
+      z.object({
+        agentId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify agent exists and belongs to organization
+      const agent = await agentService.getAgent(ctx.organizationId!, input.agentId);
+      if (!agent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Agent not found",
+        });
+      }
+
+      // Update organization's default agent
+      const { organizationRepository } = await import("../../../repositories/organization.repository");
+      const organization = await organizationRepository.findById(ctx.organizationId!);
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      await organizationRepository.update(ctx.organizationId!, {
+        defaultAgentId: input.agentId,
+      } as any);
+
+      return {
+        success: true,
+        message: "Default agent updated successfully",
+        agentId: input.agentId,
       };
     }),
 });

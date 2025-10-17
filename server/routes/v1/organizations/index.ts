@@ -14,6 +14,7 @@ const updateSettingsSchema = z.object({
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
   timezone: z.nativeEnum(Timezone).optional(),
+  defaultAgentId: z.string().uuid().nullable().optional(),
 });
 
 export const organizationsRouter = t.router({
@@ -32,6 +33,7 @@ export const organizationsRouter = t.router({
       dateFormat: organization.dateFormat,
       timeFormat: organization.timeFormat,
       timezone: organization.timezone,
+      defaultAgentId: organization.defaultAgentId,
     };
   }),
 
@@ -59,6 +61,7 @@ export const organizationsRouter = t.router({
           dateFormat: updatedOrg.dateFormat,
           timeFormat: updatedOrg.timeFormat,
           timezone: updatedOrg.timezone,
+          defaultAgentId: updatedOrg.defaultAgentId,
         },
       };
     }),

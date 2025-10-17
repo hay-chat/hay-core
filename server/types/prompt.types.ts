@@ -13,6 +13,7 @@ export interface PromptContent {
 
 export interface PromptOptions {
   organizationId?: string;
+  conversationId?: string;
   language?: string;
   variables: Record<string, any>;
 }

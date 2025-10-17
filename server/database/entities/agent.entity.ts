@@ -37,6 +37,9 @@ export class Agent {
   @Column({ type: "text", nullable: true })
   trigger!: string | null;
 
+  @Column({ type: "text", nullable: true })
+  initialGreeting!: string | null;
+
   @Column({ type: "jsonb", nullable: true })
   human_handoff_available_instructions!: unknown[] | null;
 

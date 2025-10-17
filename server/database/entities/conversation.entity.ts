@@ -17,6 +17,7 @@ import { MessageType } from "./message.entity";
 import { analyzeInstructions } from "../../utils/instruction-formatter";
 import { documentRepository } from "../../repositories/document.repository";
 import { debugLog } from "@server/lib/debug-logger";
+import { SupportedLanguage } from "../../types/language.types";
 
 @Entity("conversations")
 export class Conversation {
@@ -128,6 +129,9 @@ export class Conversation {
 
   @Column({ type: "varchar", length: 50, nullable: true })
   previous_status!: string | null;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  language!: SupportedLanguage | null;
 
   @OneToMany(() => Message, (message) => message.conversation)
   messages!: Message[];
@@ -667,9 +671,65 @@ The following tools are available for you to use. You MUST return only valid JSO
     });
   }
 
+  /**
+   * Generate a localized greeting message using LLM translation if needed
+   */
+  private async generateLocalizedGreeting(
+    greeting: string,
+    targetLanguage: SupportedLanguage,
+  ): Promise<string> {
+    const { LLMService } = await import("../../services/core/llm.service");
+    const llmService = new LLMService();
+
+    const translationPrompt = `Translate the following greeting message to ${targetLanguage}.
+Keep the tone natural and appropriate for a customer service context.
+Only return the translated text, nothing else.
+
+Original message: "${greeting}"
+
+Translated message:`;
+
+    try {
+      const translated = await llmService.invoke({
+        prompt: translationPrompt,
+      });
+      return translated.trim();
+    } catch (error) {
+      console.error("Error translating greeting:", error);
+      // Fallback to original greeting if translation fails
+      return greeting;
+    }
+  }
+
   async addInitialBotMessage(): Promise<Message> {
+    // Fetch the agent to get custom greeting
+    const { agentRepository } = await import("../../repositories/agent.repository");
+    const { PromptService } = await import("../../services/prompt.service");
+    const promptService = PromptService.getInstance();
+
+    let greetingText = "Hello! How can I help you today?";
+
+    if (this.agent_id) {
+      const agent = await agentRepository.findById(this.agent_id);
+      if (agent?.initialGreeting) {
+        greetingText = agent.initialGreeting;
+      }
+    }
+
+    // Determine the target language for this conversation
+    const targetLanguage = await promptService["determineLanguage"]({
+      conversationId: this.id,
+      organizationId: this.organization_id,
+    });
+
+    // Translate greeting if needed (assuming greeting is in English by default)
+    const DEFAULT_LANGUAGE = "en";
+    if (targetLanguage !== DEFAULT_LANGUAGE) {
+      greetingText = await this.generateLocalizedGreeting(greetingText, targetLanguage);
+    }
+
     return this.addMessage({
-      content: "Hello! How can I help you today?",
+      content: greetingText,
       type: "BotAgent",
     });
   }

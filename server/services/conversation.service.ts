@@ -26,6 +26,7 @@ export class ConversationService {
       metadata?: Record<string, unknown>;
       status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
       customer_id?: string | null;
+      language?: string | null;
     },
   ): Promise<Conversation> {
     // If no customer_id is provided, create an anonymous customer
@@ -35,9 +36,19 @@ export class ConversationService {
       customerId = anonymousCustomer.id;
     }
 
+    // Determine agent_id: use provided, or fall back to organization's default agent
+    let agentId = data.agentId || null;
+    if (!agentId) {
+      const { organizationRepository } = await import("../repositories/organization.repository");
+      const org = await organizationRepository.findById(organizationId);
+      if (org?.defaultAgentId) {
+        agentId = org.defaultAgentId;
+      }
+    }
+
     const conversation = await this.conversationRepository.create({
       title: data.title || "New Conversation",
-      agent_id: data.agentId || null,
+      agent_id: agentId,
       playbook_id: data.playbook_id || null,
       organization_id: organizationId,
       status: data.status || "open",
@@ -45,6 +56,7 @@ export class ConversationService {
       metadata: data.metadata || {},
       needs_processing: data.status === "open" || data.status === "processing",
       customer_id: customerId,
+      language: data.language as any || null,
     });
 
     // Trigger hook for conversation created
@@ -52,9 +64,10 @@ export class ConversationService {
       organizationId,
       conversationId: conversation.id,
       metadata: {
-        agentId: data.agentId,
+        agentId,
         customerId,
         status: data.status || "open",
+        language: data.language,
       },
     });
 

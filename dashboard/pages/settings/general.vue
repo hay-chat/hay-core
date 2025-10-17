@@ -506,6 +506,7 @@ const saveSettings = async () => {
       timezone: settings.value.timezone as any,
       dateFormat: settings.value.dateFormat as any,
       timeFormat: settings.value.timeFormat as any,
+      defaultAgentId: settings.value.defaultAgent || null,
     });
 
     if (response.success) {

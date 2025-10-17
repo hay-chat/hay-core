@@ -136,9 +136,32 @@ export class PromptService {
    * Determine the language to use
    */
   private async determineLanguage(options?: Partial<PromptOptions>): Promise<SupportedLanguage> {
-    // Priority: explicit language > organization language > default
+    // Priority: explicit language > conversation language > organization language > default
     if (options?.language && this.isValidLanguage(options.language)) {
       return options.language as SupportedLanguage;
+    }
+
+    // Check conversation language first
+    if (options?.conversationId) {
+      try {
+        const { Conversation } = await import("../database/entities/conversation.entity");
+        const conversationRepo = AppDataSource.getRepository(Conversation);
+        const conversation = await conversationRepo.findOne({
+          where: { id: options.conversationId },
+          select: ["language", "organization_id"],
+        });
+
+        if (conversation?.language) {
+          return conversation.language as SupportedLanguage;
+        }
+
+        // If conversation has no language, fall back to organization
+        if (conversation?.organization_id) {
+          options = { ...options, organizationId: conversation.organization_id };
+        }
+      } catch (error) {
+        console.error("Error fetching conversation language:", error);
+      }
     }
 
     if (options?.organizationId) {

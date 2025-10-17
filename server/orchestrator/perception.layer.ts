@@ -7,6 +7,7 @@ import { debugLog } from "@server/lib/debug-logger";
 export interface Perception {
   intent: { label: MessageIntent; score: number; rationale?: string };
   sentiment: { label: MessageSentiment; score: number };
+  language: string;
 }
 
 export class PerceptionLayer {
@@ -19,18 +20,19 @@ export class PerceptionLayer {
     debugLog("perception", "PerceptionLayer initialized");
   }
 
-  async perceive(message: Message, organizationId?: string): Promise<Perception> {
+  async perceive(message: Message, conversationId?: string, organizationId?: string): Promise<Perception> {
     debugLog("perception", "Starting intent and sentiment analysis", {
       messageId: message.id,
       messageContent: message.content.substring(0, 100),
+      conversationId,
       organizationId,
     });
 
-    // Get prompt from PromptService with organization's language
+    // Get prompt from PromptService with conversation's language
     const perceptionPrompt = await this.promptService.getPrompt(
       "perception/intent-analysis",
       { message: message.content },
-      { organizationId },
+      { conversationId, organizationId },
     );
 
     debugLog("perception", "Retrieved perception prompt", {
@@ -62,8 +64,13 @@ export class PerceptionLayer {
           },
           required: ["label", "score"],
         },
+        language: {
+          type: "string",
+          description: "ISO 639-1 two-letter language code (e.g., 'en', 'pt', 'es', 'de', 'fr')",
+          pattern: "^[a-z]{2}$",
+        },
       },
-      required: ["intent", "sentiment"],
+      required: ["intent", "sentiment", "language"],
     };
 
     debugLog("perception", "Invoking LLM for perception analysis");
@@ -80,6 +87,7 @@ export class PerceptionLayer {
       intentScore: result.intent.score,
       sentiment: result.sentiment.label,
       sentimentScore: result.sentiment.score,
+      language: result.language,
     });
 
     return result;
@@ -88,11 +96,13 @@ export class PerceptionLayer {
   async getAgentCandidate(
     message: Message,
     agents: Agent[],
+    conversationId?: string,
     organizationId?: string,
   ): Promise<Agent | null> {
     debugLog("perception", "Starting agent candidate selection", {
       messageId: message.id,
       availableAgentsCount: agents.length,
+      conversationId,
       organizationId,
     });
 
@@ -132,7 +142,7 @@ export class PerceptionLayer {
           description: a.description,
         })),
       },
-      { organizationId },
+      { conversationId, organizationId },
     );
 
     debugLog("perception", "Retrieved agent selection prompt, invoking LLM");

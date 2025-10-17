@@ -8,6 +8,7 @@ version: 1.0.0
 Analise a seguinte mensagem do usuário e determine:
 1. A intenção (o que o usuário deseja realizar)
 2. O sentimento (tom emocional da mensagem)
+3. O idioma (idioma em que a mensagem foi escrita - código ISO 639-1 de duas letras, ex: "pt", "en", "es", "de", "fr")
 
 ## REGRAS IMPORTANTES PARA CLASSIFICAÇÃO DE INTENÇÃO:
 - Use apenas "close_satisfied" ou "close_unsatisfied" quando o usuário EXPLICITAMENTE indicar que deseja ENCERRAR a conversa

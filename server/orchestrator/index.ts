@@ -181,6 +181,8 @@ export class Orchestrator {
               publicMessages,
               lastUserMessage.intent,
               conversation.playbook_id !== null,
+              conversation.id,
+              conversation.organization_id,
             );
 
             if (closureValidation.shouldClose) {

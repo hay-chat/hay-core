@@ -49,7 +49,7 @@ export async function generateConversationTitle(
     const prompt = await promptService.getPrompt(
       "conversation/title-generation",
       { conversationContext },
-      { organizationId }
+      { conversationId, organizationId }
     );
 
     const response = await llmService.invoke({
@@ -102,7 +102,7 @@ export async function sendInactivityWarning(
     const prompt = await promptService.getPrompt(
       "conversation/inactivity-check",
       { conversationContext },
-      { organizationId }
+      { conversationId: conversation.id, organizationId }
     );
 
     const response = await llmService.invoke({
@@ -175,7 +175,7 @@ export async function closeInactiveConversation(
         const prompt = await promptService.getPrompt(
           "conversation/closure-message",
           { conversationContext },
-          { organizationId }
+          { conversationId: conversation.id, organizationId }
         );
 
         closureMessage = await llmService.invoke({
@@ -262,6 +262,7 @@ export async function validateConversationClosure(
   publicMessages: any[],
   detectedIntent: string,
   hasActivePlaybook: boolean,
+  conversationId?: string,
   organizationId?: string,
 ): Promise<{ shouldClose: boolean; reason: string }> {
   try {
@@ -280,7 +281,7 @@ export async function validateConversationClosure(
         detectedIntent,
         hasActivePlaybook
       },
-      { organizationId }
+      { conversationId, organizationId }
     );
 
     const response = await llmService.invoke({

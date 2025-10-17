@@ -135,6 +135,9 @@ export class Message {
   })
   intent!: MessageIntent | null;
 
+  @Column({ type: "varchar", length: 10, nullable: true })
+  detectedLanguage!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 
@@ -204,12 +207,14 @@ export class Message {
   async savePerception(perception: {
     intent: MessageIntent;
     sentiment: MessageSentiment;
+    language?: string;
   }): Promise<Message | null> {
     const { MessageRepository } = await import("../../repositories/message.repository");
     const messageRepository = new MessageRepository();
     return messageRepository.update(this.id, {
       intent: perception.intent,
       sentiment: perception.sentiment,
+      ...(perception.language && { detectedLanguage: perception.language }),
     });
   }
 }
