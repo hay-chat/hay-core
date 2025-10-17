@@ -12,6 +12,12 @@
       "@plugins/*": ["../plugins/*"]
     }
   },
+  "ts-node": {
+    "require": ["tsconfig-paths/register"],
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.example.ts"]
 }
