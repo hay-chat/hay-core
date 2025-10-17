@@ -73,7 +73,7 @@ export class ExecutionLayer {
     };
   }
 
-  async execute(conversation: Conversation): Promise<ExecutionResult | null> {
+  async execute(conversation: Conversation, customerLanguage?: string): Promise<ExecutionResult | null> {
     try {
       debugLog("execution", "Starting execution for conversation", {
         conversationId: conversation.id,
@@ -81,6 +81,7 @@ export class ExecutionLayer {
         agentId: conversation.agent_id,
         playbookId: conversation.playbook_id,
         enabledTools: conversation.enabled_tools,
+        customerLanguage,
       });
 
       const messages = await conversation.getMessages();
@@ -97,11 +98,40 @@ export class ExecutionLayer {
           hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
           tools: conversation.enabled_tools?.join(", "),
         },
-        { organizationId: conversation.organization_id },
+        { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
 
+      // Inject explicit language instruction if customer language is detected
+      let finalPrompt = responsePrompt;
+      if (customerLanguage) {
+        const languageNames: Record<string, string> = {
+          en: "English",
+          pt: "Portuguese",
+          es: "Spanish",
+          de: "German",
+          fr: "French",
+          it: "Italian",
+          nl: "Dutch",
+          pl: "Polish",
+          ru: "Russian",
+          ja: "Japanese",
+          zh: "Chinese",
+          ko: "Korean",
+          ar: "Arabic",
+          hi: "Hindi",
+        };
+        const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+        const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
+        finalPrompt = responsePrompt + languageInstruction;
+
+        debugLog("execution", "Injected language enforcement instruction", {
+          customerLanguage,
+          languageName,
+        });
+      }
+
       debugLog("execution", "Retrieved execution planner prompt", {
-        promptLength: responsePrompt.length,
+        promptLength: finalPrompt.length,
         hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
         tools: conversation.enabled_tools,
       });
@@ -110,7 +140,7 @@ export class ExecutionLayer {
 
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string
-        prompt: responsePrompt,
+        prompt: finalPrompt,
         jsonSchema: this.plannerSchema,
       });
 

@@ -48,6 +48,15 @@
               hint="Define the general agent's behavior and how it should respond to users. DO NOT include any specific instructions for the agent to follow - use the Playbooks to define that."
               :error="errors.instructions"
             />
+            <!-- Initial Greeting Field -->
+            <Input
+              id="initialGreeting"
+              v-model="form.initialGreeting"
+              type="textarea"
+              label="Initial Greeting Message"
+              helper-text="The first message customers will see when starting a conversation. If left empty, a default greeting will be used. This message will be automatically translated to match the conversation's language."
+              placeholder="Hello! How can I help you today?"
+            />
             <!-- Tone Field -->
             <div>
               <Label cla>Tone</Label>
@@ -183,6 +192,17 @@
               </Button>
               <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
                 <Button
+                  v-if="isEditMode && !isDefaultAgent"
+                  type="button"
+                  variant="outline"
+                  :disabled="isSubmitting || settingAsDefault"
+                  :loading="settingAsDefault"
+                  @click="setAsDefaultAgent"
+                >
+                  <Star class="h-4 w-4 mr-2" />
+                  Set as Default
+                </Button>
+                <Button
                   type="button"
                   variant="outline"
                   :disabled="isSubmitting"
@@ -231,16 +251,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ArrowLeft, Trash2 } from "lucide-vue-next";
+import { ArrowLeft, Trash2, Star } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
-import { HayApi } from "@/utils/api";
+import { HayApi, Hay } from "@/utils/api";
+import { useOrganizationStore } from "~/stores/organization";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const organizationStore = useOrganizationStore();
 const loadingInstructions = ref(false);
+const settingAsDefault = ref(false);
 
 // Track initial form state for unsaved changes detection
 const initialForm = ref({
@@ -287,6 +310,7 @@ const form = ref({
   name: "",
   description: "",
   instructions: [] as any,
+  initialGreeting: "",
   tone: "",
   avoid: "",
   trigger: "",
@@ -302,6 +326,12 @@ const isSubmitting = ref(false);
 const agent = ref<Agent | null>(null);
 const errors = ref<Record<string, string>>({});
 const selectedTone = ref<string | null>(null);
+
+// Check if this agent is the default agent for the organization
+const isDefaultAgent = computed(() => {
+  if (!agent.value || !organizationStore.current) return false;
+  return (organizationStore.current as any).defaultAgentId === agent.value.id;
+});
 
 // Unsaved changes detection
 const {
@@ -348,6 +378,7 @@ onMounted(async () => {
         name: agentResponse.name,
         description: agentResponse.description || "",
         instructions: agentResponse.instructions || [],
+        initialGreeting: (agentResponse as any).initialGreeting || "",
         tone: agentResponse.tone || "",
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
@@ -416,6 +447,7 @@ const handleSubmit = async () => {
       name: form.value.name,
       description: form.value.description || undefined,
       instructions: form.value.instructions,
+      initialGreeting: form.value.initialGreeting || undefined,
       tone: form.value.tone || undefined,
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
@@ -489,6 +521,30 @@ const confirmDelete = async () => {
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
+  }
+};
+
+// Set this agent as the default for the organization
+const setAsDefaultAgent = async () => {
+  if (!agentId.value) return;
+
+  try {
+    settingAsDefault.value = true;
+
+    await HayApi.agents.setAsDefault.mutate({ agentId: agentId.value });
+
+    // Refresh organization data to update defaultAgentId
+    const updatedOrg = await Hay.organizations.getSettings.query();
+    if (updatedOrg) {
+      organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
+    }
+
+    toast.success("Agent set as default successfully");
+  } catch (error) {
+    console.error("Failed to set agent as default:", error);
+    toast.error("Failed to set agent as default. Please try again.");
+  } finally {
+    settingAsDefault.value = false;
   }
 };
 

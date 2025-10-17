@@ -102,14 +102,16 @@ export const runConversation = async (conversationId: string) => {
     // 01. Perception layer
     const perceptionLayer = new PerceptionLayer();
 
-    // 01.1. Get Intent and Sentiment
-    const { intent, sentiment } = await perceptionLayer.perceive(
+    // 01.1. Get Intent, Sentiment, and Language
+    const { intent, sentiment, language } = await perceptionLayer.perceive(
       lastCustomerMessage,
+      conversation.id,
       conversation.organization_id,
     );
     await lastCustomerMessage.savePerception({
       intent: intent.label,
       sentiment: sentiment.label,
+      language,
     });
 
     // Check if user indicated potential closure intent
@@ -129,6 +131,7 @@ export const runConversation = async (conversationId: string) => {
         publicMessages,
         intent.label,
         conversation.playbook_id !== null,
+        conversation.id,
         conversation.organization_id,
       );
 
@@ -182,29 +185,19 @@ export const runConversation = async (conversationId: string) => {
       return; // Exit early since conversation is closed
     }
 
-    // 01.2. Get Agent Candidates
+    // 01.2. Agent Assignment
+    // Agents are now required at conversation creation and fall back to organization default agent.
+    // Automatic agent selection during orchestration is no longer used.
     const currentAgent = conversation.agent_id;
     if (!currentAgent) {
-      debugLog("orchestrator", "No agent assigned, selecting agent candidate", {
+      debugLog("orchestrator", "WARNING: No agent assigned to conversation", {
         conversationId: conversation.id,
+        organizationId: conversation.organization_id,
       });
-      const activeAgents = await agentRepository.findByOrganization(conversation.organization_id);
-      const agentCandidate = await perceptionLayer.getAgentCandidate(
-        lastCustomerMessage,
-        activeAgents,
-        conversation.organization_id,
-      );
-      if (agentCandidate) {
-        debugLog("orchestrator", "Agent candidate selected, updating conversation", {
-          agentId: agentCandidate.id,
-          agentName: agentCandidate.name,
-        });
-        conversation.updateAgent(agentCandidate.id);
-      } else {
-        debugLog("orchestrator", "No agent candidate found");
-      }
+      // This shouldn't happen if conversation creation is working correctly
+      // Agent should be set at creation time or fall back to organization default
     } else {
-      debugLog("orchestrator", "Agent already assigned", {
+      debugLog("orchestrator", "Agent assigned", {
         agentId: currentAgent,
       });
     }
@@ -308,7 +301,7 @@ export const runConversation = async (conversationId: string) => {
     }
 
     // 04. Execution - Handle iterative execution with tool calls
-    await handleExecutionLoop(conversation);
+    await handleExecutionLoop(conversation, language);
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
@@ -329,7 +322,7 @@ export const runConversation = async (conversationId: string) => {
  * Handle iterative execution loop with tool calls
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
-async function handleExecutionLoop(conversation: Conversation) {
+async function handleExecutionLoop(conversation: Conversation, customerLanguage?: string) {
   const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
   const maxIterations = 5; // Prevent infinite loops
@@ -341,7 +334,7 @@ async function handleExecutionLoop(conversation: Conversation) {
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
     // Get current messages and execute
-    const executionResult = await executionLayer.execute(conversation);
+    const executionResult = await executionLayer.execute(conversation, customerLanguage);
 
     if (!executionResult) {
       debugLog("orchestrator", "No execution result, ending loop");

@@ -8,6 +8,7 @@ version: 1.0.0
 Analyze the following user message and determine:
 1. The intent (what the user wants to accomplish)
 2. The sentiment (emotional tone of the message)
+3. The language (language in which the message was written - ISO 639-1 two-letter code, e.g., "pt", "en", "es", "de", "fr")
 
 ## IMPORTANT RULES FOR INTENT CLASSIFICATION:
 - Only use "close_satisfied" or "close_unsatisfied" when the user EXPLICITLY indicates they want to END the conversation

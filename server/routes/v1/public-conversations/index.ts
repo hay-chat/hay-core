@@ -22,6 +22,7 @@ const createPublicConversationSchema = z.object({
     use: z.string().optional(),
   }),
   metadata: z.record(z.any()).optional(),
+  language: z.string().optional(),
 });
 
 // Schema for sending messages
@@ -61,6 +62,7 @@ export const publicConversationsRouter = t.router({
       const conversation = await conversationService.createConversation(organizationId, {
         title: "Web Chat - " + input.metadata?.source,
         status: "open",
+        language: input.language || null,
         metadata: {
           ...input.metadata,
           channel: "web",

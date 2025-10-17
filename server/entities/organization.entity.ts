@@ -1,9 +1,10 @@
-import { Entity, Column, Index, OneToMany } from "typeorm";
+import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
+import { Agent } from "../database/entities/agent.entity";
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
 import {
   DateFormat,
@@ -82,7 +83,14 @@ export class Organization extends BaseEntity {
   })
   timezone!: Timezone;
 
+  @Column({ type: "uuid", nullable: true })
+  defaultAgentId?: string | null;
+
   // Relationships
+  @ManyToOne(() => Agent, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "default_agent_id" })
+  defaultAgent?: Agent | null;
+
   @OneToMany(() => User, (user) => user.organization)
   users!: User[];
 

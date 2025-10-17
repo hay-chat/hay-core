@@ -19,7 +19,7 @@ const messageRepository = new MessageRepository();
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
-
+  language: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
   customerId: z.string().uuid().optional(),

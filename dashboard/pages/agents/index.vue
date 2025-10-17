@@ -98,9 +98,18 @@
                 @update:checked="toggleAgentSelection(agent.id)"
               />
               <div class="flex-1">
-                <CardTitle class="text-lg">
-                  {{ agent.name }}
-                </CardTitle>
+                <div class="flex items-center gap-2">
+                  <CardTitle class="text-lg">
+                    {{ agent.name }}
+                  </CardTitle>
+                  <span
+                    v-if="isDefaultAgent(agent.id)"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary"
+                  >
+                    <Star class="h-3 w-3 mr-1 fill-current" />
+                    Default
+                  </span>
+                </div>
                 <CardDescription class="mt-1">
                   {{ agent.description }}
                 </CardDescription>
@@ -116,6 +125,13 @@
                 <DropdownMenuItem @click="viewAgent(agent.id)">
                   <Settings class="mr-2 h-4 w-4" />
                   Manage
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  :disabled="isDefaultAgent(agent.id)"
+                  @click="setAgentAsDefault(agent.id)"
+                >
+                  <Star class="mr-2 h-4 w-4" :class="{ 'fill-current': isDefaultAgent(agent.id) }" />
+                  {{ isDefaultAgent(agent.id) ? "Default Agent" : "Set as Default" }}
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="toggleAgentStatus(agent)">
                   <Power class="mr-2 h-4 w-4" />
@@ -299,8 +315,9 @@ import {
 
 import { useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
+import { useOrganizationStore } from "@/stores/organization";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
-import { HayApi } from "@/utils/api";
+import { HayApi, Hay } from "@/utils/api";
 
 interface AgentData {
   id: string;
@@ -340,6 +357,7 @@ const typeFilter = ref("");
 const selectedAgents = ref<string[]>([]);
 const router = useRouter();
 const toast = useToast();
+const organizationStore = useOrganizationStore();
 const currentPage = ref(1);
 const pageSize = ref(10);
 
@@ -475,6 +493,29 @@ const createAgent = () => {
 
 const viewAgent = (id: string) => {
   router.push(`/agents/${id}`);
+};
+
+// Check if agent is the default agent
+const isDefaultAgent = (agentId: string) => {
+  return (organizationStore.current as any)?.defaultAgentId === agentId;
+};
+
+// Set agent as default
+const setAgentAsDefault = async (agentId: string) => {
+  try {
+    await HayApi.agents.setAsDefault.mutate({ agentId });
+
+    // Refresh organization data to update defaultAgentId
+    const updatedOrg = await Hay.organizations.getSettings.query();
+    if (updatedOrg) {
+      organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
+    }
+
+    toast.success("Agent set as default successfully");
+  } catch (error) {
+    console.error("Failed to set agent as default:", error);
+    toast.error("Failed to set agent as default. Please try again.");
+  }
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
