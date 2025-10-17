@@ -12,7 +12,7 @@ Contexto da conversa: "{{conversationContext}}"
 
 Playbooks disponíveis:
 {{#each playbooks}}
-- ID: {{id}}, Título: "{{title}}", Gatilho: "{{trigger}}", Descrição: "{{description|default:"Sem descrição"}}"
+- ID: {{item.id}}, Título: "{{item.title}}", Gatilho: "{{item.trigger}}", Descrição: "{{item.description|default:"Sem descrição"}}"
 {{/each}}
 
 Para cada playbook, forneça uma pontuação de relevância e uma breve justificativa.

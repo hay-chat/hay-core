@@ -12,7 +12,7 @@ Conversation context: "{{conversationContext}}"
 
 Available playbooks:
 {{#each playbooks}}
-- ID: {{id}}, Title: "{{title}}", Trigger: "{{trigger}}", Description: "{{description|default:"No description"}}"
+- ID: {{item.id}}, Title: "{{item.title}}", Trigger: "{{item.trigger}}", Description: "{{item.description|default:"No description"}}"
 {{/each}}
 
 For each playbook, provide a relevance score and brief rationale.

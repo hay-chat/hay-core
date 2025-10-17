@@ -11,6 +11,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
+import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -59,22 +60,21 @@ export const runConversation = async (conversationId: string) => {
 
   // Skip processing for conversations taken over by humans
   if (conversation.status === "human-took-over") {
-    console.log("[Orchestrator] Skipping - conversation taken over by human", conversationId);
+    debugLog("orchestrator", "Skipping - conversation taken over by human", { conversationId });
     return;
   }
 
-  if (conversation?.needs_processing)
-    console.log("[Orchestrator] Running conversation", conversationId);
+  if (conversation?.needs_processing) {
+    debugLog("orchestrator", "Running conversation", { conversationId });
+  }
 
   try {
     // 00. Intialize
-    // console.log("[Orchestrator] Initializing conversation", conversationId);
     const locked = await conversation.lock();
     if (!locked) {
-      console.log(
-        "[Orchestrator] Could not acquire lock, conversation already being processed",
+      debugLog("orchestrator", "Could not acquire lock, conversation already being processed", {
         conversationId,
-      );
+      });
       return;
     }
 
@@ -135,15 +135,15 @@ export const runConversation = async (conversationId: string) => {
       shouldClose = closureValidation.shouldClose;
 
       if (!shouldClose) {
-        console.log(
-          `[Orchestrator] Closure intent detected but validation failed: ${closureValidation.reason}`,
+        debugLog("orchestrator", 
+          `Closure intent detected but validation failed: ${closureValidation.reason}`,
         );
       }
     }
 
     if (shouldClose) {
-      console.log(
-        `[Orchestrator] User indicated closure intent (${intent.label}) with confidence ${intent.score}, marking conversation as resolved`,
+      debugLog("orchestrator", 
+        `User indicated closure intent (${intent.label}) with confidence ${intent.score}, marking conversation as resolved`,
       );
 
       // Generate a title for the conversation before closing
@@ -185,6 +185,9 @@ export const runConversation = async (conversationId: string) => {
     // 01.2. Get Agent Candidates
     const currentAgent = conversation.agent_id;
     if (!currentAgent) {
+      debugLog("orchestrator", "No agent assigned, selecting agent candidate", {
+        conversationId: conversation.id,
+      });
       const activeAgents = await agentRepository.findByOrganization(conversation.organization_id);
       const agentCandidate = await perceptionLayer.getAgentCandidate(
         lastCustomerMessage,
@@ -192,8 +195,18 @@ export const runConversation = async (conversationId: string) => {
         conversation.organization_id,
       );
       if (agentCandidate) {
+        debugLog("orchestrator", "Agent candidate selected, updating conversation", {
+          agentId: agentCandidate.id,
+          agentName: agentCandidate.name,
+        });
         conversation.updateAgent(agentCandidate.id);
+      } else {
+        debugLog("orchestrator", "No agent candidate found");
       }
+    } else {
+      debugLog("orchestrator", "Agent already assigned", {
+        agentId: currentAgent,
+      });
     }
 
     // 02. Retrieval
@@ -203,10 +216,26 @@ export const runConversation = async (conversationId: string) => {
     const publicMessages = await conversation.getPublicMessages();
 
     const currentPlaybook = conversation.playbook_id;
+
+    debugLog("orchestrator", "Starting playbook retrieval", {
+      conversationId: conversation.id,
+      currentPlaybookId: currentPlaybook,
+      publicMessagesCount: publicMessages.length,
+    });
+
     const activePlaybooks = await playbookRepository.findByStatus(
       conversation.organization_id,
       PlaybookStatus.ACTIVE,
     );
+
+    debugLog("orchestrator", "Retrieved active playbooks", {
+      activePlaybooksCount: activePlaybooks.length,
+      playbooks: activePlaybooks.map((p) => ({
+        id: p.id,
+        title: p.title,
+        trigger: p.trigger?.substring(0, 50),
+      })),
+    });
 
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
@@ -215,22 +244,54 @@ export const runConversation = async (conversationId: string) => {
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
+      debugLog("orchestrator", "Playbook candidate differs from current, updating conversation", {
+        oldPlaybookId: currentPlaybook,
+        newPlaybookId: playbookCandidate.id,
+        newPlaybookTitle: playbookCandidate.title,
+      });
       await conversation.updatePlaybook(playbookCandidate.id);
+    } else if (playbookCandidate) {
+      debugLog("orchestrator", "Playbook candidate matches current playbook, no update needed", {
+        playbookId: currentPlaybook,
+      });
+    } else {
+      debugLog("orchestrator", "No playbook candidate selected", {
+        currentPlaybookId: currentPlaybook,
+      });
     }
 
     // 02.2. Get Document Candidates
+    debugLog("orchestrator", "Starting document retrieval", {
+      conversationId: conversation.id,
+      currentDocumentIds: conversation.document_ids,
+    });
+
     const retrievedDocuments = await retrievalLayer.getRelevantDocuments(
       publicMessages,
       conversation.organization_id,
     );
 
+    debugLog("orchestrator", "Document retrieval complete", {
+      retrievedDocumentsCount: retrievedDocuments.length,
+      documents: retrievedDocuments,
+    });
+
     if (retrievedDocuments.length > 0) {
       for (const document of retrievedDocuments) {
-        console.log("[Orchestrator] Adding document to conversation", document);
         if (!conversation.document_ids?.includes(document.id)) {
+          debugLog("orchestrator", "Adding new document to conversation", {
+            documentId: document.id,
+            similarity: document.similarity,
+          });
           await conversation.addDocument(document.id);
+        } else {
+          debugLog("orchestrator", "Document already attached to conversation", {
+            documentId: document.id,
+          });
         }
       }
+    } else {
+      debugLog("orchestrator", "No relevant documents found");
     }
 
     // 03. Initialize orchestration context if needed
@@ -277,13 +338,13 @@ async function handleExecutionLoop(conversation: Conversation) {
 
   while (iterations < maxIterations) {
     iterations++;
-    console.log(`[Orchestrator] Execution iteration ${iterations}`);
+    debugLog("orchestrator", `Execution iteration ${iterations}`);
 
     // Get current messages and execute
     const executionResult = await executionLayer.execute(conversation);
 
     if (!executionResult) {
-      console.log("[Orchestrator] No execution result, ending loop");
+      debugLog("orchestrator", "No execution result, ending loop");
       break;
     }
 
@@ -335,16 +396,16 @@ async function handleExecutionLoop(conversation: Conversation) {
             toolStatus: "ERROR",
           },
         });
-        console.log("[Orchestrator] Tool execution failed, continuing execution loop...");
+        debugLog("orchestrator", "Tool execution failed, continuing execution loop...");
         // Continue the loop to let LLM handle the error
       }
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
-      console.log("[Orchestrator] HANDOFF step detected");
+      debugLog("orchestrator", "HANDOFF step detected");
 
       // Check if we've already processed handoff to avoid duplicates
       if (handoffProcessed) {
-        console.log("[Orchestrator] Handoff already processed, skipping duplicate");
+        debugLog("orchestrator", "Handoff already processed, skipping duplicate");
         continue;
       }
 
@@ -380,7 +441,7 @@ async function handleExecutionLoop(conversation: Conversation) {
       const onlineHumans = await userRepository.findOnlineByOrganization(
         conversation.organization_id,
       );
-      console.log(`[Orchestrator] Found ${onlineHumans.length} online human agents`);
+      debugLog("orchestrator", `Found ${onlineHumans.length} online human agents`);
 
       if (onlineHumans.length > 0) {
         // Humans are available
@@ -392,13 +453,13 @@ async function handleExecutionLoop(conversation: Conversation) {
           availableInstructions.length > 0
         ) {
           // Execute custom instructions for when humans are available
-          console.log("[Orchestrator] Executing handoff instructions for available humans");
+          debugLog("orchestrator", "Executing handoff instructions for available humans");
           await conversation.addHandoffInstructions(availableInstructions, "available");
           // Continue loop to process the handoff instructions
           continue;
         } else {
           // Default behavior: update status and send message
-          console.log("[Orchestrator] No custom instructions, using default handoff");
+          debugLog("orchestrator", "No custom instructions, using default handoff");
           await conversationRepository.update(conversation.id, conversation.organization_id, {
             status: "pending-human",
           });
@@ -464,13 +525,13 @@ async function handleExecutionLoop(conversation: Conversation) {
           unavailableInstructions.length > 0
         ) {
           // Execute custom instructions for when humans are not available
-          console.log("[Orchestrator] Executing handoff instructions for unavailable humans");
+          debugLog("orchestrator", "Executing handoff instructions for unavailable humans");
           await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
           // Continue loop to process the handoff instructions
           continue;
         } else {
           // Default fallback message
-          console.log("[Orchestrator] No custom fallback, using default message");
+          debugLog("orchestrator", "No custom fallback, using default message");
           await conversation.addMessage({
             content: "I apologize, but no human agents are currently available.",
             type: MessageType.BOT_AGENT,
@@ -484,7 +545,7 @@ async function handleExecutionLoop(conversation: Conversation) {
       }
     } else if (executionResult.step === "CLOSE") {
       // Handle conversation closure
-      console.log("[Orchestrator] CLOSE step detected");
+      debugLog("orchestrator", "CLOSE step detected");
       if (executionResult.userMessage) {
         await conversation.addMessage({
           content: executionResult.userMessage,
@@ -499,22 +560,20 @@ async function handleExecutionLoop(conversation: Conversation) {
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
         });
-        console.log(
-          "[Orchestrator] Added bot response " +
-            executionResult.userMessage +
-            ", ending execution loop",
+        debugLog("orchestrator", 
+          "Added bot response " + executionResult.userMessage + ", ending execution loop",
         );
 
         break;
       } else {
         // Retry the loop
-        console.log("[Orchestrator] No user message, retrying execution loop");
+        debugLog("orchestrator", "No user message, retrying execution loop");
         continue;
       }
     }
   }
 
   if (iterations >= maxIterations) {
-    console.warn("[Orchestrator] Reached maximum execution iterations, ending loop");
+    debugLog("orchestrator", "Reached maximum execution iterations, ending loop", { level: "warn" });
   }
 }

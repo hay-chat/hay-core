@@ -1,5 +1,6 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
+import { debugLog } from "@server/lib/debug-logger";
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
@@ -22,7 +23,7 @@ export class OrchestratorWorker {
     try {
       this.orchestrator = new Orchestrator();
       this.initialized = true;
-      console.log("[Worker] Orchestrator worker initialized successfully");
+      debugLog("worker", "Orchestrator worker initialized successfully");
     } catch (error) {
       console.error("Failed to initialize orchestrator worker:", error);
       this.initialized = false;
@@ -31,11 +32,11 @@ export class OrchestratorWorker {
 
   start(intervalMs: number = 1000): void {
     if (this.intervalId) {
-      console.log("Orchestrator worker is already running");
+      debugLog("worker", "Orchestrator worker is already running");
       return;
     }
 
-    console.log(`Starting orchestrator worker with ${intervalMs}ms interval`);
+    debugLog("worker", `Starting orchestrator worker with ${intervalMs}ms interval`);
 
     this.intervalId = setInterval(async () => {
       if (!this.isProcessing) {
@@ -61,12 +62,12 @@ export class OrchestratorWorker {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      console.log("Orchestrator worker stopped");
+      debugLog("worker", "Orchestrator worker stopped");
     }
     if (this.inactivityCheckIntervalId) {
       clearInterval(this.inactivityCheckIntervalId);
       this.inactivityCheckIntervalId = null;
-      console.log("Inactivity check stopped");
+      debugLog("worker", "Inactivity check stopped");
     }
   }
 
@@ -100,8 +101,6 @@ export class OrchestratorWorker {
         // Skip if not initialized
         return;
       }
-
-      console.log("[Worker] Running inactivity check");
 
       // Call the orchestrator's inactivity check method
       await this.orchestrator.checkInactivity();

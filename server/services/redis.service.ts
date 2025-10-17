@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { config } from "../config/env";
+import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * Redis Service
@@ -17,9 +18,15 @@ export class RedisService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log("[Redis] Already initialized");
+      debugLog("redis", "Already initialized");
       return;
     }
+
+    debugLog("redis", "Initializing Redis service", {
+      host: config.redis.host,
+      port: config.redis.port,
+      db: config.redis.db,
+    });
 
     try {
       // Create publisher connection
@@ -35,7 +42,7 @@ export class RedisService {
             return null; // Stop retrying
           }
           const delay = Math.min(times * 1000, 5000);
-          console.log(`[Redis] Retrying connection in ${delay}ms (attempt ${times})`);
+          debugLog("redis", `Retrying connection in ${delay}ms (attempt ${times})`);
           return delay;
         },
         maxRetriesPerRequest: null, // Allow indefinite retries per request
@@ -58,7 +65,7 @@ export class RedisService {
             return null; // Stop retrying
           }
           const delay = Math.min(times * 1000, 5000);
-          console.log(`[Redis] Retrying connection in ${delay}ms (attempt ${times})`);
+          debugLog("redis", `Retrying connection in ${delay}ms (attempt ${times})`);
           return delay;
         },
         maxRetriesPerRequest: null, // Allow indefinite retries per request
@@ -78,11 +85,11 @@ export class RedisService {
       });
 
       this.publisher.on("connect", () => {
-        console.log("[Redis Publisher] Connected");
+        debugLog("redis", "Publisher connected");
       });
 
       this.subscriber.on("connect", () => {
-        console.log("[Redis Subscriber] Connected");
+        debugLog("redis", "Subscriber connected");
       });
 
       // Handle incoming messages
@@ -91,7 +98,7 @@ export class RedisService {
       });
 
       this.isInitialized = true;
-      console.log("🔴 Redis service initialized");
+      debugLog("redis", "Redis service fully initialized and ready");
     } catch (error) {
       console.error("[Redis] Failed to initialize:", error);
       throw error;
@@ -109,7 +116,13 @@ export class RedisService {
 
     try {
       const message = JSON.stringify(data);
+      debugLog("redis", `Publishing message to channel: ${channel}`, {
+        channel,
+        dataType: data.type,
+        dataKeys: Object.keys(data),
+      });
       await this.publisher.publish(channel, message);
+      debugLog("redis", `Message published successfully to: ${channel}`);
     } catch (error) {
       console.error(`[Redis] Failed to publish to ${channel}:`, error);
       throw error;
@@ -130,11 +143,17 @@ export class RedisService {
       if (!this.eventHandlers.has(channel)) {
         this.eventHandlers.set(channel, new Set());
         // Subscribe to channel if first handler
+        debugLog("redis", `Subscribing to new channel: ${channel}`);
         await this.subscriber.subscribe(channel);
-        console.log(`[Redis] Subscribed to channel: ${channel}`);
+        debugLog("redis", `Successfully subscribed to channel: ${channel}`);
+      } else {
+        debugLog("redis", `Adding handler to existing subscription: ${channel}`);
       }
 
       this.eventHandlers.get(channel)!.add(handler);
+      debugLog("redis", `Handler added for channel: ${channel}`, {
+        totalHandlers: this.eventHandlers.get(channel)!.size,
+      });
     } catch (error) {
       console.error(`[Redis] Failed to subscribe to ${channel}:`, error);
       throw error;
@@ -181,10 +200,20 @@ export class RedisService {
    */
   private handleMessage(channel: string, message: string): void {
     try {
+      debugLog("redis", `Received message on channel: ${channel}`, {
+        messageLength: message.length,
+        messagePreview: message.substring(0, 100),
+      });
+
       const data = JSON.parse(message);
       const handlers = this.eventHandlers.get(channel);
 
       if (handlers) {
+        debugLog("redis", `Dispatching to ${handlers.size} handler(s) for channel: ${channel}`, {
+          dataType: data.type,
+          dataKeys: Object.keys(data),
+        });
+
         handlers.forEach((handler) => {
           try {
             handler(data);
@@ -192,6 +221,10 @@ export class RedisService {
             console.error(`[Redis] Error in handler for ${channel}:`, error);
           }
         });
+
+        debugLog("redis", `Message handling complete for channel: ${channel}`);
+      } else {
+        debugLog("redis", `No handlers found for channel: ${channel}`);
       }
     } catch (error) {
       console.error(`[Redis] Failed to parse message from ${channel}:`, error);

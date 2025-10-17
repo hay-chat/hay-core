@@ -5,6 +5,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { PromptService } from "@server/services/prompt.service";
+import { debugLog } from "@server/lib/debug-logger";
 
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
@@ -61,8 +62,9 @@ export async function generateConversationTitle(
       title: title.substring(0, 255), // Ensure it fits in the column
     });
 
-    console.log(
-      `[ConversationUtils] Generated title for conversation ${conversationId}: "${title}"`,
+    debugLog(
+      "conversation-utils",
+      `Generated title for conversation ${conversationId}: "${title}"`,
     );
   } catch (error) {
     console.error("Error generating conversation title:", error);
@@ -118,7 +120,10 @@ export async function sendInactivityWarning(
       },
     });
 
-    console.log(`[ConversationUtils] Sent inactivity warning for conversation ${conversationId}`);
+    debugLog(
+      "conversation-utils",
+      `Sent inactivity warning for conversation ${conversationId}`,
+    );
   } catch (error) {
     console.error("Error sending inactivity warning:", error);
     throw error;
@@ -211,8 +216,9 @@ export async function closeInactiveConversation(
       },
     });
 
-    console.log(
-      `[ConversationUtils] Closed inactive conversation ${conversationId} (silent: ${!sendMessage})`,
+    debugLog(
+      "conversation-utils",
+      `Closed inactive conversation ${conversationId} (silent: ${!sendMessage})`,
     );
   } catch (error) {
     console.error("Error closing inactive conversation:", error);
@@ -235,8 +241,9 @@ export async function checkForClosureIntent(
 
     // Check if message has closure intent
     if (message.intent === "close_satisfied" || message.intent === "close_unsatisfied") {
-      console.log(
-        `[ConversationUtils] Detected closure intent (${message.intent}) in message ${messageId}`,
+      debugLog(
+        "conversation-utils",
+        `Detected closure intent (${message.intent}) in message ${messageId}`,
       );
       return true;
     }

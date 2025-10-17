@@ -1,6 +1,7 @@
 import { redisService } from "./redis.service";
 import { jobRepository } from "../repositories/job.repository";
 import { Job, JobStatus } from "../entities/job.entity";
+import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * Job Queue Service
@@ -29,7 +30,7 @@ export class JobQueueService {
     // Start processing jobs
     this.startProcessing();
 
-    console.log("[JobQueue] Job queue service initialized");
+    debugLog("job-queue", "Job queue service initialized");
   }
 
   /**
@@ -43,7 +44,7 @@ export class JobQueueService {
       progress?: Record<string, unknown>;
       result?: Record<string, unknown>;
       error?: string;
-    }
+    },
   ): Promise<void> {
     await redisService.publish(this.JOB_CHANNEL, {
       jobId,
@@ -57,7 +58,7 @@ export class JobQueueService {
    * Handle incoming job update from Redis
    */
   private handleJobUpdate(event: any): void {
-    console.log("[JobQueue] Job update received:", {
+    debugLog("job-queue", "Job update received", {
       jobId: event.jobId,
       status: event.status,
       hasProgress: !!event.progress,
@@ -81,7 +82,7 @@ export class JobQueueService {
       });
     }, 5000);
 
-    console.log("[JobQueue] Started job processing");
+    debugLog("job-queue", "Started job processing");
   }
 
   /**
@@ -94,7 +95,7 @@ export class JobQueueService {
     }
 
     this.isProcessing = false;
-    console.log("[JobQueue] Stopped job processing");
+    debugLog("job-queue", "Stopped job processing");
   }
 
   /**
@@ -116,7 +117,7 @@ export class JobQueueService {
       status?: JobStatus;
       data?: Record<string, unknown>;
       result?: Record<string, unknown>;
-    }
+    },
   ): Promise<Job | null> {
     // Update job in database
     const job = await jobRepository.update(jobId, organizationId, update);
@@ -142,7 +143,7 @@ export class JobQueueService {
   async updateJobProgress(
     jobId: string,
     organizationId: string,
-    progress: Record<string, unknown>
+    progress: Record<string, unknown>,
   ): Promise<Job | null> {
     // Get current job data
     const job = await jobRepository.findById(jobId);
@@ -154,7 +155,7 @@ export class JobQueueService {
     const updatedData = {
       ...job.data,
       progress: {
-        ...(job.data?.progress as Record<string, unknown> || {}),
+        ...((job.data?.progress as Record<string, unknown>) || {}),
         ...progress,
       },
     };
@@ -181,7 +182,7 @@ export class JobQueueService {
   async completeJob(
     jobId: string,
     organizationId: string,
-    result: Record<string, unknown>
+    result: Record<string, unknown>,
   ): Promise<Job | null> {
     return this.updateJobStatus(jobId, organizationId, {
       status: JobStatus.COMPLETED,
@@ -202,11 +203,11 @@ export class JobQueueService {
 
     // Only cancel jobs that are not already completed or failed
     if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
-      console.log(`[JobQueue] Cannot cancel job ${jobId} - already ${job.status}`);
+      debugLog("job-queue", `Cannot cancel job ${jobId} - already ${job.status}`);
       return job;
     }
 
-    console.log(`[JobQueue] Cancelling job ${jobId}`);
+    debugLog("job-queue", `Cancelling job ${jobId}`);
 
     return this.updateJobStatus(jobId, organizationId, {
       status: JobStatus.CANCELLED,
@@ -222,7 +223,7 @@ export class JobQueueService {
    */
   async shutdown(): Promise<void> {
     this.stopProcessing();
-    console.log("[JobQueue] Job queue service shut down");
+    debugLog("job-queue", "Job queue service shut down");
   }
 }
 

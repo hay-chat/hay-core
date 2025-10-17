@@ -176,6 +176,17 @@
       :destructive="true"
       @confirm="confirmDelete"
     />
+
+    <!-- Unsaved Changes Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showConfirmDialog"
+      :title="confirmDialogConfig.title"
+      :description="confirmDialogConfig.description"
+      confirm-text="Leave Page"
+      :destructive="true"
+      @confirm="confirmDialogConfig.onConfirm"
+      @cancel="handleDialogCancel"
+    />
   </Page>
 </template>
 
@@ -191,12 +202,23 @@ type InstructionData = {
   instructions: string;
 };
 import { useToast } from "~/composables/useToast";
+import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { HayApi } from "@/utils/api";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const loadingInstructions = ref(false);
+
+// Track initial form state for unsaved changes detection
+const initialForm = ref({
+  title: "",
+  trigger: "",
+  description: "",
+  instructions: [] as InstructionData[],
+  status: "draft" as PlaybookStatus,
+  agentIds: [] as string[],
+});
 
 // Determine if we're in edit mode based on route
 const isEditMode = computed(() => {
@@ -245,6 +267,16 @@ const playbook = ref<
 >(null);
 const errors = ref<Record<string, string>>({});
 
+// Unsaved changes detection
+const {
+  hasUnsavedChanges,
+  confirmNavigation,
+  markAsSaved,
+  showConfirmDialog,
+  confirmDialogConfig,
+  handleDialogCancel,
+} = useUnsavedChanges(initialForm, form, computed(() => !loading.value && !isSubmitting.value));
+
 // Format date
 const formatDate = (date: string | Date) => {
   return new Intl.DateTimeFormat("en-US", {
@@ -281,7 +313,7 @@ onMounted(async () => {
       playbook.value = playbookResponse;
 
       // Populate form
-      form.value = {
+      const formData = {
         title: playbookResponse.title,
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
@@ -291,6 +323,10 @@ onMounted(async () => {
         status: playbookResponse.status,
         agentIds: playbookResponse.agents?.map((a) => a.id) || [],
       };
+
+      form.value = { ...formData };
+      // Set initial form state for unsaved changes detection
+      initialForm.value = JSON.parse(JSON.stringify(formData));
 
       loadingInstructions.value = false;
     }
@@ -360,10 +396,12 @@ const handleSubmit = async () => {
         data: payload,
       });
       toast.success("Playbook updated successfully");
+      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
     } else {
       // Create new playbook
       const response = await HayApi.playbooks.create.mutate(payload);
       toast.success("Playbook created successfully");
+      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
       // Check if there's a redirect parameter
       const redirectPath = route.query.redirect as string;
@@ -407,6 +445,7 @@ const confirmDelete = async () => {
     await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
     toast.success("Playbook deleted successfully");
+    markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
     await router.push("/playbooks");
   } catch (error) {
@@ -419,8 +458,11 @@ const confirmDelete = async () => {
 };
 
 // Handle cancel
-const handleCancel = () => {
-  router.push("/playbooks");
+const handleCancel = async () => {
+  const confirmed = await confirmNavigation();
+  if (confirmed) {
+    router.push("/playbooks");
+  }
 };
 
 // Set page meta

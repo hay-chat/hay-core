@@ -8,12 +8,13 @@ import {
   closeInactiveConversation,
 } from "./conversation-utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
+import { debugLog } from "@server/lib/debug-logger";
 
 export class Orchestrator {
   private conversationRepository: ConversationRepository;
 
   constructor() {
-    console.log("Orchestrator initialized with v2 implementation");
+    debugLog("orchestrator", "Orchestrator initialized with v2 implementation");
     this.conversationRepository = new ConversationRepository();
   }
 
@@ -46,17 +47,17 @@ export class Orchestrator {
 
   async checkInactivity(): Promise<void> {
     try {
-      console.log("[Orchestrator] Starting inactivity check across all organizations");
+      debugLog("orchestrator", "Starting inactivity check across all organizations");
 
       // Get all open conversations across all organizations
       const openConversations = await this.conversationRepository.findAllOpenConversations();
 
       if (openConversations.length === 0) {
-        console.log("[Orchestrator] No open conversations found");
+        debugLog("orchestrator", "No open conversations found");
         return;
       }
 
-      console.log(`[Orchestrator] Found ${openConversations.length} open conversations to check`);
+      debugLog("orchestrator", `Found ${openConversations.length} open conversations to check`);
 
       const now = new Date();
       const inactivityThreshold = config.conversation.inactivityInterval;
@@ -69,7 +70,7 @@ export class Orchestrator {
           const messages = await conversation.getMessages();
 
           if (messages.length === 0) {
-            console.log(`[Orchestrator] Conversation ${conversation.id} has no messages, skipping`);
+            debugLog("orchestrator", `Conversation ${conversation.id} has no messages, skipping`);
             continue;
           }
 
@@ -82,19 +83,19 @@ export class Orchestrator {
             // Check if conversation is old enough to delete (created more than 2x timeout ago)
             const conversationAge = now.getTime() - new Date(conversation.created_at).getTime();
             if (conversationAge > silentCloseThreshold) {
-              console.log(
-                `[Orchestrator] Deleting empty conversation ${conversation.id} (age: ${conversationAge}ms > ${silentCloseThreshold}ms)`,
+              debugLog("orchestrator", 
+                `Deleting empty conversation ${conversation.id} (age: ${conversationAge}ms > ${silentCloseThreshold}ms)`,
               );
               await this.conversationRepository.delete(
                 conversation.id,
                 conversation.organization_id,
               );
-              console.log(
-                `[Orchestrator] Deleted conversation ${conversation.id} and associated messages`,
+              debugLog("orchestrator", 
+                `Deleted conversation ${conversation.id} and associated messages`,
               );
             } else {
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} has no user messages, skipping`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} has no user messages, skipping`,
               );
             }
             continue;
@@ -113,8 +114,8 @@ export class Orchestrator {
           // Check for different timeout scenarios
           if (timeSinceLastMessage > silentCloseThreshold) {
             // 2x timeout: Close silently without sending a message
-            console.log(
-              `[Orchestrator] Conversation ${conversation.id} exceeded silent close threshold (${timeSinceLastMessage}ms > ${silentCloseThreshold}ms), closing silently`,
+            debugLog("orchestrator", 
+              `Conversation ${conversation.id} exceeded silent close threshold (${timeSinceLastMessage}ms > ${silentCloseThreshold}ms), closing silently`,
             );
             await closeInactiveConversation(
               conversation.id,
@@ -128,8 +129,8 @@ export class Orchestrator {
 
             if (hasWarning) {
               // Warning was sent but no response, close the conversation
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} didn't respond to warning, closing`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} didn't respond to warning, closing`,
               );
               await closeInactiveConversation(
                 conversation.id,
@@ -139,8 +140,8 @@ export class Orchestrator {
               );
             } else {
               // No warning sent yet but past full timeout, close with message
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} exceeded timeout without warning, closing with message`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} exceeded timeout without warning, closing with message`,
               );
               await closeInactiveConversation(
                 conversation.id,
@@ -154,8 +155,8 @@ export class Orchestrator {
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
             if (!hasWarning) {
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} reached warning threshold (${timeSinceLastMessage}ms > ${warningThreshold}ms), sending warning`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} reached warning threshold (${timeSinceLastMessage}ms > ${warningThreshold}ms), sending warning`,
               );
               await sendInactivityWarning(conversation.id, conversation.organization_id);
 
@@ -183,8 +184,8 @@ export class Orchestrator {
             );
 
             if (closureValidation.shouldClose) {
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} has validated closure intent (${lastUserMessage.intent}), closing. Reason: ${closureValidation.reason}`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} has validated closure intent (${lastUserMessage.intent}), closing. Reason: ${closureValidation.reason}`,
               );
               await this.conversationRepository.update(
                 conversation.id,
@@ -213,8 +214,8 @@ export class Orchestrator {
               // Generate title for closed conversation
               await generateConversationTitle(conversation.id, conversation.organization_id);
             } else {
-              console.log(
-                `[Orchestrator] Conversation ${conversation.id} has closure intent but validation failed: ${closureValidation.reason}. Keeping open.`,
+              debugLog("orchestrator", 
+                `Conversation ${conversation.id} has closure intent but validation failed: ${closureValidation.reason}. Keeping open.`,
               );
             }
           }
@@ -224,7 +225,7 @@ export class Orchestrator {
         }
       }
 
-      console.log("[Orchestrator] Inactivity check completed");
+      debugLog("orchestrator", "Inactivity check completed");
     } catch (error) {
       console.error("[Orchestrator] Error in checkInactivity:", error);
     }

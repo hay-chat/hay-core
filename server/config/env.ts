@@ -73,6 +73,7 @@ export const config = {
 
   logging: {
     level: process.env.LOG_LEVEL || "debug",
+    debug: process.env.DEBUG === "true",
   },
 
   organization: {
