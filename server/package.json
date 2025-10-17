@@ -24,10 +24,10 @@
     "@plugins": "../plugins"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "tsconfig-paths": "^4.2.0"
+    "@types/jest": "^30.0.0"
   },
   "dependencies": {
+    "tsconfig-paths": "^4.2.0",
     "@stripe/stripe-js": "^7.9.0",
     "@types/bcrypt": "^5.0.2",
     "@types/mjml": "^4.7.4",
