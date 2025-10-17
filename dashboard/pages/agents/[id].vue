@@ -443,6 +443,17 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
 
+    // Convert testMode to proper type (null | boolean) since select returns strings
+    let testModeValue: boolean | null = null;
+    const testModeRaw = form.value.testMode as any;
+    if (testModeRaw === true || testModeRaw === "true") {
+      testModeValue = true;
+    } else if (testModeRaw === false || testModeRaw === "false") {
+      testModeValue = false;
+    } else {
+      testModeValue = null;
+    }
+
     const payload = {
       name: form.value.name,
       description: form.value.description || undefined,
@@ -452,7 +463,7 @@ const handleSubmit = async () => {
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
-      testMode: form.value.testMode,
+      testMode: testModeValue,
       humanHandoffAvailableInstructions: form.value.humanHandoffAvailableInstructions,
       humanHandoffUnavailableInstructions: form.value.humanHandoffUnavailableInstructions,
     };
