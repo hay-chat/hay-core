@@ -214,6 +214,17 @@
       :destructive="true"
       @confirm="confirmDelete"
     />
+
+    <!-- Unsaved Changes Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showConfirmDialog"
+      :title="confirmDialogConfig.title"
+      :description="confirmDialogConfig.description"
+      confirm-text="Leave Page"
+      :destructive="true"
+      @confirm="confirmDialogConfig.onConfirm"
+      @cancel="handleDialogCancel"
+    />
   </Page>
 </template>
 
@@ -223,12 +234,27 @@ import { useRouter, useRoute } from "vue-router";
 import { ArrowLeft, Trash2 } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
+import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { HayApi } from "@/utils/api";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const loadingInstructions = ref(false);
+
+// Track initial form state for unsaved changes detection
+const initialForm = ref({
+  name: "",
+  description: "",
+  instructions: [] as any,
+  tone: "",
+  avoid: "",
+  trigger: "",
+  enabled: true,
+  testMode: null as boolean | null,
+  humanHandoffAvailableInstructions: [] as any,
+  humanHandoffUnavailableInstructions: [] as any,
+});
 
 // Determine if we're in edit mode based on route
 const isEditMode = computed(() => {
@@ -277,6 +303,16 @@ const agent = ref<Agent | null>(null);
 const errors = ref<Record<string, string>>({});
 const selectedTone = ref<string | null>(null);
 
+// Unsaved changes detection
+const {
+  hasUnsavedChanges,
+  confirmNavigation,
+  markAsSaved,
+  showConfirmDialog,
+  confirmDialogConfig,
+  handleDialogCancel,
+} = useUnsavedChanges(initialForm, form, computed(() => !loading.value && !isSubmitting.value));
+
 // Format date
 const formatDate = (date: string | Date) => {
   return new Intl.DateTimeFormat("en-US", {
@@ -308,7 +344,7 @@ onMounted(async () => {
       agent.value = agentResponse;
 
       // Populate form
-      form.value = {
+      const formData = {
         name: agentResponse.name,
         description: agentResponse.description || "",
         instructions: agentResponse.instructions || [],
@@ -322,6 +358,10 @@ onMounted(async () => {
         humanHandoffUnavailableInstructions:
           (agentResponse as any).human_handoff_unavailable_instructions || [],
       };
+
+      form.value = { ...formData };
+      // Set initial form state for unsaved changes detection
+      initialForm.value = JSON.parse(JSON.stringify(formData));
 
       // Detect which tone preset is selected
       if (agentResponse.tone) {
@@ -391,10 +431,12 @@ const handleSubmit = async () => {
         data: payload,
       });
       toast.success("Agent updated successfully");
+      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
     } else {
       // Create new agent
       const response = await HayApi.agents.create.mutate(payload);
       toast.success("Agent created successfully");
+      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
       // Check if there's a redirect parameter
       const redirectPath = route.query.redirect as string;
@@ -438,6 +480,7 @@ const confirmDelete = async () => {
     await HayApi.agents.delete.mutate({ id: agentId.value });
 
     toast.success("Agent deleted successfully");
+    markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
     await router.push("/agents");
   } catch (error) {
@@ -456,8 +499,11 @@ const setTone = (tone: string) => {
 };
 
 // Handle cancel
-const handleCancel = () => {
-  router.push("/agents");
+const handleCancel = async () => {
+  const confirmed = await confirmNavigation();
+  if (confirmed) {
+    router.push("/agents");
+  }
 };
 
 // Set page meta

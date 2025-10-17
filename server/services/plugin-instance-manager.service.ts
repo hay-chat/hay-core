@@ -2,6 +2,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { processManagerService } from "./process-manager.service";
 import { getUTCNow } from "@server/utils/date.utils";
+import { debugLog } from "@server/lib/debug-logger";
 
 interface InstancePoolStats {
   runningCount: number;
@@ -27,11 +28,11 @@ export class PluginInstanceManagerService {
 
     this.cleanupTimer = setInterval(() => {
       this.cleanupInactiveInstances().catch((error) => {
-        console.error("Error during instance cleanup:", error);
+        debugLog("plugin-manager", "Error during instance cleanup", { level: "error", data: error });
       });
     }, this.CLEANUP_INTERVAL_MS);
 
-    console.log("🧹 Plugin instance cleanup started (checking every minute)");
+    debugLog("plugin-manager", "Plugin instance cleanup started (checking every minute)");
   }
 
   /**
@@ -41,7 +42,7 @@ export class PluginInstanceManagerService {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
-      console.log("🧹 Plugin instance cleanup stopped");
+      debugLog("plugin-manager", "Plugin instance cleanup stopped");
     }
   }
 
@@ -69,7 +70,7 @@ export class PluginInstanceManagerService {
     const canStart = await this.canStartInstance(pluginId);
     if (!canStart) {
       // Queue the request or wait
-      console.log(`⏳ Instance pool limit reached for ${pluginId}, queueing request`);
+      debugLog("plugin-manager", `Instance pool limit reached for ${pluginId}, queueing request`);
       await this.waitForAvailableSlot(pluginId);
     }
 
@@ -89,13 +90,13 @@ export class PluginInstanceManagerService {
    */
   private async startInstance(organizationId: string, pluginId: string): Promise<void> {
     try {
-      console.log(`🚀 Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
+      debugLog("plugin-manager", `Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
 
       await processManagerService.startPlugin(organizationId, pluginId);
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
-      console.error(`❌ Failed to start plugin ${pluginId} for org ${organizationId}:`, error);
+      debugLog("plugin-manager", `Failed to start plugin ${pluginId} for org ${organizationId}`, { level: "error", data: error });
 
       // Extract meaningful error message
       let errorMessage = "Failed to start plugin";
@@ -148,8 +149,9 @@ export class PluginInstanceManagerService {
       if (!lastActivity || lastActivity < inactiveThreshold) {
         // Check if instance is actually running in process manager
         if (processManagerService.isRunning(instance.organizationId, instance.plugin.pluginId)) {
-          console.log(
-            `🛑 Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
+          debugLog(
+            "plugin-manager",
+            `Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
           try {
@@ -160,7 +162,7 @@ export class PluginInstanceManagerService {
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
-            console.error(`Error stopping inactive instance ${instanceKey}:`, error);
+            debugLog("plugin-manager", `Error stopping inactive instance ${instanceKey}`, { level: "error", data: error });
           }
         }
       }

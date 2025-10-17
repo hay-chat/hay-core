@@ -470,4 +470,10 @@ const avatarIcon = computed(() => {
   font-size: 0.75rem;
   color: var(--color-neutral-muted);
 }
+
+.chat-message {
+  a {
+    text-decoration: underline;
+  }
+}
 </style>

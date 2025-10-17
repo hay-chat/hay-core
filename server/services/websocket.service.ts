@@ -10,6 +10,7 @@ import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
 import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
+import { debugLog } from "@server/lib/debug-logger";
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -73,7 +74,7 @@ export class WebSocketService {
         path: "/ws",
         clientTracking: true,
       });
-      console.log(`🔌 WebSocket server initialized on standalone port ${serverOrPort}`);
+      debugLog("websocket", `WebSocket server initialized on standalone port ${serverOrPort}`);
     } else {
       // WebSocket server attached to existing HTTP server
       this.wss = new WebSocketServer({
@@ -81,7 +82,7 @@ export class WebSocketService {
         path: "/ws",
         clientTracking: true,
       });
-      console.log("🔌 WebSocket server initialized");
+      debugLog("websocket", "WebSocket server initialized");
     }
 
     this.wss.on("connection", (ws, req) => {
@@ -114,7 +115,7 @@ export class WebSocketService {
       });
 
       this.redisInitialized = true;
-      console.log("[WebSocket] Redis pub/sub initialized for cross-server broadcasting");
+      debugLog("websocket", "Redis pub/sub initialized for cross-server broadcasting");
     } catch (error) {
       console.error("[WebSocket] Failed to initialize Redis:", error);
       console.warn(
@@ -136,7 +137,7 @@ export class WebSocketService {
 
     // Broadcast to local clients in the organization
     const sent = this.sendToOrganization(organizationId, { type, payload });
-    console.log(`[WebSocket] Broadcasted ${type} from Redis to ${sent} local clients`);
+    debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
   }
 
   /**
@@ -160,7 +161,7 @@ export class WebSocketService {
       error,
     });
 
-    console.log(`[WebSocket] Broadcasted job update for ${jobId} to ${sent} clients`);
+    debugLog("websocket", `Broadcasted job update for ${jobId} to ${sent} clients`);
   }
 
   /**
@@ -189,8 +190,9 @@ export class WebSocketService {
     // Authenticate if token provided
     if (token) {
       const authenticated = this.authenticateClient(clientId, token);
-      console.log(
-        `[WebSocket] Client ${clientId} authentication: ${authenticated}, org: ${client.organizationId}`,
+      debugLog(
+        "websocket",
+        `Client ${clientId} authentication: ${authenticated}, org: ${client.organizationId}`,
       );
 
       // Add to organization clients if authenticated
@@ -199,12 +201,11 @@ export class WebSocketService {
           this.organizationClients.set(client.organizationId, new Set());
         }
         this.organizationClients.get(client.organizationId)!.add(clientId);
-        console.log(
-          `[WebSocket] Added client ${clientId} to organization ${client.organizationId}`,
-        );
+        debugLog("websocket", `Added client ${clientId} to organization ${client.organizationId}`);
       } else {
-        console.log(
-          `[WebSocket] Client ${clientId} NOT added to organization (authenticated: ${client.authenticated}, org: ${client.organizationId})`,
+        debugLog(
+          "websocket",
+          `Client ${clientId} NOT added to organization (authenticated: ${client.authenticated}, org: ${client.organizationId})`,
         );
       }
     }
@@ -285,7 +286,7 @@ export class WebSocketService {
           break;
 
         default:
-          console.log(`Unknown message type: ${message.type}`);
+          debugLog("websocket", `Unknown message type: ${message.type}`);
       }
     } catch (error) {
       console.error(`Failed to handle message from ${clientId}:`, error);
@@ -622,7 +623,7 @@ export class WebSocketService {
       }
     }
 
-    console.log(`[WebSocket] Sent message to ${sent} clients in organization ${organizationId}`);
+    debugLog("websocket", `Sent message to ${sent} clients in organization ${organizationId}`);
     return sent;
   }
 

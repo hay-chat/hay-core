@@ -16,6 +16,7 @@ import { Customer } from "./customer.entity";
 import { MessageType } from "./message.entity";
 import { analyzeInstructions } from "../../utils/instruction-formatter";
 import { documentRepository } from "../../repositories/document.repository";
+import { debugLog } from "@server/lib/debug-logger";
 
 @Entity("conversations")
 export class Conversation {
@@ -208,7 +209,7 @@ export class Conversation {
 
     // Log playbook addition with embedded references (only logs once per conversation per playbook)
     if (this.playbook_id !== playbookId) {
-      console.log("[Orchestrator] Playbook added to conversation", {
+      debugLog("conversation", "Playbook added to conversation", {
         conversationId: this.id,
         playbookName: playbook.title,
         referencedActions: referencedActions,
@@ -269,9 +270,9 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
 
         if (toolSchema) {
-          // Add tool ID to enabled_tools list
-          if (!enabledToolIds.includes(toolSchema.name as string)) {
-            enabledToolIds.push(toolSchema.name as string);
+          // Add tool ID to enabled_tools list using the full namespaced name (pluginId:toolName)
+          if (!enabledToolIds.includes(actionName)) {
+            enabledToolIds.push(actionName);
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
@@ -318,8 +319,9 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // Attach documents referenced in the playbook
     if (referencedDocuments.length > 0) {
-      console.log(
-        `[Conversation] Playbook references ${referencedDocuments.length} documents, attempting to attach them`,
+      debugLog(
+        "conversation",
+        `Playbook references ${referencedDocuments.length} documents, attempting to attach them`,
       );
 
       for (const documentId of referencedDocuments) {
@@ -328,18 +330,23 @@ The following tools are available for you to use. You MUST return only valid JSO
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            console.log(
-              `[Conversation] Attaching document "${document.title}" (${documentId}) from playbook`,
+            debugLog(
+              "conversation",
+              `Attaching document "${document.title}" (${documentId}) from playbook`,
             );
 
             // addDocument already handles deduplication
             await this.addDocument(documentId);
           } else if (document) {
-            console.warn(
-              `[Conversation] Document ${documentId} belongs to different organization, skipping`,
+            debugLog(
+              "conversation",
+              `Document ${documentId} belongs to different organization, skipping`,
+              { level: "warn" },
             );
           } else {
-            console.warn(`[Conversation] Document ${documentId} referenced in playbook not found`);
+            debugLog("conversation", `Document ${documentId} referenced in playbook not found`, {
+              level: "warn",
+            });
           }
         } catch (error) {
           console.error(`[Conversation] Error attaching document "${documentId}":`, error);
@@ -369,7 +376,7 @@ The following tools are available for you to use. You MUST return only valid JSO
       referencedDocuments = analysis.documents;
     }
 
-    console.log("[Conversation] Adding handoff instructions", {
+    debugLog("conversation", "Adding handoff instructions", {
       conversationId: this.id,
       handoffType,
       referencedActions,
@@ -421,9 +428,9 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
 
         if (toolSchema) {
-          // Add tool ID to enabled_tools list
-          if (!enabledToolIds.includes(toolSchema.name as string)) {
-            enabledToolIds.push(toolSchema.name as string);
+          // Add tool ID to enabled_tools list using the full namespaced name (pluginId:toolName)
+          if (!enabledToolIds.includes(actionName)) {
+            enabledToolIds.push(actionName);
           }
 
           const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
@@ -469,8 +476,9 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // Attach documents referenced in the handoff instructions
     if (referencedDocuments.length > 0) {
-      console.log(
-        `[Conversation] Handoff references ${referencedDocuments.length} documents, attempting to attach them`,
+      debugLog(
+        "conversation",
+        `Handoff references ${referencedDocuments.length} documents, attempting to attach them`,
       );
 
       for (const documentId of referencedDocuments) {
@@ -478,16 +486,21 @@ The following tools are available for you to use. You MUST return only valid JSO
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            console.log(
-              `[Conversation] Attaching document "${document.title}" (${documentId}) from handoff instructions`,
+            debugLog(
+              "conversation",
+              `Attaching document "${document.title}" (${documentId}) from handoff instructions`,
             );
             await this.addDocument(documentId);
           } else if (document) {
-            console.warn(
-              `[Conversation] Document ${documentId} belongs to different organization, skipping`,
+            debugLog(
+              "conversation",
+              `Document ${documentId} belongs to different organization, skipping`,
+              { level: "warn" },
             );
           } else {
-            console.warn(`[Conversation] Document ${documentId} referenced in handoff not found`);
+            debugLog("conversation", `Document ${documentId} referenced in handoff not found`, {
+              level: "warn",
+            });
           }
         } catch (error) {
           console.error(`[Conversation] Error attaching document "${documentId}":`, error);
@@ -500,10 +513,10 @@ The following tools are available for you to use. You MUST return only valid JSO
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     if (!this.document_ids?.includes(documentId)) {
-      console.log("Adding document to conversation", documentId);
-      console.log("Current document ids", this.document_ids);
+      debugLog("conversation", "Adding document to conversation", { documentId });
+      debugLog("conversation", "Current document ids", { documentIds: this.document_ids });
       const updatedDocIds = [...(this.document_ids || []), documentId];
-      console.log("Updated document ids", updatedDocIds);
+      debugLog("conversation", "Updated document ids", { documentIds: updatedDocIds });
       await conversationRepository.update(this.id, this.organization_id, {
         document_ids: updatedDocIds,
       });
@@ -604,9 +617,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             messageType: message.type,
           },
         });
-        console.log(
-          `[Conversation] Published message_received event to Redis for conversation ${this.id}`,
-        );
+        debugLog("redis", `Published message_received event to Redis for conversation ${this.id}`);
       } else {
         // Fallback to direct WebSocket if Redis not available
         const { websocketService } = await import("../../services/websocket.service");
@@ -618,8 +629,9 @@ The following tools are available for you to use. You MUST return only valid JSO
             messageType: message.type,
           },
         });
-        console.log(
-          `[Conversation] Sent message_received directly to ${sent} local clients (Redis not available)`,
+        debugLog(
+          "conversation",
+          `Sent message_received directly to ${sent} local clients (Redis not available)`,
         );
       }
     } catch (error) {
@@ -759,5 +771,29 @@ The following tools are available for you to use. You MUST return only valid JSO
    */
   isTakenOverBy(userId: string): boolean {
     return this.isTakenOver() && this.assigned_user_id === userId;
+  }
+
+  /**
+   * Close conversation (mark as resolved and closed)
+   */
+  async closeConversation(): Promise<void> {
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+
+    await conversationRepository.update(this.id, this.organization_id, {
+      status: "closed",
+      closed_at: new Date(),
+      assigned_user_id: null,
+      assigned_at: null,
+      ended_at: new Date(),
+      previous_status: null,
+    });
+
+    // Update local instance
+    this.status = "closed";
+    this.closed_at = new Date();
+    this.ended_at = new Date();
+    this.assigned_user_id = null;
+    this.assigned_at = null;
+    this.previous_status = null;
   }
 }

@@ -4,6 +4,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { pluginManagerService } from "./plugin-manager.service";
 import { environmentManagerService } from "./environment-manager.service";
 import { getUTCNow } from "../utils/date.utils";
+import { debugLog } from "@server/lib/debug-logger";
 
 interface ProcessInfo {
   process: ChildProcess;
@@ -15,6 +16,7 @@ interface ProcessInfo {
   restartAttempts: number;
   installRecoveryAttempted: boolean; // Track if we've already tried installing dependencies
   lastErrorOutput: string; // Store stderr to detect dependency errors
+  gracefulShutdown: boolean; // Track if this is an intentional shutdown (don't restart)
 }
 
 export class ProcessManagerService {
@@ -41,7 +43,7 @@ export class ProcessManagerService {
 
     // Check if already running
     if (this.processes.has(processKey)) {
-      console.log(`Plugin already running for ${processKey}`);
+      debugLog("process-manager", `Plugin already running for ${processKey}`);
       return;
     }
 
@@ -62,7 +64,7 @@ export class ProcessManagerService {
     if (!startCommand) {
       // Some plugins (like channels) don't need a separate process
       // They just serve assets and handle webhooks
-      console.log(`ℹ️  Plugin ${plugin.name} doesn't require a separate process`);
+      debugLog("process-manager", `Plugin ${plugin.name} doesn't require a separate process`);
       await pluginInstanceRepository.updateStatus(instance.id, "running");
       return;
     }
@@ -123,6 +125,7 @@ export class ProcessManagerService {
         restartAttempts: 0,
         installRecoveryAttempted: false,
         lastErrorOutput: "",
+        gracefulShutdown: false,
       };
 
       this.processes.set(processKey, processInfo);
@@ -136,9 +139,9 @@ export class ProcessManagerService {
       // Set up event handlers AFTER storing process info
       this.setupProcessHandlers(processKey, processInfo);
 
-      console.log(`✅ Started plugin ${plugin.name} for org ${organizationId} (PID: ${pid})`);
+      debugLog("process-manager", `Started plugin ${plugin.name} for org ${organizationId}`, { data: { pid } });
     } catch (error) {
-      console.error(`❌ [ProcessManager] Failed to start plugin ${plugin.name}:`, error);
+      debugLog("process-manager", `Failed to start plugin ${plugin.name}`, { level: "error", data: error });
 
       // Update database status
       await pluginInstanceRepository.updateStatus(
@@ -164,7 +167,7 @@ export class ProcessManagerService {
     const processInfo = this.processes.get(processKey);
 
     if (!processInfo) {
-      console.log(`No running process found for ${processKey}`);
+      debugLog("process-manager", `No running process found for ${processKey}`);
       return;
     }
 
@@ -174,6 +177,9 @@ export class ProcessManagerService {
       clearTimeout(restartTimer);
       this.restartTimers.delete(processKey);
     }
+
+    // Mark as graceful shutdown to prevent automatic restart
+    processInfo.gracefulShutdown = true;
 
     // Update status to stopping
     await pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "stopping");
@@ -196,7 +202,7 @@ export class ProcessManagerService {
     await pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "stopped");
     await pluginInstanceRepository.updateProcessId(processInfo.pluginInstanceId, null);
 
-    console.log(`🛑 Stopped plugin ${processInfo.pluginName} for org ${organizationId}`);
+    debugLog("process-manager", `Stopped plugin ${processInfo.pluginName} for org ${organizationId}`);
   }
 
   /**
@@ -215,13 +221,13 @@ export class ProcessManagerService {
 
     // Handle stdout
     process.stdout?.on("data", (data) => {
-      console.log(`[${pluginName}:${organizationId}] ${data.toString()}`);
+      debugLog("process-manager", `[${pluginName}:${organizationId}] ${data.toString()}`);
     });
 
     // Handle stderr - capture errors to detect dependency issues
     process.stderr?.on("data", (data) => {
       const errorOutput = data.toString();
-      console.error(`[${pluginName}:${organizationId}] ERROR: ${errorOutput}`);
+      debugLog("process-manager", `[${pluginName}:${organizationId}] ERROR: ${errorOutput}`, { level: "error" });
 
       // Store last error output for dependency detection
       processInfo.lastErrorOutput += errorOutput;
@@ -239,11 +245,19 @@ export class ProcessManagerService {
 
     // Handle process exit
     process.on("exit", async (code, signal) => {
-      console.log(
+      debugLog(
+        "process-manager",
         `Plugin ${pluginName} for org ${organizationId} exited with code ${code} and signal ${signal}`,
       );
 
       this.processes.delete(processKey);
+
+      // If this was a graceful shutdown, don't restart
+      if (processInfo.gracefulShutdown) {
+        await pluginInstanceRepository.updateStatus(pluginInstanceId, "stopped");
+        await pluginInstanceRepository.updateProcessId(pluginInstanceId, null);
+        return;
+      }
 
       // Check if this was a dependency error and we haven't tried recovery yet
       if (
@@ -251,21 +265,22 @@ export class ProcessManagerService {
         this.isDependencyError(processInfo.lastErrorOutput) &&
         !processInfo.installRecoveryAttempted
       ) {
-        console.log(`🔍 Dependency error detected for ${pluginName}, attempting recovery...`);
+        debugLog("process-manager", `Dependency error detected for ${pluginName}, attempting recovery...`);
 
         // Attempt recovery by running install command
         const recoverySuccess = await this.attemptDependencyRecovery(processKey, processInfo);
 
         if (recoverySuccess) {
           // Retry starting the plugin after successful recovery
-          console.log(`🔄 Retrying plugin ${pluginName} after dependency recovery...`);
+          debugLog("process-manager", `Retrying plugin ${pluginName} after dependency recovery...`);
           try {
             await this.startPlugin(organizationId, processInfo.pluginId);
             return; // Exit early - plugin restarted successfully
           } catch (error) {
-            console.error(
-              `❌ Failed to restart ${pluginName} after recovery:`,
-              error instanceof Error ? error.message : String(error),
+            debugLog(
+              "process-manager",
+              `Failed to restart ${pluginName} after recovery`,
+              { level: "error", data: error instanceof Error ? error.message : String(error) }
             );
             // Fall through to error handling below
           }
@@ -289,7 +304,7 @@ export class ProcessManagerService {
 
     // Handle process errors
     process.on("error", async (error) => {
-      console.error(`Error in plugin ${pluginName} for org ${organizationId}:`, error);
+      debugLog("process-manager", `Error in plugin ${pluginName} for org ${organizationId}`, { level: "error", data: error });
 
       await pluginInstanceRepository.updateStatus(pluginInstanceId, "error", error.message);
     });
@@ -302,7 +317,7 @@ export class ProcessManagerService {
     const processInfo = this.processes.get(processKey);
     if (!processInfo) return;
 
-    console.log(`[IPC from ${processInfo.pluginName}:${processInfo.organizationId}]`, message);
+    debugLog("process-manager", `[IPC from ${processInfo.pluginName}:${processInfo.organizationId}]`, { data: message });
 
     // Handle different message types
     if (typeof message === "object" && message !== null && "type" in message) {
@@ -323,7 +338,8 @@ export class ProcessManagerService {
 
     await pluginInstanceRepository.incrementRestartCount(processInfo.pluginInstanceId);
 
-    console.log(
+    debugLog(
+      "process-manager",
       `Scheduling restart for ${processInfo.pluginName} (attempt ${processInfo.restartAttempts}/${this.MAX_RESTART_ATTEMPTS})`,
     );
 
@@ -334,7 +350,7 @@ export class ProcessManagerService {
         const [organizationId, pluginId] = processKey.split(":");
         await this.startPlugin(organizationId, pluginId);
       } catch (error) {
-        console.error(`Failed to restart plugin:`, error);
+        debugLog("process-manager", "Failed to restart plugin", { level: "error", data: error });
       }
     }, this.RESTART_DELAY_MS);
 
@@ -345,7 +361,7 @@ export class ProcessManagerService {
    * Cross-platform command spawning helper
    */
   private spawnCommand(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
-    console.log(`Executing command: ${command} in ${cwd}`);
+    debugLog("process-manager", `Executing command: ${command} in ${cwd}`);
 
     // Simple command parsing - split on space
     // For complex arguments, the manifest should use simple patterns
@@ -353,7 +369,7 @@ export class ProcessManagerService {
     const executable = parts[0];
     const args = parts.slice(1);
 
-    console.log(`Spawning: ${executable} with args:`, args);
+    debugLog("process-manager", `Spawning: ${executable} with args`, { data: args });
 
     // Use spawn with args array for better reliability and security
     const childProcess = spawn(executable, args, {
@@ -364,12 +380,12 @@ export class ProcessManagerService {
 
     // Critical: Add error handler immediately to prevent uncaught errors from crashing the app
     childProcess.on("error", (error) => {
-      console.error(`[ProcessManager] Failed to spawn command "${command}":`, error);
+      debugLog("process-manager", `Failed to spawn command "${command}"`, { level: "error", data: error });
       // Error will be handled by the 'exit' event handler in setupProcessHandlers
     });
 
     if (childProcess.pid) {
-      console.log(`Started process with PID: ${childProcess.pid}`);
+      debugLog("process-manager", `Started process with PID: ${childProcess.pid}`);
     }
 
     // Pipe outputs for visibility
@@ -408,14 +424,17 @@ export class ProcessManagerService {
   ): Promise<boolean> {
     // Don't attempt recovery if already tried
     if (processInfo.installRecoveryAttempted) {
-      console.log(
-        `⚠️  Dependency recovery already attempted for ${processInfo.pluginName}, skipping`,
+      debugLog(
+        "process-manager",
+        `Dependency recovery already attempted for ${processInfo.pluginName}, skipping`,
+        { level: "warn" }
       );
       return false;
     }
 
-    console.log(
-      `🔧 Detected dependency error for ${processInfo.pluginName}, attempting recovery...`,
+    debugLog(
+      "process-manager",
+      `Detected dependency error for ${processInfo.pluginName}, attempting recovery...`,
     );
 
     // Mark as attempted to prevent loops
@@ -424,12 +443,13 @@ export class ProcessManagerService {
     try {
       // Run the plugin's install command
       await pluginManagerService.installPlugin(processInfo.pluginId);
-      console.log(`✅ Dependency recovery completed for ${processInfo.pluginName}`);
+      debugLog("process-manager", `Dependency recovery completed for ${processInfo.pluginName}`);
       return true;
     } catch (error) {
-      console.error(
-        `❌ Dependency recovery failed for ${processInfo.pluginName}:`,
-        error instanceof Error ? error.message : String(error),
+      debugLog(
+        "process-manager",
+        `Dependency recovery failed for ${processInfo.pluginName}`,
+        { level: "error", data: error instanceof Error ? error.message : String(error) }
       );
       return false;
     }
@@ -514,7 +534,7 @@ export class ProcessManagerService {
                   return;
                 }
               } catch (parseError) {
-                console.warn(`Failed to parse MCP response line: ${line}`, parseError);
+                debugLog("process-manager", `Failed to parse MCP response line: ${line}`, { level: "warn", data: parseError });
               }
             }
           }
@@ -544,7 +564,7 @@ export class ProcessManagerService {
       });
     } catch (error) {
       // Ensure all errors are properly logged and formatted
-      console.error(`❌ [ProcessManager] sendToPlugin failed for ${pluginId}:`, error);
+      debugLog("process-manager", `sendToPlugin failed for ${pluginId}`, { level: "error", data: error });
 
       if (error instanceof Error) {
         throw error;
@@ -557,7 +577,7 @@ export class ProcessManagerService {
    * Stop all running processes (for graceful shutdown)
    */
   async stopAll(): Promise<void> {
-    console.log("Stopping all plugin processes...");
+    debugLog("process-manager", "Stopping all plugin processes...");
 
     const promises = Array.from(this.processes.entries()).map(async ([processKey]) => {
       const [organizationId, pluginId] = processKey.split(":");

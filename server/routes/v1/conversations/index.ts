@@ -325,11 +325,11 @@ export const conversationsRouter = t.router({
         });
       }
 
-      // Check if conversation can be taken over
-      if (!["pending-human", "human-took-over"].includes(conversation.status)) {
+      // Check if conversation is already closed or resolved
+      if (["closed", "resolved"].includes(conversation.status)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Conversation cannot be taken over in current status",
+          message: "Cannot take over a closed or resolved conversation",
         });
       }
 
@@ -498,6 +498,67 @@ export const conversationsRouter = t.router({
         email: user.email,
         assignedAt: conversation.assigned_at,
       };
+    }),
+
+  close: authenticatedProcedure
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      // Verify organization access
+      if (conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this conversation",
+        });
+      }
+
+      // Verify user is the one who took over (if conversation is taken over)
+      if (conversation.status === "human-took-over" && conversation.assigned_user_id !== ctx.user!.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You can only close conversations assigned to you",
+        });
+      }
+
+      // Close conversation
+      await conversation.closeConversation();
+
+      // Add system message
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const user = await userRepository.findById(ctx.user!.id);
+      await conversation.addMessage({
+        content: `${user?.getFullName() || "User"} closed this conversation`,
+        type: MessageType.SYSTEM,
+        metadata: {
+          isCloseMessage: true,
+          userId: ctx.user!.id,
+          userName: user?.getFullName(),
+        },
+      });
+
+      // Generate conversation title
+      await generateConversationTitle(input.conversationId, ctx.organizationId!, false);
+
+      // Emit WebSocket event
+      const { websocketService } = await import("../../../services/websocket.service");
+      websocketService.sendToOrganization(ctx.organizationId!, {
+        type: "conversation_closed",
+        payload: {
+          conversationId: conversation.id,
+          closedBy: ctx.user!.id,
+          userName: user?.getFullName(),
+        },
+      });
+
+      return conversation;
     }),
 
   approveMessage: authenticatedProcedure

@@ -24,6 +24,8 @@ const getProductById = {
             title
             description
             handle
+            onlineStoreUrl
+            onlineStorePreviewUrl
             status
             createdAt
             updatedAt
@@ -108,11 +110,15 @@ const getProductById = {
                 id: collectionEdge.node.id,
                 title: collectionEdge.node.title
             }));
+            // Use onlineStoreUrl if available (published), otherwise use onlineStorePreviewUrl (unpublished/draft)
+            const productUrl = product.onlineStoreUrl || product.onlineStorePreviewUrl;
+
             const formattedProduct = {
                 id: product.id,
                 title: product.title,
                 description: product.description,
                 handle: product.handle,
+                url: productUrl,
                 status: product.status,
                 createdAt: product.createdAt,
                 updatedAt: product.updatedAt,

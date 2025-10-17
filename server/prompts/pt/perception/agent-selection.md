@@ -12,7 +12,7 @@ Mensagem do usuário: "{{message}}"
 
 Agentes disponíveis:
 {{#each agents}}
-- ID: {{id}}, Nome: "{{name}}", Gatilho: "{{trigger}}", Descrição: "{{description|default:"Sem descrição"}}"
+- ID: {{item.id}}, Nome: "{{item.name}}", Gatilho: "{{item.trigger}}", Descrição: "{{item.description|default:"Sem descrição"}}"
 {{/each}}
 
 Para cada agente, forneça uma pontuação de relevância e uma breve justificativa.

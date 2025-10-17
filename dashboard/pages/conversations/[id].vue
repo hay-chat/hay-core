@@ -148,7 +148,12 @@
                 >You are handling this conversation</span
               >
             </div>
-            <Button variant="outline" size="sm" @click="endTakeover"> Release Conversation </Button>
+            <div class="flex items-center space-x-2">
+              <Button variant="outline" size="sm" @click="endTakeover"> Release Conversation </Button>
+              <Button variant="outline" size="sm" @click="showCloseDialog = true">
+                Close Conversation
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -349,6 +354,23 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Close Dialog -->
+    <Dialog v-model:open="showCloseDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Close Conversation</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to close this conversation? This will mark it as resolved and
+            closed.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="showCloseDialog = false"> Cancel </Button>
+          <Button @click="confirmClose"> Close Conversation </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -452,6 +474,7 @@ const userStore = useUserStore();
 const currentUserId = computed(() => userStore.user?.id);
 const assignedUser = ref<any>(null);
 const showReleaseDialog = ref(false);
+const showCloseDialog = ref(false);
 const releaseMode = ref<"ai" | "queue">("queue");
 
 // Check if conversation is taken over by current user
@@ -567,17 +590,23 @@ const toggleSupervisionMode = () => {
 };
 
 const takeOverConversation = async () => {
+  const { useToast } = await import("@/composables/useToast");
+  const toast = useToast();
+
   try {
     await HayApi.conversations.takeover.mutate({
       conversationId,
     });
     humanTakeover.value = true;
     supervisionMode.value = false;
+    toast.success("Conversation taken over", "You are now handling this conversation");
     // Refresh conversation and assigned user
     await fetchConversation();
     assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to take over conversation:", error);
+    const errorMessage = error?.message || error?.data?.message || "Failed to take over conversation";
+    toast.error("Takeover failed", errorMessage);
   }
 };
 
@@ -587,6 +616,9 @@ const endTakeover = () => {
 };
 
 const confirmRelease = async () => {
+  const { useToast } = await import("@/composables/useToast");
+  const toast = useToast();
+
   try {
     await HayApi.conversations.release.mutate({
       conversationId,
@@ -595,10 +627,36 @@ const confirmRelease = async () => {
     humanTakeover.value = false;
     assignedUser.value = null;
     showReleaseDialog.value = false;
+    const message =
+      releaseMode.value === "ai"
+        ? "Conversation returned to AI"
+        : "Conversation returned to queue";
+    toast.success("Conversation released", message);
     // Refresh conversation to get updated status
     await fetchConversation();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to release conversation:", error);
+    const errorMessage = error?.message || error?.data?.message || "Failed to release conversation";
+    toast.error("Release failed", errorMessage);
+  }
+};
+
+const confirmClose = async () => {
+  const { useToast } = await import("@/composables/useToast");
+  const toast = useToast();
+
+  try {
+    await HayApi.conversations.close.mutate({
+      conversationId,
+    });
+    showCloseDialog.value = false;
+    toast.success("Conversation closed", "This conversation has been marked as closed");
+    // Refresh conversation to get updated status
+    await fetchConversation();
+  } catch (error: any) {
+    console.error("Failed to close conversation:", error);
+    const errorMessage = error?.message || error?.data?.message || "Failed to close conversation";
+    toast.error("Close failed", errorMessage);
   }
 };
 

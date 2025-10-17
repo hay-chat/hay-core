@@ -12,7 +12,7 @@ User message: "{{message}}"
 
 Available agents:
 {{#each agents}}
-- ID: {{id}}, Name: "{{name}}", Trigger: "{{trigger}}", Description: "{{description|default:"No description"}}"
+- ID: {{item.id}}, Name: "{{item.name}}", Trigger: "{{item.trigger}}", Description: "{{item.description|default:"No description"}}"
 {{/each}}
 
 For each agent, provide a relevance score and brief rationale.

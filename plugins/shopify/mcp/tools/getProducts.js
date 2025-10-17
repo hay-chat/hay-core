@@ -28,6 +28,8 @@ const getProducts = {
                 title
                 description
                 handle
+                onlineStoreUrl
+                onlineStorePreviewUrl
                 status
                 createdAt
                 updatedAt
@@ -86,11 +88,15 @@ const getProducts = {
                 const imageUrl = product.images.edges.length > 0
                     ? product.images.edges[0].node.url
                     : null;
+                // Use onlineStoreUrl if available (published), otherwise use onlineStorePreviewUrl (unpublished/draft)
+                const productUrl = product.onlineStoreUrl || product.onlineStorePreviewUrl;
+
                 return {
                     id: product.id,
                     title: product.title,
                     description: product.description,
                     handle: product.handle,
+                    url: productUrl,
                     status: product.status,
                     createdAt: product.createdAt,
                     updatedAt: product.updatedAt,
