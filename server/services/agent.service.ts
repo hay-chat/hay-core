@@ -18,6 +18,7 @@ export class AgentService {
       tone?: string;
       avoid?: string;
       trigger?: string;
+      testMode?: boolean | null;
       humanHandoffAvailableInstructions?: unknown[];
       humanHandoffUnavailableInstructions?: unknown[];
     },
@@ -30,6 +31,7 @@ export class AgentService {
       tone: data.tone,
       avoid: data.avoid,
       trigger: data.trigger,
+      testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
       organization_id: organizationId,
@@ -59,6 +61,7 @@ export class AgentService {
       tone?: string;
       avoid?: string;
       trigger?: string;
+      testMode?: boolean | null;
       humanHandoffAvailableInstructions?: unknown[];
       humanHandoffUnavailableInstructions?: unknown[];
     },
@@ -71,6 +74,7 @@ export class AgentService {
       tone: data.tone,
       avoid: data.avoid,
       trigger: data.trigger,
+      testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
     });
