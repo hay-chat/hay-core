@@ -452,6 +452,7 @@ const handleSubmit = async () => {
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
+      testMode: form.value.testMode,
       humanHandoffAvailableInstructions: form.value.humanHandoffAvailableInstructions,
       humanHandoffUnavailableInstructions: form.value.humanHandoffUnavailableInstructions,
     };
