@@ -1,0 +1,395 @@
+{
+  "$schema": "../base/plugin-manifest.schema.json",
+  "id": "hay-plugin-top-santiago",
+  "name": "Top Santiago",
+  "description": "Connect your Top Santiago account to manage addresses, subscriptions, and delivery routes",
+  "version": "1.0.0",
+  "author": "Hay",
+  "type": ["mcp-connector"],
+  "entry": "./mcp/index.js",
+  "enabled": true,
+  "category": "integration",
+  "icon": "truck",
+  "marketplace": {
+    "featured": false,
+    "tags": ["logistics", "delivery", "shipping", "routes", "subscriptions"]
+  },
+  "capabilities": {
+    "mcp": {
+      "tools": [
+        {
+          "name": "list_addresses",
+          "label": "List Addresses",
+          "description": "Fetch addresses with optional filters (lodging, street, postal code, locality, council)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": "string",
+                "description": "Filter by lodging | street | postal code | locality | council"
+              },
+              "description": {
+                "type": "string",
+                "description": "Filter by lodging name"
+              },
+              "streetName": {
+                "type": "string",
+                "description": "Filter by street name"
+              },
+              "locality": {
+                "type": "string",
+                "description": "Filter by locality name"
+              },
+              "council": {
+                "type": "string",
+                "description": "Filter by council name"
+              },
+              "offset": {
+                "type": "number",
+                "description": "Number of records to skip (default: 0)"
+              },
+              "limit": {
+                "type": "number",
+                "description": "Number of results per page (1-100, default: 10)"
+              }
+            }
+          }
+        },
+        {
+          "name": "get_address",
+          "label": "Get Address",
+          "description": "Retrieve a specific address by ID",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ID of the address to retrieve"
+              }
+            },
+            "required": ["id"]
+          }
+        },
+        {
+          "name": "list_subscriptions",
+          "label": "List Subscriptions",
+          "description": "Fetch subscriptions with optional filters",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Filter by subscription name"
+              },
+              "contact": {
+                "type": "string",
+                "description": "Filter by subscription contact"
+              },
+              "email": {
+                "type": "string",
+                "description": "Filter by subscription email"
+              },
+              "offset": {
+                "type": "number",
+                "description": "Number of records to skip (default: 0)"
+              },
+              "limit": {
+                "type": "number",
+                "description": "Number of results per page (1-100, default: 10)"
+              }
+            }
+          }
+        },
+        {
+          "name": "get_subscription",
+          "label": "Get Subscription",
+          "description": "Retrieve a specific subscription by ID",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ID of the subscription to retrieve"
+              }
+            },
+            "required": ["id"]
+          }
+        },
+        {
+          "name": "create_subscription",
+          "label": "Create Subscription",
+          "description": "Create a new subscription with optional routes",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the subscription"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "contact": {
+                "type": "string",
+                "description": "Contact information"
+              },
+              "paymentMode": {
+                "type": "string",
+                "enum": ["CRE", "TRF", "CRD", "DIN", "MBWAY", "PAL"],
+                "description": "Payment mode (default: CRE)"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Additional notes"
+              },
+              "routes": {
+                "type": "array",
+                "description": "Array of routes",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "routeDate": {
+                      "type": "string",
+                      "description": "Route date in format YYYY-MM-DD"
+                    },
+                    "pickupAddressId": {
+                      "type": "number",
+                      "description": "Pickup Address ID"
+                    },
+                    "deliveryAddressId": {
+                      "type": "number",
+                      "description": "Delivery Address ID"
+                    },
+                    "numberBags": {
+                      "type": "number",
+                      "description": "Number of bags (minimum 1)"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["HOLD", "PICKUP", "TRANS", "DELIVERED", "PROBLEM", "CANCELED"],
+                      "description": "Route state (default: HOLD)"
+                    },
+                    "isActive": {
+                      "type": "number",
+                      "description": "Is active flag (1 or 0, default: 1)"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Additional notes (max 200 characters)"
+                    }
+                  },
+                  "required": ["routeDate", "pickupAddressId", "deliveryAddressId", "state"]
+                }
+              }
+            },
+            "required": ["name", "email", "contact"]
+          }
+        },
+        {
+          "name": "update_subscription",
+          "label": "Update Subscription",
+          "description": "Update a subscription by ID (full update - replaces all fields)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ID of the subscription to update"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the subscription"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "contact": {
+                "type": "string",
+                "description": "Contact information"
+              },
+              "paymentMode": {
+                "type": "string",
+                "enum": ["CRE", "TRF", "CRD", "DIN", "MBWAY", "PAL"],
+                "description": "Payment mode"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Additional notes"
+              },
+              "routes": {
+                "type": "array",
+                "description": "Array of routes"
+              }
+            },
+            "required": ["id", "name", "email", "contact"]
+          }
+        },
+        {
+          "name": "patch_subscription",
+          "label": "Patch Subscription",
+          "description": "Patch a subscription by ID (partial update - only updates provided fields)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ID of the subscription to update"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the subscription"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "contact": {
+                "type": "string",
+                "description": "Contact information"
+              },
+              "paymentMode": {
+                "type": "string",
+                "enum": ["CRE", "TRF", "CRD", "DIN", "MBWAY", "PAL"],
+                "description": "Payment mode"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Additional notes"
+              },
+              "routes": {
+                "type": "array",
+                "description": "Array of routes"
+              }
+            },
+            "required": ["id"]
+          }
+        },
+        {
+          "name": "delete_subscription",
+          "label": "Delete Subscription",
+          "description": "Delete a subscription by ID",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ID of the subscription to delete"
+              }
+            },
+            "required": ["id"]
+          }
+        },
+        {
+          "name": "create_api_token",
+          "label": "Create API Token",
+          "description": "Create new API agency token (Restricted - Top Santiago internal use only)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "API token (32-64 characters)"
+              },
+              "agencyId": {
+                "type": "number",
+                "description": "Agency ID"
+              },
+              "environment": {
+                "type": "string",
+                "enum": ["sandbox", "production"],
+                "description": "Environment (sandbox or production)"
+              },
+              "expiredAt": {
+                "type": "string",
+                "description": "Token expiration date (ISO format)"
+              }
+            },
+            "required": ["token", "agencyId", "environment"]
+          }
+        },
+        {
+          "name": "create_user",
+          "label": "Create User",
+          "description": "Create new User (Restricted - Top Santiago internal use only)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "User email address"
+              },
+              "userId": {
+                "type": "number",
+                "description": "User ID"
+              },
+              "agencyId": {
+                "type": "number",
+                "description": "Agency ID"
+              }
+            },
+            "required": ["email", "userId", "agencyId"]
+          }
+        },
+        {
+          "name": "create_agency",
+          "label": "Create Agency",
+          "description": "Create a new agency (Restricted - Top Santiago internal use only)",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the agency"
+              },
+              "email": {
+                "type": "string",
+                "description": "Agency email address"
+              },
+              "contact": {
+                "type": "string",
+                "description": "Contact information"
+              },
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the agency"
+              }
+            },
+            "required": ["name", "email"]
+          }
+        }
+      ],
+      "transport": "stdio",
+      "auth": ["apiKey"],
+      "installCommand": "npm install",
+      "startCommand": "node mcp/index.js"
+    }
+  },
+  "permissions": {
+    "env": ["TOP_SANTIAGO_API_KEY", "TOP_SANTIAGO_API_URL"],
+    "scopes": ["org:<orgId>:mcp:invoke"]
+  },
+  "configSchema": {
+    "topSantiagoApiKey": {
+      "type": "string",
+      "description": "Your Top Santiago API key (x-api-key header)",
+      "label": "Top Santiago API Key",
+      "placeholder": "Enter your Top Santiago API key",
+      "required": true,
+      "encrypted": true,
+      "env": "TOP_SANTIAGO_API_KEY"
+    },
+    "topSantiagoApiUrl": {
+      "type": "string",
+      "description": "Top Santiago API base URL (default: sandbox)",
+      "label": "API Base URL",
+      "placeholder": "https://api.sandbox.topsantiago.com",
+      "required": false,
+      "env": "TOP_SANTIAGO_API_URL"
+    }
+  },
+  "ui": {
+    "settings": true
+  }
+}
