@@ -4,50 +4,31 @@ export enum PlaybookStatus {
   ARCHIVED = "archived",
 }
 
-export interface InstructionItem {
-  id: string;
-  level: number;
-  instructions: string;
-}
-
 export interface Agent {
   id: string;
   name: string;
   description?: string | null;
+  instructions?: any;
+  tone?: string | null;
+  avoid?: string | null;
+  trigger?: string | null;
   enabled: boolean;
-  instructions?: string | null;
-  organization_id: string;
-  created_at: string;
-  updated_at: string;
+  organization_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any; // Allow additional properties from API
 }
 
 export interface Playbook {
   id: string;
   title: string;
-  trigger: string;
   description?: string | null;
-  instructions?: InstructionItem[] | string | null;
-  status: PlaybookStatus;
-  organization_id: string;
-  agents?: Agent[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreatePlaybookInput {
-  title: string;
-  trigger: string;
-  description?: string;
-  instructions?: InstructionItem[] | string | null;
-  status?: PlaybookStatus;
-  agentIds?: string[];
-}
-
-export interface UpdatePlaybookInput {
-  title?: string;
+  instructions?: any;
+  required_fields?: string[] | null;
   trigger?: string;
-  description?: string;
-  instructions?: InstructionItem[] | string | null;
   status?: PlaybookStatus;
-  agentIds?: string[];
+  organization_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any; // Allow additional properties from API
 }

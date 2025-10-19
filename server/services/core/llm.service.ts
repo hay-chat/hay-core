@@ -152,16 +152,41 @@ export class LLMService {
           break;
         case MessageType.HUMAN_AGENT:
         case MessageType.BOT_AGENT:
-        case MessageType.TOOL_CALL:
-        case MessageType.TOOL_RESPONSE:
+        case MessageType.TOOL:
         default:
           role = "assistant";
           break;
       }
 
+      // For TOOL messages, include the actual tool output in the content
+      let content = message.content;
+      if (message.type === MessageType.TOOL && message.metadata?.toolOutput) {
+        const toolOutput = message.metadata.toolOutput;
+
+        // Extract the actual data from MCP format if present
+        let formattedOutput = toolOutput;
+        if (
+          typeof toolOutput === "object" &&
+          toolOutput !== null &&
+          "content" in toolOutput &&
+          Array.isArray(toolOutput.content)
+        ) {
+          const mcpContent = toolOutput.content as Array<{ text?: string; type?: string }>;
+          if (mcpContent.length > 0 && mcpContent[0].text) {
+            try {
+              formattedOutput = JSON.parse(mcpContent[0].text);
+            } catch {
+              formattedOutput = mcpContent[0].text;
+            }
+          }
+        }
+
+        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+      }
+
       return {
         role,
-        content: message.content,
+        content,
       };
     });
   }

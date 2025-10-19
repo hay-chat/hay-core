@@ -138,7 +138,7 @@
           <div class="flex items-start justify-between">
             <div class="space-y-2">
               <div class="flex items-center space-x-2">
-                <Badge :variant="getStatusVariant(playbook.status)">
+                <Badge :variant="getStatusVariant(playbook.status || 'draft')">
                   {{ playbook.status }}
                 </Badge>
               </div>
@@ -160,7 +160,7 @@
               <span class="text-neutral-muted">Agents:</span>
               <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div v-if="playbook.created_at" class="flex items-center justify-between text-sm">
               <span class="text-neutral-muted">Created:</span>
               <span class="font-medium">{{ formatDate(new Date(playbook.created_at)) }}</span>
             </div>
@@ -205,12 +205,12 @@
                 </td>
                 <td class="py-3 px-4 text-sm">{{ playbook.agents?.length || 0 }} agents</td>
                 <td class="py-3 px-4">
-                  <Badge :variant="getStatusVariant(playbook.status)">
+                  <Badge :variant="getStatusVariant(playbook.status || 'draft')">
                     {{ playbook.status }}
                   </Badge>
                 </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ formatDate(new Date(playbook.created_at)) }}
+                  {{ playbook.created_at ? formatDate(new Date(playbook.created_at)) : '-' }}
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">

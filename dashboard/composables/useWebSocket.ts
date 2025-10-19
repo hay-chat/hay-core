@@ -32,13 +32,11 @@ export function useWebSocket() {
       ws.value = createAuthenticatedWebSocket();
 
       if (!ws.value) {
-        console.error("Failed to create WebSocket connection");
         scheduleReconnect();
         return;
       }
 
       ws.value.onopen = () => {
-        console.log("WebSocket connected");
         isConnected.value = true;
         reconnectAttempts.value = 0;
 
@@ -57,16 +55,12 @@ export function useWebSocket() {
       };
 
       ws.value.onclose = () => {
-        console.log("WebSocket disconnected");
         isConnected.value = false;
         scheduleReconnect();
       };
 
-      ws.value.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
+      ws.value.onerror = (error) => {};
     } catch (error) {
-      console.error("WebSocket connection error:", error);
       scheduleReconnect();
     }
   };
@@ -76,7 +70,6 @@ export function useWebSocket() {
    */
   const scheduleReconnect = () => {
     if (reconnectAttempts.value >= maxReconnectAttempts) {
-      console.error("Max reconnection attempts reached");
       return;
     }
 
@@ -87,8 +80,6 @@ export function useWebSocket() {
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value), 30000);
     reconnectAttempts.value++;
 
-    console.log(`Scheduling reconnect attempt ${reconnectAttempts.value} in ${delay}ms`);
-
     reconnectTimeout = setTimeout(() => {
       connect();
     }, delay);
@@ -98,22 +89,16 @@ export function useWebSocket() {
    * Handle incoming WebSocket message
    */
   const handleMessage = (message: WebSocketMessage) => {
-    console.log("[WebSocket] Received message:", message.type, message);
-
     // Emit to registered event handlers
     const handlers = eventHandlers.get(message.type);
     if (handlers) {
-      console.log(`[WebSocket] Found ${handlers.size} handlers for ${message.type}`);
       handlers.forEach((handler) => {
         try {
           handler(message.payload);
-        } catch (error) {
-          console.error(`Error in WebSocket event handler for ${message.type}:`, error);
-        }
+        } catch (error) {}
       });
     } else {
       // Use debug level for unknown message types to reduce noise
-      console.debug(`[WebSocket] No handlers registered for ${message.type}`);
     }
 
     // Handle built-in events
@@ -135,7 +120,6 @@ export function useWebSocket() {
         break;
 
       case "connected":
-        console.log("WebSocket connection confirmed:", message);
         break;
 
       default:
@@ -153,8 +137,6 @@ export function useWebSocket() {
     title?: string;
     customerName?: string;
   }) => {
-    console.log("Conversation status changed:", payload);
-
     // Show notification if conversation needs human attention
     if (payload.status === "pending-human") {
       await notifications.notifyConversationNeedsAttention({
@@ -174,8 +156,6 @@ export function useWebSocket() {
     userName: string;
     previousOwnerId?: string;
   }) => {
-    console.log("Conversation taken over:", payload);
-
     // Get current user from user store
     const { useUserStore } = await import("@/stores/user");
     const userStore = useUserStore();
@@ -188,7 +168,7 @@ export function useWebSocket() {
       toast.warning(
         "Conversation Taken Over",
         `${payload.userName} has taken over the conversation you were handling`,
-        10000
+        10000,
       );
     }
   };
@@ -203,8 +183,6 @@ export function useWebSocket() {
     userName: string;
     returnToMode: "ai" | "queue";
   }) => {
-    console.log("Conversation released:", payload);
-
     // If released back to queue, notify available agents
     if (payload.returnToMode === "queue" && payload.newStatus === "pending-human") {
       const { useToast } = await import("@/composables/useToast");
@@ -212,7 +190,7 @@ export function useWebSocket() {
       toast.info(
         "Conversation Available",
         `${payload.userName} returned a conversation to the queue`,
-        5000
+        5000,
       );
     }
   };
@@ -224,7 +202,6 @@ export function useWebSocket() {
     if (ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify(message));
     } else {
-      console.warn("WebSocket not connected, cannot send message");
     }
   };
 

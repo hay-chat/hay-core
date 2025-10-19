@@ -59,36 +59,38 @@
 
           <!-- Description Field -->
           <div class="space-y-2">
-            <label for="description" class="text-sm font-medium"> Description </label>
-            <Textarea
-              id="description"
+            <Input
               v-model="form.description"
+              label="Description"
+              type="textarea"
               placeholder="Describe what this playbook does..."
               :rows="3"
             />
           </div>
 
           <!-- Instructions Field -->
-          <InstructionsEditor
-            v-model="form.instructions"
+          <InstructionsTiptap
+            ref="instructionsEditorRef"
+            :initial-data="form.instructions"
             label="Instructions"
-            :loading="loadingInstructions"
             hint="Create numbered step-by-step instructions that agents will follow when executing this playbook"
             :error="errors.instructions"
           />
 
           <!-- Status Field -->
           <div class="space-y-2">
-            <label for="status" class="text-sm font-medium">Status</label>
-            <select
+            <Input
               id="status"
               v-model="form.status"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md"
-            >
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
-            </select>
+              type="select"
+              label="Status"
+              :options="[
+                { label: 'Draft', value: 'draft' },
+                { label: 'Active', value: 'active' },
+                { label: 'Archived', value: 'archived' },
+              ]"
+              class="w-full"
+            />
           </div>
 
           <!-- Agent Selection -->
@@ -123,8 +125,10 @@
 
           <!-- Metadata (only in edit mode) -->
           <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-neutral-muted">
-            <div>Created: {{ formatDate(playbook.created_at) }}</div>
-            <div>Last updated: {{ formatDate(playbook.updated_at) }}</div>
+            <div v-if="playbook.created_at">Created: {{ formatDate(playbook.created_at) }}</div>
+            <div v-if="playbook.updated_at">
+              Last updated: {{ formatDate(playbook.updated_at) }}
+            </div>
           </div>
 
           <!-- Form Actions -->
@@ -239,7 +243,7 @@ const form = ref({
   title: "",
   trigger: "",
   description: "",
-  instructions: [] as InstructionData[],
+  instructions: { blocks: [] } as any,
   status: "draft" as PlaybookStatus,
   agentIds: [] as string[],
 });
@@ -247,6 +251,9 @@ const form = ref({
 // UI state
 const loading = ref(false);
 const isSubmitting = ref(false);
+
+// Editor refs
+const instructionsEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
 const playbook = ref<
@@ -275,7 +282,11 @@ const {
   showConfirmDialog,
   confirmDialogConfig,
   handleDialogCancel,
-} = useUnsavedChanges(initialForm, form, computed(() => !loading.value && !isSubmitting.value));
+} = useUnsavedChanges(
+  initialForm,
+  form,
+  computed(() => !loading.value && !isSubmitting.value),
+);
 
 // Format date
 const formatDate = (date: string | Date) => {
@@ -317,9 +328,7 @@ onMounted(async () => {
         title: playbookResponse.title,
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
-        instructions: Array.isArray(playbookResponse.instructions)
-          ? (playbookResponse.instructions as InstructionData[])
-          : [],
+        instructions: playbookResponse.instructions || { blocks: [] },
         status: playbookResponse.status,
         agentIds: playbookResponse.agents?.map((a) => a.id) || [],
       };
@@ -380,11 +389,14 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
 
+    // Save editor data before submitting
+    const savedInstructions = await instructionsEditorRef.value?.save();
+
     const payload = {
       title: form.value.title,
       trigger: form.value.trigger,
       description: form.value.description || undefined,
-      instructions: form.value.instructions.length > 0 ? form.value.instructions : null,
+      instructions: savedInstructions || { blocks: [] },
       status: form.value.status,
       agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
     };

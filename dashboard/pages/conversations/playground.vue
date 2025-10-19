@@ -523,8 +523,12 @@ const pollConversation = async () => {
         id: msg.id,
         content: msg.content,
         timestamp: msg.created_at,
+        created_at: msg.created_at,
         type: msg.type,
         sender,
+        metadata: msg.metadata,
+        attachments: msg.attachments,
+        status: msg.status,
       };
     });
 

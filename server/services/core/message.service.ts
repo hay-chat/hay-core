@@ -4,10 +4,9 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { Agent } from "@server/database/entities/agent.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { DeliveryState } from "@server/types/message-feedback.types";
-import type { ToolCall } from "@server/orchestrator/types";
 
 export class MessageService {
-  private messageRepository: MessageRepository;
+  public messageRepository: MessageRepository;
 
   constructor() {
     this.messageRepository = new MessageRepository();
@@ -23,30 +22,6 @@ export class MessageService {
       type: MessageType.SYSTEM,
       sender: "system",
       metadata: systemMessage.metadata || {},
-      usage_metadata: null,
-    });
-  }
-
-  async saveToolMessage(
-    conversation: Conversation,
-    toolCall: ToolCall,
-    toolResult: unknown,
-    success: boolean = true,
-    latencyMs: number = 0,
-  ): Promise<Message> {
-    const content = success
-      ? `Tool "${toolCall.name}" executed successfully`
-      : `Tool "${toolCall.name}" failed`;
-
-    return await this.messageRepository.create({
-      conversation_id: conversation.id,
-      content,
-      type: MessageType.TOOL_RESPONSE,
-      sender: "system",
-      metadata: {
-        latency_ms: latencyMs,
-        ...(toolResult as Record<string, unknown>),
-      } as Record<string, unknown>,
       usage_metadata: null,
     });
   }
@@ -89,21 +64,6 @@ export class MessageService {
       sender: "assistant",
       metadata,
       usage_metadata: usageMetadata,
-    };
-  }
-
-  createToolCallResponse(
-    toolCall: ToolCall,
-    metadata: Record<string, unknown> = {},
-  ): Partial<Message> {
-    return {
-      content: JSON.stringify(toolCall),
-      type: MessageType.TOOL_CALL,
-      sender: "assistant",
-      metadata: {
-        ...metadata,
-      } as Record<string, unknown>,
-      usage_metadata: null,
     };
   }
 

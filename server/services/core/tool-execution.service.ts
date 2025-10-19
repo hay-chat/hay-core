@@ -48,19 +48,11 @@ export class ToolExecutionService {
 
   async handleToolExecution(
     conversation: Conversation,
-    toolMessage: Partial<Message>,
+    toolCall: { name: string; args: Record<string, unknown> },
+    messageId?: string,
   ): Promise<ToolExecutionResult> {
     try {
-      const toolCall = toolMessage.metadata?.tool_call;
-      if (!toolCall) {
-        console.warn("Tool call message missing tool_call metadata");
-        return {
-          success: false,
-          error: "Tool call message missing tool_call metadata",
-        };
-      }
-
-      console.log(`Executing tool: ${toolCall.tool_name} with args:`, toolCall.arguments);
+      console.log(`Executing tool: ${toolCall.name} with args:`, toolCall.args);
 
       const currentContext = conversation.orchestration_status as ConversationContext | null;
       if (currentContext) {
@@ -79,33 +71,45 @@ export class ToolExecutionService {
           idempotencyKey: string;
         } = {
           turn: currentContext.lastTurn + 1,
-          name: toolCall.tool_name,
-          input: toolCall.arguments,
+          name: toolCall.name,
+          input: toolCall.args,
           ok: false,
           latencyMs: 0,
           idempotencyKey: uuidv4(),
         };
 
         const startTime = Date.now();
+        const executedAt = new Date().toISOString();
+
         try {
           console.log(`[ToolExecutionService] Executing tool call:`, toolCall);
-          const result = await this.executeToolCall(conversation, toolCall);
+          const result = await this.executeToolCall(conversation, {
+            tool_name: toolCall.name,
+            arguments: toolCall.args,
+          });
           console.log(`[ToolExecutionService] Tool call result:`, result);
 
           toolLogEntry.ok = true;
           toolLogEntry.result = result;
           toolLogEntry.latencyMs = Date.now() - startTime;
 
-          await this.messageService.saveToolMessage(
-            conversation,
-            {
-              name: toolCall.tool_name,
-              args: toolCall.arguments,
-            },
-            result,
-            true,
-            toolLogEntry.latencyMs,
-          );
+          // Update the message with the result
+          if (messageId) {
+            const message = await this.messageService.messageRepository.findById(messageId);
+            if (message) {
+              await this.messageService.messageRepository.update(messageId, {
+                content: `Action completed: ${toolCall.name}`,
+                metadata: {
+                  ...message.metadata,
+                  toolOutput: result,
+                  toolStatus: "SUCCESS",
+                  toolLatencyMs: toolLogEntry.latencyMs,
+                  toolExecutedAt: executedAt,
+                  httpStatus: 200,
+                },
+              });
+            }
+          }
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
@@ -120,16 +124,23 @@ export class ToolExecutionService {
           toolLogEntry.result = err.message || "Unknown error";
           toolLogEntry.latencyMs = Date.now() - startTime;
 
-          await this.messageService.saveToolMessage(
-            conversation,
-            {
-              name: toolCall.tool_name,
-              args: toolCall.arguments,
-            },
-            { error: err.message },
-            false,
-            toolLogEntry.latencyMs,
-          );
+          // Update the message with the error
+          if (messageId) {
+            const message = await this.messageService.messageRepository.findById(messageId);
+            if (message) {
+              await this.messageService.messageRepository.update(messageId, {
+                content: `Action failed: ${toolCall.name}`,
+                metadata: {
+                  ...message.metadata,
+                  toolOutput: { error: err.message },
+                  toolStatus: "ERROR",
+                  toolLatencyMs: toolLogEntry.latencyMs,
+                  toolExecutedAt: executedAt,
+                  httpStatus: 500,
+                },
+              });
+            }
+          }
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
