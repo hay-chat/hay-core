@@ -5,56 +5,88 @@
       class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
       <div class="flex items-center justify-between px-6 py-4">
-        <div class="flex items-center space-x-4">
-          <Button variant="ghost" @click="goBack">
-            <ArrowLeft class="h-4 w-4 mr-2" />
-            Back to Conversations
-          </Button>
-          <div>
-            <h1 class="text-xl font-semibold">
-              {{ conversation?.title || "Loading..." }}
-            </h1>
-            <p class="text-sm text-neutral-muted">
-              Conversation #{{ conversation?.id?.slice(0, 8) }}
-            </p>
+        <!-- Playground Mode Header -->
+        <template v-if="isPlaygroundMode">
+          <div class="flex items-center space-x-4">
+            <Button variant="ghost" @click="exitPlayground">
+              <X class="h-4 w-4 mr-2" />
+              Exit Playground
+            </Button>
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 class="text-xl font-semibold">Conversation Playground</h1>
+                <Badge variant="outline" class="text-xs">
+                  <Info class="h-3 w-3 mr-1" />
+                  Auto-sends
+                </Badge>
+              </div>
+              <p class="text-sm text-neutral-muted">
+                Test conversations with AI • Messages auto-send • Use
+                <ThumbsUp class="icon" />/<ThumbsDown class="icon" /> to rate quality
+              </p>
+            </div>
           </div>
-        </div>
-        <div class="flex items-center space-x-2">
-          <Badge :variant="getStatusVariant(conversation?.status)">
-            <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
-            {{ formatStatus(conversation?.status) }}
-          </Badge>
-          <Badge
-            v-if="isTestMode"
-            :variant="isTestMode ? 'default' : 'secondary'"
-            class="bg-orange-100 text-orange-700 hover:bg-orange-200"
-          >
-            <ShieldAlert class="h-3 w-3 mr-1" />
-            Test Mode: {{ isTestMode ? "ON" : "OFF" }}
-          </Badge>
-          <Button variant="outline" size="sm" @click="exportConversation">
-            <Download class="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button
-            v-if="conversation?.status === 'open'"
-            variant="outline"
-            size="sm"
-            :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
-            @click="toggleSupervisionMode"
-          >
-            <Eye class="h-4 w-4 mr-2" />
-            {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
-          </Button>
-          <Button
-            v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
-            size="sm"
-            @click="takeOverConversation"
-          >
-            <UserCheck class="h-4 w-4 mr-2" />
-            Take Over
-          </Button>
-        </div>
+          <div class="flex items-center space-x-2">
+            <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
+              <RefreshCw class="h-4 w-4 mr-2" />
+              New Test
+            </Button>
+          </div>
+        </template>
+
+        <!-- Regular Conversation Header -->
+        <template v-else>
+          <div class="flex items-center space-x-4">
+            <Button variant="ghost" @click="goBack">
+              <ArrowLeft class="h-4 w-4 mr-2" />
+              Back to Conversations
+            </Button>
+            <div>
+              <h1 class="text-xl font-semibold">
+                {{ conversation?.title || "Loading..." }}
+              </h1>
+              <p class="text-sm text-neutral-muted">
+                Conversation #{{ conversation?.id?.slice(0, 8) }}
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <Badge :variant="getStatusVariant(conversation?.status)">
+              <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
+              {{ formatStatus(conversation?.status) }}
+            </Badge>
+            <Badge
+              v-if="isTestMode"
+              :variant="isTestMode ? 'default' : 'secondary'"
+              class="bg-orange-100 text-orange-700 hover:bg-orange-200"
+            >
+              <ShieldAlert class="h-3 w-3 mr-1" />
+              Test Mode: {{ isTestMode ? "ON" : "OFF" }}
+            </Badge>
+            <Button variant="outline" size="sm" @click="exportConversation">
+              <Download class="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button
+              v-if="conversation?.status === 'open'"
+              variant="outline"
+              size="sm"
+              :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
+              @click="toggleSupervisionMode"
+            >
+              <Eye class="h-4 w-4 mr-2" />
+              {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
+            </Button>
+            <Button
+              v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
+              size="sm"
+              @click="takeOverConversation"
+            >
+              <UserCheck class="h-4 w-4 mr-2" />
+              Take Over
+            </Button>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -64,7 +96,65 @@
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
-          <div v-if="loading" class="space-y-4">
+          <!-- Playground Loading State -->
+          <div v-if="isPlaygroundMode && messagesLoading" class="space-y-4">
+            <div v-for="i in 3" :key="i" class="animate-pulse">
+              <div class="flex space-x-3">
+                <div class="w-8 h-8 bg-gray-200 rounded-full" />
+                <div class="flex-1">
+                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2" />
+                  <div class="h-10 bg-gray-200 rounded w-3/4" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Playground Empty State -->
+          <div
+            v-else-if="isPlaygroundMode && messages.length === 0"
+            class="text-center py-12"
+          >
+            <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
+            <p class="text-neutral-muted">Send a message to start testing</p>
+          </div>
+
+          <!-- Playground Messages -->
+          <div v-else-if="isPlaygroundMode" class="space-y-4">
+            <ChatMessage
+              v-for="message in messages"
+              :key="message.id"
+              :message="message"
+              :inverted="true"
+              :show-feedback="true"
+            />
+
+            <!-- Agent Typing indicator -->
+            <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
+              <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                <Bot class="h-4 w-4 text-primary" />
+              </div>
+              <div class="flex-1">
+                <div class="bg-background-tertiary p-3 rounded-lg">
+                  <div class="flex space-x-1">
+                    <div
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
+                    />
+                    <div
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
+                      style="animation-delay: 0.1s"
+                    />
+                    <div
+                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
+                      style="animation-delay: 0.2s"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Regular Conversation Loading State -->
+          <div v-else-if="loading" class="space-y-4">
             <div v-for="i in 5" :key="i" class="animate-pulse">
               <div class="flex space-x-3">
                 <div class="w-8 h-8 bg-gray-200 rounded-full" />
@@ -76,11 +166,13 @@
             </div>
           </div>
 
+          <!-- Regular Conversation Empty State -->
           <div v-else-if="conversation?.messages?.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
             <p class="text-neutral-muted">No messages in this conversation yet</p>
           </div>
 
+          <!-- Regular Conversation Messages -->
           <div v-else class="space-y-4">
             <!-- Conversation Start -->
             <div class="text-center">
@@ -157,11 +249,17 @@
           </div>
         </div>
 
-        <!-- Message Input (when conversation is taken over by current user) -->
-        <div v-if="isTakenOverByCurrentUser" class="border-t p-4">
+        <!-- Message Input (playground mode or when conversation is taken over by current user) -->
+        <div v-if="isPlaygroundMode || isTakenOverByCurrentUser" class="border-t p-4 bg-background">
           <form @submit.prevent="sendMessage" class="flex space-x-3">
-            <Input v-model="newMessage" placeholder="Type your message..." class="flex-1" />
-            <Button type="submit" :disabled="!newMessage.trim() || isSendingMessage">
+            <Input
+              v-model="newMessage"
+              :placeholder="isPlaygroundMode ? 'Type your test message...' : 'Type your message...'"
+              class="flex-1"
+              :disabled="isPlaygroundMode && !conversation"
+              @keyup.enter="sendMessage"
+            />
+            <Button type="submit" :disabled="!newMessage.trim() || isSendingMessage || (isPlaygroundMode && !conversation)">
               <Send class="h-4 w-4" />
             </Button>
           </form>
@@ -171,6 +269,109 @@
       <!-- Right Side: Context Panel -->
       <div class="w-80 border-l bg-background-tertiary">
         <div class="p-6 space-y-6">
+          <!-- Playground Mode Panels -->
+          <template v-if="isPlaygroundMode">
+            <!-- Orchestrator Status -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base flex items-center">
+                  <Activity class="h-4 w-4 mr-2" />
+                  Orchestrator Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Status:</span>
+                  <Badge :variant="orchestratorStatus === 'processing' ? 'default' : 'secondary'">
+                    {{ orchestratorStatus }}
+                  </Badge>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Last Check:</span>
+                  <span>{{ lastOrchestratorCheck || "Never" }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Messages:</span>
+                  <span>{{ messages.length }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Needs Processing:</span>
+                  <span>{{ conversation?.needs_processing }}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <!-- Test Scenarios -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Test Scenarios </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="w-full justify-start"
+                  @click="sendQuickMessage('What are your business hours?')"
+                >
+                  <Clock class="h-4 w-4 mr-2" />
+                  Ask About Hours
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="w-full justify-start"
+                  @click="sendQuickMessage('I need help with my account')"
+                >
+                  <HelpCircle class="h-4 w-4 mr-2" />
+                  Request Support
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="w-full justify-start"
+                  @click="sendQuickMessage('I want to cancel my subscription')"
+                >
+                  <DollarSign class="h-4 w-4 mr-2" />
+                  Cancel Subscription
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="w-full justify-start"
+                  @click="sendQuickMessage('I want to speak to a human')"
+                >
+                  <UserCheck class="h-4 w-4 mr-2" />
+                  Request Human
+                </Button>
+              </CardContent>
+            </Card>
+
+            <!-- Testing Tips -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Testing Tips </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul class="text-sm space-y-2 text-neutral-muted">
+                  <li class="flex items-start">
+                    <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Test different message types to see AI responses</span>
+                  </li>
+                  <li class="flex items-start">
+                    <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Try switching playbooks to test different scenarios</span>
+                  </li>
+                  <li class="flex items-start">
+                    <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Use "New Test" to start fresh with a new conversation</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </template>
+
+          <!-- Regular Conversation Panels -->
+          <template v-else>
           <!-- Customer Information -->
           <Card>
             <CardHeader>
@@ -309,6 +510,7 @@
               </div>
             </CardContent>
           </Card>
+          </template>
         </div>
       </div>
     </div>
@@ -393,6 +595,15 @@ import {
   XCircle,
   User,
   ShieldAlert,
+  X,
+  RefreshCw,
+  Bot,
+  Activity,
+  HelpCircle,
+  DollarSign,
+  Info,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import Badge from "@/components/ui/Badge.vue";
@@ -452,7 +663,13 @@ interface RelatedArticle {
 
 // Get conversation ID from route
 const route = useRoute();
-const conversationId = route.params["id"] as string;
+const routeId = route.params["id"] as string;
+
+// Detect playground mode (similar to playbooks detecting "new")
+const isPlaygroundMode = computed(() => routeId === "playground");
+
+// Conversation ID - will be set after creating playground conversation
+const conversationId = ref<string>(routeId);
 
 // Reactive state
 const loading = ref(true);
@@ -461,6 +678,15 @@ const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
+
+// Playground-specific state
+const isResetting = ref(false);
+const messagesLoading = ref(false);
+const isAgentTyping = ref(false);
+const orchestratorStatus = ref("idle");
+const lastOrchestratorCheck = ref("");
+const processingCount = ref(0);
+const messages = ref<any[]>([]);
 
 // Data from API - Use any to handle multiple possible response formats
 const conversation = ref<any>(null);
@@ -515,6 +741,60 @@ const handleFeedbackSubmitted = () => {
 
 const goBack = () => {
   navigateTo("/conversations");
+};
+
+// Playground-specific functions
+const exitPlayground = () => {
+  navigateTo("/conversations");
+};
+
+const createTestConversation = async () => {
+  try {
+    messagesLoading.value = true;
+
+    const response = await HayApi.conversations.create.mutate({
+      title: "Playground Test - " + new Date().toLocaleTimeString(),
+      metadata: {
+        sourceId: "playground",
+        test_mode: true,
+      },
+      status: "open",
+    });
+
+    conversation.value = response;
+    conversationId.value = response.id;
+    messages.value = [];
+  } catch (error) {
+    console.error("Failed to create test conversation:", error);
+  } finally {
+    messagesLoading.value = false;
+  }
+};
+
+const resetConversation = async () => {
+  try {
+    isResetting.value = true;
+
+    // Close current conversation if exists
+    if (conversation.value) {
+      await HayApi.conversations.update.mutate({
+        id: conversation.value.id,
+        data: { status: "closed" },
+      });
+    }
+
+    // Create new conversation
+    await createTestConversation();
+  } catch (error) {
+    console.error("Failed to reset conversation:", error);
+  } finally {
+    isResetting.value = false;
+  }
+};
+
+const sendQuickMessage = async (message: string) => {
+  newMessage.value = message;
+  await sendMessage();
 };
 
 const getStatusVariant = (
@@ -595,14 +875,14 @@ const takeOverConversation = async () => {
 
   try {
     await HayApi.conversations.takeover.mutate({
-      conversationId,
+      conversationId: conversationId.value,
     });
     humanTakeover.value = true;
     supervisionMode.value = false;
     toast.success("Conversation taken over", "You are now handling this conversation");
     // Refresh conversation and assigned user
     await fetchConversation();
-    assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId });
+    assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId: conversationId.value });
   } catch (error: any) {
     console.error("Failed to take over conversation:", error);
     const errorMessage = error?.message || error?.data?.message || "Failed to take over conversation";
@@ -621,7 +901,7 @@ const confirmRelease = async () => {
 
   try {
     await HayApi.conversations.release.mutate({
-      conversationId,
+      conversationId: conversationId.value,
       returnToMode: releaseMode.value,
     });
     humanTakeover.value = false;
@@ -647,7 +927,7 @@ const confirmClose = async () => {
 
   try {
     await HayApi.conversations.close.mutate({
-      conversationId,
+      conversationId: conversationId.value,
     });
     showCloseDialog.value = false;
     toast.success("Conversation closed", "This conversation has been marked as closed");
@@ -666,11 +946,33 @@ const isSendingMessage = ref(false);
 const sendMessage = async () => {
   if (!newMessage.value.trim() || isSendingMessage.value) return;
 
+  // Generate a unique ID for the temp message (for playground mode)
+  const tempMessageId = Date.now().toString();
+
   isSendingMessage.value = true;
   const messageContent = newMessage.value;
   newMessage.value = ""; // Clear immediately to prevent double-send
 
   try {
+    // Playground mode: Add message to UI immediately and show typing
+    if (isPlaygroundMode.value) {
+      isAgentTyping.value = true;
+
+      const tempMessage = {
+        id: tempMessageId,
+        sender: "customer",
+        content: messageContent,
+        timestamp: new Date(),
+        type: "HumanMessage",
+      };
+      messages.value.push(tempMessage);
+      scrollToBottom();
+
+      // Update orchestrator status
+      orchestratorStatus.value = "processing";
+      processingCount.value++;
+    }
+
     // Send message via API
     // When conversation is taken over by current user, send as assistant (human agent)
     const role = isTakenOverByCurrentUser.value ? "assistant" : "user";
@@ -679,7 +981,7 @@ const sendMessage = async () => {
       : MessageType.CUSTOMER;
 
     const result = await HayApi.conversations.sendMessage.mutate({
-      conversationId,
+      conversationId: conversationId.value,
       content: messageContent,
       role,
     });
@@ -687,27 +989,47 @@ const sendMessage = async () => {
     // Play message sent sound
     playSound("/sounds/message-sent.mp3");
 
-    // Add message to local list
-    if (conversation.value && conversation.value.messages) {
-      conversation.value.messages.push({
-        id: result.id,
-        content: messageContent,
-        type: messageType,
-        created_at: new Date().toISOString(),
-        conversation_id: conversationId,
-        updated_at: new Date().toISOString(),
-        status: "approved",
-      });
+    // Playground mode: Update temp message with actual message from server
+    if (isPlaygroundMode.value) {
+      const messageIndex = messages.value.findIndex((m) => m.id === tempMessageId);
+      if (messageIndex !== -1) {
+        messages.value[messageIndex] = {
+          ...result,
+          sender: "customer",
+          timestamp: result.created_at,
+        };
+      }
+    } else {
+      // Regular mode: Add message to local list
+      if (conversation.value && conversation.value.messages) {
+        conversation.value.messages.push({
+          id: result.id,
+          content: messageContent,
+          type: messageType,
+          created_at: new Date().toISOString(),
+          conversation_id: conversationId.value,
+          updated_at: new Date().toISOString(),
+          status: "approved",
+        });
+      }
     }
 
     scrollToBottom();
 
     // Refresh messages after a short delay to get any AI response (skip if taken over)
-    if (!isTakenOverByCurrentUser.value) {
+    // In playground mode, WebSocket will handle updates
+    if (!isTakenOverByCurrentUser.value && !isPlaygroundMode.value) {
       setTimeout(() => fetchConversation(), 2000);
     }
   } catch (error) {
     console.error("Failed to send message:", error);
+
+    // Playground mode: Remove temp message on error
+    if (isPlaygroundMode.value) {
+      messages.value = messages.value.filter((m) => m.id !== tempMessageId);
+      isAgentTyping.value = false;
+    }
+
     // Restore message on error
     newMessage.value = messageContent;
   } finally {
@@ -757,12 +1079,15 @@ const previousMessageCount = ref(0);
 
 // Fetch conversation data
 const fetchConversation = async () => {
+  // Skip if in playground mode and no conversation ID yet
+  if (isPlaygroundMode.value && !conversationId.value) return;
+
   try {
     // Only show loading skeleton on initial load
     if (!conversation.value) {
       loading.value = true;
     }
-    const result = await HayApi.conversations.get.query({ id: conversationId });
+    const result = await HayApi.conversations.get.query({ id: conversationId.value });
 
     // Check if new messages were received
     const currentMessageCount = result.messages?.length || 0;
@@ -782,13 +1107,56 @@ const fetchConversation = async () => {
 
     conversation.value = result;
 
-    // Fetch assigned user info if conversation is taken over
-    if (result.status === "human-took-over") {
-      assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId });
-      humanTakeover.value = assignedUser.value?.id === currentUserId.value;
+    // Playground mode: Transform messages for display
+    if (isPlaygroundMode.value) {
+      const allMessages = result.messages || [];
+
+      // Transform messages to match the component format
+      const transformedMessages = allMessages.map((msg: any) => {
+        let sender = "system";
+        if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
+          sender = "agent";
+        } else if (msg.type === "HumanMessage" || msg.type === "HUMAN_MESSAGE") {
+          sender = "customer";
+        } else if (msg.sender) {
+          sender =
+            msg.sender === "assistant" ? "agent" : msg.sender === "user" ? "customer" : msg.sender;
+        }
+
+        return {
+          id: msg.id,
+          content: msg.content,
+          timestamp: msg.created_at,
+          created_at: msg.created_at,
+          type: msg.type,
+          sender,
+          metadata: msg.metadata,
+          attachments: msg.attachments,
+          status: msg.status,
+        };
+      });
+
+      // Check if we have new messages
+      if (transformedMessages.length > messages.value.length) {
+        messages.value = transformedMessages;
+        isAgentTyping.value = false;
+        scrollToBottom();
+      }
+
+      // Update orchestrator status
+      lastOrchestratorCheck.value = new Date().toLocaleTimeString();
+      orchestratorStatus.value = result.status;
     } else {
-      assignedUser.value = null;
-      humanTakeover.value = false;
+      // Fetch assigned user info if conversation is taken over
+      if (result.status === "human-took-over") {
+        assignedUser.value = await HayApi.conversations.getAssignedUser.query({
+          conversationId: conversationId.value,
+        });
+        humanTakeover.value = assignedUser.value?.id === currentUserId.value;
+      } else {
+        assignedUser.value = null;
+        humanTakeover.value = false;
+      }
     }
   } catch (error) {
     console.error("Failed to fetch conversation:", error);
@@ -819,8 +1187,13 @@ let unsubscribeStatusChanged: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch conversation and messages in parallel
-  await Promise.all([fetchConversation()]);
+  // Playground mode: Create test conversation first
+  if (isPlaygroundMode.value) {
+    await createTestConversation();
+  } else {
+    // Regular mode: Fetch conversation
+    await Promise.all([fetchConversation()]);
+  }
 
   // Setup WebSocket connection for real-time updates
   websocket.connect();
@@ -828,7 +1201,7 @@ onMounted(async () => {
   // Listen for new messages
   unsubscribeMessageReceived = websocket.on("message_received", async (payload: any) => {
     console.log("[WebSocket] Received message_received event", payload);
-    if (payload.conversationId === conversationId) {
+    if (payload.conversationId === conversationId.value) {
       // Skip refresh only if in takeover mode AND the message is from a human agent (our sent message)
       if (isTakenOverByCurrentUser.value && payload.messageType === MessageType.HUMAN_AGENT) {
         console.log("[WebSocket] In takeover mode, skipping refresh for human agent message");
@@ -839,14 +1212,14 @@ onMounted(async () => {
       scrollToBottom();
     } else {
       console.log(
-        `[WebSocket] Message for different conversation (current: ${conversationId}, received: ${payload.conversationId})`,
+        `[WebSocket] Message for different conversation (current: ${conversationId.value}, received: ${payload.conversationId})`,
       );
     }
   });
 
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
-    if (payload.conversationId === conversationId) {
+    if (payload.conversationId === conversationId.value) {
       console.log("[WebSocket] Conversation status changed, refreshing");
       await fetchConversation();
     }
@@ -858,6 +1231,16 @@ onUnmounted(() => {
   // Cleanup WebSocket event handlers
   if (unsubscribeMessageReceived) unsubscribeMessageReceived();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
+
+  // Close test conversation in playground mode
+  if (isPlaygroundMode.value && conversation.value) {
+    HayApi.conversations.update
+      .mutate({
+        id: conversation.value.id,
+        data: { status: "closed" },
+      })
+      .catch(console.error);
+  }
 });
 
 // Set page meta
