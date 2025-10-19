@@ -1,0 +1,77 @@
+{
+  "$schema": "../base/plugin-manifest.schema.json",
+  "id": "hay-plugin-hello-world",
+  "name": "Hello World",
+  "description": "A simple demo MCP plugin showing how to create list and post tools",
+  "version": "1.0.0",
+  "author": "Hay",
+  "type": ["mcp-connector"],
+  "entry": "./mcp/index.js",
+  "enabled": true,
+  "category": "utility",
+  "icon": "sparkles",
+  "marketplace": {
+    "featured": false,
+    "tags": ["demo", "example", "tutorial", "hello-world"]
+  },
+  "capabilities": {
+    "mcp": {
+      "tools": [
+        {
+          "name": "list_greetings",
+          "label": "List Greetings",
+          "description": "List available greetings in different languages",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "string",
+                "description": "Filter by language (e.g., 'en', 'es', 'fr')"
+              }
+            }
+          }
+        },
+        {
+          "name": "create_greeting",
+          "label": "Create Greeting",
+          "description": "Create a personalized Hello World greeting",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name to include in the greeting"
+              },
+              "language": {
+                "type": "string",
+                "description": "Language for the greeting (default: 'en')"
+              }
+            },
+            "required": ["name"]
+          }
+        }
+      ],
+      "transport": "stdio",
+      "auth": [],
+      "installCommand": "npm install",
+      "startCommand": "node mcp/index.js"
+    }
+  },
+  "permissions": {
+    "env": [],
+    "scopes": ["org:<orgId>:mcp:invoke"]
+  },
+  "configSchema": {
+    "defaultLanguage": {
+      "type": "string",
+      "description": "Default language for greetings",
+      "label": "Default Language",
+      "placeholder": "en",
+      "required": false,
+      "env": "HELLO_WORLD_DEFAULT_LANGUAGE"
+    }
+  },
+  "ui": {
+    "settings": false
+  }
+}
