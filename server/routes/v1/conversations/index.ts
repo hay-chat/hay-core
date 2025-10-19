@@ -2,8 +2,6 @@ import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType } from "../../../database/entities/message.entity";
-import { Hay } from "../../../services/hay.service";
-import type { HayInputMessage } from "../../../services/hay.service";
 import { TRPCError } from "@trpc/server";
 import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
@@ -42,11 +40,6 @@ const messageSchema = z.object({
 const addMessageSchema = z.object({
   conversationId: z.string().uuid(),
   message: messageSchema,
-});
-
-const invokeSchema = z.object({
-  conversationId: z.string().uuid(),
-  messages: z.array(messageSchema),
 });
 
 const sendMessageSchema = z.object({
@@ -214,54 +207,6 @@ export const conversationsRouter = t.router({
     // which checks for MessageIntent.CLOSE_SATISFIED or CLOSE_UNSATISFIED
 
     return message;
-  }),
-
-  invoke: authenticatedProcedure.input(invokeSchema).mutation(async ({ ctx, input }) => {
-    const conversation = await conversationService.getConversation(
-      input.conversationId,
-      ctx.organizationId!,
-    );
-
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    Hay.init();
-
-    const response = await Hay.invokeConversation(
-      input.conversationId,
-      ctx.organizationId!,
-      input.messages as HayInputMessage[],
-    );
-
-    return response;
-  }),
-
-  invokeWithHistory: authenticatedProcedure.input(invokeSchema).mutation(async ({ ctx, input }) => {
-    const conversation = await conversationService.getConversation(
-      input.conversationId,
-      ctx.organizationId!,
-    );
-
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    Hay.init();
-
-    const response = await Hay.invokeWithHistory(
-      input.conversationId,
-      ctx.organizationId!,
-      input.messages as HayInputMessage[],
-    );
-
-    return response;
   }),
 
   sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {

@@ -63,21 +63,16 @@
             {{ message.metadata?.documentTitle }}
           </a>
         </div>
-        <div v-else-if="message.type === 'ToolCall' && message.metadata?.toolName">
-          <div class="chat-message__tool-call-title font-bold">
-            <Zap class="mr-2 h-4 w-4 inline" />
-            Running action &lt;{{ message.metadata?.toolName }}&gt;
-          </div>
-        </div>
-        <div v-else-if="message.type === 'ToolResponse'">
-          <div class="chat-message__tool-response-title font-bold">
-            <Zap class="mr-2 h-4 w-4 inline" /><template
-              v-if="message.metadata?.toolStatus === 'ERROR'"
-            >
-              Action failed
-            </template>
-            <template v-else> Action responded </template> &lt;{{ message.metadata?.toolName }}&gt;
-          </div>
+        <div v-else-if="message.type === 'Tool'">
+          <ToolExecutionViewer
+            :tool-name="message.metadata?.toolName"
+            :tool-input="message.metadata?.toolInput"
+            :tool-output="message.metadata?.toolOutput"
+            :tool-status="message.metadata?.toolStatus"
+            :http-status="message.metadata?.httpStatus"
+            :latency="message.metadata?.toolLatencyMs"
+            :executed-at="message.metadata?.toolExecutedAt"
+          />
         </div>
         <div v-else-if="message.type === 'System'">
           <div class="chat-message__system-title font-bold">
@@ -182,6 +177,7 @@ import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
 import MessageFeedbackControl from "@/components/MessageFeedbackControl.vue";
 import MessageApprovalDialog from "@/components/MessageApprovalDialog.vue";
+import ToolExecutionViewer from "@/components/ToolExecutionViewer.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
@@ -242,7 +238,7 @@ const systemMessageRef = ref<HTMLElement | null>(null);
 const isSystemExpandable = ref(false);
 const isSystemCollapsed = ref(false);
 const isCollapsibleVariant = computed(() =>
-  ["System", "ToolCall", "ToolResponse", "Document", "Playbook"].includes(props.message.type),
+  ["System", "Tool", "Document", "Playbook"].includes(props.message.type),
 );
 
 const checkSystemMessageHeight = async () => {
@@ -423,13 +419,12 @@ const avatarIcon = computed(() => {
   --bubble-fg: var(--color-green-700);
 }
 
-.chat-message--ToolCall,
-.chat-message--ToolResponse {
+.chat-message--Tool {
   --bubble-bg: var(--color-purple-50);
   --bubble-fg: var(--color-purple-700);
 }
 
-.chat-message--ToolResponse.chat-message--has-error {
+.chat-message--Tool.chat-message--has-error {
   --bubble-bg: var(--color-red-50);
   --bubble-fg: var(--color-red-700);
 }

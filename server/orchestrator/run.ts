@@ -138,14 +138,16 @@ export const runConversation = async (conversationId: string) => {
       shouldClose = closureValidation.shouldClose;
 
       if (!shouldClose) {
-        debugLog("orchestrator", 
+        debugLog(
+          "orchestrator",
           `Closure intent detected but validation failed: ${closureValidation.reason}`,
         );
       }
     }
 
     if (shouldClose) {
-      debugLog("orchestrator", 
+      debugLog(
+        "orchestrator",
         `User indicated closure intent (${intent.label}) with confidence ${intent.score}, marking conversation as resolved`,
       );
 
@@ -325,11 +327,11 @@ export const runConversation = async (conversationId: string) => {
 async function handleExecutionLoop(conversation: Conversation, customerLanguage?: string) {
   const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
-  const maxIterations = 5; // Prevent infinite loops
+  const MAX_ITERATIONS = 15; // Prevent infinite loops
   let iterations = 0;
   let handoffProcessed = false; // Track if handoff has been processed
 
-  while (iterations < maxIterations) {
+  while (iterations < MAX_ITERATIONS) {
     iterations++;
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
@@ -342,56 +344,26 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     }
 
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
-      // Add tool call message
-      await conversation.addMessage({
-        content: `Calling tool in the background: ${executionResult.tool.name}`,
-        type: MessageType.TOOL_CALL,
+      // Create unified tool message with initial state
+      const toolMessageId = await conversation.addMessage({
+        content: `Running action: ${executionResult.tool.name}`,
+        type: MessageType.TOOL,
         metadata: {
           toolName: executionResult.tool.name,
-          toolArgs: executionResult.tool.args,
-          toolStatus: "CALLING",
+          toolInput: executionResult.tool.args,
+          toolStatus: "RUNNING",
         },
       });
 
-      // Execute the tool
-      const toolMessage = {
-        type: MessageType.TOOL_CALL,
-        metadata: {
-          tool_call: {
-            tool_name: executionResult.tool.name,
-            arguments: executionResult.tool.args,
-          },
-        },
-      };
+      // Execute the tool with the message ID for updating
+      const toolResult = await toolExecutionService.handleToolExecution(
+        conversation,
+        executionResult.tool,
+        toolMessageId?.id,
+      );
 
-      const toolResult = await toolExecutionService.handleToolExecution(conversation, toolMessage);
-
-      if (toolResult.success) {
-        // Add tool response message
-        await conversation.addMessage({
-          content: `${JSON.stringify(toolResult.result)}`,
-          type: MessageType.TOOL_RESPONSE,
-          metadata: {
-            toolName: executionResult.tool.name,
-            toolResult: JSON.stringify(toolResult.result),
-            toolStatus: "SUCCESS",
-          },
-        });
-
-        // Continue the loop to let LLM analyze the result
-      } else {
-        // Add error message
-        await conversation.addMessage({
-          content: `Tool execution failed: ${toolResult.error}`,
-          type: MessageType.TOOL_RESPONSE,
-          metadata: {
-            toolName: executionResult.tool.name,
-            toolStatus: "ERROR",
-          },
-        });
-        debugLog("orchestrator", "Tool execution failed, continuing execution loop...");
-        // Continue the loop to let LLM handle the error
-      }
+      // The tool execution service now updates the message internally
+      // Continue the loop to let LLM analyze the result
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
       debugLog("orchestrator", "HANDOFF step detected");
@@ -553,7 +525,8 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
         });
-        debugLog("orchestrator", 
+        debugLog(
+          "orchestrator",
           "Added bot response " + executionResult.userMessage + ", ending execution loop",
         );
 
@@ -566,7 +539,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     }
   }
 
-  if (iterations >= maxIterations) {
-    debugLog("orchestrator", "Reached maximum execution iterations, ending loop", { level: "warn" });
+  if (iterations >= MAX_ITERATIONS) {
+    debugLog("orchestrator", "Reached maximum execution iterations, ending loop", {
+      level: "warn",
+    });
   }
 }

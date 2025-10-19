@@ -17,8 +17,7 @@ export enum MessageType {
   SYSTEM = "System",
   HUMAN_AGENT = "HumanAgent",
   BOT_AGENT = "BotAgent",
-  TOOL_CALL = "ToolCall",
-  TOOL_RESPONSE = "ToolResponse",
+  TOOL = "Tool",
   DOCUMENT = "Document",
   PLAYBOOK = "Playbook",
 }
@@ -99,19 +98,21 @@ export class Message {
     total_tokens?: number;
     latency_ms?: number;
     confidence?: number;
-    toolStatus?: string;
+    // Tool execution metadata
     toolName?: string;
-    toolArgs?: Record<string, unknown>;
-    toolResult?: Record<string, unknown>;
-    tool_call?: {
-      tool_name: string;
-      arguments: Record<string, unknown>;
-    };
+    toolInput?: Record<string, unknown>;
+    toolOutput?: unknown;
+    toolLatencyMs?: number;
+    httpStatus?: number;
+    toolStatus?: string;
+    toolExecutedAt?: string;
+    // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;
     playbookTitle?: string;
     documentId?: string;
     documentTitle?: string;
+    // Conversation management metadata
     isInactivityWarning?: boolean;
     warningTimestamp?: string;
     reason?: string;

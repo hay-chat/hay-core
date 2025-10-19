@@ -256,7 +256,7 @@ onMounted(() => {
   border: 1px solid var(--color-input);
   background-color: var(--color-background);
   padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--font-size-input);
   line-height: 1.25rem;
   outline: none;
   transition: box-shadow 0.2s;
@@ -284,7 +284,7 @@ onMounted(() => {
   &::file-selector-button {
     border: 0;
     background-color: transparent;
-    font-size: 0.875rem;
+    font-size: var(--font-size-input);
     line-height: 1.25rem;
     font-weight: 500;
   }
@@ -313,14 +313,14 @@ onMounted(() => {
 }
 
 .hint-text {
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   line-height: 1rem;
   color: var(--color-neutral-muted);
   margin: 0;
 }
 
 .error-text {
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   line-height: 1rem;
   color: var(--color-destructive);
   margin: 0;

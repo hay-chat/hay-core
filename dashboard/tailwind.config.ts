@@ -169,6 +169,16 @@ export default <Partial<Config>>{
         primary: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         secondary: ["Gabarito", "sans-serif"],
       },
+      fontSize: {
+        xs: "0.75rem",
+        sm: "0.875rem",
+        md: "1rem",
+        lg: "1.125rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
+        DEFAULT: "var(--font-size-md)",
+        input: "var(--font-size-sm)",
+      },
     },
   },
   plugins: [
@@ -210,6 +220,9 @@ export default <Partial<Config>>{
 
       const fontFamily = theme("fontFamily") as Record<string, string[]>;
       generateCssVars("font-family", fontFamily);
+
+      const fontSize = theme("fontSize") as Record<string, string>;
+      generateCssVars("font-size", fontSize);
 
       addBase({ ":root": cssVars });
     }),

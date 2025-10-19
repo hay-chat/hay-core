@@ -15,7 +15,7 @@ import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
 import { MessageType, MessageStatus } from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
-import { analyzeInstructions } from "../../utils/instruction-formatter";
+import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
 import { documentRepository } from "../../repositories/document.repository";
 import { debugLog } from "@server/lib/debug-logger";
 import { SupportedLanguage } from "../../types/language.types";
@@ -196,20 +196,16 @@ export class Conversation {
       return;
     }
 
-    // Handle different instruction formats
+    // Analyze Editor.js instructions
     let instructionText = "";
     let referencedActions: string[] = [];
     let referencedDocuments: string[] = [];
 
     if (playbook.instructions) {
-      if (typeof playbook.instructions === "string") {
-        instructionText = playbook.instructions;
-      } else if (Array.isArray(playbook.instructions)) {
-        const analysis = analyzeInstructions(playbook.instructions);
-        instructionText = analysis.formattedText;
-        referencedActions = analysis.actions;
-        referencedDocuments = analysis.documents;
-      }
+      const analysis = analyzeTiptapInstructions(playbook.instructions as any);
+      instructionText = analysis.formattedText;
+      referencedActions = analysis.actions;
+      referencedDocuments = analysis.documents;
     }
 
     // Log playbook addition with embedded references (only logs once per conversation per playbook)
@@ -369,13 +365,13 @@ The following tools are available for you to use. You MUST return only valid JSO
     // Initialize enabled tools array
     const enabledToolIds: string[] = [];
 
-    // Analyze instructions to extract actions and documents
+    // Analyze Editor.js instructions to extract actions and documents
     let instructionText = "";
     let referencedActions: string[] = [];
     let referencedDocuments: string[] = [];
 
-    if (Array.isArray(instructions) && instructions.length > 0) {
-      const analysis = analyzeInstructions(instructions as any);
+    if (instructions) {
+      const analysis = analyzeTiptapInstructions(instructions as any);
       instructionText = analysis.formattedText;
       referencedActions = analysis.actions;
       referencedDocuments = analysis.documents;

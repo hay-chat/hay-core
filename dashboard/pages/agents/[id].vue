@@ -41,10 +41,10 @@
               placeholder="Describe what this agent does..."
             />
             <!-- Instructions Field -->
-            <InstructionsEditor
-              v-model="form.instructions"
+            <InstructionsTiptap
+              ref="instructionsEditorRef"
+              :initial-data="form.instructions"
               label="Instructions"
-              :loading="loadingInstructions"
               hint="Define the general agent's behavior and how it should respond to users. DO NOT include any specific instructions for the agent to follow - use the Playbooks to define that."
               :error="errors.instructions"
             />
@@ -118,8 +118,8 @@
 
             <!-- Metadata (only in edit mode) -->
             <div v-if="isEditMode && agent" class="space-y-2 text-sm text-neutral-muted">
-              <div>Created: {{ formatDate(agent.created_at) }}</div>
-              <div>Last updated: {{ formatDate(agent.updated_at) }}</div>
+              <div v-if="agent.created_at">Created: {{ formatDate(agent.created_at) }}</div>
+              <div v-if="agent.updated_at">Last updated: {{ formatDate(agent.updated_at) }}</div>
             </div>
           </CardContent>
         </Card>
@@ -162,14 +162,16 @@
             >
           </CardHeader>
           <CardContent class="space-y-6">
-            <InstructionsEditor
-              v-model="form.humanHandoffAvailableInstructions"
+            <InstructionsTiptap
+              ref="handoffAvailableEditorRef"
+              :initial-data="form.humanHandoffAvailableInstructions"
               label="If any human agent is available"
               hint="Define the instructions for the agent to follow when a human agent is available. Leave empty to simply change status to 'pending-human'."
             />
 
-            <InstructionsEditor
-              v-model="form.humanHandoffUnavailableInstructions"
+            <InstructionsTiptap
+              ref="handoffUnavailableEditorRef"
+              :initial-data="form.humanHandoffUnavailableInstructions"
               label="If all human agents are unavailable"
               hint="Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email)."
             />
@@ -309,15 +311,15 @@ Example: "Great question! Let's get this sorted out right away 🎉 I just need 
 const form = ref({
   name: "",
   description: "",
-  instructions: [] as any,
+  instructions: { blocks: [] } as any,
   initialGreeting: "",
   tone: "",
   avoid: "",
   trigger: "",
   enabled: true,
   testMode: null as boolean | null,
-  humanHandoffAvailableInstructions: [] as any,
-  humanHandoffUnavailableInstructions: [] as any,
+  humanHandoffAvailableInstructions: { blocks: [] } as any,
+  humanHandoffUnavailableInstructions: { blocks: [] } as any,
 });
 
 // UI state
@@ -325,6 +327,11 @@ const loading = ref(false);
 const isSubmitting = ref(false);
 const agent = ref<Agent | null>(null);
 const errors = ref<Record<string, string>>({});
+
+// Editor refs
+const instructionsEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
+const handoffAvailableEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
+const handoffUnavailableEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
 const selectedTone = ref<string | null>(null);
 
 // Check if this agent is the default agent for the organization
@@ -377,7 +384,7 @@ onMounted(async () => {
       const formData = {
         name: agentResponse.name,
         description: agentResponse.description || "",
-        instructions: agentResponse.instructions || [],
+        instructions: agentResponse.instructions || { blocks: [] },
         initialGreeting: (agentResponse as any).initialGreeting || "",
         tone: agentResponse.tone || "",
         avoid: agentResponse.avoid || "",
@@ -385,9 +392,9 @@ onMounted(async () => {
         testMode: (agentResponse as any).testMode ?? null,
         enabled: agentResponse.enabled ?? true,
         humanHandoffAvailableInstructions:
-          (agentResponse as any).human_handoff_available_instructions || [],
+          (agentResponse as any).human_handoff_available_instructions || { blocks: [] },
         humanHandoffUnavailableInstructions:
-          (agentResponse as any).human_handoff_unavailable_instructions || [],
+          (agentResponse as any).human_handoff_unavailable_instructions || { blocks: [] },
       };
 
       form.value = { ...formData };
@@ -443,6 +450,11 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
 
+    // Save editor data before submitting
+    const savedInstructions = await instructionsEditorRef.value?.save();
+    const savedHandoffAvailable = await handoffAvailableEditorRef.value?.save();
+    const savedHandoffUnavailable = await handoffUnavailableEditorRef.value?.save();
+
     // Convert testMode to proper type (null | boolean) since select returns strings
     let testModeValue: boolean | null = null;
     const testModeRaw = form.value.testMode as any;
@@ -457,15 +469,15 @@ const handleSubmit = async () => {
     const payload = {
       name: form.value.name,
       description: form.value.description || undefined,
-      instructions: form.value.instructions,
+      instructions: savedInstructions || { blocks: [] },
       initialGreeting: form.value.initialGreeting || undefined,
       tone: form.value.tone || undefined,
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
       testMode: testModeValue,
-      humanHandoffAvailableInstructions: form.value.humanHandoffAvailableInstructions,
-      humanHandoffUnavailableInstructions: form.value.humanHandoffUnavailableInstructions,
+      humanHandoffAvailableInstructions: savedHandoffAvailable || { blocks: [] },
+      humanHandoffUnavailableInstructions: savedHandoffUnavailable || { blocks: [] },
     };
 
     if (isEditMode.value && agentId.value) {

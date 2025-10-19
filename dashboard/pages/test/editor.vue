@@ -50,8 +50,9 @@
           <CardTitle>Instructions Editor</CardTitle>
         </CardHeader>
         <CardContent>
-          <InstructionsEditor
-            v-model="instructions"
+          <InstructionsTiptap
+            ref="editorRef"
+            :initial-data="instructions"
             label="Test Instructions"
             hint="Paste multi-line text or use slash commands to test"
             :disable-api="true"
@@ -111,15 +112,10 @@ import CardContent from "@/components/ui/CardContent.vue";
 import CardHeader from "@/components/ui/CardHeader.vue";
 import CardTitle from "@/components/ui/CardTitle.vue";
 import Button from "@/components/ui/Button.vue";
-import InstructionsEditor from "@/components/InstructionsEditor.vue";
+import InstructionsTiptap from "@/components/InstructionsTiptap.vue";
+import { type JSONContent } from "@tiptap/vue-3";
 
-interface InstructionData {
-  id: string;
-  level: number;
-  instructions: string;
-}
-
-const instructions = ref<InstructionData[]>([]);
+const instructions = ref<JSONContent | undefined>(undefined);
 
 const testText = `First instruction line
 Second instruction line
@@ -154,6 +150,7 @@ const mockTools = ref([
     id: "tool-1",
     name: "send-email",
     label: "Send Email",
+    pluginId: "email-plugin",
     pluginName: "Email Plugin",
     description: "Send an email to a recipient",
   },
@@ -161,6 +158,7 @@ const mockTools = ref([
     id: "tool-2",
     name: "create-ticket",
     label: "Create Ticket",
+    pluginId: "support-plugin",
     pluginName: "Support Plugin",
     description: "Create a support ticket",
   },
@@ -168,6 +166,7 @@ const mockTools = ref([
     id: "tool-3",
     name: "search-database",
     label: "Search Database",
+    pluginId: "database-plugin",
     pluginName: "Database Plugin",
     description: "Search the database for records",
   },

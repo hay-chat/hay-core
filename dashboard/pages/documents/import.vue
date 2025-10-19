@@ -1025,7 +1025,6 @@ onBeforeUnmount(async () => {
 const setupWebSocket = () => {
   const socket = createAuthenticatedWebSocket();
   if (!socket) {
-    console.warn("Failed to create WebSocket connection - will use polling fallback");
     wsConnected.value = false;
     return;
   }
@@ -1044,13 +1043,11 @@ const setupWebSocket = () => {
     handleWebSocketMessage(message);
   };
 
-  socket.onerror = (error) => {
-    console.error("WebSocket error:", error);
+  socket.onerror = () => {
     wsConnected.value = false;
   };
 
   socket.onclose = () => {
-    console.log("WebSocket connection closed");
     wsConnected.value = false;
   };
 };
