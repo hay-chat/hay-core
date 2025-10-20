@@ -61,15 +61,6 @@
 </template>
 
 <script setup lang="ts">
-import Input from "@/components/ui/Input.vue";
-import Pagination from "@/components/ui/pagination/Pagination.vue";
-import PaginationContent from "@/components/ui/pagination/PaginationContent.vue";
-import PaginationItem from "@/components/ui/pagination/PaginationItem.vue";
-import PaginationLink from "@/components/ui/pagination/PaginationLink.vue";
-import PaginationPrevious from "@/components/ui/pagination/PaginationPrevious.vue";
-import PaginationNext from "@/components/ui/pagination/PaginationNext.vue";
-import PaginationEllipsis from "@/components/ui/pagination/PaginationEllipsis.vue";
-
 export interface DataPaginationProps {
   currentPage: number;
   totalPages: number;

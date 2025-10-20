@@ -1,0 +1,278 @@
+{
+  "exportDate": "2025-10-20T21:24:25.984Z",
+  "dataSubject": {
+    "email": "roger@rogerjunior.com",
+    "userId": "1141e247-07f9-4ead-92e5-158d10804cdd"
+  },
+  "personalData": {
+    "profile": {
+      "email": "roger@rogerjunior.com",
+      "firstName": "Roger",
+      "lastName": "Junior",
+      "createdAt": "2025-09-29T13:45:55.382Z",
+      "lastLoginAt": "2025-10-20T21:21:56.876Z",
+      "lastSeenAt": "2025-10-20T21:24:08.727Z",
+      "role": "owner",
+      "status": "available"
+    },
+    "organization": {
+      "id": "56c9a5ea-71e0-4837-b343-cd277811e1be",
+      "name": "Teste",
+      "role": "owner"
+    },
+    "apiKeys": [],
+    "auditLogs": [
+      {
+        "id": "e2b37553-6592-4ded-9d44-996615deb28e",
+        "action": "privacy.export.confirm",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "jobId": "1185cefa-2eda-4ec9-a6da-7ab144a4dd3a",
+          "requestId": "188e82ad-3c45-4745-890c-69d790c61888"
+        },
+        "createdAt": "2025-10-20T21:24:25.655Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "86ee8dd6-137d-48e8-a017-aa5804801059",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "188e82ad-3c45-4745-890c-69d790c61888",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T21:24:10.916Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "5b695813-c6f4-4964-9816-2fecd84aa06e",
+        "action": "privacy.export.download",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "requestId": "a79eb195-13f7-41fa-98fd-540f90e2cd19"
+        },
+        "createdAt": "2025-10-20T21:23:22.854Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "37c838d3-096a-42de-b464-4bcdf4dc7d95",
+        "action": "privacy.export.download",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "requestId": "a79eb195-13f7-41fa-98fd-540f90e2cd19"
+        },
+        "createdAt": "2025-10-20T21:22:03.391Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "4f9bcaf8-fc3b-42b9-8fc3-043542e49c01",
+        "action": "privacy.export.confirm",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "jobId": "a3e3b963-b121-4f45-81dd-0dd699122805",
+          "requestId": "a79eb195-13f7-41fa-98fd-540f90e2cd19"
+        },
+        "createdAt": "2025-10-20T21:12:17.720Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "4e35523b-49d9-443b-b732-fa1d13a6484e",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "a79eb195-13f7-41fa-98fd-540f90e2cd19",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T21:11:27.571Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "5ab66044-8de3-4e65-bbef-860cf410ecf3",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "d4601956-15f0-4e71-8c45-3716e1104a78",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T21:05:16.817Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "889b7b28-ae38-43bf-aa34-f715f3fb212f",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "7cd74ac6-47ad-4821-b97d-52e25dd5d650",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T19:48:47.254Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "c00219a1-c9c4-4925-a28d-dec4a49f5480",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "a9677661-1053-40dd-ad2e-dc677e64f67e",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T19:36:59.882Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "f408ff7e-8a51-4336-b182-475d2497d5f4",
+        "action": "password.change",
+        "resource": "user",
+        "changes": null,
+        "createdAt": "2025-10-20T19:34:17.754Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "4a186c8d-a6fb-4554-ae91-d413f82b9ebf",
+        "action": "password.change",
+        "resource": "user",
+        "changes": null,
+        "createdAt": "2025-10-20T19:33:07.009Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "62f542d3-763c-493c-a783-90a417e8f597",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "c25775d8-d96f-4dd7-8450-c993bca8a7ea",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T19:31:50.311Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "2a77a8af-482e-4c22-8cf9-f151e0ec6a7f",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "f116648f-0672-4c26-ba0d-06e3e334be05",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T19:30:02.259Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "c1fa9115-c178-4b9e-ad90-3c997dccfcac",
+        "action": "privacy.export.request",
+        "resource": "privacy_request",
+        "changes": {
+          "email": "roger@rogerjunior.com",
+          "ipAddress": "::1",
+          "requestId": "a3b44d1c-93e0-4263-969a-bc1f3264ec8e",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        },
+        "createdAt": "2025-10-20T19:23:50.499Z",
+        "ipAddress": "::1",
+        "status": "success"
+      },
+      {
+        "id": "b4e64bea-b34f-4a94-952a-f6cb5eea5a4b",
+        "action": "profile.update",
+        "resource": "user",
+        "changes": {
+          "lastName": {
+            "new": "Junior",
+            "old": "Junio"
+          }
+        },
+        "createdAt": "2025-10-16T09:50:57.601Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "500658fc-c4e3-4e67-89ac-a21f50041136",
+        "action": "profile.update",
+        "resource": "user",
+        "changes": {
+          "lastName": {
+            "new": "Junio",
+            "old": "Junior"
+          }
+        },
+        "createdAt": "2025-10-14T21:02:37.560Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "39937056-a017-4394-8940-aa0e32802e59",
+        "action": "password.change",
+        "resource": "user",
+        "changes": null,
+        "createdAt": "2025-10-13T17:35:39.800Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "841e94e3-6d8c-429c-948f-be256f3d43e7",
+        "action": "password.change",
+        "resource": "user",
+        "changes": null,
+        "createdAt": "2025-10-13T13:17:38.877Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "8cd71e8b-a0fc-412b-b0c5-8cfda7aabb30",
+        "action": "email.change",
+        "resource": "user",
+        "changes": {
+          "newEmail": "roger@rogerjunior.com",
+          "oldEmail": "roger@hay.chat"
+        },
+        "createdAt": "2025-10-09T15:54:55.915Z",
+        "ipAddress": null,
+        "status": "success"
+      },
+      {
+        "id": "b4db9a16-103f-41da-b125-b2988f21e1d2",
+        "action": "email.change",
+        "resource": "user",
+        "changes": {
+          "newEmail": "roger@hay.chat",
+          "oldEmail": "roger@rogerjunior.com"
+        },
+        "createdAt": "2025-10-09T15:25:11.741Z",
+        "ipAddress": null,
+        "status": "success"
+      }
+    ],
+    "documents": []
+  }
+}
