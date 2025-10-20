@@ -1,6 +1,7 @@
 import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
+import { UserOrganization } from "./user-organization.entity";
 import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
@@ -93,6 +94,10 @@ export class Organization extends BaseEntity {
 
   @OneToMany(() => User, (user) => user.organization)
   users!: User[];
+
+  // Many-to-many relationship with users (new multi-org support)
+  @OneToMany(() => UserOrganization, (userOrg) => userOrg.organization)
+  userOrganizations!: UserOrganization[];
 
   @OneToMany(() => Document, (document) => document.organization)
   documents!: Document[];

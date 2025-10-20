@@ -1,6 +1,7 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
+import { UserOrganization } from "./user-organization.entity";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -57,6 +58,10 @@ export class User extends BaseEntity {
   })
   @JoinColumn()
   organization?: Organization;
+
+  // Many-to-many relationship with organizations (new multi-org support)
+  @OneToMany(() => UserOrganization, (userOrg) => userOrg.user)
+  userOrganizations!: UserOrganization[];
 
   // Helper methods
   toJSON(): any {

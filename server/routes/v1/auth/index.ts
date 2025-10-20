@@ -5,6 +5,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Organization } from "@server/entities/organization.entity";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 import { Not, IsNull } from "typeorm";
 import {
   hashPassword,
@@ -20,6 +21,29 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
+
+/**
+ * Helper function to get all organizations for a user with their roles
+ */
+async function getUserOrganizations(userId: string) {
+  const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+  const userOrganizations = await userOrgRepository.find({
+    where: { userId, isActive: true },
+    relations: ["organization"],
+    order: { createdAt: "ASC" },
+  });
+
+  return userOrganizations.map((userOrg) => ({
+    id: userOrg.organization.id,
+    name: userOrg.organization.name,
+    slug: userOrg.organization.slug,
+    logo: userOrg.organization.logo,
+    role: userOrg.role,
+    permissions: userOrg.permissions,
+    joinedAt: userOrg.joinedAt,
+    lastAccessedAt: userOrg.lastAccessedAt,
+  }));
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -108,23 +132,28 @@ export const authRouter = t.router({
     const sessionId = generateSessionId();
     const tokens = generateTokens(user, sessionId);
 
-    // Prepare organization data
-    const organizations = user.organization
-      ? [
-          {
-            id: user.organization.id,
-            name: user.organization.name,
-            slug: user.organization.slug,
-            role: user.role,
-          },
-        ]
-      : [];
+    // Load all user organizations (multi-org support)
+    const organizations = await getUserOrganizations(user.id);
+
+    // Determine active organization
+    // If user has UserOrganizations, use the most recently accessed one
+    // Otherwise fall back to legacy organizationId
+    let activeOrganizationId = user.organizationId;
+    if (organizations.length > 0) {
+      // Find most recently accessed, or first one if none have been accessed
+      const mostRecent = organizations.reduce((prev, current) => {
+        if (!prev.lastAccessedAt) return current;
+        if (!current.lastAccessedAt) return prev;
+        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+      });
+      activeOrganizationId = mostRecent.id;
+    }
 
     return {
       user: {
         ...user.toJSON(),
         organizations,
-        activeOrganizationId: user.organizationId,
+        activeOrganizationId,
         onlineStatus: user.getOnlineStatus(),
       },
       ...tokens,
@@ -208,21 +237,25 @@ export const authRouter = t.router({
       user.updateLastSeen();
       await userRepository.save(user);
 
+      // Create UserOrganization entry if organization exists (multi-org support)
+      if (organization) {
+        const userOrgRepository = manager.getRepository(UserOrganization);
+        const userOrg = userOrgRepository.create({
+          userId: user.id,
+          organizationId: organization.id,
+          role: "owner",
+          isActive: true,
+          joinedAt: new Date(),
+        });
+        await userOrgRepository.save(userOrg);
+      }
+
       // Generate tokens
       const sessionId = generateSessionId();
       const tokens = generateTokens(user, sessionId);
 
-      // Prepare organization data
-      const organizations = organization
-        ? [
-            {
-              id: organization.id,
-              name: organization.name,
-              slug: organization.slug,
-              role: user.role,
-            },
-          ]
-        : [];
+      // Load all user organizations (multi-org support)
+      const organizations = await getUserOrganizations(user.id);
 
       return {
         user: {
@@ -286,17 +319,26 @@ export const authRouter = t.router({
       });
     }
 
-    // Prepare organization data
-    const organizations = user.organization
-      ? [
-          {
-            id: user.organization.id,
-            name: user.organization.name,
-            slug: user.organization.slug,
-            role: user.role,
-          },
-        ]
-      : [];
+    // Load all user organizations (multi-org support)
+    const organizations = await getUserOrganizations(user.id);
+
+    // Determine active organization
+    // Use the one from context if available, otherwise use most recently accessed or legacy
+    let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
+    if (!activeOrganizationId && organizations.length > 0) {
+      const mostRecent = organizations.reduce((prev, current) => {
+        if (!prev.lastAccessedAt) return current;
+        if (!current.lastAccessedAt) return prev;
+        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+      });
+      activeOrganizationId = mostRecent.id;
+    }
+
+    // Get role for active organization or fall back to user role
+    let role = user.role;
+    if (ctx.user!.userOrganization) {
+      role = ctx.user!.userOrganization.role;
+    }
 
     return {
       id: user.id,
@@ -311,8 +353,8 @@ export const authRouter = t.router({
       onlineStatus: user.getOnlineStatus(),
       authMethod: ctx.user!.authMethod,
       organizations,
-      activeOrganizationId: user.organizationId,
-      role: user.role,
+      activeOrganizationId,
+      role,
     };
   }),
 
