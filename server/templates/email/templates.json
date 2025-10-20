@@ -145,6 +145,54 @@
         "supportUrl",
         "companyName"
       ]
+    },
+    {
+      "id": "privacy-export-request",
+      "name": "Privacy - Data Export Request",
+      "description": "GDPR data export verification email",
+      "category": "privacy",
+      "variables": [
+        "userName",
+        "verificationUrl",
+        "expiresIn",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "privacy-export-ready",
+      "name": "Privacy - Export Ready",
+      "description": "Notification that data export is ready for download",
+      "category": "privacy",
+      "variables": [
+        "downloadUrl",
+        "expiresIn",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "privacy-deletion-request",
+      "name": "Privacy - Data Deletion Request",
+      "description": "GDPR data deletion verification email",
+      "category": "privacy",
+      "variables": [
+        "userName",
+        "verificationUrl",
+        "expiresIn",
+        "supportUrl",
+        "companyName"
+      ]
+    },
+    {
+      "id": "privacy-deletion-complete",
+      "name": "Privacy - Deletion Complete",
+      "description": "Confirmation that data has been deleted",
+      "category": "privacy",
+      "variables": [
+        "supportUrl",
+        "companyName"
+      ]
     }
   ],
   "defaultVariables": {

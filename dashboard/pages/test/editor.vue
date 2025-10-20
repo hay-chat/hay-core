@@ -107,11 +107,6 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import Card from "@/components/ui/Card.vue";
-import CardContent from "@/components/ui/CardContent.vue";
-import CardHeader from "@/components/ui/CardHeader.vue";
-import CardTitle from "@/components/ui/CardTitle.vue";
-import Button from "@/components/ui/Button.vue";
 import InstructionsTiptap from "@/components/InstructionsTiptap.vue";
 import { type JSONContent } from "@tiptap/vue-3";
 

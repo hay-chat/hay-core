@@ -22,6 +22,13 @@ export interface ApiKeyScope {
   actions: string[];
 }
 
+// Re-export API token scopes for convenience
+export {
+  ApiTokenScope,
+  API_TOKEN_SCOPE_GROUPS,
+  API_TOKEN_SCOPE_DESCRIPTIONS,
+} from "./api-token-scopes";
+
 export interface AuthContext {
   user: User | null;
   sessionId?: string;

@@ -143,11 +143,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import Card from "@/components/ui/Card.vue";
-import CardContent from "@/components/ui/CardContent.vue";
-import CardHeader from "@/components/ui/CardHeader.vue";
-import CardTitle from "@/components/ui/CardTitle.vue";
-import Button from "@/components/ui/Button.vue";
 import { Shield, Key, RefreshCw, Trash2, Download } from "lucide-vue-next";
 import {
   isWebCryptoAvailable,

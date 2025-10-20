@@ -178,9 +178,13 @@ export function getWebSocketUrl(): string {
 }
 
 export function getDashboardUrl(): string {
-  return `${getProtocol()}://${config.domain.dashboard}`;
+  // Remove protocol if accidentally included in domain config
+  const domain = config.domain.dashboard.replace(/^https?:\/\//, '');
+  return `${getProtocol()}://${domain}`;
 }
 
 export function getCdnUrl(): string {
-  return `${getProtocol()}://${config.domain.cdn}`;
+  // Remove protocol if accidentally included in domain config
+  const domain = config.domain.cdn.replace(/^https?:\/\//, '');
+  return `${getProtocol()}://${domain}`;
 }

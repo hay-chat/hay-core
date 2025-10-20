@@ -9,7 +9,6 @@
 import { inject, computed, type Ref } from "vue";
 import { Menu } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
-import Button from "@/components/ui/Button.vue";
 
 interface SidebarTriggerProps {
   class?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;

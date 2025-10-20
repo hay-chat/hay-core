@@ -1,0 +1,53 @@
+<!-- subject: Verify Your Data Export Request -->
+    <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="20px">
+      <mj-column width="100%">
+        <mj-text align="center" color="#333333" font-size="24px" font-weight="bold" padding-bottom="10px">
+          Verify Your Data Export Request
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
+      <mj-column width="100%">
+        <mj-text color="#555555" font-size="16px" line-height="24px">
+          Hi {{userName}},
+        </mj-text>
+
+        <mj-text color="#555555" font-size="16px" line-height="24px">
+          We received a request to export your personal data from {{companyName}}. To confirm this request and ensure your data security, please verify your identity by clicking the button below.
+        </mj-text>
+
+        <mj-button background-color="#0066ff" color="#ffffff" href="{{verificationUrl}}" padding-top="20px" padding-bottom="20px">
+          Verify Data Export Request
+        </mj-button>
+
+        <mj-text color="#555555" font-size="14px" line-height="20px" padding-top="10px">
+          Or copy and paste this link into your browser:
+        </mj-text>
+
+        <mj-text color="#0066ff" font-size="12px" line-height="18px" padding-bottom="20px">
+          {{verificationUrl}}
+        </mj-text>
+
+        <mj-divider border-color="#e0e0e0" border-width="1px" />
+
+        <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
+          <strong>Important Information:</strong>
+        </mj-text>
+
+        <mj-text color="#555555" font-size="14px" line-height="20px">
+          • This verification link will expire in {{expiresIn}}<br/>
+          • After verification, we'll process your data export request<br/>
+          • You'll receive a download link when your export is ready<br/>
+          • If you didn't request this export, please ignore this email
+        </mj-text>
+
+        <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
+          This is an automated message related to your GDPR data subject rights. If you didn't request this data export, you can safely ignore this email.
+        </mj-text>
+
+        <mj-text color="#777777" font-size="14px" line-height="20px" padding-bottom="20px">
+          Need help? Contact us at <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
+        </mj-text>
+      </mj-column>
+    </mj-section>

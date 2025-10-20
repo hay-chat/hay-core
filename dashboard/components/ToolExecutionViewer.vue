@@ -75,7 +75,6 @@ import {
   CalendarClock,
   AlertCircle,
 } from "lucide-vue-next";
-import Badge from "@/components/ui/Badge.vue";
 
 interface Props {
   toolName?: string;
