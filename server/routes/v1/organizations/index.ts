@@ -4,6 +4,9 @@ import { organizationService } from "@server/services/organization.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
 import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
+import { AppDataSource } from "@server/database/data-source";
+import { UserOrganization } from "@server/entities/user-organization.entity";
+import { User } from "@server/entities/user.entity";
 
 const updateSettingsSchema = z.object({
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
@@ -76,6 +79,218 @@ export const organizationsRouter = t.router({
           defaultAgentId: updatedOrg.defaultAgentId,
           testModeDefault: updatedOrg.settings?.testModeDefault || false,
         },
+      };
+    }),
+
+  // Multi-organization member management endpoints
+  listMembers: authenticatedProcedure.query(async ({ ctx }) => {
+    if (!ctx.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization ID required",
+      });
+    }
+
+    // Check if user is admin in this organization
+    if (!ctx.user?.isAdmin()) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only admins can view organization members",
+      });
+    }
+
+    const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+    const members = await userOrgRepository.find({
+      where: { organizationId: ctx.organizationId },
+      relations: ["user"],
+      order: { createdAt: "ASC" },
+    });
+
+    return members.map((userOrg) => ({
+      id: userOrg.id,
+      userId: userOrg.userId,
+      email: userOrg.user.email,
+      firstName: userOrg.user.firstName,
+      lastName: userOrg.user.lastName,
+      role: userOrg.role,
+      permissions: userOrg.permissions,
+      isActive: userOrg.isActive,
+      joinedAt: userOrg.joinedAt,
+      lastAccessedAt: userOrg.lastAccessedAt,
+      invitedAt: userOrg.invitedAt,
+      invitedBy: userOrg.invitedBy,
+    }));
+  }),
+
+  getMember: authenticatedProcedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID required",
+        });
+      }
+
+      // Check if user is admin or viewing their own info
+      if (!ctx.user?.isAdmin() && ctx.user?.id !== input.userId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Not authorized to view this member",
+        });
+      }
+
+      const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+      const userOrg = await userOrgRepository.findOne({
+        where: {
+          userId: input.userId,
+          organizationId: ctx.organizationId,
+        },
+        relations: ["user"],
+      });
+
+      if (!userOrg) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
+      }
+
+      return {
+        id: userOrg.id,
+        userId: userOrg.userId,
+        email: userOrg.user.email,
+        firstName: userOrg.user.firstName,
+        lastName: userOrg.user.lastName,
+        role: userOrg.role,
+        permissions: userOrg.permissions,
+        isActive: userOrg.isActive,
+        joinedAt: userOrg.joinedAt,
+        lastAccessedAt: userOrg.lastAccessedAt,
+        invitedAt: userOrg.invitedAt,
+        invitedBy: userOrg.invitedBy,
+      };
+    }),
+
+  updateMemberRole: authenticatedProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid(),
+        role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+        permissions: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID required",
+        });
+      }
+
+      // Only owners can change roles
+      if (!ctx.user?.isOwner()) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only owners can change member roles",
+        });
+      }
+
+      // Prevent changing own role
+      if (ctx.user?.id === input.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot change your own role",
+        });
+      }
+
+      const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+      const userOrg = await userOrgRepository.findOne({
+        where: {
+          userId: input.userId,
+          organizationId: ctx.organizationId,
+        },
+      });
+
+      if (!userOrg) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
+      }
+
+      // Update role and permissions
+      userOrg.role = input.role;
+      if (input.permissions !== undefined) {
+        userOrg.permissions = input.permissions;
+      }
+      await userOrgRepository.save(userOrg);
+
+      return {
+        success: true,
+        message: "Member role updated successfully",
+        data: {
+          userId: userOrg.userId,
+          role: userOrg.role,
+          permissions: userOrg.permissions,
+        },
+      };
+    }),
+
+  removeMember: authenticatedProcedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID required",
+        });
+      }
+
+      // Only owners and admins can remove members
+      if (!ctx.user?.isAdmin()) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can remove members",
+        });
+      }
+
+      // Prevent removing yourself
+      if (ctx.user?.id === input.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot remove yourself from the organization",
+        });
+      }
+
+      const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+      const userOrg = await userOrgRepository.findOne({
+        where: {
+          userId: input.userId,
+          organizationId: ctx.organizationId,
+        },
+      });
+
+      if (!userOrg) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
+      }
+
+      // Prevent non-owners from removing owners
+      if (userOrg.role === "owner" && !ctx.user?.isOwner()) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only owners can remove other owners",
+        });
+      }
+
+      await userOrgRepository.remove(userOrg);
+
+      return {
+        success: true,
+        message: "Member removed successfully",
       };
     }),
 });

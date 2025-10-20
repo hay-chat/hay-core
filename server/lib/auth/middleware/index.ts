@@ -4,6 +4,79 @@ import { authenticateBearerAuth } from "./bearerAuth";
 import { authenticateApiKeyAuth } from "./apiKeyAuth";
 import type { Request } from "express";
 import { TRPCError } from "@trpc/server";
+import { AppDataSource } from "@server/database/data-source";
+import { UserOrganization } from "@server/entities/user-organization.entity";
+import { User } from "@server/entities/user.entity";
+
+/**
+ * Load UserOrganization relationship for multi-org context
+ */
+async function loadUserOrganization(
+  userId: string,
+  organizationId: string,
+): Promise<UserOrganization | undefined> {
+  const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+
+  const userOrg = await userOrgRepository.findOne({
+    where: {
+      userId,
+      organizationId,
+      isActive: true,
+    },
+    relations: ["organization"],
+  });
+
+  return userOrg || undefined;
+}
+
+/**
+ * Enhance AuthUser with organization context
+ */
+async function enhanceWithOrgContext(
+  baseAuthUser: AuthUser,
+  req: Request,
+): Promise<AuthUser> {
+  const organizationId = req.headers["x-organization-id"] as string | undefined;
+
+  // If no organization header, return base AuthUser
+  if (!organizationId) {
+    return baseAuthUser;
+  }
+
+  // Load UserOrganization relationship
+  const userOrg = await loadUserOrganization(baseAuthUser.id, organizationId);
+
+  // If user doesn't belong to this organization, throw error
+  if (!userOrg) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "User does not belong to the specified organization",
+    });
+  }
+
+  // Get the full user with relations
+  const userRepository = AppDataSource.getRepository(User);
+  const user = await userRepository.findOne({
+    where: { id: baseAuthUser.id },
+  });
+
+  if (!user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "User not found",
+    });
+  }
+
+  // Create new AuthUser with organization context
+  return new AuthUser(user, baseAuthUser.authMethod, {
+    sessionId: baseAuthUser.sessionId,
+    apiKeyId: baseAuthUser.apiKeyId,
+    scopes: baseAuthUser.scopes,
+    organizationId,
+    userOrganization: userOrg,
+  });
+}
+
 /**
  * Main authentication middleware that tries all authentication methods
  * Returns AuthUser if authenticated, null otherwise
@@ -16,17 +89,18 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
   }
 
   try {
+    let baseAuthUser: AuthUser | null = null;
+
     // Try Bearer token authentication first (most common)
     if (authHeader.startsWith("Bearer ")) {
-      const authUser = await authenticateBearerAuth(authHeader);
-      if (authUser) {
-        logAuthSuccess("jwt", authUser.id);
-        return authUser;
+      baseAuthUser = await authenticateBearerAuth(authHeader);
+      if (baseAuthUser) {
+        logAuthSuccess("jwt", baseAuthUser.id);
       }
     }
 
     // Try Basic authentication
-    if (authHeader.startsWith("Basic ")) {
+    if (!baseAuthUser && authHeader.startsWith("Basic ")) {
       const result = await authenticateBasicAuth(authHeader);
       if (result) {
         // Store tokens in response headers for the client
@@ -35,24 +109,30 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
           req.res.setHeader("X-Refresh-Token", result.tokens.refreshToken);
           req.res.setHeader("X-Token-Expires-In", result.tokens.expiresIn.toString());
         }
-        logAuthSuccess("basic", result.user.id);
-        return result.user;
+        baseAuthUser = result.user;
+        logAuthSuccess("basic", baseAuthUser.id);
       }
     }
 
     // Try API key authentication
     if (
-      authHeader.startsWith("ApiKey ") ||
-      (authHeader.startsWith("Bearer ") && authHeader.includes("hay_"))
+      !baseAuthUser &&
+      (authHeader.startsWith("ApiKey ") ||
+        (authHeader.startsWith("Bearer ") && authHeader.includes("hay_")))
     ) {
-      const authUser = await authenticateApiKeyAuth(authHeader);
-      if (authUser) {
-        logAuthSuccess("apikey", authUser.id);
-        return authUser;
+      baseAuthUser = await authenticateApiKeyAuth(authHeader);
+      if (baseAuthUser) {
+        logAuthSuccess("apikey", baseAuthUser.id);
       }
     }
 
-    return null;
+    // If no authentication succeeded, return null
+    if (!baseAuthUser) {
+      return null;
+    }
+
+    // Enhance with organization context if organizationId header is present
+    return await enhanceWithOrgContext(baseAuthUser, req);
   } catch (error) {
     logAuthFailure(authHeader.split(" ")[0], error);
     throw error;
