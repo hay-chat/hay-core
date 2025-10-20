@@ -4,7 +4,11 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  role?: "owner" | "admin" | "member" | "viewer";
+  logo?: string;
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
+  permissions?: string[];
+  joinedAt?: Date;
+  lastAccessedAt?: Date;
 }
 
 export interface User {
