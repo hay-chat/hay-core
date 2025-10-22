@@ -98,6 +98,32 @@
       </CardContent>
     </Card>
 
+    <!-- Error Alert -->
+    <Alert v-if="errorState.type" variant="destructive" class="mb-6">
+      <AlertCircle class="h-4 w-4" />
+      <AlertTitle>
+        {{ errorState.type === "rate_limit" ? "Too Many Requests" : "Error" }}
+      </AlertTitle>
+      <AlertDescription>
+        {{ errorState.message }}
+        <div v-if="errorState.retryAfter" class="mt-2 font-medium">
+          Try again after: {{ formatTime(errorState.retryAfter) }}
+        </div>
+        <div v-if="errorState.type === 'email_failed'" class="mt-2">
+          Please check your spam folder or try again later.
+        </div>
+      </AlertDescription>
+      <Button
+        v-if="errorState.type !== 'rate_limit'"
+        variant="outline"
+        size="sm"
+        class="mt-2"
+        @click="errorState = { type: null, message: '' }"
+      >
+        Dismiss
+      </Button>
+    </Alert>
+
     <!-- Data Export Section -->
     <Card>
       <CardHeader>
@@ -126,7 +152,12 @@
           </AlertDescription>
         </Alert>
 
-        <Button :loading="exportLoading" class="w-full sm:w-auto" @click="requestExport">
+        <Button
+          :loading="exportLoading"
+          :disabled="errorState.type === 'rate_limit'"
+          class="w-full sm:w-auto"
+          @click="requestExport"
+        >
           <Download class="h-4 w-4 mr-2" />
           Request Data Export
         </Button>
@@ -282,6 +313,7 @@ import {
   FileText,
   ExternalLink,
   Mail,
+  AlertCircle,
 } from "lucide-vue-next";
 
 import { useToast } from "@/composables/useToast";
@@ -299,6 +331,97 @@ const successTitle = ref("");
 const successMessage = ref("");
 const activeRequests = ref<any[]>([]);
 
+// Error state management
+const errorState = ref<{
+  type: "network" | "rate_limit" | "invalid_token" | "service_unavailable" | "email_failed" | null;
+  message: string;
+  retryAfter?: Date;
+}>({ type: null, message: "" });
+
+// Extract retry time from error message
+const extractRetryTime = (message: string): Date | undefined => {
+  const match = message.match(/try again (?:after|in) (\d+) (second|minute|hour)s?/i);
+  if (match) {
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    const now = new Date();
+
+    switch (unit) {
+      case "second":
+        return new Date(now.getTime() + value * 1000);
+      case "minute":
+        return new Date(now.getTime() + value * 60 * 1000);
+      case "hour":
+        return new Date(now.getTime() + value * 60 * 60 * 1000);
+    }
+  }
+  return undefined;
+};
+
+// Format retry time
+const formatTime = (date: Date): string => {
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
+
+// Handle API errors
+const handleApiError = (error: unknown): void => {
+  const err = error as {
+    data?: { code?: string };
+    code?: string;
+    message?: string;
+    error?: { message?: string };
+  };
+  console.error("Privacy request error:", err);
+
+  // Clear previous error state
+  errorState.value = { type: null, message: "" };
+
+  // Check for tRPC error codes
+  const errorCode = err.data?.code || err.code;
+  const errorMessage = err.message || err.error?.message || "An error occurred";
+
+  if (errorCode === "TOO_MANY_REQUESTS" || errorMessage.toLowerCase().includes("rate limit")) {
+    errorState.value = {
+      type: "rate_limit",
+      message: errorMessage,
+      retryAfter: extractRetryTime(errorMessage),
+    };
+  } else if (
+    errorCode === "SERVICE_UNAVAILABLE" ||
+    errorMessage.toLowerCase().includes("unavailable")
+  ) {
+    errorState.value = {
+      type: "service_unavailable",
+      message: "Privacy service is temporarily unavailable. Please try again in a few minutes.",
+    };
+  } else if (
+    errorMessage.toLowerCase().includes("verification email") ||
+    errorMessage.toLowerCase().includes("email")
+  ) {
+    errorState.value = {
+      type: "email_failed",
+      message: errorMessage,
+    };
+  } else if (
+    errorMessage.toLowerCase().includes("network") ||
+    errorMessage.toLowerCase().includes("connection")
+  ) {
+    errorState.value = {
+      type: "network",
+      message: "Network error. Please check your connection and try again.",
+    };
+  } else {
+    errorState.value = {
+      type: "network",
+      message: errorMessage || "An error occurred. Please try again.",
+    };
+  }
+};
+
 // Request data export
 const requestExport = async () => {
   if (!user.value?.email) {
@@ -308,6 +431,8 @@ const requestExport = async () => {
 
   try {
     exportLoading.value = true;
+    errorState.value = { type: null, message: "" };
+
     const result = await Hay.privacy.requestExport.mutate({
       email: user.value.email,
     });
@@ -318,11 +443,8 @@ const requestExport = async () => {
 
     // Refresh active requests
     await loadActiveRequests();
-  } catch (error: any) {
-    console.error("Export request error:", error);
-    // Extract message from tRPC error structure
-    const errorMessage = error.message || error.error?.message || "Failed to request data export";
-    toast.error("Error", errorMessage);
+  } catch (error: unknown) {
+    handleApiError(error);
   } finally {
     exportLoading.value = false;
   }
@@ -336,6 +458,8 @@ const confirmDelete = async () => {
 
   try {
     deleteLoading.value = true;
+    errorState.value = { type: null, message: "" };
+
     const result = await Hay.privacy.requestDeletion.mutate({
       email: user.value.email,
     });
@@ -349,25 +473,23 @@ const confirmDelete = async () => {
 
     // Refresh active requests
     await loadActiveRequests();
-  } catch (error: any) {
-    console.error("Deletion request error:", error);
-    // Extract message from tRPC error structure
-    const errorMessage =
-      error.message || error.error?.message || "Failed to request account deletion";
-    toast.error("Error", errorMessage);
+  } catch (error: unknown) {
+    showDeleteConfirmation.value = false;
+    handleApiError(error);
   } finally {
     deleteLoading.value = false;
   }
 };
 
 // Download completed export
-const downloadExport = async (requestId: string) => {
+const downloadExport = async (_requestId: string) => {
   try {
     // In a real implementation, you would get the download token from the email
     // For now, we'll show a message
     toast.info("Download Ready", "Please check your email for the download link");
-  } catch (error: any) {
-    toast.error("Error", error.message || "Failed to download export");
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    toast.error("Error", err.message || "Failed to download export");
   }
 };
 

@@ -297,11 +297,14 @@ export const privacyRouter = t.router({
         downloadToken: z.string().min(1, "Download token is required"),
       }),
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       try {
+        const ipAddress = ctx.ipAddress || "unknown";
+
         const result = await privacyService.downloadExport(
           input.requestId,
           input.downloadToken,
+          ipAddress,
         );
 
         return {
