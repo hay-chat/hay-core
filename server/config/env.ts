@@ -154,6 +154,13 @@ export const config = {
     },
     enabled: process.env.SMTP_ENABLED === "true",
   },
+
+  privacy: {
+    downloadIpRestriction: process.env.PRIVACY_DOWNLOAD_IP_RESTRICTION === "true",
+    maxDownloadCount: parseInt(process.env.PRIVACY_MAX_DOWNLOAD_COUNT || "1", 10),
+    exportRetentionDays: parseInt(process.env.PRIVACY_EXPORT_RETENTION_DAYS || "7", 10),
+    verificationExpiryHours: parseInt(process.env.PRIVACY_VERIFICATION_EXPIRY_HOURS || "24", 10),
+  },
 } as const;
 
 export type Config = typeof config;
@@ -178,9 +185,13 @@ export function getWebSocketUrl(): string {
 }
 
 export function getDashboardUrl(): string {
-  return `${getProtocol()}://${config.domain.dashboard}`;
+  // Remove protocol if accidentally included in domain config
+  const domain = config.domain.dashboard.replace(/^https?:\/\//, '');
+  return `${getProtocol()}://${domain}`;
 }
 
 export function getCdnUrl(): string {
-  return `${getProtocol()}://${config.domain.cdn}`;
+  // Remove protocol if accidentally included in domain config
+  const domain = config.domain.cdn.replace(/^https?:\/\//, '');
+  return `${getProtocol()}://${domain}`;
 }

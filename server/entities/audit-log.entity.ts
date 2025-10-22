@@ -21,7 +21,14 @@ export type AuditAction =
   | "user.register"
   | "apikey.create"
   | "apikey.revoke"
-  | "security.setting.change";
+  | "security.setting.change"
+  | "privacy.export.request"
+  | "privacy.export.confirm"
+  | "privacy.export.download"
+  | "privacy.deletion.request"
+  | "privacy.deletion.confirm"
+  | "privacy.deletion.complete"
+  | "privacy.rectification.request";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

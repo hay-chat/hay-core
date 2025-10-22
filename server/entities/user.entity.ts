@@ -29,6 +29,9 @@ export class User extends BaseEntity {
   @Column({ type: "timestamptz", nullable: true })
   lastSeenAt?: Date;
 
+  @Column({ type: "timestamptz", nullable: true })
+  deletedAt?: Date;
+
   @Column({ type: "varchar", length: 20, default: "available" })
   status!: "available" | "away";
 
@@ -158,5 +161,20 @@ export class User extends BaseEntity {
     this.pendingEmail = null as any;
     this.emailVerificationTokenHash = null as any;
     this.emailVerificationExpiresAt = null as any;
+  }
+
+  /**
+   * Check if user has been soft deleted
+   */
+  isDeleted(): boolean {
+    return !!this.deletedAt;
+  }
+
+  /**
+   * Soft delete the user
+   */
+  softDelete(): void {
+    this.deletedAt = new Date();
+    this.isActive = false;
   }
 }

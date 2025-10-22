@@ -241,14 +241,10 @@ import {
   Clock,
   Heart,
   Search,
-  Download,
   RefreshCcw,
   CheckSquare,
   Archive,
   Star,
-  Eye,
-  UserCheck,
-  MoreHorizontal,
   Circle,
   CheckCircle,
   AlertTriangle,
@@ -260,9 +256,6 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { useConversationTakeover } from "@/composables/useConversationTakeover";
-import Badge from "@/components/ui/Badge.vue";
-import DataPagination from "@/components/DataPagination.vue";
-import MetricCard from "@/components/MetricCard.vue";
 
 // Router
 const router = useRouter();

@@ -26,9 +26,6 @@
 
 <script setup lang="ts">
 import { computed, type Component } from "vue";
-import Card from "@/components/ui/Card.vue";
-import CardContent from "@/components/ui/CardContent.vue";
-import CardHeader from "@/components/ui/CardHeader.vue";
 import { Clock } from "lucide-vue-next";
 
 interface Props {

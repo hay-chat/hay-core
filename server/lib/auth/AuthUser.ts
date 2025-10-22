@@ -16,6 +16,7 @@ export class AuthUser {
   public readonly sessionId?: string;
   public readonly apiKeyId?: string;
   public readonly scopes?: ApiKeyScope[];
+  public readonly organizationId?: string;
 
   private readonly _user: User;
 
@@ -26,6 +27,7 @@ export class AuthUser {
       sessionId?: string;
       apiKeyId?: string;
       scopes?: ApiKeyScope[];
+      organizationId?: string;
     },
   ) {
     this._user = user;
@@ -38,6 +40,7 @@ export class AuthUser {
     this.sessionId = metadata?.sessionId;
     this.apiKeyId = metadata?.apiKeyId;
     this.scopes = metadata?.scopes;
+    this.organizationId = metadata?.organizationId;
   }
 
   /**
@@ -101,6 +104,7 @@ export class AuthUser {
       sessionId: this.sessionId,
       apiKeyId: this.apiKeyId,
       scopes: this.scopes,
+      organizationId: this.organizationId,
       hasScope: this.hasScope.bind(this),
       canAccess: this.canAccess.bind(this),
       isAdmin: this.isAdmin.bind(this),

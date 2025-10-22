@@ -842,8 +842,6 @@ import {
   HelpCircle,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import Button from "@/components/ui/Button.vue";
 import { useDocumentImportTour } from "@/composables/useDocumentImportTour";
 import { useToast } from "@/composables/useToast";
 import {

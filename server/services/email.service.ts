@@ -52,7 +52,7 @@ export class EmailService {
 
         // Verify connection
         await this.verifyConnection();
-        
+
         // Start retry queue processor
         this.startRetryProcessor();
       } else {
@@ -90,14 +90,18 @@ export class EmailService {
     console.log("📧 [EmailService] sendEmail called with:", {
       to: options.to,
       subject: options.subject,
-      from: options.from,
+      hasFromProperty: "from" in options,
+      fromValue: options.from,
       smtpEnabled: config.smtp.enabled,
     });
 
     if (!config.smtp.enabled) {
       console.log("⚠️ [EmailService] SMTP disabled. Would send email to:", options.to);
       console.log("📝 [EmailService] Email subject:", options.subject);
-      console.log("📄 [EmailService] Email preview (first 200 chars):", options.html?.substring(0, 200));
+      console.log(
+        "📄 [EmailService] Email preview (first 200 chars):",
+        options.html?.substring(0, 200),
+      );
       return {
         success: true,
         messageId: `mock-${uuidv4()}`,
@@ -110,16 +114,31 @@ export class EmailService {
       throw new Error("Email service not initialized");
     }
 
+    // Build the 'from' address with fallback
+    const fromAddress = options.from
+      ? `"${options.from.name || options.from.email}" <${options.from.email}>`
+      : `"${config.smtp.from.name}" <${config.smtp.from.email}>`;
+
+    console.log("🔧 [EmailService] Building from address:", {
+      hasOptionsFrom: !!options.from,
+      optionsFrom: options.from,
+      configFromName: config.smtp.from.name,
+      configFromEmail: config.smtp.from.email,
+      finalFromAddress: fromAddress,
+    });
+
     const mailOptions = {
-      from: options.from
-        ? `"${options.from.name || options.from.email}" <${options.from.email}>`
-        : `"${config.smtp.from.name}" <${config.smtp.from.email}>`,
+      from: fromAddress,
       to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
       subject: options.subject,
       html: options.html,
       text: options.text,
       cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(", ") : options.cc) : undefined,
-      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(", ") : options.bcc) : undefined,
+      bcc: options.bcc
+        ? Array.isArray(options.bcc)
+          ? options.bcc.join(", ")
+          : options.bcc
+        : undefined,
       replyTo: options.replyTo,
       attachments: options.attachments,
       headers: options.headers,
@@ -127,12 +146,28 @@ export class EmailService {
     };
 
     try {
-      console.log("📤 [EmailService] Sending email via SMTP...");
+      console.log("📤 [EmailService] Sending email via SMTP with mailOptions:", {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        hasHtml: !!mailOptions.html,
+        htmlLength: mailOptions.html?.length,
+        hasText: !!mailOptions.text,
+      });
       const info = await this.transporter.sendMail(mailOptions);
-      console.log("✅ [EmailService] Email sent successfully:", {
+      console.log("✅ [EmailService] Email sent successfully!");
+      console.log("📬 [EmailService] SMTP Response:", {
         messageId: info.messageId,
         response: info.response,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        pending: info.pending,
+        envelope: info.envelope,
+      });
+      console.log("📧 [EmailService] Email details:", {
         to: options.to,
+        from: mailOptions.from,
+        subject: options.subject,
       });
       return {
         success: true,
@@ -211,14 +246,31 @@ export class EmailService {
         }
       }
 
+      // Build email options, excluding undefined 'from' to allow default fallback
       const emailOptions: EmailOptions = {
-        ...options,
+        to: options.to,
         subject: subject || "No Subject",
         html,
         text,
+        ...(options.from && { from: options.from }),
+        ...(options.cc && { cc: options.cc }),
+        ...(options.bcc && { bcc: options.bcc }),
+        ...(options.replyTo && { replyTo: options.replyTo }),
+        ...(options.attachments && { attachments: options.attachments }),
+        ...(options.headers && { headers: options.headers }),
+        ...(options.priority && { priority: options.priority }),
       };
 
-      console.log("📨 [EmailService] Sending template email with subject:", subject);
+      console.log("📨 [EmailService] Built emailOptions:", {
+        to: emailOptions.to,
+        subject: emailOptions.subject,
+        hasFrom: !!emailOptions.from,
+        from: emailOptions.from,
+        hasHtml: !!emailOptions.html,
+        htmlLength: emailOptions.html?.length,
+        hasText: !!emailOptions.text,
+      });
+
       return await this.sendEmail(emailOptions);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -264,7 +316,7 @@ export class EmailService {
       for (const [id, item] of this.emailQueue.entries()) {
         if (item.status === "retry" && item.attempts < item.maxAttempts) {
           item.attempts++;
-          
+
           try {
             const result = await this.sendEmail(item.options);
             if (result.success) {
