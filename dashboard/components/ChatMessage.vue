@@ -173,11 +173,6 @@ import {
   Clock,
   Ban,
 } from "lucide-vue-next";
-import Badge from "@/components/ui/Badge.vue";
-import Button from "@/components/ui/Button.vue";
-import MessageFeedbackControl from "@/components/MessageFeedbackControl.vue";
-import MessageApprovalDialog from "@/components/MessageApprovalDialog.vue";
-import ToolExecutionViewer from "@/components/ToolExecutionViewer.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 

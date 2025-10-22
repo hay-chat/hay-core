@@ -130,7 +130,10 @@
                   :disabled="isDefaultAgent(agent.id)"
                   @click="setAgentAsDefault(agent.id)"
                 >
-                  <Star class="mr-2 h-4 w-4" :class="{ 'fill-current': isDefaultAgent(agent.id) }" />
+                  <Star
+                    class="mr-2 h-4 w-4"
+                    :class="{ 'fill-current': isDefaultAgent(agent.id) }"
+                  />
                   {{ isDefaultAgent(agent.id) ? "Default Agent" : "Set as Default" }}
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="toggleAgentStatus(agent)">
@@ -301,14 +304,12 @@
 
 <script setup lang="ts">
 import {
-  Bot,
   Plus,
   RefreshCw,
   Search,
   Settings,
   MoreVertical,
   Power,
-  Download,
   Trash2,
   Star,
 } from "lucide-vue-next";
@@ -316,7 +317,6 @@ import {
 import { useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import { useOrganizationStore } from "@/stores/organization";
-import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { HayApi, Hay } from "@/utils/api";
 
 interface AgentData {

@@ -29,14 +29,6 @@ import {
   Puzzle,
 } from "lucide-vue-next";
 
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarRail,
-} from "@/components/ui/sidebar";
-
 import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
 import NavUser from "./NavUser.vue";
@@ -191,6 +183,21 @@ const navMain = computed(() => {
           title: "General",
           url: "/settings/general",
           isActive: route.path === "/settings/general",
+        },
+        {
+          title: "Privacy & Data",
+          url: "/settings/privacy",
+          isActive: route.path === "/settings/privacy",
+        },
+        {
+          title: "Customer Privacy",
+          url: "/settings/customer-privacy",
+          isActive: route.path === "/settings/customer-privacy",
+        },
+        {
+          title: "API Tokens",
+          url: "/settings/api-tokens",
+          isActive: route.path === "/settings/api-tokens",
         },
         // Add plugin menu items for settings
         ...pluginMenuItems.value

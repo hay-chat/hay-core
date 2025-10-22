@@ -461,11 +461,6 @@ import {
   Package,
   Check,
 } from "lucide-vue-next";
-import Alert from "@/components/ui/alert/Alert.vue";
-import AlertTitle from "@/components/ui/alert/AlertTitle.vue";
-import AlertDescription from "@/components/ui/alert/AlertDescription.vue";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";

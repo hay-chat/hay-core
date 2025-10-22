@@ -348,8 +348,6 @@
 
 <script setup lang="ts">
 import { HayApi } from "@/utils/api";
-import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
-import DataPagination from "@/components/DataPagination.vue";
 import { useToast } from "@/composables/useToast";
 
 import {

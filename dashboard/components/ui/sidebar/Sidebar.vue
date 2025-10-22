@@ -62,7 +62,6 @@
 <script setup lang="ts">
 import { ref, computed, provide, onMounted } from "vue";
 import { cn } from "@/lib/utils";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export interface SidebarProps {
   side?: "left" | "right";
