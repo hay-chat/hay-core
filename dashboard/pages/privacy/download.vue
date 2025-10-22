@@ -201,9 +201,31 @@ const checkExportAvailability = async () => {
     }
 
     loading.value = false;
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const apiError = err as {
+      data?: { code?: string };
+      code?: string;
+      message?: string;
+      error?: { message?: string };
+    };
+
+    const errorCode = apiError.data?.code || apiError.code;
+    const errMessage =
+      apiError.message || apiError.error?.message || "Failed to check export availability";
+
+    if (errorCode === "TOO_MANY_REQUESTS" || errMessage.toLowerCase().includes("rate limit")) {
+      errorMessage.value = "Too many requests. Please wait a few minutes before trying again.";
+    } else if (
+      errorCode === "SERVICE_UNAVAILABLE" ||
+      errMessage.toLowerCase().includes("unavailable")
+    ) {
+      errorMessage.value =
+        "Privacy service is temporarily unavailable. Please try again in a few minutes.";
+    } else {
+      errorMessage.value = errMessage;
+    }
+
     error.value = true;
-    errorMessage.value = err.message || "Failed to check export availability.";
     loading.value = false;
   }
 };
@@ -249,9 +271,40 @@ const startDownload = async () => {
     } else {
       fileSize.value = `${(sizeInBytes / (1024 * 1024)).toFixed(2)} MB`;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const apiError = err as {
+      data?: { code?: string };
+      code?: string;
+      message?: string;
+      error?: { message?: string };
+    };
+
+    const errorCode = apiError.data?.code || apiError.code;
+    const errMessage = apiError.message || apiError.error?.message || "Failed to download export";
+
+    if (errorCode === "TOO_MANY_REQUESTS" || errMessage.toLowerCase().includes("rate limit")) {
+      errorMessage.value =
+        "Too many download attempts. This link may have exceeded its usage limit. Please request a new export.";
+    } else if (
+      errorCode === "SERVICE_UNAVAILABLE" ||
+      errMessage.toLowerCase().includes("unavailable")
+    ) {
+      errorMessage.value =
+        "Privacy service is temporarily unavailable. Please try again in a few minutes.";
+    } else if (errMessage.toLowerCase().includes("expired")) {
+      errorMessage.value =
+        "This download link has expired. Please request a new data export from your settings.";
+    } else if (
+      errMessage.toLowerCase().includes("invalid") ||
+      errMessage.toLowerCase().includes("token")
+    ) {
+      errorMessage.value =
+        "Invalid or already used download link. Please request a new data export if needed.";
+    } else {
+      errorMessage.value = errMessage;
+    }
+
     error.value = true;
-    errorMessage.value = err.message || "Failed to download your data export.";
   } finally {
     downloading.value = false;
   }

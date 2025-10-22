@@ -13,6 +13,32 @@
       </AlertDescription>
     </Alert>
 
+    <!-- Error Alert -->
+    <Alert v-if="errorState.type" variant="destructive" class="mb-6">
+      <AlertCircle class="h-4 w-4" />
+      <AlertTitle>
+        {{ errorState.type === "rate_limit" ? "Too Many Requests" : "Error" }}
+      </AlertTitle>
+      <AlertDescription>
+        {{ errorState.message }}
+        <div v-if="errorState.retryAfter" class="mt-2 font-medium">
+          Try again after: {{ formatTime(errorState.retryAfter) }}
+        </div>
+        <div v-if="errorState.type === 'email_failed'" class="mt-2">
+          Please check your spam folder or try again later.
+        </div>
+      </AlertDescription>
+      <Button
+        v-if="errorState.type !== 'rate_limit'"
+        variant="outline"
+        size="sm"
+        class="mt-2"
+        @click="errorState = { type: null, message: '' }"
+      >
+        Dismiss
+      </Button>
+    </Alert>
+
     <!-- Initiate Request Form -->
     <Card>
       <CardHeader>
@@ -115,22 +141,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { Hay } from '@/utils/api';
-import { Download, Trash2, InfoIcon, AlertCircle, CheckCircle, Loader2 } from 'lucide-vue-next';
-import CustomerPrivacyRequestsTable from '@/components/CustomerPrivacyRequestsTable.vue';
+import { ref, computed, onMounted } from "vue";
+import { Hay } from "@/utils/api";
+import { Download, Trash2, InfoIcon, AlertCircle, CheckCircle, Loader2 } from "lucide-vue-next";
+import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
 
 // Form state
-const identifierType = ref<'email' | 'phone' | 'externalId'>('email');
-const identifierValue = ref('');
-const requestType = ref<'export' | 'deletion'>('export');
+const identifierType = ref<"email" | "phone" | "externalId">("email");
+const identifierValue = ref("");
+const requestType = ref<"export" | "deletion">("export");
 const isLoading = ref(false);
-const successMessage = ref('');
-const errorMessage = ref('');
+const successMessage = ref("");
+const errorMessage = ref("");
+
+// Error state management
+const errorState = ref<{
+  type: "network" | "rate_limit" | "service_unavailable" | "email_failed" | null;
+  message: string;
+  retryAfter?: Date;
+}>({ type: null, message: "" });
 
 // Table state
-const requests = ref<any[]>([]);
+const requests = ref<unknown[]>([]);
 const tableLoading = ref(false);
+
+// Extract retry time from error message
+const extractRetryTime = (message: string): Date | undefined => {
+  const match = message.match(/try again (?:after|in) (\d+) (second|minute|hour)s?/i);
+  if (match) {
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    const now = new Date();
+
+    switch (unit) {
+      case "second":
+        return new Date(now.getTime() + value * 1000);
+      case "minute":
+        return new Date(now.getTime() + value * 60 * 1000);
+      case "hour":
+        return new Date(now.getTime() + value * 60 * 60 * 1000);
+    }
+  }
+  return undefined;
+};
+
+// Format retry time
+const formatTime = (date: Date): string => {
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
 
 // Computed properties
 const identifierLabel = computed(() => {
@@ -159,16 +221,68 @@ const identifierPlaceholder = computed(() => {
   }
 });
 
+// Handle API errors
+const handleApiError = (error: unknown): void => {
+  const err = error as {
+    data?: { code?: string };
+    code?: string;
+    message?: string;
+    error?: { message?: string };
+  };
+  console.error("Privacy request error:", err);
+
+  // Clear previous states
+  errorState.value = { type: null, message: "" };
+  errorMessage.value = "";
+
+  const errorCode = err.data?.code || err.code;
+  const errMessage = err.message || err.error?.message || "An error occurred";
+
+  if (errorCode === "TOO_MANY_REQUESTS" || errMessage.toLowerCase().includes("rate limit")) {
+    errorState.value = {
+      type: "rate_limit",
+      message: errMessage,
+      retryAfter: extractRetryTime(errMessage),
+    };
+    errorMessage.value = errMessage;
+  } else if (
+    errorCode === "SERVICE_UNAVAILABLE" ||
+    errMessage.toLowerCase().includes("unavailable")
+  ) {
+    errorState.value = {
+      type: "service_unavailable",
+      message: "Privacy service is temporarily unavailable. Please try again in a few minutes.",
+    };
+    errorMessage.value = "Privacy service is temporarily unavailable. Please try again in a few minutes.";
+  } else if (
+    errMessage.toLowerCase().includes("verification email") ||
+    errMessage.toLowerCase().includes("email")
+  ) {
+    errorState.value = {
+      type: "email_failed",
+      message: errMessage,
+    };
+    errorMessage.value = errMessage;
+  } else {
+    errorState.value = {
+      type: "network",
+      message: errMessage,
+    };
+    errorMessage.value = errMessage || "Failed to initiate privacy request. Please try again.";
+  }
+};
+
 // Methods
 const initiateRequest = async () => {
   if (!identifierValue.value) return;
 
   isLoading.value = true;
-  successMessage.value = '';
-  errorMessage.value = '';
+  successMessage.value = "";
+  errorMessage.value = "";
+  errorState.value = { type: null, message: "" };
 
   try {
-    if (requestType.value === 'export') {
+    if (requestType.value === "export") {
       const result = await Hay.customerPrivacy.requestExport.mutate({
         identifier: {
           type: identifierType.value,
@@ -189,13 +303,12 @@ const initiateRequest = async () => {
     }
 
     // Clear form
-    identifierValue.value = '';
+    identifierValue.value = "";
 
     // Refresh request list
     await fetchRequests();
-  } catch (error: any) {
-    console.error('Privacy request error:', error);
-    errorMessage.value = error.message || 'Failed to initiate privacy request. Please try again.';
+  } catch (error: unknown) {
+    handleApiError(error);
   } finally {
     isLoading.value = false;
   }

@@ -178,9 +178,42 @@ const verifyRequest = async () => {
     } else {
       throw new Error("Invalid request type");
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const apiError = err as {
+      data?: { code?: string };
+      code?: string;
+      message?: string;
+      error?: { message?: string };
+    };
+
+    // Provide more specific error messages based on error type
+    const errorCode = apiError.data?.code || apiError.code;
+    const errMessage =
+      apiError.message || apiError.error?.message || "Failed to verify your request";
+
+    if (errorCode === "TOO_MANY_REQUESTS" || errMessage.toLowerCase().includes("rate limit")) {
+      errorMessage.value =
+        "Too many verification attempts. Please wait a few minutes before trying again.";
+    } else if (
+      errorCode === "SERVICE_UNAVAILABLE" ||
+      errMessage.toLowerCase().includes("unavailable")
+    ) {
+      errorMessage.value =
+        "Privacy service is temporarily unavailable. Please try again in a few minutes.";
+    } else if (errMessage.toLowerCase().includes("expired")) {
+      errorMessage.value =
+        "This verification link has expired. Please request a new privacy request from your settings.";
+    } else if (
+      errMessage.toLowerCase().includes("invalid") ||
+      errMessage.toLowerCase().includes("token")
+    ) {
+      errorMessage.value =
+        "Invalid or already used verification link. Please request a new privacy request if needed.";
+    } else {
+      errorMessage.value = errMessage || "Failed to verify your request. Please try again.";
+    }
+
     error.value = true;
-    errorMessage.value = err.message || "Failed to verify your request. Please try again.";
   } finally {
     loading.value = false;
   }

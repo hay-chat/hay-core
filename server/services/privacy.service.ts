@@ -390,6 +390,7 @@ export class PrivacyService {
   async downloadExport(
     requestId: string,
     downloadToken: string,
+    ipAddress?: string,
   ): Promise<{ data: any; fileName: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
@@ -412,6 +413,43 @@ export class PrivacyService {
       throw new Error("Export has expired");
     }
 
+    // Check if already downloaded (single-use)
+    if (request.downloadCount >= request.maxDownloads) {
+      throw new Error(
+        "Download limit exceeded. This link has already been used. " +
+          "Please request a new export if needed.",
+      );
+    }
+
+    // Check IP restriction (optional - can be disabled for mobile users)
+    const { config } = await import("@server/config/env");
+    const ENABLE_IP_RESTRICTION = config.privacy.downloadIpRestriction;
+
+    if (
+      ENABLE_IP_RESTRICTION &&
+      ipAddress &&
+      request.downloadIpAddress &&
+      request.downloadIpAddress !== ipAddress
+    ) {
+      console.warn(`[Privacy] Download attempt from different IP`, {
+        requestId,
+        originalIp: request.downloadIpAddress,
+        currentIp: ipAddress,
+      });
+
+      // Log security event
+      await this.logPrivacyAction("privacy.download.ip_mismatch", request.email, request.userId, {
+        requestId,
+        originalIp: request.downloadIpAddress,
+        attemptedIp: ipAddress,
+      });
+
+      throw new Error(
+        "Security validation failed. Please download from the same device/network " +
+          "used to request the export.",
+      );
+    }
+
     // Read export file
     const exportUrl = request.getExportUrl();
     if (!exportUrl) {
@@ -421,13 +459,24 @@ export class PrivacyService {
     const exportData = await fs.readFile(exportUrl, "utf-8");
     const data = JSON.parse(exportData);
 
+    // Record download
+    if (!request.downloadedAt) {
+      request.downloadIpAddress = ipAddress;
+      request.downloadedAt = new Date();
+    }
+    request.downloadCount += 1;
+    await requestRepository.save(request);
+
     // Log download
     await this.logPrivacyAction("privacy.export.download", request.email, request.userId, {
       requestId: request.id,
+      downloadCount: request.downloadCount,
+      ipAddress,
     });
 
     debugLog("privacy", `Export downloaded for ${request.email}`, {
       requestId: request.id,
+      downloadCount: request.downloadCount,
     });
 
     return {
@@ -672,14 +721,33 @@ export class PrivacyService {
       // They are managed at the organization level and not deleted with individual users
 
       // Anonymize audit logs (keep for compliance but remove PII)
-      await auditLogRepository.update(
-        { userId },
-        {
-          userId: "deleted-user",
-          userAgent: "deleted",
-          ipAddress: "0.0.0.0",
-        },
-      );
+      const auditLogs = await auditLogRepository.find({ where: { userId } });
+
+      for (const log of auditLogs) {
+        // Anonymize user identifier
+        log.userId = "deleted-user";
+
+        // Anonymize IP addresses
+        if (log.ipAddress) {
+          log.ipAddress = this.anonymizeIpAddress(log.ipAddress);
+        }
+
+        // Anonymize user agent
+        if (log.userAgent) {
+          log.userAgent = "anonymized-user-agent";
+        }
+
+        // Anonymize PII in changes/metadata JSON fields
+        if (log.changes) {
+          log.changes = this.anonymizeJsonPii(log.changes);
+        }
+
+        if (log.metadata) {
+          log.metadata = this.anonymizeJsonPii(log.metadata);
+        }
+
+        await auditLogRepository.save(log);
+      }
 
       // Soft delete user
       user.softDelete();
@@ -1606,6 +1674,62 @@ export class PrivacyService {
         recipientEmail: email,
       },
     });
+  }
+
+  /**
+   * Anonymize IP address (keep network prefix for analytics)
+   * IPv4: 192.168.1.100 -> 192.168.0.0
+   * IPv6: 2001:0db8:85a3::8a2e:0370:7334 -> 2001:0db8:0000::
+   */
+  private anonymizeIpAddress(ip: string): string {
+    if (ip.includes(":")) {
+      // IPv6 - keep first 32 bits
+      const parts = ip.split(":");
+      return `${parts[0]}:${parts[1]}:0000::`;
+    } else {
+      // IPv4 - keep first 16 bits
+      const parts = ip.split(".");
+      return `${parts[0]}.${parts[1]}.0.0`;
+    }
+  }
+
+  /**
+   * Recursively anonymize PII in JSON objects
+   */
+  private anonymizeJsonPii(obj: any): any {
+    if (!obj || typeof obj !== "object") {
+      return obj;
+    }
+
+    const sensitiveFields = [
+      "email",
+      "phone",
+      "phoneNumber",
+      "firstName",
+      "lastName",
+      "name",
+      "address",
+      "ssn",
+      "password",
+      "token",
+      "apiKey",
+      "creditCard",
+      "bankAccount",
+      "ipAddress",
+      "userAgent",
+    ];
+
+    const anonymized = { ...obj };
+
+    for (const key in anonymized) {
+      if (sensitiveFields.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {
+        anonymized[key] = "[REDACTED]";
+      } else if (typeof anonymized[key] === "object") {
+        anonymized[key] = this.anonymizeJsonPii(anonymized[key]);
+      }
+    }
+
+    return anonymized;
   }
 }
 

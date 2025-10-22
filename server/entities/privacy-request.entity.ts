@@ -125,6 +125,18 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
   @Column({ type: "text", nullable: true })
   errorMessage?: string;
 
+  @Column({ type: "varchar", length: 45, nullable: true })
+  downloadIpAddress?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  downloadedAt?: Date;
+
+  @Column({ type: "int", default: 0 })
+  downloadCount!: number;
+
+  @Column({ type: "int", default: 1 })
+  maxDownloads!: number;
+
   // Relationships
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn()
