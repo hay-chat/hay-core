@@ -11,15 +11,17 @@ export class RateLimitService {
    * @param ipAddress - Client IP address
    * @param maxRequests - Maximum requests allowed
    * @param windowSeconds - Time window in seconds
+   * @param failClosed - If true, reject requests when Redis is unavailable (for critical endpoints)
    * @returns true if rate limit exceeded, false otherwise
    */
   async checkIpRateLimit(
     ipAddress: string,
     maxRequests: number,
     windowSeconds: number,
+    failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
     const key = `rate_limit:ip:${ipAddress}`;
-    return this.checkRateLimit(key, maxRequests, windowSeconds);
+    return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
   /**
@@ -27,15 +29,17 @@ export class RateLimitService {
    * @param email - Email address
    * @param maxRequests - Maximum requests allowed
    * @param windowSeconds - Time window in seconds
+   * @param failClosed - If true, reject requests when Redis is unavailable (for critical endpoints)
    * @returns true if rate limit exceeded, false otherwise
    */
   async checkEmailRateLimit(
     email: string,
     maxRequests: number,
     windowSeconds: number,
+    failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
     const key = `rate_limit:email:${email.toLowerCase()}`;
-    return this.checkRateLimit(key, maxRequests, windowSeconds);
+    return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
   /**
@@ -44,15 +48,17 @@ export class RateLimitService {
    * @param email - Email address
    * @param maxRequests - Maximum requests allowed
    * @param windowSeconds - Time window in seconds
+   * @param failClosed - If true, reject requests when Redis is unavailable (for critical endpoints)
    */
   async checkCombinedRateLimit(
     ipAddress: string,
     email: string,
     maxRequests: number,
     windowSeconds: number,
+    failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
     const key = `rate_limit:combined:${ipAddress}:${email.toLowerCase()}`;
-    return this.checkRateLimit(key, maxRequests, windowSeconds);
+    return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
   /**
@@ -75,11 +81,13 @@ export class RateLimitService {
   /**
    * Generic rate limit check using Redis
    * Uses sliding window counter algorithm
+   * @param failClosed - If true, will reject requests when Redis is unavailable (for critical endpoints like privacy)
    */
   private async checkRateLimit(
     key: string,
     maxRequests: number,
     windowSeconds: number,
+    failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
     // Ensure Redis is connected
     if (!redisService.isConnected()) {
@@ -88,8 +96,14 @@ export class RateLimitService {
 
     const client = redisService.getClient();
     if (!client) {
-      // If Redis is unavailable, allow the request (fail open)
-      debugLog("rate-limit", "Redis unavailable, allowing request");
+      if (failClosed) {
+        // For critical endpoints (privacy, security), fail closed to prevent abuse
+        console.error("[RateLimit] Redis unavailable, rejecting request (fail-closed policy)");
+        throw new Error("Rate limiting service unavailable. Please try again later.");
+      }
+
+      // For non-critical endpoints, fail open
+      debugLog("rate-limit", "Redis unavailable, allowing request (fail-open policy)");
       return {
         limited: false,
         remaining: maxRequests,
@@ -144,7 +158,13 @@ export class RateLimitService {
       };
     } catch (error) {
       console.error("[RateLimit] Error checking rate limit:", error);
-      // Fail open if Redis errors
+
+      if (failClosed) {
+        // For critical endpoints, fail closed on errors
+        throw new Error("Rate limiting service error. Please try again later.");
+      }
+
+      // For non-critical endpoints, fail open if Redis errors
       return {
         limited: false,
         remaining: maxRequests,

@@ -50,55 +50,72 @@ function formatTimeRemaining(resetAt: Date): string {
 /**
  * Check rate limits for privacy requests
  * Applies IP, email, and combined throttling
+ * Uses fail-closed policy to prevent abuse during Redis outages
  */
 async function checkPrivacyRateLimits(
   email: string,
   ipAddress: string,
 ): Promise<void> {
-  // Check IP rate limit (5 requests per hour)
-  const ipLimit = await rateLimitService.checkIpRateLimit(
-    ipAddress,
-    RATE_LIMITS.IP_REQUESTS_PER_HOUR,
-    RATE_LIMITS.IP_WINDOW_SECONDS,
-  );
+  const FAIL_CLOSED = true; // Privacy endpoints fail closed for security
 
-  if (ipLimit.limited) {
-    const timeRemaining = formatTimeRemaining(ipLimit.resetAt);
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Too many requests from this IP address. Please try again in ${timeRemaining}.`,
-    });
-  }
+  try {
+    // Check IP rate limit (5 requests per hour)
+    const ipLimit = await rateLimitService.checkIpRateLimit(
+      ipAddress,
+      RATE_LIMITS.IP_REQUESTS_PER_HOUR,
+      RATE_LIMITS.IP_WINDOW_SECONDS,
+      FAIL_CLOSED,
+    );
 
-  // Check email rate limit (3 requests per day)
-  const emailLimit = await rateLimitService.checkEmailRateLimit(
-    email,
-    RATE_LIMITS.EMAIL_REQUESTS_PER_DAY,
-    RATE_LIMITS.EMAIL_WINDOW_SECONDS,
-  );
+    if (ipLimit.limited) {
+      const timeRemaining = formatTimeRemaining(ipLimit.resetAt);
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Too many requests from this IP address. Please try again in ${timeRemaining}.`,
+      });
+    }
 
-  if (emailLimit.limited) {
-    const timeRemaining = formatTimeRemaining(emailLimit.resetAt);
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Too many requests for this email address. Please try again in ${timeRemaining}.`,
-    });
-  }
+    // Check email rate limit (3 requests per day)
+    const emailLimit = await rateLimitService.checkEmailRateLimit(
+      email,
+      RATE_LIMITS.EMAIL_REQUESTS_PER_DAY,
+      RATE_LIMITS.EMAIL_WINDOW_SECONDS,
+      FAIL_CLOSED,
+    );
 
-  // Check combined IP+email rate limit (2 requests per day)
-  const combinedLimit = await rateLimitService.checkCombinedRateLimit(
-    ipAddress,
-    email,
-    RATE_LIMITS.COMBINED_REQUESTS_PER_DAY,
-    RATE_LIMITS.COMBINED_WINDOW_SECONDS,
-  );
+    if (emailLimit.limited) {
+      const timeRemaining = formatTimeRemaining(emailLimit.resetAt);
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Too many requests for this email address. Please try again in ${timeRemaining}.`,
+      });
+    }
 
-  if (combinedLimit.limited) {
-    const timeRemaining = formatTimeRemaining(combinedLimit.resetAt);
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Too many requests. Please try again in ${timeRemaining}.`,
-    });
+    // Check combined IP+email rate limit (2 requests per day)
+    const combinedLimit = await rateLimitService.checkCombinedRateLimit(
+      ipAddress,
+      email,
+      RATE_LIMITS.COMBINED_REQUESTS_PER_DAY,
+      RATE_LIMITS.COMBINED_WINDOW_SECONDS,
+      FAIL_CLOSED,
+    );
+
+    if (combinedLimit.limited) {
+      const timeRemaining = formatTimeRemaining(combinedLimit.resetAt);
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Too many requests. Please try again in ${timeRemaining}.`,
+      });
+    }
+  } catch (error) {
+    // If rate limiting service throws an error (Redis unavailable), convert to TRPC error
+    if (error instanceof Error && error.message.includes("Rate limiting service")) {
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "Privacy request system is temporarily unavailable. Please try again later.",
+      });
+    }
+    throw error;
   }
 }
 
