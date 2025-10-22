@@ -73,8 +73,18 @@ export class PrivacyService {
       userAgent,
     });
 
-    // Send verification email
-    await this.sendVerificationEmail(email, verificationToken, "export", user?.firstName);
+    // Send verification email with error handling
+    try {
+      await this.sendVerificationEmail(email, verificationToken, "export", user?.firstName);
+    } catch (error) {
+      // Mark request as failed if email cannot be sent
+      console.error("[Privacy] Failed to send verification email:", error);
+      request.status = "failed";
+      request.errorMessage = "Failed to send verification email. Please try again.";
+      await requestRepository.save(request);
+
+      throw new Error("Failed to send verification email. Please try again later.");
+    }
 
     debugLog("privacy", `Export request created for ${email}`, {
       requestId: request.id,
@@ -223,8 +233,18 @@ export class PrivacyService {
       userAgent,
     });
 
-    // Send verification email
-    await this.sendVerificationEmail(email, verificationToken, "deletion", user.firstName);
+    // Send verification email with error handling
+    try {
+      await this.sendVerificationEmail(email, verificationToken, "deletion", user.firstName);
+    } catch (error) {
+      // Mark request as failed if email cannot be sent
+      console.error("[Privacy] Failed to send verification email:", error);
+      request.status = "failed";
+      request.errorMessage = "Failed to send verification email. Please try again.";
+      await requestRepository.save(request);
+
+      throw new Error("Failed to send verification email. Please try again later.");
+    }
 
     debugLog("privacy", `Deletion request created for ${email}`, {
       requestId: request.id,
