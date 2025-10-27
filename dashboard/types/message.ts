@@ -12,6 +12,16 @@ export interface Message {
     total_tokens?: number;
     latency_ms?: number;
     confidence?: number;
+    confidenceBreakdown?: {
+      grounding: number;
+      retrieval: number;
+      certainty: number;
+    };
+    confidenceTier?: "high" | "medium" | "low";
+    confidenceDetails?: string;
+    documentsUsed?: Array<{ id: string; title: string; similarity: number }>;
+    recheckAttempted?: boolean;
+    recheckCount?: number;
     // Tool execution metadata
     toolName?: string;
     toolInput?: Record<string, unknown>;
@@ -26,6 +36,17 @@ export interface Message {
     playbookTitle?: string;
     documentId?: string;
     documentTitle?: string;
+    // Conversation management metadata
+    isInactivityWarning?: boolean;
+    warningTimestamp?: string;
+    reason?: string;
+    inactivity_duration_ms?: number;
+    isClosureMessage?: boolean;
+    closureReason?: string;
+    blockReason?: string;
+    // Handoff metadata
+    isHandoffMessage?: boolean;
+    handoffType?: string;
   } | null;
   sentiment?: MessageSentiment | null;
   intent?: MessageIntent | null;
