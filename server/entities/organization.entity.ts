@@ -13,6 +13,7 @@ import {
   DEFAULT_DATE_FORMAT,
   DEFAULT_TIME_FORMAT,
   DEFAULT_TIMEZONE,
+  OrganizationSettings,
 } from "../types/organization-settings.types";
 
 @Entity("organizations")
@@ -38,10 +39,7 @@ export class Organization extends BaseEntity {
   website?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  settings?: {
-    testModeDefault?: boolean;
-    [key: string]: unknown;
-  };
+  settings?: OrganizationSettings;
 
   @Column({ type: "jsonb", nullable: true })
   limits?: {

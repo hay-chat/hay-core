@@ -124,11 +124,13 @@ export class ConfidenceExecutionOrchestrator {
         "Low confidence detected after recheck, applying fallback/escalation",
       );
 
-      // Get fallback message from config
+      // Get fallback message from config and translate it
       const config = await this.getConfidenceConfig(conversation);
-      const fallbackMessage =
-        config.fallbackMessage ||
-        "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.";
+      const fallbackMessage = await this.getTranslatedFallbackMessage(
+        conversation,
+        config.fallbackMessage,
+        customerLanguage,
+      );
 
       // If escalation is enabled, change the step to HANDOFF
       if (config.enableEscalation) {
@@ -209,6 +211,7 @@ export class ConfidenceExecutionOrchestrator {
       const moreDocuments = await this.retrieveWithRelaxedThreshold(
         messages,
         conversation.organization_id,
+        conversation,
       );
 
       // Attach new documents to conversation temporarily (for this execution only)
@@ -281,8 +284,14 @@ export class ConfidenceExecutionOrchestrator {
   private async retrieveWithRelaxedThreshold(
     messages: any[],
     organizationId: string,
+    conversation?: Conversation,
   ): Promise<Array<{ id: string; similarity: number }>> {
     try {
+      // Get configuration for recheck parameters
+      const config = conversation ? await this.getConfidenceConfig(conversation) : null;
+      const maxDocuments = config?.recheckConfig?.maxDocuments || 10;
+      const similarityThreshold = config?.recheckConfig?.similarityThreshold || 0.3;
+
       // Import vector store service
       const { vectorStoreService } = await import("@server/services/vector-store.service");
 
@@ -306,15 +315,21 @@ export class ConfidenceExecutionOrchestrator {
         await vectorStoreService.initialize();
       }
 
-      // Retrieve MORE documents (10 instead of 5)
-      const searchResults = await vectorStoreService.search(organizationId, query, 10);
+      // Retrieve documents using configured parameters
+      debugLog("confidence-orchestrator", "Retrieving documents with relaxed threshold", {
+        maxDocuments,
+        similarityThreshold,
+      });
+      const searchResults = await vectorStoreService.search(organizationId, query, maxDocuments);
 
       if (!searchResults || searchResults.length === 0) {
         return [];
       }
 
-      // Use LOWER threshold (0.3 instead of 0.4)
-      const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.3);
+      // Use configured similarity threshold
+      const filteredResults = searchResults.filter(
+        (result) => (result.similarity || 0) > similarityThreshold,
+      );
 
       return filteredResults.map((result) => ({
         id: result.documentId,
@@ -400,6 +415,51 @@ export class ConfidenceExecutionOrchestrator {
         error: error instanceof Error ? error.message : String(error),
       });
       return ConfidenceGuardrailService.getDefaultConfig();
+    }
+  }
+
+  /**
+   * Translate fallback message to match conversation language
+   */
+  private async getTranslatedFallbackMessage(
+    conversation: Conversation,
+    fallbackMessage: string,
+    customerLanguage?: string,
+  ): Promise<string> {
+    try {
+      // If no customer language detected, use organization default
+      const targetLanguage =
+        customerLanguage || conversation.organization?.defaultLanguage || "en";
+
+      // If already in English and target is English, return as-is
+      if (targetLanguage === "en") {
+        return fallbackMessage;
+      }
+
+      // Use LLM to translate the fallback message
+      const { LLMService } = await import("@server/services/core/llm.service");
+      const llmService = new LLMService();
+
+      const translationPrompt = `Translate the following customer service message to ${targetLanguage}.
+Keep the tone professional, empathetic, and appropriate for a customer service context.
+Only return the translated text, nothing else.
+
+Original message: "${fallbackMessage}"
+
+Translated message:`;
+
+      const translated = await llmService.invoke({
+        prompt: translationPrompt,
+      });
+
+      return translated.trim();
+    } catch (error) {
+      debugLog("confidence-orchestrator", "Error translating fallback message, using original", {
+        level: "warn",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // If translation fails, return original message
+      return fallbackMessage;
     }
   }
 
