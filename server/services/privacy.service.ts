@@ -52,6 +52,9 @@ export class PrivacyService {
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
+    // Get max downloads from config
+    const { config } = await import("@server/config/env");
+
     // Create privacy request
     const request = requestRepository.create({
       email,
@@ -62,6 +65,7 @@ export class PrivacyService {
       verificationExpiresAt: expiresAt,
       ipAddress,
       userAgent,
+      maxDownloads: config.privacy.maxDownloadCount,
     });
 
     await requestRepository.save(request);
@@ -385,6 +389,68 @@ export class PrivacyService {
   }
 
   /**
+   * Cancel a privacy request
+   * Only pending_verification or verified requests can be cancelled
+   */
+  async cancelRequest(requestId: string, token: string, ipAddress?: string): Promise<void> {
+    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
+    const jobRepository = AppDataSource.getRepository(Job);
+
+    // Find the request
+    const request = await requestRepository.findOne({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      throw new Error("Privacy request not found");
+    }
+
+    // Verify token
+    if (!request.verificationTokenHash) {
+      throw new Error("This request cannot be cancelled (no verification token)");
+    }
+
+    const isValid = await verifyPassword(token, request.verificationTokenHash);
+    if (!isValid) {
+      throw new Error("Invalid verification token");
+    }
+
+    // Check if request can be cancelled
+    const cancellableStatuses = ["pending_verification", "verified", "processing"];
+    if (!cancellableStatuses.includes(request.status)) {
+      throw new Error(
+        `Cannot cancel request with status '${request.status}'. ` +
+          `Only pending, verified, or processing requests can be cancelled.`,
+      );
+    }
+
+    // If there's an associated job, cancel it
+    if (request.jobId) {
+      const job = await jobRepository.findOne({ where: { id: request.jobId } });
+      if (job && job.status !== JobStatus.COMPLETED && job.status !== JobStatus.FAILED) {
+        job.status = JobStatus.CANCELLED;
+        await jobRepository.save(job);
+      }
+    }
+
+    // Mark request as cancelled
+    request.status = "cancelled";
+    await requestRepository.save(request);
+
+    // Log audit trail
+    await this.logPrivacyAction("privacy.request.cancelled", request.email, request.userId, {
+      requestId: request.id,
+      type: request.type,
+      ipAddress,
+    });
+
+    debugLog("privacy", `Privacy request cancelled: ${requestId}`, {
+      type: request.type,
+      email: request.email,
+    });
+  }
+
+  /**
    * Download export data
    */
   async downloadExport(
@@ -414,6 +480,9 @@ export class PrivacyService {
     }
 
     // Check if already downloaded (single-use)
+    // Note: maxDownloads is set at request creation time and doesn't change
+    // if PRIVACY_MAX_DOWNLOAD_COUNT env var is updated later. This is intentional
+    // for security - we don't want to retroactively increase limits on existing requests.
     if (request.downloadCount >= request.maxDownloads) {
       throw new Error(
         "Download limit exceeded. This link has already been used. " +
@@ -916,6 +985,9 @@ export class PrivacyService {
     }
 
     // Create privacy request
+    // Get max downloads from config
+    const { config: envConfig } = await import("@server/config/env");
+
     const request = requestRepository.create({
       email: verificationEmail,
       customerId: customer?.id,
@@ -929,6 +1001,7 @@ export class PrivacyService {
       identifierValue: identifier.value,
       ipAddress,
       userAgent,
+      maxDownloads: envConfig.privacy.maxDownloadCount,
     });
 
     await requestRepository.save(request);
@@ -1677,30 +1750,79 @@ export class PrivacyService {
   }
 
   /**
-   * Anonymize IP address (keep network prefix for analytics)
-   * IPv4: 192.168.1.100 -> 192.168.0.0
-   * IPv6: 2001:0db8:85a3::8a2e:0370:7334 -> 2001:0db8:0000::
+   * Anonymize IP address while preserving network prefix for analytics
+   * IPv4: 192.168.1.100 -> 192.168.0.0 (keeps first 16 bits / class B network)
+   * IPv6: 2001:0db8:85a3::8a2e -> 2001:0db8:0000:: (keeps first 48 bits / /48 prefix)
    */
   private anonymizeIpAddress(ip: string): string {
     if (ip.includes(":")) {
-      // IPv6 - keep first 32 bits
-      const parts = ip.split(":");
-      return `${parts[0]}:${parts[1]}:0000::`;
+      // IPv6 handling
+      try {
+        // Handle special cases
+        if (ip === "::1" || ip === "::") {
+          return "0000:0000:0000::";
+        }
+
+        // Split and filter empty parts (from :: compression)
+        const parts = ip.split(":").filter((p) => p !== "");
+
+        // Ensure we have at least some parts to work with
+        if (parts.length === 0) {
+          return "0000:0000:0000::";
+        }
+
+        // Keep first 3 hextets (48 bits), zero out the rest
+        const firstHextet = parts[0] || "0000";
+        const secondHextet = parts[1] || "0000";
+        const thirdHextet = parts[2] || "0000";
+
+        return `${firstHextet}:${secondHextet}:${thirdHextet}::`;
+      } catch (error) {
+        // Safe fallback for any parsing errors
+        console.warn("[Privacy] Failed to anonymize IPv6 address, using fallback", { ip, error });
+        return "0000:0000:0000::";
+      }
     } else {
-      // IPv4 - keep first 16 bits
+      // IPv4 handling - keep first 16 bits (class B network)
       const parts = ip.split(".");
-      return `${parts[0]}.${parts[1]}.0.0`;
+
+      // Validate IPv4 format
+      if (parts.length !== 4) {
+        console.warn("[Privacy] Invalid IPv4 address format, using fallback", { ip });
+        return "0.0.0.0";
+      }
+
+      // Validate each octet is a number
+      const octets = parts.map((p) => parseInt(p, 10));
+      if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) {
+        console.warn("[Privacy] Invalid IPv4 octet values, using fallback", { ip });
+        return "0.0.0.0";
+      }
+
+      return `${octets[0]}.${octets[1]}.0.0`;
     }
   }
 
   /**
-   * Recursively anonymize PII in JSON objects
+   * Recursively anonymize PII in JSON objects and arrays
    */
   private anonymizeJsonPii(obj: any): any {
-    if (!obj || typeof obj !== "object") {
+    // Handle null/undefined
+    if (!obj) {
       return obj;
     }
 
+    // Handle arrays - recursively anonymize each element
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.anonymizeJsonPii(item));
+    }
+
+    // Handle primitives (string, number, boolean, etc.)
+    if (typeof obj !== "object") {
+      return obj;
+    }
+
+    // Handle objects - check for sensitive fields and recurse
     const sensitiveFields = [
       "email",
       "phone",
@@ -1723,13 +1845,65 @@ export class PrivacyService {
 
     for (const key in anonymized) {
       if (sensitiveFields.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {
+        // Redact sensitive fields
         anonymized[key] = "[REDACTED]";
-      } else if (typeof anonymized[key] === "object") {
+      } else if (anonymized[key] !== null && typeof anonymized[key] === "object") {
+        // Recursively anonymize nested objects and arrays
         anonymized[key] = this.anonymizeJsonPii(anonymized[key]);
       }
     }
 
     return anonymized;
+  }
+
+  /**
+   * Clean up expired privacy export files
+   * Called by scheduled job: 'cleanup-expired-privacy-exports'
+   * Deletes export files older than 7 days
+   */
+  async cleanupExpiredExports(): Promise<void> {
+    const { config } = await import("@server/config/env");
+    const retentionDays = config.privacy.exportRetentionDays;
+
+    const exportsDir = path.join(__dirname, "../../exports");
+    let deletedCount = 0;
+    let errorCount = 0;
+
+    try {
+      // Ensure directory exists
+      await fs.mkdir(exportsDir, { recursive: true });
+
+      const files = await fs.readdir(exportsDir);
+
+      for (const file of files) {
+        // Only process JSON files
+        if (!file.endsWith(".json")) continue;
+
+        try {
+          const filePath = path.join(exportsDir, file);
+          const stats = await fs.stat(filePath);
+          const ageInDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
+
+          if (ageInDays > retentionDays) {
+            await fs.unlink(filePath);
+            deletedCount++;
+            debugLog("privacy", `Deleted expired export: ${file}`, {
+              ageInDays: Math.round(ageInDays),
+            });
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`[Privacy] Error processing file ${file}:`, error);
+        }
+      }
+
+      console.log(
+        `[Privacy] Cleanup complete: ${deletedCount} files deleted, ${errorCount} errors`,
+      );
+    } catch (error) {
+      console.error("[Privacy] Failed to cleanup expired exports:", error);
+      throw error;
+    }
   }
 }
 

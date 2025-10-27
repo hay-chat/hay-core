@@ -12,7 +12,7 @@
           <SelectItem
             v-for="option in options"
             :key="getOptionValue(option)"
-            :value="String(getOptionValue(option))"
+            :value="String(getOptionValue(option)) || '__empty__'"
           >
             {{ getOptionLabel(option) }}
           </SelectItem>
@@ -159,9 +159,18 @@ const getOptionLabel = (option: SelectOption): string => {
 
 // Select value management
 const selectValue = computed({
-  get: () => (props.modelValue ? String(props.modelValue) : undefined),
+  get: () => {
+    // Convert empty string to sentinel value for SelectItem
+    if (props.modelValue === "") return "__empty__";
+    return props.modelValue ? String(props.modelValue) : undefined;
+  },
   set: (value: string | undefined) => {
     if (value) {
+      // Convert sentinel value back to empty string
+      if (value === "__empty__") {
+        emit("update:modelValue", "");
+        return;
+      }
       // Try to convert back to number if the original was a number
       const numValue = Number(value);
       emit("update:modelValue", isNaN(numValue) ? value : numValue);
