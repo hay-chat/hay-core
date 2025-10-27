@@ -2,6 +2,10 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { debugLog } from "@server/lib/debug-logger";
+import {
+  ConfidenceGuardrailService,
+  ConfidenceAssessment,
+} from "@server/services/core/confidence-guardrail.service";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -18,16 +22,22 @@ export interface ExecutionResult {
     reason: string;
   };
   rationale?: string;
+  // Confidence guardrail fields
+  confidence?: ConfidenceAssessment;
+  recheckAttempted?: boolean;
+  recheckCount?: number;
 }
 
 export class ExecutionLayer {
   private llmService: LLMService;
   private promptService: PromptService;
+  private confidenceService: ConfidenceGuardrailService;
   private plannerSchema: object;
 
   constructor() {
     this.llmService = new LLMService();
     this.promptService = PromptService.getInstance();
+    this.confidenceService = new ConfidenceGuardrailService();
     debugLog("execution", "ExecutionLayer initialized");
 
     this.plannerSchema = {
@@ -157,6 +167,11 @@ export class ExecutionLayer {
         rationale: result.rationale,
       });
 
+      // Apply confidence guardrails to RESPOND steps
+      if (result.step === "RESPOND" && result.userMessage) {
+        return await this.applyConfidenceGuardrails(result, conversation, customerLanguage);
+      }
+
       return result;
     } catch (error) {
       debugLog("execution", "Error in execution layer", {
@@ -170,6 +185,350 @@ export class ExecutionLayer {
         userMessage:
           "I apologize, but I encountered an error while processing your request. Please try again.",
       };
+    }
+  }
+
+  /**
+   * Apply confidence guardrails to execution result
+   * This integrates confidence checking, recheck, and escalation logic
+   */
+  private async applyConfidenceGuardrails(
+    result: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+  ): Promise<ExecutionResult> {
+    debugLog("execution", "Applying confidence guardrails to RESPOND step");
+
+    // Assess confidence
+    const confidenceAssessment = await this.assessResponseConfidence(
+      conversation,
+      result.userMessage!,
+    );
+
+    // Add confidence to result
+    result.confidence = confidenceAssessment;
+    result.recheckAttempted = false;
+    result.recheckCount = 0;
+
+    debugLog("execution", "Confidence assessment complete", {
+      score: confidenceAssessment.score,
+      tier: confidenceAssessment.tier,
+      shouldRecheck: confidenceAssessment.shouldRecheck,
+      shouldEscalate: confidenceAssessment.shouldEscalate,
+    });
+
+    // Handle medium confidence - trigger recheck
+    if (confidenceAssessment.shouldRecheck) {
+      debugLog("execution", "Medium confidence detected, triggering recheck");
+
+      const recheckResult = await this.performRecheck(result, conversation, customerLanguage);
+
+      if (recheckResult) {
+        result.userMessage = recheckResult.userMessage;
+        result.confidence = recheckResult.confidence;
+        result.recheckAttempted = true;
+        result.recheckCount = 1;
+
+        debugLog("execution", "Recheck complete", {
+          newScore: recheckResult.confidence?.score,
+          newTier: recheckResult.confidence?.tier,
+        });
+      }
+    }
+
+    // Handle low confidence - escalate or fallback
+    if (
+      result.confidence?.shouldEscalate ||
+      (result.recheckAttempted && result.confidence!.tier === "low")
+    ) {
+      debugLog("execution", "Low confidence detected, applying fallback/escalation");
+
+      const config = await this.getConfidenceConfig(conversation);
+      const fallbackMessage = await this.getTranslatedFallbackMessage(
+        conversation,
+        config.fallbackMessage,
+        customerLanguage,
+      );
+
+      // If escalation is enabled, convert to HANDOFF
+      if (config.enableEscalation) {
+        debugLog("execution", "Escalation enabled, converting to HANDOFF");
+        return {
+          step: "HANDOFF",
+          userMessage: fallbackMessage,
+          handoff: {
+            reason: "Low confidence in AI response",
+            fields: {
+              confidenceScore: result.confidence?.score,
+              confidenceTier: result.confidence?.tier,
+            },
+          },
+          confidence: result.confidence,
+          recheckAttempted: result.recheckAttempted,
+          recheckCount: result.recheckCount,
+        };
+      } else {
+        // Just use fallback message
+        debugLog("execution", "Using fallback message");
+        result.userMessage = fallbackMessage;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Assess confidence in a response
+   */
+  private async assessResponseConfidence(
+    conversation: Conversation,
+    response: string,
+  ): Promise<ConfidenceAssessment> {
+    const { documentRepository } = await import("@server/repositories/document.repository");
+
+    // Get retrieved documents with full content
+    const retrievedDocs: Array<{ document: any; similarity: number }> = [];
+    if (conversation.document_ids && conversation.document_ids.length > 0) {
+      const orchestrationStatus = conversation.orchestration_status as any;
+      const documentScores: Record<string, number> = {};
+
+      // Extract similarity scores if available
+      if (orchestrationStatus?.rag?.retrievedDocuments) {
+        for (const doc of orchestrationStatus.rag.retrievedDocuments) {
+          documentScores[doc.id] = doc.similarity || 0.5;
+        }
+      }
+
+      // Fetch full document entities
+      for (const docId of conversation.document_ids) {
+        try {
+          const doc = await documentRepository.findById(docId);
+          if (doc) {
+            retrievedDocs.push({
+              document: doc,
+              similarity: documentScores[docId] || 0.5,
+            });
+          }
+        } catch (error) {
+          debugLog("execution", "Error fetching document for confidence assessment", {
+            level: "error",
+            documentId: docId,
+          });
+        }
+      }
+    }
+
+    // Get last customer message
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+    if (!lastCustomerMessage) {
+      throw new Error("No customer message found for confidence assessment");
+    }
+
+    // Get conversation history
+    const conversationHistory = await conversation.getMessages();
+
+    // Build confidence context
+    const context = {
+      response,
+      retrievedDocuments: retrievedDocs,
+      conversationHistory,
+      customerQuery: lastCustomerMessage.content,
+    };
+
+    // Get configuration
+    const config = await this.getConfidenceConfig(conversation);
+
+    // Perform confidence assessment
+    return await this.confidenceService.assessConfidence(context, config);
+  }
+
+  /**
+   * Perform recheck with alternate retrieval strategy
+   */
+  private async performRecheck(
+    originalResult: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+  ): Promise<{ userMessage: string; confidence?: ConfidenceAssessment } | null> {
+    debugLog("execution", "Performing recheck with alternate strategy");
+
+    try {
+      // Get more documents with relaxed threshold
+      const messages = await conversation.getPublicMessages();
+      const moreDocuments = await this.retrieveWithRelaxedThreshold(
+        messages,
+        conversation.organization_id,
+        conversation,
+      );
+
+      // Store original document IDs
+      const originalDocIds = conversation.document_ids || [];
+
+      // Add new documents temporarily
+      for (const doc of moreDocuments) {
+        if (!originalDocIds.includes(doc.id)) {
+          debugLog("execution", "Adding additional document for recheck", {
+            documentId: doc.id,
+            similarity: doc.similarity,
+          });
+          await conversation.addDocument(doc.id);
+        }
+      }
+
+      // Re-execute with new documents
+      const recheckResult = await this.execute(conversation, customerLanguage);
+
+      if (!recheckResult || recheckResult.step !== "RESPOND" || !recheckResult.userMessage) {
+        // Recheck failed, restore original documents
+        conversation.document_ids = originalDocIds;
+        return null;
+      }
+
+      // Assess confidence again (it will already be in recheckResult if this was called recursively)
+      // To prevent infinite recursion, we need to assess without triggering another recheck
+      const recheckAssessment = recheckResult.confidence ||
+        await this.assessResponseConfidence(conversation, recheckResult.userMessage);
+
+      debugLog("execution", "Recheck assessment complete", {
+        newScore: recheckAssessment.score,
+        improved: recheckAssessment.score > (originalResult.confidence?.score || 0),
+      });
+
+      // If recheck improved confidence, keep the new response and documents
+      if (recheckAssessment.score > (originalResult.confidence?.score || 0)) {
+        debugLog("execution", "Recheck improved confidence, keeping new response");
+        return {
+          userMessage: recheckResult.userMessage,
+          confidence: recheckAssessment,
+        };
+      } else {
+        // Recheck didn't improve, restore original documents
+        debugLog("execution", "Recheck did not improve confidence, reverting");
+        conversation.document_ids = originalDocIds;
+        return null;
+      }
+    } catch (error) {
+      debugLog("execution", "Error during recheck", {
+        level: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Retrieve documents with relaxed threshold
+   */
+  private async retrieveWithRelaxedThreshold(
+    messages: any[],
+    organizationId: string,
+    conversation?: Conversation,
+  ): Promise<Array<{ id: string; similarity: number }>> {
+    try {
+      // Get configuration for recheck parameters
+      const config = conversation ? await this.getConfidenceConfig(conversation) : null;
+      const maxDocuments = config?.recheckConfig?.maxDocuments || 10;
+      const similarityThreshold = config?.recheckConfig?.similarityThreshold || 0.3;
+
+      const { vectorStoreService } = await import("@server/services/vector-store.service");
+
+      // Get customer messages
+      const customerMessages = messages.filter((msg) => msg.type === "Customer").slice(-3);
+      if (customerMessages.length === 0) {
+        return [];
+      }
+
+      const query = customerMessages.map((msg) => msg.content).join(" ").trim();
+      if (!query) {
+        return [];
+      }
+
+      if (!vectorStoreService.initialized) {
+        await vectorStoreService.initialize();
+      }
+
+      debugLog("execution", "Retrieving documents with relaxed threshold", {
+        maxDocuments,
+        similarityThreshold,
+      });
+
+      const searchResults = await vectorStoreService.search(organizationId, query, maxDocuments);
+      if (!searchResults || searchResults.length === 0) {
+        return [];
+      }
+
+      const filteredResults = searchResults.filter(
+        (result) => (result.similarity || 0) > similarityThreshold,
+      );
+
+      return filteredResults.map((result) => ({
+        id: result.documentId,
+        similarity: result.similarity || 0,
+      }));
+    } catch (error) {
+      debugLog("execution", "Error in relaxed retrieval", {
+        level: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get confidence configuration
+   */
+  private async getConfidenceConfig(conversation: Conversation) {
+    try {
+      const { organizationRepository } = await import("@server/repositories/organization.repository");
+      const organization = await organizationRepository.findById(conversation.organization_id);
+
+      return ConfidenceGuardrailService.mergeConfig(
+        organization?.settings as Record<string, unknown>,
+        undefined,
+      );
+    } catch (error) {
+      debugLog("execution", "Error loading confidence config, using defaults", {
+        level: "warn",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return ConfidenceGuardrailService.getDefaultConfig();
+    }
+  }
+
+  /**
+   * Translate fallback message to match conversation language
+   */
+  private async getTranslatedFallbackMessage(
+    conversation: Conversation,
+    fallbackMessage: string,
+    customerLanguage?: string,
+  ): Promise<string> {
+    try {
+      const targetLanguage = customerLanguage || conversation.organization?.defaultLanguage || "en";
+
+      if (targetLanguage === "en") {
+        return fallbackMessage;
+      }
+
+      const translationPrompt = `Translate the following customer service message to ${targetLanguage}.
+Keep the tone professional, empathetic, and appropriate for a customer service context.
+Only return the translated text, nothing else.
+
+Original message: "${fallbackMessage}"
+
+Translated message:`;
+
+      const translated = await this.llmService.invoke({
+        prompt: translationPrompt,
+      });
+
+      return translated.trim();
+    } catch (error) {
+      debugLog("execution", "Error translating fallback message, using original", {
+        level: "warn",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return fallbackMessage;
     }
   }
 }

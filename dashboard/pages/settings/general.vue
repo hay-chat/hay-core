@@ -100,6 +100,108 @@
       </CardContent>
     </Card>
 
+    <!-- AI Confidence Guardrails -->
+    <Card>
+      <CardHeader>
+        <CardTitle>AI Confidence Guardrails</CardTitle>
+        <CardDescription>
+          Configure how AI responses are evaluated for confidence and accuracy
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-6">
+        <!-- Confidence Thresholds -->
+        <div class="space-y-4">
+          <div>
+            <Label>Confidence Thresholds</Label>
+            <p class="text-sm text-neutral-muted mb-4">
+              Set the minimum confidence scores required for different quality tiers
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
+              <Input
+                v-model.number="settings.confidenceGuardrail.highThreshold"
+                type="number"
+                label="High Confidence Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Minimum score for high confidence (0.0 - 1.0)"
+              />
+              <Input
+                v-model.number="settings.confidenceGuardrail.mediumThreshold"
+                type="number"
+                label="Medium Confidence Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Minimum score for medium confidence (0.0 - 1.0)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Enable/Disable Features -->
+        <div class="space-y-4 pt-2 border-t">
+          <Input
+            v-model="settings.confidenceGuardrail.enableRecheck"
+            type="switch"
+            label="Enable Automatic Recheck"
+            hint="When confidence is medium, automatically retrieve more documents and regenerate the response"
+          />
+
+          <Input
+            v-model="settings.confidenceGuardrail.enableEscalation"
+            type="switch"
+            label="Enable Human Escalation"
+            hint="When confidence is low, escalate to a human agent instead of sending the AI response"
+          />
+        </div>
+
+        <!-- Recheck Configuration -->
+        <div
+          v-if="settings.confidenceGuardrail.enableRecheck"
+          class="space-y-4 pt-2 border-t"
+        >
+          <div>
+            <Label>Recheck Configuration</Label>
+            <p class="text-sm text-neutral-muted mb-4">
+              Parameters used when rechecking medium-confidence responses
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
+              <Input
+                v-model.number="settings.confidenceGuardrail.recheckConfig.maxDocuments"
+                type="number"
+                label="Max Documents"
+                :min="1"
+                :max="50"
+                helper-text="Number of documents to retrieve (default: 10)"
+              />
+              <Input
+                v-model.number="settings.confidenceGuardrail.recheckConfig.similarityThreshold"
+                type="number"
+                label="Similarity Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Lower threshold for broader search (default: 0.3)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Fallback Message -->
+        <div class="pt-2 border-t">
+          <Input
+            v-model="settings.confidenceGuardrail.fallbackMessage"
+            type="textarea"
+            label="Fallback Message"
+            :rows="3"
+            placeholder="Enter fallback message..."
+            helper-text="Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language."
+          />
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Notification Preferences -->
     <!-- <Card>
       <CardHeader>
@@ -362,6 +464,18 @@ import { TIMEZONE_GROUPS } from "@/utils/timezones";
 const toast = useToast();
 
 // Import types for proper typing
+type ConfidenceGuardrailSettings = {
+  highThreshold: number;
+  mediumThreshold: number;
+  enableRecheck: boolean;
+  enableEscalation: boolean;
+  fallbackMessage: string;
+  recheckConfig: {
+    maxDocuments: number;
+    similarityThreshold: number;
+  };
+};
+
 type PlatformSettings = {
   defaultLanguage: string;
   timezone: string;
@@ -369,6 +483,7 @@ type PlatformSettings = {
   timeFormat: string;
   defaultAgent: string;
   testModeDefault: boolean;
+  confidenceGuardrail: ConfidenceGuardrailSettings;
   notifications: any;
   webhooks: any;
   dataRetention: any;
@@ -384,6 +499,18 @@ const settings = ref<PlatformSettings>({
   timeFormat: "12h",
   defaultAgent: "",
   testModeDefault: false,
+  confidenceGuardrail: {
+    highThreshold: 0.8,
+    mediumThreshold: 0.5,
+    enableRecheck: true,
+    enableEscalation: true,
+    fallbackMessage:
+      "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+    recheckConfig: {
+      maxDocuments: 10,
+      similarityThreshold: 0.3,
+    },
+  },
   notifications: {
     email: {
       newConversations: true,
@@ -508,6 +635,19 @@ const saveSettings = async () => {
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
+      confidenceGuardrail: {
+        ...settings.value.confidenceGuardrail,
+        // Ensure boolean values are properly typed (Input component may return strings)
+        enableRecheck: Boolean(settings.value.confidenceGuardrail.enableRecheck),
+        enableEscalation: Boolean(settings.value.confidenceGuardrail.enableEscalation),
+        // Ensure number values are properly typed
+        highThreshold: Number(settings.value.confidenceGuardrail.highThreshold),
+        mediumThreshold: Number(settings.value.confidenceGuardrail.mediumThreshold),
+        recheckConfig: {
+          maxDocuments: Number(settings.value.confidenceGuardrail.recheckConfig.maxDocuments),
+          similarityThreshold: Number(settings.value.confidenceGuardrail.recheckConfig.similarityThreshold),
+        },
+      },
     });
 
     if (response.success) {
@@ -533,6 +673,18 @@ const resetToDefaults = () => {
       timeFormat: "12h",
       defaultAgent: "",
       testModeDefault: false,
+      confidenceGuardrail: {
+        highThreshold: 0.8,
+        mediumThreshold: 0.5,
+        enableRecheck: true,
+        enableEscalation: true,
+        fallbackMessage:
+          "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+        recheckConfig: {
+          maxDocuments: 10,
+          similarityThreshold: 0.3,
+        },
+      },
       notifications: {
         email: {
           newConversations: true,
@@ -602,6 +754,14 @@ onMounted(async () => {
       "testModeDefault" in orgSettings
         ? ((orgSettings as Record<string, unknown>).testModeDefault as boolean)
         : false;
+
+    // Load confidence guardrail settings
+    if (orgSettings.confidenceGuardrail) {
+      settings.value.confidenceGuardrail = {
+        ...settings.value.confidenceGuardrail,
+        ...(orgSettings.confidenceGuardrail as any),
+      };
+    }
 
     // Store original settings for change detection
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));

@@ -34,6 +34,22 @@
       <Label v-if="label" :for="inputId">{{ label }}</Label>
     </div>
 
+    <!-- Checkbox Type -->
+    <div v-else-if="type === 'checkbox'" class="checkbox-wrapper">
+      <input
+        :id="inputId"
+        type="checkbox"
+        :checked="Boolean(modelValue)"
+        :disabled="disabledAttr"
+        :name="nameAttr"
+        :required="requiredAttr"
+        :class="props.class"
+        class="checkbox"
+        @change="handleCheckboxChange"
+      />
+      <Label v-if="label" :for="inputId">{{ label }}</Label>
+    </div>
+
     <!-- Regular Input -->
     <div v-else-if="type !== 'textarea'" class="input-container">
       <component :is="iconStart" v-if="iconStart" class="input-icon icon-start" />
@@ -98,7 +114,7 @@ export type SelectOption = string | { label: string; value: string | number };
 export interface InputProps {
   class?: string;
   modelValue?: string | number | boolean | undefined;
-  type?: "text" | "textarea" | "select" | "password" | "email" | "switch";
+  type?: "text" | "textarea" | "select" | "password" | "email" | "switch" | "checkbox" | "number";
   label?: string;
   hint?: string;
   error?: string;
@@ -135,14 +151,20 @@ const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value;
 };
 
-// Input handler for email trimming
+// Input handler for email trimming and number conversion
 const handleInputChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  let value = target.value;
+  let value: string | number = target.value;
 
   // Trim whitespace for email fields
   if (props.type === "email") {
     value = value.trim();
+  }
+
+  // Convert to number for number inputs
+  if (props.type === "number") {
+    const numValue = Number(value);
+    value = isNaN(numValue) ? value : numValue;
   }
 
   emit("update:modelValue", value);
@@ -181,6 +203,12 @@ const selectValue = computed({
 // Switch handler
 const handleSwitchChange = (value: boolean) => {
   emit("update:modelValue", value);
+};
+
+// Checkbox handler
+const handleCheckboxChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit("update:modelValue", target.checked);
 };
 
 // Get attrs
@@ -371,5 +399,36 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--color-input);
+  cursor: pointer;
+
+  &:checked {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-ring);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 }
 </style>
