@@ -34,6 +34,10 @@ export interface ConfidenceConfig {
   enableRecheck: boolean; // Default: true
   enableEscalation: boolean; // Default: true
   fallbackMessage: string; // Default message for low confidence
+  recheckConfig?: {
+    maxDocuments: number; // Default: 10
+    similarityThreshold: number; // Default: 0.3
+  };
 }
 
 /**
@@ -62,6 +66,10 @@ export class ConfidenceGuardrailService {
     enableEscalation: true,
     fallbackMessage:
       "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+    recheckConfig: {
+      maxDocuments: 10,
+      similarityThreshold: 0.3,
+    },
   };
 
   // Weights for confidence components (must sum to 1.0)
