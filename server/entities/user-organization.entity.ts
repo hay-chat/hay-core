@@ -106,14 +106,9 @@ export class UserOrganization extends BaseEntity {
     return this.isActive && this.hasScope(resource, ACTIONS.READ);
   }
 
-  isOwner(): boolean {
-    return this.role === "owner";
-  }
-
-  isAdmin(): boolean {
-    return this.role === "owner" || this.role === "admin";
-  }
-
+  /**
+   * Update last accessed timestamp
+   */
   updateLastAccessed(): void {
     this.lastAccessedAt = new Date();
   }

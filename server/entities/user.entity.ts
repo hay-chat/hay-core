@@ -96,14 +96,6 @@ export class User extends BaseEntity {
     return this.isActive && !!this.organizationId;
   }
 
-  isOrganizationOwner(): boolean {
-    return this.role === "owner";
-  }
-
-  isOrganizationAdmin(): boolean {
-    return this.role === "owner" || this.role === "admin";
-  }
-
   getFullName(): string {
     if (this.firstName && this.lastName) {
       return `${this.firstName} ${this.lastName}`;

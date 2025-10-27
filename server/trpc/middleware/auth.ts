@@ -52,7 +52,8 @@ export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
 });
 
 /**
- * Middleware to ensure user is an admin
+ * Middleware to ensure user has admin access (full permissions)
+ * Checks for *:* scope (full access to all resources)
  */
 const isAdmin = t.middleware(({ ctx, next }) => {
   if (!ctx.user) {
@@ -62,7 +63,8 @@ const isAdmin = t.middleware(({ ctx, next }) => {
     });
   }
 
-  if (!ctx.user.isAdmin()) {
+  // Check if user has full access (*:* scope)
+  if (!ctx.user.hasScope("*", "*")) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Admin access required",
