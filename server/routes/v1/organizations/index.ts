@@ -3,7 +3,12 @@ import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
-import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
+import {
+  DateFormat,
+  TimeFormat,
+  Timezone,
+  DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
+} from "@server/types/organization-settings.types";
 
 const confidenceGuardrailSchema = z.object({
   highThreshold: z.number().min(0).max(1).optional(),
@@ -40,6 +45,19 @@ export const organizationsRouter = t.router({
       });
     }
 
+    // Merge confidence guardrail settings with defaults
+    const confidenceGuardrail = organization.settings?.confidenceGuardrail
+      ? {
+          ...DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
+          ...organization.settings.confidenceGuardrail,
+          // Explicitly ensure boolean values default to true if null/undefined
+          enableRecheck:
+            organization.settings.confidenceGuardrail.enableRecheck ?? true,
+          enableEscalation:
+            organization.settings.confidenceGuardrail.enableEscalation ?? true,
+        }
+      : DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG;
+
     return {
       defaultLanguage: organization.defaultLanguage,
       dateFormat: organization.dateFormat,
@@ -47,7 +65,7 @@ export const organizationsRouter = t.router({
       timezone: organization.timezone,
       defaultAgentId: organization.defaultAgentId,
       testModeDefault: organization.settings?.testModeDefault || false,
-      confidenceGuardrail: organization.settings?.confidenceGuardrail,
+      confidenceGuardrail,
     };
   }),
 

@@ -471,8 +471,13 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           conversation.title,
         );
 
+        // Use executionResult.userMessage if available (e.g., from confidence guardrail)
+        const handoffMessage =
+          executionResult.userMessage ||
+          "I'm transferring you to a human agent. Someone will be with you shortly.";
+
         await conversation.addMessage({
-          content: "I'm transferring you to a human agent. Someone will be with you shortly.",
+          content: handoffMessage,
           type: MessageType.BOT_AGENT,
           metadata: buildMessageMetadata(executionResult, {
             isHandoffMessage: true,
@@ -516,16 +521,27 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             conversation.title,
           );
 
-          // Generate natural handoff message
-          const llmService = new LLMService();
-          const messages = await conversation.getMessages();
-          try {
-            const handoffMessage = await llmService.invoke({
-              history: messages,
-              prompt:
-                "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
-            });
+          // Use executionResult.userMessage if available (e.g., from confidence guardrail),
+          // otherwise generate a natural handoff message
+          let handoffMessage: string = executionResult.userMessage || "";
 
+          if (!handoffMessage) {
+            const llmService = new LLMService();
+            const messages = await conversation.getMessages();
+            try {
+              handoffMessage = await llmService.invoke({
+                history: messages,
+                prompt:
+                  "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
+              });
+            } catch (error) {
+              console.error("[Orchestrator] Error generating handoff message:", error);
+              handoffMessage =
+                "I'm transferring you to a human agent. Someone will be with you shortly.";
+            }
+          }
+
+          try {
             await conversation.addMessage({
               content: handoffMessage,
               type: MessageType.BOT_AGENT,
@@ -574,10 +590,14 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           // Continue loop to process the handoff instructions
           continue;
         } else {
-          // Default fallback message
+          // Use executionResult.userMessage if available, otherwise use default
+          const unavailableMessage =
+            executionResult.userMessage ||
+            "I apologize, but no human agents are currently available.";
+
           debugLog("orchestrator", "No custom fallback, using default message");
           await conversation.addMessage({
-            content: "I apologize, but no human agents are currently available.",
+            content: unavailableMessage,
             type: MessageType.BOT_AGENT,
             metadata: buildMessageMetadata(executionResult, {
               isHandoffMessage: true,

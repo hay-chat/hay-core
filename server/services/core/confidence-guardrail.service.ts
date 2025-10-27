@@ -322,6 +322,15 @@ export class ConfidenceGuardrailService {
       Object.assign(config, agentConf);
     }
 
+    // Ensure boolean values default to true if explicitly set to undefined/null
+    // This handles cases where the database has null/undefined values
+    if (config.enableRecheck === undefined || config.enableRecheck === null) {
+      config.enableRecheck = true;
+    }
+    if (config.enableEscalation === undefined || config.enableEscalation === null) {
+      config.enableEscalation = true;
+    }
+
     return config;
   }
 }

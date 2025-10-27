@@ -143,16 +143,16 @@
         <div class="space-y-4 pt-2 border-t">
           <Input
             v-model="settings.confidenceGuardrail.enableRecheck"
-            type="checkbox"
+            type="switch"
             label="Enable Automatic Recheck"
-            helper-text="When confidence is medium, automatically retrieve more documents and regenerate the response"
+            hint="When confidence is medium, automatically retrieve more documents and regenerate the response"
           />
 
           <Input
             v-model="settings.confidenceGuardrail.enableEscalation"
-            type="checkbox"
+            type="switch"
             label="Enable Human Escalation"
-            helper-text="When confidence is low, escalate to a human agent instead of sending the AI response"
+            hint="When confidence is low, escalate to a human agent instead of sending the AI response"
           />
         </div>
 
@@ -635,7 +635,19 @@ const saveSettings = async () => {
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
-      confidenceGuardrail: settings.value.confidenceGuardrail,
+      confidenceGuardrail: {
+        ...settings.value.confidenceGuardrail,
+        // Ensure boolean values are properly typed (Input component may return strings)
+        enableRecheck: Boolean(settings.value.confidenceGuardrail.enableRecheck),
+        enableEscalation: Boolean(settings.value.confidenceGuardrail.enableEscalation),
+        // Ensure number values are properly typed
+        highThreshold: Number(settings.value.confidenceGuardrail.highThreshold),
+        mediumThreshold: Number(settings.value.confidenceGuardrail.mediumThreshold),
+        recheckConfig: {
+          maxDocuments: Number(settings.value.confidenceGuardrail.recheckConfig.maxDocuments),
+          similarityThreshold: Number(settings.value.confidenceGuardrail.recheckConfig.similarityThreshold),
+        },
+      },
     });
 
     if (response.success) {
