@@ -12,6 +12,10 @@ import { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { debugLog } from "@server/lib/debug-logger";
+import {
+  ConfidenceExecutionOrchestrator,
+  ConfidenceEnhancedExecutionResult,
+} from "./confidence-execution.orchestrator";
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -325,7 +329,7 @@ export const runConversation = async (conversationId: string) => {
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
 async function handleExecutionLoop(conversation: Conversation, customerLanguage?: string) {
-  const executionLayer = new ExecutionLayer();
+  const confidenceOrchestrator = new ConfidenceExecutionOrchestrator();
   const toolExecutionService = new ToolExecutionService();
   const MAX_ITERATIONS = 15; // Prevent infinite loops
   let iterations = 0;
@@ -335,8 +339,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     iterations++;
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
-    // Get current messages and execute
-    const executionResult = await executionLayer.execute(conversation, customerLanguage);
+    // Get current messages and execute WITH CONFIDENCE GUARDRAILS
+    const executionResult: ConfidenceEnhancedExecutionResult | null =
+      await confidenceOrchestrator.executeWithConfidence(conversation, customerLanguage);
 
     if (!executionResult) {
       debugLog("orchestrator", "No execution result, ending loop");
@@ -366,7 +371,10 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Continue the loop to let LLM analyze the result
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
-      debugLog("orchestrator", "HANDOFF step detected");
+      debugLog("orchestrator", "HANDOFF step detected", {
+        confidenceRelated: !!executionResult.confidence,
+        confidenceScore: executionResult.confidence?.score,
+      });
 
       // Check if we've already processed handoff to avoid duplicates
       if (handoffProcessed) {
@@ -375,6 +383,16 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       }
 
       handoffProcessed = true; // Mark as processed
+
+      // Save confidence log if this is a confidence-related handoff
+      if (executionResult.confidence) {
+        await confidenceOrchestrator.saveConfidenceLog(
+          conversation,
+          executionResult.confidence,
+          executionResult.recheckAttempted || false,
+          executionResult.recheckCount || 0,
+        );
+      }
 
       // Get agent configuration
       const agent = await agentRepository.findById(conversation.agent_id!);
@@ -397,6 +415,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           type: MessageType.BOT_AGENT,
           metadata: {
             isHandoffMessage: true,
+            confidence: executionResult.confidence?.score,
+            confidenceTier: executionResult.confidence?.tier,
+            recheckAttempted: executionResult.recheckAttempted || false,
           },
         });
         break;
@@ -453,6 +474,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
               metadata: {
                 isHandoffMessage: true,
                 handoffType: "available",
+                confidence: executionResult.confidence?.score,
+                confidenceTier: executionResult.confidence?.tier,
+                recheckAttempted: executionResult.recheckAttempted || false,
               },
             });
           } catch (error) {
@@ -463,6 +487,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
               metadata: {
                 isHandoffMessage: true,
                 handoffType: "available",
+                confidence: executionResult.confidence?.score,
+                confidenceTier: executionResult.confidence?.tier,
+                recheckAttempted: executionResult.recheckAttempted || false,
               },
             });
           }
@@ -503,6 +530,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             metadata: {
               isHandoffMessage: true,
               handoffType: "unavailable",
+              confidence: executionResult.confidence?.score,
+              confidenceTier: executionResult.confidence?.tier,
+              recheckAttempted: executionResult.recheckAttempted || false,
             },
           });
           break;
@@ -521,13 +551,39 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     } else {
       // Regular response (not a tool call) - end the loop
       if (executionResult.userMessage) {
+        // Add confidence metadata to message
+        const metadata: Record<string, unknown> = {};
+
+        if (executionResult.confidence) {
+          metadata.confidence = executionResult.confidence.score;
+          metadata.confidenceBreakdown = executionResult.confidence.breakdown;
+          metadata.confidenceTier = executionResult.confidence.tier;
+          metadata.confidenceDetails = executionResult.confidence.details;
+          metadata.documentsUsed = executionResult.confidence.documentsUsed;
+          metadata.recheckAttempted = executionResult.recheckAttempted || false;
+          metadata.recheckCount = executionResult.recheckCount || 0;
+
+          // Save confidence log to orchestration_status
+          await confidenceOrchestrator.saveConfidenceLog(
+            conversation,
+            executionResult.confidence,
+            executionResult.recheckAttempted || false,
+            executionResult.recheckCount || 0,
+          );
+        }
+
         await conversation.addMessage({
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
+          metadata,
         });
         debugLog(
           "orchestrator",
           "Added bot response " + executionResult.userMessage + ", ending execution loop",
+          {
+            confidenceScore: executionResult.confidence?.score,
+            confidenceTier: executionResult.confidence?.tier,
+          },
         );
 
         break;

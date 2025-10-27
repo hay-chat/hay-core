@@ -13,7 +13,7 @@
 import { computed } from "vue";
 
 interface Props {
-  variant?: "default" | "secondary" | "destructive" | "outline" | "success";
+  variant?: "default" | "secondary" | "destructive" | "outline" | "success" | "warning";
   href?: string;
   onClick?: () => void;
 }
@@ -76,6 +76,11 @@ const onClick = (event: MouseEvent) => {
     color: rgb(22, 101, 52);
   }
 
+  &--warning {
+    background-color: rgb(254, 243, 199);
+    color: rgb(120, 53, 15);
+  }
+
   &--interactive {
     cursor: pointer;
 
@@ -98,6 +103,10 @@ const onClick = (event: MouseEvent) => {
 
     &.badge--success:hover {
       background-color: rgb(187, 247, 208);
+    }
+
+    &.badge--warning:hover {
+      background-color: rgb(253, 230, 138);
     }
   }
 }

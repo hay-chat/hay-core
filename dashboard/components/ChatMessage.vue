@@ -131,8 +131,15 @@
       <!-- Sent Message Metadata & Feedback -->
       <div v-else-if="message.type === 'BotAgent' && !isQueued" class="chat-message__metadata">
         <div class="flex items-center gap-3 mt-1">
-          <div v-if="message.metadata?.confidence" class="chat-message__confidence">
-            Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
+          <div v-if="message.metadata?.confidence" class="chat-message__confidence-detailed">
+            <Badge
+              :variant="getConfidenceBadgeVariant(message.metadata.confidenceTier)"
+              class="text-xs"
+            >
+              {{ getConfidenceIcon(message.metadata.confidenceTier) }}
+              {{ (message.metadata.confidence * 100).toFixed(0) }}% Confidence
+              <span v-if="message.metadata.recheckAttempted" class="ml-1" title="Rechecked">↻</span>
+            </Badge>
           </div>
           <MessageFeedbackControl
             v-if="showFeedback"
@@ -293,6 +300,35 @@ const avatarIcon = computed(() => {
   if (props.message.type === "BotAgent" || props.message.type === "HumanAgent") return Bot;
   return User;
 });
+
+// Confidence display helpers
+const getConfidenceBadgeVariant = (tier: string | undefined) => {
+  if (!tier) return "secondary";
+  switch (tier) {
+    case "high":
+      return "success";
+    case "medium":
+      return "warning";
+    case "low":
+      return "destructive";
+    default:
+      return "secondary";
+  }
+};
+
+const getConfidenceIcon = (tier: string | undefined) => {
+  if (!tier) return "";
+  switch (tier) {
+    case "high":
+      return "✓";
+    case "medium":
+      return "⚡";
+    case "low":
+      return "⚠";
+    default:
+      return "";
+  }
+};
 </script>
 
 <style lang="scss">
