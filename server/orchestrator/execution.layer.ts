@@ -2,6 +2,10 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { debugLog } from "@server/lib/debug-logger";
+import {
+  ConfidenceGuardrailService,
+  ConfidenceAssessment,
+} from "@server/services/core/confidence-guardrail.service";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -18,16 +22,22 @@ export interface ExecutionResult {
     reason: string;
   };
   rationale?: string;
+  // Confidence guardrail fields
+  confidence?: ConfidenceAssessment;
+  recheckAttempted?: boolean;
+  recheckCount?: number;
 }
 
 export class ExecutionLayer {
   private llmService: LLMService;
   private promptService: PromptService;
+  private confidenceService: ConfidenceGuardrailService;
   private plannerSchema: object;
 
   constructor() {
     this.llmService = new LLMService();
     this.promptService = PromptService.getInstance();
+    this.confidenceService = new ConfidenceGuardrailService();
     debugLog("execution", "ExecutionLayer initialized");
 
     this.plannerSchema = {

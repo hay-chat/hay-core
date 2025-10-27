@@ -56,6 +56,29 @@ async function publishStatusChange(
   }
 }
 
+/**
+ * Helper function to build message metadata from execution result
+ * Makes metadata assignment DRY across different message types
+ */
+function buildMessageMetadata(
+  executionResult: ConfidenceEnhancedExecutionResult,
+  additionalMetadata?: Record<string, unknown>,
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = { ...additionalMetadata };
+
+  if (executionResult.confidence) {
+    metadata.confidence = executionResult.confidence.score;
+    metadata.confidenceBreakdown = executionResult.confidence.breakdown;
+    metadata.confidenceTier = executionResult.confidence.tier;
+    metadata.confidenceDetails = executionResult.confidence.details;
+    metadata.documentsUsed = executionResult.confidence.documentsUsed;
+    metadata.recheckAttempted = executionResult.recheckAttempted || false;
+    metadata.recheckCount = executionResult.recheckCount || 0;
+  }
+
+  return metadata;
+}
+
 export const runConversation = async (conversationId: string) => {
   const conversation = await conversationRepository.findById(conversationId);
   if (!conversation) {
@@ -413,12 +436,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
         await conversation.addMessage({
           content: "I'm transferring you to a human agent. Someone will be with you shortly.",
           type: MessageType.BOT_AGENT,
-          metadata: {
+          metadata: buildMessageMetadata(executionResult, {
             isHandoffMessage: true,
-            confidence: executionResult.confidence?.score,
-            confidenceTier: executionResult.confidence?.tier,
-            recheckAttempted: executionResult.recheckAttempted || false,
-          },
+          }),
         });
         break;
       }
@@ -471,26 +491,20 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             await conversation.addMessage({
               content: handoffMessage,
               type: MessageType.BOT_AGENT,
-              metadata: {
+              metadata: buildMessageMetadata(executionResult, {
                 isHandoffMessage: true,
                 handoffType: "available",
-                confidence: executionResult.confidence?.score,
-                confidenceTier: executionResult.confidence?.tier,
-                recheckAttempted: executionResult.recheckAttempted || false,
-              },
+              }),
             });
           } catch (error) {
             console.error("[Orchestrator] Error generating handoff message:", error);
             await conversation.addMessage({
               content: "I'm connecting you with a human agent who will be with you shortly.",
               type: MessageType.BOT_AGENT,
-              metadata: {
+              metadata: buildMessageMetadata(executionResult, {
                 isHandoffMessage: true,
                 handoffType: "available",
-                confidence: executionResult.confidence?.score,
-                confidenceTier: executionResult.confidence?.tier,
-                recheckAttempted: executionResult.recheckAttempted || false,
-              },
+              }),
             });
           }
           break;
@@ -527,13 +541,10 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           await conversation.addMessage({
             content: "I apologize, but no human agents are currently available.",
             type: MessageType.BOT_AGENT,
-            metadata: {
+            metadata: buildMessageMetadata(executionResult, {
               isHandoffMessage: true,
               handoffType: "unavailable",
-              confidence: executionResult.confidence?.score,
-              confidenceTier: executionResult.confidence?.tier,
-              recheckAttempted: executionResult.recheckAttempted || false,
-            },
+            }),
           });
           break;
         }
@@ -551,19 +562,8 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     } else {
       // Regular response (not a tool call) - end the loop
       if (executionResult.userMessage) {
-        // Add confidence metadata to message
-        const metadata: Record<string, unknown> = {};
-
+        // Save confidence log if available
         if (executionResult.confidence) {
-          metadata.confidence = executionResult.confidence.score;
-          metadata.confidenceBreakdown = executionResult.confidence.breakdown;
-          metadata.confidenceTier = executionResult.confidence.tier;
-          metadata.confidenceDetails = executionResult.confidence.details;
-          metadata.documentsUsed = executionResult.confidence.documentsUsed;
-          metadata.recheckAttempted = executionResult.recheckAttempted || false;
-          metadata.recheckCount = executionResult.recheckCount || 0;
-
-          // Save confidence log to orchestration_status
           await confidenceOrchestrator.saveConfidenceLog(
             conversation,
             executionResult.confidence,
@@ -575,7 +575,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
         await conversation.addMessage({
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
-          metadata,
+          metadata: buildMessageMetadata(executionResult),
         });
         debugLog(
           "orchestrator",
