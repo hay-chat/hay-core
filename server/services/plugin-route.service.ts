@@ -230,24 +230,33 @@ export class PluginRouteService {
   }
 
   /**
-   * Clear rate limits (for cleanup)
+   * Clear expired rate limits (for cleanup)
+   * Called by scheduled job: 'plugin-rate-limit-cleanup'
    */
-  clearRateLimits(): void {
+  async clearRateLimits(): Promise<void> {
     const now = Date.now();
+    let cleared = 0;
+
     for (const [key, entry] of this.rateLimits.entries()) {
       if (entry.resetTime < now) {
         this.rateLimits.delete(key);
+        cleared++;
       }
+    }
+
+    if (cleared > 0) {
+      console.log(`[PluginRoute] Cleared ${cleared} expired rate limit entries`);
     }
   }
 
   /**
    * Start periodic cleanup
+   * NOTE: Cleanup is now handled by the scheduler service
+   * See: server/services/scheduled-jobs.registry.ts -> 'plugin-rate-limit-cleanup'
    */
   startCleanup(): void {
-    setInterval(() => {
-      this.clearRateLimits();
-    }, this.rateLimitWindow);
+    // No-op: Cleanup is now handled by scheduler
+    console.log("[PluginRoute] Rate limit cleanup handled by scheduler service");
   }
 }
 
