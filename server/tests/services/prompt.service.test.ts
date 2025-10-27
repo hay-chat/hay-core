@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { PromptService } from "../../services/prompt.service";
 import { VariableEngine } from "../../utils/variable-engine";
 import { PromptParser } from "../../utils/prompt-parser";

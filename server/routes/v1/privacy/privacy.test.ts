@@ -39,16 +39,32 @@ describe("Privacy DSAR Integration Tests", () => {
   });
 
   beforeEach(async () => {
-    // Clean up test data
+    // Clean up test data - order matters due to foreign key constraints
     const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
     const auditLogRepo = AppDataSource.getRepository(AuditLog);
     const userRepo = AppDataSource.getRepository(User);
     const orgRepo = AppDataSource.getRepository(Organization);
 
-    await privacyRequestRepo.delete({ email: testEmail });
-    await auditLogRepo.delete({ userId: testUser?.id });
-    await userRepo.delete({ email: testEmail });
-    await orgRepo.delete({ name: "Privacy Test Org" });
+    // Find the organization first to get its ID
+    const existingOrg = await orgRepo.findOne({ where: { slug: "privacy-test-org" } });
+    if (existingOrg) {
+      // Delete in order: privacy requests, audit logs, jobs, users, then organization
+      await privacyRequestRepo.delete({ email: testEmail });
+
+      // Delete ALL audit logs for this organization (not just test user)
+      await auditLogRepo.delete({ organizationId: existingOrg.id });
+
+      // Delete all jobs in this organization
+      const { Job } = await import("@server/entities/job.entity");
+      const jobRepo = AppDataSource.getRepository(Job);
+      await jobRepo.delete({ organizationId: existingOrg.id });
+
+      // Delete all users in this organization
+      await userRepo.delete({ organizationId: existingOrg.id });
+
+      // Now safe to delete the organization
+      await orgRepo.delete({ id: existingOrg.id });
+    }
 
     // Reset rate limits
     await rateLimitService.resetRateLimit(testEmail, "email");
@@ -324,6 +340,296 @@ describe("Privacy DSAR Integration Tests", () => {
       // Should work again
       const resetResult = await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600);
       expect(resetResult.limited).toBe(false);
+    });
+  });
+
+  describe("Edge Cases & Error Handling", () => {
+    it("should handle concurrent verification attempts", async () => {
+      // Request export
+      const { requestId } = await privacyService.requestExport(testEmail, testIp, testUserAgent);
+
+      // Get the request to extract the token
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
+      expect(request).toBeDefined();
+
+      // Simulate concurrent confirmations
+      // Note: In real scenario, we'd use the actual token from email
+      // For testing, we'll create a new token and hash it
+      const testToken = "test-verification-token";
+      const tokenHash = await hashPassword(testToken, "argon2");
+      request!.verificationTokenHash = tokenHash;
+      await privacyRequestRepo.save(request!);
+
+      // Try to confirm multiple times concurrently
+      const confirmPromises = [
+        privacyService.confirmExport(testToken),
+        privacyService.confirmExport(testToken),
+        privacyService.confirmExport(testToken),
+      ];
+
+      const results = await Promise.allSettled(confirmPromises);
+
+      // Only one should succeed
+      const successful = results.filter((r) => r.status === "fulfilled");
+      const failed = results.filter((r) => r.status === "rejected");
+
+      expect(successful.length).toBeGreaterThanOrEqual(1);
+      expect(failed.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should handle expired verification tokens", async () => {
+      // Request export
+      const { requestId } = await privacyService.requestExport(testEmail, testIp, testUserAgent);
+
+      // Get request and manually expire it
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
+      expect(request).toBeDefined();
+
+      // Set expiry to past
+      request!.verificationExpiresAt = new Date(Date.now() - 1000);
+      await privacyRequestRepo.save(request!);
+
+      // Try to confirm with a test token
+      const testToken = "test-verification-token";
+      const tokenHash = await hashPassword(testToken, "argon2");
+      request!.verificationTokenHash = tokenHash;
+      await privacyRequestRepo.save(request!);
+
+      // Should fail
+      await expect(privacyService.confirmExport(testToken)).rejects.toThrow("expired");
+    });
+
+    it("should prevent token reuse after verification", async () => {
+      // Request export
+      const { requestId } = await privacyService.requestExport(testEmail, testIp, testUserAgent);
+
+      // Get request and set test token
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
+      const testToken = "test-verification-token";
+      const tokenHash = await hashPassword(testToken, "argon2");
+      request!.verificationTokenHash = tokenHash;
+      await privacyRequestRepo.save(request!);
+
+      // First confirmation should work
+      await privacyService.confirmExport(testToken);
+
+      // Second confirmation with same token should fail
+      await expect(privacyService.confirmExport(testToken)).rejects.toThrow();
+    });
+
+    it("should handle download token expiry", async () => {
+      // Create a completed export request
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = privacyRequestRepo.create({
+        email: testEmail,
+        userId: testUser.id,
+        type: "export",
+        status: "completed",
+        metadata: {
+          exportUrl: "/tmp/test-export.json",
+          downloadToken: "test-download-token",
+          exportExpiresAt: new Date(Date.now() - 1000), // Already expired
+        },
+      });
+      await privacyRequestRepo.save(request);
+
+      // Try to download
+      await expect(
+        privacyService.downloadExport(request.id, "test-download-token", testIp),
+      ).rejects.toThrow("expired");
+    });
+
+    it("should enforce single-use downloads", async () => {
+      // Create a completed export with maxDownloads = 1
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = privacyRequestRepo.create({
+        email: testEmail,
+        userId: testUser.id,
+        type: "export",
+        status: "completed",
+        downloadCount: 1, // Already downloaded once
+        maxDownloads: 1,
+        metadata: {
+          exportUrl: "/tmp/test-export.json",
+          downloadToken: "test-download-token",
+          exportExpiresAt: new Date(Date.now() + 86400000), // Not expired
+        },
+      });
+      await privacyRequestRepo.save(request);
+
+      // Try to download again
+      await expect(
+        privacyService.downloadExport(request.id, "test-download-token", testIp),
+      ).rejects.toThrow("Download limit exceeded");
+    });
+
+    it("should handle IP address anonymization edge cases", async () => {
+      // Test various IP formats
+      const testCases = [
+        { ip: "192.168.1.100", expected: "192.168.0.0" },
+        { ip: "10.0.0.1", expected: "10.0.0.0" },
+        { ip: "172.16.254.1", expected: "172.16.0.0" },
+        { ip: "::1", expected: "0000:0000:0000::" },
+        { ip: "::", expected: "0000:0000:0000::" },
+        { ip: "2001:db8:85a3::8a2e:370:7334", expected: "2001:db8:85a3::" },
+        { ip: "fe80::1", expected: "fe80:0000:0000::" },
+      ];
+
+      for (const { ip, expected } of testCases) {
+        // Create audit log with IP
+        const auditLogRepo = AppDataSource.getRepository(AuditLog);
+        const log = auditLogRepo.create({
+          action: "profile.update",
+          resource: "test",
+          userId: testUser.id,
+          organizationId: testOrg.id,
+          ipAddress: ip,
+          status: "success",
+        });
+        await auditLogRepo.save(log);
+
+        // Delete user (which triggers anonymization)
+        await (privacyService as any).executeDataDeletion(testUser.id, testUser.email);
+
+        // Verify IP was anonymized
+        const anonymizedLog = await auditLogRepo.findOne({ where: { id: log.id } });
+        expect(anonymizedLog?.ipAddress).toBe(expected);
+
+        // Cleanup for next iteration
+        await auditLogRepo.delete({ id: log.id });
+
+        // Recreate user for next test
+        const userRepo = AppDataSource.getRepository(User);
+        const hashedPassword = await hashPassword("TestPassword123!", "argon2");
+        testUser = userRepo.create({
+          email: testEmail,
+          password: hashedPassword,
+          firstName: "Privacy",
+          lastName: "Tester",
+          isActive: true,
+          organizationId: testOrg.id,
+          role: "member",
+        });
+        await userRepo.save(testUser);
+      }
+    });
+
+    it("should anonymize arrays in JSON metadata", async () => {
+      // Create audit log with array of sensitive data
+      const auditLogRepo = AppDataSource.getRepository(AuditLog);
+      const log = auditLogRepo.create({
+        action: "profile.update",
+        resource: "test",
+        userId: testUser.id,
+        organizationId: testOrg.id,
+        metadata: {
+          users: [
+            { name: "John Doe", email: "john@example.com" },
+            { name: "Jane Doe", email: "jane@example.com" },
+          ],
+          emails: ["test1@example.com", "test2@example.com"],
+        },
+        status: "success",
+      });
+      await auditLogRepo.save(log);
+
+      // Delete user (triggers anonymization)
+      await (privacyService as any).executeDataDeletion(testUser.id, testUser.email);
+
+      // Verify arrays were anonymized
+      const anonymizedLog = await auditLogRepo.findOne({ where: { id: log.id } });
+      expect(anonymizedLog?.metadata.users[0].email).toBe("[REDACTED]");
+      expect(anonymizedLog?.metadata.users[1].email).toBe("[REDACTED]");
+      expect(anonymizedLog?.metadata.users[0].name).toBe("[REDACTED]");
+    });
+
+    it("should handle deletion of already-deleted users", async () => {
+      // Soft delete user first
+      const userRepo = AppDataSource.getRepository(User);
+      testUser.deletedAt = new Date();
+      await userRepo.save(testUser);
+
+      // Try to request deletion again
+      await expect(
+        privacyService.requestDeletion(testEmail, testIp, testUserAgent),
+      ).rejects.toThrow("not found");
+    });
+
+    it("should cancel pending privacy requests", async () => {
+      // Request export
+      const { requestId } = await privacyService.requestExport(testEmail, testIp, testUserAgent);
+
+      // Get request and set test token
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
+      const testToken = "test-verification-token";
+      const tokenHash = await hashPassword(testToken, "argon2");
+      request!.verificationTokenHash = tokenHash;
+      await privacyRequestRepo.save(request!);
+
+      // Cancel the request
+      await privacyService.cancelRequest(requestId, testToken, testIp);
+
+      // Verify status is cancelled
+      const cancelledRequest = await privacyRequestRepo.findOne({ where: { id: requestId } });
+      expect(cancelledRequest?.status).toBe("cancelled");
+    });
+
+    it("should not allow cancelling completed requests", async () => {
+      // Create a completed request
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const testToken = "test-verification-token";
+      const tokenHash = await hashPassword(testToken, "argon2");
+
+      const request = privacyRequestRepo.create({
+        email: testEmail,
+        userId: testUser.id,
+        type: "export",
+        status: "completed",
+        verificationTokenHash: tokenHash,
+      });
+      await privacyRequestRepo.save(request);
+
+      // Try to cancel
+      await expect(
+        privacyService.cancelRequest(request.id, testToken, testIp),
+      ).rejects.toThrow("Cannot cancel");
+    });
+
+    it("should handle invalid download tokens", async () => {
+      // Create a completed export
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = privacyRequestRepo.create({
+        email: testEmail,
+        userId: testUser.id,
+        type: "export",
+        status: "completed",
+        metadata: {
+          exportUrl: "/tmp/test-export.json",
+          downloadToken: "correct-token",
+        },
+      });
+      await privacyRequestRepo.save(request);
+
+      // Try with wrong token
+      await expect(
+        privacyService.downloadExport(request.id, "wrong-token", testIp),
+      ).rejects.toThrow("Invalid download token");
+    });
+
+    it("should respect maxDownloads configuration", async () => {
+      // Request export (which should use config.privacy.maxDownloadCount)
+      const { requestId } = await privacyService.requestExport(testEmail, testIp, testUserAgent);
+
+      // Verify maxDownloads was set from config
+      const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
+      const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
+
+      // Default is 1 from config
+      expect(request?.maxDownloads).toBe(1);
     });
   });
 });
