@@ -12,10 +12,7 @@ import { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { debugLog } from "@server/lib/debug-logger";
-import {
-  ConfidenceExecutionOrchestrator,
-  ConfidenceEnhancedExecutionResult,
-} from "./confidence-execution.orchestrator";
+import { ExecutionResult } from "./execution.layer";
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -61,7 +58,7 @@ async function publishStatusChange(
  * Makes metadata assignment DRY across different message types
  */
 function buildMessageMetadata(
-  executionResult: ConfidenceEnhancedExecutionResult,
+  executionResult: ExecutionResult,
   additionalMetadata?: Record<string, unknown>,
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = { ...additionalMetadata };
@@ -77,6 +74,54 @@ function buildMessageMetadata(
   }
 
   return metadata;
+}
+
+/**
+ * Helper function to save confidence log to conversation orchestration_status
+ */
+async function saveConfidenceLog(
+  conversation: Conversation,
+  executionResult: ExecutionResult,
+): Promise<void> {
+  if (!executionResult.confidence) {
+    return;
+  }
+
+  try {
+    const orchestrationStatus = (conversation.orchestration_status as any) || {};
+
+    // Initialize confidence log if not exists
+    if (!orchestrationStatus.confidenceLog) {
+      orchestrationStatus.confidenceLog = [];
+    }
+
+    // Add new confidence entry
+    orchestrationStatus.confidenceLog.push({
+      timestamp: new Date().toISOString(),
+      score: executionResult.confidence.score,
+      tier: executionResult.confidence.tier,
+      breakdown: executionResult.confidence.breakdown,
+      documentsUsed: executionResult.confidence.documentsUsed,
+      recheckAttempted: executionResult.recheckAttempted || false,
+      recheckCount: executionResult.recheckCount || 0,
+      details: executionResult.confidence.details,
+    });
+
+    // Update conversation
+    await conversationRepository.updateById(conversation.id, {
+      orchestration_status: orchestrationStatus,
+    });
+
+    debugLog("orchestrator", "Confidence log saved", {
+      conversationId: conversation.id,
+      logEntries: orchestrationStatus.confidenceLog.length,
+    });
+  } catch (error) {
+    debugLog("orchestrator", "Error saving confidence log", {
+      level: "error",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 export const runConversation = async (conversationId: string) => {
@@ -352,7 +397,7 @@ export const runConversation = async (conversationId: string) => {
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
 async function handleExecutionLoop(conversation: Conversation, customerLanguage?: string) {
-  const confidenceOrchestrator = new ConfidenceExecutionOrchestrator();
+  const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
   const MAX_ITERATIONS = 15; // Prevent infinite loops
   let iterations = 0;
@@ -362,9 +407,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     iterations++;
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
-    // Get current messages and execute WITH CONFIDENCE GUARDRAILS
-    const executionResult: ConfidenceEnhancedExecutionResult | null =
-      await confidenceOrchestrator.executeWithConfidence(conversation, customerLanguage);
+    // Get current messages and execute (with confidence guardrails integrated)
+    const executionResult: ExecutionResult | null =
+      await executionLayer.execute(conversation, customerLanguage);
 
     if (!executionResult) {
       debugLog("orchestrator", "No execution result, ending loop");
@@ -408,14 +453,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       handoffProcessed = true; // Mark as processed
 
       // Save confidence log if this is a confidence-related handoff
-      if (executionResult.confidence) {
-        await confidenceOrchestrator.saveConfidenceLog(
-          conversation,
-          executionResult.confidence,
-          executionResult.recheckAttempted || false,
-          executionResult.recheckCount || 0,
-        );
-      }
+      await saveConfidenceLog(conversation, executionResult);
 
       // Get agent configuration
       const agent = await agentRepository.findById(conversation.agent_id!);
@@ -563,14 +601,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Regular response (not a tool call) - end the loop
       if (executionResult.userMessage) {
         // Save confidence log if available
-        if (executionResult.confidence) {
-          await confidenceOrchestrator.saveConfidenceLog(
-            conversation,
-            executionResult.confidence,
-            executionResult.recheckAttempted || false,
-            executionResult.recheckCount || 0,
-          );
-        }
+        await saveConfidenceLog(conversation, executionResult);
 
         await conversation.addMessage({
           content: executionResult.userMessage,
