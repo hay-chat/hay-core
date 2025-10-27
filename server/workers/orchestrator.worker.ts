@@ -4,8 +4,6 @@ import { debugLog } from "@server/lib/debug-logger";
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
-  private intervalId: NodeJS.Timeout | null = null;
-  private inactivityCheckIntervalId: NodeJS.Timeout | null = null;
   private isProcessing = false;
   private initialized = false;
 
@@ -30,48 +28,31 @@ export class OrchestratorWorker {
     }
   }
 
+  /**
+   * Start the orchestrator worker
+   * NOTE: Worker processing is now handled by the scheduler service
+   * See: server/services/scheduled-jobs.registry.ts -> 'orchestrator-worker-tick' and 'orchestrator-inactivity-check'
+   */
   start(intervalMs: number = 1000): void {
-    if (this.intervalId) {
-      debugLog("worker", "Orchestrator worker is already running");
-      return;
-    }
-
-    debugLog("worker", `Starting orchestrator worker with ${intervalMs}ms interval`);
-
-    this.intervalId = setInterval(async () => {
-      if (!this.isProcessing) {
-        await this.tick();
-      }
-    }, intervalMs);
-
-    // Start inactivity check every 5 minutes
-    this.inactivityCheckIntervalId = setInterval(
-      async () => {
-        await this.checkInactivity();
-      },
-      5 * 60 * 1000,
-    ); // 5 minutes
-
-    // Run immediately
+    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
+    // Run immediately once
     this.tick();
-    // Run inactivity check immediately as well
     this.checkInactivity();
   }
 
+  /**
+   * Stop the orchestrator worker
+   * NOTE: Worker processing is now handled by the scheduler service
+   */
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-      debugLog("worker", "Orchestrator worker stopped");
-    }
-    if (this.inactivityCheckIntervalId) {
-      clearInterval(this.inactivityCheckIntervalId);
-      this.inactivityCheckIntervalId = null;
-      debugLog("worker", "Inactivity check stopped");
-    }
+    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
   }
 
-  private async tick(): Promise<void> {
+  /**
+   * Process one tick of the orchestrator
+   * Called by scheduled job: 'orchestrator-worker-tick'
+   */
+  async tick(): Promise<void> {
     this.isProcessing = true;
 
     try {
@@ -92,7 +73,11 @@ export class OrchestratorWorker {
     }
   }
 
-  private async checkInactivity(): Promise<void> {
+  /**
+   * Check for inactive conversations
+   * Called by scheduled job: 'orchestrator-inactivity-check'
+   */
+  async checkInactivity(): Promise<void> {
     try {
       // Initialize if not already done
       await this.initialize();

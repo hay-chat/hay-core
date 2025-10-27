@@ -12,6 +12,13 @@
     "start": "node -r module-alias/register dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern=services",
+    "test:integration": "jest --testPathPattern=routes",
+    "test:scheduler": "jest scheduler.service.test.ts",
+    "test:privacy": "jest privacy.test.ts",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d ./database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
@@ -24,17 +31,19 @@
     "@plugins": "../plugins"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0"
+    "@types/jest": "^30.0.0",
+    "@types/node-cron": "^3.0.11",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5"
   },
   "dependencies": {
-    "tsconfig-paths": "^4.2.0",
     "@stripe/stripe-js": "^7.9.0",
     "@types/bcrypt": "^5.0.2",
-    "@types/mjml": "^4.7.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/ioredis": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/mjml": "^4.7.4",
     "@types/node": "^24.3.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
@@ -48,7 +57,9 @@
     "mammoth": "^1.11.0",
     "mjml": "^4.16.1",
     "module-alias": "^2.2.3",
+    "node-cron": "^4.2.1",
     "stripe": "^18.5.0",
+    "tsconfig-paths": "^4.2.0",
     "word-extractor": "^1.0.4",
     "xml2js": "^0.6.2"
   }
