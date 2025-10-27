@@ -8,11 +8,10 @@ export class DPoPCacheService {
 
   private readonly nonces = new Map<string, { nonce: string; expiry: number }>();
   private readonly jtis = new Map<string, number>();
-  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    // Run cleanup every minute
-    this.cleanupInterval = setInterval(() => this.cleanupExpired(), 60000);
+    // Cleanup is now handled by the scheduler service
+    // See: server/services/scheduled-jobs.registry.ts -> 'dpop-cache-cleanup'
   }
 
   /**
@@ -95,14 +94,18 @@ export class DPoPCacheService {
 
   /**
    * Clean up expired entries
+   * Called by scheduled job: 'dpop-cache-cleanup'
    */
-  private cleanupExpired(): void {
+  async cleanupExpired(): Promise<void> {
     const now = Date.now();
+    let noncesDeleted = 0;
+    let jtisDeleted = 0;
 
     // Cleanup expired nonces
     for (const [key, value] of this.nonces.entries()) {
       if (value.expiry < now) {
         this.nonces.delete(key);
+        noncesDeleted++;
       }
     }
 
@@ -110,17 +113,12 @@ export class DPoPCacheService {
     for (const [key, expiry] of this.jtis.entries()) {
       if (expiry < now) {
         this.jtis.delete(key);
+        jtisDeleted++;
       }
     }
-  }
 
-  /**
-   * Stop the cleanup interval (for graceful shutdown)
-   */
-  destroy(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
+    if (noncesDeleted > 0 || jtisDeleted > 0) {
+      console.log(`[DPoP] Cleanup: ${noncesDeleted} nonces, ${jtisDeleted} JTIs deleted`);
     }
   }
 }

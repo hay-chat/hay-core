@@ -7,3 +7,5 @@ export * from "./job.entity";
 export * from "./session.entity";
 export * from "./audit-log.entity";
 export * from "./privacy-request.entity";
+export * from "./scheduled-job.entity";
+export * from "./scheduled-job-history.entity";
