@@ -14,7 +14,7 @@ import { rateLimitService } from "@server/services/rate-limit.service";
 
 // Rate limit configurations
 const RATE_LIMITS = {
-  IP_REQUESTS_PER_HOUR: 5,
+  IP_REQUESTS_PER_HOUR: 10,
   EMAIL_REQUESTS_PER_DAY: 3,
   COMBINED_REQUESTS_PER_DAY: 2,
   IP_WINDOW_SECONDS: 3600, // 1 hour
@@ -281,6 +281,36 @@ export const privacyRouter = t.router({
         const message = error instanceof Error ? error.message : "Unknown error";
         throw new TRPCError({
           code: "NOT_FOUND",
+          message,
+        });
+      }
+    }),
+
+  /**
+   * Cancel a pending privacy request
+   * Requires verification token from the original request email
+   */
+  cancelRequest: publicProcedure
+    .input(
+      z.object({
+        requestId: z.string().uuid("Invalid request ID"),
+        token: z.string().min(1, "Verification token is required"),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ipAddress = ctx.ipAddress || "unknown";
+
+      try {
+        await privacyService.cancelRequest(input.requestId, input.token, ipAddress);
+
+        return {
+          success: true,
+          message: "Privacy request has been cancelled successfully.",
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        throw new TRPCError({
+          code: "BAD_REQUEST",
           message,
         });
       }
