@@ -96,52 +96,8 @@ export class AuthUser {
   }
 
   /**
-   * Check if the user can perform administrative actions
-   * In multi-org: checks if user is admin/owner in current organization
-   * Legacy: checks if user is admin/owner globally
-   */
-  isAdmin(): boolean {
-    // API key users cannot have admin privileges
-    if (this.authMethod === "apikey") {
-      return false;
-    }
-
-    if (!this.isActive) {
-      return false;
-    }
-
-    // If we have organization context, check org-level role
-    if (this.userOrganization) {
-      return this.userOrganization.isAdmin();
-    }
-
-    // Fallback to user-level role (legacy support)
-    return this._user.isOrganizationAdmin();
-  }
-
-  /**
-   * Check if the user is owner in the current organization
-   */
-  isOwner(): boolean {
-    if (this.authMethod === "apikey") {
-      return false;
-    }
-
-    if (!this.isActive) {
-      return false;
-    }
-
-    // If we have organization context, check org-level role
-    if (this.userOrganization) {
-      return this.userOrganization.isOwner();
-    }
-
-    // Fallback to user-level role (legacy support)
-    return this._user.isOrganizationOwner();
-  }
-
-  /**
    * Get the user's role in the current organization
+   * Note: Use scope checks (hasScope) for permission validation, not role checks
    */
   getRole(): "owner" | "admin" | "member" | "viewer" | "contributor" | undefined {
     if (this.userOrganization) {
@@ -186,8 +142,6 @@ export class AuthUser {
       role: this.getRole(),
       hasScope: this.hasScope.bind(this),
       canAccess: this.canAccess.bind(this),
-      isAdmin: this.isAdmin.bind(this),
-      isOwner: this.isOwner.bind(this),
       getRole: this.getRole.bind(this),
       belongsToOrganization: this.belongsToOrganization.bind(this),
       toJSON: this.toJSON.bind(this),

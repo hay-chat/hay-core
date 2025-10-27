@@ -275,7 +275,7 @@ export const organizationsRouter = t.router({
       }
 
       // Prevent non-owners from removing owners
-      if (userOrg.role === "owner" && !ctx.user?.isOwner()) {
+      if (userOrg.role === "owner" && ctx.user?.getRole() !== "owner") {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Only owners can remove other owners",

@@ -177,10 +177,11 @@ export function requireScopes(authUser: AuthUser, resource: string, action: stri
 }
 
 /**
- * Check if the user is an admin
+ * Check if the user has admin access (full permissions)
+ * Checks for *:* scope (full access to all resources)
  */
 export function requireAdmin(authUser: AuthUser): void {
-  if (!authUser.isAdmin()) {
+  if (!authUser.hasScope("*", "*")) {
     throw new Error("Admin access required");
   }
 }
