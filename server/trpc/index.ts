@@ -1,5 +1,5 @@
 import { v1Router } from "../routes/v1";
-import { isAuthed } from "@server/trpc/middleware/auth";
+import { isAuthed, scopedProcedure as scopedProcedureFactory } from "@server/trpc/middleware/auth";
 import { withPagination } from "@server/trpc/middleware/pagination";
 import { t, router, publicProcedure } from "./init";
 import { createContext } from "./context";
@@ -14,3 +14,6 @@ export { withPagination };
 export type AppRouter = typeof v1Router;
 
 export const authenticatedProcedure = t.procedure.use(isAuthed);
+
+// Export scoped procedure factory
+export const scopedProcedure = scopedProcedureFactory;

@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, publicProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
@@ -6,6 +6,7 @@ import { OrganizationInvitation } from "@server/entities/organization-invitation
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import * as crypto from "crypto";
 
 /**
@@ -42,8 +43,11 @@ async function sendInvitationEmail(
 }
 
 export const invitationsRouter = t.router({
-  // Send an invitation to join an organization
-  sendInvitation: authenticatedProcedure
+  /**
+   * Send an invitation to join an organization
+   * Requires: organization_invitations:invite scope (typically admin/owner only)
+   */
+  sendInvitation: scopedProcedure(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.INVITE)
     .input(
       z.object({
         email: z.string().email(),
@@ -57,14 +61,6 @@ export const invitationsRouter = t.router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Organization ID required",
-        });
-      }
-
-      // Only admins can send invitations
-      if (!ctx.user?.isAdmin()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can send invitations",
         });
       }
 
@@ -165,8 +161,11 @@ export const invitationsRouter = t.router({
       };
     }),
 
-  // List all invitations for the current organization
-  listInvitations: authenticatedProcedure
+  /**
+   * List all invitations for the current organization
+   * Requires: organization_invitations:read scope
+   */
+  listInvitations: scopedProcedure(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.READ)
     .input(
       z
         .object({
@@ -181,14 +180,6 @@ export const invitationsRouter = t.router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Organization ID required",
-        });
-      }
-
-      // Only admins can list invitations
-      if (!ctx.user?.isAdmin()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can view invitations",
         });
       }
 
@@ -235,22 +226,17 @@ export const invitationsRouter = t.router({
       }));
     }),
 
-  // Cancel a pending invitation
-  cancelInvitation: authenticatedProcedure
+  /**
+   * Cancel a pending invitation
+   * Requires: organization_invitations:delete scope
+   */
+  cancelInvitation: scopedProcedure(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.DELETE)
     .input(z.object({ invitationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.organizationId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Organization ID required",
-        });
-      }
-
-      // Only admins can cancel invitations
-      if (!ctx.user?.isAdmin()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can cancel invitations",
         });
       }
 
@@ -278,7 +264,10 @@ export const invitationsRouter = t.router({
       };
     }),
 
-  // Accept an invitation (can be called by authenticated or unauthenticated users)
+  /**
+   * Accept an invitation (public endpoint - no authentication required initially)
+   * User must be authenticated to actually accept
+   */
   acceptInvitation: publicProcedure
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -381,7 +370,9 @@ export const invitationsRouter = t.router({
       };
     }),
 
-  // Decline an invitation
+  /**
+   * Decline an invitation (public endpoint)
+   */
   declineInvitation: publicProcedure
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -408,7 +399,10 @@ export const invitationsRouter = t.router({
       };
     }),
 
-  // Get invitation details by token (for preview before accepting)
+  /**
+   * Get invitation details by token (for preview before accepting)
+   * Public endpoint - no authentication required
+   */
   getInvitationByToken: publicProcedure
     .input(z.object({ token: z.string() }))
     .query(async ({ input }) => {

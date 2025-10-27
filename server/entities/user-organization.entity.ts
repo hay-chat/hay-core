@@ -2,6 +2,15 @@ import { Entity, Column, Index, ManyToOne, JoinColumn, Unique } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { Organization } from "./organization.entity";
+import {
+  buildScope,
+  getDefaultScopesForRole,
+  hasRequiredScope,
+  RESOURCES,
+  ACTIONS,
+  type Resource,
+  type Action,
+} from "../types/scopes";
 
 /**
  * UserOrganization entity - Join table for many-to-many relationship between users and organizations
@@ -55,36 +64,46 @@ export class UserOrganization extends BaseEntity {
   organization!: Organization;
 
   // Helper methods
+
+  /**
+   * Check if user has permission for a specific resource and action
+   * Uses scope-based permission system with role defaults and custom permissions
+   */
   hasScope(resource: string, action: string): boolean {
-    // Check role-based permissions
-    if (this.role === "owner" || this.role === "admin") {
-      return true;
+    // Inactive users have no access
+    if (!this.isActive) {
+      return false;
     }
 
-    // Check specific permissions
-    if (this.permissions && this.permissions.length > 0) {
-      return this.permissions.includes(`${resource}:${action}`);
-    }
+    // Get default scopes for the user's role
+    const defaultScopes = getDefaultScopesForRole(this.role);
 
-    // Default permissions based on role
-    if (this.role === "member") {
-      return ["read", "create", "update"].includes(action);
-    }
+    // Combine default role scopes with custom permissions
+    const allScopes = [
+      ...defaultScopes,
+      ...(this.permissions || []),
+    ];
 
-    if (this.role === "contributor") {
-      // Contributors can create/edit drafts but not publish
-      return ["read", "create", "update"].includes(action);
-    }
-
-    if (this.role === "viewer") {
-      return action === "read";
-    }
-
-    return false;
+    // Check if any of the user's scopes match the required permission
+    return hasRequiredScope(resource as Resource, action as Action, allScopes);
   }
 
+  /**
+   * Get all scopes for this user in the organization
+   */
+  getScopes(): string[] {
+    const defaultScopes = getDefaultScopesForRole(this.role);
+    return [
+      ...defaultScopes,
+      ...(this.permissions || []),
+    ];
+  }
+
+  /**
+   * Check if user can access a resource (basic read access)
+   */
   canAccess(resource: string): boolean {
-    return this.isActive;
+    return this.isActive && this.hasScope(resource, ACTIONS.READ);
   }
 
   isOwner(): boolean {

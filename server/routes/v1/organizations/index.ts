@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
 import { TRPCError } from "@trpc/server";
@@ -7,6 +7,7 @@ import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-set
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const updateSettingsSchema = z.object({
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
@@ -18,27 +19,33 @@ const updateSettingsSchema = z.object({
 });
 
 export const organizationsRouter = t.router({
-  getSettings: authenticatedProcedure.query(async ({ ctx }) => {
-    const organization = await organizationService.findOne(ctx.organizationId!);
+  // ============================================================================
+  // ORGANIZATION SETTINGS
+  // ============================================================================
 
-    if (!organization) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found",
-      });
-    }
+  getSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
 
-    return {
-      defaultLanguage: organization.defaultLanguage,
-      dateFormat: organization.dateFormat,
-      timeFormat: organization.timeFormat,
-      timezone: organization.timezone,
-      defaultAgentId: organization.defaultAgentId,
-      testModeDefault: organization.settings?.testModeDefault || false,
-    };
-  }),
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
 
-  updateSettings: authenticatedProcedure
+      return {
+        defaultLanguage: organization.defaultLanguage,
+        dateFormat: organization.dateFormat,
+        timeFormat: organization.timeFormat,
+        timezone: organization.timezone,
+        defaultAgentId: organization.defaultAgentId,
+        testModeDefault: organization.settings?.testModeDefault || false,
+      };
+    },
+  ),
+
+  updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
     .input(updateSettingsSchema)
     .mutation(async ({ ctx, input }) => {
       const organization = await organizationService.findOne(ctx.organizationId!);
@@ -82,49 +89,16 @@ export const organizationsRouter = t.router({
       };
     }),
 
-  // Multi-organization member management endpoints
-  listMembers: authenticatedProcedure.query(async ({ ctx }) => {
-    if (!ctx.organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Organization ID required",
-      });
-    }
+  // ============================================================================
+  // ORGANIZATION MEMBER MANAGEMENT
+  // ============================================================================
 
-    // Check if user is admin in this organization
-    if (!ctx.user?.isAdmin()) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Only admins can view organization members",
-      });
-    }
-
-    const userOrgRepository = AppDataSource.getRepository(UserOrganization);
-    const members = await userOrgRepository.find({
-      where: { organizationId: ctx.organizationId },
-      relations: ["user"],
-      order: { createdAt: "ASC" },
-    });
-
-    return members.map((userOrg) => ({
-      id: userOrg.id,
-      userId: userOrg.userId,
-      email: userOrg.user.email,
-      firstName: userOrg.user.firstName,
-      lastName: userOrg.user.lastName,
-      role: userOrg.role,
-      permissions: userOrg.permissions,
-      isActive: userOrg.isActive,
-      joinedAt: userOrg.joinedAt,
-      lastAccessedAt: userOrg.lastAccessedAt,
-      invitedAt: userOrg.invitedAt,
-      invitedBy: userOrg.invitedBy,
-    }));
-  }),
-
-  getMember: authenticatedProcedure
-    .input(z.object({ userId: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
+  /**
+   * List all members of the organization
+   * Requires: organization_members:read scope
+   */
+  listMembers: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ).query(
+    async ({ ctx }) => {
       if (!ctx.organizationId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -132,11 +106,41 @@ export const organizationsRouter = t.router({
         });
       }
 
-      // Check if user is admin or viewing their own info
-      if (!ctx.user?.isAdmin() && ctx.user?.id !== input.userId) {
+      const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+      const members = await userOrgRepository.find({
+        where: { organizationId: ctx.organizationId },
+        relations: ["user"],
+        order: { createdAt: "ASC" },
+      });
+
+      return members.map((userOrg) => ({
+        id: userOrg.id,
+        userId: userOrg.userId,
+        email: userOrg.user.email,
+        firstName: userOrg.user.firstName,
+        lastName: userOrg.user.lastName,
+        role: userOrg.role,
+        permissions: userOrg.permissions,
+        isActive: userOrg.isActive,
+        joinedAt: userOrg.joinedAt,
+        lastAccessedAt: userOrg.lastAccessedAt,
+        invitedAt: userOrg.invitedAt,
+        invitedBy: userOrg.invitedBy,
+      }));
+    },
+  ),
+
+  /**
+   * Get details of a specific member
+   * Requires: organization_members:read scope
+   */
+  getMember: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ)
+    .input(z.object({ userId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Not authorized to view this member",
+          code: "BAD_REQUEST",
+          message: "Organization ID required",
         });
       }
 
@@ -172,7 +176,11 @@ export const organizationsRouter = t.router({
       };
     }),
 
-  updateMemberRole: authenticatedProcedure
+  /**
+   * Update a member's role and permissions
+   * Requires: organization_members:manage scope (typically owner/admin only)
+   */
+  updateMemberRole: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.MANAGE)
     .input(
       z.object({
         userId: z.string().uuid(),
@@ -185,14 +193,6 @@ export const organizationsRouter = t.router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Organization ID required",
-        });
-      }
-
-      // Only owners can change roles
-      if (!ctx.user?.isOwner()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only owners can change member roles",
         });
       }
 
@@ -237,21 +237,17 @@ export const organizationsRouter = t.router({
       };
     }),
 
-  removeMember: authenticatedProcedure
+  /**
+   * Remove a member from the organization
+   * Requires: organization_members:manage scope (typically admin/owner only)
+   */
+  removeMember: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.MANAGE)
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.organizationId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Organization ID required",
-        });
-      }
-
-      // Only owners and admins can remove members
-      if (!ctx.user?.isAdmin()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can remove members",
         });
       }
 
