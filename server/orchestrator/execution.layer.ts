@@ -259,8 +259,8 @@ export class ExecutionLayer {
           handoff: {
             reason: "Low confidence in AI response",
             fields: {
-              confidenceScore: result.confidence.score,
-              confidenceTier: result.confidence.tier,
+              confidenceScore: result.confidence?.score,
+              confidenceTier: result.confidence?.tier,
             },
           },
           confidence: result.confidence,

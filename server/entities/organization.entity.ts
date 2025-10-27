@@ -13,7 +13,7 @@ import {
   DEFAULT_DATE_FORMAT,
   DEFAULT_TIME_FORMAT,
   DEFAULT_TIMEZONE,
-  OrganizationSettings,
+  type OrganizationSettings,
 } from "../types/organization-settings.types";
 
 @Entity("organizations")
