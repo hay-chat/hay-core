@@ -1,4 +1,5 @@
 import { LLMService } from "./llm.service";
+import { PromptService } from "../prompt.service";
 import { Document } from "@server/entities/document.entity";
 import { Message } from "@server/database/entities/message.entity";
 
@@ -51,6 +52,7 @@ export interface ConfidenceContext {
  */
 export class ConfidenceGuardrailService {
   private llmService: LLMService;
+  private promptService: PromptService;
 
   // Default configuration
   private static readonly DEFAULT_CONFIG: ConfidenceConfig = {
@@ -71,6 +73,7 @@ export class ConfidenceGuardrailService {
 
   constructor() {
     this.llmService = new LLMService();
+    this.promptService = PromptService.getInstance();
   }
 
   /**
@@ -142,41 +145,12 @@ export class ConfidenceGuardrailService {
       })
       .join("\n---\n\n");
 
-    // Ask the LLM to evaluate if the response can be derived from the context
-    const evaluationPrompt = `You are a strict evaluator assessing whether an AI response is grounded in provided context.
-
-**Customer Question:**
-${context.customerQuery}
-
-**AI Response to Evaluate:**
-${context.response}
-
-**Available Context (Retrieved Documents):**
-${documentContext}
-
-**Your Task:**
-Evaluate if the AI response can be answered using ONLY the information provided in the context above.
-
-**Scoring Guidelines:**
-- Score 1.0: The response is entirely based on the provided context. Every claim can be traced to the documents.
-- Score 0.7-0.9: The response is mostly grounded but includes minor general knowledge or reasonable inferences.
-- Score 0.4-0.6: The response mixes context-based information with general knowledge.
-- Score 0.1-0.3: The response is primarily based on general knowledge with minimal use of context.
-- Score 0.0: The response completely ignores the provided context or contradicts it.
-
-**Important:**
-- General pleasantries, greetings, or conversational elements are acceptable and don't reduce the score.
-- Only evaluate the factual/informational content of the response.
-- If the question cannot be answered from the context, and the AI admits this, that's acceptable (score based on honesty).
-- If the AI provides information not in the context without acknowledging the limitation, penalize heavily.
-
-Respond with a JSON object containing:
-{
-  "score": <number between 0 and 1>,
-  "reasoning": "<brief explanation of your scoring>",
-  "contextClaims": [<list of claims directly from context>],
-  "generalKnowledgeClaims": [<list of claims from general knowledge>]
-}`;
+    // Get prompt from PromptService
+    const evaluationPrompt = await this.promptService.getPrompt("execution/confidence-grounding", {
+      retrievedDocuments: documentContext,
+      response: context.response,
+      customerQuery: context.customerQuery,
+    });
 
     try {
       const schema = {
@@ -184,10 +158,8 @@ Respond with a JSON object containing:
         properties: {
           score: { type: "number", minimum: 0, maximum: 1 },
           reasoning: { type: "string" },
-          contextClaims: { type: "array", items: { type: "string" } },
-          generalKnowledgeClaims: { type: "array", items: { type: "string" } },
         },
-        required: ["score", "reasoning", "contextClaims", "generalKnowledgeClaims"],
+        required: ["score", "reasoning"],
         additionalProperties: false,
       };
 
@@ -229,50 +201,14 @@ Respond with a JSON object containing:
 
   /**
    * Calculate certainty score: LLM's self-assessment of confidence.
-   * Detects hedging language and asks the LLM to rate its own certainty.
+   * Uses AI evaluation instead of pattern matching for better accuracy.
    */
   private async calculateCertaintyScore(context: ConfidenceContext): Promise<number> {
-    // Quick heuristic: Check for hedging language
-    const hedgingPatterns = [
-      /i think/i,
-      /maybe/i,
-      /possibly/i,
-      /perhaps/i,
-      /i'm not sure/i,
-      /i don't know/i,
-      /might be/i,
-      /could be/i,
-      /uncertain/i,
-    ];
-
-    let hedgingPenalty = 0;
-    for (const pattern of hedgingPatterns) {
-      if (pattern.test(context.response)) {
-        hedgingPenalty += 0.1;
-      }
-    }
-
-    // Ask LLM to rate its certainty
-    const certaintyPrompt = `Evaluate the certainty level of this AI response.
-
-**Customer Question:**
-${context.customerQuery}
-
-**AI Response:**
-${context.response}
-
-Rate the certainty/confidence level of this response on a scale of 0 to 1:
-- 1.0: Completely certain, definitive answer
-- 0.7-0.9: High confidence with minor uncertainty
-- 0.4-0.6: Moderate confidence, some uncertainty
-- 0.1-0.3: Low confidence, significant uncertainty
-- 0.0: No confidence, unable to answer
-
-Respond with JSON:
-{
-  "score": <number between 0 and 1>,
-  "reasoning": "<brief explanation>"
-}`;
+    // Get prompt from PromptService
+    const certaintyPrompt = await this.promptService.getPrompt("execution/confidence-certainty", {
+      response: context.response,
+      customerQuery: context.customerQuery,
+    });
 
     try {
       const schema = {
@@ -293,10 +229,7 @@ Respond with JSON:
       });
 
       const parsed = JSON.parse(result);
-      let score = Math.max(0, Math.min(1, parsed.score));
-
-      // Apply hedging penalty
-      score = Math.max(0, score - Math.min(hedgingPenalty, 0.3));
+      const score = Math.max(0, Math.min(1, parsed.score));
 
       return score;
     } catch (error) {
