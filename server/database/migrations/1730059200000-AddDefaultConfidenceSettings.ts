@@ -12,7 +12,7 @@ export class AddDefaultConfidenceSettings1730059200000 implements MigrationInter
           "mediumThreshold": 0.5,
           "enableRecheck": true,
           "enableEscalation": true,
-          "fallbackMessage": "I'\''m not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+          "fallbackMessage": "I''m not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
           "recheckConfig": {
             "maxDocuments": 10,
             "similarityThreshold": 0.3
