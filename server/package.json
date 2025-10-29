@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:base && npm run migration:ensure && tsc && npm run copy:templates",
+    "build": "npm run build:base && tsc && npm run copy:templates",
     "copy:templates": "cp -r templates dist/",
     "build:base": "cd ../plugins/base && npm run build",
     "start": "node -r module-alias/register dist/main.js",
