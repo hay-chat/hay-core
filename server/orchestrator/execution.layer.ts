@@ -6,6 +6,7 @@ import {
   ConfidenceGuardrailService,
   ConfidenceAssessment,
 } from "@server/services/core/confidence-guardrail.service";
+import { MessageIntent } from "@server/database/entities/message.entity";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -198,6 +199,25 @@ export class ExecutionLayer {
     customerLanguage?: string,
   ): Promise<ExecutionResult> {
     debugLog("execution", "Applying confidence guardrails to RESPOND step");
+
+    // Check if we should skip confidence checks based on user intent
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+    if (lastCustomerMessage?.intent) {
+      const intent = lastCustomerMessage.intent as MessageIntent;
+      
+      // Skip confidence checks for conversational intents that don't require document grounding
+      const exemptIntents: MessageIntent[] = [MessageIntent.GREET, MessageIntent.OTHER, 
+      MessageIntent.CLOSE_SATISFIED,
+      MessageIntent.CLOSE_UNSATISFIED,];
+      
+      if (exemptIntents.includes(intent)) {
+        debugLog("execution", "Skipping confidence check - conversational intent detected", {
+          intent: lastCustomerMessage.intent,
+          messageContent: lastCustomerMessage.content,
+        });
+        return result;
+      }
+    }
 
     // Assess confidence
     const confidenceAssessment = await this.assessResponseConfidence(

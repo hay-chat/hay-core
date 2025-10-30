@@ -2,12 +2,7 @@
   <div
     v-if="variant === 'default' || isOpen"
     ref="contentRef"
-    :class="
-      cn(
-        'card-content flex-1 overflow-hidden transition-all duration-200 ease-in-out p-6',
-        props.class,
-      )
-    "
+    :class="cn('card-content flex-1 transition-all duration-200 ease-in-out p-6', props.class)"
     :style="{
       maxHeight: variant === 'accordion' ? (isOpen ? maxHeight : '0px') : 'none',
       opacity: variant === 'accordion' ? (isOpen ? '1' : '0') : '1',
