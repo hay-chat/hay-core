@@ -19,14 +19,18 @@ const createConversationSchema = z.object({
   agentId: z.string().uuid().optional(),
   language: z.string().optional(),
   metadata: z.record(z.any()).optional(),
-  status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
+  status: z
+    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
+    .optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
 });
 
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
+  status: z
+    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
+    .optional(),
   metadata: z.record(z.any()).optional(),
   customer_id: z.string().uuid().optional(),
 });
@@ -224,8 +228,7 @@ export const conversationsRouter = t.router({
     if (input.role === "assistant") {
       // If conversation is taken over by current user, it's a human agent message
       const isTakenOverByCurrentUser =
-        conversation.status === "human-took-over" &&
-        conversation.assigned_user_id === ctx.user?.id;
+        conversation.status === "human-took-over" && conversation.assigned_user_id === ctx.user?.id;
 
       messageType = isTakenOverByCurrentUser ? MessageType.HUMAN_AGENT : MessageType.BOT_AGENT;
     } else {
@@ -466,7 +469,10 @@ export const conversationsRouter = t.router({
       }
 
       // Verify user is the one who took over (if conversation is taken over)
-      if (conversation.status === "human-took-over" && conversation.assigned_user_id !== ctx.user!.id) {
+      if (
+        conversation.status === "human-took-over" &&
+        conversation.assigned_user_id !== ctx.user!.id
+      ) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You can only close conversations assigned to you",
@@ -511,7 +517,7 @@ export const conversationsRouter = t.router({
       z.object({
         messageId: z.string().uuid(),
         editedContent: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const message = await messageRepository.findById(input.messageId);
@@ -545,6 +551,39 @@ export const conversationsRouter = t.router({
 
       const updatedMessage = await messageRepository.update(message.id, updates);
 
+      // Broadcast message approval to WebSocket clients
+      try {
+        const { redisService } = await import("../../../services/redis.service");
+        const conversation = await conversationRepository.findById(message.conversation_id);
+
+        if (conversation && redisService.isConnected()) {
+          await redisService.publish("websocket:events", {
+            type: "message_approved",
+            organizationId: conversation.organization_id,
+            payload: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              messageType: message.type,
+              editedContent: input.editedContent,
+            },
+          });
+        } else if (conversation) {
+          // Fallback to direct WebSocket if Redis not available
+          const { websocketService } = await import("../../../services/websocket.service");
+          websocketService.sendToOrganization(conversation.organization_id, {
+            type: "message_approved",
+            payload: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              messageType: message.type,
+              editedContent: input.editedContent,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("[approveMessage] Failed to publish approval event:", error);
+      }
+
       // TODO: Trigger actual message delivery to customer via WebSocket/plugin
       // This would be handled by the orchestrator or messaging service
 
@@ -556,7 +595,7 @@ export const conversationsRouter = t.router({
       z.object({
         messageId: z.string().uuid(),
         reason: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const message = await messageRepository.findById(input.messageId);
@@ -586,6 +625,39 @@ export const conversationsRouter = t.router({
           blockReason: input.reason,
         },
       });
+
+      // Broadcast message block to WebSocket clients
+      try {
+        const { redisService } = await import("../../../services/redis.service");
+        const conversation = await conversationRepository.findById(message.conversation_id);
+
+        if (conversation && redisService.isConnected()) {
+          await redisService.publish("websocket:events", {
+            type: "message_blocked",
+            organizationId: conversation.organization_id,
+            payload: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              messageType: message.type,
+              reason: input.reason,
+            },
+          });
+        } else if (conversation) {
+          // Fallback to direct WebSocket if Redis not available
+          const { websocketService } = await import("../../../services/websocket.service");
+          websocketService.sendToOrganization(conversation.organization_id, {
+            type: "message_blocked",
+            payload: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              messageType: message.type,
+              reason: input.reason,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("[blockMessage] Failed to publish block event:", error);
+      }
 
       return updatedMessage;
     }),
