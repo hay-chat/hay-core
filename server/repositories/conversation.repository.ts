@@ -37,6 +37,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     queryBuilder
       .leftJoinAndSelect("conversation.messages", "messages")
+      .leftJoinAndSelect("conversation.agent", "agent")
+      .leftJoinAndSelect("conversation.organization", "organization")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();

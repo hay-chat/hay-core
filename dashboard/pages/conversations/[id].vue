@@ -713,11 +713,14 @@ const isTakenOverByCurrentUser = computed(() => {
 // Check if test mode is enabled for this conversation
 const isTestMode = computed(() => {
   const agent = conversation.value?.agent;
+  const organization = conversation.value?.organization;
+
   if (!agent) return false;
 
   // Check agent's testMode setting
   // If agent has explicit setting, use it; otherwise check org default
-  return agent.testMode ?? false; // TODO: Fetch org default from settings
+  const orgDefault = organization?.settings?.testModeDefault ?? false;
+  return agent.testMode ?? orgDefault;
 });
 
 // Message approval handlers
@@ -1184,6 +1187,8 @@ const { useWebSocket } = await import("@/composables/useWebSocket");
 const websocket = useWebSocket();
 let unsubscribeMessageReceived: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
+let unsubscribeMessageApproved: (() => void) | null = null;
+let unsubscribeMessageBlocked: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -1224,6 +1229,25 @@ onMounted(async () => {
       await fetchConversation();
     }
   });
+
+  // Listen for message approval events
+  unsubscribeMessageApproved = websocket.on("message_approved", async (payload: any) => {
+    console.log("[WebSocket] Received message_approved event", payload);
+    if (payload.conversationId === conversationId.value) {
+      console.log("[WebSocket] Message approved in current conversation, refreshing");
+      await fetchConversation();
+      scrollToBottom();
+    }
+  });
+
+  // Listen for message block events
+  unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: any) => {
+    console.log("[WebSocket] Received message_blocked event", payload);
+    if (payload.conversationId === conversationId.value) {
+      console.log("[WebSocket] Message blocked in current conversation, refreshing");
+      await fetchConversation();
+    }
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -1231,6 +1255,8 @@ onUnmounted(() => {
   // Cleanup WebSocket event handlers
   if (unsubscribeMessageReceived) unsubscribeMessageReceived();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
+  if (unsubscribeMessageApproved) unsubscribeMessageApproved();
+  if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {
