@@ -124,20 +124,18 @@
           </CardContent>
         </Card>
 
-        <!-- Test Mode Field -->
+        <!-- Message Approval Field -->
         <Card>
           <CardHeader>
-            <CardTitle>Test Mode</CardTitle>
-            <CardDescription>Define the test mode for the agent.</CardDescription>
+            <CardTitle>Message Approval</CardTitle>
+            <CardDescription
+              >Choose whether AI responses are sent automatically or require manual review before
+              reaching customers.</CardDescription
+            >
           </CardHeader>
           <CardContent class="space-y-6">
-            <!-- Test Mode Field -->
+            <!-- Message Approval Field -->
             <div class="space-y-2">
-              <Label>Test Mode</Label>
-              <p class="text-sm text-neutral-muted mb-3">
-                When enabled, AI messages require approval before sending to customers. Playground
-                always bypasses this.
-              </p>
               <div class="gap-4 grid grid-cols-3">
                 <OptionCard
                   label="Inherit from Organization"
@@ -146,20 +144,20 @@
                   @click="setTestMode(null)"
                 />
                 <OptionCard
-                  label="On (Require Approval)"
-                  :icon="FastForward"
+                  label="Require Approval"
+                  :icon="Hand"
                   :checked="form.testMode === true"
                   @click="setTestMode(true)"
                 />
                 <OptionCard
-                  label="Off (Auto-Send)"
-                  :icon="CopyCheck"
+                  label="Auto-Send"
+                  :icon="FastForward"
                   :checked="form.testMode === false"
                   @click="setTestMode(false)"
                 />
               </div>
               <p class="text-sm text-neutral-muted mt-2">
-                Set to 'Inherit' to use organization default, or override per agent
+                Note: Playground conversations always send automatically regardless of this setting.
               </p>
             </div>
           </CardContent>
@@ -265,7 +263,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ArrowLeft, Trash2, Star, FastForward, CopyCheck, CornerDownRight } from "lucide-vue-next";
+import { ArrowLeft, Trash2, Star, FastForward, Hand, CornerDownRight } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
