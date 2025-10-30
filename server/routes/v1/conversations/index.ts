@@ -1,7 +1,7 @@
 import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
-import { MessageType } from "../../../database/entities/message.entity";
+import { MessageType, MessageStatus } from "../../../database/entities/message.entity";
 import { TRPCError } from "@trpc/server";
 import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
@@ -538,13 +538,15 @@ export const conversationsRouter = t.router({
       }
 
       // If content was edited, store original content
+      const wasEdited = input.editedContent && input.editedContent !== message.content;
       const updates: Partial<typeof message> = {
+        status: wasEdited ? MessageStatus.EDITED : MessageStatus.APPROVED,
         deliveryState: DeliveryState.SENT,
         approvedBy: ctx.user!.id,
         approvedAt: new Date(),
       };
 
-      if (input.editedContent && input.editedContent !== message.content) {
+      if (wasEdited) {
         updates.originalContent = message.content;
         updates.content = input.editedContent;
       }
@@ -617,6 +619,7 @@ export const conversationsRouter = t.router({
 
       // Update message to blocked state
       const updatedMessage = await messageRepository.update(message.id, {
+        status: MessageStatus.REJECTED,
         deliveryState: DeliveryState.BLOCKED,
         approvedBy: ctx.user!.id,
         approvedAt: new Date(),

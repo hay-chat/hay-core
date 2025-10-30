@@ -332,11 +332,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   async getPublicMessages(conversationId: string): Promise<Message[]> {
     const messageRepository = this.getMessageRepository();
+    const { DeliveryState } = await import("@server/types/message-feedback.types");
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
         type: In([MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT]),
-        status: Not(MessageStatus.PENDING), // Exclude pending messages (awaiting approval)
+        deliveryState: DeliveryState.SENT, // Only include approved/sent messages
       },
       order: { created_at: "ASC" },
     });
