@@ -250,10 +250,7 @@ export class ConfidenceGuardrailService {
   /**
    * Determine confidence tier based on score and thresholds
    */
-  private determineTier(
-    score: number,
-    config: ConfidenceConfig,
-  ): "high" | "medium" | "low" {
+  private determineTier(score: number, config: ConfidenceConfig): "high" | "medium" | "low" {
     if (score >= config.highThreshold) {
       return "high";
     } else if (score >= config.mediumThreshold) {
@@ -266,11 +263,7 @@ export class ConfidenceGuardrailService {
   /**
    * Generate human-readable details about the confidence assessment
    */
-  private generateDetails(
-    breakdown: ConfidenceBreakdown,
-    tier: string,
-    score: number,
-  ): string {
+  private generateDetails(breakdown: ConfidenceBreakdown, tier: string, score: number): string {
     const details = [
       `Overall Confidence: ${(score * 100).toFixed(1)}% (${tier.toUpperCase()})`,
       "",

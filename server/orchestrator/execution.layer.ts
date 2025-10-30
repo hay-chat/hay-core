@@ -84,7 +84,10 @@ export class ExecutionLayer {
     };
   }
 
-  async execute(conversation: Conversation, customerLanguage?: string): Promise<ExecutionResult | null> {
+  async execute(
+    conversation: Conversation,
+    customerLanguage?: string,
+  ): Promise<ExecutionResult | null> {
     try {
       debugLog("execution", "Starting execution for conversation", {
         conversationId: conversation.id,
@@ -204,12 +207,15 @@ export class ExecutionLayer {
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
     if (lastCustomerMessage?.intent) {
       const intent = lastCustomerMessage.intent as MessageIntent;
-      
+
       // Skip confidence checks for conversational intents that don't require document grounding
-      const exemptIntents: MessageIntent[] = [MessageIntent.GREET, MessageIntent.OTHER, 
-      MessageIntent.CLOSE_SATISFIED,
-      MessageIntent.CLOSE_UNSATISFIED,];
-      
+      const exemptIntents: MessageIntent[] = [
+        MessageIntent.GREET,
+        MessageIntent.OTHER,
+        MessageIntent.CLOSE_SATISFIED,
+        MessageIntent.CLOSE_UNSATISFIED,
+      ];
+
       if (exemptIntents.includes(intent)) {
         debugLog("execution", "Skipping confidence check - conversational intent detected", {
           intent: lastCustomerMessage.intent,
@@ -306,6 +312,12 @@ export class ExecutionLayer {
   ): Promise<ConfidenceAssessment> {
     const { documentRepository } = await import("@server/repositories/document.repository");
 
+    // Get conversation history first to check for tool results
+    const conversationHistory = await conversation.getMessages();
+
+    // Check if there are recent tool call results
+    const recentToolMessages = conversationHistory.filter((msg) => msg.type === "Tool").slice(-3); // Get last 3 tool messages
+
     // Get retrieved documents with full content
     const retrievedDocs: Array<{ document: any; similarity: number }> = [];
     if (conversation.document_ids && conversation.document_ids.length > 0) {
@@ -338,14 +350,55 @@ export class ExecutionLayer {
       }
     }
 
+    // Add tool results as synthetic documents with high similarity (they're authoritative)
+    if (recentToolMessages.length > 0) {
+      debugLog("execution", "Including tool results in confidence assessment", {
+        toolMessageCount: recentToolMessages.length,
+        toolNames: recentToolMessages.map((msg) => msg.metadata?.toolName || "Unknown"),
+      });
+    }
+
+    for (const toolMsg of recentToolMessages) {
+      // Extract tool output from metadata - this contains the actual JSON data
+      let toolContent = toolMsg.content; // Fallback to content
+
+      if (toolMsg.metadata?.toolOutput) {
+        const toolOutput = toolMsg.metadata.toolOutput;
+
+        // Format tool output for readability
+        if (typeof toolOutput === "object" && toolOutput !== null) {
+          // If it's MCP format with content array, extract the text
+          if ("content" in toolOutput && Array.isArray(toolOutput.content)) {
+            const mcpContent = toolOutput.content as Array<{ text?: string; type?: string }>;
+            if (mcpContent.length > 0 && mcpContent[0].text) {
+              toolContent = mcpContent[0].text;
+            } else {
+              toolContent = JSON.stringify(toolOutput, null, 2);
+            }
+          } else {
+            toolContent = JSON.stringify(toolOutput, null, 2);
+          }
+        } else {
+          toolContent = String(toolOutput);
+        }
+      }
+
+      retrievedDocs.push({
+        document: {
+          id: `tool-result-${toolMsg.id}`,
+          title: `Tool Result: ${toolMsg.metadata?.toolName || "Unknown Tool"}`,
+          content: toolContent,
+          type: "tool-result",
+        },
+        similarity: 0.95, // High similarity since tool results are authoritative
+      });
+    }
+
     // Get last customer message
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
     if (!lastCustomerMessage) {
       throw new Error("No customer message found for confidence assessment");
     }
-
-    // Get conversation history
-    const conversationHistory = await conversation.getMessages();
 
     // Build confidence context
     const context = {
@@ -406,8 +459,9 @@ export class ExecutionLayer {
 
       // Assess confidence again (it will already be in recheckResult if this was called recursively)
       // To prevent infinite recursion, we need to assess without triggering another recheck
-      const recheckAssessment = recheckResult.confidence ||
-        await this.assessResponseConfidence(conversation, recheckResult.userMessage);
+      const recheckAssessment =
+        recheckResult.confidence ||
+        (await this.assessResponseConfidence(conversation, recheckResult.userMessage));
 
       debugLog("execution", "Recheck assessment complete", {
         newScore: recheckAssessment.score,
@@ -458,7 +512,10 @@ export class ExecutionLayer {
         return [];
       }
 
-      const query = customerMessages.map((msg) => msg.content).join(" ").trim();
+      const query = customerMessages
+        .map((msg) => msg.content)
+        .join(" ")
+        .trim();
       if (!query) {
         return [];
       }
@@ -499,7 +556,9 @@ export class ExecutionLayer {
    */
   private async getConfidenceConfig(conversation: Conversation) {
     try {
-      const { organizationRepository } = await import("@server/repositories/organization.repository");
+      const { organizationRepository } = await import(
+        "@server/repositories/organization.repository"
+      );
       const organization = await organizationRepository.findById(conversation.organization_id);
 
       return ConfidenceGuardrailService.mergeConfig(
