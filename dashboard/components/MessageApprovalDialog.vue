@@ -1,6 +1,6 @@
 <template>
-  <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="max-w-2xl">
+  <Dialog :open="open" size="lg" @update:open="$emit('update:open', $event)">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Review AI Message</DialogTitle>
         <DialogDescription>
@@ -17,43 +17,38 @@
 
         <!-- Editable Content -->
         <div>
-          <Label for="message-content">Message Content</Label>
-          <Textarea
+          <Input
             id="message-content"
             v-model="editedContent"
+            label="Message Content"
+            type="textarea"
             rows="8"
             class="w-full mt-1"
             placeholder="Edit message content..."
           />
-          <p class="text-xs text-neutral-muted mt-1">
-            {{ editedContent.length }} characters
-          </p>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center justify-between pt-4 border-t">
-          <div class="flex items-center gap-2">
-            <Button
-              variant="destructive"
-              @click="handleBlock"
-              :disabled="loading"
-            >
-              <Ban class="h-4 w-4 mr-2" />
-              Block Message
-            </Button>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <Button variant="outline" @click="handleCancel" :disabled="loading">
-              Cancel
-            </Button>
-            <Button @click="handleApprove" :disabled="loading || !editedContent.trim()">
-              <Check class="h-4 w-4 mr-2" />
-              {{ isEdited ? "Approve & Send Edited" : "Approve & Send" }}
-            </Button>
-          </div>
+          <p class="text-xs text-neutral-muted mt-1">{{ editedContent.length }} characters</p>
         </div>
       </div>
+
+      <DialogFooter>
+        <template #secondary>
+          <Button variant="destructive" :disabled="loading" @click="handleBlock">
+            <Ban class="h-4 w-4 mr-2" />
+            Block Message
+          </Button>
+        </template>
+        <template #primary>
+          <Button variant="outline" :disabled="loading" @click="handleCancel"> Cancel </Button>
+          <Button
+            variant="success"
+            :disabled="loading || !editedContent.trim()"
+            @click="handleApprove"
+          >
+            <Check class="h-4 w-4 mr-2" />
+            {{ isEdited ? "Approve & Send Edited" : "Approve & Send" }}
+          </Button>
+        </template>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
@@ -81,11 +76,14 @@ const editedContent = ref("");
 const isEdited = computed(() => editedContent.value !== props.originalContent);
 
 // Reset content when dialog opens
-watch(() => props.open, (newValue) => {
-  if (newValue) {
-    editedContent.value = props.originalContent;
-  }
-});
+watch(
+  () => props.open,
+  (newValue) => {
+    if (newValue) {
+      editedContent.value = props.originalContent;
+    }
+  },
+);
 
 const handleApprove = async () => {
   try {

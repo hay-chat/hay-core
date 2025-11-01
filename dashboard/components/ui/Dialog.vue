@@ -25,7 +25,10 @@
             leave-to="opacity-0 scale-95"
           >
             <HeadlessDialogPanel
-              class="w-full max-w-md transform overflow-hidden rounded-2xl bg-background p-6 text-left align-middle shadow-xl transition-all"
+              :class="[
+                'w-full transform overflow-hidden rounded-2xl bg-background p-6 text-left align-middle shadow-xl transition-all',
+                sizeClass
+              ]"
             >
               <slot />
             </HeadlessDialogPanel>
@@ -37,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import {
   Dialog as HeadlessDialog,
   TransitionRoot as HeadlessTransitionRoot,
@@ -44,11 +48,30 @@ import {
   DialogPanel as HeadlessDialogPanel,
 } from "@headlessui/vue";
 
-defineProps<{
-  open: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    size?: "sm" | "md" | "lg";
+  }>(),
+  {
+    size: "md",
+  }
+);
 
 defineEmits<{
   "update:open": [value: boolean];
 }>();
+
+const sizeClass = computed(() => {
+  switch (props.size) {
+    case "sm":
+      return "max-w-md";  // 28rem (448px)
+    case "md":
+      return "max-w-2xl"; // 42rem (672px)
+    case "lg":
+      return "max-w-3xl"; // 48rem (768px)
+    default:
+      return "max-w-md";
+  }
+});
 </script>
