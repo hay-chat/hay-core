@@ -165,7 +165,7 @@ const statusVariant = computed(() => {
     case "ERROR":
       return "destructive";
     case "RUNNING":
-      return "secondary";
+      return "tool";
     default:
       return "outline";
   }

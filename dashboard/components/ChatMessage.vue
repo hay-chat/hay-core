@@ -20,7 +20,14 @@
         "
         class="chat-message__header"
       >
-        <span class="chat-message__sender">{{ message.sender }}</span>
+        <div v-if="isQueued && showApproval" class="mb-2 flex-1">
+          <Badge variant="outline" class="text-xs">
+            <Clock class="h-3 w-3 mr-1" />
+            Queued for Approval
+          </Badge>
+        </div>
+
+        <span v-else class="chat-message__sender">{{ message.sender }}</span>
         <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="message.metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
@@ -112,12 +119,8 @@
       </div>
       <!-- Queued Message Actions (Test Mode) -->
       <div v-if="isQueued && showApproval" class="chat-message__actions">
-        <Badge variant="outline" class="text-xs mb-2">
-          <Clock class="h-3 w-3 mr-1" />
-          Queued for Approval
-        </Badge>
-        <div class="flex gap-2">
-          <Button size="sm" variant="outline" @click="handleApproveClick">
+        <div class="flex gap-2 mt-2 mb-4">
+          <Button size="sm" variant="success" @click="handleApproveClick">
             <Check class="h-3 w-3 mr-1" />
             Approve & Send
           </Button>
@@ -411,6 +414,23 @@ const getConfidenceIcon = (tier: string | undefined) => {
 
 .chat-message__bubble--expanded::after {
   display: none;
+}
+
+.chat-message__bubble--needs-approval {
+  position: relative;
+  animation: approval-pulse 2s ease-in-out infinite;
+  border: 1px dashed var(--color-neutral-400);
+  --bubble-bg: var(--color-neutral-100);
+  --bubble-fg: var(--color-neutral-800);
+}
+
+@keyframes approval-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-neutral-600) 50%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--color-neutral-600) 0%, transparent);
+  }
 }
 
 .chat-message__expand-button {
