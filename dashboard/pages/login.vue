@@ -104,9 +104,13 @@
       <div class="text-center">
         <p class="text-sm text-gray-600">
           Don't have an account?
-          <NuxtLink to="/signup" class="font-medium text-primary hover:text-primary/80">
-            Sign up
-          </NuxtLink>
+          <a
+            href="https://hay.chat/pilot/form"
+            target="_blank"
+            class="font-medium text-primary hover:text-primary/80"
+          >
+            Apply for Pilot Program
+          </a>
         </p>
       </div>
     </div>
