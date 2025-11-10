@@ -47,6 +47,7 @@ import { configureMentionExtension } from "@/components/tiptap/MentionExtension"
 import { configureSlashCommand } from "@/components/tiptap/SlashCommand";
 import type { MCPTool, DocumentItem } from "@/components/tiptap/MentionExtension";
 import { HayApi } from "@/utils/api";
+import { useDomain } from "@/composables/useDomain";
 
 interface Props {
   initialData?: JSONContent;
@@ -124,11 +125,16 @@ const editorContent = computed(() => {
   };
 });
 
+// Get API URL
+const { getApiUrl } = useDomain();
+const apiBaseUrl = getApiUrl();
+
 // Tiptap extensions
 const editorExtensions = computed(() => [
   configureMentionExtension({
     mcpTools: mcpTools.value,
     documents: documents.value,
+    apiBaseUrl,
   }),
   configureSlashCommand({
     mcpTools: mcpTools.value,

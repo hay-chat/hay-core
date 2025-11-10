@@ -464,6 +464,7 @@ import {
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
+import { useDomain } from "@/composables/useDomain";
 
 // Route and router
 const route = useRoute();
@@ -475,10 +476,10 @@ const runtimeConfig = useRuntimeConfig();
 // Plugin ID from route
 const pluginId = computed(() => route.params.pluginId as string);
 
-// API Base URL from runtime config with fallback
+// API Base URL from runtime config
 const apiBaseUrl = computed(() => {
-  const url = runtimeConfig.public.apiBaseUrl || "http://localhost:3001";
-  return url;
+  const { getApiUrl } = useDomain();
+  return getApiUrl();
 });
 
 // Vite glob imports for automatic plugin component discovery
@@ -575,9 +576,8 @@ const getPluginDisplayName = (name: string) => {
 };
 
 const getPluginThumbnail = (pluginId: string) => {
-  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix)
-  const pluginName = pluginId.replace("hay-plugin-", "");
-  return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
+  const { getApiUrl } = useDomain();
+  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
 };
 
 const handleThumbnailError = (event: Event) => {
