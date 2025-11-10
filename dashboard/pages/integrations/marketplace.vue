@@ -216,6 +216,7 @@ import {
 } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/composables/useToast";
+import { useDomain } from "@/composables/useDomain";
 
 // Reactive state
 const loading = ref(true);
@@ -310,9 +311,8 @@ const formatPluginType = (type: string) => {
 };
 
 const getPluginThumbnail = (pluginId: string) => {
-  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix)
-  const pluginName = pluginId.replace("hay-plugin-", "");
-  return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
+  const { getApiUrl } = useDomain();
+  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
 };
 
 const handleThumbnailError = (event: Event) => {

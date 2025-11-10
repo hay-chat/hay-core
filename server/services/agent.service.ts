@@ -14,7 +14,7 @@ export class AgentService {
       name: string;
       description?: string;
       enabled?: boolean;
-      instructions?: string;
+      instructions?: unknown[] | null;
       tone?: string;
       avoid?: string;
       trigger?: string;
@@ -57,7 +57,7 @@ export class AgentService {
       name?: string;
       description?: string;
       enabled?: boolean;
-      instructions?: string;
+      instructions?: unknown[] | null;
       tone?: string;
       avoid?: string;
       trigger?: string;

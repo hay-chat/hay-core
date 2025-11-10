@@ -351,6 +351,7 @@ import { useRouter } from "vue-router";
 import { Hay } from "@/utils/api";
 import { CheckCircle2, Check, ArrowRight, Lightbulb, Lock } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
+import { useDomain } from "@/composables/useDomain";
 
 interface OnboardingStep {
   id: string;
@@ -438,9 +439,8 @@ const isStepOpen = (stepId: string) => {
 
 // Helper to get plugin thumbnail from API
 const getPluginThumbnail = (pluginId: string) => {
-  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix)
-  const pluginName = pluginId.replace("hay-plugin-", "");
-  return `http://localhost:3001/plugins/thumbnails/${pluginName}`;
+  const { getApiUrl } = useDomain();
+  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
 };
 
 // Handle thumbnail load error - show fallback

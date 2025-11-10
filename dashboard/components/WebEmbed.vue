@@ -83,6 +83,7 @@ import {
   isWebCryptoAvailable,
 } from "@/utils/dpop-crypto";
 import { DPoPClient } from "@/utils/dpop-proof";
+import { useDomain } from "@/composables/useDomain";
 
 interface WebEmbedProps {
   title?: string;
@@ -92,10 +93,12 @@ interface WebEmbedProps {
   metadata?: Record<string, any>;
 }
 
+const { getApiUrl } = useDomain();
+
 const props = withDefaults(defineProps<WebEmbedProps>(), {
   title: "Chat with us",
   description: "",
-  apiUrl: "http://localhost:3001",
+  apiUrl: getApiUrl(),
 });
 
 interface Message {
