@@ -6,12 +6,19 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:base && npm run migration:ensure && tsc && npm run copy:templates",
+    "build": "npm run build:base && tsc && npm run copy:templates",
     "copy:templates": "cp -r templates dist/",
     "build:base": "cd ../plugins/base && npm run build",
     "start": "node -r module-alias/register dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern=services",
+    "test:integration": "jest --testPathPattern=routes",
+    "test:scheduler": "jest scheduler.service.test.ts",
+    "test:privacy": "jest privacy.test.ts",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d ./database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
@@ -24,10 +31,10 @@
     "@plugins": "../plugins"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.932.0",
-    "@aws-sdk/lib-storage": "^3.932.0",
     "@types/jest": "^30.0.0",
-    "@types/mime-types": "^3.0.1"
+    "@types/node-cron": "^3.0.11",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5"
   },
   "dependencies": {
     "@stripe/stripe-js": "^7.9.0",
@@ -50,6 +57,7 @@
     "mammoth": "^1.11.0",
     "mjml": "^4.16.1",
     "module-alias": "^2.2.3",
+    "node-cron": "^4.2.1",
     "stripe": "^18.5.0",
     "tsconfig-paths": "^4.2.0",
     "word-extractor": "^1.0.4",

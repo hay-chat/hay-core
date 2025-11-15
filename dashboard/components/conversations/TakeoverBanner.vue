@@ -51,7 +51,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { UserCheck, LogOut } from "lucide-vue-next";
-import Button from "@/components/ui/Button.vue";
 import { useUserStore } from "@/stores/user";
 
 interface AssignedUser {

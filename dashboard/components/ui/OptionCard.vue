@@ -2,7 +2,7 @@
   <label
     :class="
       cn(
-        'relative rounded-lg border bg-background text-neutral shadow-sm flex p-1 items-center gap-3 cursor-pointer transition-colors',
+        'relative rounded-lg border bg-background text-neutral shadow-sm flex p-1 items-center cursor-pointer transition-colors',
         'hover:bg-gray-50',
         'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
         isChecked && 'border-primary border-2',
@@ -10,8 +10,18 @@
       )
     "
   >
-    <img v-if="image" :src="image" :alt="label" class="h-12 w-12 flex-shrink-0" />
-    <p class="flex-1">{{ label }}</p>
+    <component
+      :is="props.icon"
+      v-if="props.icon"
+      class="h-4 w-4 flex-shrink-0 ml-3 text-muted-foreground mr-1"
+    />
+    <img
+      v-else-if="props.image"
+      :src="props.image"
+      :alt="props.label"
+      class="h-12 w-12 flex-shrink-0"
+    />
+    <p class="flex-1 p-2 option-card-label">{{ label }}</p>
 
     <input
       type="checkbox"
@@ -21,7 +31,7 @@
       @change="handleChange"
     />
 
-    <div :class="cn('h-5 w-5 flex-shrink-0  flex items-center justify-center transition-all')">
+    <div :class="cn('h-5 w-5 flex-shrink-0  flex items-center justify-center transition-all mr-2')">
       <svg
         v-if="isChecked"
         xmlns="http://www.w3.org/2000/svg"
@@ -40,13 +50,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, type Component } from "vue";
 import { cn } from "@/lib/utils";
 
 export interface CheckboxProps {
   checked?: boolean;
   modelValue?: boolean;
   image?: string;
+  icon?: Component;
   label?: string;
   class?: string;
 }
@@ -82,3 +93,9 @@ const handleChange = (event: Event) => {
   emit("update:checked", newValue);
 };
 </script>
+
+<style scoped lang="scss">
+.option-card-label {
+  font-size: var(--font-size-input);
+}
+</style>

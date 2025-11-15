@@ -124,31 +124,41 @@
           </CardContent>
         </Card>
 
-        <!-- Test Mode Field -->
+        <!-- Message Approval Field -->
         <Card>
           <CardHeader>
-            <CardTitle>Test Mode</CardTitle>
-            <CardDescription>Define the test mode for the agent.</CardDescription>
+            <CardTitle>Message Approval</CardTitle>
+            <CardDescription
+              >Choose whether AI responses are sent automatically or require manual review before
+              reaching customers.</CardDescription
+            >
           </CardHeader>
           <CardContent class="space-y-6">
-            <!-- Test Mode Field -->
+            <!-- Message Approval Field -->
             <div class="space-y-2">
-              <Label>Test Mode</Label>
-              <p class="text-sm text-neutral-muted mb-3">
-                When enabled, AI messages require approval before sending to customers. Playground
-                always bypasses this.
+              <div class="gap-4 grid grid-cols-3">
+                <OptionCard
+                  label="Inherit from Organization"
+                  :icon="CornerDownRight"
+                  :checked="form.testMode === null"
+                  @click="setTestMode(null)"
+                />
+                <OptionCard
+                  label="Require Approval"
+                  :icon="Hand"
+                  :checked="form.testMode === true"
+                  @click="setTestMode(true)"
+                />
+                <OptionCard
+                  label="Auto-Send"
+                  :icon="FastForward"
+                  :checked="form.testMode === false"
+                  @click="setTestMode(false)"
+                />
+              </div>
+              <p class="text-sm text-neutral-muted mt-2">
+                Note: Playground conversations always send automatically regardless of this setting.
               </p>
-              <Input
-                id="testMode"
-                v-model="form.testMode"
-                type="select"
-                :options="[
-                  { label: 'Inherit from Organization', value: null },
-                  { label: 'On (Require Approval)', value: true },
-                  { label: 'Off (Auto-Send)', value: false },
-                ]"
-                helper-text="Set to 'Inherit' to use organization default, or override per agent"
-              />
             </div>
           </CardContent>
         </Card>
@@ -253,7 +263,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ArrowLeft, Trash2, Star } from "lucide-vue-next";
+import { ArrowLeft, Trash2, Star, FastForward, Hand, CornerDownRight } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
@@ -348,7 +358,11 @@ const {
   showConfirmDialog,
   confirmDialogConfig,
   handleDialogCancel,
-} = useUnsavedChanges(initialForm, form, computed(() => !loading.value && !isSubmitting.value));
+} = useUnsavedChanges(
+  initialForm,
+  form,
+  computed(() => !loading.value && !isSubmitting.value),
+);
 
 // Format date
 const formatDate = (date: string | Date) => {
@@ -381,6 +395,17 @@ onMounted(async () => {
       agent.value = agentResponse;
 
       // Populate form
+      // Normalize testMode: handle null, true, false, or undefined
+      let testModeValue: boolean | null = null;
+      const testModeRaw = (agentResponse as any).testMode;
+      if (testModeRaw === true || testModeRaw === "true") {
+        testModeValue = true;
+      } else if (testModeRaw === false || testModeRaw === "false") {
+        testModeValue = false;
+      } else {
+        testModeValue = null; // null or undefined defaults to null (inherit)
+      }
+
       const formData = {
         name: agentResponse.name,
         description: agentResponse.description || "",
@@ -389,12 +414,12 @@ onMounted(async () => {
         tone: agentResponse.tone || "",
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
-        testMode: (agentResponse as any).testMode ?? null,
+        testMode: testModeValue,
         enabled: agentResponse.enabled ?? true,
-        humanHandoffAvailableInstructions:
-          (agentResponse as any).human_handoff_available_instructions || { blocks: [] },
-        humanHandoffUnavailableInstructions:
-          (agentResponse as any).human_handoff_unavailable_instructions || { blocks: [] },
+        humanHandoffAvailableInstructions: (agentResponse as any)
+          .human_handoff_available_instructions || { blocks: [] },
+        humanHandoffUnavailableInstructions: (agentResponse as any)
+          .human_handoff_unavailable_instructions || { blocks: [] },
       };
 
       form.value = { ...formData };
@@ -576,6 +601,11 @@ const setAsDefaultAgent = async () => {
 const setTone = (tone: string) => {
   selectedTone.value = tone;
   form.value.tone = tonePresets[tone as keyof typeof tonePresets];
+};
+
+// Handle test mode selection
+const setTestMode = (value: boolean | null) => {
+  form.value.testMode = value;
 };
 
 // Handle cancel

@@ -9,11 +9,15 @@
     "clean": "rm -rf dist",
     "rebuild": "npm run clean && npm run build"
   },
-  "keywords": ["hay", "plugin", "base"],
+  "keywords": [
+    "hay",
+    "plugin",
+    "base"
+  ],
   "author": "Hay",
   "license": "MIT",
-  "dependencies": {},
   "devDependencies": {
+    "@types/node": "^24.9.1",
     "typescript": "^5.0.0"
   }
 }

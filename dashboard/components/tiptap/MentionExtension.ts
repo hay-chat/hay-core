@@ -38,6 +38,7 @@ export interface MentionItem {
 export interface MentionConfig {
   mcpTools: MCPTool[];
   documents: DocumentItem[];
+  apiBaseUrl: string;
 }
 
 export const configureMentionExtension = (config: MentionConfig) => {
@@ -120,7 +121,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
         content.push([
           "img",
           {
-            src: `http://localhost:3001/plugins/thumbnails/${pluginId}`,
+            src: `${config.apiBaseUrl}/plugins/thumbnails/${pluginId}`,
             alt: node.attrs.label,
             class: "mention-thumbnail",
           },

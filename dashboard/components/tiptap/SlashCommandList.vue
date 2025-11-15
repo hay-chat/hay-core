@@ -25,7 +25,7 @@
         <div class="slash-command-icon">
           <img
             v-if="tool.pluginId"
-            :src="`http://localhost:3001/plugins/thumbnails/${tool.pluginId}`"
+            :src="`${apiBaseUrl}/plugins/thumbnails/${tool.pluginId}`"
             :alt="tool.label"
             class="slash-command-thumbnail"
           />
@@ -102,6 +102,7 @@ import { ref, watch, nextTick } from "vue";
 import type { CommandItem } from "./SlashCommand";
 import type { MCPTool, DocumentItem } from "./MentionExtension";
 import { Type, Heading1, Heading2, List, ListOrdered, Zap, Book } from "lucide-vue-next";
+import { useDomain } from "@/composables/useDomain";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, any> = {
@@ -126,6 +127,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Get API URL
+const { getApiUrl } = useDomain();
+const apiBaseUrl = getApiUrl();
 
 const selectedIndex = ref(0);
 const showSubmenu = ref<"action" | "document" | null>(null);

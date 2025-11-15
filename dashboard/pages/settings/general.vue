@@ -3,7 +3,7 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="openResetDialog">
+        <Button variant="outline" @click="resetToDefaults">
           <RotateCcw class="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
@@ -13,65 +13,6 @@
         </Button>
       </div>
     </template>
-
-    <!-- Organization Settings -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Organization</CardTitle>
-        <CardDescription>Manage your organization details</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <Input
-          v-model="settings.organizationName"
-          label="Organization Name"
-          placeholder="Acme Corporation"
-          helper-text="The name of your organization"
-        />
-
-        <!-- Organization Logo -->
-        <div>
-          <label class="text-sm font-medium mb-2 block">Logo</label>
-          <div class="space-y-4">
-            <!-- Logo Preview -->
-            <div
-              v-if="logoUpload.preview.value || organizationLogo"
-              class="flex items-start gap-4"
-            >
-              <img
-                :src="logoUpload.preview.value || organizationLogo || ''"
-                alt="Organization logo"
-                class="h-24 w-24 rounded-lg border object-cover"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                :disabled="logoUpload.isUploading.value"
-                @click="removeLogo"
-              >
-                <Trash2 class="h-4 w-4 mr-2" />
-                Remove Logo
-              </Button>
-            </div>
-
-            <!-- File Input -->
-            <div class="space-y-2">
-              <Input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                @change="logoUpload.selectFile"
-                :disabled="logoUpload.isUploading.value"
-              />
-              <p class="text-sm text-muted-foreground">
-                Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)
-              </p>
-              <p v-if="logoUpload.error.value" class="text-sm text-destructive">
-                {{ logoUpload.error.value }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
 
     <!-- Platform Settings -->
     <Card>
@@ -155,6 +96,108 @@
           <p class="text-xs text-neutral-muted mt-2">
             ℹ️ Note: Playground conversations always auto-send regardless of this setting.
           </p>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- AI Confidence Guardrails -->
+    <Card>
+      <CardHeader>
+        <CardTitle>AI Confidence Guardrails</CardTitle>
+        <CardDescription>
+          Configure how AI responses are evaluated for confidence and accuracy
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-6">
+        <!-- Confidence Thresholds -->
+        <div class="space-y-4">
+          <div>
+            <Label>Confidence Thresholds</Label>
+            <p class="text-sm text-neutral-muted mb-4">
+              Set the minimum confidence scores required for different quality tiers
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
+              <Input
+                v-model.number="settings.confidenceGuardrail.highThreshold"
+                type="number"
+                label="High Confidence Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Minimum score for high confidence (0.0 - 1.0)"
+              />
+              <Input
+                v-model.number="settings.confidenceGuardrail.mediumThreshold"
+                type="number"
+                label="Medium Confidence Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Minimum score for medium confidence (0.0 - 1.0)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Enable/Disable Features -->
+        <div class="space-y-4 pt-2 border-t">
+          <Input
+            v-model="settings.confidenceGuardrail.enableRecheck"
+            type="switch"
+            label="Enable Automatic Recheck"
+            hint="When confidence is medium, automatically retrieve more documents and regenerate the response"
+          />
+
+          <Input
+            v-model="settings.confidenceGuardrail.enableEscalation"
+            type="switch"
+            label="Enable Human Escalation"
+            hint="When confidence is low, escalate to a human agent instead of sending the AI response"
+          />
+        </div>
+
+        <!-- Recheck Configuration -->
+        <div
+          v-if="settings.confidenceGuardrail.enableRecheck"
+          class="space-y-4 pt-2 border-t"
+        >
+          <div>
+            <Label>Recheck Configuration</Label>
+            <p class="text-sm text-neutral-muted mb-4">
+              Parameters used when rechecking medium-confidence responses
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
+              <Input
+                v-model.number="settings.confidenceGuardrail.recheckConfig.maxDocuments"
+                type="number"
+                label="Max Documents"
+                :min="1"
+                :max="50"
+                helper-text="Number of documents to retrieve (default: 10)"
+              />
+              <Input
+                v-model.number="settings.confidenceGuardrail.recheckConfig.similarityThreshold"
+                type="number"
+                label="Similarity Threshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                helper-text="Lower threshold for broader search (default: 0.3)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Fallback Message -->
+        <div class="pt-2 border-t">
+          <Input
+            v-model="settings.confidenceGuardrail.fallbackMessage"
+            type="textarea"
+            label="Fallback Message"
+            :rows="3"
+            placeholder="Enter fallback message..."
+            helper-text="Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language."
+          />
         </div>
       </CardContent>
     </Card>
@@ -410,45 +453,37 @@
       </CardContent>
     </Card> -->
   </Page>
-
-  <!-- Reset to Defaults Confirmation Dialog -->
-  <ConfirmDialog
-    v-model:open="resetDialogOpen"
-    title="Reset to Defaults"
-    description="Are you sure you want to reset all settings to their default values? This action cannot be undone."
-    confirm-text="Reset"
-    :destructive="true"
-    @confirm="confirmResetToDefaults"
-  />
 </template>
 
 <script setup lang="ts">
-import { Save, RotateCcw, Trash2 } from "lucide-vue-next";
+import { Save, RotateCcw } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
-import { useUserStore } from "@/stores/user";
-import { useFileUpload } from "@/composables/useFileUpload";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
 const toast = useToast();
 
-// Logo upload
-const logoUpload = useFileUpload({
-  accept: "image/*",
-  maxSizeMB: 2,
-});
-
-const organizationLogo = ref<string | null>(null);
-
 // Import types for proper typing
+type ConfidenceGuardrailSettings = {
+  highThreshold: number;
+  mediumThreshold: number;
+  enableRecheck: boolean;
+  enableEscalation: boolean;
+  fallbackMessage: string;
+  recheckConfig: {
+    maxDocuments: number;
+    similarityThreshold: number;
+  };
+};
+
 type PlatformSettings = {
-  organizationName: string;
   defaultLanguage: string;
   timezone: string;
   dateFormat: string;
   timeFormat: string;
   defaultAgent: string;
   testModeDefault: boolean;
+  confidenceGuardrail: ConfidenceGuardrailSettings;
   notifications: any;
   webhooks: any;
   dataRetention: any;
@@ -457,15 +492,25 @@ type PlatformSettings = {
 // Reactive state
 const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
 const isSaving = ref(false);
-const resetDialogOpen = ref(false);
 const settings = ref<PlatformSettings>({
-  organizationName: "",
   defaultLanguage: "en",
   timezone: "UTC",
   dateFormat: "MM/DD/YYYY",
   timeFormat: "12h",
   defaultAgent: "",
   testModeDefault: false,
+  confidenceGuardrail: {
+    highThreshold: 0.8,
+    mediumThreshold: 0.5,
+    enableRecheck: true,
+    enableEscalation: true,
+    fallbackMessage:
+      "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+    recheckConfig: {
+      maxDocuments: 10,
+      similarityThreshold: 0.3,
+    },
+  },
   notifications: {
     email: {
       newConversations: true,
@@ -510,10 +555,7 @@ const webhookEvents = [
 
 // Computed properties
 const hasChanges = computed(() => {
-  return (
-    JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value) ||
-    logoUpload.preview.value !== null
-  );
+  return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
 });
 
 const timezoneOptions = computed(() => {
@@ -585,86 +627,78 @@ const toggleWebhookEvent = (eventId: string) => {
 const saveSettings = async () => {
   try {
     isSaving.value = true;
-
-    // Upload logo if changed
-    if (logoUpload.preview.value) {
-      logoUpload.isUploading.value = true;
-      const base64 = await logoUpload.getBase64();
-      if (base64) {
-        await Hay.organizations.uploadLogo.mutate({
-          logo: base64,
-        });
-        logoUpload.reset();
-      }
-    }
-
     // Save platform settings to API
     const response = await Hay.organizations.updateSettings.mutate({
-      name: settings.value.organizationName,
       defaultLanguage: settings.value.defaultLanguage as any,
       timezone: settings.value.timezone as any,
       dateFormat: settings.value.dateFormat as any,
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
-    } as any);
+      confidenceGuardrail: {
+        ...settings.value.confidenceGuardrail,
+        // Ensure boolean values are properly typed (Input component may return strings)
+        enableRecheck: Boolean(settings.value.confidenceGuardrail.enableRecheck),
+        enableEscalation: Boolean(settings.value.confidenceGuardrail.enableEscalation),
+        // Ensure number values are properly typed
+        highThreshold: Number(settings.value.confidenceGuardrail.highThreshold),
+        mediumThreshold: Number(settings.value.confidenceGuardrail.mediumThreshold),
+        recheckConfig: {
+          maxDocuments: Number(settings.value.confidenceGuardrail.recheckConfig.maxDocuments),
+          similarityThreshold: Number(settings.value.confidenceGuardrail.recheckConfig.similarityThreshold),
+        },
+      },
+    });
 
     if (response.success) {
       // Update original settings to new saved state
       originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
-      // Update the organization name in the user store if it changed
-      if ((response.data as any).name) {
-        const userStore = useUserStore();
-        const activeOrg = userStore.organizations.find(
-          (org: any) => org.id === userStore.activeOrganizationId,
-        );
-        if (activeOrg) {
-          activeOrg.name = (response.data as any).name;
-        }
-      }
-
       toast.success("Settings saved successfully");
-
-      // Reload organization settings to get updated logo URL
-      await loadOrganizationSettings();
     }
   } catch (error) {
     console.error("Failed to save settings:", error);
     toast.error("Failed to save settings. Please try again.");
   } finally {
     isSaving.value = false;
-    logoUpload.isUploading.value = false;
   }
 };
 
-const openResetDialog = () => {
-  resetDialogOpen.value = true;
-};
-
-const confirmResetToDefaults = () => {
-  settings.value = {
-    organizationName: originalSettings.value.organizationName,
-    defaultLanguage: "en",
-    timezone: "UTC",
-    dateFormat: "MM/DD/YYYY",
-    timeFormat: "12h",
-    defaultAgent: "",
-    testModeDefault: false,
-    notifications: {
-      email: {
-        newConversations: true,
-        escalatedConversations: true,
-        performanceAlerts: false,
-        weeklyReports: true,
+const resetToDefaults = () => {
+  if (confirm("Are you sure you want to reset all settings to their default values?")) {
+    settings.value = {
+      defaultLanguage: "en",
+      timezone: "UTC",
+      dateFormat: "MM/DD/YYYY",
+      timeFormat: "12h",
+      defaultAgent: "",
+      testModeDefault: false,
+      confidenceGuardrail: {
+        highThreshold: 0.8,
+        mediumThreshold: 0.5,
+        enableRecheck: true,
+        enableEscalation: true,
+        fallbackMessage:
+          "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+        recheckConfig: {
+          maxDocuments: 10,
+          similarityThreshold: 0.3,
+        },
       },
-      inApp: {
-        realTimeAlerts: true,
-        systemUpdates: true,
-        featureAnnouncements: true,
-      },
-      quietHours: {
-        start: "22:00",
+      notifications: {
+        email: {
+          newConversations: true,
+          escalatedConversations: true,
+          performanceAlerts: false,
+          weeklyReports: true,
+        },
+        inApp: {
+          realTimeAlerts: true,
+          systemUpdates: true,
+          featureAnnouncements: true,
+        },
+        quietHours: {
+          start: "22:00",
           end: "08:00",
         },
       },
@@ -680,8 +714,7 @@ const confirmResetToDefaults = () => {
         exports: "30",
       },
     };
-
-  toast.success("Settings reset to defaults");
+  }
 };
 
 const testWebhook = async () => {
@@ -701,27 +734,6 @@ const viewWebhookLogs = () => {
   console.log("View webhook logs");
 };
 
-const removeLogo = async () => {
-  try {
-    await Hay.organizations.deleteLogo.mutate();
-    toast.success("Logo removed successfully");
-    logoUpload.reset();
-    await loadOrganizationSettings();
-  } catch (error) {
-    console.error("Failed to remove logo:", error);
-    toast.error("Failed to remove logo. Please try again.");
-  }
-};
-
-const loadOrganizationSettings = async () => {
-  try {
-    const orgSettings = await Hay.organizations.getSettings.query();
-    organizationLogo.value = (orgSettings as any).logoUrl || null;
-  } catch (error) {
-    console.error("Failed to load organization logo:", error);
-  }
-};
-
 // Lifecycle
 onMounted(async () => {
   try {
@@ -733,7 +745,6 @@ onMounted(async () => {
     const orgSettings = await Hay.organizations.getSettings.query();
 
     // Update only platform settings, keep other settings as mock for now
-    settings.value.organizationName = (orgSettings as any).name;
     settings.value.defaultLanguage = orgSettings.defaultLanguage;
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;
@@ -744,8 +755,13 @@ onMounted(async () => {
         ? ((orgSettings as Record<string, unknown>).testModeDefault as boolean)
         : false;
 
-    // Load organization logo
-    organizationLogo.value = (orgSettings as any).logoUrl || null;
+    // Load confidence guardrail settings
+    if (orgSettings.confidenceGuardrail) {
+      settings.value.confidenceGuardrail = {
+        ...settings.value.confidenceGuardrail,
+        ...(orgSettings.confidenceGuardrail as any),
+      };
+    }
 
     // Store original settings for change detection
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));

@@ -239,3 +239,45 @@ export function timezoneLabelWithOffset(tz: string, label: string): string {
   const offset = getTimezoneOffset(tz);
   return `${label} (${offset})`;
 }
+
+/**
+ * Confidence Guardrail Configuration
+ * Controls AI response confidence scoring and guardrails
+ */
+export interface ConfidenceGuardrailConfig {
+  highThreshold: number; // Default: 0.8 (minimum score for high confidence)
+  mediumThreshold: number; // Default: 0.5 (minimum score for medium confidence)
+  enableRecheck: boolean; // Default: true (enable automatic recheck for medium confidence)
+  enableEscalation: boolean; // Default: true (enable human handoff for low confidence)
+  fallbackMessage: string; // Message shown when escalation is disabled
+  recheckConfig?: {
+    maxDocuments: number; // Default: 10 (number of documents to retrieve on recheck)
+    similarityThreshold: number; // Default: 0.3 (lower threshold for broader search)
+  };
+}
+
+/**
+ * Default confidence guardrail configuration
+ */
+export const DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG: ConfidenceGuardrailConfig = {
+  highThreshold: 0.8,
+  mediumThreshold: 0.5,
+  enableRecheck: true,
+  enableEscalation: true,
+  fallbackMessage:
+    "I'm not confident I can provide an accurate answer to this question based on the available information. Let me connect you with a team member who can help.",
+  recheckConfig: {
+    maxDocuments: 10,
+    similarityThreshold: 0.3,
+  },
+};
+
+/**
+ * Organization Settings JSONB structure
+ * This type defines the complete structure of the settings field in the Organization entity
+ */
+export interface OrganizationSettings {
+  testModeDefault?: boolean;
+  confidenceGuardrail?: ConfidenceGuardrailConfig;
+  [key: string]: unknown;
+}

@@ -1,0 +1,47 @@
+<!-- subject: Your Data Has Been Deleted -->
+<mj-section background-color="#ffffff" padding-bottom="20px" padding-top="20px">
+  <mj-column width="100%">
+    <mj-text align="center" color="#333333" font-size="24px" font-weight="bold" padding-bottom="10px">
+      Data Deletion Completed
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
+  <mj-column width="100%">
+    <mj-text color="#555555" font-size="16px" line-height="24px">
+      This confirms that your personal data has been successfully deleted from {{companyName}} as requested.
+    </mj-text>
+
+    <mj-text color="#555555" font-size="16px" line-height="24px" padding-top="15px">
+      <strong>What we've done:</strong>
+    </mj-text>
+
+    <mj-text color="#555555" font-size="14px" line-height="20px">
+      ✓ Your account has been permanently deactivated<br/>
+      ✓ All API keys have been revoked<br/>
+      ✓ Personal information has been removed or anonymized<br/>
+      ✓ You can no longer access your account
+    </mj-text>
+
+    <mj-divider border-color="#e0e0e0" border-width="1px" padding-top="20px" />
+
+    <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
+      <strong>Important Notes:</strong>
+    </mj-text>
+
+    <mj-text color="#555555" font-size="14px" line-height="20px">
+      • Some audit logs have been retained (anonymized) for legal and compliance requirements<br/>
+      • If you create a new account with the same email address, it will be treated as a completely new account<br/>
+      • Backup copies in our disaster recovery systems will be deleted as part of our regular backup rotation (within 90 days)
+    </mj-text>
+
+    <mj-text color="#555555" font-size="16px" line-height="24px" padding-top="20px">
+      Thank you for using {{companyName}}. If you have any questions about this deletion, please contact our support team.
+    </mj-text>
+
+    <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px" padding-bottom="20px">
+      Questions? Contact us at <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
+    </mj-text>
+  </mj-column>
+</mj-section>

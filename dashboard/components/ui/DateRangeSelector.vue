@@ -45,13 +45,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { Calendar, ChevronDown } from "lucide-vue-next";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 interface DateRange {
   startDate: string;

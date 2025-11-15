@@ -345,8 +345,6 @@ import {
   Frown,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
-import SimpleGauge from "@/components/ui/SimpleGauge.vue";
-import DateRangeSelector from "@/components/ui/DateRangeSelector.vue";
 import { useAnalyticsStore } from "@/stores/analytics";
 
 // State

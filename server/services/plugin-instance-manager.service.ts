@@ -13,37 +13,27 @@ interface InstancePoolStats {
 export class PluginInstanceManagerService {
   private readonly INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private readonly CLEANUP_INTERVAL_MS = 60 * 1000; // Check every minute
-  private cleanupTimer: NodeJS.Timeout | null = null;
   private instanceActivity: Map<string, Date> = new Map();
   private startupQueue: Map<string, Promise<void>> = new Map();
   private instancePools: Map<string, InstancePoolStats> = new Map();
 
   /**
    * Start the cleanup timer for inactive instances
+   * NOTE: Cleanup is now handled by the scheduler service
+   * See: server/services/scheduled-jobs.registry.ts -> 'plugin-instance-cleanup'
    */
   startCleanup(): void {
-    if (this.cleanupTimer) {
-      return;
-    }
-
-    this.cleanupTimer = setInterval(() => {
-      this.cleanupInactiveInstances().catch((error) => {
-        debugLog("plugin-manager", "Error during instance cleanup", { level: "error", data: error });
-      });
-    }, this.CLEANUP_INTERVAL_MS);
-
-    debugLog("plugin-manager", "Plugin instance cleanup started (checking every minute)");
+    // No-op: Cleanup is now handled by scheduler
+    debugLog("plugin-manager", "Plugin instance cleanup handled by scheduler service");
   }
 
   /**
    * Stop the cleanup timer
+   * NOTE: Cleanup is now handled by the scheduler service
    */
   stopCleanup(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-      debugLog("plugin-manager", "Plugin instance cleanup stopped");
-    }
+    // No-op: Cleanup is now handled by scheduler
+    debugLog("plugin-manager", "Plugin instance cleanup handled by scheduler service");
   }
 
   /**
@@ -131,8 +121,9 @@ export class PluginInstanceManagerService {
 
   /**
    * Clean up inactive instances
+   * Called by scheduled job: 'plugin-instance-cleanup'
    */
-  private async cleanupInactiveInstances(): Promise<void> {
+  async cleanupInactiveInstances(): Promise<void> {
     const now = getUTCNow();
     const inactiveThreshold = new Date(now.getTime() - this.INACTIVITY_TIMEOUT_MS);
 

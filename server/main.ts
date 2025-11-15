@@ -35,6 +35,17 @@ async function startServer() {
     console.warn("⚠️  Starting server without Job Queue service");
   }
 
+  // Initialize Scheduler service (depends on Database)
+  const { schedulerService } = await import("@server/services/scheduler.service");
+  const { registerAllScheduledJobs } = await import("@server/services/scheduled-jobs.registry");
+  try {
+    await schedulerService.initialize();
+    registerAllScheduledJobs();
+  } catch (error) {
+    console.warn("⚠️  Starting server without Scheduler service");
+    console.error(error);
+  }
+
   // Import services after database initialization to avoid circular dependency issues
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");

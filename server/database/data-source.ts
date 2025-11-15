@@ -2,8 +2,6 @@ import { DataSource } from "typeorm";
 import { User } from "../entities/user.entity";
 import { ApiKey } from "../entities/apikey.entity";
 import { Organization } from "../entities/organization.entity";
-import { UserOrganization } from "../entities/user-organization.entity";
-import { OrganizationInvitation } from "../entities/organization-invitation.entity";
 import { Document } from "../entities/document.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
@@ -18,7 +16,7 @@ import { MessageFeedback } from "./entities/message-feedback.entity";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
 import { AuditLog } from "../entities/audit-log.entity";
-import { Upload } from "../entities/upload.entity";
+import { PrivacyRequest } from "../entities/privacy-request.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import "reflect-metadata";
@@ -37,8 +35,6 @@ export const AppDataSource = new DataSource({
     User,
     ApiKey,
     Organization,
-    UserOrganization,
-    OrganizationInvitation,
     Document,
     Job,
     Session,
@@ -53,7 +49,7 @@ export const AppDataSource = new DataSource({
     PluginRegistry,
     PluginInstance,
     AuditLog,
-    Upload,
+    PrivacyRequest,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
