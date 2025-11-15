@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { Loader2, Send, AlertCircle } from "lucide-vue-next";
 import {
   generateKeypair,
@@ -93,13 +93,16 @@ interface WebEmbedProps {
   metadata?: Record<string, any>;
 }
 
-const { getApiUrl } = useDomain();
-
 const props = withDefaults(defineProps<WebEmbedProps>(), {
   title: "Chat with us",
   description: "",
-  apiUrl: getApiUrl(),
+  apiUrl: "",
 });
+
+const { getApiUrl } = useDomain();
+
+// Use the provided API URL or fall back to the default from useDomain
+const apiUrl = computed(() => props.apiUrl || getApiUrl());
 
 interface Message {
   id: string;
@@ -143,7 +146,7 @@ async function initialize() {
 
       if (existingKeypair) {
         conversationId.value = existingConversationId;
-        dpopClient.value = new DPoPClient(existingConversationId, props.apiUrl);
+        dpopClient.value = new DPoPClient(existingConversationId, apiUrl.value);
 
         // Fetch existing messages
         await fetchMessages();
@@ -157,7 +160,7 @@ async function initialize() {
     const { privateKey, publicKey, publicJwk } = await generateKeypair();
 
     // Create conversation via tRPC
-    const response = await fetch(`${props.apiUrl}/v1/publicConversations.create`, {
+    const response = await fetch(`${apiUrl.value}/v1/publicConversations.create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -188,7 +191,7 @@ async function initialize() {
 
     // Initialize DPoP client
     conversationId.value = newConversationId;
-    dpopClient.value = new DPoPClient(newConversationId, props.apiUrl);
+    dpopClient.value = new DPoPClient(newConversationId, apiUrl.value);
     dpopClient.value.setNonce(nonce);
 
     connectionStatus.value = "connected";
@@ -224,7 +227,7 @@ async function fetchMessages() {
       body: JSON.stringify({
         conversationId: conversationId.value,
         method: "POST",
-        url: `${props.apiUrl}/v1/publicConversations.getMessages`,
+        url: `${apiUrl.value}/v1/publicConversations.getMessages`,
         limit: 50,
       }),
     });
@@ -274,7 +277,7 @@ async function sendMessage() {
         conversationId: conversationId.value,
         content,
         method: "POST",
-        url: `${props.apiUrl}/v1/publicConversations.sendMessage`,
+        url: `${apiUrl.value}/v1/publicConversations.sendMessage`,
       }),
     });
 
