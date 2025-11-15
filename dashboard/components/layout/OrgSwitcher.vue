@@ -118,7 +118,18 @@ const switchOrganization = async (organizationId: string) => {
 
   try {
     // Call backend to update lastAccessedAt and log the switch
-    await Hay.organizations.switchOrganization.mutate({ organizationId });
+    const result = await Hay.organizations.switchOrganization.mutate({ organizationId });
+
+    // Update the organization data in the store with fresh data from backend (including logo)
+    if (result.organization) {
+      const orgIndex = userStore.organizations.findIndex((o) => o.id === organizationId);
+      if (orgIndex !== -1) {
+        userStore.organizations[orgIndex] = {
+          ...userStore.organizations[orgIndex],
+          ...result.organization,
+        };
+      }
+    }
 
     // Update the store - this will cause all subsequent API calls to use the new org ID
     const org = await userStore.switchOrganization(organizationId);
@@ -153,12 +164,14 @@ const handleOrganizationCreated = async (organization: {
   name: string;
   slug: string;
   role: string;
+  logo?: string | null;
 }) => {
   // Add the new organization to the user's organizations list
   userStore.organizations.push({
     id: organization.id,
     name: organization.name,
     slug: organization.slug,
+    logo: organization.logo || null,
     role: organization.role as "owner" | "admin" | "member" | "viewer" | "contributor",
   });
 

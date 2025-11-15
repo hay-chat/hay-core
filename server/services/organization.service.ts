@@ -8,7 +8,10 @@ class OrganizationService {
   private storageService = new StorageService();
 
   async findOne(id: string): Promise<Organization | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({
+      where: { id },
+      relations: ["logoUpload"],
+    });
   }
 
   async findOneWithUrls(id: string): Promise<Organization & { logoUrl?: string } | null> {
