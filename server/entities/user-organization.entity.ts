@@ -54,13 +54,13 @@ export class UserOrganization extends BaseEntity {
   @ManyToOne(() => User, (user) => user.userOrganizations, {
     onDelete: "CASCADE",
   })
-  @JoinColumn()
+  @JoinColumn({ name: "user_id" })
   user!: User;
 
   @ManyToOne(() => Organization, (organization) => organization.userOrganizations, {
     onDelete: "CASCADE",
   })
-  @JoinColumn()
+  @JoinColumn({ name: "organization_id" })
   organization!: Organization;
 
   // Helper methods

@@ -49,15 +49,15 @@ export class OrganizationInvitation extends BaseEntity {
 
   // Relationships
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })
-  @JoinColumn()
+  @JoinColumn({ name: "organization_id" })
   organization!: Organization;
 
   @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn()
+  @JoinColumn({ name: "invited_user_id" })
   invitedUser?: User;
 
   @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn()
+  @JoinColumn({ name: "invited_by" })
   invitedByUser?: User;
 
   // Helper methods

@@ -1,5 +1,5 @@
 <template>
-  <Menu as="div" class="relative inline-flex text-left">
+  <Menu as="div" class="relative inline-flex text-left w-full">
     <slot />
   </Menu>
 </template>

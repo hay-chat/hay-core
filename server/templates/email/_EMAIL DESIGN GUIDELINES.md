@@ -8,38 +8,38 @@ All colors are defined in `base.mjml` and should be used consistently across all
 
 ### Brand Colors
 
-| Color Name | Hex Code | Usage | MJML Class |
-|-----------|----------|-------|------------|
-| Primary   | `#007bff` | Primary actions, links | `text-primary`, `btn-primary` |
-| Success   | `#28a745` | Success messages, confirmations | `text-success`, `btn-success` |
-| Warning   | `#ffc107` | Warnings, caution messages | `text-warning`, `btn-warning` |
-| Danger    | `#dc3545` | Errors, security alerts | `text-danger`, `btn-danger` |
-| Info      | `#17a2b8` | Informational messages | `text-info`, `btn-info` |
+| Color Name | Hex Code  | Usage                           | MJML Class                    |
+| ---------- | --------- | ------------------------------- | ----------------------------- |
+| Primary    | `#001bf4` | Primary actions, links          | `text-primary`, `btn-primary` |
+| Success    | `#28a745` | Success messages, confirmations | `text-success`, `btn-success` |
+| Warning    | `#ffc107` | Warnings, caution messages      | `text-warning`, `btn-warning` |
+| Danger     | `#dc3545` | Errors, security alerts         | `text-danger`, `btn-danger`   |
+| Info       | `#17a2b8` | Informational messages          | `text-info`, `btn-info`       |
 
 ### Text Colors
 
-| Color Name | Hex Code | Usage |
-|-----------|----------|-------|
-| Heading   | `#1a1a1a` | Headings (h1, h2, h3) |
-| Body Text | `#555555` | Main body text |
-| Muted     | `#888888` | Secondary text, footer links |
-| Light     | `#999999` | Copyright, very subtle text |
+| Color Name | Hex Code  | Usage                        |
+| ---------- | --------- | ---------------------------- |
+| Heading    | `#1a1a1a` | Headings (h1, h2, h3)        |
+| Body Text  | `#555555` | Main body text               |
+| Muted      | `#888888` | Secondary text, footer links |
+| Light      | `#999999` | Copyright, very subtle text  |
 
 ### Background Colors
 
-| Color Name | Hex Code | Usage | MJML Class |
-|-----------|----------|-------|------------|
-| White     | `#ffffff` | Main content sections | `section-white` |
-| Light Gray | `#f9f9f9` | Alternate sections | `section-gray` |
-| Background | `#f4f4f4` | Page background | `section-light` |
+| Color Name | Hex Code  | Usage                 | MJML Class      |
+| ---------- | --------- | --------------------- | --------------- |
+| White      | `#ffffff` | Main content sections | `section-white` |
+| Light Gray | `#f9f9f9` | Alternate sections    | `section-gray`  |
+| Background | `#f4f4f4` | Page background       | `section-light` |
 
 ### Border Colors
 
-| Color Name | Hex Code | Usage |
-|-----------|----------|-------|
-| Default   | `#e0e0e0` | Standard dividers |
-| Light     | `#f0f0f0` | Subtle dividers |
-| Dark      | `#cccccc` | Prominent dividers |
+| Color Name | Hex Code  | Usage              |
+| ---------- | --------- | ------------------ |
+| Default    | `#e0e0e0` | Standard dividers  |
+| Light      | `#f0f0f0` | Subtle dividers    |
+| Dark       | `#cccccc` | Prominent dividers |
 
 ## Typography
 
@@ -53,11 +53,11 @@ Use MJML classes for consistent heading styles:
 <mj-text mj-class="h3">Subsection Heading</mj-text>
 ```
 
-| Class | Size | Weight | Color | Line Height |
-|-------|------|--------|-------|-------------|
-| `h1`  | 24px | 700    | #1a1a1a | 32px |
-| `h2`  | 20px | 600    | #1a1a1a | 28px |
-| `h3`  | 16px | 600    | #1a1a1a | 24px |
+| Class | Size | Weight | Color   | Line Height |
+| ----- | ---- | ------ | ------- | ----------- |
+| `h1`  | 24px | 700    | #1a1a1a | 32px        |
+| `h2`  | 20px | 600    | #1a1a1a | 28px        |
+| `h3`  | 16px | 600    | #1a1a1a | 24px        |
 
 ### Text Variants
 
@@ -68,12 +68,12 @@ Use MJML classes for consistent heading styles:
 <mj-text mj-class="text-bold">Bold text</mj-text>
 ```
 
-| Class | Size | Color | Usage |
-|-------|------|-------|-------|
-| `text-body` | 14px | #555555 | Regular body text |
+| Class        | Size | Color   | Usage                |
+| ------------ | ---- | ------- | -------------------- |
+| `text-body`  | 14px | #555555 | Regular body text    |
 | `text-small` | 12px | #666666 | Small text, captions |
-| `text-muted` | 12px | #888888 | Less important text |
-| `text-bold` | - | - | Bold emphasis |
+| `text-muted` | 12px | #888888 | Less important text  |
+| `text-bold`  | -    | -       | Bold emphasis        |
 
 ## Buttons
 
@@ -89,6 +89,7 @@ Use MJML classes for consistent heading styles:
 ```
 
 All buttons have:
+
 - Font size: 14px
 - Font weight: 600
 - Border radius: 6px

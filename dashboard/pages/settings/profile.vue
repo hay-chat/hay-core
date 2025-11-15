@@ -319,6 +319,11 @@ const refreshUserData = async () => {
       ...userData,
       lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
       lastLoginAt: userData.lastLoginAt ? new Date(userData.lastLoginAt) : undefined,
+      organizations: userData.organizations?.map(org => ({
+        ...org,
+        joinedAt: org.joinedAt ? new Date(org.joinedAt) : undefined,
+        lastAccessedAt: org.lastAccessedAt ? new Date(org.lastAccessedAt) : undefined,
+      })),
     };
     userStore.setUser(userDataWithDates);
   } catch (error) {

@@ -4,7 +4,7 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  logo?: string;
+  logo?: string | null;
   role?: "owner" | "admin" | "member" | "viewer" | "contributor";
   permissions?: string[];
   joinedAt?: Date;
@@ -18,7 +18,7 @@ export interface User {
   lastName?: string;
   isActive?: boolean;
   isAdmin?: boolean;
-  role?: "owner" | "admin" | "member" | "viewer";
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
   organizations?: Organization[];
   activeOrganizationId?: string;
   lastSeenAt?: Date;
@@ -99,6 +99,23 @@ export const useUserStore = defineStore("user", {
       if (this.organizations.find((org) => org.id === organizationId)) {
         this.activeOrganizationId = organizationId;
       }
+    },
+
+    /**
+     * Switch to a different organization
+     * This updates the active organization and returns the organization info
+     */
+    async switchOrganization(organizationId: string): Promise<Organization | null> {
+      const targetOrg = this.organizations.find((org) => org.id === organizationId);
+      if (!targetOrg) {
+        return null;
+      }
+
+      // Update the active organization ID
+      // This will cause the tRPC client to use the new org ID in the x-organization-id header
+      this.activeOrganizationId = organizationId;
+
+      return targetOrg;
     },
 
     clearUser() {

@@ -10,7 +10,9 @@
         <div class="flex items-center justify-between">
           <div>
             <CardTitle>Team Members</CardTitle>
-            <CardDescription>Manage who has access to {{ userStore.activeOrganization?.name }}</CardDescription>
+            <CardDescription
+              >Manage who has access to {{ userStore.activeOrganization?.name }}</CardDescription
+            >
           </div>
           <Button v-if="userStore.isAdmin" @click="inviteDialogOpen = true">
             <UserPlus class="h-4 w-4 mr-2" />
@@ -19,12 +21,44 @@
         </div>
       </CardHeader>
       <CardContent>
-        <div v-if="loading" class="flex items-center justify-center py-8">
-          <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+        <!-- Search and Filter Bar -->
+        <div class="flex gap-3 mb-4">
+          <Input
+            v-model="searchQuery"
+            type="text"
+            :icon-start="Search"
+            placeholder="Search members by name or email..."
+            class="flex-1"
+            @input="debouncedSearch"
+          />
+
+          <Input
+            v-model="roleFilter"
+            type="select"
+            class="w-[180px]"
+            placeholder="All Roles"
+            :options="[
+              { label: 'All Roles', value: '' },
+              { label: 'Owner', value: 'owner' },
+              { label: 'Admin', value: 'admin' },
+              { label: 'Contributor', value: 'contributor' },
+              { label: 'Member', value: 'member' },
+              { label: 'Viewer', value: 'viewer' },
+            ]"
+            @update:model-value="loadMembers(true)"
+          />
+        </div>
+
+        <div v-if="loading" class="py-8">
+          <Loading />
         </div>
 
         <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
-          No members found
+          {{
+            searchQuery || roleFilter
+              ? "No members found matching your filters"
+              : "No members found"
+          }}
         </div>
 
         <div v-else class="space-y-2">
@@ -34,11 +68,19 @@
             class="flex items-center justify-between p-4 rounded-lg border"
           >
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <div
+                class="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700"
+              >
                 <User class="h-5 w-5" />
               </div>
               <div>
-                <p class="font-medium">{{ member.firstName || member.lastName ? `${member.firstName || ''} ${member.lastName || ''}`.trim() : member.email }}</p>
+                <p class="font-medium">
+                  {{
+                    member.firstName || member.lastName
+                      ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
+                      : member.email
+                  }}
+                </p>
                 <p class="text-sm text-muted-foreground">{{ member.email }}</p>
               </div>
             </div>
@@ -56,13 +98,56 @@
                     Change Role
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive" @click="removeMember(member)">
+                  <DropdownMenuItem
+                    class="text-destructive"
+                    @click="openRemoveMemberDialog(member)"
+                  >
                     <Trash2 class="h-4 w-4 mr-2" />
                     Remove Member
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div
+          v-if="!loading && totalPages > 1"
+          class="flex items-center justify-between mt-4 pt-4 border-t"
+        >
+          <div class="text-sm text-muted-foreground">
+            Showing {{ (currentPage - 1) * pageSize + 1 }} to
+            {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} members
+          </div>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
+              <ChevronLeft class="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+
+            <div class="flex items-center gap-1">
+              <Button
+                v-for="page in getPaginationPages()"
+                :key="page"
+                :variant="page === currentPage ? 'default' : 'outline'"
+                size="sm"
+                class="min-w-[40px]"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="currentPage === totalPages"
+              @click="nextPage"
+            >
+              Next
+              <ChevronRight class="h-4 w-4 ml-1" />
+            </Button>
           </div>
         </div>
       </CardContent>
@@ -75,17 +160,20 @@
         <CardDescription>Invitations sent to join your organization</CardDescription>
       </CardHeader>
       <CardContent>
-        <div v-if="loadingInvitations" class="flex items-center justify-center py-8">
-          <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+        <div v-if="loadingInvitations" class="py-8">
+          <Loading />
         </div>
 
-        <div v-else-if="invitations.length === 0" class="text-center py-8 text-muted-foreground">
+        <div
+          v-else-if="invitations.filter((inv) => inv.status === 'pending').length === 0"
+          class="text-center py-8 text-muted-foreground"
+        >
           No pending invitations
         </div>
 
         <div v-else class="space-y-2">
           <div
-            v-for="invitation in invitations"
+            v-for="invitation in invitations.filter((inv) => inv.status === 'pending')"
             :key="invitation.id"
             class="flex items-center justify-between p-4 rounded-lg border"
           >
@@ -97,17 +185,24 @@
               </p>
             </div>
             <div class="flex items-center gap-2">
-              <Badge variant="outline" class="capitalize">{{ invitation.role }}</Badge>
-              <Badge :variant="invitation.status === 'pending' ? 'secondary' : 'destructive'">
-                {{ invitation.status }}
-              </Badge>
               <Button
                 v-if="invitation.status === 'pending'"
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="xs"
+                :disabled="resendingInvitation === invitation.id"
+                title="Resend invitation"
+                @click="resendInvitation(invitation.id)"
+              >
+                Resend invitation
+              </Button>
+              <Button
+                v-if="invitation.status === 'pending'"
+                variant="outline"
+                size="xs"
+                title="Cancel invitation"
                 @click="cancelInvitation(invitation.id)"
               >
-                <X class="h-4 w-4" />
+                Cancel invitation
               </Button>
             </div>
           </div>
@@ -165,9 +260,7 @@
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change Member Role</DialogTitle>
-          <DialogDescription>
-            Update the role for {{ selectedMember?.email }}
-          </DialogDescription>
+          <DialogDescription> Update the role for {{ selectedMember?.email }} </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
           <div>
@@ -192,6 +285,16 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Remove Member Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="removeMemberDialogOpen"
+      title="Remove Member"
+      :description="`Are you sure you want to remove ${memberToRemove?.email} from the organization? This action cannot be undone.`"
+      confirm-text="Remove"
+      :destructive="true"
+      @confirm="confirmRemoveMember"
+    />
   </Page>
 </template>
 
@@ -205,24 +308,39 @@ import {
   Trash2,
   X,
   Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
 } from "lucide-vue-next";
 import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/composables/useToast";
 
 const userStore = useUserStore();
-const { toast } = useToast();
+const toastService = useToast();
 
 const loading = ref(false);
 const loadingInvitations = ref(false);
 const members = ref<any[]>([]);
 const invitations = ref<any[]>([]);
 
+// Pagination and filtering
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalItems = ref(0);
+const totalPages = ref(0);
+const searchQuery = ref("");
+const roleFilter = ref<"" | "owner" | "admin" | "contributor" | "member" | "viewer">("");
+let searchTimeout: NodeJS.Timeout | null = null;
+
 const inviteDialogOpen = ref(false);
 const roleDialogOpen = ref(false);
 const sendingInvite = ref(false);
 const updatingRole = ref(false);
 const selectedMember = ref<any>(null);
+const removeMemberDialogOpen = ref(false);
+const memberToRemove = ref<any>(null);
 
 const inviteForm = ref({
   email: "",
@@ -234,20 +352,103 @@ const roleForm = ref({
   role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
 });
 
-const loadMembers = async () => {
+const resendingInvitation = ref<string | null>(null);
+
+const loadMembers = async (resetPage = false) => {
+  if (resetPage) {
+    currentPage.value = 1;
+  }
+
   loading.value = true;
   try {
-    const response = await Hay.organizations.listMembers.query();
-    members.value = response;
-  } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to load members",
-      variant: "destructive",
+    const response = await Hay.organizations.listMembers.query({
+      pagination: {
+        page: currentPage.value,
+        limit: pageSize.value,
+      },
+      search: searchQuery.value || undefined,
+      role: roleFilter.value || undefined,
     });
+
+    members.value = response.items;
+    totalItems.value = response.pagination.total;
+    totalPages.value = response.pagination.totalPages;
+  } catch (error: any) {
+    toastService.error(
+      "Failed to load members",
+      error.message || "Could not retrieve team members",
+    );
   } finally {
     loading.value = false;
   }
+};
+
+const debouncedSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+  searchTimeout = setTimeout(() => {
+    loadMembers(true);
+  }, 300);
+};
+
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+    loadMembers();
+  }
+};
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    loadMembers();
+  }
+};
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    loadMembers();
+  }
+};
+
+const getPaginationPages = () => {
+  const pages: number[] = [];
+  const maxPagesToShow = 5;
+
+  if (totalPages.value <= maxPagesToShow) {
+    // Show all pages if total is less than max
+    for (let i = 1; i <= totalPages.value; i++) {
+      pages.push(i);
+    }
+  } else {
+    // Always show first page
+    pages.push(1);
+
+    // Calculate range around current page
+    let start = Math.max(2, currentPage.value - 1);
+    let end = Math.min(totalPages.value - 1, currentPage.value + 1);
+
+    // Adjust range if we're near the beginning or end
+    if (currentPage.value <= 3) {
+      end = 4;
+    } else if (currentPage.value >= totalPages.value - 2) {
+      start = totalPages.value - 3;
+    }
+
+    // Add pages in range
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    // Always show last page
+    if (!pages.includes(totalPages.value)) {
+      pages.push(totalPages.value);
+    }
+  }
+
+  return pages;
 };
 
 const loadInvitations = async () => {
@@ -256,11 +457,10 @@ const loadInvitations = async () => {
     const response = await Hay.invitations.listInvitations.query();
     invitations.value = response;
   } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to load invitations",
-      variant: "destructive",
-    });
+    toastService.error(
+      "Failed to load invitations",
+      error.message || "Could not retrieve pending invitations",
+    );
   } finally {
     loadingInvitations.value = false;
   }
@@ -268,11 +468,7 @@ const loadInvitations = async () => {
 
 const sendInvitation = async () => {
   if (!inviteForm.value.email) {
-    toast({
-      title: "Error",
-      description: "Please enter an email address",
-      variant: "destructive",
-    });
+    toastService.error("Email required", "Please enter an email address");
     return;
   }
 
@@ -284,20 +480,13 @@ const sendInvitation = async () => {
       message: inviteForm.value.message || undefined,
     });
 
-    toast({
-      title: "Success",
-      description: "Invitation sent successfully",
-    });
+    toastService.success("Invitation sent", `Invitation sent to ${inviteForm.value.email}`);
 
     inviteDialogOpen.value = false;
     inviteForm.value = { email: "", role: "member", message: "" };
     await loadInvitations();
   } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to send invitation",
-      variant: "destructive",
-    });
+    toastService.error("Failed to send invitation", error.message || "Could not send invitation");
   } finally {
     sendingInvite.value = false;
   }
@@ -306,17 +495,23 @@ const sendInvitation = async () => {
 const cancelInvitation = async (invitationId: string) => {
   try {
     await Hay.invitations.cancelInvitation.mutate({ invitationId });
-    toast({
-      title: "Success",
-      description: "Invitation cancelled",
-    });
+    toastService.success("Invitation cancelled", "The invitation has been cancelled");
     await loadInvitations();
   } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to cancel invitation",
-      variant: "destructive",
-    });
+    toastService.error("Failed to cancel invitation", error.message || "Could not cancel invitation");
+  }
+};
+
+const resendInvitation = async (invitationId: string) => {
+  resendingInvitation.value = invitationId;
+  try {
+    await Hay.invitations.resendInvitation.mutate({ invitationId });
+    toastService.success("Invitation resent", "The invitation email has been sent again");
+    await loadInvitations();
+  } catch (error: any) {
+    toastService.error("Failed to resend invitation", error.message || "Could not resend invitation");
+  } finally {
+    resendingInvitation.value = null;
   }
 };
 
@@ -336,42 +531,39 @@ const updateMemberRole = async () => {
       role: roleForm.value.role,
     });
 
-    toast({
-      title: "Success",
-      description: "Member role updated successfully",
-    });
+    toastService.success(
+      "Role updated",
+      `${selectedMember.value.email}'s role has been updated to ${roleForm.value.role}`,
+    );
 
     roleDialogOpen.value = false;
     await loadMembers();
   } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to update role",
-      variant: "destructive",
-    });
+    toastService.error("Failed to update role", error.message || "Could not update member role");
   } finally {
     updatingRole.value = false;
   }
 };
 
-const removeMember = async (member: any) => {
-  if (!confirm(`Are you sure you want to remove ${member.email} from the organization?`)) {
-    return;
-  }
+const openRemoveMemberDialog = (member: any) => {
+  memberToRemove.value = member;
+  removeMemberDialogOpen.value = true;
+};
+
+const confirmRemoveMember = async () => {
+  if (!memberToRemove.value) return;
 
   try {
-    await Hay.organizations.removeMember.mutate({ userId: member.userId });
-    toast({
-      title: "Success",
-      description: "Member removed successfully",
-    });
+    await Hay.organizations.removeMember.mutate({ userId: memberToRemove.value.userId });
+    toastService.success(
+      "Member removed",
+      `${memberToRemove.value.email} has been removed from the organization`,
+    );
     await loadMembers();
   } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Failed to remove member",
-      variant: "destructive",
-    });
+    toastService.error("Failed to remove member", error.message || "Could not remove member");
+  } finally {
+    memberToRemove.value = null;
   }
 };
 

@@ -1,6 +1,6 @@
 <template>
-  <MenuButton v-bind="$attrs">
-    <slot />
+  <MenuButton v-bind="$attrs" class="w-full">
+    <slot class="w-full" />
   </MenuButton>
 </template>
 

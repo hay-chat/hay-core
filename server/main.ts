@@ -90,6 +90,24 @@ async function startServer() {
     res.send("Welcome to Hay");
   });
 
+  // Serve uploaded files from local storage
+  const uploadDir = require("path").resolve(config.storage.local.uploadDir);
+  if (!require("fs").existsSync(uploadDir)) {
+    require("fs").mkdirSync(uploadDir, { recursive: true });
+  }
+  server.use(
+    "/uploads",
+    express.static(uploadDir, {
+      maxAge: "7d",
+      etag: true,
+      lastModified: true,
+      setHeaders: (res, filePath) => {
+        // Security headers
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      },
+    }),
+  );
+
   // Plugin thumbnail route - serve thumbnail.jpg files
   server.get("/plugins/thumbnails/:pluginName", (req, res) => {
     pluginAssetService.serveThumbnail(req, res).catch((error) => {

@@ -3,7 +3,7 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="resetToDefaults">
+        <Button variant="outline" @click="openResetDialog">
           <RotateCcw class="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>
@@ -13,6 +13,22 @@
         </Button>
       </div>
     </template>
+
+    <!-- Organization Settings -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Organization</CardTitle>
+        <CardDescription>Manage your organization details</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-6">
+        <Input
+          v-model="settings.organizationName"
+          label="Organization Name"
+          placeholder="Acme Corporation"
+          helper-text="The name of your organization"
+        />
+      </CardContent>
+    </Card>
 
     <!-- Platform Settings -->
     <Card>
@@ -351,18 +367,30 @@
       </CardContent>
     </Card> -->
   </Page>
+
+  <!-- Reset to Defaults Confirmation Dialog -->
+  <ConfirmDialog
+    v-model:open="resetDialogOpen"
+    title="Reset to Defaults"
+    description="Are you sure you want to reset all settings to their default values? This action cannot be undone."
+    confirm-text="Reset"
+    :destructive="true"
+    @confirm="confirmResetToDefaults"
+  />
 </template>
 
 <script setup lang="ts">
 import { Save, RotateCcw } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
 const toast = useToast();
 
 // Import types for proper typing
 type PlatformSettings = {
+  organizationName: string;
   defaultLanguage: string;
   timezone: string;
   dateFormat: string;
@@ -377,7 +405,9 @@ type PlatformSettings = {
 // Reactive state
 const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
 const isSaving = ref(false);
+const resetDialogOpen = ref(false);
 const settings = ref<PlatformSettings>({
+  organizationName: "",
   defaultLanguage: "en",
   timezone: "UTC",
   dateFormat: "MM/DD/YYYY",
@@ -502,17 +532,29 @@ const saveSettings = async () => {
     isSaving.value = true;
     // Save platform settings to API
     const response = await Hay.organizations.updateSettings.mutate({
+      name: settings.value.organizationName,
       defaultLanguage: settings.value.defaultLanguage as any,
       timezone: settings.value.timezone as any,
       dateFormat: settings.value.dateFormat as any,
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
-    });
+    } as any);
 
     if (response.success) {
       // Update original settings to new saved state
       originalSettings.value = JSON.parse(JSON.stringify(settings.value));
+
+      // Update the organization name in the user store if it changed
+      if ((response.data as any).name) {
+        const userStore = useUserStore();
+        const activeOrg = userStore.organizations.find(
+          (org: any) => org.id === userStore.activeOrganizationId,
+        );
+        if (activeOrg) {
+          activeOrg.name = (response.data as any).name;
+        }
+      }
 
       toast.success("Settings saved successfully");
     }
@@ -524,29 +566,33 @@ const saveSettings = async () => {
   }
 };
 
-const resetToDefaults = () => {
-  if (confirm("Are you sure you want to reset all settings to their default values?")) {
-    settings.value = {
-      defaultLanguage: "en",
-      timezone: "UTC",
-      dateFormat: "MM/DD/YYYY",
-      timeFormat: "12h",
-      defaultAgent: "",
-      testModeDefault: false,
-      notifications: {
-        email: {
-          newConversations: true,
-          escalatedConversations: true,
-          performanceAlerts: false,
-          weeklyReports: true,
-        },
-        inApp: {
-          realTimeAlerts: true,
-          systemUpdates: true,
-          featureAnnouncements: true,
-        },
-        quietHours: {
-          start: "22:00",
+const openResetDialog = () => {
+  resetDialogOpen.value = true;
+};
+
+const confirmResetToDefaults = () => {
+  settings.value = {
+    organizationName: originalSettings.value.organizationName,
+    defaultLanguage: "en",
+    timezone: "UTC",
+    dateFormat: "MM/DD/YYYY",
+    timeFormat: "12h",
+    defaultAgent: "",
+    testModeDefault: false,
+    notifications: {
+      email: {
+        newConversations: true,
+        escalatedConversations: true,
+        performanceAlerts: false,
+        weeklyReports: true,
+      },
+      inApp: {
+        realTimeAlerts: true,
+        systemUpdates: true,
+        featureAnnouncements: true,
+      },
+      quietHours: {
+        start: "22:00",
           end: "08:00",
         },
       },
@@ -562,7 +608,8 @@ const resetToDefaults = () => {
         exports: "30",
       },
     };
-  }
+
+  toast.success("Settings reset to defaults");
 };
 
 const testWebhook = async () => {
@@ -593,6 +640,7 @@ onMounted(async () => {
     const orgSettings = await Hay.organizations.getSettings.query();
 
     // Update only platform settings, keep other settings as mock for now
+    settings.value.organizationName = (orgSettings as any).name;
     settings.value.defaultLanguage = orgSettings.defaultLanguage;
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;
