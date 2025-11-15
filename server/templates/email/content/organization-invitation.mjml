@@ -1,0 +1,114 @@
+<!-- Organization Invitation Content -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="20px" font-weight="600" color="#333333" padding="0 0 20px 0">
+      You've Been Invited!
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px"> Hi there, </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      <strong>{{ inviterName }}</strong> ({{ inviterEmail }}) has invited you to join
+      <strong>{{ organizationName }}</strong> on Hay Platform.
+    </mj-text>
+
+    {{#if message}}
+    <mj-text
+      color="#555555"
+      font-style="italic"
+      line-height="24px"
+      padding="10px 0"
+      background-color="#f9f9f9"
+      border-left="3px solid #001bf4"
+      padding-left="15px"
+    >
+      "{{ message }}"
+    </mj-text>
+    {{/if}}
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      You've been invited as a <strong>{{ role }}</strong
+      >.
+    </mj-text>
+
+    <mj-divider border-color="#e0e0e0" border-width="1px" padding="20px 0" />
+
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 15px 0">
+      Accept Your Invitation
+    </mj-text>
+
+    <mj-button
+      background-color="#001bf4"
+      color="#ffffff"
+      font-size="14px"
+      font-weight="600"
+      border-radius="4px"
+      padding="10px 0 20px 0"
+      href="{{acceptInvitationUrl}}"
+    >
+      Accept Invitation
+    </mj-button>
+
+    {{#if isNewUser}}
+    <mj-text color="#666666" font-size="12px" line-height="20px" padding="0 0 10px 0">
+      You'll need to create an account to accept this invitation.
+    </mj-text>
+    {{/if}}
+
+    <mj-text color="#888888" font-size="12px" line-height="20px" padding="10px 0">
+      This invitation will expire on <strong>{{ expiresAt }}</strong
+      >.
+    </mj-text>
+
+    <mj-text color="#888888" font-size="12px" line-height="20px">
+      Not interested? You can
+      <a href="{{declineInvitationUrl}}" style="color: #001bf4; text-decoration: none"
+        >decline this invitation</a
+      >.
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<!-- Role Information -->
+<mj-section background-color="#f9f9f9" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      About Your Role
+    </mj-text>
+
+    {{#if isOwner}}
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      As an <strong>Owner</strong>, you'll have full administrative access to
+      {{ organizationName }}, including the ability to manage members, settings, and billing.
+    </mj-text>
+    {{/if}}
+
+    {{#if isAdmin}}
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      As an <strong>Admin</strong>, you'll have administrative access to {{ organizationName }},
+      including the ability to manage members and most organization settings.
+    </mj-text>
+    {{/if}}
+
+    {{#if isContributor}}
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      As a <strong>Contributor</strong>, you'll be able to create and edit content within
+      {{ organizationName }}.
+    </mj-text>
+    {{/if}}
+
+    {{#if isMember}}
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      As a <strong>Member</strong>, you'll have standard access to {{ organizationName }}'s
+      resources and features.
+    </mj-text>
+    {{/if}}
+
+    {{#if isViewer}}
+    <mj-text color="#666666" font-size="12px" line-height="18px">
+      As a <strong>Viewer</strong>, you'll have read-only access to {{ organizationName }}'s
+      resources.
+    </mj-text>
+    {{/if}}
+  </mj-column>
+</mj-section>

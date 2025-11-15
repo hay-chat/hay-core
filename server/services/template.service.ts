@@ -6,13 +6,11 @@ import type { EmailTemplate, TemplateRenderOptions } from "../types/email.types"
 export class TemplateService {
   private templateCache: Map<string, EmailTemplate> = new Map();
   private templateDir: string;
-  private baseTemplatePath: string;
   private baseMjmlPath: string;
   private contentDir: string;
 
   constructor() {
     this.templateDir = path.join(__dirname, "../templates/email");
-    this.baseTemplatePath = path.join(this.templateDir, "base.template.html");
     this.baseMjmlPath = path.join(this.templateDir, "base.mjml");
     this.contentDir = path.join(this.templateDir, "content");
   }
@@ -29,82 +27,41 @@ export class TemplateService {
   }
 
   /**
-   * Load templates from the templates directory
+   * Auto-discover and load MJML templates from content directory
    */
   private async loadTemplates(): Promise<void> {
     try {
-      const templateConfigPath = path.join(this.templateDir, "templates.json");
-      const configExists = await this.fileExists(templateConfigPath);
-      
-      if (!configExists) {
-        console.warn("Templates configuration not found, skipping template loading");
+      const contentDirExists = await this.fileExists(this.contentDir);
+      if (!contentDirExists) {
+        console.warn("[TemplateService] Content directory not found");
         return;
       }
 
-      const configContent = await fs.readFile(templateConfigPath, "utf-8");
-      const templatesConfig = JSON.parse(configContent);
+      // Read all .mjml files from content directory
+      const files = await fs.readdir(this.contentDir);
+      const mjmlFiles = files.filter(file => file.endsWith(".mjml"));
 
-      for (const templateConfig of templatesConfig.templates) {
-        const template = await this.loadTemplate(templateConfig.id);
+      console.log(`[TemplateService] Loading ${mjmlFiles.length} MJML templates...`);
+
+      for (const file of mjmlFiles) {
+        const templateId = file.replace(".mjml", "");
+        const template = await this.loadMjmlTemplate(templateId);
         if (template) {
-          this.templateCache.set(templateConfig.id, template);
+          this.templateCache.set(templateId, template);
+          console.log(`[TemplateService] ✓ Loaded template: ${templateId}`);
+        } else {
+          console.warn(`[TemplateService] ✗ Failed to load template: ${templateId}`);
         }
       }
+
+      console.log(`[TemplateService] Total templates cached: ${this.templateCache.size}`);
     } catch (error) {
       console.error("Error loading templates:", error);
     }
   }
 
   /**
-   * Load a single template
-   */
-  private async loadTemplate(templateId: string): Promise<EmailTemplate | null> {
-    try {
-      // First check if MJML content template exists
-      const mjmlContentPath = path.join(this.contentDir, `${templateId}.mjml`);
-      const mjmlContentExists = await this.fileExists(mjmlContentPath);
-
-      if (mjmlContentExists) {
-        // Load MJML content template
-        return await this.loadMjmlTemplate(templateId);
-      }
-
-      // Fall back to legacy HTML template
-      const htmlPath = path.join(this.templateDir, `${templateId}.template.html`);
-      const textPath = path.join(this.templateDir, `${templateId}.template.txt`);
-
-      const htmlExists = await this.fileExists(htmlPath);
-      if (!htmlExists) {
-        console.warn(`Template file not found: ${templateId}`);
-        return null;
-      }
-
-      const htmlContent = await fs.readFile(htmlPath, "utf-8");
-      let textContent: string | undefined;
-
-      const textExists = await this.fileExists(textPath);
-      if (textExists) {
-        textContent = await fs.readFile(textPath, "utf-8");
-      }
-
-      const variables = this.extractVariables(htmlContent);
-
-      return {
-        id: templateId,
-        name: templateId.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-        subject: this.extractSubject(htmlContent) || "",
-        htmlContent,
-        textContent,
-        variables,
-      };
-    } catch (error) {
-      console.error(`Error loading template ${templateId}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Load and compile MJML template
+   * Load MJML template
    */
   private async loadMjmlTemplate(templateId: string): Promise<EmailTemplate | null> {
     try {
@@ -122,7 +79,7 @@ export class TemplateService {
         htmlContent: contentMjml, // Store MJML, will compile during render
         textContent: undefined,
         variables,
-        isMjml: true, // Flag to indicate this is MJML
+        isMjml: true,
       };
     } catch (error) {
       console.error(`Error loading MJML template ${templateId}:`, error);
@@ -176,11 +133,16 @@ export class TemplateService {
 
     let template = this.templateCache.get(templateId);
 
-    if (!template && !options.useCache) {
-      const loadedTemplate = await this.loadTemplate(templateId);
+    // If template is not in cache, try to load it
+    if (!template) {
+      console.log(`[TemplateService] Template "${templateId}" not in cache, attempting to load...`);
+      const loadedTemplate = await this.loadMjmlTemplate(templateId);
       if (loadedTemplate) {
         this.templateCache.set(templateId, loadedTemplate);
         template = loadedTemplate;
+        console.log(`[TemplateService] ✓ Successfully loaded template: ${templateId}`);
+      } else {
+        console.error(`[TemplateService] ✗ Failed to load template: ${templateId}`);
       }
     }
 
@@ -188,55 +150,36 @@ export class TemplateService {
       throw new Error(`Template not found: ${templateId}`);
     }
 
-    let html: string;
-    let text: string | undefined;
-
-    // Check if this is an MJML template
-    if ((template as any).isMjml) {
-      // Render MJML template
-      const mjmlContent = template.htmlContent;
-
-      // First replace variables in the MJML content
-      const contentWithVars = this.replaceVariables(mjmlContent, variables);
-
-      // Load base MJML template
-      const baseMjmlExists = await this.fileExists(this.baseMjmlPath);
-      if (!baseMjmlExists) {
-        throw new Error("Base MJML template not found");
-      }
-
-      const baseMjml = await fs.readFile(this.baseMjmlPath, "utf-8");
-
-      // Inject content into base template and replace all variables
-      const fullMjml = baseMjml.replace("{{content}}", contentWithVars);
-      const mjmlWithVars = this.replaceVariables(fullMjml, variables);
-
-      // Compile MJML to HTML
-      const result = mjml2html(mjmlWithVars, {
-        keepComments: false,
-        validationLevel: "soft",
-      });
-
-      if (result.errors.length > 0) {
-        console.warn("MJML compilation warnings:", result.errors);
-      }
-
-      html = result.html;
-      text = this.htmlToText(html);
-    } else {
-      // Legacy HTML template rendering
-      html = this.replaceVariables(template.htmlContent, variables);
-      text = template.textContent
-        ? this.replaceVariables(template.textContent, variables)
-        : this.htmlToText(html);
-
-      // Apply base template if exists
-      const baseExists = await this.fileExists(this.baseTemplatePath);
-      if (baseExists && templateId !== "base") {
-        const baseContent = await fs.readFile(this.baseTemplatePath, "utf-8");
-        html = this.applyBaseTemplate(baseContent, html, variables);
-      }
+    // Load base MJML template first
+    const baseMjmlExists = await this.fileExists(this.baseMjmlPath);
+    if (!baseMjmlExists) {
+      throw new Error("Base MJML template not found");
     }
+
+    const baseMjml = await fs.readFile(this.baseMjmlPath, "utf-8");
+
+    // Render MJML template
+    const mjmlContent = template.htmlContent;
+
+    // Inject content into base template FIRST (before variable replacement)
+    // Handle both {{content}} and {{ content }} (with spaces)
+    const fullMjml = baseMjml.replace(/\{\{\s*content\s*\}\}/g, mjmlContent);
+
+    // Then replace ALL variables in one pass
+    const mjmlWithVars = this.replaceVariables(fullMjml, variables);
+
+    // Compile MJML to HTML
+    const result = mjml2html(mjmlWithVars, {
+      keepComments: false,
+      validationLevel: "soft",
+    });
+
+    if (result.errors.length > 0) {
+      console.warn("MJML compilation warnings:", result.errors);
+    }
+
+    let html = result.html;
+    const text = this.htmlToText(html);
 
     if (options.stripComments) {
       html = this.stripHtmlComments(html);
@@ -254,17 +197,30 @@ export class TemplateService {
    */
   private replaceVariables(content: string, variables: Record<string, any>): string {
     let result = content;
+    const originalLength = content.length;
 
     // Handle conditional blocks
     result = this.processConditionals(result, variables);
+    console.log(`[TemplateService] After conditionals: ${originalLength} -> ${result.length} bytes`);
 
     // Handle loops
     result = this.processLoops(result, variables);
+    console.log(`[TemplateService] After loops: ${result.length} bytes`);
 
     // Replace simple variables
     for (const [key, value] of Object.entries(variables)) {
       const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
+      const matches = result.match(pattern);
+      if (matches) {
+        console.log(`[TemplateService] Replacing ${matches.length} instances of {{${key}}}`);
+      }
       result = result.replace(pattern, this.formatValue(value));
+    }
+
+    // Count remaining unmatched variables before removal
+    const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
+    if (unmatchedVars) {
+      console.log(`[TemplateService] Removing ${unmatchedVars.length} unmatched variables:`, unmatchedVars.slice(0, 5));
     }
 
     // Remove any remaining unmatched variables
@@ -278,13 +234,17 @@ export class TemplateService {
    */
   private processConditionals(content: string, variables: Record<string, any>): string {
     const conditionalPattern = /\{\{#if\s+([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g;
-    
+    let matchCount = 0;
+
     return content.replace(conditionalPattern, (_match, condition, block) => {
+      matchCount++;
       const variable = condition.trim();
       const value = this.getNestedValue(variables, variable);
-      
+
+      console.log(`[TemplateService] Conditional #${matchCount}: {{#if ${variable}}} = ${!!value} (value: ${JSON.stringify(value)?.substring(0, 50)})`);
+
       if (value) {
-        return this.replaceVariables(block, variables);
+        return block; // Don't recursively replace here - will be done in main replaceVariables
       }
       return "";
     });
@@ -337,14 +297,6 @@ export class TemplateService {
       return JSON.stringify(value);
     }
     return String(value);
-  }
-
-  /**
-   * Apply base template
-   */
-  private applyBaseTemplate(baseContent: string, content: string, variables: Record<string, any>): string {
-    const baseWithContent = baseContent.replace("{{content}}", content);
-    return this.replaceVariables(baseWithContent, variables);
   }
 
   /**

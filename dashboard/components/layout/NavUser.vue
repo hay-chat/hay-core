@@ -40,7 +40,7 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width]" align="start" side="top">
-      <DropdownMenuItem class="text-xs text-muted-foreground" disabled>Status</DropdownMenuItem>
+      <DropdownMenuLabel>Status</DropdownMenuLabel>
       <DropdownMenuItem :disabled="currentStatus === 'available'" @click="setStatus('available')">
         <div class="mr-2 h-2 w-2 rounded-full bg-green-500"></div>
         Available

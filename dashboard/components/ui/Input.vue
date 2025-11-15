@@ -1,6 +1,8 @@
 <template>
   <div class="input-wrapper">
-    <Label v-if="label && type !== 'switch'" :for="inputId">{{ label }}</Label>
+    <Label v-if="label && type !== 'switch' && type !== 'checkbox'" :for="inputId">
+      {{ label }}
+    </Label>
 
     <!-- Select Type -->
     <div v-if="type === 'select'" class="select-wrapper">
@@ -31,7 +33,27 @@
         :class="props.class"
         @update:model-value="handleSwitchChange"
       />
-      <Label v-if="label" :for="inputId">{{ label }}</Label>
+      <Label v-if="label || $slots.default" :for="inputId">
+        <slot v-if="$slots.default" />
+        <template v-else>{{ label }}</template>
+      </Label>
+    </div>
+
+    <!-- Checkbox Type -->
+    <div v-else-if="type === 'checkbox'" class="checkbox-wrapper">
+      <Checkbox
+        :id="inputId"
+        :model-value="Boolean(modelValue)"
+        :disabled="disabledAttr"
+        :name="nameAttr"
+        :required="requiredAttr"
+        :class="props.class"
+        @update:model-value="handleCheckboxChange"
+      />
+      <Label v-if="label || $slots.default" :for="inputId">
+        <slot v-if="$slots.default" />
+        <template v-else>{{ label }}</template>
+      </Label>
     </div>
 
     <!-- Regular Input -->
@@ -91,6 +113,7 @@ import SelectValue from "./SelectValue.vue";
 import SelectContent from "./SelectContent.vue";
 import SelectItem from "./SelectItem.vue";
 import Switch from "./Switch.vue";
+import Checkbox from "./Checkbox.vue";
 import Label from "./Label.vue";
 
 export type SelectOption = string | { label: string; value: string | number };
@@ -98,7 +121,7 @@ export type SelectOption = string | { label: string; value: string | number };
 export interface InputProps {
   class?: string;
   modelValue?: string | number | boolean | undefined;
-  type?: "text" | "textarea" | "select" | "password" | "email" | "switch";
+  type?: "text" | "textarea" | "select" | "password" | "email" | "switch" | "checkbox";
   label?: string;
   hint?: string;
   error?: string;
@@ -171,6 +194,11 @@ const selectValue = computed({
 
 // Switch handler
 const handleSwitchChange = (value: boolean) => {
+  emit("update:modelValue", value);
+};
+
+// Checkbox handler
+const handleCheckboxChange = (value: boolean) => {
   emit("update:modelValue", value);
 };
 
@@ -301,6 +329,20 @@ onMounted(() => {
     opacity: 0.5;
   }
 
+  &:read-only {
+    background-color: #f5f5f5;
+    cursor: default;
+
+    &:hover {
+      border-color: var(--color-input);
+    }
+
+    &:focus-visible {
+      box-shadow: none;
+      border-color: var(--color-input);
+    }
+  }
+
   &.has-error {
     border-color: var(--color-destructive);
 
@@ -359,6 +401,12 @@ onMounted(() => {
 }
 
 .switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-wrapper {
   display: flex;
   align-items: center;
   gap: 0.5rem;

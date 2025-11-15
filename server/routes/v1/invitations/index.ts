@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure, publicProcedure, scopedProcedure } from "@server/trpc";
+import { t, publicProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
@@ -7,6 +7,10 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { emailService } from "@server/services/email.service";
+import { getDashboardUrl } from "@server/config/env";
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
+import { auditLogService } from "@server/services/audit-log.service";
 import * as crypto from "crypto";
 
 /**
@@ -24,30 +28,64 @@ function hashToken(token: string): string {
 }
 
 /**
- * Send invitation email (placeholder - implement actual email sending)
+ * Send invitation email using the email service
  */
 async function sendInvitationEmail(
   email: string,
   organizationName: string,
   inviterName: string,
+  inviterEmail: string,
+  role: string,
   token: string,
+  expiresAt: Date,
+  isNewUser: boolean,
   message?: string,
 ): Promise<void> {
-  // TODO: Implement actual email sending using your email service
-  console.log(`[Invitation] Sending invitation to ${email}`);
-  console.log(`Organization: ${organizationName}`);
-  console.log(`Invited by: ${inviterName}`);
-  console.log(`Token: ${token}`);
-  console.log(`Message: ${message || "No message"}`);
-  console.log(`Accept URL: ${process.env.APP_URL}/accept-invitation?token=${token}`);
+  const dashboardUrl = getDashboardUrl();
+  const acceptUrl = `${dashboardUrl}/accept-invitation?token=${token}`;
+  const declineUrl = `${dashboardUrl}/decline-invitation?token=${token}`;
+
+  // Format expiration date
+  const expiresAtFormatted = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(expiresAt));
+
+  // Ensure email service is initialized
+  await emailService.initialize();
+
+  await emailService.sendTemplateEmail({
+    template: "organization-invitation",
+    to: email,
+    subject: `You've been invited to join ${organizationName}`,
+    variables: {
+      organizationName,
+      inviterName,
+      inviterEmail,
+      role,
+      message,
+      isOwner: role === "owner",
+      isAdmin: role === "admin",
+      isContributor: role === "contributor",
+      isMember: role === "member",
+      isViewer: role === "viewer",
+      acceptInvitationUrl: acceptUrl,
+      declineInvitationUrl: declineUrl,
+      expiresAt: expiresAtFormatted,
+      isNewUser,
+      invitedUserEmail: email,
+    },
+  });
 }
 
 export const invitationsRouter = t.router({
   /**
    * Send an invitation to join an organization
    * Requires: organization_invitations:invite scope (typically admin/owner only)
+   * Rate limited to 10 invitations per hour per user
    */
   sendInvitation: scopedProcedure(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.INVITE)
+    .use(rateLimitMiddleware(RateLimits.INVITATIONS))
     .input(
       z.object({
         email: z.string().email(),
@@ -140,13 +178,33 @@ export const invitationsRouter = t.router({
       await invitationRepository.save(invitation);
 
       // Send invitation email
-      const inviterName = ctx.user?.getUser().getFullName() || "Someone";
+      const inviter = ctx.user?.getUser();
+      const inviterName = inviter?.getFullName() || "Someone";
+      const inviterEmail = inviter?.email || "";
+
       await sendInvitationEmail(
         input.email,
         organization.name,
         inviterName,
+        inviterEmail,
+        input.role,
         token,
+        invitation.expiresAt,
+        !existingUser, // isNewUser: true if user doesn't exist yet
         input.message,
+      );
+
+      // Log audit event
+      await auditLogService.logInvitationSend(
+        ctx.user!.id,
+        ctx.organizationId!,
+        input.email,
+        input.role,
+        {
+          invitationId: invitation.id,
+          message: input.message,
+          isNewUser: !existingUser,
+        },
       );
 
       return {
@@ -169,9 +227,7 @@ export const invitationsRouter = t.router({
     .input(
       z
         .object({
-          status: z
-            .enum(["pending", "accepted", "declined", "expired", "cancelled"])
-            .optional(),
+          status: z.enum(["pending", "accepted", "declined", "expired", "cancelled"]).optional(),
         })
         .optional(),
     )
@@ -258,6 +314,17 @@ export const invitationsRouter = t.router({
       invitation.cancel();
       await invitationRepository.save(invitation);
 
+      // Log audit event
+      await auditLogService.logInvitationCancel(
+        ctx.user!.id,
+        ctx.organizationId!,
+        invitation.email,
+        {
+          invitationId: invitation.id,
+          role: invitation.role,
+        },
+      );
+
       return {
         success: true,
         message: "Invitation cancelled successfully",
@@ -304,9 +371,9 @@ export const invitationsRouter = t.router({
         // User is already authenticated
         userId = ctx.user.id;
 
-        // Verify email matches
+        // Verify email matches (case-insensitive)
         const user = await userRepository.findOne({ where: { id: userId } });
-        if (!user || user.email !== invitation.email) {
+        if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Invitation email does not match your account",
@@ -359,6 +426,17 @@ export const invitationsRouter = t.router({
       invitation.accept();
       await invitationRepository.save(invitation);
 
+      // Log audit event
+      await auditLogService.logInvitationAccept(
+        userId,
+        invitation.organizationId,
+        invitation.role,
+        {
+          invitationId: invitation.id,
+          organizationName: invitation.organization.name,
+        },
+      );
+
       return {
         success: true,
         message: "Invitation accepted successfully",
@@ -392,6 +470,14 @@ export const invitationsRouter = t.router({
 
       invitation.decline();
       await invitationRepository.save(invitation);
+
+      // Log audit event (if user is authenticated)
+      if (ctx.user) {
+        await auditLogService.logInvitationDecline(ctx.user.id, invitation.organizationId, {
+          invitationId: invitation.id,
+          email: invitation.email,
+        });
+      }
 
       return {
         success: true,
@@ -446,6 +532,153 @@ export const invitationsRouter = t.router({
             }
           : null,
         canAccept: invitation.canAccept(),
+        isExistingUser: invitation.invitedUserId !== null,
+      };
+    }),
+
+  /**
+   * Resend an invitation email
+   * Requires: organization_invitations:invite scope
+   * Rate limited to 3 resends per invitation per day
+   */
+  resendInvitation: scopedProcedure(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.INVITE)
+    .input(z.object({ invitationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID required",
+        });
+      }
+
+      const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
+      const orgRepository = AppDataSource.getRepository(Organization);
+
+      // Find the invitation
+      const invitation = await invitationRepository.findOne({
+        where: {
+          id: input.invitationId,
+          organizationId: ctx.organizationId,
+        },
+        relations: ["organization"],
+      });
+
+      if (!invitation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invitation not found",
+        });
+      }
+
+      // Check if invitation is pending
+      if (invitation.status !== "pending") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Cannot resend ${invitation.status} invitation`,
+        });
+      }
+
+      // Check if invitation has expired
+      if (invitation.isExpired()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot resend expired invitation",
+        });
+      }
+
+      // Check rate limit manually using Redis
+      const redisService = require("@server/services/redis.service").redisService;
+      const redis = redisService.getClient();
+
+      if (redis) {
+        const rateLimitKey = `ratelimit:invitation_resend:invitations.resendInvitation:${input.invitationId}`;
+        const now = Date.now();
+        const windowMs = 24 * 60 * 60 * 1000; // 24 hours
+        const windowStart = now - windowMs;
+        const maxResends = 3;
+
+        // Remove old entries
+        await redis.zremrangebyscore(rateLimitKey, 0, windowStart);
+
+        // Count resends in the current window
+        const resendCount = await redis.zcard(rateLimitKey);
+
+        if (resendCount >= maxResends) {
+          const oldestRequests = await redis.zrange(rateLimitKey, 0, 0, "WITHSCORES");
+          const oldestTimestamp = oldestRequests[1] ? parseInt(oldestRequests[1]) : now;
+          const retryAfter = Math.ceil((oldestTimestamp + windowMs - now) / 1000);
+
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `Maximum ${maxResends} resends per invitation per day. Try again in ${Math.ceil(retryAfter / 3600)} hours.`,
+          });
+        }
+
+        // Record this resend
+        const requestId = `${now}-${Math.random().toString(36).substring(7)}`;
+        await redis.zadd(rateLimitKey, now, requestId);
+        await redis.expire(rateLimitKey, Math.ceil(windowMs / 1000));
+      }
+
+      // Generate new token and update invitation
+      const token = generateInvitationToken();
+      const tokenHash = hashToken(token);
+
+      invitation.tokenHash = tokenHash;
+      invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await invitationRepository.save(invitation);
+
+      // Get organization details
+      const organization =
+        invitation.organization ||
+        (await orgRepository.findOne({
+          where: { id: ctx.organizationId },
+        }));
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      // Send invitation email
+      const inviter = ctx.user?.getUser();
+      const inviterName = inviter?.getFullName() || "Someone";
+      const inviterEmail = inviter?.email || "";
+
+      await sendInvitationEmail(
+        invitation.email,
+        organization.name,
+        inviterName,
+        inviterEmail,
+        invitation.role,
+        token,
+        invitation.expiresAt,
+        !invitation.invitedUserId, // isNewUser: true if invitedUserId is null
+        invitation.message,
+      );
+
+      // Log audit event
+      await auditLogService.logInvitationResend(
+        ctx.user!.id,
+        ctx.organizationId!,
+        invitation.email,
+        {
+          invitationId: invitation.id,
+          role: invitation.role,
+          newExpiresAt: invitation.expiresAt,
+        },
+      );
+
+      return {
+        success: true,
+        message: "Invitation resent successfully",
+        data: {
+          id: invitation.id,
+          email: invitation.email,
+          expiresAt: invitation.expiresAt,
+        },
       };
     }),
 });

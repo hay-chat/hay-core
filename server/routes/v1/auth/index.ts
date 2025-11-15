@@ -184,23 +184,23 @@ export const authRouter = t.router({
 
       // Create organization if name provided
       if (organizationName) {
-        const orgSlug =
-          organizationSlug ||
-          organizationName
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)+/g, "");
+        // Use organizationService to generate a unique slug
+        const { organizationService } = await import("@server/services/organization.service");
 
-        // Check if slug already exists
-        const existingOrg = await organizationRepository.findOne({
-          where: { slug: orgSlug },
-        });
-
-        if (existingOrg) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "Organization slug already exists",
-          });
+        let orgSlug: string;
+        if (organizationSlug) {
+          // User provided a custom slug, check if it's available
+          const existingOrg = await organizationService.findBySlug(organizationSlug);
+          if (existingOrg) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Organization slug already exists",
+            });
+          }
+          orgSlug = organizationSlug;
+        } else {
+          // Generate a unique slug automatically
+          orgSlug = await organizationService.generateUniqueSlug(organizationName);
         }
 
         organization = organizationRepository.create({
@@ -302,7 +302,33 @@ export const authRouter = t.router({
   }),
 
   // Protected endpoints
-  me: protectedProcedure.query(async ({ ctx }) => {
+  me: protectedProcedure
+    .output(z.object({
+      id: z.string(),
+      email: z.string(),
+      pendingEmail: z.string().optional(),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      isActive: z.boolean(),
+      lastLoginAt: z.date().nullable().optional(),
+      lastSeenAt: z.date().nullable().optional(),
+      status: z.enum(["available", "away"]).optional(),
+      onlineStatus: z.enum(["online", "away", "offline"]),
+      authMethod: z.string(),
+      organizations: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        logo: z.string().nullable().optional(),
+        role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+        permissions: z.array(z.string()).optional(),
+        joinedAt: z.date().optional(),
+        lastAccessedAt: z.date().nullable().optional(),
+      })),
+      activeOrganizationId: z.string().optional(),
+      role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+    }))
+    .query(async ({ ctx }) => {
     const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
 
     // Fetch user with organization data

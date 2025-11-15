@@ -21,7 +21,16 @@ export type AuditAction =
   | "user.register"
   | "apikey.create"
   | "apikey.revoke"
-  | "security.setting.change";
+  | "security.setting.change"
+  | "organization.create"
+  | "organization.invitation.send"
+  | "organization.invitation.accept"
+  | "organization.invitation.decline"
+  | "organization.invitation.cancel"
+  | "organization.invitation.resend"
+  | "organization.member.role_change"
+  | "organization.member.remove"
+  | "organization.switch";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
