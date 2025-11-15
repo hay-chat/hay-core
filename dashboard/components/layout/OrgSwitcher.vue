@@ -6,6 +6,17 @@
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <div
+          v-if="userStore.activeOrganization.logo"
+          class="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden"
+        >
+          <img
+            :src="userStore.activeOrganization.logo"
+            :alt="userStore.activeOrganization.name"
+            class="h-full w-full object-cover"
+          />
+        </div>
+        <div
+          v-else
           class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
         >
           <Building2 class="size-4" />
@@ -40,6 +51,17 @@
         @click="switchOrganization(organization.id)"
       >
         <div
+          v-if="organization.logo"
+          class="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden"
+        >
+          <img
+            :src="organization.logo"
+            :alt="organization.name"
+            class="h-full w-full object-cover"
+          />
+        </div>
+        <div
+          v-else
           class="flex aspect-square size-8 items-center justify-center rounded-lg bg-background-tertiary"
         >
           {{ organization.name.charAt(0) }}

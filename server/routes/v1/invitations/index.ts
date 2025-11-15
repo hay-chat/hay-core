@@ -11,6 +11,7 @@ import { emailService } from "@server/services/email.service";
 import { getDashboardUrl } from "@server/config/env";
 import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { auditLogService } from "@server/services/audit-log.service";
+import { StorageService } from "@server/services/storage.service";
 import * as crypto from "crypto";
 
 /**
@@ -497,7 +498,7 @@ export const invitationsRouter = t.router({
 
       const invitation = await invitationRepository.findOne({
         where: { tokenHash },
-        relations: ["organization", "invitedByUser"],
+        relations: ["organization", "organization.logoUpload", "invitedByUser"],
       });
 
       if (!invitation) {
@@ -523,7 +524,9 @@ export const invitationsRouter = t.router({
         organization: {
           id: invitation.organization.id,
           name: invitation.organization.name,
-          logo: invitation.organization.logo,
+          logo: invitation.organization.logoUpload
+            ? new StorageService().getPublicUrl(invitation.organization.logoUpload)
+            : null,
         },
         invitedBy: invitation.invitedByUser
           ? {

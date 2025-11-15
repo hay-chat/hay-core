@@ -561,13 +561,6 @@ export const organizationsRouter = t.router({
         logoUploadId: result.upload.id,
       });
 
-      // Log audit event
-      await auditLogService.logOrganizationSettingsUpdate(
-        ctx.user!.id,
-        ctx.organizationId!,
-        { logoUploadId: result.upload.id },
-      );
-
       // 5. Return URL for immediate display
       return {
         success: true,
@@ -591,15 +584,8 @@ export const organizationsRouter = t.router({
         await storageService.delete(org.logoUploadId);
 
         await organizationService.update(ctx.organizationId!, {
-          logoUploadId: null,
+          logoUploadId: undefined,
         });
-
-        // Log audit event
-        await auditLogService.logOrganizationSettingsUpdate(
-          ctx.user!.id,
-          ctx.organizationId!,
-          { logoUploadId: null },
-        );
       }
 
       return {
