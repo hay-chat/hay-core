@@ -350,8 +350,11 @@ export const authRouter = t.router({
 
     // Get role for active organization or fall back to user role
     let role = user.role;
-    if (ctx.user!.userOrganization) {
-      role = ctx.user!.userOrganization.role;
+    if (activeOrganizationId && organizations.length > 0) {
+      const activeOrg = organizations.find(org => org.id === activeOrganizationId);
+      if (activeOrg) {
+        role = activeOrg.role;
+      }
     }
 
     return {
