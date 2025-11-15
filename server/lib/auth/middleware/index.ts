@@ -73,6 +73,7 @@ async function enhanceWithOrgContext(
     apiKeyId: baseAuthUser.apiKeyId,
     scopes: baseAuthUser.scopes,
     organizationId,
+    userOrganization: userOrg,
   });
 }
 
