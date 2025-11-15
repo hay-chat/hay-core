@@ -332,7 +332,7 @@ interface AgentData {
   lastActivity: Date;
   createdAt: Date;
   enabled: boolean;
-  instructions?: string | null;
+  instructions?: unknown[] | string | null;
 }
 
 interface AgentApiResponse {
@@ -340,7 +340,7 @@ interface AgentApiResponse {
   name: string;
   description?: string | null;
   enabled: boolean;
-  instructions?: string | null;
+  instructions?: unknown[] | string | null;
   created_at: string;
   updated_at: string;
 }

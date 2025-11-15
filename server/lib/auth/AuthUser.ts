@@ -1,9 +1,11 @@
 import { User } from "@server/entities/user.entity";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { ApiKeyScope } from "@server/types/auth.types";
 
 /**
  * AuthUser class represents an authenticated user in the tRPC context
  * This class wraps the User entity and adds authentication-specific methods
+ * Supports multi-organization with org-scoped roles and permissions
  */
 export class AuthUser {
   public readonly id: string;
@@ -16,7 +18,10 @@ export class AuthUser {
   public readonly sessionId?: string;
   public readonly apiKeyId?: string;
   public readonly scopes?: ApiKeyScope[];
+
+  // Organization context
   public readonly organizationId?: string;
+  public readonly userOrganization?: UserOrganization;
 
   private readonly _user: User;
 
@@ -28,6 +33,7 @@ export class AuthUser {
       apiKeyId?: string;
       scopes?: ApiKeyScope[];
       organizationId?: string;
+      userOrganization?: UserOrganization;
     },
   ) {
     this._user = user;
@@ -41,27 +47,36 @@ export class AuthUser {
     this.apiKeyId = metadata?.apiKeyId;
     this.scopes = metadata?.scopes;
     this.organizationId = metadata?.organizationId;
+    this.userOrganization = metadata?.userOrganization;
   }
 
   /**
-   * Check if the user has a specific scope for API key authentication
+   * Check if the user has a specific scope
+   * For API key auth: checks API key scopes
+   * For JWT/Basic auth with org context: checks organization-scoped role
+   * For JWT/Basic auth without org context: falls back to user role
    */
   hasScope(resource: string, action: string): boolean {
-    // For JWT and Basic auth, users have full access
-    if (this.authMethod !== "apikey") {
-      return true;
+    // For API key auth, check the API key scopes
+    if (this.authMethod === "apikey") {
+      if (!this.scopes || this.scopes.length === 0) {
+        return true; // No scopes means full access
+      }
+
+      return this.scopes.some(
+        (scope) =>
+          (scope.resource === resource || scope.resource === "*") &&
+          (scope.actions.includes(action) || scope.actions.includes("*")),
+      );
     }
 
-    // For API key auth, check the scopes
-    if (!this.scopes || this.scopes.length === 0) {
-      return true; // No scopes means full access
+    // For JWT/Basic auth with organization context, use UserOrganization permissions
+    if (this.userOrganization) {
+      return this.userOrganization.hasScope(resource, action);
     }
 
-    return this.scopes.some(
-      (scope) =>
-        (scope.resource === resource || scope.resource === "*") &&
-        (scope.actions.includes(action) || scope.actions.includes("*")),
-    );
+    // Fallback to user-level permissions (legacy support)
+    return this._user.hasScope(resource, action);
   }
 
   /**
@@ -72,16 +87,32 @@ export class AuthUser {
       return false;
     }
 
+    // If we have organization context, check if user is active in that org
+    if (this.userOrganization && !this.userOrganization.isActive) {
+      return false;
+    }
+
     return this.hasScope(resource, action);
   }
 
   /**
-   * Check if the user can perform administrative actions
+   * Get the user's role in the current organization
+   * Note: Use scope checks (hasScope) for permission validation, not role checks
    */
-  isAdmin(): boolean {
-    // For now, only JWT and Basic auth users can be admins
-    // API key users cannot have admin privileges
-    return this.authMethod !== "apikey" && this.isActive;
+  getRole(): "owner" | "admin" | "member" | "viewer" | "contributor" | undefined {
+    if (this.userOrganization) {
+      return this.userOrganization.role;
+    }
+
+    // Fallback to user-level role (legacy support)
+    return this._user.role;
+  }
+
+  /**
+   * Check if user belongs to the specified organization
+   */
+  belongsToOrganization(organizationId: string): boolean {
+    return this.organizationId === organizationId;
   }
 
   /**
@@ -94,7 +125,10 @@ export class AuthUser {
   /**
    * Convert to JSON-safe object (removes sensitive data)
    */
-  toJSON(): Omit<AuthUser, "_user" | "getUser"> {
+  toJSON(): Omit<AuthUser, "_user" | "getUser" | "userOrganization"> & {
+    role?: string;
+    organizationId?: string;
+  } {
     return {
       id: this.id,
       email: this.email,
@@ -105,9 +139,11 @@ export class AuthUser {
       apiKeyId: this.apiKeyId,
       scopes: this.scopes,
       organizationId: this.organizationId,
+      role: this.getRole(),
       hasScope: this.hasScope.bind(this),
       canAccess: this.canAccess.bind(this),
-      isAdmin: this.isAdmin.bind(this),
+      getRole: this.getRole.bind(this),
+      belongsToOrganization: this.belongsToOrganization.bind(this),
       toJSON: this.toJSON.bind(this),
     };
   }
