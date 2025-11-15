@@ -165,6 +165,7 @@ async function startServer() {
   const dynamicRouter = createV1Router();
 
   // Add tRPC middleware with context
+  // @ts-ignore - Express type definition mismatch between root and server node_modules
   server.use(
     "/v1",
     createExpressMiddleware({

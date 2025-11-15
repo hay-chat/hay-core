@@ -21,6 +21,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
+import { StorageService } from "@server/services/storage.service";
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -29,15 +30,19 @@ async function getUserOrganizations(userId: string) {
   const userOrgRepository = AppDataSource.getRepository(UserOrganization);
   const userOrganizations = await userOrgRepository.find({
     where: { userId, isActive: true },
-    relations: ["organization"],
+    relations: ["organization", "organization.logoUpload"],
     order: { createdAt: "ASC" },
   });
+
+  const storageService = new StorageService();
 
   return userOrganizations.map((userOrg) => ({
     id: userOrg.organization.id,
     name: userOrg.organization.name,
     slug: userOrg.organization.slug,
-    logo: userOrg.organization.logo,
+    logo: userOrg.organization.logoUpload
+      ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+      : null,
     role: userOrg.role,
     permissions: userOrg.permissions,
     joinedAt: userOrg.joinedAt,

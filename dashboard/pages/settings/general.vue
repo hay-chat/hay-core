@@ -27,6 +27,49 @@
           placeholder="Acme Corporation"
           helper-text="The name of your organization"
         />
+
+        <!-- Organization Logo -->
+        <div>
+          <label class="text-sm font-medium mb-2 block">Logo</label>
+          <div class="space-y-4">
+            <!-- Logo Preview -->
+            <div
+              v-if="logoUpload.preview.value || organizationLogo"
+              class="flex items-start gap-4"
+            >
+              <img
+                :src="logoUpload.preview.value || organizationLogo || ''"
+                alt="Organization logo"
+                class="h-24 w-24 rounded-lg border object-cover"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="logoUpload.isUploading.value"
+                @click="removeLogo"
+              >
+                <Trash2 class="h-4 w-4 mr-2" />
+                Remove Logo
+              </Button>
+            </div>
+
+            <!-- File Input -->
+            <div class="space-y-2">
+              <Input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                @change="logoUpload.selectFile"
+                :disabled="logoUpload.isUploading.value"
+              />
+              <p class="text-sm text-muted-foreground">
+                Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)
+              </p>
+              <p v-if="logoUpload.error.value" class="text-sm text-destructive">
+                {{ logoUpload.error.value }}
+              </p>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
 
@@ -380,13 +423,22 @@
 </template>
 
 <script setup lang="ts">
-import { Save, RotateCcw } from "lucide-vue-next";
+import { Save, RotateCcw, Trash2 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
+import { useFileUpload } from "@/composables/useFileUpload";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
 const toast = useToast();
+
+// Logo upload
+const logoUpload = useFileUpload({
+  accept: "image/*",
+  maxSizeMB: 2,
+});
+
+const organizationLogo = ref<string | null>(null);
 
 // Import types for proper typing
 type PlatformSettings = {
@@ -458,7 +510,10 @@ const webhookEvents = [
 
 // Computed properties
 const hasChanges = computed(() => {
-  return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
+  return (
+    JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value) ||
+    logoUpload.preview.value !== null
+  );
 });
 
 const timezoneOptions = computed(() => {
@@ -530,6 +585,19 @@ const toggleWebhookEvent = (eventId: string) => {
 const saveSettings = async () => {
   try {
     isSaving.value = true;
+
+    // Upload logo if changed
+    if (logoUpload.preview.value) {
+      logoUpload.isUploading.value = true;
+      const base64 = await logoUpload.getBase64();
+      if (base64) {
+        await Hay.organizations.uploadLogo.mutate({
+          logo: base64,
+        });
+        logoUpload.reset();
+      }
+    }
+
     // Save platform settings to API
     const response = await Hay.organizations.updateSettings.mutate({
       name: settings.value.organizationName,
@@ -557,12 +625,16 @@ const saveSettings = async () => {
       }
 
       toast.success("Settings saved successfully");
+
+      // Reload organization settings to get updated logo URL
+      await loadOrganizationSettings();
     }
   } catch (error) {
     console.error("Failed to save settings:", error);
     toast.error("Failed to save settings. Please try again.");
   } finally {
     isSaving.value = false;
+    logoUpload.isUploading.value = false;
   }
 };
 
@@ -629,6 +701,27 @@ const viewWebhookLogs = () => {
   console.log("View webhook logs");
 };
 
+const removeLogo = async () => {
+  try {
+    await Hay.organizations.deleteLogo.mutate();
+    toast.success("Logo removed successfully");
+    logoUpload.reset();
+    await loadOrganizationSettings();
+  } catch (error) {
+    console.error("Failed to remove logo:", error);
+    toast.error("Failed to remove logo. Please try again.");
+  }
+};
+
+const loadOrganizationSettings = async () => {
+  try {
+    const orgSettings = await Hay.organizations.getSettings.query();
+    organizationLogo.value = (orgSettings as any).logoUrl || null;
+  } catch (error) {
+    console.error("Failed to load organization logo:", error);
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
   try {
@@ -650,6 +743,9 @@ onMounted(async () => {
       "testModeDefault" in orgSettings
         ? ((orgSettings as Record<string, unknown>).testModeDefault as boolean)
         : false;
+
+    // Load organization logo
+    organizationLogo.value = (orgSettings as any).logoUrl || null;
 
     // Store original settings for change detection
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));

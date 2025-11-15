@@ -1,5 +1,5 @@
 import mime from "mime-types";
-import { StorageService, UploadResult } from "../services/storage.service";
+import { StorageService, type UploadResult } from "../services/storage.service";
 
 export interface ParsedUpload {
   buffer: Buffer;

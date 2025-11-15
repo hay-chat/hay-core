@@ -24,17 +24,19 @@
     "@plugins": "../plugins"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0"
+    "@aws-sdk/client-s3": "^3.932.0",
+    "@aws-sdk/lib-storage": "^3.932.0",
+    "@types/jest": "^30.0.0",
+    "@types/mime-types": "^3.0.1"
   },
   "dependencies": {
-    "tsconfig-paths": "^4.2.0",
     "@stripe/stripe-js": "^7.9.0",
     "@types/bcrypt": "^5.0.2",
-    "@types/mjml": "^4.7.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/ioredis": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/mjml": "^4.7.4",
     "@types/node": "^24.3.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
@@ -49,6 +51,7 @@
     "mjml": "^4.16.1",
     "module-alias": "^2.2.3",
     "stripe": "^18.5.0",
+    "tsconfig-paths": "^4.2.0",
     "word-extractor": "^1.0.4",
     "xml2js": "^0.6.2"
   }

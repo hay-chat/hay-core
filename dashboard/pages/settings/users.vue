@@ -1,7 +1,7 @@
 <template>
   <Page
-    title="Organization Settings"
-    description="Manage your organization members and settings"
+    title="Team Members"
+    description="Manage who has access to your organization"
     width="max"
   >
     <!-- Organization Members -->
@@ -11,7 +11,8 @@
           <div>
             <CardTitle>Team Members</CardTitle>
             <CardDescription
-              >Manage who has access to {{ userStore.activeOrganization?.name }}</CardDescription
+              >Manage who has access to
+              {{ userStore.activeOrganization?.name }}</CardDescription
             >
           </div>
           <Button v-if="userStore.isAdmin" @click="inviteDialogOpen = true">
@@ -20,136 +21,136 @@
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <!-- Search and Filter Bar -->
-        <div class="flex gap-3 mb-4">
-          <Input
-            v-model="searchQuery"
-            type="text"
-            :icon-start="Search"
-            placeholder="Search members by name or email..."
-            class="flex-1"
-            @input="debouncedSearch"
-          />
+          <CardContent>
+            <!-- Search and Filter Bar -->
+            <div class="flex gap-3 mb-4">
+              <Input
+                v-model="searchQuery"
+                type="text"
+                :icon-start="Search"
+                placeholder="Search members by name or email..."
+                class="flex-1"
+                @input="debouncedSearch"
+              />
 
-          <Input
-            v-model="roleFilter"
-            type="select"
-            class="w-[180px]"
-            placeholder="All Roles"
-            :options="[
-              { label: 'All Roles', value: '' },
-              { label: 'Owner', value: 'owner' },
-              { label: 'Admin', value: 'admin' },
-              { label: 'Contributor', value: 'contributor' },
-              { label: 'Member', value: 'member' },
-              { label: 'Viewer', value: 'viewer' },
-            ]"
-            @update:model-value="loadMembers(true)"
-          />
-        </div>
+              <Input
+                v-model="roleFilter"
+                type="select"
+                class="w-[180px]"
+                placeholder="All Roles"
+                :options="[
+                  { label: 'All Roles', value: '' },
+                  { label: 'Owner', value: 'owner' },
+                  { label: 'Admin', value: 'admin' },
+                  { label: 'Contributor', value: 'contributor' },
+                  { label: 'Member', value: 'member' },
+                  { label: 'Viewer', value: 'viewer' },
+                ]"
+                @update:model-value="loadMembers(true)"
+              />
+            </div>
 
-        <div v-if="loading" class="py-8">
-          <Loading />
-        </div>
+            <div v-if="loading" class="py-8">
+              <Loading />
+            </div>
 
-        <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
-          {{
-            searchQuery || roleFilter
-              ? "No members found matching your filters"
-              : "No members found"
-          }}
-        </div>
+            <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
+              {{
+                searchQuery || roleFilter
+                  ? "No members found matching your filters"
+                  : "No members found"
+              }}
+            </div>
 
-        <div v-else class="space-y-2">
-          <div
-            v-for="member in members"
-            :key="member.id"
-            class="flex items-center justify-between p-4 rounded-lg border"
-          >
-            <div class="flex items-center gap-3">
+            <div v-else class="space-y-2">
               <div
-                class="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700"
+                v-for="member in members"
+                :key="member.id"
+                class="flex items-center justify-between p-4 rounded-lg border"
               >
-                <User class="h-5 w-5" />
-              </div>
-              <div>
-                <p class="font-medium">
-                  {{
-                    member.firstName || member.lastName
-                      ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
-                      : member.email
-                  }}
-                </p>
-                <p class="text-sm text-muted-foreground">{{ member.email }}</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <Badge variant="secondary" class="capitalize">{{ member.role }}</Badge>
-              <DropdownMenu v-if="userStore.isOwner && member.userId !== userStore.user?.id">
-                <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical class="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="openRoleDialog(member)">
-                    <Shield class="h-4 w-4 mr-2" />
-                    Change Role
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    class="text-destructive"
-                    @click="openRemoveMemberDialog(member)"
+                <div class="flex items-center gap-3">
+                  <div
+                    class="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700"
                   >
-                    <Trash2 class="h-4 w-4 mr-2" />
-                    Remove Member
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <User class="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p class="font-medium">
+                      {{
+                        member.firstName || member.lastName
+                          ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
+                          : member.email
+                      }}
+                    </p>
+                    <p class="text-sm text-muted-foreground">{{ member.email }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Badge variant="secondary" class="capitalize">{{ member.role }}</Badge>
+                  <DropdownMenu v-if="userStore.isOwner && member.userId !== userStore.user?.id">
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem @click="openRoleDialog(member)">
+                        <Shield class="h-4 w-4 mr-2" />
+                        Change Role
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        class="text-destructive"
+                        @click="openRemoveMemberDialog(member)"
+                      >
+                        <Trash2 class="h-4 w-4 mr-2" />
+                        Remove Member
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Pagination Controls -->
-        <div
-          v-if="!loading && totalPages > 1"
-          class="flex items-center justify-between mt-4 pt-4 border-t"
-        >
-          <div class="text-sm text-muted-foreground">
-            Showing {{ (currentPage - 1) * pageSize + 1 }} to
-            {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} members
-          </div>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
-              <ChevronLeft class="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-
-            <div class="flex items-center gap-1">
-              <Button
-                v-for="page in getPaginationPages()"
-                :key="page"
-                :variant="page === currentPage ? 'default' : 'outline'"
-                size="sm"
-                class="min-w-[40px]"
-                @click="goToPage(page)"
-              >
-                {{ page }}
-              </Button>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              :disabled="currentPage === totalPages"
-              @click="nextPage"
+            <!-- Pagination Controls -->
+            <div
+              v-if="!loading && totalPages > 1"
+              class="flex items-center justify-between mt-4 pt-4 border-t"
             >
-              Next
-              <ChevronRight class="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+              <div class="text-sm text-muted-foreground">
+                Showing {{ (currentPage - 1) * pageSize + 1 }} to
+                {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} members
+              </div>
+              <div class="flex items-center gap-2">
+                <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
+                  <ChevronLeft class="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+
+                <div class="flex items-center gap-1">
+                  <Button
+                    v-for="page in getPaginationPages()"
+                    :key="page"
+                    :variant="page === currentPage ? 'default' : 'outline'"
+                    size="sm"
+                    class="min-w-[40px]"
+                    @click="goToPage(page)"
+                  >
+                    {{ page }}
+                  </Button>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="currentPage === totalPages"
+                  @click="nextPage"
+                >
+                  Next
+                  <ChevronRight class="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
       </CardContent>
     </Card>
 
@@ -306,12 +307,9 @@ import {
   MoreVertical,
   Shield,
   Trash2,
-  X,
-  Loader2,
   Search,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
 } from "lucide-vue-next";
 import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
@@ -498,7 +496,10 @@ const cancelInvitation = async (invitationId: string) => {
     toastService.success("Invitation cancelled", "The invitation has been cancelled");
     await loadInvitations();
   } catch (error: any) {
-    toastService.error("Failed to cancel invitation", error.message || "Could not cancel invitation");
+    toastService.error(
+      "Failed to cancel invitation",
+      error.message || "Could not cancel invitation",
+    );
   }
 };
 
@@ -509,7 +510,10 @@ const resendInvitation = async (invitationId: string) => {
     toastService.success("Invitation resent", "The invitation email has been sent again");
     await loadInvitations();
   } catch (error: any) {
-    toastService.error("Failed to resend invitation", error.message || "Could not resend invitation");
+    toastService.error(
+      "Failed to resend invitation",
+      error.message || "Could not resend invitation",
+    );
   } finally {
     resendingInvitation.value = null;
   }
