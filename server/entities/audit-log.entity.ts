@@ -22,15 +22,13 @@ export type AuditAction =
   | "apikey.create"
   | "apikey.revoke"
   | "security.setting.change"
-  | "organization.create"
-  | "organization.invitation.send"
-  | "organization.invitation.accept"
-  | "organization.invitation.decline"
-  | "organization.invitation.cancel"
-  | "organization.invitation.resend"
-  | "organization.member.role_change"
-  | "organization.member.remove"
-  | "organization.switch";
+  | "privacy.export.request"
+  | "privacy.export.confirm"
+  | "privacy.export.download"
+  | "privacy.deletion.request"
+  | "privacy.deletion.confirm"
+  | "privacy.deletion.complete"
+  | "privacy.rectification.request";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
@@ -61,6 +59,9 @@ export class AuditLog extends TypeOrmBaseEntity {
 
   @Column({ type: "jsonb", nullable: true })
   changes?: Record<string, any>;
+
+  @Column({ type: "jsonb", nullable: true })
+  metadata?: Record<string, any>;
 
   @Column({ type: "varchar", length: 45, nullable: true })
   ipAddress?: string;

@@ -143,11 +143,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import Card from "@/components/ui/Card.vue";
-import CardContent from "@/components/ui/CardContent.vue";
-import CardHeader from "@/components/ui/CardHeader.vue";
-import CardTitle from "@/components/ui/CardTitle.vue";
-import Button from "@/components/ui/Button.vue";
 import { Shield, Key, RefreshCw, Trash2, Download } from "lucide-vue-next";
 import {
   isWebCryptoAvailable,
@@ -155,6 +150,7 @@ import {
   clearAllKeypairs,
   exportKeypairForBackup,
 } from "@/utils/dpop-crypto";
+import { useDomain } from "@/composables/useDomain";
 
 // Declare HayChat on window object
 declare global {
@@ -176,6 +172,10 @@ declare global {
 }
 
 // State
+// Get API URL from domain composable
+const { getApiUrl } = useDomain();
+const apiBaseUrl = getApiUrl();
+
 const sessionInfo = ref({
   conversationId: null as string | null,
   hasKeypair: null as boolean | null,
@@ -226,7 +226,7 @@ function reloadWidget() {
 
   // Reload the widget script with new timestamp to force refresh
   const script = document.createElement("script");
-  script.src = "http://localhost:3001/plugins/assets/hay-plugin-webchat/widget.js?v=" + Date.now();
+  script.src = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 }
@@ -318,7 +318,7 @@ onMounted(() => {
   window.HayChat.config = {
     organizationId: "c3578568-c83b-493f-991c-ca2d34a3bd17",
     pluginId: "hay-plugin-webchat",
-    baseUrl: "http://localhost:3001",
+    baseUrl: apiBaseUrl,
 
     // Widget customization for demo
     widgetTitle: "Chat with us",
@@ -332,14 +332,14 @@ onMounted(() => {
 
   // Load the widget script
   const script = document.createElement("script");
-  script.src = "http://localhost:3001/plugins/assets/hay-plugin-webchat/widget.js?v=" + Date.now();
+  script.src = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 
   // Load the widget styles
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "http://localhost:3001/plugins/assets/hay-plugin-webchat/widget.css";
+  link.href = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.css`;
   document.head.appendChild(link);
 
   // Start polling for session changes

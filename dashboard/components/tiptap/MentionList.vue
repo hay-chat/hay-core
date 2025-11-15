@@ -25,7 +25,7 @@
         <div class="mention-item-icon">
           <img
             v-if="item.type === 'action' && item.pluginId"
-            :src="`http://localhost:3001/plugins/thumbnails/${item.pluginId}`"
+            :src="`${apiBaseUrl}/plugins/thumbnails/${item.pluginId}`"
             :alt="item.label"
             class="mention-plugin-thumbnail"
           />
@@ -47,6 +47,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from "vue";
 import type { MentionItem } from "./MentionExtension";
+import { useDomain } from "@/composables/useDomain";
 
 interface Props {
   items: MentionItem[];
@@ -54,6 +55,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Get API URL
+const { getApiUrl } = useDomain();
+const apiBaseUrl = getApiUrl();
 
 const selectedIndex = ref(0);
 const itemRefs = ref<(HTMLElement | null)[]>([]);

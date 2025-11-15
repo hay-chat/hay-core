@@ -3,20 +3,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
-import { ApiKey } from "@server/entities/apikey.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { Not, IsNull } from "typeorm";
 import {
   hashPassword,
   verifyPassword,
-  generateApiKey,
-  hashApiKey,
   generateSessionId,
 } from "@server/lib/auth/utils/hashing";
 import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
 import { protectedProcedure, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
-import type { ApiKeyResponse } from "@server/types/auth.types";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
@@ -69,19 +65,6 @@ const registerSchema = z
     message: "Passwords don't match",
     path: ["confirmPassword"],
   });
-
-const createApiKeySchema = z.object({
-  name: z.string().min(1),
-  expiresAt: z.date().optional(),
-  scopes: z
-    .array(
-      z.object({
-        resource: z.string(),
-        actions: z.array(z.string()),
-      }),
-    )
-    .optional(),
-});
 
 const refreshTokenSchema = z.object({
   refreshToken: z.string(),
@@ -924,68 +907,8 @@ export const authRouter = t.router({
     };
   }),
 
-  // API Key management
-  createApiKey: protectedProcedure
-    .input(createApiKeySchema)
-    .mutation(async ({ input, ctx }): Promise<ApiKeyResponse> => {
-      // Generate API key
-      const apiKey = generateApiKey();
-      const keyHash = await hashApiKey(apiKey);
-
-      // Create API key entity
-      const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-      const apiKeyEntity = apiKeyRepository.create({
-        userId: ctx.user!.id,
-        keyHash,
-        name: input.name,
-        expiresAt: input.expiresAt,
-        scopes: input.scopes || [],
-        isActive: true,
-      });
-
-      await apiKeyRepository.save(apiKeyEntity);
-
-      return {
-        id: apiKeyEntity.id,
-        key: apiKey, // Return the plain key only once
-        name: apiKeyEntity.name,
-        createdAt: apiKeyEntity.createdAt,
-        expiresAt: apiKeyEntity.expiresAt,
-        scopes: apiKeyEntity.scopes,
-      };
-    }),
-
-  listApiKeys: protectedProcedure.query(async ({ ctx }) => {
-    const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-    const apiKeys = await apiKeyRepository.find({
-      where: { userId: ctx.user!.id, isActive: true },
-      select: ["id", "name", "createdAt", "lastUsedAt", "expiresAt", "scopes"],
-      order: { createdAt: "DESC" },
-    });
-
-    return apiKeys;
-  }),
-
-  revokeApiKey: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
-      const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-      const apiKey = await apiKeyRepository.findOne({
-        where: { id: input.id, userId: ctx.user!.id },
-      });
-
-      if (!apiKey) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "API key not found",
-        });
-      }
-
-      apiKey.isActive = false;
-      await apiKeyRepository.save(apiKey);
-
-      return { success: true };
-    }),
+  // API Key management has been moved to /api-tokens router
+  // See server/routes/v1/api-tokens/index.ts for organization-scoped API tokens
 
   // Admin endpoints
   listUsers: adminProcedure.query(async () => {

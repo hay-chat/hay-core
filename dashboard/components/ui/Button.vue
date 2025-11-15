@@ -55,6 +55,7 @@ const buttonVariants = cva("btn-base", {
       secondary: "btn-secondary",
       ghost: "btn-ghost",
       link: "btn-link",
+      success: "btn-success",
     },
     size: {
       default: "btn-size-default",
@@ -132,6 +133,15 @@ const props = withDefaults(defineProps<ButtonProps>(), {
 
   &:hover {
     background-color: color-mix(in srgb, var(--color-destructive) 90%, transparent);
+  }
+}
+
+.btn-success {
+  background-color: var(--color-green-600);
+  color: #ffffff;
+
+  &:hover {
+    background-color: var(--color-green-700);
   }
 }
 

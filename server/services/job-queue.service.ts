@@ -11,7 +11,6 @@ export class JobQueueService {
   private readonly JOB_CHANNEL = "job:updates";
   private readonly JOB_QUEUE_KEY = "jobs:queue";
   private isProcessing = false;
-  private processingInterval?: NodeJS.Timeout;
 
   /**
    * Initialize the job queue service
@@ -67,41 +66,28 @@ export class JobQueueService {
 
   /**
    * Start the job processing loop
+   * NOTE: Job processing is now handled by the scheduler service
+   * See: server/services/scheduled-jobs.registry.ts -> 'job-queue-processing'
    */
   private startProcessing(): void {
-    if (this.isProcessing) {
-      return;
-    }
-
-    this.isProcessing = true;
-
-    // Process jobs every 5 seconds
-    this.processingInterval = setInterval(() => {
-      this.processNextJob().catch((error) => {
-        console.error("[JobQueue] Error processing job:", error);
-      });
-    }, 5000);
-
-    debugLog("job-queue", "Started job processing");
+    // No-op: Processing is now handled by scheduler
+    debugLog("job-queue", "Job processing handled by scheduler service");
   }
 
   /**
    * Stop the job processing loop
+   * NOTE: Job processing is now handled by the scheduler service
    */
   private stopProcessing(): void {
-    if (this.processingInterval) {
-      clearInterval(this.processingInterval);
-      this.processingInterval = undefined;
-    }
-
-    this.isProcessing = false;
-    debugLog("job-queue", "Stopped job processing");
+    // No-op: Processing is now handled by scheduler
+    debugLog("job-queue", "Job processing handled by scheduler service");
   }
 
   /**
    * Process the next available job
+   * Called by the scheduler service for background job processing
    */
-  private async processNextJob(): Promise<void> {
+  async processNextJob(): Promise<void> {
     // This is a placeholder for future job processing
     // Jobs are currently processed inline in the import functions
     // In the future, we can move job processing here for true background processing

@@ -1,29 +1,83 @@
 import "reflect-metadata";
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { vectorStoreService } from "../../services/vector-store.service";
 import type { VectorChunk } from "../../services/vector-store.service";
+import { Organization } from "../../entities/organization.entity";
+import { Document, DocumentationType } from "../../entities/document.entity";
 
 describe("VectorStore Integration Tests", () => {
   const testOrgId = "123e4567-e89b-12d3-a456-426614174000";
   const testDocId = "456e7890-e89b-12d3-a456-426614174000";
+  const deleteDocId = "789e0123-e89b-12d3-a456-426614174000";
 
   beforeAll(async () => {
     // Initialize database connection
-    await AppDataSource.initialize();
+    if (!AppDataSource.isInitialized) {
+      await AppDataSource.initialize();
+    }
 
     // Run migrations
     await AppDataSource.runMigrations();
 
     // Initialize vector store
     await vectorStoreService.initialize();
+
+    // Create test organization
+    const orgRepo = AppDataSource.getRepository(Organization);
+    const existingOrg = await orgRepo.findOne({ where: { id: testOrgId } });
+    if (!existingOrg) {
+      const testOrg = orgRepo.create({
+        id: testOrgId,
+        name: "Test Organization",
+        slug: "test-org",
+      });
+      await orgRepo.save(testOrg);
+    }
+
+    // Create test documents
+    const docRepo = AppDataSource.getRepository(Document);
+    const existingDoc = await docRepo.findOne({ where: { id: testDocId } });
+    if (!existingDoc) {
+      const testDoc = docRepo.create({
+        id: testDocId,
+        organizationId: testOrgId,
+        title: "Test Document",
+        type: DocumentationType.ARTICLE,
+      });
+      await docRepo.save(testDoc);
+    }
+
+    // Create second test document for deletion tests
+    const existingDeleteDoc = await docRepo.findOne({ where: { id: deleteDocId } });
+    if (!existingDeleteDoc) {
+      const deleteDoc = docRepo.create({
+        id: deleteDocId,
+        organizationId: testOrgId,
+        title: "Document for Deletion Tests",
+        type: DocumentationType.ARTICLE,
+      });
+      await docRepo.save(deleteDoc);
+    }
   });
 
   afterAll(async () => {
     // Clean up test data
     await vectorStoreService.deleteByOrganizationId(testOrgId);
 
+    // Clean up test documents
+    const docRepo = AppDataSource.getRepository(Document);
+    await docRepo.delete({ id: testDocId });
+    await docRepo.delete({ id: deleteDocId });
+
+    // Clean up test organization
+    const orgRepo = AppDataSource.getRepository(Organization);
+    await orgRepo.delete({ id: testOrgId });
+
     // Close database connection
-    await AppDataSource.destroy();
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.destroy();
+    }
   });
 
   describe("addChunks", () => {
@@ -108,8 +162,6 @@ describe("VectorStore Integration Tests", () => {
 
   describe("deleteByDocumentId", () => {
     it("should delete embeddings for a specific document", async () => {
-      const deleteDocId = "789e0123-e89b-12d3-a456-426614174000";
-
       // Add test embeddings
       const chunks: VectorChunk[] = [{ content: "Test chunk for deletion", metadata: {} }];
       await vectorStoreService.addChunks(testOrgId, deleteDocId, chunks);
@@ -121,8 +173,8 @@ describe("VectorStore Integration Tests", () => {
 
       // Verify deletion
       const results = await AppDataSource.query(
-        `SELECT COUNT(*) as count FROM embeddings 
-         WHERE "organizationId" = $1 AND "documentId" = $2`,
+        `SELECT COUNT(*) as count FROM embeddings
+         WHERE "organization_id" = $1 AND "document_id" = $2`,
         [testOrgId, deleteDocId],
       );
 

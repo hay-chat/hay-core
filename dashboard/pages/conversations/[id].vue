@@ -110,10 +110,7 @@
           </div>
 
           <!-- Playground Empty State -->
-          <div
-            v-else-if="isPlaygroundMode && messages.length === 0"
-            class="text-center py-12"
-          >
+          <div v-else-if="isPlaygroundMode && messages.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
             <p class="text-neutral-muted">Send a message to start testing</p>
           </div>
@@ -241,7 +238,9 @@
               >
             </div>
             <div class="flex items-center space-x-2">
-              <Button variant="outline" size="sm" @click="endTakeover"> Release Conversation </Button>
+              <Button variant="outline" size="sm" @click="endTakeover">
+                Release Conversation
+              </Button>
               <Button variant="outline" size="sm" @click="showCloseDialog = true">
                 Close Conversation
               </Button>
@@ -259,7 +258,12 @@
               :disabled="isPlaygroundMode && !conversation"
               @keyup.enter="sendMessage"
             />
-            <Button type="submit" :disabled="!newMessage.trim() || isSendingMessage || (isPlaygroundMode && !conversation)">
+            <Button
+              type="submit"
+              :disabled="
+                !newMessage.trim() || isSendingMessage || (isPlaygroundMode && !conversation)
+              "
+            >
               <Send class="h-4 w-4" />
             </Button>
           </form>
@@ -372,144 +376,146 @@
 
           <!-- Regular Conversation Panels -->
           <template v-else>
-          <!-- Customer Information -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base"> Customer Information </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User class="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div class="font-medium">Customer</div>
-                  <div class="text-sm text-neutral-muted">
-                    {{ conversation?.id?.slice(0, 8) }}
+            <!-- Customer Information -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Customer Information </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-3">
+                <div class="flex items-center space-x-3">
+                  <div
+                    class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
+                  >
+                    <User class="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div class="font-medium">Customer</div>
+                    <div class="text-sm text-neutral-muted">
+                      {{ conversation?.id?.slice(0, 8) }}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="space-y-2 text-sm">
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-neutral-muted">Conversation ID:</span>
+                    <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-neutral-muted">Status:</span>
+                    <span>{{ conversation?.status }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-neutral-muted">Created:</span>
+                    <span>{{ formatDate(conversation?.created_at) }}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <!-- Conversation Details -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Conversation Details </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-3 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Conversation ID:</span>
-                  <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
+                  <span class="text-neutral-muted">Agent:</span>
+                  <span>{{ conversation?.agent?.name || "AI Assistant" }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-neutral-muted">Status:</span>
-                  <span>{{ conversation?.status }}</span>
+                  <span>{{ formatStatus(conversation?.status) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Messages:</span>
+                  <span>{{ conversation?.messages?.length }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-neutral-muted">Created:</span>
                   <span>{{ formatDate(conversation?.created_at) }}</span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div class="flex justify-between">
+                  <span class="text-neutral-muted">Updated:</span>
+                  <span>{{ formatDate(conversation?.updated_at) }}</span>
+                </div>
+              </CardContent>
+            </Card>
 
-          <!-- Conversation Details -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base"> Conversation Details </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-3 text-sm">
-              <div class="flex justify-between">
-                <span class="text-neutral-muted">Agent:</span>
-                <span>{{ conversation?.agent?.name || "AI Assistant" }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-muted">Status:</span>
-                <span>{{ formatStatus(conversation?.status) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-muted">Messages:</span>
-                <span>{{ conversation?.messages?.length }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-muted">Created:</span>
-                <span>{{ formatDate(conversation?.created_at) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-muted">Updated:</span>
-                <span>{{ formatDate(conversation?.updated_at) }}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <!-- Previous Conversations -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base"> Previous Conversations </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div v-if="previousConversations.length === 0" class="text-sm text-neutral-muted">
-                No previous conversations
-              </div>
-              <div v-else class="space-y-3">
-                <div
-                  v-for="prevConv in previousConversations"
-                  :key="prevConv.id"
-                  class="p-3 border rounded-md hover:bg-background-secondary cursor-pointer"
-                  @click="viewConversation(prevConv.id)"
-                >
-                  <div class="text-sm font-medium">
-                    {{ prevConv.subject || prevConv.title }}
-                  </div>
-                  <div class="text-xs text-neutral-muted">
-                    {{ formatDate(prevConv.createdAt || prevConv.date) }} •
-                    {{ prevConv.status || "Unknown" }}
+            <!-- Previous Conversations -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Previous Conversations </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div v-if="previousConversations.length === 0" class="text-sm text-neutral-muted">
+                  No previous conversations
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="prevConv in previousConversations"
+                    :key="prevConv.id"
+                    class="p-3 border rounded-md hover:bg-background-secondary cursor-pointer"
+                    @click="viewConversation(prevConv.id)"
+                  >
+                    <div class="text-sm font-medium">
+                      {{ prevConv.subject || prevConv.title }}
+                    </div>
+                    <div class="text-xs text-neutral-muted">
+                      {{ formatDate(prevConv.createdAt || prevConv.date) }} •
+                      {{ prevConv.status || "Unknown" }}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <!-- Available Actions -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base"> Quick Actions </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-2">
-              <Button variant="outline" size="sm" class="w-full justify-start">
-                <Ticket class="h-4 w-4 mr-2" />
-                Create Support Ticket
-              </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
-                <Mail class="h-4 w-4 mr-2" />
-                Send Email
-              </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
-                <Phone class="h-4 w-4 mr-2" />
-                Schedule Call
-              </Button>
-              <Button variant="outline" size="sm" class="w-full justify-start">
-                <Star class="h-4 w-4 mr-2" />
-                Request Feedback
-              </Button>
-            </CardContent>
-          </Card>
+            <!-- Available Actions -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Quick Actions </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-2">
+                <Button variant="outline" size="sm" class="w-full justify-start">
+                  <Ticket class="h-4 w-4 mr-2" />
+                  Create Support Ticket
+                </Button>
+                <Button variant="outline" size="sm" class="w-full justify-start">
+                  <Mail class="h-4 w-4 mr-2" />
+                  Send Email
+                </Button>
+                <Button variant="outline" size="sm" class="w-full justify-start">
+                  <Phone class="h-4 w-4 mr-2" />
+                  Schedule Call
+                </Button>
+                <Button variant="outline" size="sm" class="w-full justify-start">
+                  <Star class="h-4 w-4 mr-2" />
+                  Request Feedback
+                </Button>
+              </CardContent>
+            </Card>
 
-          <!-- Knowledge Base Articles -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base"> Related Articles </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-2">
-                <div
-                  v-for="article in relatedArticles"
-                  :key="article.id"
-                  class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
-                >
-                  <div class="font-medium">
-                    {{ article.title }}
-                  </div>
-                  <div class="text-xs text-neutral-muted">
-                    {{ article.category || "General" }}
+            <!-- Knowledge Base Articles -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base"> Related Articles </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div class="space-y-2">
+                  <div
+                    v-for="article in relatedArticles"
+                    :key="article.id"
+                    class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
+                  >
+                    <div class="font-medium">
+                      {{ article.title }}
+                    </div>
+                    <div class="text-xs text-neutral-muted">
+                      {{ article.category || "General" }}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           </template>
         </div>
       </div>
@@ -606,13 +612,6 @@ import {
   ThumbsDown,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
-import Badge from "@/components/ui/Badge.vue";
-import Dialog from "@/components/ui/Dialog.vue";
-import DialogContent from "@/components/ui/DialogContent.vue";
-import DialogDescription from "@/components/ui/DialogDescription.vue";
-import DialogFooter from "@/components/ui/DialogFooter.vue";
-import DialogHeader from "@/components/ui/DialogHeader.vue";
-import DialogTitle from "@/components/ui/DialogTitle.vue";
 
 import { MessageType } from "~/types/message";
 
@@ -714,11 +713,14 @@ const isTakenOverByCurrentUser = computed(() => {
 // Check if test mode is enabled for this conversation
 const isTestMode = computed(() => {
   const agent = conversation.value?.agent;
+  const organization = conversation.value?.organization;
+
   if (!agent) return false;
 
   // Check agent's testMode setting
   // If agent has explicit setting, use it; otherwise check org default
-  return agent.testMode ?? false; // TODO: Fetch org default from settings
+  const orgDefault = organization?.settings?.testModeDefault ?? false;
+  return agent.testMode ?? orgDefault;
 });
 
 // Message approval handlers
@@ -882,10 +884,13 @@ const takeOverConversation = async () => {
     toast.success("Conversation taken over", "You are now handling this conversation");
     // Refresh conversation and assigned user
     await fetchConversation();
-    assignedUser.value = await HayApi.conversations.getAssignedUser.query({ conversationId: conversationId.value });
+    assignedUser.value = await HayApi.conversations.getAssignedUser.query({
+      conversationId: conversationId.value,
+    });
   } catch (error: any) {
     console.error("Failed to take over conversation:", error);
-    const errorMessage = error?.message || error?.data?.message || "Failed to take over conversation";
+    const errorMessage =
+      error?.message || error?.data?.message || "Failed to take over conversation";
     toast.error("Takeover failed", errorMessage);
   }
 };
@@ -908,9 +913,7 @@ const confirmRelease = async () => {
     assignedUser.value = null;
     showReleaseDialog.value = false;
     const message =
-      releaseMode.value === "ai"
-        ? "Conversation returned to AI"
-        : "Conversation returned to queue";
+      releaseMode.value === "ai" ? "Conversation returned to AI" : "Conversation returned to queue";
     toast.success("Conversation released", message);
     // Refresh conversation to get updated status
     await fetchConversation();
@@ -1184,6 +1187,8 @@ const { useWebSocket } = await import("@/composables/useWebSocket");
 const websocket = useWebSocket();
 let unsubscribeMessageReceived: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
+let unsubscribeMessageApproved: (() => void) | null = null;
+let unsubscribeMessageBlocked: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -1224,6 +1229,25 @@ onMounted(async () => {
       await fetchConversation();
     }
   });
+
+  // Listen for message approval events
+  unsubscribeMessageApproved = websocket.on("message_approved", async (payload: any) => {
+    console.log("[WebSocket] Received message_approved event", payload);
+    if (payload.conversationId === conversationId.value) {
+      console.log("[WebSocket] Message approved in current conversation, refreshing");
+      await fetchConversation();
+      scrollToBottom();
+    }
+  });
+
+  // Listen for message block events
+  unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: any) => {
+    console.log("[WebSocket] Received message_blocked event", payload);
+    if (payload.conversationId === conversationId.value) {
+      console.log("[WebSocket] Message blocked in current conversation, refreshing");
+      await fetchConversation();
+    }
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -1231,6 +1255,8 @@ onUnmounted(() => {
   // Cleanup WebSocket event handlers
   if (unsubscribeMessageReceived) unsubscribeMessageReceived();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
+  if (unsubscribeMessageApproved) unsubscribeMessageApproved();
+  if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {

@@ -75,7 +75,6 @@ import {
   CalendarClock,
   AlertCircle,
 } from "lucide-vue-next";
-import Badge from "@/components/ui/Badge.vue";
 
 interface Props {
   toolName?: string;
@@ -166,7 +165,7 @@ const statusVariant = computed(() => {
     case "ERROR":
       return "destructive";
     case "RUNNING":
-      return "secondary";
+      return "tool";
     default:
       return "outline";
   }

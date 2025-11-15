@@ -608,6 +608,10 @@ The following tools are available for you to use. You MUST return only valid JSO
       const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
       const organization = await organizationRepository.findById(this.organization_id);
 
+      // Check if this is an initial greeting (no customer messages yet)
+      const messages = await this.getMessages();
+      const hasCustomerMessages = messages.some((msg) => msg.type === MessageType.CUSTOMER);
+
       // Determine if test mode is enabled
       let testModeEnabled = false;
       if (agent && agent.testMode !== null && agent.testMode !== undefined) {
@@ -618,7 +622,8 @@ The following tools are available for you to use. You MUST return only valid JSO
         testModeEnabled = organization.settings.testModeDefault;
       }
 
-      if (testModeEnabled) {
+      // Only apply test mode if this is a response to a customer (not the initial greeting)
+      if (testModeEnabled && hasCustomerMessages) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;
         deliveryState = DeliveryState.QUEUED;

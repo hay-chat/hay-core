@@ -25,8 +25,8 @@ export class Agent {
   @Column({ type: "boolean", default: true })
   enabled!: boolean;
 
-  @Column({ type: "text", nullable: true })
-  instructions!: string | null;
+  @Column({ type: "jsonb", nullable: true })
+  instructions!: unknown[] | null;
 
   @Column({ type: "text", nullable: true })
   tone!: string | null;

@@ -1,8 +1,6 @@
 <template>
   <div class="input-wrapper">
-    <Label v-if="label && type !== 'switch' && type !== 'checkbox'" :for="inputId">
-      {{ label }}
-    </Label>
+    <Label v-if="label && type !== 'switch'" :for="inputId">{{ label }}</Label>
 
     <!-- Select Type -->
     <div v-if="type === 'select'" class="select-wrapper">
@@ -14,7 +12,7 @@
           <SelectItem
             v-for="option in options"
             :key="getOptionValue(option)"
-            :value="String(getOptionValue(option))"
+            :value="String(getOptionValue(option)) || '__empty__'"
           >
             {{ getOptionLabel(option) }}
           </SelectItem>
@@ -33,27 +31,23 @@
         :class="props.class"
         @update:model-value="handleSwitchChange"
       />
-      <Label v-if="label || $slots.default" :for="inputId">
-        <slot v-if="$slots.default" />
-        <template v-else>{{ label }}</template>
-      </Label>
+      <Label v-if="label" :for="inputId">{{ label }}</Label>
     </div>
 
     <!-- Checkbox Type -->
     <div v-else-if="type === 'checkbox'" class="checkbox-wrapper">
-      <Checkbox
+      <input
         :id="inputId"
-        :model-value="Boolean(modelValue)"
+        type="checkbox"
+        :checked="Boolean(modelValue)"
         :disabled="disabledAttr"
         :name="nameAttr"
         :required="requiredAttr"
         :class="props.class"
-        @update:model-value="handleCheckboxChange"
+        class="checkbox"
+        @change="handleCheckboxChange"
       />
-      <Label v-if="label || $slots.default" :for="inputId">
-        <slot v-if="$slots.default" />
-        <template v-else>{{ label }}</template>
-      </Label>
+      <Label v-if="label" :for="inputId">{{ label }}</Label>
     </div>
 
     <!-- Regular Input -->
@@ -113,7 +107,6 @@ import SelectValue from "./SelectValue.vue";
 import SelectContent from "./SelectContent.vue";
 import SelectItem from "./SelectItem.vue";
 import Switch from "./Switch.vue";
-import Checkbox from "./Checkbox.vue";
 import Label from "./Label.vue";
 
 export type SelectOption = string | { label: string; value: string | number };
@@ -121,7 +114,7 @@ export type SelectOption = string | { label: string; value: string | number };
 export interface InputProps {
   class?: string;
   modelValue?: string | number | boolean | undefined;
-  type?: "text" | "textarea" | "select" | "password" | "email" | "switch" | "checkbox";
+  type?: "text" | "textarea" | "select" | "password" | "email" | "switch" | "checkbox" | "number";
   label?: string;
   hint?: string;
   error?: string;
@@ -158,14 +151,20 @@ const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value;
 };
 
-// Input handler for email trimming
+// Input handler for email trimming and number conversion
 const handleInputChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  let value = target.value;
+  let value: string | number = target.value;
 
   // Trim whitespace for email fields
   if (props.type === "email") {
     value = value.trim();
+  }
+
+  // Convert to number for number inputs
+  if (props.type === "number") {
+    const numValue = Number(value);
+    value = isNaN(numValue) ? value : numValue;
   }
 
   emit("update:modelValue", value);
@@ -182,9 +181,18 @@ const getOptionLabel = (option: SelectOption): string => {
 
 // Select value management
 const selectValue = computed({
-  get: () => (props.modelValue ? String(props.modelValue) : undefined),
+  get: () => {
+    // Convert empty string to sentinel value for SelectItem
+    if (props.modelValue === "") return "__empty__";
+    return props.modelValue ? String(props.modelValue) : undefined;
+  },
   set: (value: string | undefined) => {
     if (value) {
+      // Convert sentinel value back to empty string
+      if (value === "__empty__") {
+        emit("update:modelValue", "");
+        return;
+      }
       // Try to convert back to number if the original was a number
       const numValue = Number(value);
       emit("update:modelValue", isNaN(numValue) ? value : numValue);
@@ -198,8 +206,9 @@ const handleSwitchChange = (value: boolean) => {
 };
 
 // Checkbox handler
-const handleCheckboxChange = (value: boolean) => {
-  emit("update:modelValue", value);
+const handleCheckboxChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit("update:modelValue", target.checked);
 };
 
 // Get attrs
@@ -329,20 +338,6 @@ onMounted(() => {
     opacity: 0.5;
   }
 
-  &:read-only {
-    background-color: #f5f5f5;
-    cursor: default;
-
-    &:hover {
-      border-color: var(--color-input);
-    }
-
-    &:focus-visible {
-      box-shadow: none;
-      border-color: var(--color-input);
-    }
-  }
-
   &.has-error {
     border-color: var(--color-destructive);
 
@@ -410,5 +405,30 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--color-input);
+  cursor: pointer;
+
+  &:checked {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-ring);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 }
 </style>

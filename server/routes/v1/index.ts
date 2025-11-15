@@ -14,6 +14,9 @@ import { invitationsRouter } from "./invitations";
 import { sourcesRouter } from "./sources";
 import { messageFeedbackRouter } from "./message-feedback";
 import { onboardingRouter } from "./onboarding";
+import { privacyRouter } from "./privacy";
+import { customerPrivacyRouter } from "./customer-privacy";
+import { apiTokensRouter } from "./api-tokens";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
 // Core routers - always available
@@ -33,6 +36,9 @@ const coreRouters = {
   sources: sourcesRouter,
   messageFeedback: messageFeedbackRouter,
   onboarding: onboardingRouter,
+  privacy: privacyRouter,
+  customerPrivacy: customerPrivacyRouter,
+  apiTokens: apiTokensRouter,
 };
 
 // Create v1Router with core + plugin routers

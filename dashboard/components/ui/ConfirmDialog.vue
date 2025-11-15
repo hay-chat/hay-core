@@ -18,14 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import Dialog from "@/components/ui/Dialog.vue";
-import DialogContent from "@/components/ui/DialogContent.vue";
-import DialogDescription from "@/components/ui/DialogDescription.vue";
-import DialogFooter from "@/components/ui/DialogFooter.vue";
-import DialogHeader from "@/components/ui/DialogHeader.vue";
-import DialogTitle from "@/components/ui/DialogTitle.vue";
-import Button from "@/components/ui/Button.vue";
-
 interface Props {
   open: boolean;
   title: string;

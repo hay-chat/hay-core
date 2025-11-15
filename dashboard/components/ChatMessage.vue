@@ -20,7 +20,14 @@
         "
         class="chat-message__header"
       >
-        <span class="chat-message__sender">{{ message.sender }}</span>
+        <div v-if="isQueued && showApproval" class="mb-2 flex-1">
+          <Badge variant="outline" class="text-xs">
+            <Clock class="h-3 w-3 mr-1" />
+            Queued for Approval
+          </Badge>
+        </div>
+
+        <span v-else class="chat-message__sender">{{ message.sender }}</span>
         <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="message.metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
@@ -112,12 +119,8 @@
       </div>
       <!-- Queued Message Actions (Test Mode) -->
       <div v-if="isQueued && showApproval" class="chat-message__actions">
-        <Badge variant="outline" class="text-xs mb-2">
-          <Clock class="h-3 w-3 mr-1" />
-          Queued for Approval
-        </Badge>
-        <div class="flex gap-2">
-          <Button size="sm" variant="outline" @click="handleApproveClick">
+        <div class="flex gap-2 mt-2 mb-4">
+          <Button size="sm" variant="success" @click="handleApproveClick">
             <Check class="h-3 w-3 mr-1" />
             Approve & Send
           </Button>
@@ -131,8 +134,15 @@
       <!-- Sent Message Metadata & Feedback -->
       <div v-else-if="message.type === 'BotAgent' && !isQueued" class="chat-message__metadata">
         <div class="flex items-center gap-3 mt-1">
-          <div v-if="message.metadata?.confidence" class="chat-message__confidence">
-            Confidence: {{ (message.metadata.confidence * 100).toFixed(0) }}%
+          <div v-if="message.metadata?.confidence" class="chat-message__confidence-detailed">
+            <Badge
+              :variant="getConfidenceBadgeVariant(message.metadata.confidenceTier)"
+              class="text-xs"
+            >
+              {{ getConfidenceIcon(message.metadata.confidenceTier) }}
+              {{ (message.metadata.confidence * 100).toFixed(0) }}% Confidence
+              <span v-if="message.metadata.recheckAttempted" class="ml-1" title="Rechecked">↻</span>
+            </Badge>
           </div>
           <MessageFeedbackControl
             v-if="showFeedback"
@@ -173,11 +183,6 @@ import {
   Clock,
   Ban,
 } from "lucide-vue-next";
-import Badge from "@/components/ui/Badge.vue";
-import Button from "@/components/ui/Button.vue";
-import MessageFeedbackControl from "@/components/MessageFeedbackControl.vue";
-import MessageApprovalDialog from "@/components/MessageApprovalDialog.vue";
-import ToolExecutionViewer from "@/components/ToolExecutionViewer.vue";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
@@ -298,6 +303,35 @@ const avatarIcon = computed(() => {
   if (props.message.type === "BotAgent" || props.message.type === "HumanAgent") return Bot;
   return User;
 });
+
+// Confidence display helpers
+const getConfidenceBadgeVariant = (tier: string | undefined) => {
+  if (!tier) return "secondary";
+  switch (tier) {
+    case "high":
+      return "success";
+    case "medium":
+      return "warning";
+    case "low":
+      return "destructive";
+    default:
+      return "secondary";
+  }
+};
+
+const getConfidenceIcon = (tier: string | undefined) => {
+  if (!tier) return "";
+  switch (tier) {
+    case "high":
+      return "✓";
+    case "medium":
+      return "⚡";
+    case "low":
+      return "⚠";
+    default:
+      return "";
+  }
+};
 </script>
 
 <style lang="scss">
@@ -380,6 +414,23 @@ const avatarIcon = computed(() => {
 
 .chat-message__bubble--expanded::after {
   display: none;
+}
+
+.chat-message__bubble--needs-approval {
+  position: relative;
+  animation: approval-pulse 2s ease-in-out infinite;
+  border: 1px dashed var(--color-neutral-400);
+  --bubble-bg: var(--color-neutral-100);
+  --bubble-fg: var(--color-neutral-800);
+}
+
+@keyframes approval-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-neutral-600) 50%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--color-neutral-600) 0%, transparent);
+  }
 }
 
 .chat-message__expand-button {

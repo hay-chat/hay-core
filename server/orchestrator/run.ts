@@ -12,6 +12,7 @@ import { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { debugLog } from "@server/lib/debug-logger";
+import { ExecutionResult } from "./execution.layer";
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -49,6 +50,77 @@ async function publishStatusChange(
     }
   } catch (error) {
     console.error("[Orchestrator] Failed to publish status change:", error);
+  }
+}
+
+/**
+ * Helper function to build message metadata from execution result
+ * Makes metadata assignment DRY across different message types
+ */
+function buildMessageMetadata(
+  executionResult: ExecutionResult,
+  additionalMetadata?: Record<string, unknown>,
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = { ...additionalMetadata };
+
+  if (executionResult.confidence) {
+    metadata.confidence = executionResult.confidence.score;
+    metadata.confidenceBreakdown = executionResult.confidence.breakdown;
+    metadata.confidenceTier = executionResult.confidence.tier;
+    metadata.confidenceDetails = executionResult.confidence.details;
+    metadata.documentsUsed = executionResult.confidence.documentsUsed;
+    metadata.recheckAttempted = executionResult.recheckAttempted || false;
+    metadata.recheckCount = executionResult.recheckCount || 0;
+  }
+
+  return metadata;
+}
+
+/**
+ * Helper function to save confidence log to conversation orchestration_status
+ */
+async function saveConfidenceLog(
+  conversation: Conversation,
+  executionResult: ExecutionResult,
+): Promise<void> {
+  if (!executionResult.confidence) {
+    return;
+  }
+
+  try {
+    const orchestrationStatus = (conversation.orchestration_status as any) || {};
+
+    // Initialize confidence log if not exists
+    if (!orchestrationStatus.confidenceLog) {
+      orchestrationStatus.confidenceLog = [];
+    }
+
+    // Add new confidence entry
+    orchestrationStatus.confidenceLog.push({
+      timestamp: new Date().toISOString(),
+      score: executionResult.confidence.score,
+      tier: executionResult.confidence.tier,
+      breakdown: executionResult.confidence.breakdown,
+      documentsUsed: executionResult.confidence.documentsUsed,
+      recheckAttempted: executionResult.recheckAttempted || false,
+      recheckCount: executionResult.recheckCount || 0,
+      details: executionResult.confidence.details,
+    });
+
+    // Update conversation
+    await conversationRepository.updateById(conversation.id, {
+      orchestration_status: orchestrationStatus,
+    });
+
+    debugLog("orchestrator", "Confidence log saved", {
+      conversationId: conversation.id,
+      logEntries: orchestrationStatus.confidenceLog.length,
+    });
+  } catch (error) {
+    debugLog("orchestrator", "Error saving confidence log", {
+      level: "error",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -335,8 +407,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     iterations++;
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
-    // Get current messages and execute
-    const executionResult = await executionLayer.execute(conversation, customerLanguage);
+    // Get current messages and execute (with confidence guardrails integrated)
+    const executionResult: ExecutionResult | null =
+      await executionLayer.execute(conversation, customerLanguage);
 
     if (!executionResult) {
       debugLog("orchestrator", "No execution result, ending loop");
@@ -366,7 +439,10 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Continue the loop to let LLM analyze the result
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
-      debugLog("orchestrator", "HANDOFF step detected");
+      debugLog("orchestrator", "HANDOFF step detected", {
+        confidenceRelated: !!executionResult.confidence,
+        confidenceScore: executionResult.confidence?.score,
+      });
 
       // Check if we've already processed handoff to avoid duplicates
       if (handoffProcessed) {
@@ -375,6 +451,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       }
 
       handoffProcessed = true; // Mark as processed
+
+      // Save confidence log if this is a confidence-related handoff
+      await saveConfidenceLog(conversation, executionResult);
 
       // Get agent configuration
       const agent = await agentRepository.findById(conversation.agent_id!);
@@ -392,12 +471,17 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           conversation.title,
         );
 
+        // Use executionResult.userMessage if available (e.g., from confidence guardrail)
+        const handoffMessage =
+          executionResult.userMessage ||
+          "I'm transferring you to a human agent. Someone will be with you shortly.";
+
         await conversation.addMessage({
-          content: "I'm transferring you to a human agent. Someone will be with you shortly.",
+          content: handoffMessage,
           type: MessageType.BOT_AGENT,
-          metadata: {
+          metadata: buildMessageMetadata(executionResult, {
             isHandoffMessage: true,
-          },
+          }),
         });
         break;
       }
@@ -437,33 +521,44 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             conversation.title,
           );
 
-          // Generate natural handoff message
-          const llmService = new LLMService();
-          const messages = await conversation.getMessages();
-          try {
-            const handoffMessage = await llmService.invoke({
-              history: messages,
-              prompt:
-                "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
-            });
+          // Use executionResult.userMessage if available (e.g., from confidence guardrail),
+          // otherwise generate a natural handoff message
+          let handoffMessage: string = executionResult.userMessage || "";
 
+          if (!handoffMessage) {
+            const llmService = new LLMService();
+            const messages = await conversation.getMessages();
+            try {
+              handoffMessage = await llmService.invoke({
+                history: messages,
+                prompt:
+                  "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
+              });
+            } catch (error) {
+              console.error("[Orchestrator] Error generating handoff message:", error);
+              handoffMessage =
+                "I'm transferring you to a human agent. Someone will be with you shortly.";
+            }
+          }
+
+          try {
             await conversation.addMessage({
               content: handoffMessage,
               type: MessageType.BOT_AGENT,
-              metadata: {
+              metadata: buildMessageMetadata(executionResult, {
                 isHandoffMessage: true,
                 handoffType: "available",
-              },
+              }),
             });
           } catch (error) {
             console.error("[Orchestrator] Error generating handoff message:", error);
             await conversation.addMessage({
               content: "I'm connecting you with a human agent who will be with you shortly.",
               type: MessageType.BOT_AGENT,
-              metadata: {
+              metadata: buildMessageMetadata(executionResult, {
                 isHandoffMessage: true,
                 handoffType: "available",
-              },
+              }),
             });
           }
           break;
@@ -495,15 +590,19 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           // Continue loop to process the handoff instructions
           continue;
         } else {
-          // Default fallback message
+          // Use executionResult.userMessage if available, otherwise use default
+          const unavailableMessage =
+            executionResult.userMessage ||
+            "I apologize, but no human agents are currently available.";
+
           debugLog("orchestrator", "No custom fallback, using default message");
           await conversation.addMessage({
-            content: "I apologize, but no human agents are currently available.",
+            content: unavailableMessage,
             type: MessageType.BOT_AGENT,
-            metadata: {
+            metadata: buildMessageMetadata(executionResult, {
               isHandoffMessage: true,
               handoffType: "unavailable",
-            },
+            }),
           });
           break;
         }
@@ -521,13 +620,21 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     } else {
       // Regular response (not a tool call) - end the loop
       if (executionResult.userMessage) {
+        // Save confidence log if available
+        await saveConfidenceLog(conversation, executionResult);
+
         await conversation.addMessage({
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
+          metadata: buildMessageMetadata(executionResult),
         });
         debugLog(
           "orchestrator",
           "Added bot response " + executionResult.userMessage + ", ending execution loop",
+          {
+            confidenceScore: executionResult.confidence?.score,
+            confidenceTier: executionResult.confidence?.tier,
+          },
         );
 
         break;

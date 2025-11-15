@@ -15,9 +15,6 @@
 </template>
 
 <script setup lang="ts">
-import AppSidebar from "@/components/layout/AppSidebar.vue";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import ToastContainer from "@/components/ui/ToastContainer.vue";
 import { useWebSocket } from "@/composables/useWebSocket";
 import { useNotifications } from "@/composables/useNotifications";
 import { onMounted } from "vue";

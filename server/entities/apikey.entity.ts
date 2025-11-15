@@ -1,30 +1,16 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
-import { BaseEntity } from "./base.entity";
+import { OrganizationScopedEntity } from "./base.entity";
 import type { ApiKeyScope } from "../types/auth.types";
-import { User } from "./user.entity";
 import { Organization } from "./organization.entity";
 
 @Entity("api_keys")
-@Index("idx_api_keys_user_id", ["userId"])
+@Index("idx_api_keys_organization_id", ["organizationId"])
 @Index("idx_api_keys_key_hash", ["keyHash"])
 @Index("idx_api_keys_is_active", ["isActive"])
-@Index("idx_api_keys_organization", ["organizationId"])
-export class ApiKey extends BaseEntity {
-  @Column({ type: "uuid" })
-  userId!: string;
-
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+export class ApiKey extends OrganizationScopedEntity {
+  @ManyToOne(() => Organization, (organization) => organization.apiKeys)
   @JoinColumn()
-  user?: User;
-
-  @Column({ type: "uuid", nullable: true })
-  organizationId?: string;
-
-  @ManyToOne(() => Organization, (organization) => organization.apiKeys, {
-    nullable: true,
-  })
-  @JoinColumn()
-  organization?: Organization;
+  organization!: Organization;
 
   @Column({ type: "varchar", length: 255 })
   keyHash!: string;

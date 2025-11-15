@@ -80,10 +80,6 @@ export const publicConversationsRouter = t.router({
       // Generate initial nonce for this conversation
       const nonce = await dpopCacheService.generateNonce(conversation.id);
 
-      // Add initial bot message
-      await conversation.addInitialSystemMessage();
-      await conversation.addInitialBotMessage();
-
       return {
         id: conversation.id,
         nonce,
