@@ -108,23 +108,18 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredPlaybooks.length === 0" class="text-center py-12">
-      <img src="/bale/playbook.svg" class="h-32 w-32 mx-auto" />
-      <h3 class="text-lg font-medium mb-2">
-        {{ searchQuery ? "No playbooks found" : "No playbooks created yet" }}
-      </h3>
-      <p class="text-neutral-muted mb-4">
-        {{
-          searchQuery
-            ? "Try adjusting your search terms."
-            : "Create your first playbook to automate conversations."
-        }}
-      </p>
-      <Button v-if="!searchQuery" @click="createPlaybook">
-        <Plus class="h-4 w-4 mr-2" />
-        Create Your First Playbook
-      </Button>
-    </div>
+    <EmptyState
+      v-else-if="filteredPlaybooks.length === 0"
+      :title="searchQuery ? 'No playbooks found' : 'No playbooks created yet'"
+      :description="
+        searchQuery
+          ? 'Try adjusting your search terms.'
+          : 'Create your first playbook to automate conversations.'
+      "
+      illustration="/bale/playbook.svg"
+      :action="searchQuery ? undefined : 'Create Your First Playbook'"
+      @click="createPlaybook"
+    />
 
     <!-- Playbooks Grid View -->
     <div v-else-if="viewMode === 'grid'" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
