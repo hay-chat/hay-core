@@ -6,7 +6,7 @@ export interface Organization {
   slug: string;
   logo?: string | null;
   role?: "owner" | "admin" | "member" | "viewer" | "contributor";
-  permissions?: string[];
+  permissions?: string[] | null;
   joinedAt?: Date;
   lastAccessedAt?: Date;
 }
@@ -14,8 +14,9 @@ export interface Organization {
 export interface User {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarUrl?: string | null;
   isActive?: boolean;
   isAdmin?: boolean;
   role?: "owner" | "admin" | "member" | "viewer" | "contributor";
@@ -24,7 +25,7 @@ export interface User {
   lastSeenAt?: Date;
   status?: "available" | "away";
   onlineStatus?: "online" | "away" | "offline";
-  pendingEmail?: string;
+  pendingEmail?: string | null;
   emailVerificationExpiresAt?: Date;
 }
 
@@ -58,6 +59,7 @@ export const useUserStore = defineStore("user", {
         email: userData.email,
         firstName: userData.firstName,
         lastName: userData.lastName,
+        avatarUrl: userData.avatarUrl,
         isActive: userData.isActive,
         isAdmin: userData.isAdmin,
         role: userData.role,

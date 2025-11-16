@@ -647,7 +647,7 @@ export const organizationsRouter = t.router({
           organizationId: input.organizationId,
           isActive: true,
         },
-        relations: ["organization"],
+        relations: ["organization", "organization.logoUpload"],
       });
 
       if (!userOrg) {
@@ -672,12 +672,19 @@ export const organizationsRouter = t.router({
         },
       );
 
+      // Get logo URL if exists
+      const storageService = new StorageService();
+      const logoUrl = userOrg.organization.logoUpload
+        ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+        : null;
+
       return {
         success: true,
         organization: {
           id: userOrg.organization.id,
           name: userOrg.organization.name,
           slug: userOrg.organization.slug,
+          logo: logoUrl,
           role: userOrg.role,
           permissions: userOrg.permissions,
         },

@@ -3,6 +3,7 @@ export * from "./document.entity";
 export * from "./organization.entity";
 export * from "./user.entity";
 export * from "./user-organization.entity";
+export * from "./organization-invitation.entity";
 export * from "./apikey.entity";
 export * from "./job.entity";
 export * from "./session.entity";

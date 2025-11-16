@@ -19,7 +19,19 @@
           v-else
           class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
         >
-          <Building2 class="size-4" />
+          <svg
+            width="177"
+            height="161"
+            viewBox="0 0 177 161"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="size-4"
+          >
+            <path
+              d="M169.457 154.602C169.457 154.602 46.8109 160.184 0 160.184C38.3848 20.6498 63.663 -65.8613 72.0895 98.7885C105.793 -19.35 127.327 -44.4661 127.327 95.0677C193.799 -54.6986 175.074 82.0447 169.457 154.602Z"
+              fill="white"
+            />
+          </svg>
         </div>
         <div class="flex-1 text-left">
           <div class="flex items-center gap-2">

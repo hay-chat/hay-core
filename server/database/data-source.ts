@@ -3,6 +3,7 @@ import { User } from "../entities/user.entity";
 import { ApiKey } from "../entities/apikey.entity";
 import { Organization } from "../entities/organization.entity";
 import { UserOrganization } from "../entities/user-organization.entity";
+import { OrganizationInvitation } from "../entities/organization-invitation.entity";
 import { Document } from "../entities/document.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
@@ -40,6 +41,7 @@ export const AppDataSource = new DataSource({
     ApiKey,
     Organization,
     UserOrganization,
+    OrganizationInvitation,
     Document,
     Job,
     Session,

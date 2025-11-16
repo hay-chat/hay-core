@@ -193,11 +193,11 @@
               </TableCell>
               <TableCell class="text-sm">
                 <div v-if="conversation.assignedUser" class="flex items-center space-x-2">
-                  <div
-                    class="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium"
-                  >
-                    {{ getInitials(conversation.assignedUser) }}
-                  </div>
+                  <Avatar
+                    :name="getFullName(conversation.assignedUser)"
+                    :url="conversation.assignedUser.avatarUrl"
+                    size="xs"
+                  />
                   <span>{{ getFullName(conversation.assignedUser) }}</span>
                 </div>
                 <span v-else class="text-neutral-muted">-</span>
@@ -256,6 +256,7 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { useConversationTakeover } from "@/composables/useConversationTakeover";
+import Avatar from "@/components/ui/Avatar.vue";
 
 // Router
 const router = useRouter();
@@ -293,6 +294,7 @@ interface Conversation {
     firstName?: string;
     lastName?: string;
     email?: string;
+    avatarUrl?: string | null;
   };
 }
 

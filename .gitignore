@@ -1,5 +1,6 @@
 dist
 node_modules
+uploads/
 # Plugin build outputs
 plugins/*/dist/
 plugins/*/*/dist/

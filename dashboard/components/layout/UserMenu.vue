@@ -12,11 +12,11 @@
       >
         <span class="absolute -inset-1.5" />
         <span class="sr-only">Open user menu</span>
-        <div class="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <span class="text-sm font-medium text-white">
-            {{ userInitials }}
-          </span>
-        </div>
+        <Avatar
+          :name="userStore.user?.firstName || userStore.user?.lastName || userStore.user?.email || 'User'"
+          :url="userStore.user?.avatarUrl"
+          size="sm"
+        />
       </button>
     </div>
 
@@ -124,6 +124,7 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { useOrganizationStore } from "@/stores/organization";
+import Avatar from "@/components/ui/Avatar.vue";
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
