@@ -216,27 +216,18 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading && filteredDocuments.length === 0" class="text-center py-12">
-      <img src="/bale/document.svg" class="h-32 w-32 mx-auto" />
-      <h3 class="text-lg font-medium text-foreground">
-        {{ searchQuery || typeFilter || statusFilter ? "No documents found" : "No documents yet" }}
-      </h3>
-      <p class="mt-2 text-sm text-neutral-muted">
-        {{
-          searchQuery || typeFilter || statusFilter
-            ? "Try adjusting your search or filters."
-            : "Get started by uploading your first document."
-        }}
-      </p>
-      <div class="mt-6">
-        <Button v-if="searchQuery || typeFilter || statusFilter" @click="clearFilters()">
-          Clear Filters
-        </Button>
-        <NuxtLink v-else to="/documents/import">
-          <Button>Import Document</Button>
-        </NuxtLink>
-      </div>
-    </div>
+    <EmptyState
+      v-else-if="!loading && filteredDocuments.length === 0"
+      :title="searchQuery || typeFilter || statusFilter ? 'No documents found' : 'No documents yet'"
+      :description="
+        searchQuery || typeFilter || statusFilter
+          ? 'Try adjusting your search or filters.'
+          : 'Get started by uploading your first document.'
+      "
+      illustration="/bale/document.svg"
+      :action="searchQuery || typeFilter || statusFilter ? 'Clear Filters' : 'Import Document'"
+      @click="searchQuery || typeFilter || statusFilter ? clearFilters() : $router.push('/documents/import')"
+    />
 
     <!-- Pagination -->
     <DataPagination
