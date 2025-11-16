@@ -20,7 +20,7 @@
         :icon="Package"
       />
       <MetricCard
-        title="Enabled"
+        title="Installed"
         :metric="stats.enabled"
         subtitle="Active plugins"
         :icon="CheckCircle"
@@ -135,7 +135,7 @@
               <div class="flex items-center justify-between">
                 <span class="text-neutral-muted">Status:</span>
                 <Badge :variant="plugin.enabled ? 'default' : 'secondary'">
-                  {{ plugin.enabled ? "Enabled" : "Disabled" }}
+                  {{ plugin.enabled ? "Installed" : "Not Installed" }}
                 </Badge>
               </div>
               <div class="flex items-center justify-between">
@@ -172,7 +172,7 @@
                 @click="enablePlugin(plugin.id)"
               >
                 <Plug class="h-3 w-3 mr-1" />
-                {{ enablingPlugin === plugin.id ? "Enabling..." : "Enable" }}
+                {{ enablingPlugin === plugin.id ? "Installing..." : "Install" }}
               </Button>
 
               <template v-else>
@@ -187,7 +187,7 @@
                   @click="disablePlugin(plugin.id)"
                 >
                   <Power class="h-3 w-3 mr-1" />
-                  {{ disablingPlugin === plugin.id ? "Disabling..." : "Disable" }}
+                  {{ disablingPlugin === plugin.id ? "Removing..." : "Remove" }}
                 </Button>
               </template>
             </div>
