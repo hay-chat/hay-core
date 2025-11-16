@@ -1,15 +1,17 @@
 <template>
-  <img v-if="illustration" :src="illustration" class="h-24 w-24 mx-auto" />
-  <h3 class="text-lg font-bold text-foreground mt-4">
-    {{ title }}
-  </h3>
-  <p class="mt-2 text-sm text-neutral-muted">
-    {{ description }}
-  </p>
-  <div class="mt-6">
-    <Button :disabled="disabled" @click="actionClick">
-      {{ action }}
-    </Button>
+  <div class="p-4">
+    <img v-if="illustration" :src="illustration" class="h-24 w-24 mx-auto" />
+    <h3 class="text-xl font-bold text-foreground mt-6 text-center">
+      {{ title }}
+    </h3>
+    <p class="mt-2 text-sm text-neutral-muted text-center">
+      {{ description }}
+    </p>
+    <div class="mt-6 mx-auto text-center">
+      <Button :disabled="disabled" @click="actionClick">
+        {{ action }}
+      </Button>
+    </div>
   </div>
 </template>
 

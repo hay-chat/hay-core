@@ -119,23 +119,18 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredConversations.length === 0" class="text-center py-12">
-      <img src="/bale/conversation.svg" class="h-32 w-32 mx-auto" />
-      <h3 class="text-lg font-medium mb-2">
-        {{ searchQuery ? "No conversations found" : "No conversations yet" }}
-      </h3>
-      <p class="text-neutral-muted mb-4">
-        {{
-          searchQuery
-            ? "Try adjusting your search terms or filters."
-            : "Click 'New Conversation' to start your first conversation."
-        }}
-      </p>
-      <Button v-if="!searchQuery" @click="openPlayground">
-        <Plus class="h-4 w-4 mr-2" />
-        Start Playground
-      </Button>
-    </div>
+    <EmptyState
+      v-else-if="filteredConversations.length === 0"
+      :title="searchQuery ? 'No conversations found' : 'No conversations yet'"
+      :description="
+        searchQuery
+          ? 'Try adjusting your search terms or filters.'
+          : 'Click \'New Conversation\' to start your first conversation.'
+      "
+      illustration="/bale/conversation.svg"
+      :action="searchQuery ? undefined : 'Start Playground'"
+      @click="openPlayground"
+    />
 
     <!-- Conversations Table -->
     <Card v-else>
