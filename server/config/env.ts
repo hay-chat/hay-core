@@ -155,6 +155,25 @@ export const config = {
     enabled: process.env.SMTP_ENABLED === "true",
   },
 
+  storage: {
+    local: {
+      uploadDir: process.env.LOCAL_UPLOAD_PATH || "./server/uploads",
+      get baseUrl() {
+        return `${getApiUrl()}/uploads`;
+      },
+    },
+    s3: {
+      endpoint: process.env.S3_ENDPOINT || null,
+      region: process.env.S3_REGION || null,
+      bucket: process.env.S3_BUCKET || null,
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || null,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || null,
+    },
+    limits: {
+      maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
+    },
+  },
+
   privacy: {
     downloadIpRestriction: process.env.PRIVACY_DOWNLOAD_IP_RESTRICTION === "true",
     maxDownloadCount: parseInt(process.env.PRIVACY_MAX_DOWNLOAD_COUNT || "1", 10),

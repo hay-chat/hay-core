@@ -1,6 +1,8 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
+import { UserOrganization } from "./user-organization.entity";
+import { getDefaultScopesForRole, hasRequiredScope, type Resource, type Action } from "@server/types/scopes";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -19,6 +21,9 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   lastName?: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  avatarUrl?: string;
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
@@ -39,7 +44,7 @@ export class User extends BaseEntity {
   organizationId?: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })
-  role!: "owner" | "admin" | "member" | "viewer";
+  role!: "owner" | "admin" | "member" | "viewer" | "contributor";
 
   @Column({ type: "jsonb", nullable: true })
   permissions?: string[];
@@ -61,45 +66,60 @@ export class User extends BaseEntity {
   @JoinColumn()
   organization?: Organization;
 
+  // Many-to-many relationship with organizations (new multi-org support)
+  @OneToMany(() => UserOrganization, (userOrg) => userOrg.user)
+  userOrganizations!: UserOrganization[];
+
   // Helper methods
   toJSON(): any {
     const { password: _password, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
 
+  /**
+   * Check if user has a specific scope (legacy user-level permissions)
+   * This is used as a fallback when there's no organization context
+   * Uses the same scope matching system as UserOrganization
+   */
   hasScope(resource: string, action: string): boolean {
-    // Check role-based permissions
-    if (this.role === "owner" || this.role === "admin") {
-      return true;
+    if (!this.isActive) {
+      return false;
     }
 
-    // Check specific permissions
-    if (this.permissions && this.permissions.length > 0) {
-      return this.permissions.includes(`${resource}:${action}`);
-    }
+    // Get default scopes for the user's role
+    const defaultScopes = getDefaultScopesForRole(this.role);
 
-    // Default permissions based on role
-    if (this.role === "member") {
-      return ["read", "create", "update"].includes(action);
-    }
+    // Combine default role scopes with custom permissions
+    const allScopes = [
+      ...defaultScopes,
+      ...(this.permissions || []),
+    ];
 
-    if (this.role === "viewer") {
-      return action === "read";
-    }
-
-    return false;
+    // Use the scope matching system to check permissions
+    return hasRequiredScope(resource as Resource, action as Action, allScopes);
   }
 
-  canAccess(_resource: string): boolean {
-    return this.isActive && !!this.organizationId;
+  /**
+   * Get all scopes for the user (legacy user-level permissions)
+   * Combines role-based default scopes with custom permissions
+   */
+  getScopes(): string[] {
+    const defaultScopes = getDefaultScopesForRole(this.role);
+    return [
+      ...defaultScopes,
+      ...(this.permissions || []),
+    ];
   }
 
-  isOrganizationOwner(): boolean {
-    return this.role === "owner";
-  }
-
-  isOrganizationAdmin(): boolean {
-    return this.role === "owner" || this.role === "admin";
+  /**
+   * Check if user can access a specific resource (legacy user-level check)
+   * Validates user is active and has organization context
+   */
+  canAccess(resource: string, action: string = "read"): boolean {
+    if (!this.isActive || !this.organizationId) {
+      return false;
+    }
+    return this.hasScope(resource, action);
   }
 
   getFullName(): string {

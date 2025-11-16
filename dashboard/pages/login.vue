@@ -1,6 +1,24 @@
 <template>
   <NuxtLayout name="auth">
     <div class="space-y-6">
+      <!-- Invitation Context Banner -->
+      <div
+        v-if="invitationContext"
+        class="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-2"
+      >
+        <p class="font-semibold text-primary">
+          Login to join <strong>{{ invitationContext.organization.name }}</strong> as
+          <strong class="capitalize">{{ invitationContext.role }}</strong>
+        </p>
+        <div v-if="invitationContext.invitedBy" class="text-sm text-gray-600">
+          Invited by {{ invitationContext.invitedBy.name }}
+          <span class="text-gray-500">({{ invitationContext.invitedBy.email }})</span>
+        </div>
+        <p v-if="invitationContext.message" class="text-sm text-gray-700 italic">
+          "{{ invitationContext.message }}"
+        </p>
+      </div>
+
       <!-- Header -->
       <div class="text-center">
         <CardTitle class="text-2xl"> Welcome back </CardTitle>
@@ -120,6 +138,7 @@
 <script setup lang="ts">
 import { validateEmail } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { Hay } from "@/utils/api";
 
 definePageMeta({
   layout: false,
@@ -128,14 +147,70 @@ definePageMeta({
 
 // Navigation
 const router = useRouter();
+const route = useRoute();
 
 // Auth store
 const authStore = useAuthStore();
 
+// Get redirect URL from query params
+const redirectUrl = computed(() => (route.query.redirect as string) || "/");
+
+// Invitation context
+interface InvitationContext {
+  email: string;
+  role: string;
+  organization: {
+    name: string;
+  };
+  invitedBy?: {
+    name: string;
+    email: string;
+  };
+  message?: string;
+}
+
+const invitationContext = ref<InvitationContext | null>(null);
+
+// Extract token from redirect URL
+const extractTokenFromRedirect = (redirectUrl: string): string | null => {
+  try {
+    const url = new URL(redirectUrl, window.location.origin);
+    return url.searchParams.get("token");
+  } catch {
+    return null;
+  }
+};
+
+// Load invitation context if present
+const loadInvitationContext = async () => {
+  const token = extractTokenFromRedirect(redirectUrl.value);
+  if (!token) return;
+
+  try {
+    const invitation = await Hay.invitations.getInvitationByToken.query({ token });
+    invitationContext.value = {
+      email: invitation.email,
+      role: invitation.role,
+      organization: {
+        name: invitation.organization.name,
+      },
+      invitedBy: invitation.invitedBy || undefined,
+      message: invitation.message,
+    };
+
+    // Pre-fill email if we have invitation context
+    form.email = invitation.email;
+  } catch (err) {
+    console.error("Failed to load invitation context:", err);
+  }
+};
+
 // Redirect to home if already logged in
 onMounted(() => {
   if (authStore.isAuthenticated) {
-    router.push("/");
+    router.push(redirectUrl.value);
+  } else {
+    loadInvitationContext();
   }
 });
 
@@ -200,8 +275,8 @@ const handleSubmit = async () => {
   try {
     await authStore.login(form.email, form.password);
 
-    // Successful login - redirect to dashboard
-    await router.push("/");
+    // Successful login - redirect to the intended page or dashboard
+    await router.push(redirectUrl.value);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     // Handle different types of authentication errors

@@ -1,10 +1,12 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn, OneToOne } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
+import { UserOrganization } from "./user-organization.entity";
 import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
 import { Agent } from "../database/entities/agent.entity";
+import { Upload } from "./upload.entity";
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
 import {
   DateFormat,
@@ -33,10 +35,15 @@ export class Organization extends BaseEntity {
   isActive!: boolean;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  logo?: string;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
   website?: string;
+
+  // Logo upload relationship
+  @OneToOne(() => Upload, { nullable: true, eager: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "logo_upload_id" })
+  logoUpload?: Upload;
+
+  @Column({ type: "uuid", nullable: true })
+  logoUploadId?: string;
 
   @Column({ type: "jsonb", nullable: true })
   settings?: OrganizationSettings;
@@ -92,6 +99,10 @@ export class Organization extends BaseEntity {
   @OneToMany(() => User, (user) => user.organization)
   users!: User[];
 
+  // Many-to-many relationship with users (new multi-org support)
+  @OneToMany(() => UserOrganization, (userOrg) => userOrg.organization)
+  userOrganizations!: UserOrganization[];
+
   @OneToMany(() => Document, (document) => document.organization)
   documents!: Document[];
 
@@ -102,13 +113,6 @@ export class Organization extends BaseEntity {
   jobs!: Job[];
 
   // Helper methods
-  generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
-  }
-
   canAddUser(currentUserCount: number): boolean {
     if (!this.limits?.maxUsers) return true;
     return currentUserCount < this.limits.maxUsers;

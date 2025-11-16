@@ -1,11 +1,7 @@
 <template>
-  <Page
-    title="Customer Privacy"
-    description="Manage GDPR data requests for your customers"
-  >
+  <Page title="Customer Privacy" description="Manage GDPR data requests for your customers">
     <!-- Info Alert -->
     <Alert class="mb-6">
-      <InfoIcon class="h-4 w-4" />
       <AlertTitle>Customer Privacy Management</AlertTitle>
       <AlertDescription>
         Organizations can initiate GDPR data export or deletion requests on behalf of their
@@ -197,27 +193,27 @@ const formatTime = (date: Date): string => {
 // Computed properties
 const identifierLabel = computed(() => {
   switch (identifierType.value) {
-    case 'email':
-      return 'Customer Email Address';
-    case 'phone':
-      return 'Customer Phone Number';
-    case 'externalId':
-      return 'External Customer ID';
+    case "email":
+      return "Customer Email Address";
+    case "phone":
+      return "Customer Phone Number";
+    case "externalId":
+      return "External Customer ID";
     default:
-      return 'Customer Identifier';
+      return "Customer Identifier";
   }
 });
 
 const identifierPlaceholder = computed(() => {
   switch (identifierType.value) {
-    case 'email':
-      return 'customer@example.com';
-    case 'phone':
-      return '+1234567890';
-    case 'externalId':
-      return 'cust_abc123';
+    case "email":
+      return "customer@example.com";
+    case "phone":
+      return "+1234567890";
+    case "externalId":
+      return "cust_abc123";
     default:
-      return 'Enter customer identifier';
+      return "Enter customer identifier";
   }
 });
 
@@ -253,7 +249,8 @@ const handleApiError = (error: unknown): void => {
       type: "service_unavailable",
       message: "Privacy service is temporarily unavailable. Please try again in a few minutes.",
     };
-    errorMessage.value = "Privacy service is temporarily unavailable. Please try again in a few minutes.";
+    errorMessage.value =
+      "Privacy service is temporarily unavailable. Please try again in a few minutes.";
   } else if (
     errMessage.toLowerCase().includes("verification email") ||
     errMessage.toLowerCase().includes("email")
@@ -324,7 +321,7 @@ const fetchRequests = async () => {
 
     requests.value = result.requests;
   } catch (error) {
-    console.error('Failed to fetch privacy requests:', error);
+    console.error("Failed to fetch privacy requests:", error);
   } finally {
     tableLoading.value = false;
   }

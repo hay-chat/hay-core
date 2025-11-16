@@ -10,6 +10,7 @@ import { pluginsRouter } from "./plugins";
 import { publicConversationsRouter } from "./public-conversations";
 import { analyticsRouter } from "./analytics";
 import { organizationsRouter } from "./organizations";
+import { invitationsRouter } from "./invitations";
 import { sourcesRouter } from "./sources";
 import { messageFeedbackRouter } from "./message-feedback";
 import { onboardingRouter } from "./onboarding";
@@ -31,6 +32,7 @@ const coreRouters = {
   publicConversations: publicConversationsRouter,
   analytics: analyticsRouter,
   organizations: organizationsRouter,
+  invitations: invitationsRouter,
   sources: sourcesRouter,
   messageFeedback: messageFeedbackRouter,
   onboarding: onboardingRouter,
