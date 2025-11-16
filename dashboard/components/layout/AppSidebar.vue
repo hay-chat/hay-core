@@ -57,7 +57,7 @@ const user = computed(() => {
     return {
       name: "User",
       email: "user@example.com",
-      avatar: "/avatars/user.jpg",
+      avatar: null,
     };
   }
 
@@ -66,7 +66,7 @@ const user = computed(() => {
       ? `${userStore.user.firstName || ""} ${userStore.user.lastName || ""}`.trim() || "User"
       : "User",
     email: userStore.user?.email || "user@example.com",
-    avatar: "/avatars/user.jpg",
+    avatar: userStore.user?.avatarUrl || null,
   };
 });
 
@@ -170,19 +170,14 @@ const navMain = computed(() => {
       isActive: isPathActive("/settings"),
       items: [
         {
-          title: "Profile",
-          url: "/settings/profile",
-          isActive: route.path === "/settings/profile",
+          title: "General",
+          url: "/settings/general",
+          isActive: route.path === "/settings/general",
         },
         {
           title: "Agents",
           url: "/agents",
           isActive: isPathActive("/agents"),
-        },
-        {
-          title: "General",
-          url: "/settings/general",
-          isActive: route.path === "/settings/general",
         },
         {
           title: "Users",
@@ -203,6 +198,11 @@ const navMain = computed(() => {
           title: "API Tokens",
           url: "/settings/api-tokens",
           isActive: route.path === "/settings/api-tokens",
+        },
+        {
+          title: "My Profile",
+          url: "/settings/profile",
+          isActive: route.path === "/settings/profile",
         },
         // Add plugin menu items for settings
         ...pluginMenuItems.value

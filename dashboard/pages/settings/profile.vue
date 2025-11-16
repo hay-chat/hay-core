@@ -4,6 +4,64 @@
     description="Manage your personal information and account security"
     width="max"
   >
+    <!-- Profile Picture -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Profile Picture</CardTitle>
+        <CardDescription>Upload a photo to personalize your profile</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <!-- Avatar Preview -->
+        <div class="flex items-start gap-6">
+          <Avatar
+            :name="currentUser?.firstName || currentUser?.lastName || currentUser?.email || 'User'"
+            :url="avatarUpload.preview.value || currentUser?.avatarUrl"
+            size="2xl"
+          />
+          <div class="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="avatarUpload.isUploading.value"
+              @click="triggerFileInput"
+            >
+              <Save class="h-4 w-4 mr-2" />
+              Change Photo
+            </Button>
+            <Button
+              v-if="avatarUpload.preview.value || currentUser?.avatarUrl"
+              variant="outline"
+              size="sm"
+              :disabled="avatarUpload.isUploading.value"
+              @click="removeAvatar"
+            >
+              <Trash2 class="h-4 w-4 mr-2" />
+              Remove Photo
+            </Button>
+          </div>
+        </div>
+
+        <!-- File Input (hidden) -->
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          class="hidden"
+          @change="handleAvatarSelect"
+        />
+
+        <p class="text-sm text-muted-foreground">
+          Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)
+        </p>
+        <p v-if="avatarUpload.error.value" class="text-sm text-destructive">
+          {{ avatarUpload.error.value }}
+        </p>
+        <p v-if="avatarUpload.isUploading.value" class="text-sm text-blue-600">
+          Uploading avatar...
+        </p>
+      </CardContent>
+    </Card>
+
     <!-- Profile Information -->
     <Card>
       <CardHeader>
@@ -227,17 +285,27 @@
 </template>
 
 <script setup lang="ts">
-import { Save, Mail, Lock, Shield, Key, UserX } from "lucide-vue-next";
+import { Save, Mail, Lock, Shield, Key, UserX, Trash2 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { validateEmail as validateEmailUtil, validatePassword } from "@/lib/utils";
+import { useFileUpload } from "@/composables/useFileUpload";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 import ReauthModal from "@/components/auth/ReauthModal.vue";
+import Avatar from "@/components/ui/Avatar.vue";
 
 const toast = useToast();
 const userStore = useUserStore();
 const currentUser = computed(() => userStore.user);
+
+// Avatar upload
+const avatarUpload = useFileUpload({
+  accept: "image/*",
+  maxSizeMB: 2,
+});
+
+const fileInputRef = ref<HTMLInputElement | null>(null);
 
 // Profile form
 const profileForm = reactive({
@@ -328,6 +396,75 @@ const refreshUserData = async () => {
     userStore.setUser(userDataWithDates);
   } catch (error) {
     console.error("Failed to refresh user data:", error);
+  }
+};
+
+// Avatar upload functions
+const triggerFileInput = () => {
+  fileInputRef.value?.click();
+};
+
+const handleAvatarSelect = async (event: Event) => {
+  avatarUpload.error.value = null;
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  // Validate size
+  if (file.size > 2 * 1024 * 1024) {
+    avatarUpload.error.value = "File too large (max 2MB)";
+    return;
+  }
+
+  try {
+    avatarUpload.isUploading.value = true;
+
+    // Read file as base64
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve, reject) => {
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        resolve(result);
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+    const base64 = await base64Promise;
+
+    // Upload avatar immediately
+    await Hay.auth.uploadAvatar.mutate({
+      avatar: base64,
+    });
+
+    // Reload user data to get the new avatar URL
+    await refreshUserData();
+
+    toast.success("Profile picture uploaded successfully");
+
+    // Clear the file input so the same file can be selected again if needed
+    target.value = "";
+  } catch (error) {
+    console.error("Failed to upload avatar:", error);
+    toast.error("Failed to upload profile picture. Please try again.");
+    avatarUpload.error.value = "Failed to upload profile picture";
+  } finally {
+    avatarUpload.isUploading.value = false;
+  }
+};
+
+const removeAvatar = async () => {
+  try {
+    await Hay.auth.deleteAvatar.mutate();
+    toast.success("Profile picture removed successfully");
+    avatarUpload.reset();
+
+    // Reload user data to clear the avatar URL
+    await refreshUserData();
+  } catch (error) {
+    console.error("Failed to remove avatar:", error);
+    toast.error("Failed to remove profile picture. Please try again.");
   }
 };
 

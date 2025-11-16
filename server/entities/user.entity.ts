@@ -22,6 +22,9 @@ export class User extends BaseEntity {
   @Column({ type: "varchar", length: 255, nullable: true })
   lastName?: string;
 
+  @Column({ type: "varchar", length: 500, nullable: true })
+  avatarUrl?: string;
+
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
 

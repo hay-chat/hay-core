@@ -18,6 +18,7 @@ import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
+import { handleUpload } from "@server/lib/upload-helper";
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -294,12 +295,13 @@ export const authRouter = t.router({
     .output(z.object({
       id: z.string(),
       email: z.string(),
-      pendingEmail: z.string().optional(),
-      firstName: z.string().optional(),
-      lastName: z.string().optional(),
+      pendingEmail: z.string().nullable().optional(),
+      firstName: z.string().nullable().optional(),
+      lastName: z.string().nullable().optional(),
+      avatarUrl: z.string().nullable().optional(),
       isActive: z.boolean(),
-      lastLoginAt: z.date().nullable().optional(),
-      lastSeenAt: z.date().nullable().optional(),
+      lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
+      lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
       status: z.enum(["available", "away"]).optional(),
       onlineStatus: z.enum(["online", "away", "offline"]),
       authMethod: z.string(),
@@ -309,9 +311,9 @@ export const authRouter = t.router({
         slug: z.string(),
         logo: z.string().nullable().optional(),
         role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
-        permissions: z.array(z.string()).optional(),
-        joinedAt: z.date().optional(),
-        lastAccessedAt: z.date().nullable().optional(),
+        permissions: z.array(z.string()).nullable().optional(),
+        joinedAt: z.union([z.date(), z.string()]).optional(),
+        lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
       })),
       activeOrganizationId: z.string().optional(),
       role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
@@ -363,6 +365,7 @@ export const authRouter = t.router({
       pendingEmail: user.pendingEmail,
       firstName: user.firstName,
       lastName: user.lastName,
+      avatarUrl: user.avatarUrl,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
       lastSeenAt: user.lastSeenAt,
@@ -534,6 +537,114 @@ export const authRouter = t.router({
         user: user.toJSON(),
       };
     }),
+
+  uploadAvatar: protectedProcedure
+    .input(
+      z.object({
+        avatar: z.string(), // base64 data URI
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      try {
+        const storageService = new StorageService();
+
+        // Upload new avatar
+        const result = await handleUpload(
+          input.avatar,
+          "avatars",
+          ctx.user!.organizationId || "",
+          ctx.user!.id,
+          { maxSize: 2 * 1024 * 1024 }, // 2MB for avatars
+        );
+
+        // Delete old avatar upload if exists (extract ID from old URL)
+        if (user.avatarUrl) {
+          try {
+            // The avatarUrl might contain the upload ID
+            // We'll try to extract and delete the old upload
+            const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
+            if (uploadIdMatch) {
+              await storageService.delete(uploadIdMatch[1]);
+            }
+          } catch (error) {
+            console.error("Failed to delete old avatar:", error);
+            // Continue even if deletion fails
+          }
+        }
+
+        // Update user with new avatar URL
+        user.avatarUrl = result.url;
+        await userRepository.save(user);
+
+        return {
+          success: true,
+          avatarUrl: result.url,
+        };
+      } catch (error) {
+        console.error("Failed to upload avatar:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to upload avatar. Please try again.",
+        });
+      }
+    }),
+
+  deleteAvatar: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    if (!user.avatarUrl) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No avatar to delete",
+      });
+    }
+
+    try {
+      const storageService = new StorageService();
+
+      // Extract upload ID from URL
+      const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
+      if (uploadIdMatch) {
+        await storageService.delete(uploadIdMatch[1]);
+      }
+
+      // Clear avatar URL from user
+      user.avatarUrl = null as any;
+      await userRepository.save(user);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("Failed to delete avatar:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to delete avatar. Please try again.",
+      });
+    }
+  }),
 
   updateEmail: protectedProcedure
     .input(

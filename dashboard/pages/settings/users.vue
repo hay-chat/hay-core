@@ -69,11 +69,15 @@
                 class="flex items-center justify-between p-4 rounded-lg border"
               >
                 <div class="flex items-center gap-3">
-                  <div
-                    class="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700"
-                  >
-                    <User class="h-5 w-5" />
-                  </div>
+                  <Avatar
+                    :name="
+                      member.firstName || member.lastName
+                        ? `${member.firstName || ''} ${member.lastName || ''}`.trim()
+                        : member.email
+                    "
+                    :url="member.avatarUrl"
+                    size="md"
+                  />
                   <div>
                     <p class="font-medium">
                       {{
@@ -314,6 +318,7 @@ import {
 import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import Avatar from "@/components/ui/Avatar.vue";
 
 const userStore = useUserStore();
 const toastService = useToast();
