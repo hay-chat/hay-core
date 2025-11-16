@@ -38,6 +38,26 @@ export class PrivacyService {
     userAgent?: string,
   ): Promise<{ requestId: string; expiresAt: Date }> {
     email = email.toLowerCase();
+
+    // Check rate limits (defense in depth - also checked at router level)
+    if (ipAddress) {
+      const { rateLimitService } = await import("./rate-limit.service");
+      const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
+      if (ipLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+
+      const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
+      if (emailLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+
+      const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
+      if (combinedLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+    }
+
     const userRepository = AppDataSource.getRepository(User);
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
@@ -105,88 +125,92 @@ export class PrivacyService {
    * Confirm data export with verification token
    */
   async confirmExport(token: string): Promise<{ requestId: string; jobId: string }> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
+    // Use transaction to prevent race conditions
+    return AppDataSource.transaction(async (manager) => {
+      const requestRepository = manager.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
-      where: {
-        type: "export",
-        status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
-      },
-    });
+      // Find matching request
+      const requests = await requestRepository.find({
+        where: {
+          type: "export",
+          status: "pending_verification",
+          verificationTokenHash: Not(IsNull()),
+        },
+      });
 
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
+      let request: PrivacyRequest | null = null;
+      for (const req of requests) {
+        if (req.verificationTokenHash) {
+          const isValid = await verifyPassword(token, req.verificationTokenHash);
+          if (isValid) {
+            request = req;
+            break;
+          }
         }
       }
-    }
 
-    if (!request) {
-      throw new Error("Invalid or expired verification token");
-    }
+      if (!request) {
+        throw new Error("Invalid or expired verification token");
+      }
 
-    if (request.isExpired()) {
-      request.status = "expired";
+      if (request.isExpired()) {
+        request.status = "expired";
+        await requestRepository.save(request);
+        throw new Error("Verification token has expired");
+      }
+
+      // Mark as verified and save immediately to prevent concurrent confirmations
+      request.markVerified();
       await requestRepository.save(request);
-      throw new Error("Verification token has expired");
-    }
 
-    // Mark as verified
-    request.markVerified();
+      // Create background job for export
+      const jobRepository = manager.getRepository(Job);
+      const userRepository = manager.getRepository(User);
 
-    // Create background job for export
-    const jobRepository = AppDataSource.getRepository(Job);
-    const userRepository = AppDataSource.getRepository(User);
+      const user = request.userId
+        ? await userRepository.findOne({ where: { id: request.userId } })
+        : null;
 
-    const user = request.userId
-      ? await userRepository.findOne({ where: { id: request.userId } })
-      : null;
+      const job = jobRepository.create({
+        title: `Data Export for ${request.email}`,
+        description: `GDPR data export request`,
+        status: JobStatus.PENDING,
+        priority: JobPriority.HIGH,
+        organizationId: user?.organizationId,
+        data: {
+          requestId: request.id,
+          email: request.email,
+          userId: request.userId,
+        },
+      });
 
-    const job = jobRepository.create({
-      title: `Data Export for ${request.email}`,
-      description: `GDPR data export request`,
-      status: JobStatus.PENDING,
-      priority: JobPriority.HIGH,
-      organizationId: user?.organizationId,
-      data: {
+      await jobRepository.save(job);
+
+      // Link job to request
+      request.markProcessing(job.id);
+      await requestRepository.save(request);
+
+      // Log audit trail
+      await this.logPrivacyAction("privacy.export.confirm", request.email, request.userId, {
         requestId: request.id,
-        email: request.email,
-        userId: request.userId,
-      },
+        jobId: job.id,
+      });
+
+      // Process export asynchronously
+      this.processExportJob(job.id, request.id).catch((error) => {
+        console.error("[Privacy] Export job failed:", error);
+      });
+
+      debugLog("privacy", `Export confirmed for ${request.email}`, {
+        requestId: request.id,
+        jobId: job.id,
+      });
+
+      return {
+        requestId: request.id,
+        jobId: job.id,
+      };
     });
-
-    await jobRepository.save(job);
-
-    // Link job to request
-    request.markProcessing(job.id);
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("privacy.export.confirm", request.email, request.userId, {
-      requestId: request.id,
-      jobId: job.id,
-    });
-
-    // Process export asynchronously
-    this.processExportJob(job.id, request.id).catch((error) => {
-      console.error("[Privacy] Export job failed:", error);
-    });
-
-    debugLog("privacy", `Export confirmed for ${request.email}`, {
-      requestId: request.id,
-      jobId: job.id,
-    });
-
-    return {
-      requestId: request.id,
-      jobId: job.id,
-    };
   }
 
   /**
@@ -198,6 +222,26 @@ export class PrivacyService {
     userAgent?: string,
   ): Promise<{ requestId: string; expiresAt: Date }> {
     email = email.toLowerCase();
+
+    // Check rate limits (defense in depth - also checked at router level)
+    if (ipAddress) {
+      const { rateLimitService } = await import("./rate-limit.service");
+      const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
+      if (ipLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+
+      const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
+      if (emailLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+
+      const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
+      if (combinedLimit.limited) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+    }
+
     const userRepository = AppDataSource.getRepository(User);
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
@@ -793,8 +837,8 @@ export class PrivacyService {
       const auditLogs = await auditLogRepository.find({ where: { userId } });
 
       for (const log of auditLogs) {
-        // Anonymize user identifier
-        log.userId = "deleted-user";
+        // Anonymize user identifier - set to null since userId is UUID type
+        log.userId = null as any;
 
         // Anonymize IP addresses
         if (log.ipAddress) {
@@ -803,7 +847,7 @@ export class PrivacyService {
 
         // Anonymize user agent
         if (log.userAgent) {
-          log.userAgent = "anonymized-user-agent";
+          log.userAgent = "deleted";
         }
 
         // Anonymize PII in changes/metadata JSON fields
@@ -821,8 +865,8 @@ export class PrivacyService {
       // Soft delete user
       user.softDelete();
       user.email = `deleted-${userId}@deleted.local`;
-      user.firstName = undefined;
-      user.lastName = undefined;
+      user.firstName = null as any;
+      user.lastName = null as any;
       user.password = "deleted";
 
       await userRepository.save(user);
