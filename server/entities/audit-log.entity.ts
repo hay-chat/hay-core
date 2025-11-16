@@ -37,7 +37,18 @@ export type AuditAction =
   | "organization.invitation.cancel"
   | "organization.invitation.resend"
   | "organization.member.role_change"
-  | "organization.member.remove";
+  | "organization.member.remove"
+  | "agent.create"
+  | "agent.update"
+  | "agent.delete"
+  | "playbook.create"
+  | "playbook.update"
+  | "playbook.delete"
+  | "playbook.publish"
+  | "document.create"
+  | "document.update"
+  | "document.delete"
+  | "permission.denied";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

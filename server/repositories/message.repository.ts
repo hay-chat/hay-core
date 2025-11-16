@@ -29,10 +29,26 @@ export class MessageRepository {
     return await this.getRepository().save(messageEntities);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   */
   async findById(id: string): Promise<Message | null> {
     return await this.getRepository().findOne({
       where: { id },
     });
+  }
+
+  /**
+   * Find message by ID and organizationId - ensures proper organization scoping
+   * Messages are scoped through their parent conversation's organization
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Message | null> {
+    return await this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoin("message.conversation", "conversation")
+      .where("message.id = :id", { id })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .getOne();
   }
 
   async findByConversation(conversationId: string): Promise<Message[]> {

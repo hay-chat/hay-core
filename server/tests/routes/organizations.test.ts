@@ -18,8 +18,8 @@ describe("Organization Management", () => {
           (uo) => uo.role === "owner" && uo.isActive,
         ).length;
 
-        const oldRole = "owner";
-        const newRole = "admin";
+        const oldRole: string = "owner";
+        const newRole: string = "admin";
 
         // Check if this would leave no owners
         const wouldRemoveLastOwner = oldRole === "owner" && newRole !== "owner" && ownerCount <= 1;
@@ -50,8 +50,8 @@ describe("Organization Management", () => {
           (uo) => uo.role === "owner" && uo.isActive,
         ).length;
 
-        const oldRole = "owner";
-        const newRole = "admin";
+        const oldRole: string = "owner";
+        const newRole: string = "admin";
 
         const wouldRemoveLastOwner = oldRole === "owner" && newRole !== "owner" && ownerCount <= 1;
 
@@ -97,8 +97,8 @@ describe("Organization Management", () => {
         ).length;
 
         // Changing admin to member doesn't affect owner count
-        const oldRole = "admin";
-        const newRole = "member";
+        const oldRole: string = "admin";
+        const newRole: string = "member";
 
         const wouldRemoveLastOwner = oldRole === "owner" && newRole !== "owner" && ownerCount <= 1;
 
@@ -197,8 +197,8 @@ describe("Organization Management", () => {
     });
 
     it("should allow changing other users' roles", () => {
-      const currentUserId = "user-1";
-      const targetUserId = "user-2";
+      const currentUserId: string = "user-1";
+      const targetUserId: string = "user-2";
 
       const isSelfModification = currentUserId === targetUserId;
 
@@ -217,8 +217,8 @@ describe("Organization Management", () => {
     });
 
     it("should prevent non-owners from removing owners", () => {
-      const currentUserRole = "admin";
-      const targetUserRole = "owner";
+      const currentUserRole: string = "admin";
+      const targetUserRole: string = "owner";
 
       const isNonOwnerRemovingOwner = targetUserRole === "owner" && currentUserRole !== "owner";
 

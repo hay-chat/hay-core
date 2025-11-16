@@ -1,8 +1,9 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { SourceService } from "../../../services/source.service";
 import { SourceCategory } from "../../../types/source.types";
 import { TRPCError } from "@trpc/server";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const sourceService = new SourceService();
 
@@ -17,12 +18,12 @@ const registerSourceSchema = z.object({
 });
 
 export const sourcesRouter = t.router({
-  list: authenticatedProcedure.query(async () => {
+  list: scopedProcedure(RESOURCES.SOURCES, ACTIONS.READ).query(async () => {
     const sources = await sourceService.getAllSources();
     return sources;
   }),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.SOURCES, ACTIONS.READ)
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const source = await sourceService.getSourceById(input.id);
@@ -37,7 +38,7 @@ export const sourcesRouter = t.router({
       return source;
     }),
 
-  getByCategory: authenticatedProcedure
+  getByCategory: scopedProcedure(RESOURCES.SOURCES, ACTIONS.READ)
     .input(z.object({ category: z.nativeEnum(SourceCategory) }))
     .query(async ({ input }) => {
       const sources = await sourceService.getSourcesByCategory(input.category);
@@ -45,7 +46,7 @@ export const sourcesRouter = t.router({
     }),
 
   // Future: for plugin system to register new sources
-  register: authenticatedProcedure
+  register: scopedProcedure(RESOURCES.SOURCES, ACTIONS.CREATE)
     .input(registerSourceSchema)
     .mutation(async ({ input }) => {
       try {
@@ -59,7 +60,7 @@ export const sourcesRouter = t.router({
       }
     }),
 
-  deactivate: authenticatedProcedure
+  deactivate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       try {
@@ -81,7 +82,7 @@ export const sourcesRouter = t.router({
       }
     }),
 
-  activate: authenticatedProcedure
+  activate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       const success = await sourceService.activateSource(input.id);

@@ -133,27 +133,42 @@ export const VIEWER_SCOPES = [
  * Default scopes for member role
  */
 export const MEMBER_SCOPES = [
-  ...VIEWER_SCOPES,
-  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.CREATE),
-  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE),
-  buildScope(RESOURCES.MESSAGES, ACTIONS.CREATE),
-  buildScope(RESOURCES.CUSTOMERS, ACTIONS.CREATE),
-  buildScope(RESOURCES.CUSTOMERS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.ALL),
+  buildScope(RESOURCES.MESSAGES, ACTIONS.ALL),
+  buildScope(RESOURCES.CUSTOMERS, ACTIONS.ALL),
+  buildScope(RESOURCES.DOCUMENTS, ACTIONS.READ),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.SOURCES, ACTIONS.READ),
   buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
+  buildScope(RESOURCES.AGENTS, ACTIONS.READ),
+  buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
+  buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
+  buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
 ];
 
 /**
  * Default scopes for contributor role
  */
 export const CONTRIBUTOR_SCOPES = [
-  ...MEMBER_SCOPES,
+  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.ALL),
+  buildScope(RESOURCES.MESSAGES, ACTIONS.ALL),
+  buildScope(RESOURCES.CUSTOMERS, ACTIONS.ALL),
+  buildScope(RESOURCES.DOCUMENTS, ACTIONS.READ),
+  buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
+  buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.SOURCES, ACTIONS.READ),
+  buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
+  buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
+  buildScope(RESOURCES.AGENTS, ACTIONS.READ),
   buildScope(RESOURCES.AGENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.AGENTS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.CREATE),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
+  buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
   // Note: Contributors cannot publish or delete - requires admin approval
 ];
 
@@ -170,10 +185,25 @@ export const ADMIN_SCOPES = [
 export const OWNER_SCOPES = ADMIN_SCOPES; // Same as admin
 
 /**
+ * Default scopes for agent role
+ * Agents are support staff who can handle conversations but not edit content
+ */
+export const AGENT_SCOPES = [
+  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.READ),
+  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.CREATE),
+  buildScope(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.MESSAGES, ACTIONS.READ),
+  buildScope(RESOURCES.MESSAGES, ACTIONS.CREATE),
+  buildScope(RESOURCES.CUSTOMERS, ACTIONS.READ),
+  buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
+  buildScope(RESOURCES.PLAYBOOKS, ACTIONS.EXECUTE),
+];
+
+/**
  * Get default scopes for a role
  */
 export function getDefaultScopesForRole(
-  role: "owner" | "admin" | "member" | "viewer" | "contributor",
+  role: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent",
 ): string[] {
   switch (role) {
     case "owner":
@@ -186,6 +216,8 @@ export function getDefaultScopesForRole(
       return MEMBER_SCOPES;
     case "viewer":
       return VIEWER_SCOPES;
+    case "agent":
+      return AGENT_SCOPES;
     default:
       return [];
   }

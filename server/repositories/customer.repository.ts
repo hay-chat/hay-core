@@ -29,9 +29,22 @@ export class CustomerRepository extends BaseRepository<Customer> {
     return await this.getLegacyRepository().save(customer);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   */
   override async findById(id: string): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { id },
+      relations: ["conversations"],
+    });
+  }
+
+  /**
+   * Find customer by ID and organizationId - ensures proper organization scoping
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Customer | null> {
+    return await this.getLegacyRepository().findOne({
+      where: { id, organization_id: organizationId },
       relations: ["conversations"],
     });
   }

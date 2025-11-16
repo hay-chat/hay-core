@@ -45,6 +45,7 @@
                   { label: 'Contributor', value: 'contributor' },
                   { label: 'Member', value: 'member' },
                   { label: 'Viewer', value: 'viewer' },
+                  { label: 'Agent', value: 'agent' },
                 ]"
                 @update:model-value="loadMembers(true)"
               />
@@ -240,9 +241,10 @@
               <SelectContent>
                 <SelectItem value="owner">Owner</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="contributor">Contributor</SelectItem>
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="contributor">Contributor</SelectItem>
+                <SelectItem value="agent">Agent</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -277,9 +279,10 @@
               <SelectContent>
                 <SelectItem value="owner">Owner</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="contributor">Contributor</SelectItem>
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="contributor">Contributor</SelectItem>
+                <SelectItem value="agent">Agent</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -334,7 +337,7 @@ const pageSize = ref(10);
 const totalItems = ref(0);
 const totalPages = ref(0);
 const searchQuery = ref("");
-const roleFilter = ref<"" | "owner" | "admin" | "contributor" | "member" | "viewer">("");
+const roleFilter = ref<"" | "owner" | "admin" | "contributor" | "member" | "viewer" | "agent">("");
 let searchTimeout: NodeJS.Timeout | null = null;
 
 const inviteDialogOpen = ref(false);
@@ -347,12 +350,12 @@ const memberToRemove = ref<any>(null);
 
 const inviteForm = ref({
   email: "",
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
+  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor" | "agent",
   message: "",
 });
 
 const roleForm = ref({
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
+  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor" | "agent",
 });
 
 const resendingInvitation = ref<string | null>(null);

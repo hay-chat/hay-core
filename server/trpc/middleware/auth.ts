@@ -3,6 +3,7 @@ import { t } from "@server/trpc/init";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import type { Context } from "@server/trpc/context";
 import type { Request } from "express";
+import { auditLogService } from "@server/services/audit-log.service";
 
 /**
  * Middleware to ensure user is authenticated
@@ -55,7 +56,7 @@ export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
  * Middleware to ensure user has admin access (full permissions)
  * Checks for *:* scope (full access to all resources)
  */
-const isAdmin = t.middleware(({ ctx, next }) => {
+const isAdmin = t.middleware(async ({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -65,6 +66,23 @@ const isAdmin = t.middleware(({ ctx, next }) => {
 
   // Check if user has full access (*:* scope)
   if (!ctx.user.hasScope("*", "*")) {
+    // Log permission denial
+    try {
+      await auditLogService.logPermissionDenied(
+        ctx.user.id,
+        ctx.organizationId || "",
+        "*",
+        "*",
+        {
+          userRole: ctx.user.getRole(),
+          requestedResource: "*",
+          requestedAction: "*",
+        }
+      );
+    } catch (error) {
+      console.error("Failed to log permission denial:", error);
+    }
+
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Admin access required",
@@ -83,7 +101,7 @@ const isAdmin = t.middleware(({ ctx, next }) => {
  * Middleware factory to check for specific scopes
  */
 const hasScope = (resource: string, action: string) => {
-  return t.middleware(({ ctx, next }) => {
+  return t.middleware(async ({ ctx, next }) => {
     if (!ctx.user) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -92,6 +110,23 @@ const hasScope = (resource: string, action: string) => {
     }
 
     if (!ctx.user.hasScope(resource, action)) {
+      // Log permission denial
+      try {
+        await auditLogService.logPermissionDenied(
+          ctx.user.id,
+          ctx.organizationId || "",
+          resource,
+          action,
+          {
+            userRole: ctx.user.getRole(),
+            requestedResource: resource,
+            requestedAction: action,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to log permission denial:", error);
+      }
+
       throw new TRPCError({
         code: "FORBIDDEN",
         message: `Insufficient permissions for ${action} on ${resource}`,
@@ -119,9 +154,10 @@ export const adminProcedure = t.procedure.use(isAdmin);
 
 /**
  * Create a scoped procedure with specific permissions
+ * Also ensures user is authenticated first
  */
 export const scopedProcedure = (resource: string, action: string) => {
-  return t.procedure.use(hasScope(resource, action));
+  return t.procedure.use(isAuthed).use(hasScope(resource, action));
 };
 
 /**

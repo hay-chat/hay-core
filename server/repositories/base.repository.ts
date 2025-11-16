@@ -204,10 +204,26 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     return await this.getRepository().save(entity as T & DeepPartial<T>);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   * This method does NOT check organization ownership and should only be used in
+   * contexts where organization scoping is not required (e.g., internal services)
+   */
   async findById(id: string): Promise<T | null> {
     return await this.getRepository().findOne({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       where: { id } as any,
+    });
+  }
+
+  /**
+   * Find entity by ID and organizationId - ensures proper organization scoping
+   * Use this method instead of findById to prevent cross-organization data access
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<T | null> {
+    return await this.getRepository().findOne({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      where: { id, organizationId } as any,
     });
   }
 

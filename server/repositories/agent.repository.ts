@@ -24,9 +24,21 @@ export class AgentRepository {
     return await this.getRepository().save(agent);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   */
   async findById(id: string): Promise<Agent | null> {
     return await this.getRepository().findOne({
       where: { id },
+    });
+  }
+
+  /**
+   * Find agent by ID and organizationId - ensures proper organization scoping
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Agent | null> {
+    return await this.getRepository().findOne({
+      where: { id, organization_id: organizationId },
     });
   }
 

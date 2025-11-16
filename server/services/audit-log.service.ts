@@ -448,6 +448,262 @@ export class AuditLogService {
       status: "success",
     });
   }
+
+  /**
+   * Log agent creation
+   */
+  async logAgentCreate(
+    userId: string,
+    organizationId: string,
+    agentId: string,
+    data: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "agent.create",
+      resource: "agent",
+      changes: {
+        agentId,
+        ...data,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log agent update
+   */
+  async logAgentUpdate(
+    userId: string,
+    organizationId: string,
+    agentId: string,
+    changes: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "agent.update",
+      resource: "agent",
+      changes: {
+        agentId,
+        ...changes,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log agent deletion
+   */
+  async logAgentDelete(
+    userId: string,
+    organizationId: string,
+    agentId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "agent.delete",
+      resource: "agent",
+      changes: {
+        agentId,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log playbook creation
+   */
+  async logPlaybookCreate(
+    userId: string,
+    organizationId: string,
+    playbookId: string,
+    data: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "playbook.create",
+      resource: "playbook",
+      changes: {
+        playbookId,
+        ...data,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log playbook update
+   */
+  async logPlaybookUpdate(
+    userId: string,
+    organizationId: string,
+    playbookId: string,
+    changes: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "playbook.update",
+      resource: "playbook",
+      changes: {
+        playbookId,
+        ...changes,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log playbook deletion
+   */
+  async logPlaybookDelete(
+    userId: string,
+    organizationId: string,
+    playbookId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "playbook.delete",
+      resource: "playbook",
+      changes: {
+        playbookId,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log playbook publish
+   */
+  async logPlaybookPublish(
+    userId: string,
+    organizationId: string,
+    playbookId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "playbook.publish",
+      resource: "playbook",
+      changes: {
+        playbookId,
+        status: "published",
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log document creation
+   */
+  async logDocumentCreate(
+    userId: string,
+    organizationId: string,
+    documentId: string,
+    data: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "document.create",
+      resource: "document",
+      changes: {
+        documentId,
+        ...data,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log document update
+   */
+  async logDocumentUpdate(
+    userId: string,
+    organizationId: string,
+    documentId: string,
+    changes: Record<string, any>,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "document.update",
+      resource: "document",
+      changes: {
+        documentId,
+        ...changes,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log document deletion
+   */
+  async logDocumentDelete(
+    userId: string,
+    organizationId: string,
+    documentId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "document.delete",
+      resource: "document",
+      changes: {
+        documentId,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log permission denied
+   */
+  async logPermissionDenied(
+    userId: string,
+    organizationId: string,
+    resource: string,
+    action: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "permission.denied",
+      resource,
+      changes: {
+        attemptedAction: action,
+      },
+      metadata,
+      status: "warning",
+    });
+  }
 }
 
 // Export singleton instance

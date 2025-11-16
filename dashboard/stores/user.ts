@@ -5,7 +5,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string | null;
-  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
   permissions?: string[] | null;
   joinedAt?: Date;
   lastAccessedAt?: Date;
@@ -19,7 +19,7 @@ export interface User {
   avatarUrl?: string | null;
   isActive?: boolean;
   isAdmin?: boolean;
-  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
   organizations?: Organization[];
   activeOrganizationId?: string;
   lastSeenAt?: Date;
@@ -39,6 +39,9 @@ export const useUserStore = defineStore("user", {
     activeOrganization: (state) => {
       return state.organizations.find((org) => org.id === state.activeOrganizationId) || null;
     },
+    currentOrganization: (state) => {
+      return state.organizations.find((org) => org.id === state.activeOrganizationId) || null;
+    },
     userRole: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role || state.user?.role || "member";
@@ -50,6 +53,130 @@ export const useUserStore = defineStore("user", {
     isAdmin: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role === "owner" || activeOrg?.role === "admin";
+    },
+    isAgent: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      return activeOrg?.role === "agent";
+    },
+
+    // Helper to check if user has a specific scope
+    hasScope: (state) => {
+      return (resource: string, action: string): boolean => {
+        const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+
+        // Owner and admin have full access
+        if (activeOrg?.role === "owner" || activeOrg?.role === "admin") {
+          return true;
+        }
+
+        // Check if user has the specific scope
+        const requiredScope = `${resource}:${action}`;
+        const permissions = activeOrg?.permissions || [];
+
+        return permissions.some((permission) => {
+          const [permResource, permAction] = permission.split(":");
+
+          // Exact match
+          if (permission === requiredScope) return true;
+
+          // Wildcard resource match
+          if (permResource === "*" && permAction === action) return true;
+
+          // Wildcard action match
+          if (permResource === resource && permAction === "*") return true;
+
+          // Full wildcard
+          if (permission === "*:*") return true;
+
+          return false;
+        });
+      };
+    },
+
+    // Enhanced permission helpers for common operations
+    canCreateAgents: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "agents:create" || p === "agents:*" || p === "*:*" || p === "*:create");
+    },
+
+    canEditAgents: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "agents:update" || p === "agents:*" || p === "*:*" || p === "*:update");
+    },
+
+    canDeleteAgents: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "agents:delete" || p === "agents:*" || p === "*:*" || p === "*:delete");
+    },
+
+    canCreatePlaybooks: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "playbooks:create" || p === "playbooks:*" || p === "*:*" || p === "*:create");
+    },
+
+    canEditPlaybooks: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "playbooks:update" || p === "playbooks:*" || p === "*:*" || p === "*:update");
+    },
+
+    canDeletePlaybooks: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "playbooks:delete" || p === "playbooks:*" || p === "*:*" || p === "*:delete");
+    },
+
+    canPublishPlaybooks: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "playbooks:publish" || p === "playbooks:*" || p === "*:*" || p === "*:publish");
+    },
+
+    canAccessAnalytics: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "analytics:read" || p === "analytics:*" || p === "*:*" || p === "*:read");
+    },
+
+    canManageUsers: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "organization_members:update" || p === "organization_members:*" || p === "*:*" || p === "*:update");
+    },
+
+    canManageApiKeys: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "api_keys:create" || p === "api_keys:*" || p === "*:*" || p === "*:create");
+    },
+
+    canManageOrganization: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "organizations:update" || p === "organizations:*" || p === "*:*" || p === "*:update");
+    },
+
+    canExportData: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      // Only owners can export audit logs
+      if (activeOrg?.role === "owner") return true;
+      const permissions = activeOrg?.permissions || [];
+      return permissions.some(p => p === "audit_logs:export" || p === "audit_logs:*" || p === "*:*" || p === "*:export");
     },
   },
   actions: {

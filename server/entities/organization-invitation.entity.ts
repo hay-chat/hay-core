@@ -27,7 +27,7 @@ export class OrganizationInvitation extends BaseEntity {
   invitedBy?: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })
-  role!: "owner" | "admin" | "member" | "viewer" | "contributor";
+  role!: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
 
   @Column({ type: "jsonb", nullable: true })
   permissions?: string[];
@@ -62,7 +62,10 @@ export class OrganizationInvitation extends BaseEntity {
 
   // Helper methods
   isExpired(): boolean {
-    return this.expiresAt < new Date();
+    // An invitation is considered expired if:
+    // 1. The expiration date has passed, OR
+    // 2. The status is not "pending" (accepted, declined, cancelled, or expired)
+    return this.expiresAt < new Date() || this.status !== "pending";
   }
 
   isPending(): boolean {

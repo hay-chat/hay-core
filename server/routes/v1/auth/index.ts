@@ -310,13 +310,13 @@ export const authRouter = t.router({
         name: z.string(),
         slug: z.string(),
         logo: z.string().nullable().optional(),
-        role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+        role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
         permissions: z.array(z.string()).nullable().optional(),
         joinedAt: z.union([z.date(), z.string()]).optional(),
         lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
       })),
       activeOrganizationId: z.string().optional(),
-      role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+      role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
     }))
     .query(async ({ ctx }) => {
     const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists

@@ -30,7 +30,7 @@ export class UserOrganization extends BaseEntity {
   organizationId!: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })
-  role!: "owner" | "admin" | "member" | "viewer" | "contributor";
+  role!: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
 
   @Column({ type: "jsonb", nullable: true })
   permissions?: string[];

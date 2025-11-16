@@ -1,5 +1,6 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { DocumentProcessorFactory } from "@server/processors";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
@@ -22,7 +23,7 @@ import { jobQueueService } from "@server/services/job-queue.service";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
-  search: authenticatedProcedure
+  search: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
         query: z.string(),
@@ -69,7 +70,7 @@ export const documentsRouter = t.router({
         };
       });
     }),
-  create: authenticatedProcedure
+  create: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.CREATE)
     .input(
       z.object({
         title: z.string(),
@@ -148,7 +149,7 @@ export const documentsRouter = t.router({
         metadata: metadata,
       };
     }),
-  update: authenticatedProcedure
+  update: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         id: z.string(),
@@ -223,7 +224,7 @@ export const documentsRouter = t.router({
         embeddingsRegenerated: false,
       };
     }),
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.DELETE)
     .input(
       z.object({
         id: z.string(),
@@ -257,7 +258,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  regenerateEmbeddings: authenticatedProcedure
+  regenerateEmbeddings: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         documentId: z.string().optional(),
@@ -354,7 +355,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  getEmbeddingStats: authenticatedProcedure.query(async ({ ctx }) => {
+  getEmbeddingStats: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ).query(async ({ ctx }) => {
     // Ensure vector store is initialized
     if (!vectorStoreService.initialized) {
       await vectorStoreService.initialize();
@@ -365,7 +366,7 @@ export const documentsRouter = t.router({
     return stats;
   }),
 
-  discoverWebPages: authenticatedProcedure
+  discoverWebPages: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.IMPORT)
     .input(
       z.object({
         url: z.string().url(),
@@ -406,7 +407,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  getDiscoveryJob: authenticatedProcedure
+  getDiscoveryJob: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
         jobId: z.string(),
@@ -428,7 +429,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  cancelJob: authenticatedProcedure
+  cancelJob: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         jobId: z.string(),
@@ -452,7 +453,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  importFromWeb: authenticatedProcedure
+  importFromWeb: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.IMPORT)
     .input(
       z.object({
         url: z.string().url(),
@@ -516,7 +517,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  recrawl: authenticatedProcedure
+  recrawl: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         documentId: z.string(),
@@ -561,7 +562,7 @@ export const documentsRouter = t.router({
       };
     }),
 
-  getImporters: authenticatedProcedure.query(async () => {
+  getImporters: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ).query(async () => {
     // Get enabled plugins with document_importer capability
     // For now, return only the native web importer
     // TODO: Load plugins with document_importer capability
