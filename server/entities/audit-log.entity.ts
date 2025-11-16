@@ -65,8 +65,8 @@ export class AuditLog extends TypeOrmBaseEntity {
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt!: Date;
 
-  @Column({ type: "uuid" })
-  userId!: string;
+  @Column({ type: "uuid", nullable: true })
+  userId?: string;
 
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;

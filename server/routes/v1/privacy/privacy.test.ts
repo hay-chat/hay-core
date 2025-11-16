@@ -74,11 +74,8 @@ describe("Privacy DSAR Integration Tests", () => {
       if (existingOrg.id) {
         await auditLogRepo.delete({ organizationId: existingOrg.id });
       }
-      // Clean up any audit logs with special string user IDs (created during deletion tests)
-      // Note: This uses raw query since userId column is UUID type but contains strings
-      await auditLogRepo.query(
-        "DELETE FROM audit_logs WHERE user_id::text IN ('anonymous', 'deleted-user')"
-      );
+      // Clean up any audit logs with null user IDs (created during deletion tests)
+      await auditLogRepo.delete({ userId: null as any });
 
       // 4. Users (now safe to delete as no audit logs reference them)
       await userRepo.delete({ organizationId: existingOrg.id });
@@ -241,17 +238,18 @@ describe("Privacy DSAR Integration Tests", () => {
       expect(deletedUser?.isActive).toBe(false);
       expect(deletedUser?.email).toContain("deleted-");
       expect(deletedUser?.email).toContain("@deleted.local");
-      expect(deletedUser?.firstName).toBeUndefined();
-      expect(deletedUser?.lastName).toBeUndefined();
+      expect(deletedUser?.firstName).toBeNull();
+      expect(deletedUser?.lastName).toBeNull();
 
-      // Verify audit logs were anonymized
+      // Verify audit logs were anonymized (userId set to null)
       const auditLogRepo = AppDataSource.getRepository(AuditLog);
       const anonymizedLogs = await auditLogRepo.find({
-        where: { userId: "deleted-user" },
+        where: { userId: null as any },
       });
 
       expect(anonymizedLogs.length).toBeGreaterThan(0);
       anonymizedLogs.forEach((log) => {
+        expect(log.userId).toBeNull();
         expect(log.ipAddress).toBe("0.0.0.0");
         expect(log.userAgent).toBe("deleted");
       });
@@ -576,7 +574,7 @@ describe("Privacy DSAR Integration Tests", () => {
       // Try to request deletion again
       await expect(
         privacyService.requestDeletion(testEmail, testIp, testUserAgent),
-      ).rejects.toThrow("not found");
+      ).rejects.toThrow("No account found with this email address");
     });
 
     it("should cancel pending privacy requests", async () => {
