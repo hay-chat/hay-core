@@ -30,13 +30,12 @@
     "@server": "dist",
     "@plugins": "../plugins"
   },
-  "devDependencies": {
-    "@types/jest": "^30.0.0",
+  "devDependencies": {},
+  "dependencies": {
     "@types/node-cron": "^3.0.11",
     "jest": "^30.2.0",
-    "ts-jest": "^29.4.5"
-  },
-  "dependencies": {
+    "ts-jest": "^29.4.5",
+    "@types/jest": "^30.0.0",
     "@stripe/stripe-js": "^7.9.0",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.19",
