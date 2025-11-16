@@ -5,9 +5,7 @@
       Profile Information Updated
     </mj-text>
 
-    <mj-text color="#555555" line-height="24px">
-      Hi {{userName}},
-    </mj-text>
+    <mj-text color="#555555" line-height="24px"> Hi {{ userName }}, </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
       This is to confirm that your profile information has been updated.
@@ -26,7 +24,7 @@
       Updated Fields
     </mj-text>
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      {{changedFields}}
+      {{ changedFields }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -41,10 +39,19 @@
     </mj-text>
 
     <mj-text color="#555555" font-size="13px" line-height="20px" padding="0 0 15px 0">
-      If you didn't authorize these changes, please contact our support team immediately to secure your account.
+      If you didn't authorize these changes, please contact our support team immediately to secure
+      your account.
     </mj-text>
 
-    <mj-button background-color="#007bff" color="#ffffff" font-size="14px" font-weight="600" border-radius="4px" padding="10px 0" href="{{supportUrl}}">
+    <mj-button
+      background-color="#001bf4"
+      color="#ffffff"
+      font-size="14px"
+      font-weight="600"
+      border-radius="4px"
+      padding="10px 0"
+      href="{{supportUrl}}"
+    >
       Contact Support
     </mj-button>
   </mj-column>
@@ -57,11 +64,11 @@
       Security Details
     </mj-text>
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      <strong>Email:</strong> {{userEmail}}<br/>
-      <strong>Time:</strong> {{requestTime}}<br/>
-      <strong>IP Address:</strong> {{ipAddress}}<br/>
-      <strong>Browser:</strong> {{browser}}<br/>
-      <strong>Location:</strong> {{location}}
+      <strong>Email:</strong> {{ userEmail }}<br />
+      <strong>Time:</strong> {{ requestTime }}<br />
+      <strong>IP Address:</strong> {{ ipAddress }}<br />
+      <strong>Browser:</strong> {{ browser }}<br />
+      <strong>Location:</strong> {{ location }}
     </mj-text>
   </mj-column>
 </mj-section>

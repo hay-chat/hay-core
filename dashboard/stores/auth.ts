@@ -43,19 +43,24 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async login(email: string, password: string) {
-      const result = await HayAuthApi.auth.login.mutate({
-        email,
-        password,
-      });
-      this.tokens = {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
-      };
-      const userStore = useUserStore();
-      userStore.setUser(result.user as User);
-      this.isAuthenticated = true;
-      this.updateActivity();
+      this.isLoading = true;
+      try {
+        const result = await HayAuthApi.auth.login.mutate({
+          email,
+          password,
+        });
+        this.tokens = {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
+        };
+        const userStore = useUserStore();
+        userStore.setUser(result.user as User);
+        this.isAuthenticated = true;
+        this.updateActivity();
+      } finally {
+        this.isLoading = false;
+      }
     },
 
     async logout(reason?: string) {
@@ -105,27 +110,32 @@ export const useAuthStore = defineStore("auth", {
       acceptTerms: boolean;
       acceptMarketing: boolean;
     }) {
-      const result = await HayAuthApi.auth.register.mutate({
-        organizationName: data.organizationName,
-        email: data.email,
-        firstName: data.fullName.split(" ")[0],
-        lastName: data.fullName.split(" ").slice(1).join(" "),
-        password: data.password,
-        confirmPassword: data.password,
-      });
+      this.isLoading = true;
+      try {
+        const result = await HayAuthApi.auth.register.mutate({
+          organizationName: data.organizationName,
+          email: data.email,
+          firstName: data.fullName.split(" ")[0],
+          lastName: data.fullName.split(" ").slice(1).join(" "),
+          password: data.password,
+          confirmPassword: data.password,
+        });
 
-      // Store tokens
-      this.tokens = {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
-      };
+        // Store tokens
+        this.tokens = {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
+        };
 
-      // Store user data with organization
-      const userStore = useUserStore();
-      userStore.setUser(result.user as User);
-      this.isAuthenticated = true;
-      this.updateActivity();
+        // Store user data with organization
+        const userStore = useUserStore();
+        userStore.setUser(result.user as User);
+        this.isAuthenticated = true;
+        this.updateActivity();
+      } finally {
+        this.isLoading = false;
+      }
     },
 
     async refreshTokens() {

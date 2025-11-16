@@ -4,35 +4,18 @@
       <button
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
-        <div
-          class="relative flex h-8 w-8 items-center justify-center rounded-full bg-background-tertiary"
-        >
-          <span class="text-sm font-medium text-foreground">
-            {{
-              (() => {
-                if (!user.name) return "";
-                const parts = user.name.trim().split(" ").filter(Boolean);
-                if (parts.length === 0) return "";
-                if (parts.length === 1) return parts[0][0]?.toUpperCase() || "";
-                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-              })()
-            }}
-          </span>
-          <!-- Online status indicator -->
-          <div
-            class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background"
-            :class="{
-              'bg-green-500': onlineStatus === 'online',
-              'bg-yellow-500': onlineStatus === 'away',
-              'bg-gray-400': onlineStatus === 'offline',
-            }"
-          ></div>
-        </div>
+        <Avatar
+          :name="user.name"
+          :url="user.avatar"
+          :status="onlineStatus"
+          :show-status="true"
+          size="sm"
+        />
         <div class="flex-1 text-left">
           <p class="font-medium">
             {{ user.name }}
           </p>
-          <p class="text-xs text-neutral-muted">
+          <p class="text-xs text-neutral-muted truncate max-w-[17ch]">
             {{ user.email }}
           </p>
         </div>
@@ -40,7 +23,7 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width]" align="start" side="top">
-      <DropdownMenuItem class="text-xs text-muted-foreground" disabled>Status</DropdownMenuItem>
+      <DropdownMenuLabel>Status</DropdownMenuLabel>
       <DropdownMenuItem :disabled="currentStatus === 'available'" @click="setStatus('available')">
         <div class="mr-2 h-2 w-2 rounded-full bg-green-500"></div>
         Available
@@ -81,6 +64,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
 import { useRouter } from "vue-router";
+import Avatar from "@/components/ui/Avatar.vue";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -89,7 +73,7 @@ const userStore = useUserStore();
 interface User {
   name: string;
   email: string;
-  avatar?: string;
+  avatar?: string | null;
 }
 
 interface Props {

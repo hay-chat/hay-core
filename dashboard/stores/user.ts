@@ -4,23 +4,28 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  role?: "owner" | "admin" | "member" | "viewer";
+  logo?: string | null;
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
+  permissions?: string[] | null;
+  joinedAt?: Date;
+  lastAccessedAt?: Date;
 }
 
 export interface User {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarUrl?: string | null;
   isActive?: boolean;
   isAdmin?: boolean;
-  role?: "owner" | "admin" | "member" | "viewer";
+  role?: "owner" | "admin" | "member" | "viewer" | "contributor";
   organizations?: Organization[];
   activeOrganizationId?: string;
   lastSeenAt?: Date;
   status?: "available" | "away";
   onlineStatus?: "online" | "away" | "offline";
-  pendingEmail?: string;
+  pendingEmail?: string | null;
   emailVerificationExpiresAt?: Date;
 }
 
@@ -54,6 +59,7 @@ export const useUserStore = defineStore("user", {
         email: userData.email,
         firstName: userData.firstName,
         lastName: userData.lastName,
+        avatarUrl: userData.avatarUrl,
         isActive: userData.isActive,
         isAdmin: userData.isAdmin,
         role: userData.role,
@@ -95,6 +101,23 @@ export const useUserStore = defineStore("user", {
       if (this.organizations.find((org) => org.id === organizationId)) {
         this.activeOrganizationId = organizationId;
       }
+    },
+
+    /**
+     * Switch to a different organization
+     * This updates the active organization and returns the organization info
+     */
+    async switchOrganization(organizationId: string): Promise<Organization | null> {
+      const targetOrg = this.organizations.find((org) => org.id === organizationId);
+      if (!targetOrg) {
+        return null;
+      }
+
+      // Update the active organization ID
+      // This will cause the tRPC client to use the new org ID in the x-organization-id header
+      this.activeOrganizationId = organizationId;
+
+      return targetOrg;
     },
 
     clearUser() {

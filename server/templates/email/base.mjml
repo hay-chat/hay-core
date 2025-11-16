@@ -1,7 +1,7 @@
 <mjml>
   <mj-head>
-    <mj-title>{{emailTitle}}</mj-title>
-    <mj-preview>{{emailPreview}}</mj-preview>
+    <mj-title>{{ emailTitle }}</mj-title>
+    <mj-preview>{{ emailPreview }}</mj-preview>
 
     <!-- ============================================ -->
     <!-- DESIGN SYSTEM - Global Styles & Variables   -->
@@ -24,20 +24,32 @@
       <mj-class name="text-bold" font-weight="600" />
 
       <!-- Brand Colors -->
-      <mj-class name="text-primary" color="#007bff" />
+      <mj-class name="text-primary" color="#001bf4" />
       <mj-class name="text-success" color="#28a745" />
       <mj-class name="text-warning" color="#ffc107" />
       <mj-class name="text-danger" color="#dc3545" />
       <mj-class name="text-info" color="#17a2b8" />
 
       <!-- Buttons -->
-      <mj-button background-color="#001df5" color="#ffffff" font-size="14px" font-weight="600" border-radius="6px" padding="12px 24px" />
+      <mj-button
+        background-color="#001df5"
+        color="#ffffff"
+        font-size="14px"
+        font-weight="600"
+        border-radius="6px"
+        padding="12px 24px"
+      />
       <mj-class name="btn-primary" background-color="#001df5" color="#ffffff" />
       <mj-class name="btn-success" background-color="#28a745" color="#ffffff" />
       <mj-class name="btn-danger" background-color="#dc3545" color="#ffffff" />
       <mj-class name="btn-warning" background-color="#ffc107" color="#212529" />
       <mj-class name="btn-info" background-color="#17a2b8" color="#ffffff" />
-      <mj-class name="btn-outline" background-color="#ffffff" color="#001df5" border="2px solid #001df5" />
+      <mj-class
+        name="btn-outline"
+        background-color="#ffffff"
+        color="#001df5"
+        border="2px solid #001df5"
+      />
 
       <!-- Sections -->
       <mj-section background-color="#ffffff" padding="20px 25px" />
@@ -54,19 +66,40 @@
     <!-- Custom CSS Classes -->
     <mj-style inline="inline">
       /* Links */
-      .link-nostyle { color: inherit; text-decoration: none; }
-      .link-primary { color: #007bff !important; text-decoration: none; }
-      .link-underline { text-decoration: underline; }
-      .footer-link { color: #888888 !important; text-decoration: none; }
+      .link-nostyle {
+        color: inherit;
+        text-decoration: none;
+      }
+      .link-primary {
+        color: #001bf4 !important;
+        text-decoration: none;
+      }
+      .link-underline {
+        text-decoration: underline;
+      }
+      .footer-link {
+        color: #888888 !important;
+        text-decoration: none;
+      }
 
       /* Utility Classes */
-      .word-break { word-break: break-all; }
+      .word-break {
+        word-break: break-all;
+      }
 
       /* Spacing */
-      .mb-0 { margin-bottom: 0 !important; }
-      .mb-1 { margin-bottom: 8px !important; }
-      .mb-2 { margin-bottom: 16px !important; }
-      .mb-3 { margin-bottom: 24px !important; }
+      .mb-0 {
+        margin-bottom: 0 !important;
+      }
+      .mb-1 {
+        margin-bottom: 8px !important;
+      }
+      .mb-2 {
+        margin-bottom: 16px !important;
+      }
+      .mb-3 {
+        margin-bottom: 24px !important;
+      }
     </mj-style>
   </mj-head>
 
@@ -79,18 +112,17 @@
     </mj-section>
 
     <!-- Main Content -->
-    {{content}}
+    {{ content }}
 
     <!-- Footer -->
     <mj-section background-color="#f4f4f4" padding="40px 25px">
       <mj-column>
         <mj-text align="center" font-size="12px" color="#888888" line-height="18px">
-          This email was sent to {{recipientEmail}}
+          This email was sent to {{ recipientEmail }}
         </mj-text>
 
-
         <mj-text align="center" font-size="11px" color="#999999" padding="20px 0 0 0">
-          © {{currentYear}} Hay. All rights reserved.
+          © {{ currentYear }} Hay. All rights reserved.
         </mj-text>
       </mj-column>
     </mj-section>

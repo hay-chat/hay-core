@@ -333,7 +333,7 @@
                 <Button variant="ghost" size="sm" @click="toggleAPIKey(key.id)">
                   {{ key.status === "active" ? "Disable" : "Enable" }}
                 </Button>
-                <Button variant="ghost" size="sm" @click="deleteAPIKey(key.id)">
+                <Button variant="ghost" size="sm" @click="openDeleteKeyDialog(key.id)">
                   <Trash2 class="h-4 w-4" />
                 </Button>
               </div>
@@ -486,6 +486,16 @@
       </Card>
     </div>
   </div>
+
+  <!-- Delete API Key Confirmation Dialog -->
+  <ConfirmDialog
+    v-model:open="deleteKeyDialogOpen"
+    title="Delete API Key"
+    description="Are you sure you want to delete this API key? This action cannot be undone."
+    confirm-text="Delete"
+    :destructive="true"
+    @confirm="confirmDeleteAPIKey"
+  />
 </template>
 
 <script setup lang="ts">
@@ -505,6 +515,8 @@ import {
 // Reactive state
 const originalSettings = ref({});
 const isSaving = ref(false);
+const deleteKeyDialogOpen = ref(false);
+const keyToDelete = ref<string | null>(null);
 const settings = ref({
   authentication: {
     passwordPolicy: {
@@ -693,13 +705,20 @@ const toggleAPIKey = (keyId: string) => {
   }
 };
 
-const deleteAPIKey = (keyId: string) => {
-  if (confirm("Are you sure you want to delete this API key? This action cannot be undone.")) {
-    const index = apiKeys.value.findIndex((k) => k.id === keyId);
-    if (index > -1) {
-      apiKeys.value.splice(index, 1);
-    }
+const openDeleteKeyDialog = (keyId: string) => {
+  keyToDelete.value = keyId;
+  deleteKeyDialogOpen.value = true;
+};
+
+const confirmDeleteAPIKey = () => {
+  if (!keyToDelete.value) return;
+
+  const index = apiKeys.value.findIndex((k) => k.id === keyToDelete.value);
+  if (index > -1) {
+    apiKeys.value.splice(index, 1);
   }
+
+  keyToDelete.value = null;
 };
 
 const implementRecommendation = (recId: string) => {

@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 import { Not, IsNull } from "typeorm";
 import {
   hashPassword,
@@ -16,6 +17,35 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
+import { StorageService } from "@server/services/storage.service";
+import { handleUpload } from "@server/lib/upload-helper";
+
+/**
+ * Helper function to get all organizations for a user with their roles
+ */
+async function getUserOrganizations(userId: string) {
+  const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+  const userOrganizations = await userOrgRepository.find({
+    where: { userId, isActive: true },
+    relations: ["organization", "organization.logoUpload"],
+    order: { createdAt: "ASC" },
+  });
+
+  const storageService = new StorageService();
+
+  return userOrganizations.map((userOrg) => ({
+    id: userOrg.organization.id,
+    name: userOrg.organization.name,
+    slug: userOrg.organization.slug,
+    logo: userOrg.organization.logoUpload
+      ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+      : null,
+    role: userOrg.role,
+    permissions: userOrg.permissions,
+    joinedAt: userOrg.joinedAt,
+    lastAccessedAt: userOrg.lastAccessedAt,
+  }));
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -91,23 +121,28 @@ export const authRouter = t.router({
     const sessionId = generateSessionId();
     const tokens = generateTokens(user, sessionId);
 
-    // Prepare organization data
-    const organizations = user.organization
-      ? [
-          {
-            id: user.organization.id,
-            name: user.organization.name,
-            slug: user.organization.slug,
-            role: user.role,
-          },
-        ]
-      : [];
+    // Load all user organizations (multi-org support)
+    const organizations = await getUserOrganizations(user.id);
+
+    // Determine active organization
+    // If user has UserOrganizations, use the most recently accessed one
+    // Otherwise fall back to legacy organizationId
+    let activeOrganizationId = user.organizationId;
+    if (organizations.length > 0) {
+      // Find most recently accessed, or first one if none have been accessed
+      const mostRecent = organizations.reduce((prev, current) => {
+        if (!prev.lastAccessedAt) return current;
+        if (!current.lastAccessedAt) return prev;
+        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+      });
+      activeOrganizationId = mostRecent.id;
+    }
 
     return {
       user: {
         ...user.toJSON(),
         organizations,
-        activeOrganizationId: user.organizationId,
+        activeOrganizationId,
         onlineStatus: user.getOnlineStatus(),
       },
       ...tokens,
@@ -138,23 +173,23 @@ export const authRouter = t.router({
 
       // Create organization if name provided
       if (organizationName) {
-        const orgSlug =
-          organizationSlug ||
-          organizationName
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)+/g, "");
+        // Use organizationService to generate a unique slug
+        const { organizationService } = await import("@server/services/organization.service");
 
-        // Check if slug already exists
-        const existingOrg = await organizationRepository.findOne({
-          where: { slug: orgSlug },
-        });
-
-        if (existingOrg) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "Organization slug already exists",
-          });
+        let orgSlug: string;
+        if (organizationSlug) {
+          // User provided a custom slug, check if it's available
+          const existingOrg = await organizationService.findBySlug(organizationSlug);
+          if (existingOrg) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Organization slug already exists",
+            });
+          }
+          orgSlug = organizationSlug;
+        } else {
+          // Generate a unique slug automatically
+          orgSlug = await organizationService.generateUniqueSlug(organizationName);
         }
 
         organization = organizationRepository.create({
@@ -191,21 +226,25 @@ export const authRouter = t.router({
       user.updateLastSeen();
       await userRepository.save(user);
 
+      // Create UserOrganization entry if organization exists (multi-org support)
+      if (organization) {
+        const userOrgRepository = manager.getRepository(UserOrganization);
+        const userOrg = userOrgRepository.create({
+          userId: user.id,
+          organizationId: organization.id,
+          role: "owner",
+          isActive: true,
+          joinedAt: new Date(),
+        });
+        await userOrgRepository.save(userOrg);
+      }
+
       // Generate tokens
       const sessionId = generateSessionId();
       const tokens = generateTokens(user, sessionId);
 
-      // Prepare organization data
-      const organizations = organization
-        ? [
-            {
-              id: organization.id,
-              name: organization.name,
-              slug: organization.slug,
-              role: user.role,
-            },
-          ]
-        : [];
+      // Load all user organizations (multi-org support)
+      const organizations = await getUserOrganizations(user.id);
 
       return {
         user: {
@@ -252,7 +291,34 @@ export const authRouter = t.router({
   }),
 
   // Protected endpoints
-  me: protectedProcedure.query(async ({ ctx }) => {
+  me: protectedProcedure
+    .output(z.object({
+      id: z.string(),
+      email: z.string(),
+      pendingEmail: z.string().nullable().optional(),
+      firstName: z.string().nullable().optional(),
+      lastName: z.string().nullable().optional(),
+      avatarUrl: z.string().nullable().optional(),
+      isActive: z.boolean(),
+      lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
+      lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
+      status: z.enum(["available", "away"]).optional(),
+      onlineStatus: z.enum(["online", "away", "offline"]),
+      authMethod: z.string(),
+      organizations: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        logo: z.string().nullable().optional(),
+        role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+        permissions: z.array(z.string()).nullable().optional(),
+        joinedAt: z.union([z.date(), z.string()]).optional(),
+        lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
+      })),
+      activeOrganizationId: z.string().optional(),
+      role: z.enum(["owner", "admin", "member", "viewer", "contributor"]),
+    }))
+    .query(async ({ ctx }) => {
     const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
 
     // Fetch user with organization data
@@ -269,17 +335,29 @@ export const authRouter = t.router({
       });
     }
 
-    // Prepare organization data
-    const organizations = user.organization
-      ? [
-          {
-            id: user.organization.id,
-            name: user.organization.name,
-            slug: user.organization.slug,
-            role: user.role,
-          },
-        ]
-      : [];
+    // Load all user organizations (multi-org support)
+    const organizations = await getUserOrganizations(user.id);
+
+    // Determine active organization
+    // Use the one from context if available, otherwise use most recently accessed or legacy
+    let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
+    if (!activeOrganizationId && organizations.length > 0) {
+      const mostRecent = organizations.reduce((prev, current) => {
+        if (!prev.lastAccessedAt) return current;
+        if (!current.lastAccessedAt) return prev;
+        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+      });
+      activeOrganizationId = mostRecent.id;
+    }
+
+    // Get role for active organization or fall back to user role
+    let role = user.role;
+    if (activeOrganizationId && organizations.length > 0) {
+      const activeOrg = organizations.find(org => org.id === activeOrganizationId);
+      if (activeOrg) {
+        role = activeOrg.role;
+      }
+    }
 
     return {
       id: user.id,
@@ -287,6 +365,7 @@ export const authRouter = t.router({
       pendingEmail: user.pendingEmail,
       firstName: user.firstName,
       lastName: user.lastName,
+      avatarUrl: user.avatarUrl,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
       lastSeenAt: user.lastSeenAt,
@@ -294,8 +373,8 @@ export const authRouter = t.router({
       onlineStatus: user.getOnlineStatus(),
       authMethod: ctx.user!.authMethod,
       organizations,
-      activeOrganizationId: user.organizationId,
-      role: user.role,
+      activeOrganizationId,
+      role,
     };
   }),
 
@@ -458,6 +537,114 @@ export const authRouter = t.router({
         user: user.toJSON(),
       };
     }),
+
+  uploadAvatar: protectedProcedure
+    .input(
+      z.object({
+        avatar: z.string(), // base64 data URI
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: ctx.user!.id },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      try {
+        const storageService = new StorageService();
+
+        // Upload new avatar
+        const result = await handleUpload(
+          input.avatar,
+          "avatars",
+          ctx.user!.organizationId || "",
+          ctx.user!.id,
+          { maxSize: 2 * 1024 * 1024 }, // 2MB for avatars
+        );
+
+        // Delete old avatar upload if exists (extract ID from old URL)
+        if (user.avatarUrl) {
+          try {
+            // The avatarUrl might contain the upload ID
+            // We'll try to extract and delete the old upload
+            const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
+            if (uploadIdMatch) {
+              await storageService.delete(uploadIdMatch[1]);
+            }
+          } catch (error) {
+            console.error("Failed to delete old avatar:", error);
+            // Continue even if deletion fails
+          }
+        }
+
+        // Update user with new avatar URL
+        user.avatarUrl = result.url;
+        await userRepository.save(user);
+
+        return {
+          success: true,
+          avatarUrl: result.url,
+        };
+      } catch (error) {
+        console.error("Failed to upload avatar:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to upload avatar. Please try again.",
+        });
+      }
+    }),
+
+  deleteAvatar: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    if (!user.avatarUrl) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No avatar to delete",
+      });
+    }
+
+    try {
+      const storageService = new StorageService();
+
+      // Extract upload ID from URL
+      const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
+      if (uploadIdMatch) {
+        await storageService.delete(uploadIdMatch[1]);
+      }
+
+      // Clear avatar URL from user
+      user.avatarUrl = null as any;
+      await userRepository.save(user);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("Failed to delete avatar:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to delete avatar. Please try again.",
+      });
+    }
+  }),
 
   updateEmail: protectedProcedure
     .input(

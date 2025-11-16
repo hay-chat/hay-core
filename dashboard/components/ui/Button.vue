@@ -60,6 +60,7 @@ const buttonVariants = cva("btn-base", {
     size: {
       default: "btn-size-default",
       sm: "btn-size-sm",
+      xs: "btn-size-xs",
       lg: "btn-size-lg",
       icon: "btn-size-icon",
     },
@@ -185,10 +186,17 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   padding: 0.5rem 1rem;
 }
 
+.btn-size-xs {
+  height: 2rem;
+  border-radius: 0.375rem;
+  padding: 0 0.5rem;
+}
+
 .btn-size-sm {
   height: 2.25rem;
   border-radius: 0.375rem;
   padding: 0 0.75rem;
+  font-size: 0.75rem;
 }
 
 .btn-size-lg {

@@ -249,6 +249,205 @@ export class AuditLogService {
 
     return result.affected || 0;
   }
+
+  /**
+   * Log organization invitation sent
+   */
+  async logInvitationSend(
+    userId: string,
+    organizationId: string,
+    invitedEmail: string,
+    role: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.invitation.send",
+      resource: "organization_invitation",
+      changes: {
+        invitedEmail,
+        role,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization invitation accepted
+   */
+  async logInvitationAccept(
+    userId: string,
+    organizationId: string,
+    role: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.invitation.accept",
+      resource: "organization_invitation",
+      changes: {
+        role,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization invitation declined
+   */
+  async logInvitationDecline(
+    userId: string,
+    organizationId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.invitation.decline",
+      resource: "organization_invitation",
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization invitation cancelled
+   */
+  async logInvitationCancel(
+    userId: string,
+    organizationId: string,
+    invitedEmail: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.invitation.cancel",
+      resource: "organization_invitation",
+      changes: {
+        invitedEmail,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization invitation resend
+   */
+  async logInvitationResend(
+    userId: string,
+    organizationId: string,
+    invitedEmail: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.invitation.resend",
+      resource: "organization_invitation",
+      changes: {
+        invitedEmail,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization member role change
+   */
+  async logMemberRoleChange(
+    userId: string,
+    organizationId: string,
+    targetUserId: string,
+    oldRole: string,
+    newRole: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.member.role_change",
+      resource: "organization_member",
+      changes: {
+        targetUserId,
+        oldRole,
+        newRole,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization member removal
+   */
+  async logMemberRemove(
+    userId: string,
+    organizationId: string,
+    removedUserId: string,
+    removedUserEmail: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.member.remove",
+      resource: "organization_member",
+      changes: {
+        removedUserId,
+        removedUserEmail,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log organization switch
+   */
+  async logOrganizationSwitch(
+    userId: string,
+    fromOrganizationId: string | null,
+    toOrganizationId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId: toOrganizationId,
+      action: "organization.switch",
+      resource: "organization",
+      changes: {
+        fromOrganizationId: fromOrganizationId || undefined,
+        toOrganizationId,
+      },
+      metadata,
+      status: "success",
+    });
+  }
+
+  async logOrganizationCreated(
+    userId: string,
+    organizationId: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "organization.create",
+      resource: "organization",
+      changes: {
+        created: true,
+      },
+      metadata,
+      status: "success",
+    });
+  }
 }
 
 // Export singleton instance

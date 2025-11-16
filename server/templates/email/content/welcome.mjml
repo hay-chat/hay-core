@@ -1,0 +1,99 @@
+<!-- Welcome Email Content -->
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="24px" font-weight="600" color="#667eea" align="center" padding="0 0 10px 0">
+      Welcome to {{companyName}}, {{userName}}!
+    </mj-text>
+
+    <mj-text font-size="18px" color="#666666" align="center" padding="0 0 30px 0">
+      We're excited to have you on board.
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      Thank you for signing up for {{companyName}}! We're thrilled to have you as part of our community.
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="10px 0">
+      Your account has been successfully created with the email address: <strong>{{userEmail}}</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Getting Started
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="0 0 10px 0">
+      Here are a few things you can do to get started:
+    </mj-text>
+
+    <mj-text color="#555555" line-height="32px" padding="0 0 0 20px">
+      • Complete your profile to personalize your experience<br/>
+      • Explore our features and tools<br/>
+      • Connect with other members of our community<br/>
+      • Check out our documentation and tutorials
+    </mj-text>
+
+    <mj-button background-color="#667eea" color="#ffffff" font-size="14px" font-weight="600" border-radius="5px" padding="30px 0" href="{{dashboardUrl}}" css-class="gradient-button">
+      Go to Dashboard
+    </mj-button>
+
+    {{#if verificationRequired}}
+    <mj-text background-color="#fff3cd" padding="15px" border-left="3px solid #ffc107" color="#856404" font-size="14px" line-height="20px">
+      <strong>Action Required:</strong> Please verify your email address by clicking the link we sent to {{userEmail}}.
+    </mj-text>
+    {{/if}}
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#ffffff" padding="20px 25px">
+  <mj-column>
+    <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 10px 0">
+      Need Help?
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="0 0 10px 0">
+      Our support team is here to help you get the most out of {{companyName}}:
+    </mj-text>
+
+    <mj-text color="#555555" line-height="32px" padding="0 0 0 20px">
+      • Visit our <a href="{{helpCenterUrl}}" style="color: #667eea; text-decoration: none;">Help Center</a><br/>
+      • Read our <a href="{{documentationUrl}}" style="color: #667eea; text-decoration: none;">Documentation</a><br/>
+      • Contact us at <a href="mailto:{{supportEmail}}" style="color: #667eea; text-decoration: none;">{{supportEmail}}</a>
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="20px 0 0 0">
+      We're looking forward to seeing what you'll accomplish with {{companyName}}!
+    </mj-text>
+
+    <mj-text color="#555555" line-height="24px" padding="20px 0 0 0">
+      Best regards,<br>
+      The {{companyName}} Team
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#f8f9fa" padding="20px 25px">
+  <mj-column>
+    <mj-text align="center" color="#666666" font-size="14px" padding="0 0 15px 0">
+      Follow us on social media for updates and tips:
+    </mj-text>
+    <mj-text align="center" font-size="14px">
+      {{#if socialLinks.twitter}}
+      <a href="{{socialLinks.twitter}}" style="display: inline-block; margin: 0 10px; color: #667eea; text-decoration: none;">Twitter</a>
+      {{/if}}
+      {{#if socialLinks.linkedin}}
+      <a href="{{socialLinks.linkedin}}" style="display: inline-block; margin: 0 10px; color: #667eea; text-decoration: none;">LinkedIn</a>
+      {{/if}}
+      {{#if socialLinks.facebook}}
+      <a href="{{socialLinks.facebook}}" style="display: inline-block; margin: 0 10px; color: #667eea; text-decoration: none;">Facebook</a>
+      {{/if}}
+    </mj-text>
+  </mj-column>
+</mj-section>
