@@ -20,31 +20,31 @@ describe("Scope System", () => {
 
   describe("matchesScope", () => {
     it("should match exact scopes", () => {
-      expect(matchesScope("conversations:read", "conversations", "read")).toBe(true);
-      expect(matchesScope("documents:create", "documents", "create")).toBe(true);
+      expect(matchesScope("conversations:read", ["conversations:read"])).toBe(true);
+      expect(matchesScope("documents:create", ["documents:create"])).toBe(true);
     });
 
     it("should not match different scopes", () => {
-      expect(matchesScope("conversations:read", "documents", "read")).toBe(false);
-      expect(matchesScope("conversations:read", "conversations", "create")).toBe(false);
+      expect(matchesScope("conversations:read", ["documents:read"])).toBe(false);
+      expect(matchesScope("conversations:read", ["conversations:create"])).toBe(false);
     });
 
     it("should match wildcard resource", () => {
-      expect(matchesScope("*:read", "conversations", "read")).toBe(true);
-      expect(matchesScope("*:read", "documents", "read")).toBe(true);
-      expect(matchesScope("*:read", "agents", "create")).toBe(false);
+      expect(matchesScope("conversations:read", ["*:read"])).toBe(true);
+      expect(matchesScope("documents:read", ["*:read"])).toBe(true);
+      expect(matchesScope("agents:create", ["*:read"])).toBe(false);
     });
 
     it("should match wildcard action", () => {
-      expect(matchesScope("conversations:*", "conversations", "read")).toBe(true);
-      expect(matchesScope("conversations:*", "conversations", "create")).toBe(true);
-      expect(matchesScope("conversations:*", "documents", "read")).toBe(false);
+      expect(matchesScope("conversations:read", ["conversations:*"])).toBe(true);
+      expect(matchesScope("conversations:create", ["conversations:*"])).toBe(true);
+      expect(matchesScope("documents:read", ["conversations:*"])).toBe(false);
     });
 
     it("should match full wildcard", () => {
-      expect(matchesScope("*:*", "conversations", "read")).toBe(true);
-      expect(matchesScope("*:*", "documents", "create")).toBe(true);
-      expect(matchesScope("*:*", "agents", "delete")).toBe(true);
+      expect(matchesScope("conversations:read", ["*:*"])).toBe(true);
+      expect(matchesScope("documents:create", ["*:*"])).toBe(true);
+      expect(matchesScope("agents:delete", ["*:*"])).toBe(true);
     });
   });
 
@@ -100,9 +100,13 @@ describe("Scope System", () => {
 
     it("should return member scopes", () => {
       const scopes = getDefaultScopesForRole("member");
-      // Should have full access to conversations and documents
+      // Should have full access to conversations
       expect(scopes).toContain("conversations:*");
-      expect(scopes).toContain("documents:*");
+      // Should have read, create, update for documents (but not delete)
+      expect(scopes).toContain("documents:read");
+      expect(scopes).toContain("documents:create");
+      expect(scopes).toContain("documents:update");
+      expect(scopes).not.toContain("documents:delete");
       // Should only have read access to agents
       expect(scopes).toContain("agents:read");
       expect(scopes).not.toContain("agents:create");
@@ -135,16 +139,22 @@ describe("Scope System", () => {
   describe("validateScopes", () => {
     it("should validate all valid scopes", () => {
       const scopes = ["conversations:read", "documents:create", "*:*"];
-      expect(validateScopes(scopes)).toBe(true);
+      const result = validateScopes(scopes);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
     });
 
     it("should reject if any scope is invalid", () => {
       const scopes = ["conversations:read", "invalid", "documents:create"];
-      expect(validateScopes(scopes)).toBe(false);
+      const result = validateScopes(scopes);
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
     });
 
     it("should validate empty array", () => {
-      expect(validateScopes([])).toBe(true);
+      const result = validateScopes([]);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
     });
   });
 

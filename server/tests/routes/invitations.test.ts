@@ -251,14 +251,13 @@ describe("Organization Invitation Lifecycle", () => {
 
   describe("Duplicate Invitation Prevention", () => {
     it("should detect existing pending invitations", () => {
-      const invitations: OrganizationInvitation[] = [
-        {
-          email: "user@example.com",
-          organizationId: "org-123",
-          status: "pending",
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        } as OrganizationInvitation,
-      ];
+      const invitation = new OrganizationInvitation();
+      invitation.email = "user@example.com";
+      invitation.organizationId = "org-123";
+      invitation.status = "pending";
+      invitation.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      const invitations: OrganizationInvitation[] = [invitation];
 
       const newInvitation = {
         email: "user@example.com",

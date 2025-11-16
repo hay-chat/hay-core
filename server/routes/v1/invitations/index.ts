@@ -90,7 +90,7 @@ export const invitationsRouter = t.router({
     .input(
       z.object({
         email: z.string().email(),
-        role: z.enum(["owner", "admin", "member", "viewer", "contributor"]).default("member"),
+        role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]).default("member"),
         permissions: z.array(z.string()).optional(),
         message: z.string().optional(),
       }),

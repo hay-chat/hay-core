@@ -5,7 +5,7 @@
     "outDir": "./dist",
     "rootDir": "./",
     "noEmit": false,
-    "types": ["node"],
+    "types": ["node", "jest"],
     "baseUrl": "./",
     "paths": {
       "@server/*": ["./*"],

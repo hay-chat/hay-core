@@ -1,6 +1,7 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { AnalyticsService } from "../../../services/analytics.service";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const analyticsService = new AnalyticsService();
 
@@ -11,7 +12,7 @@ const analyticsInputSchema = z.object({
 });
 
 export const analyticsRouter = t.router({
-  conversationActivity: authenticatedProcedure
+  conversationActivity: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(analyticsInputSchema)
     .query(async ({ ctx, input }) => {
       const activity = await analyticsService.getConversationActivity({
@@ -29,7 +30,7 @@ export const analyticsRouter = t.router({
       };
     }),
 
-  sentimentAnalysis: authenticatedProcedure
+  sentimentAnalysis: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(analyticsInputSchema)
     .query(async ({ ctx, input }) => {
       const sentimentData = await analyticsService.getSentimentAnalysis({
@@ -47,7 +48,7 @@ export const analyticsRouter = t.router({
       };
     }),
 
-  conversationMetrics: authenticatedProcedure
+  conversationMetrics: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(analyticsInputSchema)
     .query(async ({ ctx, input }) => {
       const metrics = await analyticsService.getConversationMetrics({
@@ -65,7 +66,7 @@ export const analyticsRouter = t.router({
       };
     }),
 
-  responseTime: authenticatedProcedure
+  responseTime: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(analyticsInputSchema)
     .query(async ({ ctx, input }) => {
       const responseTimeData = await analyticsService.getResponseTimeAnalytics({

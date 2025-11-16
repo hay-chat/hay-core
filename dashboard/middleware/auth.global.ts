@@ -2,6 +2,56 @@ import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 
+// Define role-protected routes
+// Map route paths to required roles
+const roleProtectedRoutes: Record<string, string[]> = {
+  // Admin only (owner, admin)
+  "/settings/users": ["owner", "admin"],
+  "/settings/api-tokens": ["owner", "admin"],
+  "/settings/general": ["owner", "admin"],
+  "/settings/billing": ["owner", "admin"],
+
+  // Analytics - all except agent
+  "/analytics": ["owner", "admin", "contributor", "member", "viewer"],
+  "/analytics/reports": ["owner", "admin", "contributor", "member", "viewer"],
+  "/insights": ["owner", "admin", "contributor", "member", "viewer"],
+
+  // Content creation - contributor+
+  "/agents/create": ["owner", "admin", "contributor"],
+  "/agents/new": ["owner", "admin", "contributor"],
+  "/playbooks/create": ["owner", "admin", "contributor"],
+  "/playbooks/new": ["owner", "admin", "contributor"],
+
+  // Document import - member+
+  "/documents/import": ["owner", "admin", "contributor", "member"],
+
+  // Plugins - admin+
+  "/integrations/marketplace": ["owner", "admin"],
+  "/plugins": ["owner", "admin"],
+};
+
+/**
+ * Check if a user role has access to a specific route
+ */
+function hasRouteAccess(path: string, userRole: string | undefined): boolean {
+  if (!userRole) return false;
+
+  // Check if this specific route is protected
+  if (roleProtectedRoutes[path]) {
+    return roleProtectedRoutes[path].includes(userRole);
+  }
+
+  // Check if any parent route matches (for dynamic routes)
+  for (const [protectedPath, allowedRoles] of Object.entries(roleProtectedRoutes)) {
+    if (path.startsWith(protectedPath)) {
+      return allowedRoles.includes(userRole);
+    }
+  }
+
+  // If route is not explicitly protected, allow access
+  return true;
+}
+
 export default defineNuxtRouteMiddleware(
   (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     // Skip auth check if staying on the same page (e.g., opening modals)
@@ -46,6 +96,21 @@ export default defineNuxtRouteMiddleware(
       }
 
       return navigateTo("/login");
+    }
+
+    // Role-based route protection
+    const currentOrganization = userStore.currentOrganization;
+    const userRole = currentOrganization?.role;
+
+    if (!hasRouteAccess(to.path, userRole)) {
+      console.warn(
+        `[Auth Middleware] Access denied to ${to.path} for role: ${userRole}`,
+      );
+      // Redirect to home page with error message
+      return navigateTo({
+        path: "/",
+        query: { error: "unauthorized" },
+      });
     }
   },
 );

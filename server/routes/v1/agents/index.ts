@@ -1,7 +1,8 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { AgentService } from "../../../services/agent.service";
 import { TRPCError } from "@trpc/server";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const agentService = new AgentService();
 
@@ -34,12 +35,12 @@ const updateAgentSchema = z.object({
 });
 
 export const agentsRouter = t.router({
-  list: authenticatedProcedure.query(async ({ ctx }) => {
+  list: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ).query(async ({ ctx }) => {
     const agents = await agentService.getAgents(ctx.organizationId!);
     return agents;
   }),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -59,7 +60,7 @@ export const agentsRouter = t.router({
       return agent;
     }),
 
-  create: authenticatedProcedure.input(createAgentSchema).mutation(async ({ ctx, input }) => {
+  create: scopedProcedure(RESOURCES.AGENTS, ACTIONS.CREATE).input(createAgentSchema).mutation(async ({ ctx, input }) => {
     const agent = await agentService.createAgent(ctx.organizationId!, input as any);
 
     // Auto-set as default agent if this is the first agent for the organization
@@ -75,7 +76,7 @@ export const agentsRouter = t.router({
     return agent;
   }),
 
-  update: authenticatedProcedure
+  update: scopedProcedure(RESOURCES.AGENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -95,7 +96,7 @@ export const agentsRouter = t.router({
       return agent;
     }),
 
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.AGENTS, ACTIONS.DELETE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -117,7 +118,7 @@ export const agentsRouter = t.router({
       };
     }),
 
-  setAsDefault: authenticatedProcedure
+  setAsDefault: scopedProcedure(RESOURCES.AGENTS, ACTIONS.UPDATE)
     .input(
       z.object({
         agentId: z.string().uuid(),

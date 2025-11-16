@@ -1,11 +1,11 @@
-import { t } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { generateApiKey, hashApiKey } from "@server/lib/auth/utils/hashing";
-import { protectedProcedure } from "@server/trpc/middleware/auth";
 import { ApiTokenScope } from "@server/types/api-token-scopes";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 // Schema for creating an API token
 const createApiTokenSchema = z.object({
@@ -31,7 +31,7 @@ export const apiTokensRouter = t.router({
    * Create a new API token
    * Returns the plain token ONLY ONCE
    */
-  create: protectedProcedure.input(createApiTokenSchema).mutation(async ({ input, ctx }) => {
+  create: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.CREATE).input(createApiTokenSchema).mutation(async ({ input, ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -79,7 +79,7 @@ export const apiTokensRouter = t.router({
    * List all API tokens for the current organization
    * Returns masked keys (never shows full token again)
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.READ).query(async ({ ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -122,7 +122,7 @@ export const apiTokensRouter = t.router({
   /**
    * Update an API token (name and scopes only)
    */
-  update: protectedProcedure.input(updateApiTokenSchema).mutation(async ({ input, ctx }) => {
+  update: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.UPDATE).input(updateApiTokenSchema).mutation(async ({ input, ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -176,7 +176,7 @@ export const apiTokensRouter = t.router({
   /**
    * Revoke an API token (soft delete - sets isActive to false)
    */
-  revoke: protectedProcedure.input(tokenIdSchema).mutation(async ({ input, ctx }) => {
+  revoke: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.DELETE).input(tokenIdSchema).mutation(async ({ input, ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -211,7 +211,7 @@ export const apiTokensRouter = t.router({
   /**
    * Permanently delete an API token
    */
-  delete: protectedProcedure.input(tokenIdSchema).mutation(async ({ input, ctx }) => {
+  delete: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.DELETE).input(tokenIdSchema).mutation(async ({ input, ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -245,7 +245,7 @@ export const apiTokensRouter = t.router({
   /**
    * Get a single API token by ID
    */
-  getById: protectedProcedure.input(tokenIdSchema).query(async ({ input, ctx }) => {
+  getById: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.READ).input(tokenIdSchema).query(async ({ input, ctx }) => {
     if (!ctx.organizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",

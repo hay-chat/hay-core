@@ -60,7 +60,7 @@ export class AuthUser {
     // For API key auth, check the API key scopes
     if (this.authMethod === "apikey") {
       if (!this.scopes || this.scopes.length === 0) {
-        return true; // No scopes means full access
+        return false; // No scopes means no access (security fix: deny by default)
       }
 
       return this.scopes.some(
@@ -99,7 +99,7 @@ export class AuthUser {
    * Get the user's role in the current organization
    * Note: Use scope checks (hasScope) for permission validation, not role checks
    */
-  getRole(): "owner" | "admin" | "member" | "viewer" | "contributor" | undefined {
+  getRole(): "owner" | "admin" | "member" | "viewer" | "contributor" | "agent" | undefined {
     if (this.userOrganization) {
       return this.userOrganization.role;
     }

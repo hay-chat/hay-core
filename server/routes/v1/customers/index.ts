@@ -1,9 +1,10 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { CustomerService } from "../../../services/customer.service";
 import { TRPCError } from "@trpc/server";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { CustomerRepository } from "@server/repositories/customer.repository";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const customerService = new CustomerService();
 const customerRepository = new CustomerRepository();
@@ -70,7 +71,7 @@ const customerListInputSchema = z.object({
 export const customersRouter = t.router({
   list: createListProcedure(customerListInputSchema, customerRepository),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const customer = await customerService.getCustomer(input.id, ctx.organizationId!);
@@ -85,7 +86,7 @@ export const customersRouter = t.router({
       return customer;
     }),
 
-  getByExternalId: authenticatedProcedure
+  getByExternalId: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.READ)
     .input(z.object({ externalId: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await customerService.getCustomerByExternalId(
@@ -103,7 +104,7 @@ export const customersRouter = t.router({
       return customer;
     }),
 
-  getByEmail: authenticatedProcedure
+  getByEmail: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.READ)
     .input(z.object({ email: z.string().email() }))
     .query(async ({ ctx, input }) => {
       const customer = await customerService.getCustomerByEmail(input.email, ctx.organizationId!);
@@ -118,7 +119,7 @@ export const customersRouter = t.router({
       return customer;
     }),
 
-  create: authenticatedProcedure.input(createCustomerSchema).mutation(async ({ ctx, input }) => {
+  create: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE).input(createCustomerSchema).mutation(async ({ ctx, input }) => {
     try {
       const customer = await customerService.createCustomer(ctx.organizationId!, {
         external_id: input.external_id || null,
@@ -137,12 +138,12 @@ export const customersRouter = t.router({
     }
   }),
 
-  createAnonymous: authenticatedProcedure.mutation(async ({ ctx }) => {
+  createAnonymous: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE).mutation(async ({ ctx }) => {
     const customer = await customerService.createAnonymousCustomer(ctx.organizationId!);
     return customer;
   }),
 
-  findOrCreate: authenticatedProcedure
+  findOrCreate: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE)
     .input(createCustomerSchema)
     .mutation(async ({ ctx, input }) => {
       const customer = await customerService.findOrCreateCustomer(ctx.organizationId!, {
@@ -156,7 +157,7 @@ export const customersRouter = t.router({
       return customer;
     }),
 
-  update: authenticatedProcedure
+  update: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -193,7 +194,7 @@ export const customersRouter = t.router({
       }
     }),
 
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.DELETE)
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const deleted = await customerService.deleteCustomer(input.id, ctx.organizationId!);
@@ -208,7 +209,7 @@ export const customersRouter = t.router({
       return { success: true };
     }),
 
-  merge: authenticatedProcedure.input(mergeCustomersSchema).mutation(async ({ ctx, input }) => {
+  merge: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE).input(mergeCustomersSchema).mutation(async ({ ctx, input }) => {
     const mergedCustomer = await customerService.mergeCustomers(
       input.sourceCustomerId,
       input.targetCustomerId,

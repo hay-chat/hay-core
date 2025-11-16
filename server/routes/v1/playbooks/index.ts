@@ -1,8 +1,9 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { PlaybookService } from "../../../services/playbook.service";
 import { PlaybookStatus } from "../../../database/entities/playbook.entity";
 import { TRPCError } from "@trpc/server";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const playbookService = new PlaybookService();
 
@@ -31,12 +32,12 @@ const updatePlaybookSchema = z.object({
 });
 
 export const playbooksRouter = t.router({
-  list: authenticatedProcedure.query(async ({ ctx }) => {
+  list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ).query(async ({ ctx }) => {
     const playbooks = await playbookService.getPlaybooks(ctx.organizationId!);
     return playbooks;
   }),
 
-  listByStatus: authenticatedProcedure
+  listByStatus: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
     .input(
       z.object({
         status: playbookStatusEnum,
@@ -50,7 +51,7 @@ export const playbooksRouter = t.router({
       return playbooks;
     }),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -69,12 +70,12 @@ export const playbooksRouter = t.router({
       return playbook;
     }),
 
-  create: authenticatedProcedure.input(createPlaybookSchema).mutation(async ({ ctx, input }) => {
+  create: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE).input(createPlaybookSchema).mutation(async ({ ctx, input }) => {
     const playbook = await playbookService.createPlaybook(ctx.organizationId!, input as any);
     return playbook;
   }),
 
-  update: authenticatedProcedure
+  update: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -98,7 +99,7 @@ export const playbooksRouter = t.router({
       return playbook;
     }),
 
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.DELETE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -117,7 +118,7 @@ export const playbooksRouter = t.router({
       return { success: true };
     }),
 
-  addAgent: authenticatedProcedure
+  addAgent: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
     .input(
       z.object({
         playbookId: z.string().uuid(),
@@ -151,7 +152,7 @@ export const playbooksRouter = t.router({
       }
     }),
 
-  removeAgent: authenticatedProcedure
+  removeAgent: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
     .input(
       z.object({
         playbookId: z.string().uuid(),

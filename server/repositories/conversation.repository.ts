@@ -30,10 +30,33 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await this.getRepository().save(conversation);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   */
   override async findById(id: string): Promise<Conversation | null> {
     const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id", { id });
+
+    queryBuilder
+      .leftJoinAndSelect("conversation.messages", "messages")
+      .leftJoinAndSelect("conversation.agent", "agent")
+      .leftJoinAndSelect("conversation.organization", "organization")
+      .orderBy("messages.created_at", "ASC");
+
+    return await queryBuilder.getOne();
+  }
+
+  /**
+   * Find conversation by ID and organizationId - ensures proper organization scoping
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
+    const queryBuilder = this.getRepository().createQueryBuilder("conversation");
+
+    queryBuilder.where("conversation.id = :id AND conversation.organization_id = :organizationId", {
+      id,
+      organizationId,
+    });
 
     queryBuilder
       .leftJoinAndSelect("conversation.messages", "messages")

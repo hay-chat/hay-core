@@ -36,9 +36,22 @@ export class PlaybookRepository {
     return await this.getRepository().save(playbook);
   }
 
+  /**
+   * @deprecated Use findByIdAndOrganization instead to ensure proper organization scoping
+   */
   async findById(id: string): Promise<Playbook | null> {
     return await this.getRepository().findOne({
       where: { id },
+      relations: ["agents"],
+    });
+  }
+
+  /**
+   * Find playbook by ID and organizationId - ensures proper organization scoping
+   */
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Playbook | null> {
+    return await this.getRepository().findOne({
+      where: { id, organization_id: organizationId },
       relations: ["agents"],
     });
   }

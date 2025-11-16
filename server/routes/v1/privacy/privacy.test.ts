@@ -48,21 +48,42 @@ describe("Privacy DSAR Integration Tests", () => {
     // Find the organization first to get its ID
     const existingOrg = await orgRepo.findOne({ where: { slug: "privacy-test-org" } });
     if (existingOrg) {
-      // Delete in order: privacy requests, audit logs, jobs, users, then organization
+      // Find all users in this organization BEFORE deleting anything
+      const existingUsers = await userRepo.find({ where: { organizationId: existingOrg.id } });
+      const userIds = existingUsers.map(u => u.id);
+
+      // Delete in correct order to respect foreign key constraints:
+      // 1. Privacy requests (references users)
       await privacyRequestRepo.delete({ email: testEmail });
 
-      // Delete ALL audit logs for this organization (not just test user)
-      await auditLogRepo.delete({ organizationId: existingOrg.id });
-
-      // Delete all jobs in this organization
+      // 2. Jobs (references organization)
       const { Job } = await import("@server/entities/job.entity");
       const jobRepo = AppDataSource.getRepository(Job);
       await jobRepo.delete({ organizationId: existingOrg.id });
 
-      // Delete all users in this organization
+      // 3. Audit logs (references both users and organization)
+      // Delete all audit logs for users in this organization
+      if (userIds.length > 0) {
+        await auditLogRepo
+          .createQueryBuilder()
+          .delete()
+          .where("user_id IN (:...userIds)", { userIds })
+          .execute();
+      }
+      // Delete audit logs by organization ID
+      if (existingOrg.id) {
+        await auditLogRepo.delete({ organizationId: existingOrg.id });
+      }
+      // Clean up any audit logs with special string user IDs (created during deletion tests)
+      // Note: This uses raw query since userId column is UUID type but contains strings
+      await auditLogRepo.query(
+        "DELETE FROM audit_logs WHERE user_id::text IN ('anonymous', 'deleted-user')"
+      );
+
+      // 4. Users (now safe to delete as no audit logs reference them)
       await userRepo.delete({ organizationId: existingOrg.id });
 
-      // Now safe to delete the organization
+      // 5. Organization (now safe to delete)
       await orgRepo.delete({ id: existingOrg.id });
     }
 
