@@ -11,6 +11,9 @@ import {
   getMCPTools,
   getMenuItems,
   testConnection,
+  initiateOAuth,
+  revokeOAuth,
+  getOAuthStatus,
 } from "./plugins.handler";
 
 export const pluginsRouter = t.router({
@@ -25,4 +28,7 @@ export const pluginsRouter = t.router({
   getMCPTools: getMCPTools,
   getMenuItems: getMenuItems,
   testConnection: testConnection,
+  initiateOAuth: initiateOAuth,
+  revokeOAuth: revokeOAuth,
+  getOAuthStatus: getOAuthStatus,
 });

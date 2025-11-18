@@ -1,5 +1,6 @@
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
+import { createAuthStrategy } from "./auth/auth-strategy-factory";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
 // Type for config schema
@@ -54,6 +55,16 @@ export class EnvironmentManagerService {
           env[schema.env] = String(decryptedConfig[key]);
         }
       }
+    }
+
+    // Add authentication environment variables from auth strategy
+    try {
+      const authStrategy = createAuthStrategy(instance, manifest);
+      const authEnv = await authStrategy.getEnvironmentVariables();
+      Object.assign(env, authEnv);
+    } catch (error) {
+      // Auth errors are non-fatal for environment preparation
+      console.warn("Failed to get auth environment variables:", error);
     }
 
     return env;

@@ -100,9 +100,24 @@
           "type": "object",
           "description": "MCP server configuration",
           "properties": {
+            "connection": {
+              "type": "object",
+              "description": "MCP server connection configuration",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["local", "remote"],
+                  "description": "Connection type: local (stdio) or remote (HTTP)"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Remote MCP server URL (required for remote connections)"
+                }
+              }
+            },
             "serverPath": {
               "type": "string",
-              "description": "Path to the MCP server entry point"
+              "description": "Path to the MCP server entry point (for local connections)"
             },
             "tools": {
               "type": "array",
@@ -135,24 +150,53 @@
               "description": "Transport protocol for MCP (e.g., 'sse|websocket|http')"
             },
             "auth": {
-              "type": "array",
-              "description": "Authentication methods supported",
-              "items": {
-                "type": "string",
-                "enum": ["oauth2", "jwt", "apiKey"]
+              "type": "object",
+              "description": "Authentication configuration",
+              "properties": {
+                "oauth": {
+                  "type": "object",
+                  "description": "OAuth 2.0/2.1 authentication configuration",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "description": "OAuth authorization endpoint URL"
+                    },
+                    "tokenUrl": {
+                      "type": "string",
+                      "description": "OAuth token endpoint URL"
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Required OAuth scopes"
+                    },
+                    "usePKCE": {
+                      "type": "boolean",
+                      "description": "Whether to use PKCE (default: true)"
+                    },
+                    "pkceMethod": {
+                      "type": "string",
+                      "enum": ["S256", "plain"],
+                      "description": "PKCE code challenge method (default: S256)"
+                    }
+                  },
+                  "required": ["authorizationUrl", "tokenUrl", "scopes"]
+                }
               }
             },
             "installCommand": {
               "type": "string",
-              "description": "Command to install dependencies"
+              "description": "Command to install dependencies (for local connections)"
             },
             "buildCommand": {
               "type": "string",
-              "description": "Command to build the plugin"
+              "description": "Command to build the plugin (for local connections)"
             },
             "startCommand": {
               "type": "string",
-              "description": "Command to start the MCP server"
+              "description": "Command to start the MCP server (for local connections)"
             }
           }
         },

@@ -6,9 +6,11 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
 import { processManagerService } from "@server/services/process-manager.service";
+import { oauthService } from "@server/services/oauth.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { OAuthTokens } from "@server/types/oauth.types";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -702,5 +704,107 @@ export const testConnection = authenticatedProcedure
         error: errorMessage,
         testedAt: new Date(),
       };
+    }
+  });
+
+/**
+ * Initiate OAuth authorization flow
+ */
+export const initiateOAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    try {
+      const result = await oauthService.initiateAuthorization(
+        input.pluginId,
+        ctx.organizationId!,
+        ctx.userId!,
+      );
+
+      return {
+        success: true,
+        authorizationUrl: result.url,
+      };
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error instanceof Error ? error.message : "Failed to initiate OAuth flow",
+      });
+    }
+  });
+
+/**
+ * Revoke OAuth authorization
+ */
+export const revokeOAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    try {
+      await oauthService.revokeAuthorization(ctx.organizationId!, input.pluginId);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error instanceof Error ? error.message : "Failed to revoke OAuth authorization",
+      });
+    }
+  });
+
+/**
+ * Get OAuth connection status
+ */
+export const getOAuthStatus = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .query(async ({ ctx, input }) => {
+    try {
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+        ctx.organizationId!,
+        input.pluginId,
+      );
+
+      if (!instance || !instance.config) {
+        return {
+          connected: false,
+        };
+      }
+
+      const oauthTokens = instance.config._oauth as OAuthTokens | undefined;
+
+      if (!oauthTokens || !oauthTokens.access_token) {
+        return {
+          connected: false,
+        };
+      }
+
+      // Calculate expiration info
+      const now = Date.now();
+      const expiresAt = oauthTokens.expires_at;
+      const expiresIn = expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : undefined;
+
+      return {
+        connected: true,
+        expiresAt,
+        expiresIn,
+        scopes: oauthTokens.scope?.split(" "),
+      };
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error instanceof Error ? error.message : "Failed to get OAuth status",
+      });
     }
   });

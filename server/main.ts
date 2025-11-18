@@ -161,6 +161,39 @@ async function startServer() {
     });
   });
 
+  // OAuth callback route - handle OAuth provider callbacks
+  server.get("/oauth/callback", async (req, res) => {
+    try {
+      const { oauthService } = await import("@server/services/oauth.service");
+
+      const result = await oauthService.handleCallback({
+        code: req.query.code as string | undefined,
+        state: req.query.state as string,
+        error: req.query.error as string | undefined,
+        error_description: req.query.error_description as string | undefined,
+      });
+
+      // Redirect to dashboard with result
+      const dashboardUrl = config.cors.origin.split(",")[0] || "http://localhost:3000";
+
+      if (result.success) {
+        res.redirect(
+          `${dashboardUrl}/plugins/${result.pluginId}/settings?oauth_success=true`,
+        );
+      } else {
+        res.redirect(
+          `${dashboardUrl}/plugins/${result.pluginId || "unknown"}/settings?oauth_error=${encodeURIComponent(result.error || "Unknown error")}`,
+        );
+      }
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      const dashboardUrl = config.cors.origin.split(",")[0] || "http://localhost:3000";
+      res.redirect(
+        `${dashboardUrl}/plugins/settings?oauth_error=${encodeURIComponent("OAuth callback failed")}`,
+      );
+    }
+  });
+
   // Initialize plugin system BEFORE creating the router
   if (dbConnected) {
     try {

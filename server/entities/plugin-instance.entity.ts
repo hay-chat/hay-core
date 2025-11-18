@@ -23,6 +23,9 @@ export class PluginInstance extends OrganizationScopedEntity {
   @Column({ type: "jsonb", nullable: true })
   config?: Record<string, unknown>;
 
+  @Column({ type: "varchar", length: 50, nullable: true })
+  authMethod?: "api_key" | "oauth";
+
   @Column({ type: "boolean", default: false })
   running!: boolean;
 
