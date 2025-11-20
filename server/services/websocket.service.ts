@@ -300,7 +300,6 @@ export class WebSocketService {
       client.authenticated = true;
       return true;
     } catch (error) {
-      console.error("WebSocket authentication failed:", error);
       return false;
     }
   }
