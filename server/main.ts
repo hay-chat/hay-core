@@ -63,7 +63,7 @@ async function startServer() {
 
   const server = express();
 
-  // Add permissive CORS middleware for publicConversations endpoints
+  // Add permissive CORS middleware for publicConversations endpoints and webchat widget
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
     // Check if the path starts with /v1/publicConversations
@@ -78,6 +78,20 @@ async function startServer() {
         optionsSuccessStatus: 204,
       })(req, res, next);
     }
+
+    // Check if the path starts with /webchat - allow all origins for widget files
+    if (req.path.startsWith("/webchat")) {
+      return cors({
+        origin: true, // Allow all origins
+        credentials: false,
+        methods: ["GET", "HEAD", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Range"],
+        exposedHeaders: ["Content-Length", "Content-Range"],
+        maxAge: 86400,
+        optionsSuccessStatus: 204,
+      })(req, res, next);
+    }
+
     next();
   });
 
@@ -180,15 +194,6 @@ async function startServer() {
   const webchatPath = isDev
     ? path.join(process.cwd(), "..", "webchat", "dist")
     : path.join(process.cwd(), "..", "webchat", "dist");
-
-  // Handle OPTIONS preflight requests for webchat widget
-  server.options(/^\/webchat\/.*/, (req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
-    res.setHeader("Access-Control-Max-Age", "86400");
-    res.sendStatus(204);
-  });
 
   server.use(
     "/webchat",
