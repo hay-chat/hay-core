@@ -1185,7 +1185,7 @@ const playSound = (soundPath: string) => {
 // WebSocket setup
 const { useWebSocket } = await import("@/composables/useWebSocket");
 const websocket = useWebSocket();
-let unsubscribeMessageReceived: (() => void) | null = null;
+let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
@@ -1203,24 +1203,70 @@ onMounted(async () => {
   // Setup WebSocket connection for real-time updates
   websocket.connect();
 
-  // Listen for new messages
-  unsubscribeMessageReceived = websocket.on("message_received", async (payload: any) => {
-    console.log("[WebSocket] Received message_received event", payload);
-    if (payload.conversationId === conversationId.value) {
-      // Skip refresh only if in takeover mode AND the message is from a human agent (our sent message)
-      if (isTakenOverByCurrentUser.value && payload.messageType === MessageType.HUMAN_AGENT) {
-        console.log("[WebSocket] In takeover mode, skipping refresh for human agent message");
-        return;
+  // Subscribe to this specific conversation to receive its messages
+  console.log("[WebSocket] Subscribing to conversation:", conversationId.value);
+  websocket.send({
+    type: "subscribe",
+    conversationId: conversationId.value,
+  });
+
+  // Listen for new messages (full message data)
+  unsubscribeMessage = websocket.on("message", async (payload: any) => {
+    console.log("[WebSocket] Received message event with full data", payload);
+    if (payload.data) {
+      const messageData = payload.data;
+
+      // Check if this message belongs to the current conversation
+      // In playground mode, check messages array, in regular mode check conversation
+      if (isPlaygroundMode.value) {
+        // Check if message already exists (prevent duplicates)
+        const messageExists = messages.value.some((m: any) => m.id === messageData.id);
+        if (messageExists) {
+          console.log("[WebSocket] Skipping duplicate message:", messageData.id);
+          return;
+        }
+
+        // Add message to playground messages
+        messages.value.push({
+          id: messageData.id,
+          content: messageData.content,
+          type: messageData.type,
+          sender: messageData.type === MessageType.CUSTOMER ? "customer" : "agent",
+          timestamp: messageData.timestamp,
+          created_at: messageData.timestamp,
+          metadata: messageData.metadata,
+          status: messageData.status,
+        });
+        scrollToBottom();
+      } else if (conversation.value && conversation.value.messages) {
+        // Check if message already exists (prevent duplicates)
+        const messageExists = conversation.value.messages.some((m: any) => m.id === messageData.id);
+        if (messageExists) {
+          console.log("[WebSocket] Skipping duplicate message:", messageData.id);
+          return;
+        }
+
+        // Add message to regular conversation
+        conversation.value.messages.push({
+          id: messageData.id,
+          content: messageData.content,
+          type: messageData.type,
+          created_at: messageData.timestamp,
+          conversation_id: conversationId.value,
+          updated_at: messageData.timestamp,
+          status: messageData.status || "approved",
+          metadata: messageData.metadata,
+        });
+        scrollToBottom();
+
+        // Play sound for customer messages
+        if (messageData.type === MessageType.CUSTOMER) {
+          playSound("/sounds/message-received.mp3");
+        }
       }
-      console.log("[WebSocket] New message for current conversation, refreshing");
-      await fetchConversation();
-      scrollToBottom();
-    } else {
-      console.log(
-        `[WebSocket] Message for different conversation (current: ${conversationId.value}, received: ${payload.conversationId})`,
-      );
     }
   });
+
 
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
@@ -1253,7 +1299,7 @@ onMounted(async () => {
 // eslint-disable-next-line no-undef
 onUnmounted(() => {
   // Cleanup WebSocket event handlers
-  if (unsubscribeMessageReceived) unsubscribeMessageReceived();
+  if (unsubscribeMessage) unsubscribeMessage();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();

@@ -45,7 +45,6 @@
                   { label: 'Contributor', value: 'contributor' },
                   { label: 'Member', value: 'member' },
                   { label: 'Viewer', value: 'viewer' },
-                  { label: 'Agent', value: 'agent' },
                 ]"
                 @update:model-value="loadMembers(true)"
               />
@@ -337,7 +336,7 @@ const pageSize = ref(10);
 const totalItems = ref(0);
 const totalPages = ref(0);
 const searchQuery = ref("");
-const roleFilter = ref<"" | "owner" | "admin" | "contributor" | "member" | "viewer" | "agent">("");
+const roleFilter = ref<"" | "owner" | "admin" | "contributor" | "member" | "viewer">("");
 let searchTimeout: NodeJS.Timeout | null = null;
 
 const inviteDialogOpen = ref(false);
@@ -350,12 +349,12 @@ const memberToRemove = ref<any>(null);
 
 const inviteForm = ref({
   email: "",
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor" | "agent",
+  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
   message: "",
 });
 
 const roleForm = ref({
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor" | "agent",
+  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
 });
 
 const resendingInvitation = ref<string | null>(null);

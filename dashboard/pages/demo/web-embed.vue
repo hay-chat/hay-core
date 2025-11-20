@@ -3,7 +3,7 @@
     <div class="container mx-auto py-8 space-y-8">
       <div class="text-center space-y-2">
         <h1 class="text-3xl font-bold">Web Chat Widget Demo</h1>
-        <p class="text-gray-600">Test the Hay webchat plugin with DPoP authentication</p>
+        <p class="text-gray-600">Test the Hay webchat widget with DPoP authentication</p>
       </div>
 
       <!-- Info Cards -->
@@ -219,14 +219,14 @@ function reloadWidget() {
   }
 
   // Remove existing script
-  const existingScript = document.querySelector('script[src*="hay-plugin-webchat/widget.js"]');
+  const existingScript = document.querySelector('script[src*="/webchat/widget.js"]');
   if (existingScript) {
     existingScript.remove();
   }
 
   // Reload the widget script with new timestamp to force refresh
   const script = document.createElement("script");
-  script.src = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.js?v=${Date.now()}`;
+  script.src = `${apiBaseUrl}/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 }
@@ -288,7 +288,6 @@ const implementationExample = `<!-- Hay Webchat Widget -->
   window.HayChat = window.HayChat || {};
   window.HayChat.config = {
     organizationId: "YOUR_ORG_ID",
-    pluginId: "hay-plugin-webchat",
     baseUrl: "https://api.your-domain.com",
 
     // Widget customization
@@ -301,12 +300,12 @@ const implementationExample = `<!-- Hay Webchat Widget -->
   };
 </${"script"}>
 <${"script"}
-  src="https://api.your-domain.com/plugins/assets/hay-plugin-webchat/widget.js"
+  src="https://api.your-domain.com/webchat/widget.js"
   async>
 </${"script"}>
 <link
   rel="stylesheet"
-  href="https://api.your-domain.com/plugins/assets/hay-plugin-webchat/widget.css"
+  href="https://api.your-domain.com/webchat/widget.css"
 />`;
 
 // Initialize the widget on this page
@@ -317,7 +316,6 @@ onMounted(() => {
   window.HayChat = window.HayChat || {};
   window.HayChat.config = {
     organizationId: "c3578568-c83b-493f-991c-ca2d34a3bd17",
-    pluginId: "hay-plugin-webchat",
     baseUrl: apiBaseUrl,
 
     // Widget customization for demo
@@ -332,14 +330,14 @@ onMounted(() => {
 
   // Load the widget script
   const script = document.createElement("script");
-  script.src = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.js?v=${Date.now()}`;
+  script.src = `${apiBaseUrl}/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 
   // Load the widget styles
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = `${apiBaseUrl}/plugins/assets/hay-plugin-webchat/widget.css`;
+  link.href = `${apiBaseUrl}/webchat/widget.css`;
   document.head.appendChild(link);
 
   // Start polling for session changes

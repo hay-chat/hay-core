@@ -522,15 +522,90 @@ const handleItemsPerPageChange = async (itemsPerPage: number) => {
   await fetchConversations();
 };
 
+// WebSocket setup
+const { useWebSocket } = await import("@/composables/useWebSocket");
+const websocket = useWebSocket();
+let unsubscribeConversationCreated: (() => void) | null = null;
+let unsubscribeConversationUpdated: (() => void) | null = null;
+let unsubscribeConversationDeleted: (() => void) | null = null;
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
+
+  // Setup WebSocket connection for real-time updates
+  websocket.connect();
+
+  // Listen for new conversations
+  unsubscribeConversationCreated = websocket.on("conversation_created", async (payload: any) => {
+    console.log("[Conversations List] Received conversation_created event", payload);
+    if (payload) {
+      const newConversation = payload;
+
+      // Only add if not already in list (avoid duplicates)
+      const exists = conversations.value.some((c) => c.id === newConversation.id);
+      if (!exists) {
+        // Add to beginning of list (newest first)
+        conversations.value.unshift(newConversation as any);
+        totalConversations.value++;
+
+        // Update stats
+        await appStore.refreshConversationsCount();
+      }
+    }
+  });
+
+  // Listen for conversation updates
+  unsubscribeConversationUpdated = websocket.on("conversation_updated", async (payload: any) => {
+    console.log("[Conversations List] Received conversation_updated event", payload);
+    if (payload) {
+      const updatedData = payload;
+      const index = conversations.value.findIndex((c) => c.id === updatedData.id);
+
+      if (index !== -1) {
+        // Update existing conversation
+        conversations.value[index] = {
+          ...conversations.value[index],
+          ...updatedData,
+        };
+
+        // Update stats if status changed
+        if (updatedData.changedFields?.includes("status")) {
+          await appStore.refreshConversationsCount();
+        }
+      } else {
+        // Conversation might have been filtered out, but status changed - refetch to be safe
+        await fetchConversations();
+      }
+    }
+  });
+
+  // Listen for conversation deletions
+  unsubscribeConversationDeleted = websocket.on("conversation_deleted", async (payload: any) => {
+    console.log("[Conversations List] Received conversation_deleted event", payload);
+    if (payload) {
+      const deletedId = payload.id;
+      const index = conversations.value.findIndex((c) => c.id === deletedId);
+
+      if (index !== -1) {
+        // Remove from list
+        conversations.value.splice(index, 1);
+        totalConversations.value--;
+
+        // Update stats
+        await appStore.refreshConversationsCount();
+      }
+    }
+  });
+
   // TODO: Fetch agents from API
-  // TODO: Setup real-time updates via WebSocket
 });
 
 onUnmounted(() => {
-  // TODO: Cleanup WebSocket connections
+  // Cleanup WebSocket event handlers
+  if (unsubscribeConversationCreated) unsubscribeConversationCreated();
+  if (unsubscribeConversationUpdated) unsubscribeConversationUpdated();
+  if (unsubscribeConversationDeleted) unsubscribeConversationDeleted();
 });
 
 // Set page meta

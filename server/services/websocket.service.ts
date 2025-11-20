@@ -11,6 +11,7 @@ import type { JWTPayload } from "../types/auth.types";
 import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
 import { debugLog } from "@server/lib/debug-logger";
+import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -36,6 +37,10 @@ interface IdentifyMessage extends WebSocketMessage {
 interface ChatMessage extends WebSocketMessage {
   content: string;
   timestamp?: number;
+  proof?: string; // DPoP proof JWT
+  method?: string; // HTTP method for DPoP validation
+  url?: string; // Request URL for DPoP validation
+  conversationId?: string; // Conversation ID for DPoP validation
 }
 
 interface TypingMessage extends WebSocketMessage {
@@ -128,16 +133,62 @@ export class WebSocketService {
    * Handle incoming Redis event and broadcast to local WebSocket clients
    */
   private handleRedisEvent(event: any): void {
-    const { type, organizationId, payload } = event;
+    const { type, organizationId, conversationId, payload } = event;
 
     if (!type || !organizationId) {
       console.error("[WebSocket] Invalid Redis event:", event);
       return;
     }
 
-    // Broadcast to local clients in the organization
-    const sent = this.sendToOrganization(organizationId, { type, payload });
-    debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
+    // For message_received events, broadcast based on delivery state
+    if (type === "message_received" && conversationId) {
+      const messagePayload = {
+        type: "message",
+        data: payload,
+      };
+
+      // Always send to dashboard (organization clients) for review/monitoring
+      const orgSent = this.sendToOrganization(organizationId, messagePayload);
+
+      // Only send to webchat (conversation clients) if deliveryState is SENT
+      // QUEUED messages should not be sent to customers until approved
+      if (payload.deliveryState === "sent") {
+        const conversationSent = this.sendToConversation(conversationId, messagePayload);
+
+        debugLog(
+          "websocket",
+          `Broadcasted SENT message to ${conversationSent} conversation clients and ${orgSent} org clients`,
+        );
+      } else {
+        debugLog(
+          "websocket",
+          `Broadcasted QUEUED message to ${orgSent} org clients only (not to conversation)`,
+        );
+      }
+    } else if (type === "conversation_status_changed" && conversationId) {
+      // Broadcast status changes to BOTH conversation clients (webchat) AND organization clients (dashboard)
+      const conversationSent = this.sendToConversation(conversationId, { type, payload });
+      const orgSent = this.sendToOrganization(organizationId, { type, payload });
+
+      debugLog(
+        "websocket",
+        `Broadcasted ${type} to ${conversationSent} conversation clients and ${orgSent} organization clients`,
+      );
+    } else if (
+      type === "conversation_created" ||
+      type === "conversation_updated" ||
+      type === "conversation_deleted"
+    ) {
+      // Broadcast conversation list updates to all organization clients
+      const sent = this.sendToOrganization(organizationId, { type, payload });
+
+      debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
+    } else {
+      // Broadcast to all clients in the organization for other events
+      const sent = this.sendToOrganization(organizationId, { type, payload });
+
+      debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
+    }
   }
 
   /**
@@ -344,44 +395,9 @@ export class WebSocketService {
       }
       this.conversationClients.get(conversation.id)!.add(clientId);
 
-      // Find webchat plugin instance
-      const pluginInstances = await pluginInstanceRepository.findAll({
-        where: {
-          organizationId: client.organizationId,
-          enabled: true,
-        },
-        relations: ["plugin"],
-      });
-
-      const pluginInstance = pluginInstances.find(
-        (instance) => instance.plugin.name === "hay-plugin-webchat",
-      );
-
-      if (pluginInstance && pluginInstance.plugin.name === "hay-plugin-webchat") {
-        client.pluginId = pluginInstance.pluginId;
-
-        // Notify plugin of connection
-        try {
-          // Update activity timestamp when WebSocket connects
-          await pluginInstanceManagerService.updateActivityTimestamp(
-            client.organizationId,
-            client.pluginId,
-          );
-
-          await processManagerService.sendToPlugin(
-            client.organizationId,
-            client.pluginId,
-            "websocket_connected",
-            {
-              conversationId: conversation.id,
-              customerId,
-              metadata,
-            },
-          );
-        } catch (error) {
-          console.error("Failed to notify plugin of WebSocket connection:", error);
-        }
-      }
+      // Webchat is now a core feature, no longer requires plugin instance
+      // Just log the connection for debugging
+      debugLog("websocket", `Webchat client connected to conversation ${conversation.id}`);
     }
 
     // Send identification confirmation
@@ -399,30 +415,105 @@ export class WebSocketService {
    */
   private async handleChatMessage(clientId: string, message: ChatMessage): Promise<void> {
     const client = this.clients.get(clientId);
-    if (!client || !client.conversationId || !client.pluginId) return;
+    if (!client || !client.conversationId) return;
 
-    // Forward to plugin
+    // Handle message directly in core system (webchat is now core, not a plugin)
     try {
-      // Update activity timestamp when message is sent
-      await pluginInstanceManagerService.updateActivityTimestamp(
-        client.organizationId,
-        client.pluginId,
+      // Check if this is a web conversation that requires DPoP authentication
+      const conversation = await conversationRepository.findById(client.conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+
+      let newNonce: string | undefined;
+
+      // If conversation has a publicJwk (web channel with DPoP), validate DPoP proof
+      if (conversation.publicJwk) {
+        if (!message.proof || !message.method || !message.url || !message.conversationId) {
+          client.ws.send(
+            JSON.stringify({
+              type: "error",
+              error:
+                "DPoP authentication required: proof, method, url, and conversationId must be provided",
+            }),
+          );
+          return;
+        }
+
+        // Validate DPoP proof
+        const dpopVerification = await verifyDPoPForRequest(
+          message.conversationId,
+          message.proof,
+          message.method,
+          message.url,
+        );
+
+        if (!dpopVerification.success) {
+          // Check if it's a nonce expiration error
+          if (dpopVerification.error === "NONCE_EXPIRED" && dpopVerification.newNonce) {
+            client.ws.send(
+              JSON.stringify({
+                type: "error",
+                error: "NONCE_EXPIRED",
+                nonce: dpopVerification.newNonce,
+              }),
+            );
+            return;
+          }
+
+          // Other DPoP validation errors
+          client.ws.send(
+            JSON.stringify({
+              type: "error",
+              error: dpopVerification.error || "DPoP validation failed",
+            }),
+          );
+          return;
+        }
+
+        // Store new nonce for response
+        newNonce = dpopVerification.newNonce;
+      }
+
+      const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
+
+      console.log(
+        `[WebSocket.handleChatMessage] Saving customer message to conversation ${conversation.id}`,
       );
 
-      await processManagerService.sendToPlugin(
-        client.organizationId,
-        client.pluginId,
-        "websocket_message",
-        {
-          conversationId: client.conversationId,
-          customerId: client.customerId,
-          text: message.text,
-          attachments: message.attachments,
-          timestamp: message.timestamp,
-        },
+      // Save customer message using conversation.addMessage() to ensure broadcasting
+      const savedMessage = await conversation.addMessage({
+        content: message.content,
+        type: MessageType.CUSTOMER,
+        sender: "customer",
+      });
+
+      console.log(`[WebSocket.handleChatMessage] Message saved with ID: ${savedMessage.id}`);
+
+      // Send confirmation with new nonce (if DPoP was validated)
+      const confirmationPayload = {
+        type: "message_sent",
+        messageId: savedMessage.id,
+        ...(newNonce && { nonce: newNonce }),
+      };
+      console.log(
+        `[WebSocket.handleChatMessage] Sending confirmation to client:`,
+        confirmationPayload,
       );
+      client.ws.send(JSON.stringify(confirmationPayload));
+
+      // Note: Message broadcasting is handled automatically by conversation.addMessage()
+      // via Redis pub/sub or direct WebSocket
+
+      // Trigger orchestrator to process the message and generate response
+      console.log(
+        `[WebSocket.handleChatMessage] Triggering orchestrator for conversation ${conversation.id}`,
+      );
+      await orchestratorWorker.tick();
+
+      debugLog("websocket", `Webchat message processed for conversation ${conversation.id}`);
     } catch (error) {
-      console.error("Failed to forward message to plugin:", error);
+      console.error("Failed to process webchat message:", error);
       client.ws.send(
         JSON.stringify({
           type: "error",
@@ -516,17 +607,10 @@ export class WebSocketService {
         }
       }
 
-      // Notify plugin of disconnection
-      if (client.pluginId && client.organizationId) {
-        processManagerService
-          .sendToPlugin(client.organizationId, client.pluginId, "websocket_disconnected", {
-            conversationId: client.conversationId,
-            customerId: client.customerId,
-          })
-          .catch((error) => {
-            console.error("Failed to notify plugin of WebSocket disconnection:", error);
-          });
-      }
+      debugLog(
+        "websocket",
+        `Webchat client disconnected from conversation ${client.conversationId}`,
+      );
     }
 
     // Remove from organization clients
@@ -562,15 +646,31 @@ export class WebSocketService {
    */
   sendToConversation(conversationId: string, message: Record<string, unknown>): number {
     const clientIds = this.conversationClients.get(conversationId);
-    if (!clientIds) return 0;
+    console.log(
+      `[WebSocket.sendToConversation] Conversation ${conversationId} has ${clientIds?.size || 0} clients`,
+    );
+
+    if (!clientIds) {
+      console.log(
+        `[WebSocket.sendToConversation] No clients found for conversation ${conversationId}`,
+      );
+      return 0;
+    }
 
     let sent = 0;
     for (const clientId of clientIds) {
+      console.log(`[WebSocket.sendToConversation] Attempting to send to client ${clientId}`);
       if (this.sendToClient(clientId, message)) {
         sent++;
+        console.log(`[WebSocket.sendToConversation] Successfully sent to client ${clientId}`);
+      } else {
+        console.log(`[WebSocket.sendToConversation] Failed to send to client ${clientId}`);
       }
     }
 
+    console.log(
+      `[WebSocket.sendToConversation] Sent to ${sent}/${clientIds.size} clients in conversation ${conversationId}`,
+    );
     return sent;
   }
 

@@ -200,6 +200,11 @@ const navMain = computed(() => {
           isActive: route.path === "/settings/api-tokens",
         },
         {
+          title: "Webchat",
+          url: "/settings/webchat",
+          isActive: route.path === "/settings/webchat",
+        },
+        {
           title: "My Profile",
           url: "/settings/profile",
           isActive: route.path === "/settings/profile",
