@@ -555,6 +555,20 @@ The following tools are available for you to use. You MUST return only valid JSO
     const { messageRepository } = await import("../../repositories/message.repository");
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
+    // Check if the last message has the same content to prevent duplicates
+    const messages = await this.getMessages();
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.content === messageData.content && lastMessage.type === messageData.type) {
+        debugLog("conversation", "Duplicate message detected, skipping", {
+          conversationId: this.id,
+          content: messageData.content.substring(0, 100),
+          type: messageData.type,
+        });
+        return lastMessage;
+      }
+    }
+
     // Handle Customer message cooldown
     if (messageData.type === MessageType.CUSTOMER) {
       const { config } = await import("../../config/env");
@@ -630,7 +644,9 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
     }
 
-    // Create the message
+    // CRITICAL: Save the message to database FIRST before broadcasting
+    // This ensures the message is committed to the database before any WebSocket clients
+    // receive the broadcast and potentially try to query for it
     const message = await messageRepository.create({
       conversation_id: this.id,
       content: messageData.content,
@@ -642,39 +658,80 @@ The following tools are available for you to use. You MUST return only valid JSO
       deliveryState,
     });
 
-    // Publish event to Redis for cross-server WebSocket broadcasting
-    try {
-      const { redisService } = await import("../../services/redis.service");
+    // IMPORTANT: Message is now saved to database and committed
+    // Now it's safe to broadcast to WebSocket clients
+    debugLog("conversation", `Message ${message.id} saved to database, preparing to broadcast`);
 
-      if (redisService.isConnected()) {
-        await redisService.publish("websocket:events", {
-          type: "message_received",
-          organizationId: this.organization_id,
-          payload: {
+    // Broadcast public-facing messages (Customer, BotAgent, HumanAgent)
+    // - SENT messages: broadcast to both dashboard and webchat
+    // - QUEUED messages: broadcast to dashboard only (for review)
+    const isPublicMessage = [MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT].includes(
+      message.type as MessageType,
+    );
+
+    console.log(`[Conversation.addMessage] Message type: ${message.type}, deliveryState: ${message.deliveryState}, isPublicMessage: ${isPublicMessage}`);
+
+    // Only broadcast after successful database save
+    if (isPublicMessage) {
+      try {
+        const { redisService } = await import("../../services/redis.service");
+
+        console.log(`[Conversation.addMessage] Redis connected: ${redisService.isConnected()}`);
+
+        if (redisService.isConnected()) {
+          const eventPayload = {
+            type: "message_received",
+            organizationId: this.organization_id,
             conversationId: this.id,
-            messageId: message.id,
-            messageType: message.type,
-          },
-        });
-        debugLog("redis", `Published message_received event to Redis for conversation ${this.id}`);
-      } else {
-        // Fallback to direct WebSocket if Redis not available
-        const { websocketService } = await import("../../services/websocket.service");
-        const sent = websocketService.sendToOrganization(this.organization_id, {
-          type: "message_received",
-          payload: {
-            conversationId: this.id,
-            messageId: message.id,
-            messageType: message.type,
-          },
-        });
-        debugLog(
-          "conversation",
-          `Sent message_received directly to ${sent} local clients (Redis not available)`,
-        );
+            payload: {
+              id: message.id,
+              content: message.content,
+              type: message.type,
+              sender: message.sender,
+              timestamp: message.created_at,
+              metadata: message.metadata,
+              status: message.status,
+              deliveryState: message.deliveryState,
+            },
+          };
+          console.log(`[Conversation.addMessage] Publishing to Redis (after DB save):`, eventPayload);
+          await redisService.publish("websocket:events", eventPayload);
+          debugLog("redis", `Published message_received event to Redis for conversation ${this.id} (after DB commit)`);
+        } else {
+          // Fallback to direct WebSocket if Redis not available
+          const { websocketService } = await import("../../services/websocket.service");
+
+          const messagePayload = {
+            type: "message",
+            data: {
+              id: message.id,
+              content: message.content,
+              type: message.type,
+              sender: message.sender,
+              timestamp: message.created_at,
+              metadata: message.metadata,
+            },
+          };
+
+          console.log(`[Conversation.addMessage] Sending directly via WebSocket (after DB save):`, messagePayload);
+
+          // Send full message data to all clients in this conversation
+          const sent = websocketService.sendToConversation(this.id, messagePayload);
+
+          console.log(`[Conversation.addMessage] Sent to ${sent} clients in conversation ${this.id}`);
+          debugLog(
+            "conversation",
+            `Sent message to ${sent} clients in conversation ${this.id} (Redis not available, after DB commit)`,
+          );
+        }
+      } catch (error) {
+        // IMPORTANT: If broadcasting fails, the message is still saved in the database
+        // This ensures we never lose messages - broadcasting is best-effort
+        console.error("[Conversation] Failed to publish message event (message still saved):", error);
+        debugLog("conversation", `Message ${message.id} saved but broadcast failed - clients will see it on refresh`);
       }
-    } catch (error) {
-      console.error("[Conversation] Failed to publish message event:", error);
+    } else {
+      console.log(`[Conversation.addMessage] Message NOT broadcast (not a public message)`);
     }
 
     return message;

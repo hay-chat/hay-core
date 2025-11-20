@@ -27,7 +27,13 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   override async create(data: Partial<Conversation>): Promise<Conversation> {
     const conversation = this.getRepository().create(data);
-    return await this.getRepository().save(conversation);
+    const savedConversation = await this.getRepository().save(conversation);
+
+    // Broadcast conversation created event
+    const { conversationEventsService } = await import("../services/conversation-events.service");
+    await conversationEventsService.broadcastConversationCreated(savedConversation);
+
+    return savedConversation;
   }
 
   /**
@@ -50,7 +56,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   /**
    * Find conversation by ID and organizationId - ensures proper organization scoping
    */
-  async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
+  override async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
     const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id AND conversation.organization_id = :organizationId", {
@@ -95,7 +101,16 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     await this.getRepository().update({ id }, data as any);
 
-    return await this.findById(id);
+    const updatedConversation = await this.findById(id);
+
+    // Broadcast conversation updated event
+    if (updatedConversation) {
+      const { conversationEventsService } = await import("../services/conversation-events.service");
+      const changedFields = Object.keys(data);
+      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+    }
+
+    return updatedConversation;
   }
 
   // Simple update method for internal use (orchestrator, etc.)
@@ -107,7 +122,16 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     await this.getRepository().update({ id }, data as any);
 
-    return await this.findById(id);
+    const updatedConversation = await this.findById(id);
+
+    // Broadcast conversation updated event
+    if (updatedConversation) {
+      const { conversationEventsService } = await import("../services/conversation-events.service");
+      const changedFields = Object.keys(data);
+      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+    }
+
+    return updatedConversation;
   }
 
   /**
@@ -153,7 +177,15 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       organization_id: organizationId,
     });
 
-    return result.affected !== 0;
+    const deleted = result.affected !== 0;
+
+    // Broadcast conversation deleted event
+    if (deleted) {
+      const { conversationEventsService } = await import("../services/conversation-events.service");
+      await conversationEventsService.broadcastConversationDeleted(id, organizationId);
+    }
+
+    return deleted;
   }
 
   /**

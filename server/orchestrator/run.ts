@@ -8,11 +8,11 @@ import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
-import { ConversationContext } from "./types";
+import type { ConversationContext } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { debugLog } from "@server/lib/debug-logger";
-import { ExecutionResult } from "./execution.layer";
+import type { ExecutionResult } from "./execution.layer";
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -131,8 +131,13 @@ export const runConversation = async (conversationId: string) => {
   }
 
   // Skip processing for conversations taken over by humans
-  if (conversation.status === "human-took-over") {
-    debugLog("orchestrator", "Skipping - conversation taken over by human", { conversationId });
+  // Check both status and assigned_user_id to handle race conditions
+  if (conversation.status === "human-took-over" || conversation.assigned_user_id) {
+    debugLog("orchestrator", "Skipping - conversation taken over by human", {
+      conversationId,
+      status: conversation.status,
+      assignedUserId: conversation.assigned_user_id,
+    });
     return;
   }
 
@@ -400,7 +405,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
   const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
   const MAX_ITERATIONS = 15; // Prevent infinite loops
+  const MAX_EMPTY_RETRIES = 3; // Max retries when LLM returns incomplete responses
   let iterations = 0;
+  let emptyRetries = 0; // Track consecutive retries without valid response
   let handoffProcessed = false; // Track if handoff has been processed
 
   while (iterations < MAX_ITERATIONS) {
@@ -408,13 +415,38 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     debugLog("orchestrator", `Execution iteration ${iterations}`);
 
     // Get current messages and execute (with confidence guardrails integrated)
-    const executionResult: ExecutionResult | null =
-      await executionLayer.execute(conversation, customerLanguage);
+    const executionResult: ExecutionResult | null = await executionLayer.execute(
+      conversation,
+      customerLanguage,
+    );
 
     if (!executionResult) {
-      debugLog("orchestrator", "No execution result, ending loop");
-      break;
+      emptyRetries++;
+      debugLog("orchestrator", "No execution result", {
+        emptyRetries,
+        maxEmptyRetries: MAX_EMPTY_RETRIES,
+      });
+
+      // If we've retried too many times, use a fallback response
+      if (emptyRetries >= MAX_EMPTY_RETRIES) {
+        debugLog("orchestrator", "Max empty retries reached, using fallback response", {
+          level: "warn",
+        });
+        await conversation.addMessage({
+          content: "I'm here to help! How can I assist you today?",
+          type: MessageType.BOT_AGENT,
+          metadata: {
+            isFallbackResponse: true,
+            reason: "execution_planning_failed",
+          },
+        });
+        break;
+      }
+      continue;
     }
+
+    // Reset empty retry counter on successful response
+    emptyRetries = 0;
 
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       // Create unified tool message with initial state
@@ -639,8 +671,29 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
         break;
       } else {
-        // Retry the loop
-        debugLog("orchestrator", "No user message, retrying execution loop");
+        // Missing userMessage for non-tool/non-handoff/non-close steps
+        emptyRetries++;
+        debugLog("orchestrator", "No user message in response, retrying", {
+          step: executionResult.step,
+          emptyRetries,
+          maxEmptyRetries: MAX_EMPTY_RETRIES,
+        });
+
+        // If we've retried too many times, use a fallback response
+        if (emptyRetries >= MAX_EMPTY_RETRIES) {
+          debugLog("orchestrator", "Max retries for missing userMessage, using fallback", {
+            level: "warn",
+          });
+          await conversation.addMessage({
+            content: "I'm here to help! How can I assist you today?",
+            type: MessageType.BOT_AGENT,
+            metadata: {
+              isFallbackResponse: true,
+              reason: "missing_user_message",
+            },
+          });
+          break;
+        }
         continue;
       }
     }

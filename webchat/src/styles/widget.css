@@ -1,0 +1,123 @@
+/* Hay Webchat Widget - Global Styles */
+
+/* Theme Colors */
+#hay-webchat-root[data-theme="blue"] {
+  --hay-primary: #3b82f6;
+  --hay-primary-dark: #2563eb;
+  --hay-primary-light: #60a5fa;
+}
+
+#hay-webchat-root[data-theme="green"] {
+  --hay-primary: #10b981;
+  --hay-primary-dark: #059669;
+  --hay-primary-light: #34d399;
+}
+
+#hay-webchat-root[data-theme="purple"] {
+  --hay-primary: #8b5cf6;
+  --hay-primary-dark: #7c3aed;
+  --hay-primary-light: #a78bfa;
+}
+
+#hay-webchat-root[data-theme="black"] {
+  --hay-primary: #000000;
+  --hay-primary-dark: #171717;
+  --hay-primary-light: #404040;
+}
+
+/* Reset and base styles */
+#hay-webchat-root {
+  all: initial;
+  position: fixed;
+  z-index: 999999;
+  pointer-events: none;
+}
+
+#hay-webchat-root * {
+  pointer-events: auto;
+}
+
+/* Typography */
+#hay-webchat-root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+/* Scrollbar styling */
+#hay-webchat-root ::-webkit-scrollbar {
+  width: 6px;
+}
+
+#hay-webchat-root ::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+#hay-webchat-root ::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+#hay-webchat-root ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Focus styles */
+#hay-webchat-root button:focus-visible,
+#hay-webchat-root textarea:focus-visible,
+#hay-webchat-root input:focus-visible {
+  outline: 2px solid var(--hay-primary);
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes hay-slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hay-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hay-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  #hay-webchat-root {
+    font-size: 14px;
+  }
+}
+
+/* Accessibility - Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #hay-webchat-root *,
+  #hay-webchat-root *::before,
+  #hay-webchat-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

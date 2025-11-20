@@ -18,6 +18,7 @@ import { privacyRouter } from "./privacy";
 import { customerPrivacyRouter } from "./customer-privacy";
 import { apiTokensRouter } from "./api-tokens";
 import { auditLogsRouter } from "./audit-logs";
+import { webchatRouter } from "./webchat";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 
 // Core routers - always available
@@ -41,6 +42,7 @@ const coreRouters = {
   customerPrivacy: customerPrivacyRouter,
   apiTokens: apiTokensRouter,
   auditLogs: auditLogsRouter,
+  webchat: webchatRouter,
 };
 
 // Create v1Router with core + plugin routers

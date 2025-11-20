@@ -2,6 +2,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
+import path from "path";
 import { config } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
@@ -160,6 +161,41 @@ async function startServer() {
       res.status(500).json({ error: "Internal server error" });
     });
   });
+
+  // Serve public static files (test pages, documentation, etc.)
+  const publicPath = path.join(__dirname, "public");
+  server.use(
+    express.static(publicPath, {
+      maxAge: "1h",
+      etag: true,
+      lastModified: true,
+      setHeaders: (res) => {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      },
+    })
+  );
+
+  // Webchat widget route - serve webchat widget files (core feature, not a plugin)
+  const isDev = process.env.NODE_ENV === "development";
+  const webchatPath = isDev
+    ? path.join(process.cwd(), "..", "webchat", "dist")
+    : path.join(process.cwd(), "..", "webchat", "dist");
+
+  server.use(
+    "/webchat",
+    express.static(webchatPath, {
+      maxAge: "1d",
+      etag: true,
+      lastModified: true,
+      setHeaders: (res) => {
+        // Allow embedding on any domain
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        // Cache JavaScript and CSS
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      },
+    })
+  );
 
   // Initialize plugin system BEFORE creating the router
   if (dbConnected) {

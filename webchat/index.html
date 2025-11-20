@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hay Webchat Widget - Development</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- Configuration for development -->
+    <script>
+      window.HayChat = {
+        config: {
+          organizationId: 'c3578568-c83b-493f-991c-ca2d34a3bd17',
+          baseUrl: 'http://localhost:3001',
+          widgetTitle: 'Chat with us',
+          widgetSubtitle: 'Development Mode',
+          position: 'right',
+          theme: 'blue',
+          showGreeting: true,
+          greetingMessage: '👋 Hello! This is the development widget.'
+        }
+      };
+    </script>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -2,10 +2,7 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { debugLog } from "@server/lib/debug-logger";
-import {
-  ConfidenceGuardrailService,
-  ConfidenceAssessment,
-} from "@server/services/core/confidence-guardrail.service";
+import { ConfidenceGuardrailService, type ConfidenceAssessment } from "@server/services/core/confidence-guardrail.service";
 import { MessageIntent } from "@server/database/entities/message.entity";
 
 export interface ExecutionResult {
@@ -50,7 +47,7 @@ export class ExecutionLayer {
         },
         userMessage: {
           type: "string",
-          description: "Message to send to user",
+          description: "Message to send to user (REQUIRED for ASK and RESPOND steps)",
         },
         tool: {
           type: "object",
@@ -81,6 +78,7 @@ export class ExecutionLayer {
         },
       },
       required: ["step", "rationale"],
+      // Note: userMessage is conditionally required - validated after parsing
     };
   }
 
@@ -159,6 +157,17 @@ export class ExecutionLayer {
       });
 
       const result = JSON.parse(response) as ExecutionResult;
+
+      // Validate that ASK and RESPOND steps have userMessage
+      if ((result.step === "ASK" || result.step === "RESPOND") && !result.userMessage) {
+        debugLog("execution", "Invalid response: ASK/RESPOND without userMessage", {
+          level: "warn",
+          step: result.step,
+          rationale: result.rationale,
+        });
+        // Return null to trigger retry in orchestrator
+        return null;
+      }
 
       debugLog("execution", "Execution planning complete", {
         step: result.step,

@@ -154,6 +154,8 @@ export const publicConversationsRouter = t.router({
         nonce: verified.newNonce,
         hasMore: filteredMessages.length === input.limit,
         typing: isTyping,
+        status: conversation?.status || "open",
+        isClosed: conversation?.status === "closed" || conversation?.status === "resolved",
         error: null,
         errorMessage: null,
       };
@@ -302,7 +304,7 @@ export const publicConversationsRouter = t.router({
 });
 
 // Helper function to verify DPoP proof for a request
-async function verifyDPoPForRequest(
+export async function verifyDPoPForRequest(
   conversationId: string,
   proof: string,
   method: string,

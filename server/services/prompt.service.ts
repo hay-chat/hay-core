@@ -169,7 +169,7 @@ export class PromptService {
         const organizationRepo = AppDataSource.getRepository(Organization);
         const org = await organizationRepo.findOne({
           where: { id: options.organizationId },
-          select: ["defaultLanguage"],
+          select: ["id", "defaultLanguage"],
         });
 
         if (org?.defaultLanguage) {

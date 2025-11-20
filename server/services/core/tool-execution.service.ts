@@ -1,7 +1,7 @@
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { ConversationContext } from "@server/orchestrator/types";
+import type { ConversationContext } from "@server/orchestrator/types";
 import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { processManagerService } from "@server/services/process-manager.service";
