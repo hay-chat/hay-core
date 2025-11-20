@@ -172,7 +172,7 @@ async function startServer() {
       setHeaders: (res) => {
         res.setHeader("X-Content-Type-Options", "nosniff");
       },
-    })
+    }),
   );
 
   // Webchat widget route - serve webchat widget files (core feature, not a plugin)
@@ -181,20 +181,40 @@ async function startServer() {
     ? path.join(process.cwd(), "..", "webchat", "dist")
     : path.join(process.cwd(), "..", "webchat", "dist");
 
+  // Handle OPTIONS preflight requests for webchat widget
+  server.options("/webchat/*", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    res.sendStatus(204);
+  });
+
   server.use(
     "/webchat",
     express.static(webchatPath, {
       maxAge: "1d",
       etag: true,
       lastModified: true,
-      setHeaders: (res) => {
-        // Allow embedding on any domain
+      setHeaders: (res, filePath) => {
+        // Allow embedding on any domain - comprehensive CORS headers
         res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
+        res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range");
         res.setHeader("X-Content-Type-Options", "nosniff");
+
+        // Set proper MIME types for widget files
+        if (filePath.endsWith(".js")) {
+          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+        } else if (filePath.endsWith(".css")) {
+          res.setHeader("Content-Type", "text/css; charset=utf-8");
+        }
+
         // Cache JavaScript and CSS
         res.setHeader("Cache-Control", "public, max-age=86400");
       },
-    })
+    }),
   );
 
   // Initialize plugin system BEFORE creating the router
