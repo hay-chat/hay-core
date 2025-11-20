@@ -193,7 +193,7 @@ async function startServer() {
   const isDev = process.env.NODE_ENV === "development";
   const webchatPath = isDev
     ? path.join(process.cwd(), "..", "webchat", "dist")
-    : path.join(process.cwd(), "..", "webchat", "dist");
+    : path.join(__dirname, "..", "..", "webchat", "dist");
 
   server.use(
     "/webchat",
