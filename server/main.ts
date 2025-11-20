@@ -182,7 +182,7 @@ async function startServer() {
     : path.join(process.cwd(), "..", "webchat", "dist");
 
   // Handle OPTIONS preflight requests for webchat widget
-  server.options("/webchat/*", (req, res) => {
+  server.options(/^\/webchat\/.*/, (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
