@@ -100,6 +100,21 @@
           "type": "object",
           "description": "MCP server configuration",
           "properties": {
+            "connection": {
+              "type": "object",
+              "description": "MCP connection configuration",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["local", "remote"],
+                  "description": "Connection type: local (stdio) or remote (HTTP/HTTPS)"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Remote MCP server URL (required when type is 'remote')"
+                }
+              }
+            },
             "serverPath": {
               "type": "string",
               "description": "Path to the MCP server entry point"
@@ -135,12 +150,65 @@
               "description": "Transport protocol for MCP (e.g., 'sse|websocket|http')"
             },
             "auth": {
-              "type": "array",
-              "description": "Authentication methods supported",
-              "items": {
-                "type": "string",
-                "enum": ["oauth2", "jwt", "apiKey"]
-              }
+              "oneOf": [
+                {
+                  "type": "array",
+                  "description": "Simple authentication methods list",
+                  "items": {
+                    "type": "string",
+                    "enum": ["oauth2", "jwt", "apiKey"]
+                  }
+                },
+                {
+                  "type": "object",
+                  "description": "Advanced authentication configuration with OAuth support",
+                  "properties": {
+                    "methods": {
+                      "type": "array",
+                      "description": "Authentication methods supported",
+                      "items": {
+                        "type": "string",
+                        "enum": ["oauth2", "jwt", "apiKey"]
+                      }
+                    },
+                    "oauth": {
+                      "type": "object",
+                      "description": "OAuth 2.0 configuration",
+                      "required": ["authorizationUrl", "tokenUrl", "scopes"],
+                      "properties": {
+                        "authorizationUrl": {
+                          "type": "string",
+                          "description": "OAuth authorization endpoint URL"
+                        },
+                        "tokenUrl": {
+                          "type": "string",
+                          "description": "OAuth token endpoint URL"
+                        },
+                        "scopes": {
+                          "type": "array",
+                          "description": "OAuth scopes to request",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "pkce": {
+                          "type": "boolean",
+                          "description": "Enable PKCE (Proof Key for Code Exchange) for enhanced security",
+                          "default": false
+                        },
+                        "clientIdEnvVar": {
+                          "type": "string",
+                          "description": "Environment variable name for OAuth client ID"
+                        },
+                        "clientSecretEnvVar": {
+                          "type": "string",
+                          "description": "Environment variable name for OAuth client secret (optional for CIMD)"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
             },
             "installCommand": {
               "type": "string",

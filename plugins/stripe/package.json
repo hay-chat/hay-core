@@ -1,0 +1,15 @@
+{
+  "name": "hay-plugin-stripe",
+  "version": "1.0.0",
+  "description": "Stripe integration plugin for Hay using Model Context Protocol",
+  "type": "module",
+  "author": "Hay",
+  "license": "MIT",
+  "keywords": [
+    "stripe",
+    "payments",
+    "mcp",
+    "model-context-protocol",
+    "hay-plugin"
+  ]
+}

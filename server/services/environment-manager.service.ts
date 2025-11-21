@@ -1,6 +1,7 @@
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { oauthAuthStrategy } from "./oauth-auth-strategy.service";
 
 // Type for config schema
 type ConfigSchema = NonNullable<HayPluginManifest["configSchema"]>;
@@ -53,6 +54,32 @@ export class EnvironmentManagerService {
         if (schema.env && decryptedConfig[key] !== undefined) {
           env[schema.env] = String(decryptedConfig[key]);
         }
+      }
+    }
+
+    // Handle OAuth tokens for local MCP servers
+    // For remote MCPs, tokens are passed as headers, not env vars
+    const connectionType = manifest.capabilities?.mcp?.connection?.type || "local";
+    if (connectionType === "local" && instance.authMethod === "oauth") {
+      try {
+        const tokens = await oauthAuthStrategy.getValidTokens(organizationId, instance.plugin.pluginId);
+        if (tokens) {
+          // Inject OAuth tokens as environment variables for local MCP servers
+          // Standard OAuth token env vars
+          env.OAUTH_ACCESS_TOKEN = tokens.access_token;
+          if (tokens.refresh_token) {
+            env.OAUTH_REFRESH_TOKEN = tokens.refresh_token;
+          }
+          if (tokens.token_type) {
+            env.OAUTH_TOKEN_TYPE = tokens.token_type;
+          }
+          if (tokens.scope) {
+            env.OAUTH_SCOPE = tokens.scope;
+          }
+        }
+      } catch (error) {
+        // Log but don't fail - plugin may handle missing tokens gracefully
+        console.warn(`Failed to inject OAuth tokens for plugin ${instance.plugin.pluginId}:`, error);
       }
     }
 

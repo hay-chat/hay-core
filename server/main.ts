@@ -2,7 +2,6 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import path from "path";
 import { config } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
@@ -63,7 +62,7 @@ async function startServer() {
 
   const server = express();
 
-  // Add permissive CORS middleware for publicConversations endpoints and webchat widget
+  // Add permissive CORS middleware for publicConversations endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
     // Check if the path starts with /v1/publicConversations
@@ -78,20 +77,6 @@ async function startServer() {
         optionsSuccessStatus: 204,
       })(req, res, next);
     }
-
-    // Check if the path starts with /webchat - allow all origins for widget files
-    if (req.path.startsWith("/webchat")) {
-      return cors({
-        origin: true, // Allow all origins
-        credentials: false,
-        methods: ["GET", "HEAD", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Range"],
-        exposedHeaders: ["Content-Length", "Content-Range"],
-        maxAge: 86400,
-        optionsSuccessStatus: 204,
-      })(req, res, next);
-    }
-
     next();
   });
 
@@ -176,51 +161,70 @@ async function startServer() {
     });
   });
 
-  // Serve public static files (test pages, documentation, etc.)
-  const publicPath = path.join(__dirname, "public");
-  server.use(
-    express.static(publicPath, {
-      maxAge: "1h",
-      etag: true,
-      lastModified: true,
-      setHeaders: (res) => {
-        res.setHeader("X-Content-Type-Options", "nosniff");
-      },
-    }),
-  );
+  // OAuth callback route - handle OAuth redirects from providers
+  server.get("/oauth/callback", async (req, res) => {
+    const { oauthService } = await import("@server/services/oauth.service");
+    const { getDashboardUrl } = await import("@server/config/env");
 
-  // Webchat widget route - serve webchat widget files (core feature, not a plugin)
-  const isDev = process.env.NODE_ENV === "development";
-  const webchatPath = isDev
-    ? path.join(process.cwd(), "..", "webchat", "dist")
-    : path.join(__dirname, "..", "..", "webchat", "dist");
+    const { code, state, error } = req.query;
 
-  server.use(
-    "/webchat",
-    express.static(webchatPath, {
-      maxAge: "1d",
-      etag: true,
-      lastModified: true,
-      setHeaders: (res, filePath) => {
-        // Allow embedding on any domain - comprehensive CORS headers
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
-        res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range");
-        res.setHeader("X-Content-Type-Options", "nosniff");
+    if (!code && !error) {
+      return res.status(400).send(`
+        <html>
+          <head><title>OAuth Error</title></head>
+          <body>
+            <h1>OAuth Error</h1>
+            <p>Missing authorization code or error parameter.</p>
+            <a href="${getDashboardUrl()}">Return to Dashboard</a>
+          </body>
+        </html>
+      `);
+    }
 
-        // Set proper MIME types for widget files
-        if (filePath.endsWith(".js")) {
-          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
-        } else if (filePath.endsWith(".css")) {
-          res.setHeader("Content-Type", "text/css; charset=utf-8");
-        }
+    try {
+      const result = await oauthService.handleCallback(
+        code as string,
+        state as string,
+        error as string | undefined,
+      );
 
-        // Cache JavaScript and CSS
-        res.setHeader("Cache-Control", "public, max-age=86400");
-      },
-    }),
-  );
+      if (result.success) {
+        // Redirect to dashboard plugin settings page with success message
+        const dashboardUrl = getDashboardUrl();
+        return res.redirect(
+          `${dashboardUrl}/integrations/plugins/${result.pluginId}?oauth=success&pluginId=${result.pluginId}`,
+        );
+      } else {
+        // Show error page
+        return res.status(400).send(`
+          <html>
+            <head><title>OAuth Error</title></head>
+            <body>
+              <h1>OAuth Authorization Failed</h1>
+              <p>${result.error || "Unknown error occurred"}</p>
+              <a href="${getDashboardUrl()}">Return to Dashboard</a>
+            </body>
+          </html>
+        `);
+      }
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      return res.status(500).send(`
+        <html>
+          <head><title>OAuth Error</title></head>
+          <body>
+            <h1>Internal Server Error</h1>
+            <p>An error occurred while processing the OAuth callback.</p>
+            <a href="${getDashboardUrl()}">Return to Dashboard</a>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Well-known endpoints for OAuth Client Metadata Document (CIMD)
+  const wellKnownRouter = await import("@server/routes/well-known");
+  server.use(wellKnownRouter.default);
 
   // Initialize plugin system BEFORE creating the router
   if (dbConnected) {

@@ -5,6 +5,7 @@ import { privacyService } from "./privacy.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginRouteService } from "./plugin-route.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
+import { refreshOAuthTokens } from "./oauth-token-refresh.job";
 
 /**
  * Centralized Scheduled Jobs Registry
@@ -97,6 +98,19 @@ const jobRegistry: CronJobConfig[] = [
     retryOnFailure: true,
     maxRetries: 3,
     enabled: true,
+  },
+
+  // ============================================================
+  // OAUTH TOKEN MANAGEMENT
+  // ============================================================
+  {
+    name: "oauth-token-refresh",
+    description: "Refresh OAuth tokens expiring within 15 minutes",
+    schedule: 600000, // Every 10 minutes
+    handler: async () => refreshOAuthTokens(),
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true, // Don't log frequent token refreshes
   },
 
   // ============================================================

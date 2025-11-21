@@ -337,51 +337,22 @@ export class ToolExecutionService {
     console.log(`[ToolExecution] Organization ID: ${organizationId}`);
     console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));
 
-    // Check if the plugin process is running
-    if (!processManagerService.isRunning(organizationId, pluginId)) {
-      console.log(`[ToolExecution] Plugin process not running, attempting to start...`);
-      try {
-        await processManagerService.startPlugin(organizationId, pluginId);
-        console.log(`[ToolExecution] Plugin process started successfully`);
-      } catch (error) {
-        console.error(`[ToolExecution] Failed to start plugin process:`, error);
-        throw new Error(`Plugin process not available: ${(error as Error).message}`);
-      }
-    }
-
-    // Prepare MCP request
-    const mcpRequest = {
-      jsonrpc: "2.0",
-      id: uuidv4(),
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: toolArgs,
-      },
-    };
-
-    console.log(
-      `[ToolExecution] Sending MCP request to running process:`,
-      JSON.stringify(mcpRequest, null, 2),
-    );
-
     try {
-      // Use the process manager to send the request to the running MCP process
-      const result = await processManagerService.sendToPlugin(
-        organizationId,
-        pluginId,
-        "mcp_call",
-        mcpRequest,
-      );
+      // Use MCP client factory to get the appropriate client (local or remote)
+      const { MCPClientFactory } = await import("@server/services/mcp-client-factory.service");
+      const client = await MCPClientFactory.createClient(organizationId, pluginId);
+
+      // Call the tool
+      const result = await client.callTool(toolName, toolArgs);
 
       console.log(`[ToolExecution] MCP response received:`, JSON.stringify(result, null, 2));
 
-      const mcpResult = result as any;
-      if (mcpResult.error) {
-        throw new Error(`MCP tool error: ${mcpResult.error.message || mcpResult.error}`);
+      if (result.isError) {
+        throw new Error(`MCP tool error: ${result.error || "Unknown error"}`);
       }
 
-      return mcpResult.result || mcpResult;
+      // Return the result content or the full result object
+      return result.content || result;
     } catch (error) {
       console.error(`[ToolExecution] MCP tool execution failed:`, error);
       throw error;

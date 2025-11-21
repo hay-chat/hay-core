@@ -53,6 +53,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
+  async findOAuthInstances(): Promise<PluginInstance[]> {
+    return this.getRepository().find({
+      where: { authMethod: "oauth" },
+      relations: ["plugin", "organization"],
+    });
+  }
+
   async updateStatus(id: string, status: PluginInstance["status"], error?: string): Promise<void> {
     const updates: Partial<PluginInstance> = { status };
 
