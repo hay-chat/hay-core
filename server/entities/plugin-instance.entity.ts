@@ -52,4 +52,7 @@ export class PluginInstance extends OrganizationScopedEntity {
 
   @Column({ type: "integer", default: 0 })
   priority!: number;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  authMethod?: "api_key" | "oauth";
 }

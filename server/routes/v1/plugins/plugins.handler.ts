@@ -7,8 +7,10 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { pluginUIService } from "@server/services/plugin-ui.service";
 import { processManagerService } from "@server/services/process-manager.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
+import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -518,8 +520,8 @@ export const testConnection = authenticatedProcedure
       const mcpTools = manifest.capabilities.mcp.tools || [];
 
       // Determine which tool to use for health check (priority order)
-      let testTool = null;
-      let testArgs = {};
+      let testTool: string | null = null;
+      let testArgs: Record<string, unknown> = {};
 
       // Priority 1: Look for health check tools
       const healthCheckTools = mcpTools.filter(
@@ -574,30 +576,66 @@ export const testConnection = authenticatedProcedure
               },
       };
 
-      console.log(`[HealthCheck] Testing connection for ${input.pluginId} with tool: ${testTool}`);
+      // Check connection type and use appropriate method
+      const connectionType = manifest.capabilities.mcp.connection?.type || "local";
+      let mcpResponse: any;
 
-      // Send request with shorter timeout for health checks
-      const result = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Connection timeout - verify server is accessible"));
-        }, 10000); // 10 second timeout for health checks
+      if (connectionType === "remote") {
+        // Use MCP client factory for remote plugins
+        const client = await MCPClientFactory.createClient(ctx.organizationId!, input.pluginId);
 
-        processManagerService
-          .sendToPlugin(ctx.organizationId!, input.pluginId, "mcp_call", mcpRequest)
-          .then((response) => {
-            clearTimeout(timeout);
-            resolve(response);
-          })
-          .catch((error) => {
-            clearTimeout(timeout);
-            reject(error);
-          });
-      });
+        try {
+          // First, list available tools to see what the server actually provides
+          const availableTools = await client.listTools();
 
-      // Type the response properly
-      const mcpResponse = result as any;
+          if (testTool === "initialize") {
+            // For initialize, just check if we can connect and list tools
+            mcpResponse = {
+              result: {
+                capabilities: {
+                  tools: availableTools.length > 0,
+                },
+              },
+            };
+          } else {
+            // Check if the test tool exists in available tools
+            const toolExists = availableTools.some((t) => t.name === testTool);
 
-      console.log(`[HealthCheck] Received response for ${input.pluginId}`);
+            if (!toolExists && availableTools.length > 0) {
+              // Use the first available tool instead
+              testTool = availableTools[0].name;
+              testArgs = {};
+            }
+
+            // Call the actual tool
+            const toolResult = await client.callTool(testTool, testArgs);
+            mcpResponse = {
+              result: toolResult,
+            };
+          }
+        } finally {
+          await client.close();
+        }
+      } else {
+        // Use process manager for local plugins
+        const result = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Connection timeout - verify server is accessible"));
+          }, 10000); // 10 second timeout for health checks
+
+          processManagerService
+            .sendToPlugin(ctx.organizationId!, input.pluginId, "mcp_call", mcpRequest)
+            .then((response) => {
+              clearTimeout(timeout);
+              resolve(response);
+            })
+            .catch((error) => {
+              clearTimeout(timeout);
+              reject(error);
+            });
+        });
+        mcpResponse = result as any;
+      }
 
       // Check if the response contains an error
       if (mcpResponse && typeof mcpResponse === "object") {
@@ -607,7 +645,8 @@ export const testConnection = authenticatedProcedure
             success: false,
             status: "unhealthy",
             message: mcpResponse.error.message || "MCP server returned an error",
-            error: mcpResponse.error.message || "Unknown MCP error",
+            error:
+              mcpResponse.error.message || JSON.stringify(mcpResponse.error) || "Unknown MCP error",
             testedAt: new Date(),
           };
         }
@@ -647,7 +686,6 @@ export const testConnection = authenticatedProcedure
                   item.text.includes("Authentication failed") ||
                   item.text.includes("Unauthorized")
                 ) {
-                  console.log(`[HealthCheck] Authentication error detected:`, item.text);
                   return {
                     success: false,
                     status: "unconfigured",
@@ -669,8 +707,6 @@ export const testConnection = authenticatedProcedure
         testedAt: new Date(),
       };
     } catch (error) {
-      console.error(`[HealthCheck] Connection test failed for ${input.pluginId}:`, error);
-
       let errorMessage = "Unknown error";
       let status: "unhealthy" | "unconfigured" = "unhealthy";
 
@@ -703,4 +739,74 @@ export const testConnection = authenticatedProcedure
         testedAt: new Date(),
       };
     }
+  });
+
+/**
+ * Initiate OAuth authorization flow
+ */
+export const initiateOAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    const { authorizationUrl, state } = await oauthService.initiateOAuth(
+      input.pluginId,
+      ctx.organizationId!,
+      ctx.user!.id,
+    );
+
+    return {
+      authorizationUrl,
+      state,
+    };
+  });
+
+/**
+ * Check if OAuth is available for a plugin
+ */
+export const isOAuthAvailable = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .query(async ({ input }) => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      return { available: false };
+    }
+
+    const manifest = plugin.manifest as HayPluginManifest;
+    const available = oauthService.isOAuthAvailable(input.pluginId, manifest);
+
+    return { available };
+  });
+
+/**
+ * Get OAuth connection status
+ */
+export const getOAuthStatus = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .query(async ({ ctx, input }) => {
+    return await oauthService.getConnectionStatus(ctx.organizationId!, input.pluginId);
+  });
+
+/**
+ * Revoke OAuth connection
+ */
+export const revokeOAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    await oauthService.revokeOAuth(ctx.organizationId!, input.pluginId);
+    return { success: true };
   });

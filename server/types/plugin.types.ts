@@ -52,7 +52,21 @@ export interface HayPluginManifest {
         description?: string;
       }>;
       transport?: string;
-      auth?: Array<"oauth2" | "jwt" | "apiKey">;
+      connection?: {
+        type: "local" | "remote";
+        url?: string; // Required for remote
+      };
+      auth?: {
+        methods?: Array<"oauth2" | "jwt" | "apiKey">;
+        oauth?: {
+          authorizationUrl: string;
+          tokenUrl: string;
+          scopes: string[];
+          pkce?: boolean;
+          clientIdEnvVar?: string;
+          clientSecretEnvVar?: string; // Optional for CIMD
+        };
+      };
       installCommand?: string;
       buildCommand?: string;
       startCommand?: string;
