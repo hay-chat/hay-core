@@ -26,12 +26,21 @@ export interface PlaybookState {
   history: Array<{ stepId: string; ts: string; notes?: string }>;
 }
 
+export type ProcessingPhase = "perceiving" | "retrieving" | "executing" | "idle";
+
+export interface ProcessingState {
+  phase: ProcessingPhase;
+  startedAt: string;
+  message?: string;
+}
+
 export interface ConversationContext {
   version: "v1";
   lastTurn: number;
   activePlaybook?: PlaybookState;
   perception?: unknown;
   rag?: RagPack | null;
+  processingState?: ProcessingState;
   toolLog: Array<{
     turn: number;
     name: string;

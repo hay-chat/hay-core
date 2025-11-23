@@ -8,7 +8,7 @@ import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
-import type { ConversationContext } from "./types";
+import type { ConversationContext, ProcessingPhase } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { debugLog } from "@server/lib/debug-logger";
@@ -22,6 +22,7 @@ async function publishStatusChange(
   conversationId: string,
   status: string,
   title?: string,
+  processingPhase?: ProcessingPhase,
 ): Promise<void> {
   try {
     const { redisService } = await import("@server/services/redis.service");
@@ -34,6 +35,7 @@ async function publishStatusChange(
           conversationId,
           status,
           title,
+          processingPhase,
         },
       });
     } else {
@@ -45,11 +47,61 @@ async function publishStatusChange(
           conversationId,
           status,
           title,
+          processingPhase,
         },
       });
     }
   } catch (error) {
     console.error("[Orchestrator] Failed to publish status change:", error);
+  }
+}
+
+/**
+ * Helper function to update processing state in orchestration_status
+ * and broadcast via WebSocket
+ */
+async function updateProcessingState(
+  conversation: Conversation,
+  phase: ProcessingPhase,
+  message?: string,
+): Promise<void> {
+  try {
+    const orchestrationStatus = (conversation.orchestration_status as unknown as ConversationContext) || {
+      version: "v1" as const,
+      lastTurn: 0,
+      toolLog: [],
+    };
+
+    // Update processing state
+    orchestrationStatus.processingState = {
+      phase,
+      startedAt: new Date().toISOString(),
+      message,
+    };
+
+    // Save to database
+    await conversationRepository.updateById(conversation.id, {
+      orchestration_status: orchestrationStatus as any,
+    });
+
+    // Update local reference
+    conversation.orchestration_status = orchestrationStatus as any;
+
+    // Broadcast via WebSocket
+    await publishStatusChange(
+      conversation.organization_id,
+      conversation.id,
+      conversation.status,
+      conversation.title,
+      phase,
+    );
+
+    debugLog("orchestrator", `Processing state updated to: ${phase}`, {
+      conversationId: conversation.id,
+      message,
+    });
+  } catch (error) {
+    console.error("[Orchestrator] Failed to update processing state:", error);
   }
 }
 
@@ -71,6 +123,11 @@ function buildMessageMetadata(
     metadata.documentsUsed = executionResult.confidence.documentsUsed;
     metadata.recheckAttempted = executionResult.recheckAttempted || false;
     metadata.recheckCount = executionResult.recheckCount || 0;
+  }
+
+  // Store original message if it was replaced by fallback
+  if (executionResult.originalMessage) {
+    metadata.originalMessage = executionResult.originalMessage;
   }
 
   return metadata;
@@ -176,6 +233,10 @@ export const runConversation = async (conversationId: string) => {
     if (!lastCustomerMessage) {
       throw new Error("Last customer message not found");
     }
+
+    // Update processing state to perceiving
+    await updateProcessingState(conversation, "perceiving", "Analyzing your message");
+
     // 01. Perception layer
     const perceptionLayer = new PerceptionLayer();
 
@@ -260,6 +321,7 @@ export const runConversation = async (conversationId: string) => {
 
       // Set processed and unlock early since we're closing
       conversation.setProcessed(true);
+      await updateProcessingState(conversation, "idle");
       await conversation.unlock();
       return; // Exit early since conversation is closed
     }
@@ -280,6 +342,9 @@ export const runConversation = async (conversationId: string) => {
         agentId: currentAgent,
       });
     }
+
+    // Update processing state to retrieving
+    await updateProcessingState(conversation, "retrieving", "Finding relevant information");
 
     // 02. Retrieval
     const retrievalLayer = new RetrievalLayer();
@@ -379,8 +444,14 @@ export const runConversation = async (conversationId: string) => {
       conversation.orchestration_status = initialContext as any;
     }
 
+    // Update processing state to executing
+    await updateProcessingState(conversation, "executing", "Generating response");
+
     // 04. Execution - Handle iterative execution with tool calls
     await handleExecutionLoop(conversation, language);
+
+    // Update processing state to idle (done)
+    await updateProcessingState(conversation, "idle");
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
@@ -391,6 +462,8 @@ export const runConversation = async (conversationId: string) => {
     ) {
       console.error("[Orchestrator] Error in conversation", error.message);
     }
+    // Set to idle on error
+    await updateProcessingState(conversation, "idle");
   } finally {
     await conversation.unlock();
     // console.log("[Orchestrator] Conversation unlocked", conversationId);

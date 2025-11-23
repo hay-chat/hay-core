@@ -24,6 +24,7 @@ export interface Message {
     documentsUsed?: Array<{ id: string; title: string; similarity: number }>;
     recheckAttempted?: boolean;
     recheckCount?: number;
+    originalMessage?: string; // Original message before fallback replacement
     // Tool execution metadata
     toolName?: string;
     toolInput?: Record<string, unknown>;

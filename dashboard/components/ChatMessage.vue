@@ -95,12 +95,44 @@
             v-html="markdownToHtml(message.content)"
           />
         </div>
-        <div
-          v-else
-          ref="systemMessageRef"
-          class="chat-message__text"
-          v-html="markdownToHtml(message.content)"
-        />
+        <div v-else>
+          <!-- Show original message if it was replaced by fallback -->
+          <div v-if="message.metadata?.originalMessage" class="confidence-fallback-viewer">
+            <div class="confidence-fallback-header" @click="toggleOriginalMessage">
+              <div class="confidence-fallback-header__left">
+                <AlertCircle class="h-4 w-4" />
+                <span class="font-bold">Low Confidence Response (Replaced with Fallback)</span>
+              </div>
+              <div class="confidence-fallback-header__right">
+                <ChevronDown v-if="!showOriginalMessage" class="h-3 w-3" />
+                <ChevronUp v-else class="h-3 w-3" />
+              </div>
+            </div>
+            <div v-show="showOriginalMessage" class="confidence-fallback-content">
+              <div class="confidence-fallback-section">
+                <div class="confidence-fallback-section__label">Original AI Response</div>
+                <div
+                  class="confidence-fallback-section__text"
+                  v-html="markdownToHtml(message.metadata.originalMessage)"
+                />
+              </div>
+              <div class="confidence-fallback-section">
+                <div class="confidence-fallback-section__label">Fallback Message (Sent to Customer)</div>
+                <div
+                  class="confidence-fallback-section__text confidence-fallback-section__text--sent"
+                  v-html="markdownToHtml(message.content)"
+                />
+              </div>
+            </div>
+          </div>
+          <!-- Regular message display -->
+          <div
+            v-else
+            ref="systemMessageRef"
+            class="chat-message__text"
+            v-html="markdownToHtml(message.content)"
+          />
+        </div>
       </div>
       <div
         v-if="isCollapsibleVariant && isSystemExpandable"
@@ -280,6 +312,12 @@ const isSystemCollapsed = ref(false);
 const isCollapsibleVariant = computed(() =>
   ["System", "Tool", "Document", "Playbook"].includes(props.message.type),
 );
+
+// Original message toggle for low-confidence fallback
+const showOriginalMessage = ref(false);
+const toggleOriginalMessage = () => {
+  showOriginalMessage.value = !showOriginalMessage.value;
+};
 
 const checkSystemMessageHeight = async () => {
   if (isCollapsibleVariant.value && systemMessageRef.value) {
@@ -580,5 +618,72 @@ const getConfidenceIcon = (tier: string | undefined) => {
   a {
     text-decoration: underline;
   }
+}
+
+/* Confidence Fallback Viewer Styles */
+.confidence-fallback-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  min-width: 50ch;
+}
+
+.confidence-fallback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.confidence-fallback-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.confidence-fallback-header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.confidence-fallback-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.confidence-fallback-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.confidence-fallback-section__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.confidence-fallback-section__text {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--color-neutral-700);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  border-left: 3px solid var(--color-orange-500);
+}
+
+.confidence-fallback-section__text--sent {
+  border-left-color: var(--color-green-500);
 }
 </style>

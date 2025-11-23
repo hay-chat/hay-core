@@ -106,6 +106,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
             timestamp: new Date(data.data.timestamp || Date.now()).getTime(),
             metadata: data.data.metadata,
           });
+
+          // Clear typing indicator when agent message is received
+          isTyping.value = false;
         }
         break;
 
@@ -131,6 +134,13 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
       case 'conversation_status_changed':
         // Handle conversation status changes (closed, resolved, etc.)
         console.log('[Webchat] Conversation status changed:', data.payload);
+
+        // Update typing indicator based on processing phase
+        if (data.payload?.processingPhase) {
+          isTyping.value = data.payload.processingPhase !== 'idle';
+          console.log(`[Webchat] Processing phase: ${data.payload.processingPhase}, typing: ${isTyping.value}`);
+        }
+
         if (data.payload && statusChangeCallback) {
           statusChangeCallback(data.payload.status, data.payload);
         }

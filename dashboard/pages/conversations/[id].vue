@@ -215,7 +215,7 @@
             <!-- Typing indicator -->
             <div v-if="isTyping" class="flex space-x-3 max-w-2xl">
               <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <User class="h-4 w-4 text-primary" />
+                <Bot class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1">
                 <div class="bg-background-tertiary p-3 rounded-lg">
@@ -1352,6 +1352,12 @@ onMounted(async () => {
           status: messageData.status,
           deliveryState: "sent",
         });
+
+        // Clear typing indicator when bot message is received
+        if (messageData.type === MessageType.BOT_AGENT) {
+          isAgentTyping.value = false;
+        }
+
         scrollToBottom();
       } else if (conversation.value && conversation.value.messages) {
         // First, try to find and replace optimistic message (pending message with matching content)
@@ -1398,6 +1404,12 @@ onMounted(async () => {
           metadata: messageData.metadata,
           deliveryState: "sent",
         });
+
+        // Clear typing indicator when bot message is received
+        if (messageData.type === MessageType.BOT_AGENT) {
+          isTyping.value = false;
+        }
+
         scrollToBottom();
 
         // Play sound for customer messages
@@ -1429,7 +1441,21 @@ onMounted(async () => {
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
     if (payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Conversation status changed");
+      console.log("[WebSocket] Conversation status changed", payload);
+
+      // Handle processing phase for typing indicator
+      if (payload.processingPhase) {
+        const isProcessing = payload.processingPhase !== "idle";
+
+        if (isPlaygroundMode.value) {
+          isAgentTyping.value = isProcessing;
+        } else {
+          isTyping.value = isProcessing;
+        }
+
+        console.log(`[WebSocket] Processing phase: ${payload.processingPhase}, typing: ${isProcessing}`);
+      }
+
       await debouncedRefreshConversation("status_changed");
     }
   });
