@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from "vue";
+import type { ComponentPublicInstance } from "vue";
 import type { CommandItem } from "./SlashCommand";
 import type { MCPTool, DocumentItem } from "./MentionExtension";
 import { Type, Heading1, Heading2, List, ListOrdered, Zap, Book } from "lucide-vue-next";
@@ -136,7 +137,7 @@ const selectedIndex = ref(0);
 const showSubmenu = ref<"action" | "document" | null>(null);
 const itemRefs = ref<(HTMLElement | null)[]>([]);
 
-const setItemRef = (el: any, index: number) => {
+const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
   if (el) {
     itemRefs.value[index] = el as HTMLElement;
   }

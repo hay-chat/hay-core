@@ -140,29 +140,39 @@ export class WebSocketService {
       return;
     }
 
-    // For message_received events, broadcast based on delivery state
+    // For message_received events, broadcast based on message type and delivery state
     if (type === "message_received" && conversationId) {
       const messagePayload = {
         type: "message",
         data: payload,
       };
 
-      // Always send to dashboard (organization clients) for review/monitoring
+      // Define public message types (visible to customers via webchat)
+      const publicMessageTypes = ["Customer", "BotAgent", "HumanAgent"];
+      const isPublicMessage = publicMessageTypes.includes(payload.type);
+
+      // Always send ALL messages to dashboard (organization clients) for full visibility
       const orgSent = this.sendToOrganization(organizationId, messagePayload);
 
-      // Only send to webchat (conversation clients) if deliveryState is SENT
-      // QUEUED messages should not be sent to customers until approved
-      if (payload.deliveryState === "sent") {
+      // Only send to webchat (conversation clients) if:
+      // 1. It's a public-facing message type (Customer, BotAgent, HumanAgent)
+      // 2. AND deliveryState is SENT (not QUEUED for approval)
+      if (isPublicMessage && payload.deliveryState === "sent") {
         const conversationSent = this.sendToConversation(conversationId, messagePayload);
 
         debugLog(
           "websocket",
-          `Broadcasted SENT message to ${conversationSent} conversation clients and ${orgSent} org clients`,
+          `Broadcasted ${payload.type} SENT message to ${conversationSent} conversation clients and ${orgSent} org clients`,
+        );
+      } else if (!isPublicMessage) {
+        debugLog(
+          "websocket",
+          `Broadcasted ${payload.type} (internal) message to ${orgSent} org clients only`,
         );
       } else {
         debugLog(
           "websocket",
-          `Broadcasted QUEUED message to ${orgSent} org clients only (not to conversation)`,
+          `Broadcasted ${payload.type} QUEUED message to ${orgSent} org clients only (not to conversation)`,
         );
       }
     } else if (type === "conversation_status_changed" && conversationId) {
@@ -580,13 +590,31 @@ export class WebSocketService {
 
     const { conversationId } = message;
 
-    // Add to conversation subscribers
+    // IMPORTANT: Dashboard clients (authenticated org members) should NOT be added to conversationClients
+    // They already receive ALL messages via organizationClients, so adding them to conversationClients
+    // would cause duplicate message delivery
+    if (client.authenticated && client.organizationId) {
+      debugLog(
+        "websocket",
+        `Client ${clientId} is authenticated org member - skipping conversationClients subscription (will receive via organizationClients)`,
+      );
+      // Still set conversationId for client metadata, but don't add to conversationClients map
+      client.conversationId = conversationId as string;
+      return;
+    }
+
+    // Add to conversation subscribers (for webchat/unauthenticated clients only)
     if (!this.conversationClients.has(conversationId as string)) {
       this.conversationClients.set(conversationId as string, new Set());
     }
     this.conversationClients.get(conversationId as string)!.add(clientId as string);
 
     client.conversationId = conversationId as string;
+
+    debugLog(
+      "websocket",
+      `Client ${clientId} subscribed to conversation ${conversationId} (webchat client)`,
+    );
   }
 
   /**
@@ -645,31 +673,18 @@ export class WebSocketService {
    */
   sendToConversation(conversationId: string, message: Record<string, unknown>): number {
     const clientIds = this.conversationClients.get(conversationId);
-    console.log(
-      `[WebSocket.sendToConversation] Conversation ${conversationId} has ${clientIds?.size || 0} clients`,
-    );
 
     if (!clientIds) {
-      console.log(
-        `[WebSocket.sendToConversation] No clients found for conversation ${conversationId}`,
-      );
       return 0;
     }
 
     let sent = 0;
     for (const clientId of clientIds) {
-      console.log(`[WebSocket.sendToConversation] Attempting to send to client ${clientId}`);
       if (this.sendToClient(clientId, message)) {
         sent++;
-        console.log(`[WebSocket.sendToConversation] Successfully sent to client ${clientId}`);
-      } else {
-        console.log(`[WebSocket.sendToConversation] Failed to send to client ${clientId}`);
       }
     }
 
-    console.log(
-      `[WebSocket.sendToConversation] Sent to ${sent}/${clientIds.size} clients in conversation ${conversationId}`,
-    );
     return sent;
   }
 

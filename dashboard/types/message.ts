@@ -5,6 +5,8 @@ export interface Message {
   type: MessageType;
   usage_metadata?: Record<string, unknown> | null;
   sender?: string | null;
+  deliveryState?: "pending" | "sent" | "failed"; // Client-side delivery state for optimistic updates
+  errorMessage?: string; // Error message if delivery failed
   metadata?: {
     model?: string;
     prompt_tokens?: number;
