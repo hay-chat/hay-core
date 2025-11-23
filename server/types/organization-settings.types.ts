@@ -241,8 +241,20 @@ export function timezoneLabelWithOffset(tz: string, label: string): string {
 }
 
 /**
- * Confidence Guardrail Configuration
- * Controls AI response confidence scoring and guardrails
+ * Company Interest Guardrail Configuration (Stage 1)
+ * Protects company interests by blocking harmful responses
+ */
+export interface CompanyInterestGuardrailConfig {
+  enabled: boolean; // Default: true
+  blockOffTopic: boolean; // Default: true (block completely off-topic responses)
+  blockCompetitorInfo: boolean; // Default: true (block generic competitor information)
+  blockFabrications: boolean; // Default: true (block fabricated products/policies)
+  allowClarifications: boolean; // Default: true (allow AI to clarify its own terms)
+}
+
+/**
+ * Confidence Guardrail Configuration (Stage 2)
+ * Controls AI response fact grounding and confidence scoring
  */
 export interface ConfidenceGuardrailConfig {
   highThreshold: number; // Default: 0.8 (minimum score for high confidence)
@@ -255,6 +267,17 @@ export interface ConfidenceGuardrailConfig {
     similarityThreshold: number; // Default: 0.3 (lower threshold for broader search)
   };
 }
+
+/**
+ * Default company interest guardrail configuration
+ */
+export const DEFAULT_COMPANY_INTEREST_GUARDRAIL_CONFIG: CompanyInterestGuardrailConfig = {
+  enabled: true,
+  blockOffTopic: true,
+  blockCompetitorInfo: true,
+  blockFabrications: true,
+  allowClarifications: true,
+};
 
 /**
  * Default confidence guardrail configuration
@@ -278,6 +301,8 @@ export const DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG: ConfidenceGuardrailConfig = {
  */
 export interface OrganizationSettings {
   testModeDefault?: boolean;
-  confidenceGuardrail?: ConfidenceGuardrailConfig;
+  companyDomain?: string; // Company's business domain/industry for context
+  companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
+  confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   [key: string]: unknown;
 }

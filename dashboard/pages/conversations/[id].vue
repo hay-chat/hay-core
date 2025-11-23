@@ -138,21 +138,17 @@
           <!-- Agent Typing indicator (outside TransitionGroup) -->
           <div v-if="isPlaygroundMode">
             <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
-              <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <Bot class="h-4 w-4 text-primary" />
-              </div>
-              <div class="flex-1">
+              <div class="w-8 h-8"></div>
+              <div class="max-w-sm">
                 <div class="bg-background-tertiary p-3 rounded-lg">
                   <div class="flex space-x-1">
+                    <div class="w-1 h-1 bg-neutral-700 rounded-full animate-bounce" />
                     <div
-                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
-                    />
-                    <div
-                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
+                      class="w-1 h-1 bg-neutral-700 rounded-full animate-bounce"
                       style="animation-delay: 0.1s"
                     />
                     <div
-                      class="w-2 h-2 bg-background-tertiary-foreground/50 rounded-full animate-bounce"
+                      class="w-1 h-1 bg-neutral-700 rounded-full animate-bounce"
                       style="animation-delay: 0.2s"
                     />
                   </div>
@@ -1318,7 +1314,10 @@ onMounted(async () => {
 
         if (optimisticIndex !== -1) {
           // Replace optimistic message with real one
-          console.log("[WebSocket] Replacing optimistic message with real message:", messageData.id);
+          console.log(
+            "[WebSocket] Replacing optimistic message with real message:",
+            messageData.id,
+          );
           messages.value[optimisticIndex] = {
             id: messageData.id,
             content: messageData.content,
@@ -1370,7 +1369,10 @@ onMounted(async () => {
 
         if (optimisticIndex !== -1) {
           // Replace optimistic message with real one
-          console.log("[WebSocket] Replacing optimistic message with real message:", messageData.id);
+          console.log(
+            "[WebSocket] Replacing optimistic message with real message:",
+            messageData.id,
+          );
           conversation.value.messages[optimisticIndex] = {
             id: messageData.id,
             content: messageData.content,
@@ -1453,7 +1455,9 @@ onMounted(async () => {
           isTyping.value = isProcessing;
         }
 
-        console.log(`[WebSocket] Processing phase: ${payload.processingPhase}, typing: ${isProcessing}`);
+        console.log(
+          `[WebSocket] Processing phase: ${payload.processingPhase}, typing: ${isProcessing}`,
+        );
       }
 
       await debouncedRefreshConversation("status_changed");

@@ -34,6 +34,31 @@ export interface ProcessingState {
   message?: string;
 }
 
+export interface GuardrailLogEntry {
+  timestamp: string;
+  companyInterest?: {
+    passed: boolean;
+    violationType: string;
+    severity: string;
+    shouldBlock: boolean;
+    requiresFactCheck: boolean;
+    reasoning: string;
+  };
+  factGrounding?: {
+    score: number;
+    tier: string;
+    breakdown: {
+      grounding: number;
+      retrieval: number;
+      certainty: number;
+    };
+    documentsUsed: Array<{ id: string; title: string; similarity: number }>;
+    recheckAttempted: boolean;
+    recheckCount: number;
+    details: string;
+  };
+}
+
 export interface ConversationContext {
   version: "v1";
   lastTurn: number;
@@ -51,4 +76,6 @@ export interface ConversationContext {
     latencyMs: number;
     idempotencyKey: string;
   }>;
+  guardrailLog?: GuardrailLogEntry[];
+  confidenceLog?: Array<any>; // Legacy, kept for backward compatibility
 }
