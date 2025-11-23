@@ -662,21 +662,19 @@ The following tools are available for you to use. You MUST return only valid JSO
     // Now it's safe to broadcast to WebSocket clients
     debugLog("conversation", `Message ${message.id} saved to database, preparing to broadcast`);
 
-    // Broadcast public-facing messages (Customer, BotAgent, HumanAgent)
+    // Broadcast messages via WebSocket:
+    // - Dashboard (organization clients): receives ALL message types
+    // - Webchat (conversation clients): receives only public-facing messages (Customer, BotAgent, HumanAgent)
     // - SENT messages: broadcast to both dashboard and webchat
     // - QUEUED messages: broadcast to dashboard only (for review)
-    const isPublicMessage = [MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT].includes(
-      message.type as MessageType,
-    );
 
-    console.log(`[Conversation.addMessage] Message type: ${message.type}, deliveryState: ${message.deliveryState}, isPublicMessage: ${isPublicMessage}`);
+    // All message types should be broadcast to dashboard for full visibility
+    const shouldBroadcast = true;
 
-    // Only broadcast after successful database save
-    if (isPublicMessage) {
+    // Broadcast after successful database save
+    if (shouldBroadcast) {
       try {
         const { redisService } = await import("../../services/redis.service");
-
-        console.log(`[Conversation.addMessage] Redis connected: ${redisService.isConnected()}`);
 
         if (redisService.isConnected()) {
           const eventPayload = {
@@ -694,9 +692,6 @@ The following tools are available for you to use. You MUST return only valid JSO
               deliveryState: message.deliveryState,
             },
           };
-          console.log(`[Conversation.addMessage] Publishing to Redis (after DB save):`, eventPayload);
-          await redisService.publish("websocket:events", eventPayload);
-          debugLog("redis", `Published message_received event to Redis for conversation ${this.id} (after DB commit)`);
         } else {
           // Fallback to direct WebSocket if Redis not available
           const { websocketService } = await import("../../services/websocket.service");
@@ -713,12 +708,9 @@ The following tools are available for you to use. You MUST return only valid JSO
             },
           };
 
-          console.log(`[Conversation.addMessage] Sending directly via WebSocket (after DB save):`, messagePayload);
-
           // Send full message data to all clients in this conversation
           const sent = websocketService.sendToConversation(this.id, messagePayload);
 
-          console.log(`[Conversation.addMessage] Sent to ${sent} clients in conversation ${this.id}`);
           debugLog(
             "conversation",
             `Sent message to ${sent} clients in conversation ${this.id} (Redis not available, after DB commit)`,
@@ -726,12 +718,14 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
       } catch (error) {
         // IMPORTANT: If broadcasting fails, the message is still saved in the database
-        // This ensures we never lose messages - broadcasting is best-effort
-        console.error("[Conversation] Failed to publish message event (message still saved):", error);
-        debugLog("conversation", `Message ${message.id} saved but broadcast failed - clients will see it on refresh`);
+
+        debugLog(
+          "conversation",
+          `Message ${message.id} saved but broadcast failed - clients will see it on refresh`,
+        );
       }
     } else {
-      console.log(`[Conversation.addMessage] Message NOT broadcast (not a public message)`);
+      debugLog("conversation", `Message NOT broadcast (not a public message)`);
     }
 
     return message;

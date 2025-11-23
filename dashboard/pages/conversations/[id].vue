@@ -116,16 +116,27 @@
           </div>
 
           <!-- Playground Messages -->
-          <div v-else-if="isPlaygroundMode" class="space-y-4">
+          <TransitionGroup
+            v-else-if="isPlaygroundMode"
+            name="message"
+            tag="div"
+            class="space-y-4"
+            enter-active-class="transition ease-out duration-200"
+            enter-from-class="opacity-0 translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+          >
             <ChatMessage
               v-for="message in messages"
               :key="message.id"
               :message="message"
               :inverted="true"
               :show-feedback="true"
+              @retry="retryMessage"
             />
+          </TransitionGroup>
 
-            <!-- Agent Typing indicator -->
+          <!-- Agent Typing indicator (outside TransitionGroup) -->
+          <div v-if="isPlaygroundMode">
             <div v-if="isAgentTyping" class="flex space-x-3 max-w-2xl">
               <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <Bot class="h-4 w-4 text-primary" />
@@ -183,12 +194,10 @@
 
             <!-- Messages -->
             <TransitionGroup
-              enter-active-class="transition duration-100 ease-out"
-              enter-from-class="transform scale-95 opacity-0"
-              enter-to-class="transform scale-100 opacity-100"
-              leave-active-class="transition duration-75 ease-in"
-              leave-from-class="transform scale-100 opacity-100"
-              leave-to-class="transform scale-95 opacity-0"
+              name="message"
+              enter-active-class="transition ease-out duration-200"
+              enter-from-class="opacity-0 translate-y-1"
+              enter-to-class="opacity-100 translate-y-0"
             >
               <ChatMessage
                 v-for="message in conversation?.messages"
@@ -199,6 +208,7 @@
                 @message-approved="handleMessageApproved"
                 @message-blocked="handleMessageBlocked"
                 @feedback-submitted="handleFeedbackSubmitted"
+                @retry="retryMessage"
               />
             </TransitionGroup>
 
@@ -248,8 +258,49 @@
           </div>
         </div>
 
+        <!-- Pending Human Panel (Playground Mode) -->
+        <div v-if="isPlaygroundMode && isPendingHuman" class="border-t bg-amber-50 p-4">
+          <div class="space-y-4">
+            <div class="flex items-start space-x-3">
+              <AlertCircle class="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div class="flex-1">
+                <p class="text-sm font-medium text-amber-900">
+                  Hay wasn't confident about answering this question
+                </p>
+                <p class="text-sm text-amber-700 mt-1">
+                  Hay decided to hand this conversation to a human agent. Providing more context in
+                  the playbooks can be a good place to start to provide more information so Hay can
+                  handle similar conversations next time.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <Button variant="outline" size="sm" @click="resetConversation">
+                <RefreshCw class="h-4 w-4 mr-2" />
+                Start New Conversation
+              </Button>
+              <Button
+                v-if="conversation?.playbook_id"
+                variant="outline"
+                size="sm"
+                @click="navigateToPlaybook"
+              >
+                <BookOpen class="h-4 w-4 mr-2" />
+                Edit Playbook
+              </Button>
+              <Button v-else variant="outline" size="sm" @click="navigateToPlaybook">
+                <BookOpen class="h-4 w-4 mr-2" />
+                Edit Playbooks
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <!-- Message Input (playground mode or when conversation is taken over by current user) -->
-        <div v-if="isPlaygroundMode || isTakenOverByCurrentUser" class="border-t p-4 bg-background">
+        <div
+          v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
+          class="border-t p-4 bg-background"
+        >
           <form @submit.prevent="sendMessage" class="flex space-x-3">
             <Input
               v-model="newMessage"
@@ -592,6 +643,7 @@ import {
   Clock,
   Send,
   AlertTriangle,
+  AlertCircle,
   Star,
   Ticket,
   Mail,
@@ -610,6 +662,7 @@ import {
   Info,
   ThumbsUp,
   ThumbsDown,
+  BookOpen,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 
@@ -723,6 +776,11 @@ const isTestMode = computed(() => {
   return agent.testMode ?? orgDefault;
 });
 
+// Check if conversation status is pending-human (needs human attention)
+const isPendingHuman = computed(() => {
+  return conversation.value?.status === "pending-human";
+});
+
 // Message approval handlers
 const handleMessageApproved = async (messageId: string) => {
   console.log("Message approved:", messageId);
@@ -748,6 +806,15 @@ const goBack = () => {
 // Playground-specific functions
 const exitPlayground = () => {
   navigateTo("/conversations");
+};
+
+const navigateToPlaybook = () => {
+  const router = useRouter();
+  if (conversation.value?.playbook_id) {
+    router.push(`/playbooks/${conversation.value.playbook_id}`);
+  } else {
+    router.push("/playbooks");
+  }
 };
 
 const createTestConversation = async () => {
@@ -949,40 +1016,41 @@ const isSendingMessage = ref(false);
 const sendMessage = async () => {
   if (!newMessage.value.trim() || isSendingMessage.value) return;
 
-  // Generate a unique ID for the temp message (for playground mode)
-  const tempMessageId = Date.now().toString();
-
   isSendingMessage.value = true;
   const messageContent = newMessage.value;
   newMessage.value = ""; // Clear immediately to prevent double-send
 
+  // Generate temporary ID for optimistic message
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const role = isTakenOverByCurrentUser.value ? "assistant" : "user";
+  const messageType = isTakenOverByCurrentUser.value
+    ? MessageType.HUMAN_AGENT
+    : MessageType.CUSTOMER;
+
+  // Create optimistic message
+  const optimisticMessage: any = {
+    id: tempId,
+    content: messageContent,
+    type: messageType,
+    sender: role === "assistant" ? "agent" : "customer",
+    created_at: new Date().toISOString(),
+    conversation_id: conversationId.value,
+    updated_at: new Date().toISOString(),
+    status: "approved",
+    deliveryState: "pending",
+  };
+
+  // Add optimistic message to the appropriate list
+  if (isPlaygroundMode.value) {
+    messages.value.push(optimisticMessage);
+  } else if (conversation.value && conversation.value.messages) {
+    conversation.value.messages.push(optimisticMessage);
+  }
+
+  scrollToBottom();
+
   try {
-    // Playground mode: Add message to UI immediately and show typing
-    if (isPlaygroundMode.value) {
-      isAgentTyping.value = true;
-
-      const tempMessage = {
-        id: tempMessageId,
-        sender: "customer",
-        content: messageContent,
-        timestamp: new Date(),
-        type: "HumanMessage",
-      };
-      messages.value.push(tempMessage);
-      scrollToBottom();
-
-      // Update orchestrator status
-      orchestratorStatus.value = "processing";
-      processingCount.value++;
-    }
-
     // Send message via API
-    // When conversation is taken over by current user, send as assistant (human agent)
-    const role = isTakenOverByCurrentUser.value ? "assistant" : "user";
-    const messageType = isTakenOverByCurrentUser.value
-      ? MessageType.HUMAN_AGENT
-      : MessageType.CUSTOMER;
-
     const result = await HayApi.conversations.sendMessage.mutate({
       conversationId: conversationId.value,
       content: messageContent,
@@ -992,52 +1060,73 @@ const sendMessage = async () => {
     // Play message sent sound
     playSound("/sounds/message-sent.mp3");
 
-    // Playground mode: Update temp message with actual message from server
-    if (isPlaygroundMode.value) {
-      const messageIndex = messages.value.findIndex((m) => m.id === tempMessageId);
+    // Update optimistic message with real ID and mark as sent
+    const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
+    if (messagesList) {
+      const messageIndex = messagesList.findIndex((m: any) => m.id === tempId);
       if (messageIndex !== -1) {
-        messages.value[messageIndex] = {
-          ...result,
-          sender: "customer",
-          timestamp: result.created_at,
+        // Update the message with real ID and mark as sent
+        messagesList[messageIndex] = {
+          ...messagesList[messageIndex],
+          id: result.id,
+          deliveryState: "sent",
         };
       }
-    } else {
-      // Regular mode: Add message to local list
-      if (conversation.value && conversation.value.messages) {
-        conversation.value.messages.push({
-          id: result.id,
-          content: messageContent,
-          type: messageType,
-          created_at: new Date().toISOString(),
-          conversation_id: conversationId.value,
-          updated_at: new Date().toISOString(),
-          status: "approved",
-        });
+    }
+
+    // Playground mode: Update orchestrator status for AI response
+    if (isPlaygroundMode.value) {
+      isAgentTyping.value = true;
+      orchestratorStatus.value = "processing";
+      processingCount.value++;
+    }
+
+    // Regular mode: Refresh messages after a short delay to get any AI response (skip if taken over)
+    if (!isPlaygroundMode.value && !isTakenOverByCurrentUser.value) {
+      setTimeout(() => fetchConversation(), 2000);
+    }
+  } catch (error: any) {
+    console.error("Failed to send message:", error);
+
+    // Mark optimistic message as failed
+    const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
+    if (messagesList) {
+      const messageIndex = messagesList.findIndex((m: any) => m.id === tempId);
+      if (messageIndex !== -1) {
+        messagesList[messageIndex] = {
+          ...messagesList[messageIndex],
+          deliveryState: "failed",
+          errorMessage: error?.message || error?.data?.message || "Failed to send message",
+        };
       }
     }
 
-    scrollToBottom();
-
-    // Refresh messages after a short delay to get any AI response (skip if taken over)
-    // In playground mode, WebSocket will handle updates
-    if (!isTakenOverByCurrentUser.value && !isPlaygroundMode.value) {
-      setTimeout(() => fetchConversation(), 2000);
-    }
-  } catch (error) {
-    console.error("Failed to send message:", error);
-
-    // Playground mode: Remove temp message on error
+    // Clear typing state on error
     if (isPlaygroundMode.value) {
-      messages.value = messages.value.filter((m) => m.id !== tempMessageId);
       isAgentTyping.value = false;
     }
-
-    // Restore message on error
-    newMessage.value = messageContent;
   } finally {
     isSendingMessage.value = false;
   }
+};
+
+const retryMessage = async (messageId: string) => {
+  // Find the failed message
+  const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
+  if (!messagesList) return;
+
+  const messageIndex = messagesList.findIndex((m: any) => m.id === messageId);
+  if (messageIndex === -1) return;
+
+  const failedMessage = messagesList[messageIndex];
+  const messageContent = failedMessage.content;
+
+  // Remove the failed message
+  messagesList.splice(messageIndex, 1);
+
+  // Resend by setting the newMessage and calling sendMessage
+  newMessage.value = messageContent;
+  await sendMessage();
 };
 
 const approveMessage = (messageId: string) => {
@@ -1219,6 +1308,31 @@ onMounted(async () => {
       // Check if this message belongs to the current conversation
       // In playground mode, check messages array, in regular mode check conversation
       if (isPlaygroundMode.value) {
+        // First, try to find and replace optimistic message (pending message with matching content)
+        const optimisticIndex = messages.value.findIndex(
+          (m: any) =>
+            m.deliveryState === "pending" &&
+            m.content === messageData.content &&
+            m.type === messageData.type,
+        );
+
+        if (optimisticIndex !== -1) {
+          // Replace optimistic message with real one
+          console.log("[WebSocket] Replacing optimistic message with real message:", messageData.id);
+          messages.value[optimisticIndex] = {
+            id: messageData.id,
+            content: messageData.content,
+            type: messageData.type,
+            sender: messageData.type === MessageType.CUSTOMER ? "customer" : "agent",
+            timestamp: messageData.timestamp,
+            created_at: messageData.timestamp,
+            metadata: messageData.metadata,
+            status: messageData.status,
+            deliveryState: "sent",
+          };
+          return;
+        }
+
         // Check if message already exists (prevent duplicates)
         const messageExists = messages.value.some((m: any) => m.id === messageData.id);
         if (messageExists) {
@@ -1236,9 +1350,35 @@ onMounted(async () => {
           created_at: messageData.timestamp,
           metadata: messageData.metadata,
           status: messageData.status,
+          deliveryState: "sent",
         });
         scrollToBottom();
       } else if (conversation.value && conversation.value.messages) {
+        // First, try to find and replace optimistic message (pending message with matching content)
+        const optimisticIndex = conversation.value.messages.findIndex(
+          (m: any) =>
+            m.deliveryState === "pending" &&
+            m.content === messageData.content &&
+            m.type === messageData.type,
+        );
+
+        if (optimisticIndex !== -1) {
+          // Replace optimistic message with real one
+          console.log("[WebSocket] Replacing optimistic message with real message:", messageData.id);
+          conversation.value.messages[optimisticIndex] = {
+            id: messageData.id,
+            content: messageData.content,
+            type: messageData.type,
+            created_at: messageData.timestamp,
+            conversation_id: conversationId.value,
+            updated_at: messageData.timestamp,
+            status: messageData.status || "approved",
+            metadata: messageData.metadata,
+            deliveryState: "sent",
+          };
+          return;
+        }
+
         // Check if message already exists (prevent duplicates)
         const messageExists = conversation.value.messages.some((m: any) => m.id === messageData.id);
         if (messageExists) {
@@ -1256,6 +1396,7 @@ onMounted(async () => {
           updated_at: messageData.timestamp,
           status: messageData.status || "approved",
           metadata: messageData.metadata,
+          deliveryState: "sent",
         });
         scrollToBottom();
 
@@ -1267,12 +1408,29 @@ onMounted(async () => {
     }
   });
 
+  // Debounce timer for conversation refreshes to prevent excessive API calls
+  let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const debouncedRefreshConversation = async (reason: string) => {
+    console.log(`[WebSocket] Conversation refresh requested (${reason}), debouncing...`);
+
+    // Clear any pending refresh
+    if (refreshDebounceTimer) {
+      clearTimeout(refreshDebounceTimer);
+    }
+
+    // Schedule new refresh after 300ms
+    refreshDebounceTimer = setTimeout(async () => {
+      console.log(`[WebSocket] Executing debounced refresh (${reason})`);
+      await fetchConversation();
+      refreshDebounceTimer = null;
+    }, 300);
+  };
 
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
     if (payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Conversation status changed, refreshing");
-      await fetchConversation();
+      console.log("[WebSocket] Conversation status changed");
+      await debouncedRefreshConversation("status_changed");
     }
   });
 
@@ -1280,9 +1438,10 @@ onMounted(async () => {
   unsubscribeMessageApproved = websocket.on("message_approved", async (payload: any) => {
     console.log("[WebSocket] Received message_approved event", payload);
     if (payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Message approved in current conversation, refreshing");
-      await fetchConversation();
-      scrollToBottom();
+      console.log("[WebSocket] Message approved in current conversation");
+      await debouncedRefreshConversation("message_approved");
+      // Scroll will happen after refresh completes
+      setTimeout(() => scrollToBottom(), 350);
     }
   });
 
@@ -1290,8 +1449,8 @@ onMounted(async () => {
   unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: any) => {
     console.log("[WebSocket] Received message_blocked event", payload);
     if (payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Message blocked in current conversation, refreshing");
-      await fetchConversation();
+      console.log("[WebSocket] Message blocked in current conversation");
+      await debouncedRefreshConversation("message_blocked");
     }
   });
 });

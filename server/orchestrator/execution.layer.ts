@@ -2,7 +2,10 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { debugLog } from "@server/lib/debug-logger";
-import { ConfidenceGuardrailService, type ConfidenceAssessment } from "@server/services/core/confidence-guardrail.service";
+import {
+  ConfidenceGuardrailService,
+  type ConfidenceAssessment,
+} from "@server/services/core/confidence-guardrail.service";
 import { MessageIntent } from "@server/database/entities/message.entity";
 
 export interface ExecutionResult {
@@ -24,6 +27,7 @@ export interface ExecutionResult {
   confidence?: ConfidenceAssessment;
   recheckAttempted?: boolean;
   recheckCount?: number;
+  originalMessage?: string; // Original message before fallback replacement
 }
 
 export class ExecutionLayer {
@@ -98,11 +102,6 @@ export class ExecutionLayer {
 
       const messages = await conversation.getMessages();
 
-      debugLog("execution", "Retrieved conversation messages", {
-        messagesCount: messages.length,
-        messageTypes: messages.map((m) => m.type),
-      });
-
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
         "execution/planner",
@@ -114,32 +113,33 @@ export class ExecutionLayer {
       );
 
       // Inject explicit language instruction if customer language is detected
+      // Only enforce language for the first 3 customer messages
       let finalPrompt = responsePrompt;
       if (customerLanguage) {
-        const languageNames: Record<string, string> = {
-          en: "English",
-          pt: "Portuguese",
-          es: "Spanish",
-          de: "German",
-          fr: "French",
-          it: "Italian",
-          nl: "Dutch",
-          pl: "Polish",
-          ru: "Russian",
-          ja: "Japanese",
-          zh: "Chinese",
-          ko: "Korean",
-          ar: "Arabic",
-          hi: "Hindi",
-        };
-        const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
-        const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
-        finalPrompt = responsePrompt + languageInstruction;
+        const customerMessages = messages.filter((msg) => msg.type === "Customer");
+        const shouldEnforceLanguage = customerMessages.length <= 3;
 
-        debugLog("execution", "Injected language enforcement instruction", {
-          customerLanguage,
-          languageName,
-        });
+        if (shouldEnforceLanguage) {
+          const languageNames: Record<string, string> = {
+            en: "English",
+            pt: "Portuguese",
+            es: "Spanish",
+            de: "German",
+            fr: "French",
+            it: "Italian",
+            nl: "Dutch",
+            pl: "Polish",
+            ru: "Russian",
+            ja: "Japanese",
+            zh: "Chinese",
+            ko: "Korean",
+            ar: "Arabic",
+            hi: "Hindi",
+          };
+          const languageName = languageNames[customerLanguage] || customerLanguage.toUpperCase();
+          const languageInstruction = `\n\nIMPORTANT LANGUAGE REQUIREMENT: The customer is communicating in ${languageName}. You MUST respond ONLY in ${languageName}, regardless of the language used in the prompts, instructions, or system messages. This is a critical requirement that overrides all other language-related instructions.`;
+          finalPrompt = responsePrompt + languageInstruction;
+        }
       }
 
       debugLog("execution", "Retrieved execution planner prompt", {
@@ -285,6 +285,9 @@ export class ExecutionLayer {
         customerLanguage,
       );
 
+      // Store the original message before replacing it
+      const originalMessage = result.userMessage;
+
       // If escalation is enabled, convert to HANDOFF
       if (config.enableEscalation) {
         debugLog("execution", "Escalation enabled, converting to HANDOFF");
@@ -301,10 +304,12 @@ export class ExecutionLayer {
           confidence: result.confidence,
           recheckAttempted: result.recheckAttempted,
           recheckCount: result.recheckCount,
+          originalMessage,
         };
       } else {
         // Just use fallback message
         debugLog("execution", "Using fallback message");
+        result.originalMessage = originalMessage;
         result.userMessage = fallbackMessage;
       }
     }

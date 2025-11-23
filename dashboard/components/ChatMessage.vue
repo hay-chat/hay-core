@@ -6,6 +6,8 @@
       {
         'chat-message--inverted': inverted,
         'chat-message--has-error': message.metadata?.toolStatus === 'ERROR',
+        'chat-message--pending': message.deliveryState === 'pending',
+        'chat-message--failed': message.deliveryState === 'failed',
       },
       '',
     ]"
@@ -44,6 +46,8 @@
             'chat-message__bubble--collapsed': isCollapsibleVariant && isSystemCollapsed,
             'chat-message__bubble--expanded':
               isCollapsibleVariant && !isSystemCollapsed && isSystemExpandable,
+            'chat-message__bubble--pending': message.deliveryState === 'pending',
+            'chat-message__bubble--failed': message.deliveryState === 'failed',
           },
         ]"
       >
@@ -107,6 +111,30 @@
         <ChevronUp v-else class="h-3 w-3" />
         {{ isSystemCollapsed ? "Expand" : "Collapse" }}
       </div>
+
+      <!-- Pending/Failed Message States -->
+      <div v-if="message.deliveryState === 'pending'" class="chat-message__status">
+        <div class="flex items-center gap-1 text-xs text-neutral-muted">
+          <Clock class="h-3 w-3 animate-pulse" />
+          <span>Sending...</span>
+        </div>
+      </div>
+      <div v-else-if="message.deliveryState === 'failed'" class="chat-message__status">
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <AlertCircle class="h-3 w-3" />
+          <span>{{ message.errorMessage || "Failed to send" }}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="h-6 px-2 text-xs hover:bg-red-50"
+            @click="handleRetryClick"
+          >
+            <RotateCcw class="h-3 w-3 mr-1" />
+            Retry
+          </Button>
+        </div>
+      </div>
+
       <div v-if="message.attachments?.length" class="chat-message__attachments">
         <div
           v-for="attachment in message.attachments"
@@ -182,6 +210,8 @@ import {
   BrainCircuit,
   Clock,
   Ban,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-vue-next";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
@@ -205,6 +235,7 @@ const emit = defineEmits<{
   feedbackSubmitted: [];
   messageApproved: [messageId: string];
   messageBlocked: [messageId: string];
+  retry: [messageId: string];
 }>();
 
 // Approval dialog state
@@ -236,6 +267,10 @@ const handleMessageBlocked = (messageId: string) => {
 
 const handleFeedbackSubmitted = () => {
   emit("feedbackSubmitted");
+};
+
+const handleRetryClick = () => {
+  emit("retry", props.message.id);
 };
 
 // System message collapse/expand logic
@@ -431,6 +466,30 @@ const getConfidenceIcon = (tier: string | undefined) => {
   100% {
     box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--color-neutral-600) 0%, transparent);
   }
+}
+
+/* Pending state - semi-transparent */
+.chat-message--pending {
+  opacity: 0.6;
+}
+
+.chat-message__bubble--pending {
+  position: relative;
+}
+
+/* Failed state - error styling */
+.chat-message--failed {
+  opacity: 1;
+}
+
+.chat-message__bubble--failed {
+  border: 1px solid var(--color-red-500);
+  background-color: color-mix(in srgb, var(--color-red-50) 50%, var(--bubble-bg));
+}
+
+.chat-message__status {
+  margin-top: 0.25rem;
+  padding: 0.25rem 0;
 }
 
 .chat-message__expand-button {

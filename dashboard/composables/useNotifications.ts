@@ -14,6 +14,10 @@ export interface NotificationOptions {
 const notificationPermission = ref<NotificationPermission>("default");
 const audioContext = ref<AudioContext | null>(null);
 
+// Notification deduplication: Track recent notifications to prevent duplicates
+const recentNotifications = new Map<string, number>();
+const NOTIFICATION_DEDUPE_WINDOW = 5000; // 5 seconds
+
 export function useNotifications() {
   const toast = useToast();
   const router = useRouter();
@@ -170,6 +174,28 @@ export function useNotifications() {
     title?: string;
     customerName?: string;
   }) => {
+    // Deduplication: Check if we recently showed this notification
+    const dedupeKey = `attention:${conversation.id}`;
+    const now = Date.now();
+    const lastShown = recentNotifications.get(dedupeKey);
+
+    if (lastShown && now - lastShown < NOTIFICATION_DEDUPE_WINDOW) {
+      console.log(
+        `[Notifications] Skipping duplicate notification for conversation ${conversation.id} (shown ${now - lastShown}ms ago)`,
+      );
+      return;
+    }
+
+    // Record this notification
+    recentNotifications.set(dedupeKey, now);
+
+    // Clean up old entries to prevent memory leak
+    for (const [key, timestamp] of recentNotifications.entries()) {
+      if (now - timestamp > NOTIFICATION_DEDUPE_WINDOW) {
+        recentNotifications.delete(key);
+      }
+    }
+
     const title = "Human Attention Needed";
     const body = conversation.title
       ? `Conversation "${conversation.title}" requires human assistance`
