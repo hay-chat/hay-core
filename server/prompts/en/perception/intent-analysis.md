@@ -22,4 +22,6 @@ Analyze the following user message and determine:
 - When in doubt, prefer "request", "question", or "other" over closure intents
 - Closure intents should have confidence > 0.8 to be valid
 
+SPECIAL NOTE: Gratitude messages like "thank you", "thanks", "appreciate it" should typically be classified as "greet" rather than closure. However, be aware that these MAY indicate conversation closure when they come after task completion. The system will evaluate context separately to determine if closure is appropriate.
+
 User message: "{{message}}"

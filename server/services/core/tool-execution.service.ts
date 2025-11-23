@@ -124,6 +124,14 @@ export class ToolExecutionService {
           toolLogEntry.result = err.message || "Unknown error";
           toolLogEntry.latencyMs = Date.now() - startTime;
 
+          // Extract MCP error details if available
+          const mcpErrorDetails = (err as any).mcpErrorDetails;
+          const errorOutput = mcpErrorDetails || {
+            error: err.message || "Unknown error",
+            errorType: err.constructor.name,
+            stack: err.stack,
+          };
+
           // Update the message with the error
           if (messageId) {
             const message = await this.messageService.messageRepository.findById(messageId);
@@ -132,7 +140,7 @@ export class ToolExecutionService {
                 content: `Action failed: ${toolCall.name}`,
                 metadata: {
                   ...message.metadata,
-                  toolOutput: { error: err.message },
+                  toolOutput: errorOutput,
                   toolStatus: "ERROR",
                   toolLatencyMs: toolLogEntry.latencyMs,
                   toolExecutedAt: executedAt,
@@ -348,7 +356,16 @@ export class ToolExecutionService {
       console.log(`[ToolExecution] MCP response received:`, JSON.stringify(result, null, 2));
 
       if (result.isError) {
-        throw new Error(`MCP tool error: ${result.error || "Unknown error"}`);
+        // Preserve the full error object for better error visibility
+        const errorDetails = result.error || { message: "Unknown error" };
+        const errorMessage = typeof errorDetails === "object"
+          ? JSON.stringify(errorDetails)
+          : String(errorDetails);
+
+        const error = new Error(`MCP tool error: ${errorMessage}`);
+        // Attach the full error object to the error for better handling
+        (error as any).mcpErrorDetails = errorDetails;
+        throw error;
       }
 
       // Return the result content or the full result object

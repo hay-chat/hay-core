@@ -66,11 +66,12 @@ async function updateProcessingState(
   message?: string,
 ): Promise<void> {
   try {
-    const orchestrationStatus = (conversation.orchestration_status as unknown as ConversationContext) || {
-      version: "v1" as const,
-      lastTurn: 0,
-      toolLog: [],
-    };
+    const orchestrationStatus =
+      (conversation.orchestration_status as unknown as ConversationContext) || {
+        version: "v1" as const,
+        lastTurn: 0,
+        toolLog: [],
+      };
 
     // Update processing state
     orchestrationStatus.processingState = {
@@ -95,11 +96,6 @@ async function updateProcessingState(
       conversation.title,
       phase,
     );
-
-    debugLog("orchestrator", `Processing state updated to: ${phase}`, {
-      conversationId: conversation.id,
-      message,
-    });
   } catch (error) {
     console.error("[Orchestrator] Failed to update processing state:", error);
   }
@@ -115,6 +111,19 @@ function buildMessageMetadata(
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = { ...additionalMetadata };
 
+  // Stage 1: Company Interest Protection
+  if (executionResult.companyInterest) {
+    metadata.companyInterest = {
+      passed: executionResult.companyInterest.passed,
+      violationType: executionResult.companyInterest.violationType,
+      severity: executionResult.companyInterest.severity,
+      shouldBlock: executionResult.companyInterest.shouldBlock,
+      requiresFactCheck: executionResult.companyInterest.requiresFactCheck,
+      reasoning: executionResult.companyInterest.reasoning,
+    };
+  }
+
+  // Stage 2: Fact Grounding
   if (executionResult.confidence) {
     metadata.confidence = executionResult.confidence.score;
     metadata.confidenceBreakdown = executionResult.confidence.breakdown;
@@ -134,47 +143,89 @@ function buildMessageMetadata(
 }
 
 /**
- * Helper function to save confidence log to conversation orchestration_status
+ * Helper function to save guardrail logs to conversation orchestration_status
+ * Includes both company interest (Stage 1) and fact grounding (Stage 2) logs
  */
 async function saveConfidenceLog(
   conversation: Conversation,
   executionResult: ExecutionResult,
 ): Promise<void> {
-  if (!executionResult.confidence) {
+  // Skip if no guardrail data
+  if (!executionResult.companyInterest && !executionResult.confidence) {
     return;
   }
 
   try {
     const orchestrationStatus = (conversation.orchestration_status as any) || {};
 
-    // Initialize confidence log if not exists
-    if (!orchestrationStatus.confidenceLog) {
-      orchestrationStatus.confidenceLog = [];
+    // Initialize guardrail log if not exists
+    if (!orchestrationStatus.guardrailLog) {
+      orchestrationStatus.guardrailLog = [];
     }
 
-    // Add new confidence entry
-    orchestrationStatus.confidenceLog.push({
+    // Build log entry
+    const logEntry: any = {
       timestamp: new Date().toISOString(),
-      score: executionResult.confidence.score,
-      tier: executionResult.confidence.tier,
-      breakdown: executionResult.confidence.breakdown,
-      documentsUsed: executionResult.confidence.documentsUsed,
-      recheckAttempted: executionResult.recheckAttempted || false,
-      recheckCount: executionResult.recheckCount || 0,
-      details: executionResult.confidence.details,
-    });
+    };
+
+    // Stage 1: Company Interest
+    if (executionResult.companyInterest) {
+      logEntry.companyInterest = {
+        passed: executionResult.companyInterest.passed,
+        violationType: executionResult.companyInterest.violationType,
+        severity: executionResult.companyInterest.severity,
+        shouldBlock: executionResult.companyInterest.shouldBlock,
+        requiresFactCheck: executionResult.companyInterest.requiresFactCheck,
+        reasoning: executionResult.companyInterest.reasoning,
+      };
+    }
+
+    // Stage 2: Fact Grounding
+    if (executionResult.confidence) {
+      logEntry.factGrounding = {
+        score: executionResult.confidence.score,
+        tier: executionResult.confidence.tier,
+        breakdown: executionResult.confidence.breakdown,
+        documentsUsed: executionResult.confidence.documentsUsed,
+        recheckAttempted: executionResult.recheckAttempted || false,
+        recheckCount: executionResult.recheckCount || 0,
+        details: executionResult.confidence.details,
+      };
+    }
+
+    // Add to log
+    orchestrationStatus.guardrailLog.push(logEntry);
+
+    // Also maintain legacy confidenceLog for backward compatibility
+    if (executionResult.confidence) {
+      if (!orchestrationStatus.confidenceLog) {
+        orchestrationStatus.confidenceLog = [];
+      }
+      orchestrationStatus.confidenceLog.push({
+        timestamp: new Date().toISOString(),
+        score: executionResult.confidence.score,
+        tier: executionResult.confidence.tier,
+        breakdown: executionResult.confidence.breakdown,
+        documentsUsed: executionResult.confidence.documentsUsed,
+        recheckAttempted: executionResult.recheckAttempted || false,
+        recheckCount: executionResult.recheckCount || 0,
+        details: executionResult.confidence.details,
+      });
+    }
 
     // Update conversation
     await conversationRepository.updateById(conversation.id, {
       orchestration_status: orchestrationStatus,
     });
 
-    debugLog("orchestrator", "Confidence log saved", {
+    debugLog("orchestrator", "Guardrail log saved", {
       conversationId: conversation.id,
-      logEntries: orchestrationStatus.confidenceLog.length,
+      hasCompanyInterest: !!executionResult.companyInterest,
+      hasFactGrounding: !!executionResult.confidence,
+      logEntries: orchestrationStatus.guardrailLog.length,
     });
   } catch (error) {
-    debugLog("orchestrator", "Error saving confidence log", {
+    debugLog("orchestrator", "Error saving guardrail log", {
       level: "error",
       error: error instanceof Error ? error.message : String(error),
     });
@@ -256,10 +307,15 @@ export const runConversation = async (conversationId: string) => {
     const hasClosureIntent =
       intent.label === "close_satisfied" || intent.label === "close_unsatisfied";
 
+    // Also check for greet intents that contain gratitude (might be closing acknowledgment)
+    const isGratitudeMessage =
+      intent.label === "greet" &&
+      /\b(thank|thanks|thx|appreciate|grateful|ty)\b/i.test(lastCustomerMessage.content);
+
     // If potential closure detected, validate with full conversation context
     let shouldClose = false;
 
-    if (hasClosureIntent) {
+    if (hasClosureIntent || isGratitudeMessage) {
       // Get all public messages for full context analysis
       const publicMessages = await conversation.getPublicMessages();
 
@@ -278,7 +334,9 @@ export const runConversation = async (conversationId: string) => {
       if (!shouldClose) {
         debugLog(
           "orchestrator",
-          `Closure intent detected but validation failed: ${closureValidation.reason}`,
+          isGratitudeMessage
+            ? `Gratitude message detected but validation determined it's not a closure: ${closureValidation.reason}`
+            : `Closure intent detected but validation failed: ${closureValidation.reason}`,
         );
       }
     }

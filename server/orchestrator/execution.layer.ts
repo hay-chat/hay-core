@@ -6,6 +6,10 @@ import {
   ConfidenceGuardrailService,
   type ConfidenceAssessment,
 } from "@server/services/core/confidence-guardrail.service";
+import {
+  CompanyInterestGuardrailService,
+  type CompanyInterestAssessment,
+} from "@server/services/core/company-interest-guardrail.service";
 import { MessageIntent } from "@server/database/entities/message.entity";
 
 export interface ExecutionResult {
@@ -23,8 +27,9 @@ export interface ExecutionResult {
     reason: string;
   };
   rationale?: string;
-  // Confidence guardrail fields
-  confidence?: ConfidenceAssessment;
+  // Guardrail fields
+  companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
+  confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
   recheckAttempted?: boolean;
   recheckCount?: number;
   originalMessage?: string; // Original message before fallback replacement
@@ -33,12 +38,14 @@ export interface ExecutionResult {
 export class ExecutionLayer {
   private llmService: LLMService;
   private promptService: PromptService;
+  private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
   private plannerSchema: object;
 
   constructor() {
     this.llmService = new LLMService();
     this.promptService = PromptService.getInstance();
+    this.companyInterestService = new CompanyInterestGuardrailService();
     this.confidenceService = new ConfidenceGuardrailService();
     debugLog("execution", "ExecutionLayer initialized");
 
@@ -202,31 +209,31 @@ export class ExecutionLayer {
   }
 
   /**
-   * Apply confidence guardrails to execution result
-   * This integrates confidence checking, recheck, and escalation logic
+   * Apply two-stage guardrails to execution result
+   * Stage 1: Company Interest Protection (blocks harmful responses)
+   * Stage 2: Fact Grounding (verifies company claims if needed)
    */
   private async applyConfidenceGuardrails(
     result: ExecutionResult,
     conversation: Conversation,
     customerLanguage?: string,
   ): Promise<ExecutionResult> {
-    debugLog("execution", "Applying confidence guardrails to RESPOND step");
+    debugLog("execution", "Applying two-stage guardrails to RESPOND step");
 
-    // Check if we should skip confidence checks based on user intent
+    // Check if we should skip guardrail checks based on user intent
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
     if (lastCustomerMessage?.intent) {
       const intent = lastCustomerMessage.intent as MessageIntent;
 
-      // Skip confidence checks for conversational intents that don't require document grounding
+      // Skip guardrails for conversational intents that don't need checks
       const exemptIntents: MessageIntent[] = [
         MessageIntent.GREET,
-        MessageIntent.OTHER,
         MessageIntent.CLOSE_SATISFIED,
         MessageIntent.CLOSE_UNSATISFIED,
       ];
 
       if (exemptIntents.includes(intent)) {
-        debugLog("execution", "Skipping confidence check - conversational intent detected", {
+        debugLog("execution", "Skipping guardrails - conversational intent detected", {
           intent: lastCustomerMessage.intent,
           messageContent: lastCustomerMessage.content,
         });
@@ -234,49 +241,29 @@ export class ExecutionLayer {
       }
     }
 
-    // Assess confidence
-    const confidenceAssessment = await this.assessResponseConfidence(
+    // STAGE 1: Company Interest Protection
+    debugLog("execution", "Stage 1: Assessing company interest");
+    const companyInterestAssessment = await this.assessCompanyInterest(
       conversation,
       result.userMessage!,
     );
 
-    // Add confidence to result
-    result.confidence = confidenceAssessment;
-    result.recheckAttempted = false;
-    result.recheckCount = 0;
+    result.companyInterest = companyInterestAssessment;
 
-    debugLog("execution", "Confidence assessment complete", {
-      score: confidenceAssessment.score,
-      tier: confidenceAssessment.tier,
-      shouldRecheck: confidenceAssessment.shouldRecheck,
-      shouldEscalate: confidenceAssessment.shouldEscalate,
+    debugLog("execution", "Company interest assessment complete", {
+      passed: companyInterestAssessment.passed,
+      violationType: companyInterestAssessment.violationType,
+      severity: companyInterestAssessment.severity,
+      shouldBlock: companyInterestAssessment.shouldBlock,
+      requiresFactCheck: companyInterestAssessment.requiresFactCheck,
     });
 
-    // Handle medium confidence - trigger recheck
-    if (confidenceAssessment.shouldRecheck) {
-      debugLog("execution", "Medium confidence detected, triggering recheck");
-
-      const recheckResult = await this.performRecheck(result, conversation, customerLanguage);
-
-      if (recheckResult) {
-        result.userMessage = recheckResult.userMessage;
-        result.confidence = recheckResult.confidence;
-        result.recheckAttempted = true;
-        result.recheckCount = 1;
-
-        debugLog("execution", "Recheck complete", {
-          newScore: recheckResult.confidence?.score,
-          newTier: recheckResult.confidence?.tier,
-        });
-      }
-    }
-
-    // Handle low confidence - escalate or fallback
-    if (
-      result.confidence?.shouldEscalate ||
-      (result.recheckAttempted && result.confidence!.tier === "low")
-    ) {
-      debugLog("execution", "Low confidence detected, applying fallback/escalation");
+    // If Stage 1 blocks response, escalate immediately
+    if (companyInterestAssessment.shouldBlock) {
+      debugLog("execution", "Stage 1 BLOCKED: Response violates company interests", {
+        violationType: companyInterestAssessment.violationType,
+        reasoning: companyInterestAssessment.reasoning,
+      });
 
       const config = await this.getConfidenceConfig(conversation);
       const fallbackMessage = await this.getTranslatedFallbackMessage(
@@ -285,40 +272,152 @@ export class ExecutionLayer {
         customerLanguage,
       );
 
-      // Store the original message before replacing it
       const originalMessage = result.userMessage;
 
-      // If escalation is enabled, convert to HANDOFF
-      if (config.enableEscalation) {
-        debugLog("execution", "Escalation enabled, converting to HANDOFF");
-        return {
-          step: "HANDOFF",
-          userMessage: fallbackMessage,
-          handoff: {
-            reason: "Low confidence in AI response",
-            fields: {
-              confidenceScore: result.confidence?.score,
-              confidenceTier: result.confidence?.tier,
-            },
+      // Always escalate for company interest violations
+      return {
+        step: "HANDOFF",
+        userMessage: fallbackMessage,
+        handoff: {
+          reason: `Company interest violation: ${companyInterestAssessment.violationType}`,
+          fields: {
+            violationType: companyInterestAssessment.violationType,
+            severity: companyInterestAssessment.severity,
           },
-          confidence: result.confidence,
-          recheckAttempted: result.recheckAttempted,
-          recheckCount: result.recheckCount,
-          originalMessage,
-        };
-      } else {
-        // Just use fallback message
-        debugLog("execution", "Using fallback message");
-        result.originalMessage = originalMessage;
-        result.userMessage = fallbackMessage;
+        },
+        companyInterest: companyInterestAssessment,
+        originalMessage,
+      };
+    }
+
+    // STAGE 2: Fact Grounding (only if Stage 1 requires it)
+    if (companyInterestAssessment.requiresFactCheck) {
+      debugLog("execution", "Stage 2: Assessing fact grounding (company claims detected)");
+
+      const confidenceAssessment = await this.assessResponseConfidence(
+        conversation,
+        result.userMessage!,
+      );
+
+      result.confidence = confidenceAssessment;
+      result.recheckAttempted = false;
+      result.recheckCount = 0;
+
+      debugLog("execution", "Fact grounding assessment complete", {
+        score: confidenceAssessment.score,
+        tier: confidenceAssessment.tier,
+        shouldRecheck: confidenceAssessment.shouldRecheck,
+        shouldEscalate: confidenceAssessment.shouldEscalate,
+      });
+
+      // Handle medium confidence - trigger recheck
+      if (confidenceAssessment.shouldRecheck) {
+        debugLog("execution", "Medium confidence detected, triggering recheck");
+
+        const recheckResult = await this.performRecheck(result, conversation, customerLanguage);
+
+        if (recheckResult) {
+          result.userMessage = recheckResult.userMessage;
+          result.confidence = recheckResult.confidence;
+          result.recheckAttempted = true;
+          result.recheckCount = 1;
+
+          debugLog("execution", "Recheck complete", {
+            newScore: recheckResult.confidence?.score,
+            newTier: recheckResult.confidence?.tier,
+          });
+        }
       }
+
+      // Handle low confidence - escalate or fallback
+      if (
+        result.confidence?.shouldEscalate ||
+        (result.recheckAttempted && result.confidence!.tier === "low")
+      ) {
+        debugLog("execution", "Stage 2: Low confidence detected, applying fallback/escalation");
+
+        const config = await this.getConfidenceConfig(conversation);
+        const fallbackMessage = await this.getTranslatedFallbackMessage(
+          conversation,
+          config.fallbackMessage,
+          customerLanguage,
+        );
+
+        const originalMessage = result.userMessage;
+
+        // If escalation is enabled, convert to HANDOFF
+        if (config.enableEscalation) {
+          debugLog("execution", "Escalation enabled, converting to HANDOFF");
+          return {
+            step: "HANDOFF",
+            userMessage: fallbackMessage,
+            handoff: {
+              reason: "Low confidence in AI response - unverified company claims",
+              fields: {
+                confidenceScore: result.confidence?.score,
+                confidenceTier: result.confidence?.tier,
+              },
+            },
+            companyInterest: companyInterestAssessment,
+            confidence: result.confidence,
+            recheckAttempted: result.recheckAttempted,
+            recheckCount: result.recheckCount,
+            originalMessage,
+          };
+        } else {
+          // Just use fallback message
+          debugLog("execution", "Using fallback message");
+          result.originalMessage = originalMessage;
+          result.userMessage = fallbackMessage;
+        }
+      }
+    } else {
+      debugLog("execution", "Stage 2 SKIPPED: No fact checking required (no company claims)");
     }
 
     return result;
   }
 
   /**
-   * Assess confidence in a response
+   * Stage 1: Assess if response serves company interests
+   */
+  private async assessCompanyInterest(
+    conversation: Conversation,
+    response: string,
+  ): Promise<CompanyInterestAssessment> {
+    const conversationHistory = await conversation.getMessages();
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+
+    if (!lastCustomerMessage) {
+      throw new Error("No customer message found for company interest assessment");
+    }
+
+    // Check if we have retrieved documents or tool results
+    const hasRetrievedDocuments = !!(
+      conversation.document_ids && conversation.document_ids.length > 0
+    );
+    const recentToolMessages = conversationHistory.filter((msg) => msg.type === "Tool").slice(-3);
+    const hasToolResults = recentToolMessages.length > 0;
+
+    // Build company interest context
+    const context = {
+      response,
+      customerQuery: lastCustomerMessage.content,
+      conversationHistory,
+      companyDomain: conversation.organization?.settings?.companyDomain as string | undefined,
+      hasRetrievedDocuments,
+      hasToolResults,
+    };
+
+    // Get configuration
+    const config = await this.getCompanyInterestConfig(conversation);
+
+    // Perform company interest assessment
+    return await this.companyInterestService.assessCompanyInterest(context, config);
+  }
+
+  /**
+   * Stage 2: Assess confidence in a response (fact grounding)
    */
   private async assessResponseConfidence(
     conversation: Conversation,
@@ -562,6 +661,29 @@ export class ExecutionLayer {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
+    }
+  }
+
+  /**
+   * Get company interest guardrail configuration
+   */
+  private async getCompanyInterestConfig(conversation: Conversation) {
+    try {
+      const { organizationRepository } = await import(
+        "@server/repositories/organization.repository"
+      );
+      const organization = await organizationRepository.findById(conversation.organization_id);
+
+      return CompanyInterestGuardrailService.mergeConfig(
+        organization?.settings as Record<string, unknown>,
+        undefined,
+      );
+    } catch (error) {
+      debugLog("execution", "Error loading company interest config, using defaults", {
+        level: "warn",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return CompanyInterestGuardrailService.getDefaultConfig();
     }
   }
 

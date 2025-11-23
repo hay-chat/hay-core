@@ -48,9 +48,8 @@ class ConversationEventsService {
       };
 
       await redisService.publish("websocket:events", eventPayload);
-      debugLog("conversation-events", `Broadcasted conversation_created for ${conversation.id}`);
     } catch (error) {
-      console.error("[ConversationEventsService] Failed to broadcast conversation_created:", error);
+      debugLog("conversation-events", "Failed to broadcast conversation_created:", error);
     }
   }
 
@@ -131,13 +130,9 @@ class ConversationEventsService {
           },
         };
         await redisService.publish("websocket:events", statusChangePayload);
-        debugLog(
-          "conversation-events",
-          `Broadcasted conversation_status_changed for ${conversation.id} to status: ${conversation.status}`,
-        );
       }
     } catch (error) {
-      console.error("[ConversationEventsService] Failed to broadcast conversation_updated:", error);
+      debugLog("conversation-events", "Failed to broadcast conversation_updated:", error);
     }
   }
 

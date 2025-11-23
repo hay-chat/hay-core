@@ -36,11 +36,11 @@
       <!-- Outputs Section -->
       <div v-if="hasOutputs" class="tool-section">
         <button class="tool-section__header" @click.stop="toggleOutputs">
-          <span class="tool-section__label">Outputs</span>
+          <span class="tool-section__label">{{ isErrorOutput ? "Error Details" : "Outputs" }}</span>
           <ChevronDown v-if="!outputsExpanded" class="h-3 w-3" />
           <ChevronUp v-else class="h-3 w-3" />
         </button>
-        <div v-show="outputsExpanded" class="tool-section__content">
+        <div v-show="outputsExpanded" :class="['tool-section__content', { 'tool-section__content--error': isErrorOutput }]">
           <VueJsonPretty :data="formattedOutput" :deep="2" :show-length="true" :show-line="false" />
         </div>
       </div>
@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
 import {
@@ -90,9 +90,23 @@ const props = withDefaults(defineProps<Props>(), {
   toolStatus: "UNKNOWN",
 });
 
-const isExpanded = ref(false);
+// Check if output contains an error
+const isErrorOutput = computed(() => {
+  return props.toolStatus === "ERROR" ||
+    (props.toolOutput && typeof props.toolOutput === "object" && "error" in props.toolOutput);
+});
+
+// Auto-expand errors by default for better visibility
+const isExpanded = ref(isErrorOutput.value);
 const inputsExpanded = ref(false);
 const outputsExpanded = ref(true); // Outputs expanded by default
+
+// Watch for changes to error status and auto-expand
+watch(isErrorOutput, (hasError) => {
+  if (hasError) {
+    isExpanded.value = true;
+  }
+});
 
 const toggleExpanded = () => {
   isExpanded.value = !isExpanded.value;
@@ -356,6 +370,11 @@ const formattedExecutedAt = computed(() => {
   :deep(.vjs-tree .vjs-tree-node) {
     padding: 0.125rem 0;
   }
+}
+
+.tool-section__content--error {
+  background: rgba(254, 226, 226, 0.5);
+  border-left: 3px solid var(--color-red-500);
 }
 
 :deep(.vjs-value-string) {
