@@ -120,7 +120,8 @@ async function startServer() {
   );
 
   // Serve webchat widget files
-  const webchatDir = require("path").resolve(__dirname, "../webchat/dist");
+  // Use process.cwd() to get project root, works in both dev and production
+  const webchatDir = require("path").resolve(process.cwd(), "webchat/dist");
   server.use(
     "/webchat",
     express.static(webchatDir, {
