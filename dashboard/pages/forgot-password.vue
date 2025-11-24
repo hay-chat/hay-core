@@ -104,21 +104,6 @@
           </NuxtLink>
         </div>
       </div>
-
-      <!-- Help Section -->
-      <div class="border-t pt-6">
-        <div class="text-center space-y-2">
-          <p class="text-sm text-gray-600">Need help?</p>
-          <div class="space-x-4">
-            <NuxtLink to="/support" class="text-sm text-primary hover:text-primary/80 font-medium">
-              Contact Support
-            </NuxtLink>
-            <NuxtLink to="/help" class="text-sm text-primary hover:text-primary/80 font-medium">
-              Help Center
-            </NuxtLink>
-          </div>
-        </div>
-      </div>
     </div>
   </NuxtLayout>
 </template>
@@ -126,9 +111,11 @@
 <script setup lang="ts">
 import { CheckCircle, ArrowLeft } from "lucide-vue-next";
 import { validateEmail } from "@/lib/utils";
+import { Hay } from "@/utils/api";
+import { useToast } from "@/composables/useToast";
 
-// TODO: Import authentication composable/store
-// TODO: Import router for navigation
+const router = useRouter();
+const toast = useToast();
 
 definePageMeta({
   layout: false,
@@ -181,24 +168,18 @@ const handleSubmit = async () => {
   error.value = "";
 
   try {
-    // TODO: Implement password reset request logic
-    // TODO: Call password reset API endpoint
-    // TODO: Handle different response scenarios
-    // TODO: Log password reset attempt for security
+    const response = await Hay.auth.requestPasswordReset.mutate({
+      email: form.email,
+    });
 
-    console.log("Password reset request for:", form.email);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // TODO: Handle successful password reset request
-    emailSent.value = true;
-  } catch (err) {
-    // TODO: Handle different types of errors
-    // TODO: Show appropriate error messages
-    // TODO: Handle rate limiting
-    error.value = "Failed to send reset email. Please try again.";
+    if (response.success) {
+      emailSent.value = true;
+      toast.success("Password reset email sent successfully!");
+    }
+  } catch (err: any) {
     console.error("Password reset error:", err);
+    error.value = err.message || "Failed to send reset email. Please try again.";
+    toast.error("Failed to send reset email");
   } finally {
     loading.value = false;
   }
@@ -206,22 +187,22 @@ const handleSubmit = async () => {
 
 const resendEmail = async () => {
   resendLoading.value = true;
+  error.value = "";
 
   try {
-    // TODO: Implement resend logic
-    // TODO: Check rate limiting on server side
-    // TODO: Update resend timestamp
+    const response = await Hay.auth.requestPasswordReset.mutate({
+      email: form.email,
+    });
 
-    console.log("Resending password reset email to:", form.email);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Start cooldown timer
-    startResendCooldown();
-  } catch (err) {
-    error.value = "Failed to resend email. Please try again.";
+    if (response.success) {
+      toast.success("Password reset email resent successfully!");
+      // Start cooldown timer
+      startResendCooldown();
+    }
+  } catch (err: any) {
     console.error("Resend error:", err);
+    error.value = err.message || "Failed to resend email. Please try again.";
+    toast.error("Failed to resend email");
   } finally {
     resendLoading.value = false;
   }
@@ -240,12 +221,7 @@ const startResendCooldown = () => {
 };
 
 const goBack = () => {
-  // TODO: Use router navigation
-  // await $router.push('/login')
-  emailSent.value = false;
-  form.email = "";
-  errors.email = "";
-  error.value = "";
+  router.push("/login");
 };
 
 // Auto-focus email input when component mounts

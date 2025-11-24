@@ -3,23 +3,38 @@
 <mj-section background-color="#ffffff" padding="20px 25px 10px 25px">
   <mj-column>
     <mj-text align="center" padding="0">
-      <div style="display: inline-block; width: 60px; height: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; line-height: 60px; text-align: center; color: white; font-size: 24px;">
-        {{notificationIcon}}
+      <div
+        style="
+          display: inline-block;
+          width: 60px;
+          height: 60px;
+          background: linear-gradient(135deg, #001af4 0%, #764ba2 100%);
+          border-radius: 50%;
+          line-height: 60px;
+          text-align: center;
+          color: white;
+          font-size: 24px;
+        "
+      >
+        {{ notificationIcon }}
       </div>
     </mj-text>
   </mj-column>
 </mj-section>
 {{/if}}
 
-<mj-section background-color="#ffffff" padding="{{#if notificationIcon}}10px 25px 20px 25px{{else}}20px 25px{{/if}}">
+<mj-section
+  background-color="#ffffff"
+  padding="{{#if notificationIcon}}10px 25px 20px 25px{{else}}20px 25px{{/if}}"
+>
   <mj-column>
-    <mj-text font-size="24px" font-weight="600" color="#667eea" align="center" padding="0 0 10px 0">
-      {{notificationTitle}}
+    <mj-text font-size="24px" font-weight="600" color="#001af4" align="center" padding="0 0 10px 0">
+      {{ notificationTitle }}
     </mj-text>
 
     {{#if notificationSubtitle}}
     <mj-text font-size="16px" color="#666666" align="center" padding="0 0 20px 0">
-      {{notificationSubtitle}}
+      {{ notificationSubtitle }}
     </mj-text>
     {{/if}}
   </mj-column>
@@ -28,18 +43,23 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     {{#if userName}}
-    <mj-text color="#555555" line-height="24px">
-      Hi {{userName}},
-    </mj-text>
+    <mj-text color="#555555" line-height="24px"> Hi {{ userName }}, </mj-text>
     {{/if}}
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
-      {{notificationMessage}}
+      {{ notificationMessage }}
     </mj-text>
 
     {{#if actionRequired}}
-    <mj-text background-color="#d1ecf1" padding="15px" border-left="3px solid #17a2b8" color="#0c5460" font-size="14px" line-height="20px">
-      <strong>Action Required:</strong> {{actionMessage}}
+    <mj-text
+      background-color="#d1ecf1"
+      padding="15px"
+      border-left="3px solid #17a2b8"
+      color="#0c5460"
+      font-size="14px"
+      line-height="20px"
+    >
+      <strong>Action Required:</strong> {{ actionMessage }}
     </mj-text>
     {{/if}}
   </mj-column>
@@ -53,7 +73,7 @@
     </mj-text>
     {{#each details}}
     <mj-text color="#555555" font-size="14px" line-height="20px" padding="5px 0">
-      <strong>{{this.label}}:</strong> {{this.value}}
+      <strong>{{ this.label }}:</strong> {{ this.value }}
     </mj-text>
     {{/each}}
   </mj-column>
@@ -63,8 +83,16 @@
 {{#if actionButton}}
 <mj-section background-color="#ffffff" padding="30px 25px">
   <mj-column>
-    <mj-button background-color="#667eea" color="#ffffff" font-size="14px" font-weight="600" border-radius="5px" href="{{actionButton.url}}" css-class="gradient-button">
-      {{actionButton.text}}
+    <mj-button
+      background-color="#001af4"
+      color="#ffffff"
+      font-size="14px"
+      font-weight="600"
+      border-radius="5px"
+      href="{{actionButton.url}}"
+      css-class="gradient-button"
+    >
+      {{ actionButton.text }}
     </mj-button>
   </mj-column>
 </mj-section>
@@ -74,7 +102,7 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text color="#555555" line-height="24px">
-      {{additionalInfo}}
+      {{ additionalInfo }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -88,7 +116,9 @@
     </mj-text>
     {{#each relatedItems}}
     <mj-text color="#555555" line-height="32px" padding="5px 0 5px 20px">
-      • {{#if this.url}}<a href="{{this.url}}" style="color: #667eea; text-decoration: none;">{{this.text}}</a>{{else}}{{this.text}}{{/if}}
+      • {{#if this.url
+      }}<a href="{{this.url}}" style="color: #001af4; text-decoration: none">{{ this.text }}</a
+      >{{else}}{{ this.text }}{{/if}}
     </mj-text>
     {{/each}}
   </mj-column>
@@ -100,8 +130,10 @@
   <mj-column>
     <mj-divider border-color="#e9ecef" border-width="1px" padding="0 0 20px 0" />
     <mj-text font-size="14px" color="#666666" line-height="20px">
-      You're receiving this notification because {{notificationReason}}.
-      <a href="{{notificationSettings.url}}" style="color: #667eea; text-decoration: none;">Manage notification preferences</a>
+      You're receiving this notification because {{ notificationReason }}.
+      <a href="{{notificationSettings.url}}" style="color: #001af4; text-decoration: none"
+        >Manage notification preferences</a
+      >
     </mj-text>
   </mj-column>
 </mj-section>
@@ -112,10 +144,13 @@
     <mj-text color="#555555" line-height="24px">
       {{#if supportContact}}
       If you have any questions, please contact us at
-      <a href="mailto:{{supportEmail}}" style="color: #667eea; text-decoration: none;">{{supportEmail}}</a><br/><br/>
+      <a href="mailto:{{supportEmail}}" style="color: #001af4; text-decoration: none">{{
+        supportEmail
+      }}</a
+      ><br /><br />
       {{/if}}
-      Best regards,<br>
-      The {{companyName}} Team
+      Best regards,<br />
+      The {{ companyName }} Team
     </mj-text>
   </mj-column>
 </mj-section>
@@ -123,9 +158,7 @@
 {{#if timestamp}}
 <mj-section background-color="#f8f9fa" padding="15px 25px">
   <mj-column>
-    <mj-text align="center" color="#666666" font-size="12px">
-      Sent on {{timestamp}}
-    </mj-text>
+    <mj-text align="center" color="#666666" font-size="12px"> Sent on {{ timestamp }} </mj-text>
   </mj-column>
 </mj-section>
 {{/if}}

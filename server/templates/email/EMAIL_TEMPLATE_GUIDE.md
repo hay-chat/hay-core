@@ -41,6 +41,7 @@ MJML templates should be placed in: `server/templates/email/content/`
 **Naming Convention**: `{category}-{action}.mjml`
 
 Examples:
+
 - `privacy-export-request.mjml`
 - `privacy-deletion-complete.mjml`
 - `onboarding-welcome.mjml`
@@ -56,9 +57,7 @@ Examples:
     ...
   </mj-head>
   <mj-body>
-    <mj-section>
-      ...
-    </mj-section>
+    <mj-section> ... </mj-section>
   </mj-body>
 </mjml>
 ```
@@ -78,7 +77,7 @@ Examples:
 <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
   <mj-column width="100%">
     <mj-text color="#555555" font-size="16px" line-height="24px">
-      Email body content goes here with {{variables}}.
+      Email body content goes here with {{ variables }}.
     </mj-text>
 
     <mj-button background-color="#0066ff" color="#ffffff" href="{{actionUrl}}">
@@ -91,6 +90,7 @@ Examples:
 ### Key Requirements
 
 1. **Subject Line**: First line must be HTML comment with subject
+
    ```mjml
    <!-- subject: Your Subject Here with {{variables}} -->
    ```
@@ -105,9 +105,7 @@ Examples:
 
 4. **Padding**: Last section should have bottom padding
    ```mjml
-   <mj-text padding-bottom="20px">
-     Last paragraph
-   </mj-text>
+   <mj-text padding-bottom="20px"> Last paragraph </mj-text>
    ```
 
 ### Available Design System
@@ -115,6 +113,7 @@ Examples:
 The `base.mjml` provides pre-defined styles:
 
 #### Text Classes
+
 ```mjml
 <mj-text mj-class="h1">Heading 1</mj-text>
 <mj-text mj-class="h2">Heading 2</mj-text>
@@ -125,6 +124,7 @@ The `base.mjml` provides pre-defined styles:
 ```
 
 #### Brand Colors
+
 ```mjml
 <mj-text mj-class="text-primary">Blue text</mj-text>
 <mj-text mj-class="text-success">Green text</mj-text>
@@ -134,6 +134,7 @@ The `base.mjml` provides pre-defined styles:
 ```
 
 #### Button Variants
+
 ```mjml
 <mj-button mj-class="btn-primary">Primary Action</mj-button>
 <mj-button mj-class="btn-success">Success Action</mj-button>
@@ -143,6 +144,7 @@ The `base.mjml` provides pre-defined styles:
 ```
 
 #### Section Backgrounds
+
 ```mjml
 <mj-section mj-class="section-white">...</mj-section>
 <mj-section mj-class="section-gray">...</mj-section>
@@ -150,6 +152,7 @@ The `base.mjml` provides pre-defined styles:
 ```
 
 #### Dividers
+
 ```mjml
 <mj-divider border-color="#e0e0e0" border-width="1px" />
 <mj-divider mj-class="divider-light" />
@@ -172,12 +175,12 @@ For password reset and other legacy templates:
 ```html
 <!-- subject: Email Subject -->
 <div style="margin-bottom: 30px;">
-    <h2 style="color: #667eea;">Title</h2>
-    <p>Content with {{variables}}</p>
+  <h2 style="color: #001af4;">Title</h2>
+  <p>Content with {{variables}}</p>
 </div>
 
 <div style="text-align: center; margin: 40px 0;">
-    <a href="{{actionUrl}}" class="button">Call to Action</a>
+  <a href="{{actionUrl}}" class="button">Call to Action</a>
 </div>
 ```
 
@@ -195,13 +198,7 @@ All templates must be registered in `server/templates/email/templates.json`:
       "name": "Privacy - Data Export Request",
       "description": "GDPR data export verification email",
       "category": "privacy",
-      "variables": [
-        "userName",
-        "verificationUrl",
-        "expiresIn",
-        "supportUrl",
-        "companyName"
-      ]
+      "variables": ["userName", "verificationUrl", "expiresIn", "supportUrl", "companyName"]
     }
   ]
 }
@@ -236,14 +233,14 @@ Define custom variables in your service code:
 
 ```typescript
 await emailService.sendTemplateEmail({
-  to: 'user@example.com',
-  template: 'privacy-export-request',
+  to: "user@example.com",
+  template: "privacy-export-request",
   variables: {
-    userName: 'John Doe',
-    verificationUrl: 'https://...',
-    expiresIn: '24 hours',
-    supportUrl: 'https://support.example.com',
-    companyName: 'Hay',
+    userName: "John Doe",
+    verificationUrl: "https://...",
+    expiresIn: "24 hours",
+    supportUrl: "https://support.example.com",
+    companyName: "Hay",
   },
 });
 ```
@@ -253,12 +250,11 @@ await emailService.sendTemplateEmail({
 Use double curly braces: `{{variableName}}`
 
 ```mjml
-<mj-text>
-  Hi {{userName}}, your link expires in {{expiresIn}}.
-</mj-text>
+<mj-text> Hi {{ userName }}, your link expires in {{ expiresIn }}. </mj-text>
 ```
 
 Variables work in:
+
 - Text content
 - URLs (`href` attributes)
 - Subjects (in HTML comment)
@@ -317,7 +313,7 @@ Always provide both button and text link:
 </mj-text>
 
 <mj-text font-size="12px" color="#0066ff">
-  {{actionUrl}}
+  {{ actionUrl }}
 </mj-text>
 ```
 
@@ -331,7 +327,7 @@ Test emails with SMTP disabled (logs to console):
 
 ```typescript
 // In server/.env
-SMTP_ENABLED=false
+SMTP_ENABLED = false;
 ```
 
 ### 2. Test Script
@@ -346,6 +342,7 @@ npm run test-email
 ### 3. Email Clients
 
 Test in multiple email clients:
+
 - Gmail (web, mobile)
 - Outlook (desktop, web)
 - Apple Mail
@@ -354,6 +351,7 @@ Test in multiple email clients:
 ### 4. MJML Validation
 
 MJML templates are validated during compilation. Check for:
+
 - Valid MJML syntax
 - No compilation errors in logs
 - Proper variable substitution
@@ -368,22 +366,15 @@ MJML templates are validated during compilation. Check for:
 <!-- subject: Verify Your {{actionType}} Request -->
 <mj-section background-color="#ffffff" padding="20px">
   <mj-column>
-    <mj-text align="center" font-size="24px" font-weight="bold">
-      Verify Your Request
-    </mj-text>
+    <mj-text align="center" font-size="24px" font-weight="bold"> Verify Your Request </mj-text>
 
     <mj-text font-size="16px">
-      Hi {{userName}}, we received a request to {{actionType}}.
-      Please verify this action.
+      Hi {{ userName }}, we received a request to {{ actionType }}. Please verify this action.
     </mj-text>
 
-    <mj-button background-color="#0066ff" href="{{verificationUrl}}">
-      Verify Request
-    </mj-button>
+    <mj-button background-color="#0066ff" href="{{verificationUrl}}"> Verify Request </mj-button>
 
-    <mj-text font-size="14px" padding-top="10px">
-      Link expires in {{expiresIn}}
-    </mj-text>
+    <mj-text font-size="14px" padding-top="10px"> Link expires in {{ expiresIn }} </mj-text>
   </mj-column>
 </mj-section>
 ```
@@ -394,20 +385,18 @@ MJML templates are validated during compilation. Check for:
 <!-- subject: {{action}} Completed -->
 <mj-section background-color="#ffffff" padding="20px">
   <mj-column>
-    <mj-text align="center" font-size="24px" font-weight="bold">
-      ✓ {{action}} Completed
-    </mj-text>
+    <mj-text align="center" font-size="24px" font-weight="bold"> ✓ {{ action }} Completed </mj-text>
 
     <mj-text font-size="16px">
-      This confirms that {{action}} has been completed successfully.
+      This confirms that {{ action }} has been completed successfully.
     </mj-text>
 
     <mj-divider border-color="#e0e0e0" />
 
     <mj-text font-size="14px">
-      <strong>What happened:</strong><br/>
-      • Action 1<br/>
-      • Action 2<br/>
+      <strong>What happened:</strong><br />
+      • Action 1<br />
+      • Action 2<br />
       • Action 3
     </mj-text>
   </mj-column>
@@ -421,20 +410,18 @@ MJML templates are validated during compilation. Check for:
 <mj-section background-color="#ffffff" padding="20px">
   <mj-column>
     <mj-text align="center" font-size="24px" font-weight="bold" color="#d32f2f">
-      ⚠️ {{warningTitle}}
+      ⚠️ {{ warningTitle }}
     </mj-text>
 
     <mj-text font-size="16px" color="#d32f2f" font-weight="bold">
-      WARNING: {{warningMessage}}
+      WARNING: {{ warningMessage }}
     </mj-text>
 
     <mj-text font-size="14px">
-      {{detailedExplanation}}
+      {{ detailedExplanation }}
     </mj-text>
 
-    <mj-button background-color="#d32f2f" href="{{actionUrl}}">
-      Take Action
-    </mj-button>
+    <mj-button background-color="#d32f2f" href="{{actionUrl}}"> Take Action </mj-button>
   </mj-column>
 </mj-section>
 ```

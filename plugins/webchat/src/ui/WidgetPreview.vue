@@ -4,7 +4,9 @@
       <!-- Chat Button -->
       <div class="preview-button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          <path
+            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+          ></path>
         </svg>
       </div>
 
@@ -12,25 +14,29 @@
       <div class="preview-window">
         <div class="preview-header">
           <div>
-            <div class="preview-title">{{ config.widgetTitle || 'Chat with us' }}</div>
-            <div class="preview-subtitle">{{ config.widgetSubtitle || '' }}</div>
+            <div class="preview-title">{{ config.widgetTitle || "Chat with us" }}</div>
+            <div class="preview-subtitle">{{ config.widgetSubtitle || "" }}</div>
           </div>
-          <svg class="preview-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="preview-close"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </div>
-        
+
         <div class="preview-messages">
           <div v-if="config.showGreeting" class="preview-message agent">
             <div class="preview-bubble">
-              {{ config.greetingMessage || 'Hello! How can we help you today?' }}
+              {{ config.greetingMessage || "Hello! How can we help you today?" }}
             </div>
           </div>
           <div class="preview-message user">
-            <div class="preview-bubble">
-              Hi, I need help with my order
-            </div>
+            <div class="preview-bubble">Hi, I need help with my order</div>
           </div>
           <div class="preview-message agent">
             <div class="preview-bubble">
@@ -38,7 +44,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="preview-input">
           <input type="text" placeholder="Type your message..." disabled />
           <button class="preview-send">
@@ -78,7 +84,7 @@ export default {
   width: 100%;
   height: 400px;
   position: relative;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #001af4 0%, #764ba2 100%);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -106,7 +112,7 @@ export default {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--preview-primary, #3B82F6);
+  background: var(--preview-primary, #3b82f6);
   color: white;
   display: flex;
   align-items: center;
@@ -132,7 +138,7 @@ export default {
 }
 
 .preview-header {
-  background: var(--preview-primary, #3B82F6);
+  background: var(--preview-primary, #3b82f6);
   color: white;
   padding: 12px;
   display: flex;
@@ -162,7 +168,7 @@ export default {
 .preview-messages {
   flex: 1;
   padding: 12px;
-  background: #F9FAFB;
+  background: #f9fafb;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -190,14 +196,14 @@ export default {
 }
 
 .preview-message.user .preview-bubble {
-  background: var(--preview-primary, #3B82F6);
+  background: var(--preview-primary, #3b82f6);
   color: white;
   border-bottom-right-radius: 4px;
 }
 
 .preview-message.agent .preview-bubble {
   background: white;
-  color: #1F2937;
+  color: #1f2937;
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
@@ -206,7 +212,7 @@ export default {
 .preview-input {
   padding: 10px;
   background: white;
-  border-top: 1px solid #E5E7EB;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   gap: 6px;
 }
@@ -214,17 +220,17 @@ export default {
 .preview-input input {
   flex: 1;
   padding: 6px 12px;
-  border: 1px solid #D1D5DB;
+  border: 1px solid #d1d5db;
   border-radius: 20px;
   font-size: 12px;
-  background: #F9FAFB;
+  background: #f9fafb;
 }
 
 .preview-send {
   width: 32px;
   height: 32px;
   border: none;
-  background: var(--preview-primary, #3B82F6);
+  background: var(--preview-primary, #3b82f6);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -240,15 +246,15 @@ export default {
 
 /* Theme Variations */
 .theme-blue {
-  --preview-primary: #3B82F6;
+  --preview-primary: #3b82f6;
 }
 
 .theme-green {
-  --preview-primary: #10B981;
+  --preview-primary: #10b981;
 }
 
 .theme-purple {
-  --preview-primary: #8B5CF6;
+  --preview-primary: #8b5cf6;
 }
 
 .theme-black {

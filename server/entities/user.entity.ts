@@ -59,6 +59,13 @@ export class User extends BaseEntity {
   @Column({ type: "timestamptz", nullable: true })
   emailVerificationExpiresAt?: Date;
 
+  // Password reset fields
+  @Column({ type: "varchar", length: 255, nullable: true })
+  passwordResetTokenHash?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  passwordResetExpiresAt?: Date;
+
   // Relationships
   @ManyToOne(() => Organization, (organization) => organization.users, {
     nullable: true,
@@ -181,6 +188,25 @@ export class User extends BaseEntity {
     this.pendingEmail = null as any;
     this.emailVerificationTokenHash = null as any;
     this.emailVerificationExpiresAt = null as any;
+  }
+
+  /**
+   * Check if user has a pending password reset that is still valid
+   */
+  hasPendingPasswordReset(): boolean {
+    return (
+      !!this.passwordResetTokenHash &&
+      !!this.passwordResetExpiresAt &&
+      this.passwordResetExpiresAt > new Date()
+    );
+  }
+
+  /**
+   * Clear password reset fields
+   */
+  clearPasswordReset(): void {
+    this.passwordResetTokenHash = null as any;
+    this.passwordResetExpiresAt = null as any;
   }
 
   /**

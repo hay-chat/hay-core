@@ -40,7 +40,10 @@
           <ChevronDown v-if="!outputsExpanded" class="h-3 w-3" />
           <ChevronUp v-else class="h-3 w-3" />
         </button>
-        <div v-show="outputsExpanded" :class="['tool-section__content', { 'tool-section__content--error': isErrorOutput }]">
+        <div
+          v-show="outputsExpanded"
+          :class="['tool-section__content', { 'tool-section__content--error': isErrorOutput }]"
+        >
           <VueJsonPretty :data="formattedOutput" :deep="2" :show-length="true" :show-line="false" />
         </div>
       </div>
@@ -92,8 +95,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Check if output contains an error
 const isErrorOutput = computed(() => {
-  return props.toolStatus === "ERROR" ||
-    (props.toolOutput && typeof props.toolOutput === "object" && "error" in props.toolOutput);
+  return (
+    props.toolStatus === "ERROR" ||
+    (props.toolOutput && typeof props.toolOutput === "object" && "error" in props.toolOutput)
+  );
 });
 
 // Auto-expand errors by default for better visibility
@@ -373,7 +378,6 @@ const formattedExecutedAt = computed(() => {
 }
 
 .tool-section__content--error {
-  background: rgba(254, 226, 226, 0.5);
   border-left: 3px solid var(--color-red-500);
 }
 
