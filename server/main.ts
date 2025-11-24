@@ -120,8 +120,15 @@ async function startServer() {
   );
 
   // Serve webchat widget files
-  // Use process.cwd() to get project root, works in both dev and production
-  const webchatDir = require("path").resolve(process.cwd(), "webchat/dist");
+  // Navigate up from current directory until we find the project root (where webchat exists)
+  const path = require("path");
+  const fs = require("fs");
+  let projectRoot = __dirname;
+  while (!fs.existsSync(path.join(projectRoot, "webchat", "dist")) && projectRoot !== "/") {
+    projectRoot = path.resolve(projectRoot, "..");
+  }
+  const webchatDir = path.join(projectRoot, "webchat", "dist");
+  console.log(`📦 Serving webchat files from: ${webchatDir}`);
   server.use(
     "/webchat",
     express.static(webchatDir, {
