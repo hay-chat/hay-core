@@ -119,6 +119,23 @@ async function startServer() {
     }),
   );
 
+  // Serve webchat widget files
+  const webchatDir = require("path").resolve(__dirname, "../webchat/dist");
+  server.use(
+    "/webchat",
+    express.static(webchatDir, {
+      maxAge: "7d",
+      etag: true,
+      lastModified: true,
+      setHeaders: (res) => {
+        // Security headers
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        // Allow CORS for widget files so they can be loaded from any domain
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      },
+    }),
+  );
+
   // Plugin thumbnail route - serve thumbnail.jpg files
   server.get("/plugins/thumbnails/:pluginName", (req, res) => {
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
