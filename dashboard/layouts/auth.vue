@@ -51,7 +51,7 @@
 
       <!-- Footer -->
       <div class="mt-8 text-center text-sm text-gray-600">
-        <p>&copy; 2025 Hay Chat. All rights reserved.</p>
+        <p>&copy; 2025 Hay. All rights reserved.</p>
         <div class="mt-2 space-x-4">
           <NuxtLink to="/privacy" class="hover:text-gray-900 transition-colors">
             Privacy Policy
