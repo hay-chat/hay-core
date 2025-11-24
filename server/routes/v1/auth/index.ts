@@ -19,6 +19,7 @@ import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
+import { rateLimitService } from "@server/services/rate-limit.service";
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -289,6 +290,251 @@ export const authRouter = t.router({
       });
     }
   }),
+
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input, ctx }) => {
+      const { email } = input;
+
+      // Rate limiting: 5 requests per day per email
+      const rateLimitResult = await rateLimitService.checkEmailRateLimit(
+        email,
+        5, // max 5 requests
+        24 * 60 * 60, // per 24 hours
+      );
+
+      if (rateLimitResult.limited) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many password reset requests. Please try again later.",
+        });
+      }
+
+      // Find user by email
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { email: email.toLowerCase() },
+      });
+
+      // Always return success to prevent user enumeration
+      // Even if the user doesn't exist, we return success
+      if (!user) {
+        // Simulate some processing time to prevent timing attacks
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return {
+          success: true,
+          message: "If an account exists with this email, you will receive a password reset link.",
+        };
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return {
+          success: true,
+          message: "If an account exists with this email, you will receive a password reset link.",
+        };
+      }
+
+      try {
+        // Generate reset token
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = await hashPassword(resetToken, "argon2");
+
+        // Store token hash and expiration (24 hours)
+        user.passwordResetTokenHash = tokenHash;
+        user.passwordResetExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await userRepository.save(user);
+
+        // Send password reset email
+        await emailService.initialize();
+        const baseUrl = getDashboardUrl();
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+
+        await emailService.sendTemplateEmail({
+          to: user.email,
+          subject: "Reset Your Password",
+          template: "reset-password",
+          variables: {
+            userName: user.getFullName(),
+            userEmail: user.email,
+            companyName: "Hay",
+            resetLink,
+            expirationHours: "24",
+            requestTime: new Date().toLocaleString(),
+            requestIP: ctx.ipAddress || "Unknown",
+            requestBrowser: ctx.userAgent || "Unknown",
+            requestLocation: "Unknown", // TODO: Add geolocation lookup
+            supportEmail: "support@hay.chat",
+            currentYear: new Date().getFullYear().toString(),
+            companyAddress: "Hay Platform",
+            websiteUrl: baseUrl,
+            preferencesUrl: `${baseUrl}/settings`,
+            recipientEmail: user.email,
+          },
+        });
+
+        // Log password reset request
+        try {
+          await auditLogService.logPasswordResetRequest(user.id, ctx.ipAddress, ctx.userAgent);
+        } catch (error) {
+          console.error("Failed to log password reset request:", error);
+        }
+
+        return {
+          success: true,
+          message: "If an account exists with this email, you will receive a password reset link.",
+        };
+      } catch (error) {
+        console.error("Failed to process password reset request:", error);
+        // Don't expose internal errors
+        return {
+          success: true,
+          message: "If an account exists with this email, you will receive a password reset link.",
+        };
+      }
+    }),
+
+  verifyResetToken: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const userRepository = AppDataSource.getRepository(User);
+
+      // Find all users with pending password resets
+      const usersWithResets = await userRepository.find({
+        where: {
+          passwordResetTokenHash: Not(IsNull()),
+        },
+      });
+
+      // Find the user with the matching token
+      let user: User | null = null;
+      for (const u of usersWithResets) {
+        if (u.passwordResetTokenHash) {
+          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
+          if (isValid) {
+            user = u;
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        return {
+          valid: false,
+          message: "Invalid or expired reset token",
+        };
+      }
+
+      // Check if token has expired
+      if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+        // Clear expired token
+        user.clearPasswordReset();
+        await userRepository.save(user);
+
+        return {
+          valid: false,
+          message: "Reset token has expired. Please request a new password reset.",
+        };
+      }
+
+      return {
+        valid: true,
+        email: user.email,
+      };
+    }),
+
+  resetPassword: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        newPassword: z.string().min(8),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userRepository = AppDataSource.getRepository(User);
+
+      // Find all users with pending password resets
+      const usersWithResets = await userRepository.find({
+        where: {
+          passwordResetTokenHash: Not(IsNull()),
+        },
+      });
+
+      // Find the user with the matching token
+      let user: User | null = null;
+      for (const u of usersWithResets) {
+        if (u.passwordResetTokenHash) {
+          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
+          if (isValid) {
+            user = u;
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired reset token",
+        });
+      }
+
+      // Check if token has expired
+      if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+        // Clear expired token
+        user.clearPasswordReset();
+        await userRepository.save(user);
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Reset token has expired. Please request a new password reset.",
+        });
+      }
+
+      // Hash new password
+      user.password = await hashPassword(input.newPassword, "argon2");
+
+      // Clear password reset fields
+      user.clearPasswordReset();
+
+      await userRepository.save(user);
+
+      // Log password reset
+      try {
+        await auditLogService.logPasswordReset(user.id, ctx.ipAddress, ctx.userAgent);
+
+        // Send confirmation email
+        await emailService.initialize();
+        await emailService.sendTemplateEmail({
+          to: user.email,
+          subject: "Your Password Has Been Changed",
+          template: "password-changed",
+          variables: {
+            userName: user.getFullName(),
+            userEmail: user.email,
+            companyName: "Hay",
+            changedAt: new Date().toLocaleString(),
+            ipAddress: ctx.ipAddress || "Unknown",
+            browser: ctx.userAgent || "Unknown",
+            location: "Unknown",
+            supportUrl: `${getDashboardUrl()}/support`,
+            currentYear: new Date().getFullYear().toString(),
+            companyAddress: "Hay Platform",
+            websiteUrl: getDashboardUrl(),
+            preferencesUrl: `${getDashboardUrl()}/settings`,
+            recipientEmail: user.email,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to log password reset or send email:", error);
+        // Don't fail the password reset if logging/email fails
+      }
+
+      return {
+        success: true,
+        message: "Your password has been successfully reset",
+      };
+    }),
 
   // Protected endpoints
   me: protectedProcedure

@@ -102,6 +102,46 @@ export class AuditLogService {
   }
 
   /**
+   * Log password reset request
+   */
+  async logPasswordResetRequest(
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      action: "password.reset.request",
+      resource: "auth",
+      ipAddress,
+      userAgent,
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
+   * Log password reset completion
+   */
+  async logPasswordReset(
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+    metadata?: Record<string, any>
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      action: "password.reset",
+      resource: "auth",
+      ipAddress,
+      userAgent,
+      metadata,
+      status: "success",
+    });
+  }
+
+  /**
    * Log user login
    */
   async logLogin(

@@ -16,6 +16,8 @@ export type AuditAction =
   | "profile.update"
   | "email.change"
   | "password.change"
+  | "password.reset.request"
+  | "password.reset"
   | "user.login"
   | "user.logout"
   | "user.register"
