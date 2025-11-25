@@ -692,6 +692,11 @@ The following tools are available for you to use. You MUST return only valid JSO
               deliveryState: message.deliveryState,
             },
           };
+
+          // Publish to Redis for distribution across all server instances
+          await redisService.publish("websocket:events", eventPayload);
+
+          debugLog("conversation", `Message ${message.id} published to Redis for broadcast`);
         } else {
           // Fallback to direct WebSocket if Redis not available
           const { websocketService } = await import("../../services/websocket.service");
