@@ -47,7 +47,7 @@
     "migration:revert": "cd server && npm run migration:revert",
     "migration:show": "cd server && npm run migration:show",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
-    "postinstall": "cd dashboard && nuxt prepare"
+    "postinstall": "git submodule update --init --recursive && cd dashboard && nuxt prepare"
   },
   "dependencies": {},
   "devDependencies": {},
