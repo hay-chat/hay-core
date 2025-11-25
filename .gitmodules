@@ -1,0 +1,3 @@
+[submodule "plugins/attio/mcp"]
+	path = plugins/attio/mcp
+	url = https://github.com/kesslerio/attio-mcp-server
