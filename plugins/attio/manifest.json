@@ -30,7 +30,7 @@
       },
       "transport": "stdio",
       "auth": ["apiKey"],
-      "installCommand": "cd mcp && npm install",
+      "installCommand": "cd mcp && npm ci --ignore-scripts",
       "buildCommand": "cd mcp && npm run build",
       "startCommand": "node mcp/dist/cli.js",
       "tools": [
