@@ -15,7 +15,7 @@ for plugin_dir in plugins/*/mcp; do
 
     # Check if build script exists in the mcp package.json
     if grep -q '"build"' "$plugin_dir/package.json"; then
-      (cd "$plugin_dir" && npm install && npm run build)
+      (cd "$plugin_dir" && npm install --ignore-scripts && npm run build)
       echo "✅ Built $plugin_name"
     else
       echo "ℹ️  No build script for $plugin_name, skipping"
