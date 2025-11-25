@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:base && tsc && npm run copy:templates",
+    "build": "npm run build:plugins && tsc && npm run copy:templates",
     "copy:templates": "cp -r templates dist/",
-    "build:base": "cd ../plugins/base && npm run build",
+    "build:plugins": "cd .. && ./scripts/build-plugins.sh",
     "start": "node -r module-alias/register dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
     "typecheck": "tsc --noEmit",

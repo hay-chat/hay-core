@@ -443,6 +443,10 @@ export class ProcessManagerService {
     try {
       // Run the plugin's install command
       await pluginManagerService.installPlugin(processInfo.pluginId);
+
+      // Build the plugin if it has a build command
+      await pluginManagerService.buildPlugin(processInfo.pluginId);
+
       debugLog("process-manager", `Dependency recovery completed for ${processInfo.pluginName}`);
       return true;
     } catch (error) {
