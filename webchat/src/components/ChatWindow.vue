@@ -54,39 +54,6 @@
       <span>Connecting...</span>
     </div>
 
-    <!-- Closed Conversation Banner -->
-    <div v-if="isConversationClosed" class="hay-chat-closed-banner">
-      <div class="hay-chat-closed-banner__content">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="hay-chat-closed-banner__icon"
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-        <div>
-          <div class="hay-chat-closed-banner__title">Conversation Closed</div>
-          <div class="hay-chat-closed-banner__text">
-            This conversation has ended. Start a new one to continue chatting.
-          </div>
-        </div>
-      </div>
-      <button
-        @click="$emit('startNewConversation')"
-        class="hay-chat-closed-banner__button"
-      >
-        Start New Conversation
-      </button>
-    </div>
-
     <!-- Greeting Message -->
     <div
       v-if="showGreeting && greetingMessage && messages.length === 0"
@@ -98,8 +65,37 @@
     <!-- Messages -->
     <MessageList :messages="messages" :is-typing="isTyping" />
 
-    <!-- Input -->
+    <!-- Closed Conversation Footer (replaces input when closed) -->
+    <div v-if="isConversationClosed" class="hay-chat-closed-footer">
+      <div class="hay-chat-closed-footer__content">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="hay-chat-closed-footer__icon"
+        >
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span class="hay-chat-closed-footer__text">This conversation has ended</span>
+      </div>
+      <button
+        @click="$emit('startNewConversation')"
+        class="hay-chat-closed-footer__button"
+      >
+        Start New Conversation
+      </button>
+    </div>
+
+    <!-- Input (hidden when conversation is closed) -->
     <MessageInput
+      v-else
       :is-connected="isConnected"
       @send="$emit('send', $event)"
       @start-typing="$emit('startTyping')"
@@ -245,41 +241,35 @@ defineEmits<{
   line-height: 1.5;
 }
 
-/* Closed conversation banner */
-.hay-chat-closed-banner {
+/* Closed conversation footer (replaces input area) */
+.hay-chat-closed-footer {
   padding: 16px;
   background: #fef2f2;
-  border-bottom: 1px solid #fecaca;
+  border-top: 1px solid #fecaca;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.hay-chat-closed-banner__content {
+.hay-chat-closed-footer__content {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
 
-.hay-chat-closed-banner__icon {
+.hay-chat-closed-footer__icon {
   flex-shrink: 0;
   color: #dc2626;
 }
 
-.hay-chat-closed-banner__title {
+.hay-chat-closed-footer__text {
   font-size: 14px;
-  font-weight: 600;
   color: #991b1b;
-  margin-bottom: 4px;
+  font-weight: 500;
 }
 
-.hay-chat-closed-banner__text {
-  font-size: 13px;
-  color: #7f1d1d;
-  line-height: 1.4;
-}
-
-.hay-chat-closed-banner__button {
+.hay-chat-closed-footer__button {
   width: 100%;
   padding: 10px 16px;
   background: var(--hay-primary);
@@ -292,11 +282,11 @@ defineEmits<{
   transition: opacity 0.2s;
 }
 
-.hay-chat-closed-banner__button:hover {
+.hay-chat-closed-footer__button:hover {
   opacity: 0.9;
 }
 
-.hay-chat-closed-banner__button:active {
+.hay-chat-closed-footer__button:active {
   opacity: 0.8;
 }
 
