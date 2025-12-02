@@ -1,0 +1,15 @@
+{
+  "name": "hay-plugin-hubspot",
+  "version": "1.0.0",
+  "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

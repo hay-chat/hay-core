@@ -32,7 +32,8 @@ export interface OAuthState {
 export interface OAuthManifestConfig {
   authorizationUrl: string;
   tokenUrl: string;
-  scopes: string[];
+  scopes?: string[]; // Required scopes
+  optionalScopes?: string[]; // Optional scopes (sent as 'optional_scope' parameter)
   pkce?: boolean;
   clientIdEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_ID
   clientSecretEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_SECRET (optional for CIMD)

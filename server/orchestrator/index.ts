@@ -14,7 +14,6 @@ export class Orchestrator {
   private conversationRepository: ConversationRepository;
 
   constructor() {
-    debugLog("orchestrator", "Orchestrator initialized with v2 implementation");
     this.conversationRepository = new ConversationRepository();
   }
 
@@ -83,18 +82,21 @@ export class Orchestrator {
             // Check if conversation is old enough to delete (created more than 2x timeout ago)
             const conversationAge = now.getTime() - new Date(conversation.created_at).getTime();
             if (conversationAge > silentCloseThreshold) {
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Deleting empty conversation ${conversation.id} (age: ${conversationAge}ms > ${silentCloseThreshold}ms)`,
               );
               await this.conversationRepository.delete(
                 conversation.id,
                 conversation.organization_id,
               );
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Deleted conversation ${conversation.id} and associated messages`,
               );
             } else {
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} has no user messages, skipping`,
               );
             }
@@ -114,7 +116,8 @@ export class Orchestrator {
           // Check for different timeout scenarios
           if (timeSinceLastMessage > silentCloseThreshold) {
             // 2x timeout: Close silently without sending a message
-            debugLog("orchestrator", 
+            debugLog(
+              "orchestrator",
               `Conversation ${conversation.id} exceeded silent close threshold (${timeSinceLastMessage}ms > ${silentCloseThreshold}ms), closing silently`,
             );
             await closeInactiveConversation(
@@ -129,7 +132,8 @@ export class Orchestrator {
 
             if (hasWarning) {
               // Warning was sent but no response, close the conversation
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} didn't respond to warning, closing`,
               );
               await closeInactiveConversation(
@@ -140,7 +144,8 @@ export class Orchestrator {
               );
             } else {
               // No warning sent yet but past full timeout, close with message
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} exceeded timeout without warning, closing with message`,
               );
               await closeInactiveConversation(
@@ -155,7 +160,8 @@ export class Orchestrator {
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
             if (!hasWarning) {
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} reached warning threshold (${timeSinceLastMessage}ms > ${warningThreshold}ms), sending warning`,
               );
               await sendInactivityWarning(conversation.id, conversation.organization_id);
@@ -186,7 +192,8 @@ export class Orchestrator {
             );
 
             if (closureValidation.shouldClose) {
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} has validated closure intent (${lastUserMessage.intent}), closing. Reason: ${closureValidation.reason}`,
               );
               await this.conversationRepository.update(
@@ -216,7 +223,8 @@ export class Orchestrator {
               // Generate title for closed conversation
               await generateConversationTitle(conversation.id, conversation.organization_id);
             } else {
-              debugLog("orchestrator", 
+              debugLog(
+                "orchestrator",
                 `Conversation ${conversation.id} has closure intent but validation failed: ${closureValidation.reason}. Keeping open.`,
               );
             }

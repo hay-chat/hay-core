@@ -66,7 +66,7 @@ export class PluginRouteService {
       }
 
       // Find plugin instance
-      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, plugin.id);
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginName);
 
       if (!instance || !instance.enabled) {
         res.status(404).json({ error: "Plugin instance not found or disabled" });

@@ -868,9 +868,41 @@ const handleDisablePlugin = async () => {
   }
 };
 
+// Handle OAuth callback redirect
+const handleOAuthCallback = () => {
+  const oauthStatus = route.query.oauth as string | undefined;
+
+  if (oauthStatus === 'success') {
+    toast.success('OAuth connection established successfully');
+
+    // Clean up URL by removing query params
+    router.replace({
+      path: route.path,
+      query: {}
+    });
+
+    // Reload plugin data to refresh OAuth connection status
+    fetchPlugin();
+  } else if (oauthStatus === 'error') {
+    toast.error('OAuth connection failed. Please try again.');
+
+    // Clean up URL
+    router.replace({
+      path: route.path,
+      query: {}
+    });
+  }
+};
+
 // Lifecycle
 onMounted(() => {
-  fetchPlugin();
+  // Check for OAuth callback first
+  handleOAuthCallback();
+
+  // Then fetch plugin normally
+  if (!route.query.oauth) {
+    fetchPlugin();
+  }
 });
 
 // Page meta
