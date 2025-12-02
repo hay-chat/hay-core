@@ -6,6 +6,7 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRouteService } from "./plugin-route.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import { refreshOAuthTokens } from "./oauth-token-refresh.job";
+import { documentRetryService } from "./document-retry.service";
 
 /**
  * Centralized Scheduled Jobs Registry
@@ -84,6 +85,66 @@ const jobRegistry: CronJobConfig[] = [
     singleton: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent checks
+  },
+
+  {
+    name: "orchestrator-stale-message-check",
+    description: "Detect and recover stale/lost messages",
+    schedule: 5000, // Every 5 seconds
+    handler: async () => {
+      const { config } = await import("../config/env");
+      if (config.staleMessageDetection?.enabled === false) {
+        return; // Skip if disabled
+      }
+
+      const { staleMessageDetectorService } = await import("./stale-message-detector.service");
+      const { messageRecoveryService } = await import("./message-recovery.service");
+      const { debugLog } = await import("../lib/debug-logger");
+
+      const staleConversations = await staleMessageDetectorService.detectStaleConversations();
+
+      if (staleConversations.length === 0) {
+        return; // Nothing to do
+      }
+
+      debugLog("stale-detector", `Found ${staleConversations.length} stale conversations`);
+
+      // Recover each conversation
+      for (const staleConv of staleConversations) {
+        try {
+          const result = await messageRecoveryService.recoverStaleConversation(staleConv, false);
+          debugLog("stale-detector", "Recovery result", {
+            conversationId: staleConv.conversationId,
+            result,
+          });
+        } catch (error) {
+          console.error("[Stale Detector] Recovery failed", {
+            conversationId: staleConv.conversationId,
+            error,
+          });
+        }
+      }
+    },
+    singleton: true, // CRITICAL: Prevent concurrent runs
+    enabled: true,
+    timeout: 30000, // 30 seconds max
+    retryOnFailure: true,
+    maxRetries: 2,
+    skipDatabaseLogging: true, // Don't log frequent checks
+  },
+
+  {
+    name: "document-processing-retry",
+    description: "Retry failed document processing with exponential backoff",
+    schedule: 300000, // Every 5 minutes
+    handler: async () => {
+      await documentRetryService.processRetryQueue();
+    },
+    singleton: true, // CRITICAL: Prevents concurrent runs
+    enabled: true,
+    timeout: 600000, // 10 minutes max - ensures job completes before next run
+    retryOnFailure: true,
+    maxRetries: 2,
   },
 
   // ============================================================

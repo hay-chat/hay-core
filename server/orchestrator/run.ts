@@ -254,9 +254,20 @@ export const runConversation = async (conversationId: string) => {
   }
 
   try {
+    // Increment processing attempts
+    await conversationRepository.updateById(conversation.id, {
+      processing_attempts: (conversation.processing_attempts || 0) + 1,
+    });
+
     // 00. Intialize
     const locked = await conversation.lock();
     if (!locked) {
+      // Track lock acquisition failure
+      await conversationRepository.updateById(conversation.id, {
+        processing_error_count: (conversation.processing_error_count || 0) + 1,
+        last_processing_error: "Failed to acquire lock",
+        last_processing_error_at: new Date(),
+      });
       debugLog("orchestrator", "Could not acquire lock, conversation already being processed", {
         conversationId,
       });
@@ -267,6 +278,9 @@ export const runConversation = async (conversationId: string) => {
     const systemMessages = await conversation.getSystemMessages();
     if (systemMessages.length === 0) {
       await conversation.addInitialSystemMessage();
+
+      // 00.1.1. Add Initial Agent Instructions
+      await conversation.addInitialAgentInstructions();
     }
 
     // 00.2. Add Initial Bot Message
@@ -511,6 +525,16 @@ export const runConversation = async (conversationId: string) => {
     // Update processing state to idle (done)
     await updateProcessingState(conversation, "idle");
 
+    // SUCCESS: Reset error counters
+    await conversationRepository.updateById(conversation.id, {
+      processing_error_count: 0,
+      last_processing_error: null,
+      last_processing_error_at: null,
+      is_stuck: false,
+      stuck_detected_at: null,
+      stuck_reason: null,
+    });
+
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
     if (
@@ -519,12 +543,46 @@ export const runConversation = async (conversationId: string) => {
       !error.message.includes("Last customer message not found")
     ) {
       console.error("[Orchestrator] Error in conversation", error.message);
+
+      // FAILURE: Track error
+      const errorCount = (conversation.processing_error_count || 0) + 1;
+      await conversationRepository.updateById(conversation.id, {
+        processing_error_count: errorCount,
+        last_processing_error: error.message,
+        last_processing_error_at: new Date(),
+      });
+
+      // Mark as stuck if threshold exceeded
+      if (errorCount >= 3) {
+        await conversationRepository.updateById(conversation.id, {
+          is_stuck: true,
+          stuck_detected_at: new Date(),
+          stuck_reason: "repeated_processing_failures",
+        });
+      }
     }
     // Set to idle on error
     await updateProcessingState(conversation, "idle");
   } finally {
-    await conversation.unlock();
-    // console.log("[Orchestrator] Conversation unlocked", conversationId);
+    // CRITICAL: Always unlock, even on error
+    try {
+      await conversation.unlock();
+    } catch (unlockError) {
+      console.error("[Orchestrator] CRITICAL: Failed to unlock conversation", {
+        conversationId,
+        error: unlockError,
+      });
+      // Emergency fallback: Force clear lock via direct DB update
+      try {
+        await conversationRepository.updateById(conversation.id, {
+          processing_locked_until: null,
+          processing_locked_by: null,
+        });
+        console.log("[Orchestrator] Emergency unlock completed via direct DB update");
+      } catch (emergencyError) {
+        console.error("[Orchestrator] CRITICAL: Emergency unlock also failed", emergencyError);
+      }
+    }
   }
 };
 

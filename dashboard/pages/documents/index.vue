@@ -61,6 +61,36 @@
       </div>
     </div>
 
+    <!-- Error Alert Banner -->
+    <div
+      v-if="errorDocumentsCount > 0"
+      class="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <AlertCircle class="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0" />
+          <div>
+            <p class="text-sm font-medium text-red-900 dark:text-red-300">
+              {{ errorDocumentsCount }} document{{ errorDocumentsCount === 1 ? "" : "s" }} failed
+              to process
+            </p>
+            <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">
+              These documents encountered errors during import and may need attention.
+            </p>
+          </div>
+        </div>
+        <div class="flex space-x-2">
+          <Button variant="outline" size="sm" @click="viewFailedDocuments">
+            View Failed
+          </Button>
+          <Button size="sm" :disabled="retryingAll" @click="retryAllFailed">
+            <RotateCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': retryingAll }" />
+            {{ retryingAll ? "Retrying..." : "Retry All" }}
+          </Button>
+        </div>
+      </div>
+    </div>
+
     <!-- Bulk Actions -->
     <div v-if="selectedDocuments.length > 0" class="bg-background-tertiary p-4 rounded-lg">
       <div class="flex items-center justify-between">
@@ -162,7 +192,13 @@
                             : 'bg-red-600',
                   ]"
                 />
-                {{ document.status === "draft" ? "Processing" : document.status }}
+                {{
+                  document.status === "draft"
+                    ? "Processing"
+                    : document.status === "error"
+                      ? "Error"
+                      : document.status
+                }}
               </div>
             </TableCell>
             <TableCell class="whitespace-nowrap">
@@ -194,6 +230,10 @@
                   >
                     <RefreshCw class="mr-2 h-4 w-4" />
                     Update from Source
+                  </DropdownMenuItem>
+                  <DropdownMenuItem v-if="document.status === 'error'" @click="retryDocument(document)">
+                    <RotateCw class="mr-2 h-4 w-4" />
+                    Retry Processing
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="archiveDocument(document)">
@@ -340,6 +380,7 @@
 <script setup lang="ts">
 import { HayApi } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useWebSocket } from "@/composables/useWebSocket";
 
 import {
   FileText,
@@ -355,12 +396,15 @@ import {
   FileCode,
   FileJson,
   File,
+  RotateCw,
+  AlertCircle,
 } from "lucide-vue-next";
 
 // State
 const loading = ref(false);
 const searching = ref(false);
 const searchQuery = ref("");
+const retryingAll = ref(false);
 interface SearchResult {
   id: string;
   title: string;
@@ -442,6 +486,14 @@ const allSelected = computed(() => {
     filteredDocuments.value.length > 0 &&
     filteredDocuments.value.every((doc) => selectedDocuments.value.includes(doc.id))
   );
+});
+
+const errorDocumentsCount = computed(() => {
+  return documents.value.filter((doc) => doc.status === "error").length;
+});
+
+const errorDocuments = computed(() => {
+  return documents.value.filter((doc) => doc.status === "error");
 });
 
 // Methods
@@ -843,9 +895,112 @@ const handleFileUpload = async (event: Event) => {
 
 const uploadDocument = async () => {};
 
+const retryDocument = async (document: Document) => {
+  try {
+    await HayApi.documents.retryDocument.mutate({
+      documentId: document.id,
+    });
+
+    toast.success(`Retry started for "${document.title || document.name}"`);
+
+    // Update document status to processing
+    document.status = "processing";
+  } catch (error) {
+    console.error("Error retrying document:", error);
+    toast.error("Failed to retry document processing");
+  }
+};
+
+const viewFailedDocuments = () => {
+  statusFilter.value = "error";
+  applyFilters();
+};
+
+const retryAllFailed = async () => {
+  if (errorDocuments.value.length === 0) return;
+
+  retryingAll.value = true;
+  const totalCount = errorDocuments.value.length;
+  let successCount = 0;
+  let failureCount = 0;
+
+  const progressToastId = toast.info(`Retrying documents... 0/${totalCount}`, undefined, 0);
+
+  try {
+    for (const document of errorDocuments.value) {
+      try {
+        await HayApi.documents.retryDocument.mutate({
+          documentId: document.id,
+        });
+
+        document.status = "processing";
+        successCount++;
+        toast.update(progressToastId, `Retrying documents... ${successCount + failureCount}/${totalCount}`);
+      } catch (error) {
+        console.error(`Failed to retry document ${document.id}:`, error);
+        failureCount++;
+        toast.update(progressToastId, `Retrying documents... ${successCount + failureCount}/${totalCount}`);
+      }
+    }
+
+    toast.remove(progressToastId);
+
+    if (failureCount > 0) {
+      toast.warning(
+        `Retry started for ${successCount} document(s). Failed to retry ${failureCount} document(s).`,
+      );
+    } else {
+      toast.success(`Retry started for ${successCount} document(s)`);
+    }
+  } catch (error) {
+    console.error("Error retrying documents:", error);
+    toast.remove(progressToastId);
+    toast.error("Failed to retry documents. Please try again.");
+  } finally {
+    retryingAll.value = false;
+  }
+};
+
+// WebSocket setup
+const websocket = useWebSocket();
+
 // Lifecycle
 onMounted(async () => {
   await refreshData();
+
+  // Set up WebSocket connection and listeners
+  websocket.connect();
+
+  // Listen for document status updates
+  const unsubscribe = websocket.on("document:status-updated", (data: any) => {
+    console.log("[Documents] Received document status update:", data);
+
+    if (!data?.documentId || !data?.status) {
+      console.warn("[Documents] Invalid document status update payload:", data);
+      return;
+    }
+
+    // Find the document in the local list and update its status
+    const document = documents.value.find((doc) => doc.id === data.documentId);
+    if (document) {
+      const oldStatus = document.status;
+      document.status = data.status;
+
+      console.log(`[Documents] Updated document ${data.documentId} status: ${oldStatus} → ${data.status}`);
+
+      // Show toast notification for status changes
+      if (data.status === "published") {
+        toast.success(`Document "${document.title || document.name}" processed successfully`);
+      } else if (data.status === "error") {
+        toast.error(`Document "${document.title || document.name}" failed to process`);
+      }
+    }
+  });
+
+  // Clean up on unmount
+  onUnmounted(() => {
+    unsubscribe();
+  });
 });
 
 // SEO

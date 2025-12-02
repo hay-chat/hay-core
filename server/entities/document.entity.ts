@@ -16,6 +16,8 @@ export enum DocumentationStatus {
   PUBLISHED = "published",
   ARCHIVED = "archived",
   UNDER_REVIEW = "under_review",
+  PROCESSING = "processing",
+  ERROR = "error",
 }
 
 export enum DocumentVisibility {
@@ -81,6 +83,16 @@ export class Document extends OrganizationScopedEntity {
     model: string;
     contentLength: number;
     createdAt: Date;
+    [key: string]: unknown;
+  };
+
+  @Column({ type: "jsonb", nullable: true })
+  processingMetadata?: {
+    retryCount?: number;
+    lastError?: string;
+    lastAttemptAt?: Date;
+    jobId?: string;
+    processingStage?: "scraping" | "html_to_markdown" | "embedding";
     [key: string]: unknown;
   };
 

@@ -36,13 +36,20 @@ export class ConversationService {
       customerId = anonymousCustomer.id;
     }
 
-    // Determine agent_id: use provided, or fall back to organization's default agent
+    // Determine agent_id: use provided, or fall back to organization's default agent, or first agent
     let agentId = data.agentId || null;
     if (!agentId) {
       const { organizationRepository } = await import("../repositories/organization.repository");
       const org = await organizationRepository.findById(organizationId);
       if (org?.defaultAgentId) {
         agentId = org.defaultAgentId;
+      } else {
+        // Fallback to first agent if no default is set
+        const { agentRepository } = await import("../repositories/agent.repository");
+        const agents = await agentRepository.findByOrganization(organizationId);
+        if (agents && agents.length > 0) {
+          agentId = agents[0].id;
+        }
       }
     }
 

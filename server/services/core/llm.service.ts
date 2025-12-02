@@ -70,14 +70,20 @@ export class LLMService {
       };
 
       if (stream) {
-        const streamResponse = await this.openai.chat.completions.create({
-          ...requestConfig,
-          stream: true,
-        });
+        const streamResponse = await this.executeWithTimeout(
+          this.openai.chat.completions.create({
+            ...requestConfig,
+            stream: true,
+          }),
+          60000 // 60 second timeout for streaming
+        );
         return this.streamToAsyncIterable(streamResponse) as T;
       }
 
-      const response = await this.openai.chat.completions.create(requestConfig);
+      const response = await this.executeWithTimeout(
+        this.openai.chat.completions.create(requestConfig),
+        30000 // 30 second timeout for non-streaming
+      );
       const content = response.choices[0]?.message?.content;
 
       // Debugging: Log response information
@@ -88,6 +94,9 @@ export class LLMService {
       }
       return content as T;
     } catch (error) {
+      if (error instanceof Error && error.message.includes("timeout")) {
+        throw new Error(`OpenAI API timeout: ${error.message}`);
+      }
       throw new Error(`Failed to generate chat response: ${error}`);
     }
   }
@@ -96,15 +105,40 @@ export class LLMService {
     const { text, model = "text-embedding-3-small" } = options;
 
     try {
-      const response = await this.openai.embeddings.create({
-        model,
-        input: text,
-      });
+      const response = await this.executeWithTimeout(
+        this.openai.embeddings.create({
+          model,
+          input: text,
+        }),
+        30000 // 30 second timeout for embeddings
+      );
 
       return response.data[0]?.embedding || [];
     } catch (error) {
+      if (error instanceof Error && error.message.includes("timeout")) {
+        throw new Error(`OpenAI embedding timeout: ${error.message}`);
+      }
       throw new Error(`Failed to generate embedding: ${error}`);
     }
+  }
+
+  /**
+   * Executes a promise with a timeout
+   * @param promise The promise to execute
+   * @param timeoutMs Timeout in milliseconds (default: 30000ms / 30s)
+   * @returns The promise result
+   * @throws Error if the operation times out
+   */
+  private async executeWithTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Operation timeout after ${timeoutMs}ms`)),
+          timeoutMs
+        )
+      ),
+    ]);
   }
 
   private prepareMessages(

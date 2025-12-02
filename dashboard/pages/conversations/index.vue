@@ -159,7 +159,7 @@
             <TableRow
               v-for="conversation in paginatedConversations"
               :key="conversation.id"
-              class="cursor-pointer"
+              :class="['cursor-pointer', getWaitTimeClass(getWaitTime(conversation))]"
               @click="!bulkMode && viewConversation(conversation.id)"
             >
               <TableCell v-if="bulkMode" @click.stop>
@@ -176,6 +176,9 @@
                     </div>
                     <div class="text-xs text-neutral-muted">
                       {{ conversation.id.slice(0, 8) }}...
+                    </div>
+                    <div v-if="getWaitTime(conversation)" class="text-xs font-medium mt-1">
+                      Waiting {{ formatWaitTime(getWaitTime(conversation)!) }}
                     </div>
                   </div>
                 </div>
@@ -281,6 +284,11 @@ interface Conversation {
   created_at: string;
   updated_at: string;
   ended_at?: string;
+  lastMessageAt?: string;
+  messages?: Array<{
+    type: string;
+    created_at: string;
+  }>;
   metadata?: {
     satisfaction?: number;
   };
@@ -439,6 +447,79 @@ const getInitials = (user: any) => {
   return "?";
 };
 
+// Calculate wait time for a conversation
+const getWaitTime = (conversation: Conversation) => {
+  // Only calculate wait time for open conversations
+  if (conversation.status !== "open" && conversation.status !== "processing") {
+    return null;
+  }
+
+  // Check if last message was from customer
+  if (!conversation.messages || conversation.messages.length === 0) {
+    return null;
+  }
+
+  // Find last customer message
+  const lastCustomerMessage = [...conversation.messages]
+    .reverse()
+    .find((m) => m.type === "Customer");
+
+  if (!lastCustomerMessage) {
+    return null;
+  }
+
+  // Check if there's a bot response after the customer message
+  const customerMessageTime = new Date(lastCustomerMessage.created_at);
+  const lastBotMessage = [...conversation.messages]
+    .reverse()
+    .find((m) => m.type === "BotAgent" || m.type === "HumanAgent");
+
+  if (lastBotMessage) {
+    const botMessageTime = new Date(lastBotMessage.created_at);
+    if (botMessageTime > customerMessageTime) {
+      return null; // Bot already responded
+    }
+  }
+
+  // Calculate wait time in seconds
+  const now = new Date();
+  const waitTimeMs = now.getTime() - customerMessageTime.getTime();
+  const waitTimeSeconds = Math.floor(waitTimeMs / 1000);
+
+  // Only show if waiting more than 30 seconds
+  if (waitTimeSeconds < 30) {
+    return null;
+  }
+
+  return waitTimeSeconds;
+};
+
+// Get CSS class based on wait time
+const getWaitTimeClass = (waitTimeSeconds: number | null) => {
+  if (!waitTimeSeconds) return "";
+
+  if (waitTimeSeconds >= 120) {
+    return "conversation-waiting-critical";
+  } else if (waitTimeSeconds >= 60) {
+    return "conversation-waiting-urgent";
+  } else if (waitTimeSeconds >= 30) {
+    return "conversation-waiting-warning";
+  }
+
+  return "";
+};
+
+// Format wait time for display
+const formatWaitTime = (waitTimeSeconds: number) => {
+  if (waitTimeSeconds < 60) {
+    return `${waitTimeSeconds}s`;
+  } else {
+    const minutes = Math.floor(waitTimeSeconds / 60);
+    const seconds = waitTimeSeconds % 60;
+    return `${minutes}m ${seconds}s`;
+  }
+};
+
 const toggleBulkMode = () => {
   bulkMode.value = !bulkMode.value;
   if (!bulkMode.value) {
@@ -493,7 +574,7 @@ const fetchConversations = async () => {
     const response = await HayApi.conversations.list.query({
       pagination: { page: currentPage.value, limit: pageSize.value },
       sorting: { orderBy: "created_at", orderDirection: "desc" },
-      include: ["assignedUser"],
+      include: ["assignedUser", "messages"],
     });
 
     conversations.value = response.items as any;
@@ -625,3 +706,15 @@ useHead({
   ],
 });
 </script>
+
+<style scoped>
+.conversation-waiting-critical {
+  @apply bg-red-100;
+}
+.conversation-waiting-urgent {
+  @apply bg-orange-100;
+}
+.conversation-waiting-warning {
+  @apply bg-yellow-100;
+}
+</style>

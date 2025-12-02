@@ -13,10 +13,7 @@ class ConversationEventsService {
       const { redisService } = await import("./redis.service");
 
       if (!redisService.isConnected()) {
-        debugLog(
-          "conversation-events",
-          "Redis not connected, skipping conversation_created broadcast",
-        );
+        debugLog("websocket", "Redis not connected, skipping conversation_created broadcast");
         return;
       }
 
@@ -49,7 +46,7 @@ class ConversationEventsService {
 
       await redisService.publish("websocket:events", eventPayload);
     } catch (error) {
-      debugLog("conversation-events", "Failed to broadcast conversation_created:", error);
+      debugLog("websocket", "Failed to broadcast conversation_created:", error);
     }
   }
 
@@ -64,10 +61,7 @@ class ConversationEventsService {
       const { redisService } = await import("./redis.service");
 
       if (!redisService.isConnected()) {
-        debugLog(
-          "conversation-events",
-          "Redis not connected, skipping conversation_updated broadcast",
-        );
+        debugLog("websocket", "Redis not connected, skipping conversation_updated broadcast");
         return;
       }
 
@@ -115,7 +109,7 @@ class ConversationEventsService {
       };
 
       await redisService.publish("websocket:events", eventPayload);
-      debugLog("conversation-events", `Broadcasted conversation_updated for ${conversation.id}`);
+      debugLog("websocket", `Broadcasted conversation_updated for ${conversation.id}`);
 
       // If status changed, also broadcast to conversation-specific clients (e.g., webchat widget)
       if (changedFields?.includes("status")) {
@@ -132,7 +126,7 @@ class ConversationEventsService {
         await redisService.publish("websocket:events", statusChangePayload);
       }
     } catch (error) {
-      debugLog("conversation-events", "Failed to broadcast conversation_updated:", error);
+      debugLog("websocket", "Failed to broadcast conversation_updated:", error);
     }
   }
 
@@ -147,10 +141,7 @@ class ConversationEventsService {
       const { redisService } = await import("./redis.service");
 
       if (!redisService.isConnected()) {
-        debugLog(
-          "conversation-events",
-          "Redis not connected, skipping conversation_deleted broadcast",
-        );
+        debugLog("websocket", "Redis not connected, skipping conversation_deleted broadcast");
         return;
       }
 
@@ -164,9 +155,9 @@ class ConversationEventsService {
       };
 
       await redisService.publish("websocket:events", eventPayload);
-      debugLog("conversation-events", `Broadcasted conversation_deleted for ${conversationId}`);
+      debugLog("websocket", `Broadcasted conversation_deleted for ${conversationId}`);
     } catch (error) {
-      console.error("[ConversationEventsService] Failed to broadcast conversation_deleted:", error);
+      debugLog("websocket", "Failed to broadcast conversation_deleted:", error);
     }
   }
 }
