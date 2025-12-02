@@ -268,6 +268,50 @@ async function startServer() {
     }
   }
 
+  // Plugin upload endpoints
+  const multer = await import("multer");
+  const { withAdminAuth } = await import("@server/middleware/auth");
+  const { pluginUploadService } = await import("@server/services/plugin-upload.service");
+
+  // Multer configuration for plugin uploads
+  const pluginUpload = multer.default({
+    storage: multer.default.memoryStorage(),
+    limits: {
+      fileSize: config.plugins.maxUploadSizeMB * 1024 * 1024,
+      files: 1,
+    },
+    fileFilter: (req: any, file: any, cb: any) => {
+      if (file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed") {
+        cb(null, true);
+      } else {
+        cb(new Error("Only ZIP files are allowed"));
+      }
+    },
+  });
+
+  // Plugin upload routes
+  server.post(
+    "/v1/plugins/upload",
+    withAdminAuth,
+    pluginUpload.single("plugin"),
+    async (req, res) => {
+      await pluginUploadService.handleUpload(req, res);
+    },
+  );
+
+  server.put(
+    "/v1/plugins/:pluginId",
+    withAdminAuth,
+    pluginUpload.single("plugin"),
+    async (req, res) => {
+      await pluginUploadService.handleUpdate(req, res);
+    },
+  );
+
+  server.delete("/v1/plugins/:pluginId", withAdminAuth, async (req, res) => {
+    await pluginUploadService.handleDelete(req, res);
+  });
+
   // Create dynamic router with plugin routes (after plugins are loaded)
   const { createV1Router } = await import("@server/routes/v1");
   const dynamicRouter = createV1Router();

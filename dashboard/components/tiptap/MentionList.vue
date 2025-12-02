@@ -11,7 +11,7 @@
       <button
         v-for="(item, index) in items"
         :key="item.id"
-        :ref="(el) => setItemRef(el, index)"
+        :ref="setItemRef(index)"
         type="button"
         class="mention-item"
         :class="{
@@ -64,7 +64,7 @@ const apiBaseUrl = getApiUrl();
 const selectedIndex = ref(0);
 const itemRefs = ref<(HTMLElement | null)[]>([]);
 
-const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
+const setItemRef = (index: number) => (el: Element | ComponentPublicInstance | null) => {
   if (el) {
     itemRefs.value[index] = el as HTMLElement;
   }

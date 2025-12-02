@@ -180,6 +180,11 @@ export const config = {
     exportRetentionDays: parseInt(process.env.PRIVACY_EXPORT_RETENTION_DAYS || "7", 10),
     verificationExpiryHours: parseInt(process.env.PRIVACY_VERIFICATION_EXPIRY_HOURS || "24", 10),
   },
+
+  plugins: {
+    maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
+    allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
+  },
 } as const;
 
 export type Config = typeof config;

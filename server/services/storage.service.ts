@@ -1,9 +1,8 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
 import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
-import mime from "mime-types";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
 
@@ -32,6 +31,10 @@ const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   "application/vnd.oasis.opendocument.text": [".odt"],
   "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
   "application/vnd.oasis.opendocument.presentation": [".odp"],
+
+  // Archives
+  "application/zip": [".zip"],
+  "application/x-zip-compressed": [".zip"],
 };
 
 export interface UploadOptions {
@@ -54,15 +57,35 @@ export class StorageService {
 
   constructor() {
     if (this.isS3Configured()) {
+      // Extract regional endpoint from bucket-specific endpoint if needed
+      const endpoint = this.getS3ClientEndpoint();
+
       this.s3Client = new S3Client({
-        endpoint: config.storage.s3.endpoint!,
+        endpoint,
         region: config.storage.s3.region!,
         credentials: {
           accessKeyId: config.storage.s3.accessKeyId!,
           secretAccessKey: config.storage.s3.secretAccessKey!,
         },
+        forcePathStyle: false, // Use virtual-hosted-style URLs
       });
     }
+  }
+
+  /**
+   * Get S3 client endpoint (regional endpoint without bucket name)
+   */
+  private getS3ClientEndpoint(): string {
+    const endpoint = config.storage.s3.endpoint!;
+    const bucket = config.storage.s3.bucket!;
+
+    // If endpoint includes bucket name (e.g., https://bucket.region.digitaloceanspaces.com)
+    // extract the regional endpoint (e.g., https://region.digitaloceanspaces.com)
+    if (endpoint.includes(`${bucket}.`)) {
+      return endpoint.replace(`${bucket}.`, "");
+    }
+
+    return endpoint;
   }
 
   /**
@@ -124,6 +147,37 @@ export class StorageService {
 
     // 3. Delete database record
     await upload.remove();
+  }
+
+  /**
+   * Specialized upload for plugin ZIP files
+   */
+  async uploadPluginZip(options: {
+    buffer: Buffer;
+    originalName: string;
+    pluginId: string;
+    organizationId: string;
+    uploadedById: string;
+    maxSize?: number;
+  }): Promise<UploadResult> {
+    const maxSize = options.maxSize || config.plugins.maxUploadSizeMB * 1024 * 1024;
+
+    // Validate ZIP
+    this.validateFile("application/zip", options.buffer.length, maxSize);
+
+    // Fixed folder structure for easy management
+    const folder = `plugin-zips/${options.organizationId}/${options.pluginId}`;
+
+    // Upload ZIP
+    return await this.upload({
+      buffer: options.buffer,
+      originalName: options.originalName,
+      mimeType: "application/zip",
+      folder,
+      organizationId: options.organizationId,
+      uploadedById: options.uploadedById,
+      maxSize,
+    });
   }
 
   /**
@@ -233,6 +287,7 @@ export class StorageService {
         Key: filePath,
         Body: buffer,
         ContentType: mimeType,
+        ACL: "public-read", // Make files publicly accessible
       },
     });
 
@@ -266,3 +321,5 @@ export class StorageService {
     await this.s3Client.send(command);
   }
 }
+
+export const storageService = new StorageService();

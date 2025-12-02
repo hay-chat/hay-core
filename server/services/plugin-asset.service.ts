@@ -81,7 +81,6 @@ export class PluginAssetService {
         res.send(content);
         return;
       } catch (error) {
-        console.warn(`Thumbnail not found for plugin ${pluginName}:`, error);
         res.status(404).json({ error: "Thumbnail not found" });
         return;
       }
@@ -130,7 +129,6 @@ export class PluginAssetService {
       res.send(content);
     } catch (error) {
       // If thumbnail doesn't exist, return 404
-      console.warn(`Thumbnail not found for plugin ${pluginName}:`, error);
       res.status(404).json({ error: "Thumbnail not found" });
     }
   }

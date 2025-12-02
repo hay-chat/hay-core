@@ -5,10 +5,25 @@
   >
     <!-- Header -->
     <template #header>
-      <Button variant="outline" size="sm" @click="refreshPlugins">
-        <RefreshCcw class="h-4 w-4 mr-2" />
-        Refresh
-      </Button>
+      <div class="flex space-x-2">
+        <Button v-if="userStore.isAdmin" size="sm" @click="navigateToUpload">
+          <Upload class="h-4 w-4 mr-2" />
+          Upload Plugin
+        </Button>
+        <Button
+          v-if="userStore.isAdmin && customPluginsCount > 0"
+          variant="outline"
+          size="sm"
+          @click="navigateToManage"
+        >
+          <Settings class="h-4 w-4 mr-2" />
+          Manage Custom ({{ customPluginsCount }})
+        </Button>
+        <Button variant="outline" size="sm" @click="refreshPlugins">
+          <RefreshCcw class="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
     </template>
 
     <!-- Stats Cards -->
@@ -114,9 +129,14 @@
                 />
               </div>
               <div>
-                <CardTitle class="text-lg">
-                  {{ plugin.name }}
-                </CardTitle>
+                <div class="flex items-center space-x-2">
+                  <CardTitle class="text-lg">
+                    {{ plugin.name }}
+                  </CardTitle>
+                  <Badge v-if="plugin.isCustom" variant="outline" class="text-xs">
+                    Custom
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
@@ -190,6 +210,18 @@
                   {{ disablingPlugin === plugin.id ? "Removing..." : "Remove" }}
                 </Button>
               </template>
+
+              <!-- Delete button for custom plugins (admin only) -->
+              <Button
+                v-if="plugin.isCustom && userStore.isAdmin"
+                variant="destructive"
+                size="sm"
+                :disabled="deletingPlugin === plugin.id"
+                @click="deletePlugin(plugin.id)"
+              >
+                <Trash2 class="h-3 w-3 mr-1" />
+                {{ deletingPlugin === plugin.id ? "Deleting..." : "Delete" }}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -213,8 +245,12 @@ import {
   FileText,
   Zap,
   Database,
+  Upload,
+  Trash2,
 } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
+import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
 
@@ -224,15 +260,23 @@ const searchQuery = ref("");
 const selectedCategory = ref("all");
 const enablingPlugin = ref<string | null>(null);
 const disablingPlugin = ref<string | null>(null);
+const deletingPlugin = ref<string | null>(null);
 
-// Use app store for plugins
+// Use stores
 const appStore = useAppStore();
+const authStore = useAuthStore();
+const userStore = useUserStore();
 
 // Router
 const router = useRouter();
 
 // Get available (non-enabled) plugins for marketplace
 const availablePlugins = computed(() => appStore.availablePlugins);
+
+// Count of custom plugins
+const customPluginsCount = computed(() => {
+  return appStore.plugins.filter((p) => p.isCustom).length;
+});
 
 // Stats computed from all plugins (including enabled ones for stats display)
 const stats = computed(() => {
@@ -398,6 +442,50 @@ const disablePlugin = async (pluginId: string) => {
 
 const navigateToSettings = (pluginId: string) => {
   router.push(`/integrations/plugins/${pluginId}`);
+};
+
+const navigateToUpload = () => {
+  router.push("/integrations/plugins/upload");
+};
+
+const navigateToManage = () => {
+  router.push("/integrations/plugins/manage");
+};
+
+const deletePlugin = async (pluginId: string) => {
+  deletingPlugin.value = pluginId;
+  const { toast } = useToast();
+  const { getApiUrl } = useDomain();
+
+  // Confirm deletion
+  if (!confirm(`Are you sure you want to delete this plugin? This action cannot be undone.`)) {
+    deletingPlugin.value = null;
+    return;
+  }
+
+  try {
+    const response = await fetch(getApiUrl(`/v1/plugins/${pluginId}`), {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${authStore.tokens?.accessToken}`,
+        "x-organization-id": userStore.activeOrganizationId!,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete plugin");
+    }
+
+    toast.success(`Plugin deleted successfully`);
+    await appStore.fetchPlugins();
+  } catch (error: unknown) {
+    console.error("Failed to delete plugin:", error);
+    const errorMessage = (error as any)?.message || "Failed to delete plugin";
+    toast.error(errorMessage);
+  } finally {
+    deletingPlugin.value = null;
+  }
 };
 
 // Lifecycle

@@ -5,11 +5,19 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
 import type { HayPluginManifest } from "../types/plugin.types";
+import { Organization } from "./organization.entity";
+import { Upload } from "./upload.entity";
+import { User } from "./user.entity";
 
 @Entity("plugin_registry")
 @Index(["pluginId"], { unique: true })
+@Index(["sourceType"])
+@Index(["organizationId"])
+@Index(["organizationId", "sourceType"])
 export class PluginRegistry {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -52,6 +60,37 @@ export class PluginRegistry {
 
   @Column({ type: "integer", default: 10 })
   maxConcurrentInstances!: number;
+
+  // Custom plugin fields
+  @Column({ type: "varchar", length: 50, default: "core" })
+  sourceType!: "core" | "custom";
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId?: string;
+
+  @ManyToOne(() => Organization, { onDelete: "CASCADE", nullable: true })
+  @JoinColumn({ name: "organization_id" })
+  organization?: Organization;
+
+  @Column({ type: "varchar", length: 1000, nullable: true })
+  zipFilePath?: string;
+
+  @Column({ type: "uuid", nullable: true })
+  zipUploadId?: string;
+
+  @ManyToOne(() => Upload, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "zip_upload_id" })
+  zipUpload?: Upload;
+
+  @Column({ type: "uuid", nullable: true })
+  uploadedById?: string;
+
+  @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "uploaded_by_id" })
+  uploadedBy?: User;
+
+  @Column({ type: "timestamptz", nullable: true })
+  uploadedAt?: Date;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;

@@ -9,7 +9,7 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginManagerService {
   private pluginsDir: string;
-  private registry: Map<string, PluginRegistry> = new Map();
+  public registry: Map<string, PluginRegistry> = new Map();
   private ajv: Ajv;
   private manifestSchema: Record<string, unknown> | null = null;
 
@@ -60,14 +60,33 @@ export class PluginManagerService {
    */
   private async discoverPlugins(): Promise<void> {
     try {
-      const entries = await fs.readdir(this.pluginsDir, {
-        withFileTypes: true,
-      });
+      // Scan core plugins
+      const coreDir = path.join(this.pluginsDir, "core");
+      const coreExists = await fs
+        .access(coreDir)
+        .then(() => true)
+        .catch(() => false);
 
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name !== "base") {
-          const pluginPath = path.join(this.pluginsDir, entry.name);
-          await this.registerPlugin(pluginPath);
+      if (coreExists) {
+        await this.scanPluginDirectory(coreDir, "core", null);
+      }
+
+      // Scan custom plugins for all organizations
+      const customDir = path.join(this.pluginsDir, "custom");
+      const customExists = await fs
+        .access(customDir)
+        .then(() => true)
+        .catch(() => false);
+
+      if (customExists) {
+        const orgDirs = await fs.readdir(customDir, { withFileTypes: true });
+
+        for (const orgDir of orgDirs) {
+          if (orgDir.isDirectory() && !orgDir.name.startsWith(".")) {
+            const organizationId = orgDir.name;
+            const orgPath = path.join(customDir, organizationId);
+            await this.scanPluginDirectory(orgPath, "custom", organizationId);
+          }
         }
       }
     } catch (error) {
@@ -76,9 +95,44 @@ export class PluginManagerService {
   }
 
   /**
+   * Scan a specific directory for plugins
+   */
+  private async scanPluginDirectory(
+    directory: string,
+    sourceType: "core" | "custom",
+    organizationId: string | null,
+  ): Promise<void> {
+    try {
+      const dirExists = await fs
+        .access(directory)
+        .then(() => true)
+        .catch(() => false);
+
+      if (!dirExists) {
+        return;
+      }
+
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory() && !entry.name.startsWith(".")) {
+          const pluginPath = path.join(directory, entry.name);
+          await this.registerPlugin(pluginPath, sourceType, organizationId);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to scan plugin directory ${directory}:`, error);
+    }
+  }
+
+  /**
    * Register a single plugin from its directory
    */
-  private async registerPlugin(pluginPath: string): Promise<void> {
+  public async registerPlugin(
+    pluginPath: string,
+    sourceType: "core" | "custom",
+    organizationId: string | null,
+  ): Promise<void> {
     try {
       // First, try to load manifest.json
       const jsonManifestPath = path.join(pluginPath, "manifest.json");
@@ -133,17 +187,19 @@ export class PluginManagerService {
       // Calculate checksum of plugin files
       const checksum = await this.calculatePluginChecksum(pluginPath);
 
-      // Extract the plugin directory name from the full path
-      const pluginDirName = path.basename(pluginPath);
+      // Calculate relative plugin path from plugins root
+      const relativePath = path.relative(this.pluginsDir, pluginPath);
 
-      // Upsert plugin in registry
+      // Upsert plugin in registry with source metadata
       const plugin = await pluginRegistryRepository.upsertPlugin({
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
-        pluginPath: pluginDirName, // Store the actual directory name
+        pluginPath: relativePath, // e.g., "core/stripe" or "custom/{orgId}/{pluginId}"
         manifest: manifest as any,
         checksum,
+        sourceType,
+        organizationId: organizationId || undefined,
       });
 
       this.registry.set(manifest.id, plugin);
@@ -345,13 +401,49 @@ export class PluginManagerService {
    */
   async getPluginFolderName(pluginId: string): Promise<string | null> {
     try {
-      const entries = await fs.readdir(this.pluginsDir, {
-        withFileTypes: true,
-      });
+      // First check if we have it in registry (faster)
+      const plugin = this.registry.get(pluginId);
+      if (plugin && plugin.pluginPath) {
+        return plugin.pluginPath;
+      }
+
+      // Fallback: scan directories
+      const dirsToScan = [
+        path.join(this.pluginsDir, "core"),
+        path.join(this.pluginsDir, "custom"),
+      ];
+
+      for (const baseDir of dirsToScan) {
+        const baseDirExists = await fs
+          .access(baseDir)
+          .then(() => true)
+          .catch(() => false);
+
+        if (!baseDirExists) continue;
+
+        const result = await this.scanForPluginId(baseDir, pluginId);
+        if (result) {
+          return result;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Failed to find folder for plugin ${pluginId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Recursively scan directory for a specific plugin ID
+   */
+  private async scanForPluginId(directory: string, pluginId: string): Promise<string | null> {
+    try {
+      const entries = await fs.readdir(directory, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.isDirectory() && entry.name !== "base") {
-          const pluginPath = path.join(this.pluginsDir, entry.name);
+        if (entry.isDirectory() && !entry.name.startsWith(".")) {
+          const pluginPath = path.join(directory, entry.name);
 
           // Check for manifest.json first
           const jsonManifestPath = path.join(pluginPath, "manifest.json");
@@ -390,14 +482,24 @@ export class PluginManagerService {
           }
 
           if (manifest && manifest.id === pluginId) {
-            return entry.name;
+            return path.relative(this.pluginsDir, pluginPath);
+          }
+
+          // Recursively search subdirectories (for custom org folders)
+          const subdirs = await fs.readdir(pluginPath, { withFileTypes: true });
+          const hasSubdirs = subdirs.some((d) => d.isDirectory() && !d.name.startsWith("."));
+
+          if (hasSubdirs) {
+            const result = await this.scanForPluginId(pluginPath, pluginId);
+            if (result) {
+              return result;
+            }
           }
         }
       }
 
       return null;
     } catch (error) {
-      console.error(`Failed to find folder for plugin ${pluginId}:`, error);
       return null;
     }
   }

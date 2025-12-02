@@ -15,7 +15,7 @@
       <button
         v-for="(tool, index) in mcpTools"
         :key="tool.id"
-        :ref="(el) => setItemRef(el, index)"
+        :ref="setItemRef(index)"
         type="button"
         class="slash-command-item"
         :class="{ active: index === selectedIndex }"
@@ -52,7 +52,7 @@
       <button
         v-for="(doc, index) in documents"
         :key="doc.id"
-        :ref="(el) => setItemRef(el, index)"
+        :ref="setItemRef(index)"
         type="button"
         class="slash-command-item"
         :class="{ active: index === selectedIndex }"
@@ -78,7 +78,7 @@
         <button
           v-for="(item, index) in items"
           :key="item.title"
-          :ref="(el) => setItemRef(el, index)"
+          :ref="setItemRef(index)"
           type="button"
           class="slash-command-item"
           :class="{ active: index === selectedIndex }"
@@ -137,7 +137,7 @@ const selectedIndex = ref(0);
 const showSubmenu = ref<"action" | "document" | null>(null);
 const itemRefs = ref<(HTMLElement | null)[]>([]);
 
-const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
+const setItemRef = (index: number) => (el: Element | ComponentPublicInstance | null) => {
   if (el) {
     itemRefs.value[index] = el as HTMLElement;
   }

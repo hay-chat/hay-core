@@ -65,6 +65,39 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       return await this.getRepository().save(entity);
     }
   }
+
+  /**
+   * Find all plugins visible to an organization (core + org's custom)
+   */
+  override async findByOrganization(organizationId: string): Promise<PluginRegistry[]> {
+    return this.getRepository().find({
+      where: [{ sourceType: "core" }, { organizationId, sourceType: "custom" }],
+      order: { name: "ASC" },
+    });
+  }
+
+  /**
+   * Find a specific custom plugin by pluginId and org
+   */
+  async findCustomByPluginId(
+    pluginId: string,
+    organizationId: string,
+  ): Promise<PluginRegistry | null> {
+    return this.getRepository().findOne({
+      where: { pluginId, organizationId, sourceType: "custom" },
+    });
+  }
+
+  /**
+   * Delete a custom plugin
+   */
+  async deleteCustomPlugin(pluginId: string, organizationId: string): Promise<void> {
+    await this.getRepository().delete({
+      pluginId,
+      organizationId,
+      sourceType: "custom",
+    });
+  }
 }
 
 export const pluginRegistryRepository = new PluginRegistryRepository();

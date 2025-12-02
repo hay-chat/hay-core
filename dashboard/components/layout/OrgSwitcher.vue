@@ -38,12 +38,6 @@
             <p class="font-semibold truncate">
               {{ userStore.activeOrganization.name }}
             </p>
-            <span
-              v-if="userStore.activeOrganization.role"
-              class="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium capitalize"
-            >
-              {{ userStore.activeOrganization.role }}
-            </span>
           </div>
         </div>
         <ChevronsUpDown class="ml-auto size-4 flex-shrink-0" />

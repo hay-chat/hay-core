@@ -49,3 +49,9 @@ node_modules/
 
 # Privacy Export Files (contain sensitive user data)
 server/exports/*.json
+
+# Custom uploaded plugins (organization-specific)
+plugins/custom/
+
+# Plugin ZIP uploads
+server/uploads/plugin-zips/

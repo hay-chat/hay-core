@@ -21,10 +21,11 @@ interface PluginHealthCheckResult {
 }
 
 /**
- * Get all available plugins
+ * Get all available plugins (core + organization's custom plugins)
  */
 export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
-  const plugins = pluginManagerService.getAllPlugins();
+  // Get plugins visible to this organization (core + org's custom)
+  const plugins = await pluginRegistryRepository.findByOrganization(ctx.organizationId!);
 
   // Get enabled instances for this organization
   const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
@@ -54,6 +55,10 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         hasCustomUI: !!manifest.ui?.configuration,
         capabilities: manifest.capabilities,
         features: manifest.capabilities?.chat_connector?.features || {},
+        sourceType: plugin.sourceType,
+        isCustom: plugin.sourceType === "custom",
+        uploadedAt: plugin.uploadedAt,
+        uploadedBy: plugin.uploadedBy,
       };
 
       return result;
@@ -116,6 +121,14 @@ export const enablePlugin = authenticatedProcedure
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Validate organization access for custom plugins
+    if (plugin.sourceType === "custom" && plugin.organizationId !== ctx.organizationId) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Cannot enable plugins from other organizations",
       });
     }
 

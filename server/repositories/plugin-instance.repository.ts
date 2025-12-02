@@ -60,6 +60,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
+  async findByPlugin(pluginRegistryId: string): Promise<PluginInstance[]> {
+    return this.getRepository().find({
+      where: { pluginId: pluginRegistryId },
+      relations: ["plugin", "organization"],
+    });
+  }
+
   async updateStatus(id: string, status: PluginInstance["status"], error?: string): Promise<void> {
     const updates: Partial<PluginInstance> = { status };
 
