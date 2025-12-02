@@ -25,6 +25,35 @@ import { documentRetryService } from "@server/services/document-retry.service";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
+  getById: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
+    .input(
+      z.object({
+        id: z.string().uuid(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const document = await documentRepository.findById(input.id);
+
+      if (!document || document.organizationId !== ctx.organizationId) {
+        throw new Error("Document not found");
+      }
+
+      return {
+        id: document.id,
+        title: document.title,
+        description: document.description,
+        content: document.content,
+        type: document.type,
+        status: document.status,
+        visibility: document.visibility,
+        tags: document.tags,
+        categories: document.categories,
+        sourceUrl: document.sourceUrl,
+        importMethod: document.importMethod,
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt,
+      };
+    }),
   search: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
