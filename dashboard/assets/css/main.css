@@ -30,6 +30,12 @@
   }
 }
 
+code {
+  @apply bg-muted text-foreground px-1.5 py-0.5 rounded-sm border border-neutral-300;
+  font-family: monospace;
+  box-shadow: 0 1px 0 0 var(--color-neutral-100);
+  font-size: 0.875em;
+}
 .icon {
   height: 1em;
   width: 1em;

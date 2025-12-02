@@ -15,6 +15,10 @@ interface Plugin {
   hasCustomUI: boolean;
   capabilities?: Record<string, unknown>;
   features?: Record<string, unknown>;
+  sourceType?: "core" | "custom";
+  isCustom?: boolean;
+  uploadedAt?: string;
+  uploadedBy?: string;
 }
 
 interface AppState {
