@@ -99,6 +99,33 @@ export class Conversation {
   @Column({ type: "varchar", length: 255, nullable: true })
   processing_locked_by!: string | null;
 
+  @Column({ type: "int", default: 0 })
+  processing_attempts!: number;
+
+  @Column({ type: "text", nullable: true })
+  last_processing_error!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  last_processing_error_at!: Date | null;
+
+  @Column({ type: "int", default: 0 })
+  processing_error_count!: number;
+
+  @Column({ type: "timestamptz", nullable: true })
+  last_recovery_attempt_at!: Date | null;
+
+  @Column({ type: "int", default: 0 })
+  recovery_attempts!: number;
+
+  @Column({ type: "boolean", default: false })
+  is_stuck!: boolean;
+
+  @Column({ type: "timestamptz", nullable: true })
+  stuck_detected_at!: Date | null;
+
+  @Column({ type: "text", nullable: true })
+  stuck_reason!: string | null;
+
   @Column({ type: "uuid", nullable: true })
   customer_id!: string | null;
 
@@ -822,6 +849,68 @@ Translated message:`;
     return this.addMessage({
       content: greetingText,
       type: "BotAgent",
+    });
+  }
+
+  async addInitialAgentInstructions(): Promise<Message | null> {
+    // Return early if no agent assigned
+    if (!this.agent_id) {
+      debugLog("conversation", "No agent assigned, skipping agent instructions");
+      return null;
+    }
+
+    // Fetch agent details
+    const { agentRepository } = await import("../../repositories/agent.repository");
+    const agent = await agentRepository.findById(this.agent_id);
+
+    if (!agent) {
+      debugLog("conversation", `Agent ${this.agent_id} not found, skipping instructions`, {
+        level: "warn",
+      });
+      return null;
+    }
+
+    // Build agent instruction content (same format as updateAgent)
+    let content = "";
+
+    if (agent.name) {
+      content += `You are the agent: ${agent.name}`;
+    }
+
+    if (agent.tone) {
+      content += content ? `\n` : "";
+      content += `Your tone should be: ${agent.tone}`;
+    }
+
+    if (agent.avoid) {
+      content += content ? `\n` : "";
+      content += `You should avoid: ${agent.avoid}`;
+    }
+
+    // Handle Tiptap-formatted instructions
+    if (agent.instructions) {
+      const analysis = analyzeTiptapInstructions(agent.instructions as any);
+
+      if (analysis.formattedText) {
+        content += content ? `\n` : "";
+        content += `Here are some general instructions: ${analysis.formattedText}`;
+      }
+    }
+
+    // Skip if no content
+    if (!content) {
+      debugLog("conversation", "Agent has no instructions to add");
+      return null;
+    }
+
+    return this.addMessage({
+      content,
+      type: "System",
+      metadata: {
+        isAgentInstructions: true,
+        agentId: agent.id,
+        agentName: agent.name,
+      },
     });
   }
 

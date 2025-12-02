@@ -20,6 +20,8 @@ import { jobRepository } from "@server/repositories/job.repository";
 import { JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Document } from "@server/entities/document.entity";
 import { jobQueueService } from "@server/services/job-queue.service";
+import { documentProcessorService } from "@server/services/document-processor.service";
+import { documentRetryService } from "@server/services/document-retry.service";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -587,6 +589,28 @@ export const documentsRouter = t.router({
       plugins: [], // TODO: Load from plugin system
     };
   }),
+  retryDocument: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        documentId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new Error("Organization ID is required");
+      }
+
+      const success = await documentRetryService.manualRetry(input.documentId, ctx.organizationId);
+
+      if (!success) {
+        throw new Error("Failed to retry document processing");
+      }
+
+      return {
+        success: true,
+        message: "Document queued for retry",
+      };
+    }),
 });
 
 // Async function to process web import
@@ -613,13 +637,19 @@ async function processWebImport(
         title: page.title || new URL(page.url).pathname,
         content: `Processing content from ${page.url}...`,
         type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
-        status: DocumentationStatus.DRAFT, // Start as draft while processing
+        status: DocumentationStatus.PROCESSING, // Mark as processing
         visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
         tags: metadata?.tags as string[] | undefined,
         categories: metadata?.categories as string[] | undefined,
         importMethod: ImportMethod.WEB,
         sourceUrl: page.url,
         organizationId,
+        processingMetadata: {
+          retryCount: 0,
+          lastAttemptAt: new Date(),
+          jobId,
+          processingStage: "scraping",
+        },
       });
       placeholderDocuments.push(doc);
     }
@@ -678,64 +708,33 @@ async function processWebImport(
           failedPages: failedPages.length,
         });
 
-        // Convert HTML to markdown with timeout
-        const processed = await Promise.race([
-          htmlProcessor.process(Buffer.from(page.html), page.title),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Processing timeout")), 30000)
-          ),
-        ]) as { content: string; metadata: Record<string, unknown> };
-
-        // Update placeholder document with actual content and metadata
-        const document = await documentRepository.update(placeholderDoc.id, organizationId, {
-          title: page.title || placeholderDoc.title,
-          content: processed.content,
-          type: (metadata?.type as DocumentationType) || placeholderDoc.type,
-          status: (metadata?.status as DocumentationStatus) || DocumentationStatus.PUBLISHED,
-          visibility: (metadata?.visibility as DocumentVisibility) || placeholderDoc.visibility,
-          tags: metadata?.tags as string[] | undefined,
-          categories: metadata?.categories as string[] | undefined,
-          lastCrawledAt: page.crawledAt,
+        // Process document using the document processor service
+        const result = await documentProcessorService.processWebDocument({
+          documentId: placeholderDoc.id,
+          organizationId,
+          pageUrl: page.url,
+          htmlContent: page.html,
+          pageTitle: page.title || placeholderDoc.title,
+          metadata: {
+            type: (metadata?.type as DocumentationType) || placeholderDoc.type,
+            status: (metadata?.status as DocumentationStatus),
+            tags: metadata?.tags as string[] | undefined,
+            categories: metadata?.categories as string[] | undefined,
+          },
+          retryCount: 0,
+          jobId,
         });
 
-        if (!document) {
-          console.error(`Failed to update document ${placeholderDoc.id}`);
-          failedPages.push({ url: page.url, error: "Failed to update document in database" });
-          continue;
-        }
-
-        // Create embeddings with error handling
-        try {
-          if (!vectorStoreService.initialized) {
-            await vectorStoreService.initialize();
-          }
-
-          const chunks = splitTextIntoChunks(processed.content, {
-            chunkSize: 1000,
-            chunkOverlap: 200,
-          });
-
-          const vectorChunks = chunks.map((content, index) => ({
-            content,
-            metadata: createChunkMetadata(index, chunks.length, {
-              documentId: document.id,
-              documentTitle: document.title,
-              documentType: document.type,
-              sourceUrl: page.url,
-            }),
-          }));
-
-          await vectorStoreService.addChunks(organizationId, document.id, vectorChunks);
-        } catch (embeddingError) {
-          console.error(`Failed to create embeddings for ${page.url}:`, embeddingError);
-          // Document is saved but without embeddings - mark as partial success
-          await documentRepository.update(document.id, organizationId, {
-            content: `${document.content}\n\n_Note: Vector embeddings failed to generate. Search may be limited for this document._`,
+        if (result.success && result.document) {
+          documents.push(result.document);
+          successfulPages.push(page.url);
+        } else {
+          // Processing failed, track the failure
+          failedPages.push({
+            url: page.url,
+            error: result.error || "Unknown processing error",
           });
         }
-
-        documents.push(document);
-        successfulPages.push(page.url);
 
         // Update progress after page completion
         await jobQueueService.updateJobProgress(jobId, organizationId, {
@@ -750,15 +749,7 @@ async function processWebImport(
         console.error(`Failed to process page ${page.url}:`, errorMessage);
         failedPages.push({ url: page.url, error: errorMessage });
 
-        // Update placeholder document to show error
-        const placeholderDoc = placeholderDocuments.find((d) => d.sourceUrl === page.url);
-        if (placeholderDoc) {
-          await documentRepository.update(placeholderDoc.id, organizationId, {
-            content: `Failed to import content from ${page.url}\n\nError: ${errorMessage}`,
-            status: DocumentationStatus.DRAFT, // Keep as draft to indicate issue
-          });
-        }
-
+        // Error is already tracked in document metadata by the processor service
         // Continue processing other pages instead of failing entire job
         continue;
       }

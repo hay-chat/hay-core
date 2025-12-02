@@ -9,6 +9,7 @@
     "build:prod": "NODE_ENV=production nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",
+    "generate:trpc": "npx tsx scripts/generate-trpc-types.ts",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare",
     "start": "cd .output && node server/index.mjs"

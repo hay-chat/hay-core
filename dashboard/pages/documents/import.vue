@@ -989,15 +989,8 @@ onMounted(async () => {
 
 // Clean up on unmount
 onBeforeUnmount(async () => {
-  // Cancel active job if still processing
-  if (currentJobId.value && (isDiscovering.value || isProcessing.value)) {
-    try {
-      console.log("Cancelling job on unmount:", currentJobId.value);
-      await Hay.documents.cancelJob.mutate({ jobId: currentJobId.value });
-    } catch (error) {
-      console.error("Failed to cancel job:", error);
-    }
-  }
+  // NOTE: We DO NOT cancel the job here anymore - we want processing to continue in the background
+  // The retry service will handle any stuck jobs, and the user can see progress on the documents page
 
   // Clear polling interval
   if (pollInterval.value) {
@@ -1010,7 +1003,7 @@ onBeforeUnmount(async () => {
   document.removeEventListener("dragleave", handleGlobalDragLeave);
   document.removeEventListener("drop", handleGlobalDrop);
 
-  // Close WebSocket connection
+  // Close WebSocket connection (but keep the job running)
   if (ws.value) {
     ws.value.close();
     ws.value = null;

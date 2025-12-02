@@ -121,6 +121,13 @@ export const config = {
     inactivityInterval: parseInt(process.env.CONVERSATION_INACTIVITY_INTERVAL || "1800000", 10),
   },
 
+  staleMessageDetection: {
+    enabled: process.env.STALE_MESSAGE_DETECTION_ENABLED !== "false",
+    thresholdMs: 30000, // Fixed: 30 seconds
+    checkIntervalMs: 5000, // Fixed: 5 seconds
+    maxRecoveryAttempts: 5, // Fixed: 5 attempts before escalation
+  },
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY || "",
     models: {
