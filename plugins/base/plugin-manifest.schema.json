@@ -174,7 +174,7 @@
                     "oauth": {
                       "type": "object",
                       "description": "OAuth 2.0 configuration",
-                      "required": ["authorizationUrl", "tokenUrl", "scopes"],
+                      "required": ["authorizationUrl", "tokenUrl"],
                       "properties": {
                         "authorizationUrl": {
                           "type": "string",
@@ -186,7 +186,14 @@
                         },
                         "scopes": {
                           "type": "array",
-                          "description": "OAuth scopes to request",
+                          "description": "Required OAuth scopes to request",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "optionalScopes": {
+                          "type": "array",
+                          "description": "Optional OAuth scopes to request (sent as separate 'optional_scope' parameter)",
                           "items": {
                             "type": "string"
                           }

@@ -11,7 +11,6 @@ import "dotenv/config";
 async function startServer() {
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
-  console.log(`🌍 Server timezone set to UTC`);
 
   // Initialize database connection (optional)
   const dbConnected = await initializeDatabase();
@@ -188,6 +187,10 @@ async function startServer() {
 
   // OAuth callback route - handle OAuth redirects from providers
   server.get("/oauth/callback", async (req, res) => {
+    console.log("\n========== OAUTH CALLBACK ENDPOINT HIT ==========");
+    console.log("Full query params:", req.query);
+    console.log("URL:", req.url);
+
     const { oauthService } = await import("@server/services/oauth.service");
     const { getDashboardUrl } = await import("@server/config/env");
 
@@ -216,10 +219,13 @@ async function startServer() {
       if (result.success) {
         // Redirect to dashboard plugin settings page with success message
         const dashboardUrl = getDashboardUrl();
-        return res.redirect(
-          `${dashboardUrl}/integrations/plugins/${result.pluginId}?oauth=success&pluginId=${result.pluginId}`,
-        );
+        const redirectUrl = `${dashboardUrl}/integrations/plugins/${result.pluginId}?oauth=success&pluginId=${result.pluginId}`;
+        console.log("✅ OAuth successful, redirecting to:", redirectUrl);
+        console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
+        return res.redirect(redirectUrl);
       } else {
+        console.log("❌ OAuth failed, showing error page");
+        console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
         // Show error page
         return res.status(400).send(`
           <html>
@@ -233,7 +239,8 @@ async function startServer() {
         `);
       }
     } catch (error) {
-      console.error("OAuth callback error:", error);
+      console.error("❌ OAuth callback exception:", error);
+      console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
       return res.status(500).send(`
         <html>
           <head><title>OAuth Error</title></head>

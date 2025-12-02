@@ -71,6 +71,11 @@ export class OAuthService {
     organizationId: string,
     userId: string,
   ): Promise<{ authorizationUrl: string; state: string }> {
+    console.log("\n========== OAUTH INITIATE START ==========");
+    console.log("Plugin ID:", pluginId);
+    console.log("Organization ID:", organizationId);
+    console.log("User ID:", userId);
+
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
@@ -78,12 +83,20 @@ export class OAuthService {
 
     const manifest = plugin.manifest as HayPluginManifest;
     const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+    console.log("OAuth Config:", JSON.stringify(oauthConfig, null, 2));
+
     if (!oauthConfig) {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }
 
     // Get OAuth credentials from environment
     const credentials = this.getClientCredentials(pluginId, manifest);
+    console.log(
+      "Client ID:",
+      credentials.clientId ? credentials.clientId.substring(0, 20) + "..." : "NOT SET",
+    );
+    console.log("Client Secret:", credentials.clientSecret ? "SET (hidden)" : "NOT SET");
+
     if (!credentials.clientId) {
       throw new Error(
         `OAuth not configured. Please set ${pluginId.toUpperCase().replace(/-/g, "_")}_OAUTH_CLIENT_ID environment variable.`,
@@ -98,6 +111,7 @@ export class OAuthService {
 
     // Generate state nonce
     const nonce = oauthStateService.generateNonce();
+    console.log("Generated nonce:", nonce.substring(0, 20) + "...");
 
     // Generate PKCE if required
     let codeVerifier: string | undefined;
@@ -106,6 +120,7 @@ export class OAuthService {
       const pkce = oauthStateService.generatePKCE();
       codeVerifier = pkce.codeVerifier;
       codeChallenge = pkce.codeChallenge;
+      console.log("PKCE enabled - Code Challenge:", codeChallenge.substring(0, 20) + "...");
     }
 
     // Store state in Redis
@@ -117,6 +132,7 @@ export class OAuthService {
       codeVerifier,
       createdAt: Date.now(),
     });
+    console.log("State stored in Redis");
 
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
@@ -125,15 +141,29 @@ export class OAuthService {
       redirect_uri: redirectUri,
       response_type: "code",
       state: nonce,
-      scope: oauthConfig.scopes.join(" "),
     });
+
+    // Add required scopes
+    if (oauthConfig.scopes && oauthConfig.scopes.length > 0) {
+      params.append("scope", oauthConfig.scopes.join(" "));
+    }
+
+    // Add optional scopes as a separate parameter
+    if (oauthConfig.optionalScopes && oauthConfig.optionalScopes.length > 0) {
+      params.append("optional_scope", oauthConfig.optionalScopes.join(" "));
+    }
 
     if (codeChallenge) {
       params.append("code_challenge", codeChallenge);
       params.append("code_challenge_method", "S256");
     }
 
-    const authorizationUrl = `${oauthConfig.authorizationUrl}?${params.toString()}`;
+    // Convert to string and replace + with %20 for proper URL encoding (RFC 3986)
+    const authorizationUrl = `${oauthConfig.authorizationUrl}?${params.toString().replace(/\+/g, "%20")}`;
+
+    // Log the authorization URL to console
+    console.log(`\n🔐 OAuth Authorization URL for ${pluginId}:\n${authorizationUrl}\n`);
+    console.log("========== OAUTH INITIATE END ==========\n");
 
     debugLog("oauth", `Initiated OAuth flow for plugin ${pluginId}`, {
       organizationId,
@@ -152,22 +182,38 @@ export class OAuthService {
     state: string,
     error?: string,
   ): Promise<{ success: boolean; pluginId?: string; organizationId?: string; error?: string }> {
+    console.log("\n========== OAUTH CALLBACK START ==========");
+    console.log("Code received:", code ? code.substring(0, 20) + "..." : "NOT PROVIDED");
+    console.log("State received:", state ? state.substring(0, 20) + "..." : "NOT PROVIDED");
+    console.log("Error received:", error || "NONE");
+
     if (error) {
+      console.log("OAuth provider returned error:", error);
       debugLog("oauth", `OAuth callback error: ${error}`, { level: "error" });
       return { success: false, error };
     }
 
     // Retrieve state from Redis (one-time use)
+    console.log("Retrieving state from Redis...");
     const oauthState = await oauthStateService.retrieveState(state);
+
     if (!oauthState) {
+      console.log("❌ State not found in Redis or expired");
       debugLog("oauth", `Invalid or expired OAuth state: ${state}`, { level: "error" });
       return { success: false, error: "Invalid or expired state" };
     }
+
+    console.log("✅ State retrieved from Redis:");
+    console.log("  Plugin ID:", oauthState.pluginId);
+    console.log("  Organization ID:", oauthState.organizationId);
+    console.log("  User ID:", oauthState.userId);
+    console.log("  Has code verifier:", !!oauthState.codeVerifier);
 
     const { pluginId, organizationId, codeVerifier } = oauthState;
 
     try {
       // Get plugin and manifest
+      console.log("Loading plugin manifest...");
       const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
       if (!plugin) {
         throw new Error(`Plugin ${pluginId} not found`);
@@ -178,6 +224,8 @@ export class OAuthService {
       if (!oauthConfig) {
         throw new Error(`Plugin ${pluginId} does not support OAuth`);
       }
+
+      console.log("Token URL:", oauthConfig.tokenUrl);
 
       // Get OAuth credentials from environment
       const credentials = this.getClientCredentials(pluginId, manifest);
@@ -190,6 +238,7 @@ export class OAuthService {
         clientSecret: credentials.clientSecret,
       };
 
+      console.log("Exchanging authorization code for tokens...");
       // Exchange code for tokens
       const tokens = await this.exchangeCodeForTokens(
         code,
@@ -197,22 +246,47 @@ export class OAuthService {
         validCredentials,
         codeVerifier,
       );
+      console.log("✅ Tokens received from provider:");
+      console.log(
+        "  Access token:",
+        tokens.access_token ? tokens.access_token.substring(0, 20) + "..." : "NOT PROVIDED",
+      );
+      console.log("  Refresh token:", tokens.refresh_token ? "PROVIDED" : "NOT PROVIDED");
+      console.log("  Expires in:", tokens.expires_in);
+      console.log("  Token type:", tokens.token_type);
+      console.log("  Scope:", tokens.scope);
+
+      // Combine required and optional scopes for storage
+      const allScopes: string[] = [];
+      if (oauthConfig.scopes && oauthConfig.scopes.length > 0) {
+        allScopes.push(...oauthConfig.scopes);
+      }
+      if (oauthConfig.optionalScopes && oauthConfig.optionalScopes.length > 0) {
+        allScopes.push(...oauthConfig.optionalScopes);
+      }
 
       // Store tokens in plugin instance config
-      await this.storeTokens(organizationId, pluginId, tokens, oauthConfig.scopes);
+      console.log("Storing tokens in database...");
+      console.log("  Combined scopes:", allScopes);
+      await this.storeTokens(organizationId, pluginId, tokens, allScopes);
+      console.log("✅ Tokens stored successfully");
 
       debugLog("oauth", `OAuth callback successful for plugin ${pluginId}`, {
         organizationId,
       });
 
+      console.log("========== OAUTH CALLBACK SUCCESS ==========\n");
       return { success: true, pluginId, organizationId };
     } catch (error) {
+      console.log("❌ OAuth callback failed:");
+      console.error(error);
       debugLog("oauth", `OAuth callback failed`, {
         level: "error",
         data: error instanceof Error ? error.message : String(error),
         pluginId,
         organizationId,
       });
+      console.log("========== OAUTH CALLBACK FAILED ==========\n");
       return {
         success: false,
         error: error instanceof Error ? error.message : "Token exchange failed",
@@ -247,6 +321,13 @@ export class OAuthService {
       body.append("code_verifier", codeVerifier);
     }
 
+    console.log("Token exchange request:");
+    console.log("  URL:", oauthConfig.tokenUrl);
+    console.log("  Grant type:", "authorization_code");
+    console.log("  Redirect URI:", redirectUri);
+    console.log("  Has client secret:", !!credentials.clientSecret);
+    console.log("  Has code verifier:", !!codeVerifier);
+
     const response = await fetch(oauthConfig.tokenUrl, {
       method: "POST",
       headers: {
@@ -255,12 +336,16 @@ export class OAuthService {
       body: body.toString(),
     });
 
+    console.log("Token exchange response status:", response.status, response.statusText);
+
     if (!response.ok) {
       const errorText = await response.text();
+      console.log("❌ Token exchange error response:", errorText);
       throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
+    console.log("Token exchange response data:", JSON.stringify(data, null, 2));
 
     // Calculate expires_at if expires_in is provided
     let expiresAt: number | undefined;
@@ -287,13 +372,26 @@ export class OAuthService {
     tokens: OAuthTokenData,
     scopes?: string[],
   ): Promise<void> {
+    console.log('\n--- Storing OAuth tokens ---');
+    console.log('Plugin ID:', pluginId);
+    console.log('Organization ID:', organizationId);
+
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    // Get or create instance
-    let instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, plugin.id);
+    console.log('Plugin registry ID:', plugin.id);
+
+    // Get or create instance (pass string pluginId, not UUID)
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    console.log('Existing instance found:', !!instance);
+    if (instance) {
+      console.log('  Instance ID:', instance.id);
+      console.log('  Instance enabled:', instance.enabled);
+      console.log('  Instance authMethod:', instance.authMethod);
+      console.log('  Instance has config:', !!instance.config);
+    }
 
     const oauthData: OAuthConfig["_oauth"] = {
       tokens,
@@ -320,25 +418,35 @@ export class OAuthService {
     };
 
     if (instance) {
+      console.log('Updating existing instance...');
       // Update existing instance
       const currentConfig = instance.config || {};
+      console.log('  Current config keys:', Object.keys(currentConfig));
+      console.log('  New config keys:', Object.keys(configToStore));
+
       await pluginInstanceRepository.updateConfig(instance.id, {
         ...currentConfig,
         ...configToStore,
       });
+      console.log('  Config updated');
 
       // Update auth_method
       await pluginInstanceRepository.update(instance.id, instance.organizationId, {
         authMethod: "oauth",
       });
+      console.log('  Auth method updated to oauth');
+      console.log('  Instance enabled state should remain:', instance.enabled);
     } else {
+      console.log('Creating new instance with enabled=false...');
       // Create new instance
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
         config: configToStore,
         authMethod: "oauth",
         enabled: false, // Don't auto-enable
       });
+      console.log('  New instance created');
     }
+    console.log('--- OAuth tokens stored ---\n');
   }
 
   /**
@@ -350,7 +458,7 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, plugin.id);
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
     if (!instance) {
       throw new Error(`Plugin instance not found`);
     }
@@ -381,7 +489,7 @@ export class OAuthService {
       return { connected: false, error: "Plugin not found" };
     }
 
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, plugin.id);
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
     if (!instance || !instance.config?._oauth) {
       return { connected: false };
     }
@@ -419,7 +527,7 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, plugin.id);
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
     if (!instance || !instance.config?._oauth) {
       throw new Error("OAuth not configured for this plugin instance");
     }

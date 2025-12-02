@@ -13,37 +13,50 @@ export class OAuthAuthStrategy {
   /**
    * Get authorization headers for OAuth-authenticated requests
    */
-  async getHeaders(
-    organizationId: string,
-    pluginId: string,
-  ): Promise<Record<string, string>> {
+  async getHeaders(organizationId: string, pluginId: string): Promise<Record<string, string>> {
+    console.log("\n--- Getting OAuth headers ---");
+    console.log("Plugin ID:", pluginId);
+    console.log("Organization ID:", organizationId);
+
     const tokens = await this.getValidTokens(organizationId, pluginId);
     if (!tokens) {
+      console.log("❌ No valid tokens available");
       throw new Error("OAuth tokens not available");
     }
 
-    const tokenType = tokens.token_type || "Bearer";
-    return {
-      Authorization: `${tokenType} ${tokens.access_token}`,
+    console.log("✅ Valid tokens found:");
+    console.log("  Token type:", tokens.token_type || "Bearer");
+    console.log(
+      "  Access token:",
+      tokens.access_token ? tokens.access_token.substring(0, 20) + "..." : "NONE",
+    );
+    console.log("  Expires at:", tokens.expires_at);
+
+    // Always use "Bearer" with capital B (RFC 6750 standard)
+    // Some OAuth providers return lowercase "bearer" but MCP servers expect "Bearer"
+    const headers = {
+      Authorization: `Bearer ${tokens.access_token}`,
     };
+
+    console.log(
+      "Generated Authorization header:",
+      `Bearer ${tokens.access_token.substring(0, 30)}...`,
+    );
+    console.log("--- OAuth headers ready ---\n");
+
+    return headers;
   }
 
   /**
    * Get valid OAuth tokens, refreshing if necessary
    */
-  async getValidTokens(
-    organizationId: string,
-    pluginId: string,
-  ): Promise<OAuthTokenData | null> {
+  async getValidTokens(organizationId: string, pluginId: string): Promise<OAuthTokenData | null> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       return null;
     }
 
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      organizationId,
-      plugin.id,
-    );
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
     if (!instance || !instance.config?._oauth) {
       return null;
     }
@@ -117,14 +130,10 @@ export class OAuthAuthStrategy {
       return false;
     }
 
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      organizationId,
-      plugin.id,
-    );
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
 
     return !!(instance && instance.authMethod === "oauth" && instance.config?._oauth);
   }
 }
 
 export const oauthAuthStrategy = new OAuthAuthStrategy();
-

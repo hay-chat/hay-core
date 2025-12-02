@@ -61,7 +61,8 @@ export interface HayPluginManifest {
         oauth?: {
           authorizationUrl: string;
           tokenUrl: string;
-          scopes: string[];
+          scopes?: string[]; // Required scopes
+          optionalScopes?: string[]; // Optional scopes (sent as 'optional_scope' parameter)
           pkce?: boolean;
           clientIdEnvVar?: string;
           clientSecretEnvVar?: string; // Optional for CIMD
