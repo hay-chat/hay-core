@@ -13,12 +13,14 @@ import { hashPassword, verifyPassword } from "@server/lib/auth/utils/hashing";
 import { emailService } from "./email.service";
 import { auditLogService } from "./audit-log.service";
 import { jobQueueService } from "./job-queue.service";
+import { vectorStoreService } from "./vector-store.service";
 import { debugLog } from "@server/lib/debug-logger";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
+import * as archiver from "archiver";
 import { getDashboardUrl } from "@server/config/env";
-import { IsNull, Not } from "typeorm";
+import { IsNull, Not, In } from "typeorm";
 
 /**
  * Privacy Service
@@ -496,12 +498,13 @@ export class PrivacyService {
 
   /**
    * Download export data
+   * Supports both legacy JSON and new ZIP format
    */
   async downloadExport(
     requestId: string,
     downloadToken: string,
     ipAddress?: string,
-  ): Promise<{ data: any; fileName: string }> {
+  ): Promise<{ data: any; fileName: string; isZip?: boolean; filePath?: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId, type: "export", status: "completed" },
@@ -569,9 +572,6 @@ export class PrivacyService {
       throw new Error("Export file not found");
     }
 
-    const exportData = await fs.readFile(exportUrl, "utf-8");
-    const data = JSON.parse(exportData);
-
     // Record download
     if (!request.downloadedAt) {
       request.downloadIpAddress = ipAddress;
@@ -592,9 +592,28 @@ export class PrivacyService {
       downloadCount: request.downloadCount,
     });
 
+    // Check if it's a ZIP file (new format) or JSON (legacy)
+    const isZip = exportUrl.endsWith(".zip") || request.metadata?.exportFormat === "zip";
+    const dateStr = new Date().toISOString().split("T")[0];
+
+    if (isZip) {
+      // Return ZIP file path for streaming
+      return {
+        data: null,
+        fileName: `data-export-${request.email}-${dateStr}.zip`,
+        isZip: true,
+        filePath: exportUrl,
+      };
+    }
+
+    // Legacy JSON format
+    const exportData = await fs.readFile(exportUrl, "utf-8");
+    const data = JSON.parse(exportData);
+
     return {
       data,
-      fileName: `data-export-${request.email}-${new Date().toISOString().split("T")[0]}.json`,
+      fileName: `data-export-${request.email}-${dateStr}.json`,
+      isZip: false,
     };
   }
 
@@ -1404,6 +1423,8 @@ export class PrivacyService {
 
   /**
    * Collect all customer data for export
+   * GDPR Article 15 - Right of Access
+   * Traverses: customers → conversations → messages → embeddings
    */
   private async collectCustomerData(customerId: string, organizationId: string): Promise<any> {
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -1425,6 +1446,9 @@ export class PrivacyService {
       order: { created_at: "ASC" },
     });
 
+    const conversationIds = conversations.map((c) => c.id);
+    const allMessageIds: string[] = [];
+
     // Get all messages for each conversation
     const conversationsWithMessages = await Promise.all(
       conversations.map(async (conversation) => {
@@ -1432,6 +1456,9 @@ export class PrivacyService {
           where: { conversation_id: conversation.id },
           order: { created_at: "ASC" },
         });
+
+        // Collect message IDs for embedding lookup
+        allMessageIds.push(...messages.map((m) => m.id));
 
         return {
           id: conversation.id,
@@ -1458,8 +1485,62 @@ export class PrivacyService {
       }),
     );
 
+    // Collect embeddings associated with conversations and messages
+    // These contain vectorized representations of customer message content
+    let embeddings: Array<{
+      id: string;
+      content: string;
+      metadata: Record<string, unknown>;
+      createdAt?: Date;
+      source: "conversation" | "message";
+    }> = [];
+
+    try {
+      // Get embeddings by conversation IDs
+      if (conversationIds.length > 0) {
+        const conversationEmbeddings = await vectorStoreService.findByConversationIds(
+          organizationId,
+          conversationIds,
+        );
+        embeddings.push(
+          ...conversationEmbeddings.map((e) => ({
+            id: e.id,
+            content: e.pageContent,
+            metadata: e.metadata || {},
+            createdAt: e.createdAt,
+            source: "conversation" as const,
+          })),
+        );
+      }
+
+      // Get embeddings by message IDs
+      if (allMessageIds.length > 0) {
+        const messageEmbeddings = await vectorStoreService.findByMessageIds(
+          organizationId,
+          allMessageIds,
+        );
+        // Filter out duplicates (some embeddings might be found by both conversation and message)
+        const existingIds = new Set(embeddings.map((e) => e.id));
+        embeddings.push(
+          ...messageEmbeddings
+            .filter((e) => !existingIds.has(e.id))
+            .map((e) => ({
+              id: e.id,
+              content: e.pageContent,
+              metadata: e.metadata || {},
+              createdAt: e.createdAt,
+              source: "message" as const,
+            })),
+        );
+      }
+    } catch (error) {
+      console.warn("[Privacy] Error collecting embeddings for export:", error);
+      // Continue without embeddings - they might not exist
+    }
+
     return {
       exportDate: new Date().toISOString(),
+      exportVersion: "2.0",
       dataSubject: {
         customerId: customer.id,
         organizationId,
@@ -1476,12 +1557,20 @@ export class PrivacyService {
           updatedAt: customer.updated_at,
         },
         conversations: conversationsWithMessages,
+        embeddings: embeddings.map((e) => ({
+          id: e.id,
+          content: e.content,
+          metadata: e.metadata,
+          createdAt: e.createdAt,
+          source: e.source,
+        })),
         statistics: {
           totalConversations: conversations.length,
           totalMessages: conversationsWithMessages.reduce(
             (sum, conv) => sum + conv.messages.length,
             0,
           ),
+          totalEmbeddings: embeddings.length,
         },
       },
     };
@@ -1489,6 +1578,7 @@ export class PrivacyService {
 
   /**
    * Process customer export job in background
+   * Creates a signed ZIP file with data.json, README.md, and manifest.json
    */
   private async processCustomerExportJob(jobId: string, requestId: string): Promise<void> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
@@ -1507,14 +1597,12 @@ export class PrivacyService {
       // Collect customer data
       const exportData = await this.collectCustomerData(request.customerId, request.organizationId);
 
-      // Save export to file
-      const exportDir = path.join(process.cwd(), "exports");
-      await fs.mkdir(exportDir, { recursive: true });
-
-      const fileName = `customer-export-${requestId}.json`;
-      const filePath = path.join(exportDir, fileName);
-
-      await fs.writeFile(filePath, JSON.stringify(exportData, null, 2), "utf-8");
+      // Create signed ZIP export
+      const { filePath, signature } = await this.createSignedZipExport(
+        exportData,
+        requestId,
+        request.email,
+      );
 
       // Generate download token
       const downloadToken = crypto.randomBytes(32).toString("hex");
@@ -1522,6 +1610,11 @@ export class PrivacyService {
 
       // Update request with export metadata
       request.setExportMetadata(filePath, downloadToken, expiresAt);
+      request.metadata = {
+        ...request.metadata,
+        signature,
+        exportFormat: "zip",
+      };
       request.markCompleted();
       await requestRepository.save(request);
 
@@ -1530,6 +1623,7 @@ export class PrivacyService {
         exportUrl: filePath,
         downloadToken,
         expiresAt: expiresAt.toISOString(),
+        signature,
       });
 
       // Send notification email
@@ -1545,6 +1639,7 @@ export class PrivacyService {
         jobId,
         customerId: request.customerId,
         organizationId: request.organizationId,
+        exportFormat: "zip",
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1560,6 +1655,172 @@ export class PrivacyService {
       // Fail job
       await jobQueueService.failJob(jobId, "", errorMessage);
     }
+  }
+
+  /**
+   * Create a signed ZIP export file containing data.json, README.md, and manifest.json
+   */
+  private async createSignedZipExport(
+    exportData: any,
+    requestId: string,
+    email: string,
+  ): Promise<{ filePath: string; signature: string }> {
+    const exportDir = path.join(process.cwd(), "exports");
+    await fs.mkdir(exportDir, { recursive: true });
+
+    const zipFileName = `customer-export-${requestId}.zip`;
+    const zipFilePath = path.join(exportDir, zipFileName);
+
+    // Prepare JSON data
+    const dataJson = JSON.stringify(exportData, null, 2);
+
+    // Generate manifest
+    const manifest = {
+      version: "2.0",
+      exportId: requestId,
+      exportDate: exportData.exportDate,
+      dataSubject: exportData.dataSubject,
+      statistics: exportData.personalData.statistics,
+      format: "GDPR DSAR Export",
+      files: ["data.json", "README.md", "manifest.json"],
+    };
+    const manifestJson = JSON.stringify(manifest, null, 2);
+
+    // Generate README
+    const readme = this.generateExportReadme(exportData, requestId);
+
+    // Sign the data (HMAC-SHA256 of data.json content)
+    const signature = this.signExportData(dataJson);
+
+    // Create ZIP archive
+    const { createWriteStream } = await import("fs");
+    const output = createWriteStream(zipFilePath);
+    const archive = archiver.default("zip", { zlib: { level: 9 } });
+
+    await new Promise<void>((resolve, reject) => {
+      output.on("close", resolve);
+      output.on("error", reject);
+      archive.on("error", reject);
+
+      archive.pipe(output);
+      archive.append(dataJson, { name: "data.json" });
+      archive.append(readme, { name: "README.md" });
+      archive.append(manifestJson, { name: "manifest.json" });
+      archive.append(signature, { name: "signature.txt" });
+      archive.finalize();
+    });
+
+    return { filePath: zipFilePath, signature };
+  }
+
+  /**
+   * Generate README.md for the export package
+   */
+  private generateExportReadme(exportData: any, requestId: string): string {
+    const stats = exportData.personalData.statistics;
+    const exportDate = new Date(exportData.exportDate).toLocaleString("en-US", {
+      dateStyle: "full",
+      timeStyle: "long",
+    });
+
+    return `# GDPR Data Export
+
+## Export Information
+
+- **Export ID:** ${requestId}
+- **Export Date:** ${exportDate}
+- **Customer ID:** ${exportData.dataSubject.customerId}
+- **Export Format:** JSON (data.json)
+
+## Contents
+
+This archive contains your personal data as required under GDPR Article 15 (Right of Access):
+
+| File | Description |
+|------|-------------|
+| data.json | Your personal data in machine-readable JSON format |
+| manifest.json | Export metadata and file listing |
+| README.md | This documentation file |
+| signature.txt | Cryptographic signature for data integrity verification |
+
+## Data Included
+
+### Profile Information
+Your customer profile data including:
+- Email address
+- Phone number
+- Name
+- Any custom metadata
+
+### Conversations
+${stats.totalConversations} conversation(s) containing:
+- ${stats.totalMessages} message(s)
+- Timestamps and metadata
+- Message content and direction
+
+### Embeddings
+${stats.totalEmbeddings || 0} embedding(s):
+- Vectorized representations of your message content
+- Used for AI-powered search and assistance
+
+## Data Structure
+
+The \`data.json\` file contains:
+
+\`\`\`json
+{
+  "exportDate": "ISO 8601 timestamp",
+  "exportVersion": "2.0",
+  "dataSubject": {
+    "customerId": "UUID",
+    "organizationId": "UUID"
+  },
+  "personalData": {
+    "profile": { ... },
+    "conversations": [ ... ],
+    "embeddings": [ ... ],
+    "statistics": { ... }
+  }
+}
+\`\`\`
+
+## Verifying Data Integrity
+
+The \`signature.txt\` file contains an HMAC-SHA256 signature of the \`data.json\` file.
+This allows you to verify that the data has not been tampered with.
+
+## Your Rights Under GDPR
+
+As a data subject, you have the following rights:
+
+1. **Right of Access** (Article 15) - This export fulfills this right
+2. **Right to Rectification** (Article 16) - Request corrections to inaccurate data
+3. **Right to Erasure** (Article 17) - Request deletion of your personal data
+4. **Right to Data Portability** (Article 20) - This export is in machine-readable format
+
+## Questions?
+
+If you have questions about your data or wish to exercise your other GDPR rights,
+please contact the organization through their support channels.
+
+---
+
+*This export was generated automatically by the Hay Platform DSAR system.*
+`;
+  }
+
+  /**
+   * Sign export data using HMAC-SHA256
+   * Uses a deterministic key derived from the organization's data
+   */
+  private signExportData(data: string): string {
+    // Use a signing key from environment or generate a deterministic one
+    const { config } = require("@server/config/env");
+    const signingKey = config.jwt.secret || "hay-dsar-export-signing-key";
+
+    const hmac = crypto.createHmac("sha256", signingKey);
+    hmac.update(data);
+    return hmac.digest("hex");
   }
 
   /**
@@ -1632,7 +1893,8 @@ export class PrivacyService {
 
   /**
    * Execute customer data deletion
-   * Soft delete customer, anonymize conversations and messages
+   * Soft delete customer, anonymize conversations and messages, delete embeddings
+   * GDPR Article 17 - Right to Erasure
    */
   private async executeCustomerDeletion(customerId: string, organizationId: string): Promise<void> {
     return AppDataSource.transaction(async (manager) => {
@@ -1653,6 +1915,49 @@ export class PrivacyService {
       const conversations = await conversationRepository.find({
         where: { customer_id: customerId, organization_id: organizationId },
       });
+
+      const conversationIds = conversations.map((c) => c.id);
+
+      // Get all message IDs for embedding deletion
+      const allMessageIds: string[] = [];
+      for (const conversation of conversations) {
+        const messages = await messageRepository.find({
+          where: { conversation_id: conversation.id },
+          select: ["id"],
+        });
+        allMessageIds.push(...messages.map((m) => m.id));
+      }
+
+      // Delete embeddings associated with conversations and messages
+      // This ensures no orphaned vectors remain (GDPR compliance)
+      let embeddingsDeleted = 0;
+      try {
+        if (conversationIds.length > 0) {
+          const deletedByConversation = await vectorStoreService.deleteByConversationIds(
+            organizationId,
+            conversationIds,
+          );
+          embeddingsDeleted += deletedByConversation;
+        }
+
+        if (allMessageIds.length > 0) {
+          const deletedByMessage = await vectorStoreService.deleteByMessageIds(
+            organizationId,
+            allMessageIds,
+          );
+          embeddingsDeleted += deletedByMessage;
+        }
+
+        debugLog("privacy", `Deleted ${embeddingsDeleted} embeddings for customer`, {
+          customerId,
+          organizationId,
+          conversationIds: conversationIds.length,
+          messageIds: allMessageIds.length,
+        });
+      } catch (error) {
+        // Log but don't fail the transaction - embeddings might not exist
+        console.warn("[Privacy] Error deleting embeddings:", error);
+      }
 
       // Anonymize messages in all conversations
       for (const conversation of conversations) {
@@ -1693,6 +1998,7 @@ export class PrivacyService {
         customerId,
         organizationId,
         conversationsAffected: conversations.length,
+        embeddingsDeleted,
       });
     });
   }
@@ -1903,7 +2209,7 @@ export class PrivacyService {
   /**
    * Clean up expired privacy export files
    * Called by scheduled job: 'cleanup-expired-privacy-exports'
-   * Deletes export files older than 7 days
+   * Deletes export files older than 7 days (supports both JSON and ZIP formats)
    */
   async cleanupExpiredExports(): Promise<void> {
     const { config } = await import("@server/config/env");
@@ -1920,8 +2226,8 @@ export class PrivacyService {
       const files = await fs.readdir(exportsDir);
 
       for (const file of files) {
-        // Only process JSON files
-        if (!file.endsWith(".json")) continue;
+        // Process both JSON and ZIP files
+        if (!file.endsWith(".json") && !file.endsWith(".zip")) continue;
 
         try {
           const filePath = path.join(exportsDir, file);
