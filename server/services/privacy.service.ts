@@ -24,7 +24,8 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as archiver from "archiver";
 import { getDashboardUrl } from "@server/config/env";
-import { IsNull, Not, In } from "typeorm";
+import { IsNull, Not, In, EntityManager } from "typeorm";
+import type { AttachmentDeletionResult } from "@server/types/privacy.types";
 
 /**
  * Privacy Service
@@ -561,7 +562,7 @@ export class PrivacyService {
       request.downloadIpAddress &&
       request.downloadIpAddress !== ipAddress
     ) {
-      console.warn(`[Privacy] Download attempt from different IP`, {
+      debugLog("privacy", "Download attempt from different IP", {
         requestId,
         originalIp: request.downloadIpAddress,
         currentIp: ipAddress,
@@ -1577,7 +1578,7 @@ export class PrivacyService {
         );
       }
     } catch (error) {
-      console.warn("[Privacy] Error collecting embeddings for export:", error);
+      debugLog("privacy", "Error collecting embeddings for export", { error });
       // Continue without embeddings - they might not exist
     }
 
@@ -1770,7 +1771,7 @@ export class PrivacyService {
               originalUrl: attachment.url,
             });
           } catch (err) {
-            console.warn(`[Privacy] Could not read local attachment: ${localPath}`, err);
+            debugLog("privacy", "Could not read local attachment", { localPath, error: err });
           }
         } else if (attachment.url.startsWith("http")) {
           // Remote URL - download
@@ -1785,11 +1786,11 @@ export class PrivacyService {
               });
             }
           } catch (err) {
-            console.warn(`[Privacy] Could not download attachment: ${attachment.url}`, err);
+            debugLog("privacy", "Could not download attachment", { url: attachment.url, error: err });
           }
         }
       } catch (err) {
-        console.warn(`[Privacy] Error processing attachment ${attachment.id}:`, err);
+        debugLog("privacy", "Error processing attachment", { attachmentId: attachment.id, error: err });
       }
     }
 
@@ -1820,10 +1821,10 @@ export class PrivacyService {
             originalUrl: upload.path,
           });
         } catch (err) {
-          console.warn(`[Privacy] Could not read upload file: ${localPath}`, err);
+          debugLog("privacy", "Could not read upload file", { localPath, error: err });
         }
       } catch (err) {
-        console.warn(`[Privacy] Error processing upload ${upload.id}:`, err);
+        debugLog("privacy", "Error processing upload", { uploadId: upload.id, error: err });
       }
     }
 
@@ -2149,6 +2150,80 @@ please contact ${supportContact}.
   }
 
   /**
+   * Delete message attachment files from storage
+   * Used during customer data erasure to remove actual files
+   *
+   * @param messageIds - Array of message IDs to process
+   * @param manager - Transaction manager for database queries
+   * @returns Statistics about deletion success/failure
+   */
+  private async deleteMessageAttachments(
+    messageIds: string[],
+    manager: EntityManager,
+  ): Promise<AttachmentDeletionResult> {
+    if (!messageIds.length) {
+      return { deleted: 0, failed: 0, errors: [] };
+    }
+
+    const messageRepository = manager.getRepository(Message);
+    const messages = await messageRepository.find({
+      where: { id: In(messageIds) },
+      select: ["id", "attachments"],
+    });
+
+    let deleted = 0;
+    let failed = 0;
+    const errors: Array<{ messageId: string; attachmentId: string; error: string }> = [];
+
+    for (const message of messages) {
+      if (!message.attachments || message.attachments.length === 0) continue;
+
+      for (const attachment of message.attachments as any[]) {
+        try {
+          // Only delete local files (not external URLs)
+          if (attachment.url && (attachment.url.startsWith("/") || attachment.url.startsWith("./"))) {
+            // Extract path from URL (e.g., "/uploads/org/folder/file.jpg" -> "org/folder/file.jpg")
+            const pathMatch = attachment.url.match(/\/uploads\/(.+)/);
+
+            if (pathMatch) {
+              const filePath = pathMatch[1];
+              const fullPath = path.join(process.cwd(), "server", "uploads", filePath);
+
+              // Attempt to delete from storage
+              await fs.unlink(fullPath);
+              deleted++;
+
+              debugLog("privacy", "Deleted attachment file", {
+                messageId: message.id,
+                attachmentId: attachment.id,
+                filePath,
+              });
+            }
+          }
+        } catch (error) {
+          failed++;
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+          errors.push({
+            messageId: message.id,
+            attachmentId: attachment.id || "unknown",
+            error: errorMessage,
+          });
+
+          // Log but don't fail transaction - file might already be deleted
+          debugLog("privacy", "Failed to delete attachment file (continuing)", {
+            messageId: message.id,
+            attachmentId: attachment.id,
+            error: errorMessage,
+          });
+        }
+      }
+    }
+
+    return { deleted, failed, errors };
+  }
+
+  /**
    * Execute customer data deletion
    * Soft delete customer, anonymize conversations and messages, delete embeddings
    * GDPR Article 17 - Right to Erasure
@@ -2175,14 +2250,37 @@ please contact ${supportContact}.
 
       const conversationIds = conversations.map((c) => c.id);
 
-      // Get all message IDs for embedding deletion
+      // Get all message IDs for embedding and attachment deletion (optimized query)
       const allMessageIds: string[] = [];
-      for (const conversation of conversations) {
+      if (conversationIds.length > 0) {
         const messages = await messageRepository.find({
-          where: { conversation_id: conversation.id },
+          where: { conversation_id: In(conversationIds) },
           select: ["id"],
         });
         allMessageIds.push(...messages.map((m) => m.id));
+      }
+
+      // Delete message attachment files from storage
+      debugLog("privacy", "Deleting message attachment files", {
+        customerId,
+        messageCount: allMessageIds.length,
+      });
+
+      const attachmentDeletionResult = await this.deleteMessageAttachments(allMessageIds, manager);
+
+      debugLog("privacy", "Attachment deletion completed", {
+        customerId,
+        deleted: attachmentDeletionResult.deleted,
+        failed: attachmentDeletionResult.failed,
+        errors: attachmentDeletionResult.errors.length,
+      });
+
+      // Log errors if any
+      if (attachmentDeletionResult.errors.length > 0) {
+        debugLog("privacy", "Attachment deletion errors", {
+          customerId,
+          errors: attachmentDeletionResult.errors,
+        });
       }
 
       // Delete embeddings associated with conversations and messages
@@ -2193,6 +2291,7 @@ please contact ${supportContact}.
           const deletedByConversation = await vectorStoreService.deleteByConversationIds(
             organizationId,
             conversationIds,
+            manager, // Pass transaction manager
           );
           embeddingsDeleted += deletedByConversation;
         }
@@ -2201,19 +2300,24 @@ please contact ${supportContact}.
           const deletedByMessage = await vectorStoreService.deleteByMessageIds(
             organizationId,
             allMessageIds,
+            manager, // Pass transaction manager
           );
           embeddingsDeleted += deletedByMessage;
         }
 
-        debugLog("privacy", `Deleted ${embeddingsDeleted} embeddings for customer`, {
+        debugLog("privacy", "Deleted embeddings for customer", {
           customerId,
           organizationId,
+          embeddingsDeleted,
           conversationIds: conversationIds.length,
           messageIds: allMessageIds.length,
         });
       } catch (error) {
         // Log but don't fail the transaction - embeddings might not exist
-        console.warn("[Privacy] Error deleting embeddings:", error);
+        debugLog("privacy", "Error deleting embeddings (continuing)", {
+          customerId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
 
       // Anonymize messages in all conversations
@@ -2384,7 +2488,7 @@ please contact ${supportContact}.
         return `${firstHextet}:${secondHextet}:${thirdHextet}::`;
       } catch (error) {
         // Safe fallback for any parsing errors
-        console.warn("[Privacy] Failed to anonymize IPv6 address, using fallback", { ip, error });
+        debugLog("privacy", "Failed to anonymize IPv6 address, using fallback", { ip, error });
         return "0000:0000:0000::";
       }
     } else {
@@ -2393,14 +2497,14 @@ please contact ${supportContact}.
 
       // Validate IPv4 format
       if (parts.length !== 4) {
-        console.warn("[Privacy] Invalid IPv4 address format, using fallback", { ip });
+        debugLog("privacy", "Invalid IPv4 address format, using fallback", { ip });
         return "0.0.0.0";
       }
 
       // Validate each octet is a number
       const octets = parts.map((p) => parseInt(p, 10));
       if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) {
-        console.warn("[Privacy] Invalid IPv4 octet values, using fallback", { ip });
+        debugLog("privacy", "Invalid IPv4 octet values, using fallback", { ip });
         return "0.0.0.0";
       }
 
