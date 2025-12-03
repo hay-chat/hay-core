@@ -818,7 +818,6 @@ const createTestConversation = async () => {
     messagesLoading.value = true;
 
     const response = await HayApi.conversations.create.mutate({
-      title: "Playground Test - " + new Date().toLocaleTimeString(),
       metadata: {
         sourceId: "playground",
         test_mode: true,
@@ -1332,14 +1331,25 @@ onMounted(async () => {
           return;
         }
 
-        // Check if message already exists (prevent duplicates)
-        const messageExists = messages.value.some((m: any) => m.id === messageData.id);
-        if (messageExists) {
-          console.log("[WebSocket] Skipping duplicate message:", messageData.id);
+        // Check if message already exists - if so, update it (for tool call responses)
+        const existingMessageIndex = messages.value.findIndex((m: any) => m.id === messageData.id);
+        if (existingMessageIndex !== -1) {
+          console.log("[WebSocket] Updating existing message:", messageData.id);
+          messages.value[existingMessageIndex] = {
+            id: messageData.id,
+            content: messageData.content,
+            type: messageData.type,
+            sender: messageData.type === MessageType.CUSTOMER ? "customer" : "agent",
+            timestamp: messageData.timestamp,
+            created_at: messageData.timestamp,
+            metadata: messageData.metadata,
+            status: messageData.status,
+            deliveryState: "sent",
+          };
           return;
         }
 
-        // Add message to playground messages
+        // Add new message to playground messages
         messages.value.push({
           id: messageData.id,
           content: messageData.content,
@@ -1387,14 +1397,25 @@ onMounted(async () => {
           return;
         }
 
-        // Check if message already exists (prevent duplicates)
-        const messageExists = conversation.value.messages.some((m: any) => m.id === messageData.id);
-        if (messageExists) {
-          console.log("[WebSocket] Skipping duplicate message:", messageData.id);
+        // Check if message already exists - if so, update it (for tool call responses)
+        const existingMessageIndex = conversation.value.messages.findIndex((m: any) => m.id === messageData.id);
+        if (existingMessageIndex !== -1) {
+          console.log("[WebSocket] Updating existing message:", messageData.id);
+          conversation.value.messages[existingMessageIndex] = {
+            id: messageData.id,
+            content: messageData.content,
+            type: messageData.type,
+            created_at: messageData.timestamp,
+            conversation_id: conversationId.value,
+            updated_at: messageData.timestamp,
+            status: messageData.status || "approved",
+            metadata: messageData.metadata,
+            deliveryState: "sent",
+          };
           return;
         }
 
-        // Add message to regular conversation
+        // Add new message to regular conversation
         conversation.value.messages.push({
           id: messageData.id,
           content: messageData.content,
@@ -1512,6 +1533,6 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${conversation.value?.title || "Conversation"} - Hay Dashboard`),
+  title: computed(() => `${conversation.value?.title || "New Conversation"} - Hay Dashboard`),
 });
 </script>

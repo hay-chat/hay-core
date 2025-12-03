@@ -1,6 +1,14 @@
 <template>
   <div class="input-wrapper">
-    <Label v-if="label && type !== 'switch'" :for="inputId">{{ label }}</Label>
+    <div v-if="label && type !== 'switch'" class="label-container">
+      <Label :for="inputId">{{ label }}</Label>
+      <span
+        v-if="characterLimit && (type === 'text' || type === 'textarea')"
+        class="character-counter"
+      >
+        {{ characterCount }}/{{ characterLimit }}
+      </span>
+    </div>
 
     <!-- Select Type -->
     <div v-if="type === 'select'" class="select-wrapper">
@@ -122,6 +130,7 @@ export interface InputProps {
   iconEnd?: Component;
   options?: SelectOption[];
   placeholder?: string;
+  characterLimit?: number;
 }
 
 const props = withDefaults(defineProps<InputProps>(), {
@@ -219,6 +228,14 @@ const disabledAttr = computed(() => attrs.disabled as boolean | undefined);
 const nameAttr = computed(() => attrs.name as string | undefined);
 const requiredAttr = computed(() => attrs.required as boolean | undefined);
 
+// Character count
+const characterCount = computed(() => {
+  if (typeof props.modelValue === "string") {
+    return props.modelValue.length;
+  }
+  return 0;
+});
+
 // Textarea helpers
 const adjustTextareaHeight = () => {
   if (textareaRef.value) {
@@ -260,6 +277,19 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
+}
+
+.label-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.character-counter {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-muted);
+  white-space: nowrap;
 }
 
 .input-container {

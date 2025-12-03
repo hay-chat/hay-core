@@ -108,6 +108,19 @@ export class ToolExecutionService {
                   httpStatus: 200,
                 },
               });
+
+              // Broadcast the updated message via WebSocket
+              await this.broadcastMessageUpdate(conversation, message.id, {
+                content: `Action completed: ${toolCall.name}`,
+                metadata: {
+                  ...message.metadata,
+                  toolOutput: result,
+                  toolStatus: "SUCCESS",
+                  toolLatencyMs: toolLogEntry.latencyMs,
+                  toolExecutedAt: executedAt,
+                  httpStatus: 200,
+                },
+              });
             }
           }
 
@@ -137,6 +150,19 @@ export class ToolExecutionService {
             const message = await this.messageService.messageRepository.findById(messageId);
             if (message) {
               await this.messageService.messageRepository.update(messageId, {
+                content: `Action failed: ${toolCall.name}`,
+                metadata: {
+                  ...message.metadata,
+                  toolOutput: errorOutput,
+                  toolStatus: "ERROR",
+                  toolLatencyMs: toolLogEntry.latencyMs,
+                  toolExecutedAt: executedAt,
+                  httpStatus: 500,
+                },
+              });
+
+              // Broadcast the updated message via WebSocket
+              await this.broadcastMessageUpdate(conversation, message.id, {
                 content: `Action failed: ${toolCall.name}`,
                 metadata: {
                   ...message.metadata,
@@ -333,6 +359,72 @@ export class ToolExecutionService {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Broadcast a message update via WebSocket/Redis
+   * This ensures the frontend receives real-time updates when tool calls complete
+   */
+  private async broadcastMessageUpdate(
+    conversation: Conversation,
+    messageId: string,
+    updates: { content: string; metadata: Record<string, unknown> },
+  ): Promise<void> {
+    try {
+      const { redisService } = await import("@server/services/redis.service");
+
+      // Fetch the full message to get all fields
+      const message = await this.messageService.messageRepository.findById(messageId);
+      if (!message) {
+        console.warn(`[ToolExecution] Message ${messageId} not found for broadcast`);
+        return;
+      }
+
+      const eventPayload = {
+        type: "message_received",
+        organizationId: conversation.organization_id,
+        conversationId: conversation.id,
+        payload: {
+          id: message.id,
+          content: updates.content,
+          type: message.type,
+          sender: message.sender,
+          timestamp: message.created_at,
+          metadata: updates.metadata,
+          status: message.status,
+          deliveryState: message.deliveryState,
+        },
+      };
+
+      if (redisService.isConnected()) {
+        // Publish to Redis for distribution across all server instances
+        await redisService.publish("websocket:events", eventPayload);
+        console.log(`[ToolExecution] Tool result broadcast via Redis for message ${messageId}`);
+      } else {
+        // Fallback to direct WebSocket if Redis not available
+        const { websocketService } = await import("@server/services/websocket.service");
+
+        const messagePayload = {
+          type: "message",
+          data: {
+            id: message.id,
+            content: updates.content,
+            type: message.type,
+            sender: message.sender,
+            timestamp: message.created_at,
+            metadata: updates.metadata,
+          },
+        };
+
+        // Broadcast to both organization (dashboard) and conversation (webchat) clients
+        websocketService.sendToOrganization(conversation.organization_id, messagePayload);
+        websocketService.sendToConversation(conversation.id, messagePayload);
+        console.log(`[ToolExecution] Tool result broadcast via WebSocket for message ${messageId}`);
+      }
+    } catch (error) {
+      console.error(`[ToolExecution] Failed to broadcast message update:`, error);
+      // Don't throw - broadcast failure shouldn't break tool execution
+    }
   }
 
   private async executeMCPTool(

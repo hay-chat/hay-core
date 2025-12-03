@@ -32,6 +32,10 @@ export class PluginManagerService {
 
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
+
+    // Restore plugins from ZIP if directories are missing
+    await this.restorePluginsFromZip();
+
     console.log("📦 Plugin registry loaded:");
 
     // Initialize auto-activated plugins
@@ -240,6 +244,63 @@ export class PluginManagerService {
     const plugins = await pluginRegistryRepository.getAllPlugins();
     for (const plugin of plugins) {
       this.registry.set(plugin.pluginId, plugin);
+    }
+  }
+
+  /**
+   * Restore plugins from stored ZIP files if directories are missing
+   */
+  private async restorePluginsFromZip(): Promise<void> {
+    try {
+      const { storageService } = await import("./storage.service");
+      const AdmZip = (await import("adm-zip")).default;
+
+      // Get all custom plugins that have ZIP uploads
+      const customPlugins = Array.from(this.registry.values()).filter(
+        (plugin) => plugin.sourceType === "custom" && plugin.zipUploadId,
+      );
+
+      if (customPlugins.length === 0) {
+        return;
+      }
+
+      console.log(`🔄 Checking ${customPlugins.length} custom plugins for restoration...`);
+
+      for (const plugin of customPlugins) {
+        try {
+          // Check if plugin directory exists
+          const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+          const dirExists = await fs
+            .access(pluginPath)
+            .then(() => true)
+            .catch(() => false);
+
+          if (!dirExists && plugin.zipUploadId) {
+            console.log(`📥 Restoring plugin ${plugin.name} from ZIP...`);
+
+            // Download ZIP from storage
+            const { buffer } = await storageService.download(plugin.zipUploadId);
+
+            // Extract ZIP to file system
+            const zip = new AdmZip(buffer);
+
+            // Create organization directory if needed
+            const orgDir = path.dirname(pluginPath);
+            if (!(await fs.access(orgDir).then(() => true).catch(() => false))) {
+              await fs.mkdir(orgDir, { recursive: true });
+            }
+
+            // Extract to plugin directory
+            zip.extractAllTo(pluginPath, true);
+
+            console.log(`✅ Restored plugin ${plugin.name} to ${plugin.pluginPath}`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to restore plugin ${plugin.name}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to restore plugins from ZIP:", error);
     }
   }
 

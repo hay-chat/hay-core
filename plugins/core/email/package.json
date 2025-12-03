@@ -1,0 +1,29 @@
+{
+  "name": "@hay/email-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Email plugin for Hay - Send emails using platform's SMTP service",
+  "main": "mcp/index.js",
+  "bin": {
+    "email-mcp": "mcp/index.js"
+  },
+  "scripts": {
+    "start": "node mcp/index.js",
+    "dev": "node --watch mcp/index.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector node mcp/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.25.76"
+  },
+  "keywords": [
+    "mcp",
+    "email",
+    "smtp",
+    "hay",
+    "plugin",
+    "notifications"
+  ],
+  "author": "Hay",
+  "license": "MIT"
+}

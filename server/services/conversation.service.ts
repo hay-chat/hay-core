@@ -54,7 +54,7 @@ export class ConversationService {
     }
 
     const conversation = await this.conversationRepository.create({
-      title: data.title || "New Conversation",
+      title: data.title || "",
       agent_id: agentId,
       playbook_id: data.playbook_id || null,
       organization_id: organizationId,

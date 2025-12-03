@@ -3,10 +3,6 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm">
-          <FileText class="h-4 w-4 mr-2" />
-          Import
-        </Button>
         <Button @click="createPlaybook">
           <Plus class="h-4 w-4 mr-2" />
           Create Playbook
@@ -29,13 +25,6 @@
           stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
         }% of total`"
         :icon="Play"
-      />
-      <MetricCard
-        title="Avg Success Rate"
-        :metric="`${stats.avgSuccessRate}%`"
-        subtitle="+2.1% from last month"
-        subtitle-color="green"
-        :icon="Target"
       />
       <MetricCard
         title="Total Triggers"
@@ -205,7 +194,7 @@
                   </Badge>
                 </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ playbook.created_at ? formatDate(new Date(playbook.created_at)) : '-' }}
+                  {{ playbook.created_at ? formatDate(new Date(playbook.created_at)) : "-" }}
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">

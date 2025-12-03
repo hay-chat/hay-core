@@ -60,7 +60,6 @@ export const publicConversationsRouter = t.router({
 
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
-        title: "Web Chat - " + input.metadata?.source,
         status: "open",
         language: input.language || null,
         metadata: {

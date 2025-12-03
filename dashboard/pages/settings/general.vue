@@ -28,15 +28,22 @@
           helper-text="The name of your organization"
         />
 
+        <Input
+          v-model="settings.organizationAbout"
+          type="textarea"
+          label="About Organization"
+          :rows="6"
+          placeholder="Describe what your organization does, what products or services you offer, your mission, values, etc. This information helps the AI assistant provide more contextually relevant responses."
+          helper-text="This information helps AI understand your business context. Max 10,000 characters."
+          :maxlength="10000"
+        />
+
         <!-- Organization Logo -->
         <div>
           <label class="text-sm font-medium mb-2 block">Logo</label>
           <div class="space-y-4">
             <!-- Logo Preview -->
-            <div
-              v-if="logoUpload.preview.value || organizationLogo"
-              class="flex items-start gap-4"
-            >
+            <div v-if="logoUpload.preview.value || organizationLogo" class="flex items-start gap-4">
               <img
                 :src="logoUpload.preview.value || organizationLogo || ''"
                 alt="Organization logo"
@@ -219,10 +226,7 @@
         </div>
 
         <!-- Recheck Configuration -->
-        <div
-          v-if="settings.confidenceGuardrail.enableRecheck"
-          class="space-y-4 pt-2 border-t"
-        >
+        <div v-if="settings.confidenceGuardrail.enableRecheck" class="space-y-4 pt-2 border-t">
           <div>
             <Label>Recheck Configuration</Label>
             <p class="text-sm text-neutral-muted mb-4">
@@ -549,6 +553,7 @@ type ConfidenceGuardrailSettings = {
 
 type PlatformSettings = {
   organizationName: string;
+  organizationAbout: string;
   defaultLanguage: string;
   timezone: string;
   dateFormat: string;
@@ -566,6 +571,7 @@ const originalSettings = ref<PlatformSettings>({} as PlatformSettings);
 const isSaving = ref(false);
 const settings = ref<PlatformSettings>({
   organizationName: "",
+  organizationAbout: "",
   defaultLanguage: "en",
   timezone: "UTC",
   dateFormat: "MM/DD/YYYY",
@@ -754,6 +760,7 @@ const saveSettings = async () => {
     // Save platform settings to API
     const response = await Hay.organizations.updateSettings.mutate({
       name: settings.value.organizationName,
+      about: settings.value.organizationAbout,
       defaultLanguage: settings.value.defaultLanguage as any,
       timezone: settings.value.timezone as any,
       dateFormat: settings.value.dateFormat as any,
@@ -770,7 +777,9 @@ const saveSettings = async () => {
         mediumThreshold: Number(settings.value.confidenceGuardrail.mediumThreshold),
         recheckConfig: {
           maxDocuments: Number(settings.value.confidenceGuardrail.recheckConfig.maxDocuments),
-          similarityThreshold: Number(settings.value.confidenceGuardrail.recheckConfig.similarityThreshold),
+          similarityThreshold: Number(
+            settings.value.confidenceGuardrail.recheckConfig.similarityThreshold,
+          ),
         },
       },
     });
@@ -845,6 +854,7 @@ const resetToDefaults = () => {
   if (confirm("Are you sure you want to reset all settings to their default values?")) {
     settings.value = {
       organizationName: originalSettings.value.organizationName,
+      organizationAbout: originalSettings.value.organizationAbout,
       defaultLanguage: "en",
       timezone: "UTC",
       dateFormat: "MM/DD/YYYY",
@@ -924,6 +934,7 @@ onMounted(async () => {
 
     // Update only platform settings, keep other settings as mock for now
     settings.value.organizationName = (orgSettings as any).name;
+    settings.value.organizationAbout = (orgSettings as any).about || "";
     settings.value.defaultLanguage = orgSettings.defaultLanguage;
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;

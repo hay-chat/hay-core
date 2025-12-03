@@ -2,6 +2,8 @@ import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { oauthAuthStrategy } from "./oauth-auth-strategy.service";
+import { PluginAPIService } from "./plugin-api/plugin-api.service";
+import { config } from "@server/config/env";
 
 // Type for config schema
 type ConfigSchema = NonNullable<HayPluginManifest["configSchema"]>;
@@ -24,11 +26,14 @@ export class EnvironmentManagerService {
       PATH: process.env.PATH,
       HOME: process.env.HOME,
       USER: process.env.USER,
-      // Add plugin-specific env vars
+      // Add plugin-specific env vars (legacy HAY_ prefix for backwards compatibility)
       HAY_ORGANIZATION_ID: organizationId,
       HAY_PLUGIN_NAME: instance.plugin.name,
       HAY_PLUGIN_VERSION: instance.plugin.version,
       HAY_PLUGIN_INSTANCE_ID: instance.id,
+      // Standard env vars (no prefix) for Plugin API and modern plugins
+      ORGANIZATION_ID: organizationId,
+      PLUGIN_ID: instance.plugin.pluginId,
     };
 
     // Decrypt config values
@@ -80,6 +85,38 @@ export class EnvironmentManagerService {
       } catch (error) {
         // Log but don't fail - plugin may handle missing tokens gracefully
         console.warn(`Failed to inject OAuth tokens for plugin ${instance.plugin.pluginId}:`, error);
+      }
+    }
+
+    // Inject Plugin API credentials for HTTP-based callback access
+    // This allows plugins running in separate processes to call back to the server
+    // for privileged operations like sending emails
+    if (connectionType === "local") {
+      try {
+        // Extract capabilities from manifest (permissions.api, not capabilities.api)
+        const capabilities: string[] = manifest.permissions?.api || [];
+
+        // Only inject credentials if plugin has API capabilities
+        if (capabilities.length > 0) {
+          // Generate JWT token for Plugin API access
+          const pluginAPIService = PluginAPIService.getInstance();
+          const apiToken = pluginAPIService.generateToken(
+            instance.plugin.pluginId,
+            organizationId,
+            capabilities,
+          );
+
+          // Inject Plugin API credentials (URL and token only, IDs already set above)
+          const serverUrl = `http://${config.server.host}:${config.server.port}`;
+          env.PLUGIN_API_URL = `${serverUrl}/v1/plugin-api`;
+          env.PLUGIN_API_TOKEN = apiToken;
+
+          console.log(
+            `[EnvironmentManager] Injected Plugin API credentials for ${instance.plugin.name} (capabilities: ${capabilities.join(", ")})`,
+          );
+        }
+      } catch (error) {
+        console.warn(`Failed to inject Plugin API credentials for plugin ${instance.plugin.pluginId}:`, error);
       }
     }
 

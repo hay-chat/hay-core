@@ -99,6 +99,7 @@ export interface HayPluginManifest {
     env?: string[];
     scopes?: string[];
     database?: boolean;
+    api?: string[]; // Platform API capabilities (email, scheduler, storage, etc.)
   };
   configSchema?: Record<
     string,

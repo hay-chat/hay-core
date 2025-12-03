@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 export class LocalMCPClient implements MCPClient {
   private organizationId: string;
   private pluginId: string;
+  private initialized: boolean = false;
 
   constructor(organizationId: string, pluginId: string) {
     this.organizationId = organizationId;
@@ -17,13 +18,88 @@ export class LocalMCPClient implements MCPClient {
   }
 
   /**
-   * List available tools from the local MCP server
+   * Initialize the MCP server with proper handshake
    */
-  async listTools(): Promise<MCPTool[]> {
+  private async initialize(): Promise<void> {
+    if (this.initialized) {
+      return; // Already initialized
+    }
+
+    const initRequest = {
+      jsonrpc: "2.0",
+      id: uuidv4(),
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: {
+          name: "hay",
+          version: "1.0.0",
+        },
+      },
+    };
+
+    try {
+      const result = await processManagerService.sendToPlugin(
+        this.organizationId,
+        this.pluginId,
+        "mcp_call",
+        initRequest,
+      );
+
+      const mcpResult = result as any;
+      if (mcpResult.error) {
+        throw new Error(`MCP initialization error: ${mcpResult.error.message || mcpResult.error}`);
+      }
+
+      this.initialized = true;
+      debugLog("local-mcp", `Initialized MCP server for plugin ${this.pluginId}`);
+
+      // Send initialized notification (required by MCP protocol)
+      const initializedNotification = {
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+        params: {},
+      };
+
+      // Send notification (no response expected)
+      await processManagerService.sendToPlugin(
+        this.organizationId,
+        this.pluginId,
+        "mcp_call",
+        initializedNotification,
+      ).catch(() => {
+        // Notifications don't have responses, so timeout is expected
+        debugLog("local-mcp", `Sent initialized notification to ${this.pluginId}`);
+      });
+    } catch (error) {
+      debugLog("local-mcp", `Failed to initialize MCP server`, {
+        level: "error",
+        data: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Ensure plugin is running and initialized
+   */
+  private async ensureInitialized(): Promise<void> {
     // Ensure plugin is running
     if (!processManagerService.isRunning(this.organizationId, this.pluginId)) {
       await processManagerService.startPlugin(this.organizationId, this.pluginId);
+      this.initialized = false; // Reset initialization state
     }
+
+    // Initialize if needed
+    await this.initialize();
+  }
+
+  /**
+   * List available tools from the local MCP server
+   */
+  async listTools(): Promise<MCPTool[]> {
+    await this.ensureInitialized();
 
     const request = {
       jsonrpc: "2.0",
@@ -63,10 +139,7 @@ export class LocalMCPClient implements MCPClient {
    * Call a tool on the local MCP server
    */
   async callTool(name: string, args: Record<string, unknown>): Promise<MCPCallResult> {
-    // Ensure plugin is running
-    if (!processManagerService.isRunning(this.organizationId, this.pluginId)) {
-      await processManagerService.startPlugin(this.organizationId, this.pluginId);
-    }
+    await this.ensureInitialized();
 
     const request = {
       jsonrpc: "2.0",

@@ -165,6 +165,46 @@ export class ExecutionLayer {
 
       const result = JSON.parse(response) as ExecutionResult;
 
+      // Detect and auto-correct missing step when tool is present
+      if (!result.step && result.tool) {
+        debugLog("execution", "Auto-correcting: Missing step with tool present → CALL_TOOL", {
+          level: "warn",
+          toolName: result.tool.name,
+        });
+        result.step = "CALL_TOOL";
+      }
+
+      // Detect and auto-correct step/field mismatch
+      if (result.step === "RESPOND" && result.tool && !result.userMessage) {
+        debugLog("execution", "Auto-correcting: RESPOND with tool but no userMessage → CALL_TOOL", {
+          level: "warn",
+          toolName: result.tool.name,
+          originalStep: result.step,
+        });
+        result.step = "CALL_TOOL";
+      }
+
+      // Validate CALL_TOOL steps have required tool field
+      if (result.step === "CALL_TOOL") {
+        if (!result.tool || !result.tool.name) {
+          debugLog("execution", "Invalid CALL_TOOL: missing tool or tool.name", {
+            level: "warn",
+            hasTool: !!result.tool,
+            toolName: result.tool?.name,
+          });
+          return null; // Trigger retry
+        }
+
+        // Clear userMessage from CALL_TOOL to prevent confusion
+        if (result.userMessage) {
+          debugLog("execution", "Removing userMessage from CALL_TOOL step", {
+            level: "warn",
+            toolName: result.tool.name,
+          });
+          result.userMessage = undefined;
+        }
+      }
+
       // Validate that ASK and RESPOND steps have userMessage
       if ((result.step === "ASK" || result.step === "RESPOND") && !result.userMessage) {
         debugLog("execution", "Invalid response: ASK/RESPOND without userMessage", {

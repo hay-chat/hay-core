@@ -90,7 +90,7 @@ const jobRegistry: CronJobConfig[] = [
   {
     name: "orchestrator-stale-message-check",
     description: "Detect and recover stale/lost messages",
-    schedule: 5000, // Every 5 seconds
+    schedule: 60000, // Every 60 seconds (1 minute)
     handler: async () => {
       const { config } = await import("../config/env");
       if (config.staleMessageDetection?.enabled === false) {

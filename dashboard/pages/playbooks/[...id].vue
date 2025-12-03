@@ -24,12 +24,10 @@
         <form data-testid="playbook-form" class="space-y-6" @submit.prevent="handleSubmit">
           <!-- Title Field -->
           <div class="space-y-2">
-            <label for="title" class="text-sm font-medium">
-              Playbook Title <span class="text-red-500">*</span>
-            </label>
             <Input
               id="title"
               v-model="form.title"
+              label="Title"
               placeholder="e.g., Customer Support Automation"
               :class="errors.title ? 'border-red-500' : ''"
               required
@@ -41,20 +39,21 @@
 
           <!-- Trigger Field -->
           <div class="space-y-2">
-            <label for="trigger" class="text-sm font-medium">
-              Trigger <span class="text-red-500">*</span>
-            </label>
             <Input
               id="trigger"
               v-model="form.trigger"
-              placeholder="e.g., customer_inquiry, ticket_created"
+              label="Trigger"
+              type="textarea"
+              :rows="3"
+              :placeholder="`This playbook will be activated when customer says:\n - I need help with my account...`"
               :class="errors.trigger ? 'border-red-500' : ''"
+              :character-limit="250"
+              hint="Define when this playbook should be activated"
               required
             />
             <p v-if="errors.trigger" class="text-sm text-red-500">
               {{ errors.trigger }}
             </p>
-            <p class="text-sm text-neutral-muted">Define when this playbook should be activated</p>
           </div>
 
           <!-- Description Field -->
