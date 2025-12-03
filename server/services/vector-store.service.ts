@@ -211,6 +211,104 @@ export class VectorStoreService {
   }
 
   /**
+   * Delete embeddings by conversation IDs (GDPR erasure)
+   * Searches for embeddings where metadata contains any of the given conversation IDs
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param conversationIds - Array of conversation IDs whose embeddings should be deleted
+   * @returns Number of deleted embeddings
+   */
+  async deleteByConversationIds(orgId: string, conversationIds: string[]): Promise<number> {
+    if (!conversationIds.length) {
+      return 0;
+    }
+
+    const result = await AppDataSource.query(
+      `DELETE FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+      [orgId, conversationIds],
+    );
+
+    return result[1] || 0;
+  }
+
+  /**
+   * Delete embeddings by message IDs (GDPR erasure)
+   * Searches for embeddings where metadata contains any of the given message IDs
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param messageIds - Array of message IDs whose embeddings should be deleted
+   * @returns Number of deleted embeddings
+   */
+  async deleteByMessageIds(orgId: string, messageIds: string[]): Promise<number> {
+    if (!messageIds.length) {
+      return 0;
+    }
+
+    const result = await AppDataSource.query(
+      `DELETE FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+      [orgId, messageIds],
+    );
+
+    return result[1] || 0;
+  }
+
+  /**
+   * Find embeddings by conversation IDs (for GDPR export)
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param conversationIds - Array of conversation IDs
+   * @returns Array of embeddings with their metadata
+   */
+  async findByConversationIds(
+    orgId: string,
+    conversationIds: string[],
+  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+    if (!conversationIds.length) {
+      return [];
+    }
+
+    const results = await AppDataSource.query(
+      `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
+       FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+      [orgId, conversationIds],
+    );
+
+    return results || [];
+  }
+
+  /**
+   * Find embeddings by message IDs (for GDPR export)
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param messageIds - Array of message IDs
+   * @returns Array of embeddings with their metadata
+   */
+  async findByMessageIds(
+    orgId: string,
+    messageIds: string[],
+  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+    if (!messageIds.length) {
+      return [];
+    }
+
+    const results = await AppDataSource.query(
+      `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
+       FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+      [orgId, messageIds],
+    );
+
+    return results || [];
+  }
+
+  /**
    * Get embedding statistics for an organization
    *
    * @param orgId - Organization ID
