@@ -136,7 +136,6 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Info,
   AlertTriangle,
   Home,
   RefreshCw,
@@ -252,7 +251,8 @@ const startDownload = async () => {
     let fileName: string;
 
     // Handle ZIP format (new) vs JSON format (legacy)
-    if (result.isZip && result.base64Data) {
+    // Type guard: check if base64Data exists in result
+    if ("base64Data" in result && result.base64Data) {
       // Decode base64 to binary
       const binaryString = atob(result.base64Data);
       const bytes = new Uint8Array(binaryString.length);
