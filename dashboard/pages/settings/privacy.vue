@@ -100,7 +100,6 @@
 
     <!-- Error Alert -->
     <Alert v-if="errorState.type" variant="destructive" class="mb-6">
-      <AlertCircle class="h-4 w-4" />
       <AlertTitle>
         {{ errorState.type === "rate_limit" ? "Too Many Requests" : "Error" }}
       </AlertTitle>
