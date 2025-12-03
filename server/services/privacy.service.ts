@@ -1483,6 +1483,7 @@ export class PrivacyService {
             metadata: msg.metadata,
             sentiment: msg.sentiment,
             intent: msg.intent,
+            attachments: msg.attachments || [],
           })),
         };
       }),
@@ -1573,6 +1574,11 @@ export class PrivacyService {
             (sum, conv) => sum + conv.messages.length,
             0,
           ),
+          totalAttachments: conversationsWithMessages.reduce(
+            (sum, conv) =>
+              sum + conv.messages.reduce((msgSum, msg) => msgSum + (msg.attachments?.length || 0), 0),
+            0,
+          ),
           totalEmbeddings: embeddings.length,
         },
       },
@@ -1661,7 +1667,7 @@ export class PrivacyService {
   }
 
   /**
-   * Create a signed ZIP export file containing data.json, README.md, and manifest.json
+   * Create a signed ZIP export file containing data.json, README.md, manifest.json, and attachments
    */
   private async createSignedZipExport(
     exportData: any,
@@ -1674,23 +1680,110 @@ export class PrivacyService {
     const zipFileName = `customer-export-${requestId}.zip`;
     const zipFilePath = path.join(exportDir, zipFileName);
 
+    // Collect all attachments from conversations/messages
+    const attachments: Array<{
+      messageId: string;
+      conversationId: string;
+      id: string;
+      name: string;
+      url: string;
+      type: string;
+      size: number;
+    }> = [];
+
+    if (exportData.personalData?.conversations) {
+      for (const conv of exportData.personalData.conversations) {
+        for (const msg of conv.messages || []) {
+          for (const attachment of msg.attachments || []) {
+            attachments.push({
+              messageId: msg.id,
+              conversationId: conv.id,
+              ...attachment,
+            });
+          }
+        }
+      }
+    }
+
+    // Download attachments and prepare for archive
+    const downloadedFiles: Array<{
+      path: string;
+      buffer: Buffer;
+      originalUrl: string;
+    }> = [];
+
+    for (const attachment of attachments) {
+      try {
+        // Handle local file paths vs URLs
+        if (attachment.url.startsWith("/") || attachment.url.startsWith("./")) {
+          // Local file - read directly
+          const localPath = path.join(process.cwd(), "uploads", attachment.url.replace(/^\.?\//, ""));
+          try {
+            const fileBuffer = await fs.readFile(localPath);
+            downloadedFiles.push({
+              path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
+              buffer: fileBuffer,
+              originalUrl: attachment.url,
+            });
+          } catch (err) {
+            console.warn(`[Privacy] Could not read local attachment: ${localPath}`, err);
+          }
+        } else if (attachment.url.startsWith("http")) {
+          // Remote URL - download
+          try {
+            const response = await fetch(attachment.url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              downloadedFiles.push({
+                path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
+                buffer: Buffer.from(arrayBuffer),
+                originalUrl: attachment.url,
+              });
+            }
+          } catch (err) {
+            console.warn(`[Privacy] Could not download attachment: ${attachment.url}`, err);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Privacy] Error processing attachment ${attachment.id}:`, err);
+      }
+    }
+
     // Prepare JSON data
     const dataJson = JSON.stringify(exportData, null, 2);
 
-    // Generate manifest
+    // Generate manifest with attachments
+    const fileList = ["data.json", "README.md", "manifest.json", "signature.txt"];
+    if (downloadedFiles.length > 0) {
+      fileList.push(...downloadedFiles.map((f) => f.path));
+    }
+
     const manifest = {
       version: "2.0",
       exportId: requestId,
       exportDate: exportData.exportDate,
       dataSubject: exportData.dataSubject,
-      statistics: exportData.personalData.statistics,
+      statistics: {
+        ...exportData.personalData.statistics,
+        totalAttachments: attachments.length,
+        downloadedAttachments: downloadedFiles.length,
+      },
       format: "GDPR DSAR Export",
-      files: ["data.json", "README.md", "manifest.json"],
+      files: fileList,
+      attachments: attachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        messageId: a.messageId,
+        conversationId: a.conversationId,
+        type: a.type,
+        size: a.size,
+        included: downloadedFiles.some((f) => f.originalUrl === a.url),
+      })),
     };
     const manifestJson = JSON.stringify(manifest, null, 2);
 
-    // Generate README
-    const readme = this.generateExportReadme(exportData, requestId);
+    // Generate README with attachment info
+    const readme = this.generateExportReadme(exportData, requestId, attachments.length, downloadedFiles.length);
 
     // Sign the data (HMAC-SHA256 of data.json content)
     const signature = this.signExportData(dataJson);
@@ -1710,6 +1803,12 @@ export class PrivacyService {
       archive.append(readme, { name: "README.md" });
       archive.append(manifestJson, { name: "manifest.json" });
       archive.append(signature, { name: "signature.txt" });
+
+      // Add downloaded attachments
+      for (const file of downloadedFiles) {
+        archive.append(file.buffer, { name: file.path });
+      }
+
       archive.finalize();
     });
 
@@ -1719,12 +1818,34 @@ export class PrivacyService {
   /**
    * Generate README.md for the export package
    */
-  private generateExportReadme(exportData: any, requestId: string): string {
+  private generateExportReadme(
+    exportData: any,
+    requestId: string,
+    totalAttachments: number = 0,
+    downloadedAttachments: number = 0,
+  ): string {
     const stats = exportData.personalData.statistics;
     const exportDate = new Date(exportData.exportDate).toLocaleString("en-US", {
       dateStyle: "full",
       timeStyle: "long",
     });
+
+    const attachmentSection =
+      totalAttachments > 0
+        ? `
+### File Attachments
+${totalAttachments} file attachment(s) found:
+- ${downloadedAttachments} successfully included in this archive
+- Located in the \`attachments/\` folder, organized by conversation ID
+${totalAttachments !== downloadedAttachments ? `- ${totalAttachments - downloadedAttachments} file(s) could not be retrieved (may have been deleted or are inaccessible)` : ""}
+`
+        : "";
+
+    const attachmentFilesRow =
+      downloadedAttachments > 0
+        ? `| attachments/ | File attachments from your conversations |
+`
+        : "";
 
     return `# GDPR Data Export
 
@@ -1733,7 +1854,7 @@ export class PrivacyService {
 - **Export ID:** ${requestId}
 - **Export Date:** ${exportDate}
 - **Customer ID:** ${exportData.dataSubject.customerId}
-- **Export Format:** JSON (data.json)
+- **Export Format:** ZIP Archive with JSON data
 
 ## Contents
 
@@ -1745,7 +1866,7 @@ This archive contains your personal data as required under GDPR Article 15 (Righ
 | manifest.json | Export metadata and file listing |
 | README.md | This documentation file |
 | signature.txt | Cryptographic signature for data integrity verification |
-
+${attachmentFilesRow}
 ## Data Included
 
 ### Profile Information
@@ -1760,7 +1881,7 @@ ${stats.totalConversations} conversation(s) containing:
 - ${stats.totalMessages} message(s)
 - Timestamps and metadata
 - Message content and direction
-
+${attachmentSection}
 ### Embeddings
 ${stats.totalEmbeddings || 0} embedding(s):
 - Vectorized representations of your message content
