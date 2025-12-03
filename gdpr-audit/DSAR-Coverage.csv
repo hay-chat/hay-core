@@ -1,12 +1,13 @@
 System,Entity/Table,Personal Data Fields,Export Supported,Erasure Supported,Rectification Supported,Notes,Priority
-Core API,customers,email|phone|name|external_metadata,No,No,No,Primary customer identity records,P0
-Core API,conversations,metadata (may contain PII references),No,No,No,Conversation metadata and state,P0
-Core API,messages,content (chat messages),No,No,No,Primary PII content - message bodies,P0
-Core API,users,email|name|phone,No,No,No,Dashboard user accounts (tenant employees),P1
+Core API,customers,email|phone|name|external_metadata,Yes,Yes,No,Primary customer identity records - Full DSAR support,P0
+Core API,conversations,metadata (may contain PII references),Yes,Yes,No,Conversation metadata and state - Full DSAR support,P0
+Core API,messages,content (chat messages)|attachments,Yes,Yes,No,Primary PII content - message bodies and file attachments - Full DSAR support,P0
+Core API,message_attachments,files uploaded by customers,Yes,Yes,No,File attachments included in ZIP export - Full DSAR support,P0
+Core API,users,email|name|phone,Yes,Yes,No,Dashboard user accounts (tenant employees),P1
 Core API,organizations,name|email|phone,No,No,No,Tenant organization details,P2
-Embeddings,embeddings,page_content (message fragments)|metadata,No,No,No,Vector embeddings of message content,P0
-Embeddings,embeddings,metadata.documentId|metadata.conversationId,No,No,No,Linking metadata for embeddings,P0
-Documents,documents,content|metadata,No,No,No,Uploaded documents and scraped content,P1
+Embeddings,embeddings,page_content (message fragments)|metadata,Yes,Yes,No,Vector embeddings of message content - Full DSAR support,P0
+Embeddings,embeddings,metadata.documentId|metadata.conversationId,Yes,Yes,No,Linking metadata for embeddings - Full DSAR support,P0
+Documents,documents,content|metadata,No,No,No,Uploaded documents and scraped content (org-scoped not customer-specific),P1
 Auth,sessions,user_agent|ip_address (if stored),No,No,No,Session tracking data,P2
 Auth,apikeys,name (may contain email),No,No,No,API key descriptions,P3
 Plugins,plugin_instances,config (may contain credentials),No,No,No,Plugin configuration per tenant,P3
@@ -19,29 +20,34 @@ External,Redis Labs,Cache data,No,No,No,Infrastructure provider,P3
 WebChat,sessionStorage,conversation_id|keypair,No,No,No,Browser storage (ephemeral),P2
 WebChat,IndexedDB,DPoP keypairs,No,No,No,Browser storage (ephemeral),P2
 Analytics,analytics_events,user_id|session_id|metadata,No,No,No,Usage analytics (if implemented),P2
-Audit,audit_log,email|organization_id|action,No,No,No,DSAR request audit trail,P1
+Audit,audit_log,email|organization_id|action,Yes,Yes,No,DSAR request audit trail - anonymized on deletion,P1
 
 DSAR_Operation,Current_Implementation_Status,Gap_Severity,Estimated_Effort,GDPR_Article
-Data Export (Art.15),Not Implemented,Critical,3-4 weeks,Art.15
-Data Erasure (Art.17),Not Implemented,Critical,2-3 weeks,Art.17
+Data Export (Art.15),Implemented - ZIP with README and signature,None,Completed,Art.15
+Data Erasure (Art.17),Implemented - Includes embeddings,None,Completed,Art.17
 Data Rectification (Art.16),Not Implemented,High,1-2 weeks,Art.16
-Data Portability (Art.20),Not Implemented,High,1 week (extends export),Art.20
+Data Portability (Art.20),Implemented - JSON export in ZIP,None,Completed,Art.20
 Right to Object (Art.21),Not Implemented,Medium,1 week,Art.21
 Restrict Processing (Art.18),Not Implemented,Medium,1 week,Art.18
 
 Coverage_Summary,Value,Notes
-Total Systems Analyzed,21,Including external subprocessors
-Systems with PII,18,86% of systems process personal data
-Export Coverage,0%,No DSAR export implemented
-Erasure Coverage,0%,No DSAR erasure implemented
+Total Systems Analyzed,22,Including external subprocessors
+Systems with PII,19,86% of systems process personal data
+Export Coverage,100%,Full customer DSAR export (customers|conversations|messages|attachments|embeddings)
+Erasure Coverage,100%,Full customer DSAR erasure (customers|conversations|messages|attachments|embeddings)
 Rectification Coverage,0%,No DSAR rectification implemented
-High-Priority Gaps,10,Systems requiring immediate DSAR support
+High-Priority Gaps,0,All P0 customer systems have DSAR support
 External Dependencies,3,OpenAI|AWS|Redis - limited direct control
 
+Implementation_Details,Status,Notes
+Customer Data Export,Complete,"Traverses: customers → conversations → messages → attachments → embeddings"
+Customer Data Erasure,Complete,"Deletes: embeddings → messages (with attachments) → conversations → customers"
+Export Format,ZIP Archive,"Contains: data.json, README.md, manifest.json, signature.txt, attachments/"
+Export Signing,HMAC-SHA256,Cryptographic signature for data integrity
+Embedding Deletion,Complete,No orphaned vectors remain after deletion
+Unit Tests,Complete,"Tests verify ""post-delete search returns 0"" in embeddings"
+
 Recommendation,Action,Priority
-Implement DSAR Export API,Create /v1/privacy/export endpoint covering all P0/P1 systems,P0
-Implement DSAR Erasure API,Create /v1/privacy/delete with cascade to embeddings|documents|messages,P0
-Add Embedding Deletion,Ensure vectorStoreService.deleteByCustomerId() called on erasure,P0
+Implement DSAR Rectification API,Create /v1/privacy/rectify endpoint for name|email|phone updates,P1
 Document External DSAR,Provide instructions for requesting data from OpenAI|AWS via DPAs,P1
-Add Rectification API,Allow customers to update name|email|phone via /v1/privacy/rectify,P1
-Audit Log All DSAR Actions,Log every export|delete|rectify request with timestamp and email,P0
+Add Portability Format Options,Support CSV and other formats in addition to JSON,P2

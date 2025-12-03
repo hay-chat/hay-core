@@ -38,7 +38,7 @@
           <Alert>
             <AlertTitle>Your Export is Ready</AlertTitle>
             <AlertDescription>
-              Click the button below to download your personal data export in JSON format.
+              Click the button below to download your personal data export.
             </AlertDescription>
           </Alert>
 
@@ -46,10 +46,10 @@
             <h4 class="font-medium">What's included:</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
               <li>Profile information and account settings</li>
-              <li>Organization memberships and roles</li>
-              <li>API keys metadata (no secrets)</li>
-              <li>Audit logs (last 1000 events)</li>
-              <li>Documents and content</li>
+              <li>Conversation history and messages</li>
+              <li>Embeddings (vectorized data)</li>
+              <li>Cryptographic signature for verification</li>
+              <li>README with data structure documentation</li>
             </ul>
           </div>
 
@@ -61,7 +61,7 @@
           </div>
 
           <p class="text-xs text-neutral-muted text-center">
-            File size: {{ fileSize }} • Format: JSON
+            File size: {{ fileSize }} • Format: {{ exportFormat }}
           </p>
         </div>
 
@@ -77,7 +77,7 @@
           <div class="space-y-2">
             <h4 class="font-medium">Next Steps:</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>Review your data in the downloaded JSON file</li>
+              <li>Extract and review your data in the downloaded ZIP file</li>
               <li>Store the file securely as it contains personal information</li>
               <li>This download link will expire in 7 days</li>
             </ul>
@@ -136,7 +136,6 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Info,
   AlertTriangle,
   Home,
   RefreshCw,
@@ -152,6 +151,9 @@ const error = ref(false);
 const errorMessage = ref("");
 const fileSize = ref("~500 KB");
 const exportData = ref<any>(null);
+const isZipFormat = ref(true);
+
+const exportFormat = computed(() => (isZipFormat.value ? "ZIP Archive" : "JSON"));
 
 const requestId = computed(() => route.query.requestId as string);
 const downloadToken = computed(() => route.query.token as string);
@@ -245,16 +247,36 @@ const startDownload = async () => {
       downloadToken: downloadToken.value,
     });
 
-    exportData.value = result.data;
+    let blob: Blob;
+    let fileName: string;
 
-    // Create a blob and download
-    const blob = new Blob([JSON.stringify(result.data, null, 2)], {
-      type: "application/json",
-    });
+    // Handle ZIP format (new) vs JSON format (legacy)
+    // Type guard: check if base64Data exists in result
+    if ("base64Data" in result && result.base64Data) {
+      // Decode base64 to binary
+      const binaryString = atob(result.base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      blob = new Blob([bytes], { type: "application/zip" });
+      fileName = result.fileName || "data-export.zip";
+      isZipFormat.value = true;
+    } else {
+      // Legacy JSON format
+      exportData.value = result.data;
+      blob = new Blob([JSON.stringify(result.data, null, 2)], {
+        type: "application/json",
+      });
+      fileName = result.fileName || "data-export.json";
+      isZipFormat.value = false;
+    }
+
+    // Create download link
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = result.fileName || "data-export.json";
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
