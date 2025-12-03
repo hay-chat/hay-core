@@ -77,7 +77,7 @@
           <div class="space-y-2">
             <h4 class="font-medium">Next Steps:</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>Review your data in the downloaded JSON file</li>
+              <li>Extract and review your data in the downloaded ZIP file</li>
               <li>Store the file securely as it contains personal information</li>
               <li>This download link will expire in 7 days</li>
             </ul>
