@@ -131,6 +131,27 @@ export class StorageService {
   }
 
   /**
+   * Download file from storage and return buffer
+   */
+  async download(uploadId: string): Promise<{ buffer: Buffer; upload: Upload }> {
+    // 1. Fetch upload record
+    const upload = await Upload.findOne({ where: { id: uploadId } });
+    if (!upload) {
+      throw new Error(`Upload not found: ${uploadId}`);
+    }
+
+    // 2. Download from storage
+    let buffer: Buffer;
+    if (upload.storageType === "s3") {
+      buffer = await this.downloadS3(upload.path);
+    } else {
+      buffer = await this.downloadLocal(upload.path);
+    }
+
+    return { buffer, upload };
+  }
+
+  /**
    * Delete file from storage and database
    */
   async delete(uploadId: string): Promise<void> {
@@ -292,6 +313,48 @@ export class StorageService {
     });
 
     await upload.done();
+  }
+
+  /**
+   * Download from local storage
+   */
+  private async downloadLocal(filePath: string): Promise<Buffer> {
+    const fullPath = path.join(config.storage.local.uploadDir, filePath);
+
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    return await fs.promises.readFile(fullPath);
+  }
+
+  /**
+   * Download from S3
+   */
+  private async downloadS3(filePath: string): Promise<Buffer> {
+    if (!this.s3Client) {
+      throw new Error("S3 client not initialized");
+    }
+
+    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+
+    const command = new GetObjectCommand({
+      Bucket: config.storage.s3.bucket!,
+      Key: filePath,
+    });
+
+    const response = await this.s3Client.send(command);
+
+    if (!response.Body) {
+      throw new Error(`Failed to download file from S3: ${filePath}`);
+    }
+
+    // Convert stream to buffer
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
   }
 
   /**

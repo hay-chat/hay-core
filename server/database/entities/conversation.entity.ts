@@ -777,9 +777,19 @@ The following tools are available for you to use. You MUST return only valid JSO
     const { PromptService } = await import("../../services/prompt.service");
     const promptService = PromptService.getInstance();
 
+    // Load organization data to get name and about
+    const { organizationRepository } = await import("../../repositories/organization.repository");
+    const organization = await organizationRepository.findById(this.organization_id);
+
+    // Prepare variables for prompt rendering
+    const variables = {
+      organizationName: organization?.name || "",
+      organizationAbout: organization?.about || "",
+    };
+
     const systemContent = await promptService.getPrompt(
       "conversation/system-instructions",
-      {},
+      variables,
       { organizationId: this.organization_id },
     );
 

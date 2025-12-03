@@ -31,6 +31,9 @@ export class Organization extends BaseEntity {
   @Column({ type: "varchar", length: 500, nullable: true })
   description?: string;
 
+  @Column({ type: "text", nullable: true })
+  about?: string;
+
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
 

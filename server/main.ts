@@ -312,6 +312,10 @@ async function startServer() {
     await pluginUploadService.handleDelete(req, res);
   });
 
+  // Plugin API routes - secure HTTP endpoints for plugins to call back to the server
+  const pluginAPIRouter = await import("@server/routes/v1/plugin-api");
+  server.use("/v1/plugin-api", pluginAPIRouter.default);
+
   // Create dynamic router with plugin routes (after plugins are loaded)
   const { createV1Router } = await import("@server/routes/v1");
   const dynamicRouter = createV1Router();

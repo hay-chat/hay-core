@@ -27,7 +27,7 @@ export async function generateConversationTitle(
     }
 
     // Only generate title if not already set or if forced
-    if (!force && conversation.title && conversation.title !== "New Conversation") {
+    if (!force && conversation.title && conversation.title.trim() !== "") {
       return;
     }
 

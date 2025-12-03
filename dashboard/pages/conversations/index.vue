@@ -172,7 +172,7 @@
                 <div class="flex items-center space-x-3">
                   <div>
                     <div class="font-medium">
-                      {{ conversation.title || "Untitled Conversation" }}
+                      {{ conversation.title || "New Conversation" }}
                     </div>
                     <div class="text-xs text-neutral-muted">
                       {{ conversation.id.slice(0, 8) }}...

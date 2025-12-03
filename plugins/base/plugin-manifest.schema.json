@@ -352,6 +352,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "api": {
+          "type": "array",
+          "description": "Platform API capabilities this plugin requires access to (Plugin API pattern). Plugins can only access APIs they explicitly declare.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "email"
+            ]
+          },
+          "uniqueItems": true
         }
       }
     },

@@ -48,6 +48,7 @@ const confidenceGuardrailSchema = z.object({
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  about: z.string().max(10000).optional(),
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
@@ -185,6 +186,7 @@ export const organizationsRouter = t.router({
 
       return {
         name: organization.name,
+        about: organization.about || "",
         defaultLanguage: organization.defaultLanguage,
         dateFormat: organization.dateFormat,
         timeFormat: organization.timeFormat,
@@ -242,6 +244,7 @@ export const organizationsRouter = t.router({
         message: "Settings updated successfully",
         data: {
           name: updatedOrg.name,
+          about: updatedOrg.about,
           defaultLanguage: updatedOrg.defaultLanguage,
           dateFormat: updatedOrg.dateFormat,
           timeFormat: updatedOrg.timeFormat,

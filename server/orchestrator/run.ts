@@ -249,10 +249,6 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
-  if (conversation?.needs_processing) {
-    debugLog("orchestrator", "Running conversation", { conversationId });
-  }
-
   try {
     // Increment processing attempts
     await conversationRepository.updateById(conversation.id, {
@@ -535,6 +531,31 @@ export const runConversation = async (conversationId: string) => {
       stuck_reason: null,
     });
 
+    // Generate conversation title if still empty and enough messages exist
+    if (!conversation.title || conversation.title.trim() === "") {
+      const publicMessages = await conversation.getPublicMessages();
+      const customerMessages = publicMessages.filter((m) => m.type === MessageType.CUSTOMER);
+
+      // Generate title after at least 2 customer messages
+      if (customerMessages.length >= 2) {
+        debugLog("orchestrator", "Generating conversation title", {
+          conversationId: conversation.id,
+          customerMessagesCount: customerMessages.length,
+        });
+
+        // Generate title asynchronously (don't block processing)
+        const { generateConversationTitle } = await import("./conversation-utils");
+        generateConversationTitle(conversation.id, conversation.organization_id, false).catch(
+          (error) => {
+            debugLog("orchestrator", "Error generating title during processing", {
+              level: "warn",
+              error: error instanceof Error ? error.message : String(error),
+            });
+          },
+        );
+      }
+    }
+
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
     if (
@@ -637,6 +658,15 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     // Reset empty retry counter on successful response
     emptyRetries = 0;
 
+    debugLog("orchestrator", "Processing execution result", {
+      step: executionResult.step,
+      hasUserMessage: !!executionResult.userMessage,
+      hasTool: !!executionResult.tool,
+      toolName: executionResult.tool?.name,
+      hasHandoff: !!executionResult.handoff,
+      hasClose: !!executionResult.close,
+    });
+
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       // Create unified tool message with initial state
       const toolMessageId = await conversation.addMessage({
@@ -650,7 +680,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       });
 
       // Execute the tool with the message ID for updating
-      const toolResult = await toolExecutionService.handleToolExecution(
+      await toolExecutionService.handleToolExecution(
         conversation,
         executionResult.tool,
         toolMessageId?.id,
@@ -844,10 +874,28 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
         // Save confidence log if available
         await saveConfidenceLog(conversation, executionResult);
 
+        // Detect if message claims action without executing tool
+        if (executionResult.tool && executionResult.tool.name) {
+          debugLog(
+            "orchestrator",
+            "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
+            {
+              level: "error",
+              toolName: executionResult.tool.name,
+              messagePreview: executionResult.userMessage.substring(0, 100),
+            },
+          );
+        }
+
         await conversation.addMessage({
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
-          metadata: buildMessageMetadata(executionResult),
+          metadata: {
+            ...buildMessageMetadata(executionResult),
+            ...(executionResult.tool
+              ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
+              : {}),
+          },
         });
         debugLog(
           "orchestrator",
@@ -866,6 +914,9 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           step: executionResult.step,
           emptyRetries,
           maxEmptyRetries: MAX_EMPTY_RETRIES,
+          hasTool: !!executionResult.tool,
+          toolName: executionResult.tool?.name,
+          possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool,
         });
 
         // If we've retried too many times, use a fallback response

@@ -1,0 +1,75 @@
+{
+  "$schema": "../../base/plugin-manifest.schema.json",
+  "id": "email",
+  "name": "Email",
+  "description": "Send emails using the platform's email service with configurable recipient lists",
+  "version": "1.0.0",
+  "author": "Hay",
+  "type": ["mcp-connector"],
+  "entry": "./dist/index.js",
+  "enabled": true,
+  "category": "utility",
+  "icon": "mail",
+  "marketplace": {
+    "featured": false,
+    "tags": ["email", "notifications", "communication", "smtp", "utility"]
+  },
+  "permissions": {
+    "api": ["email"]
+  },
+  "configSchema": {
+    "recipients": {
+      "type": "string",
+      "description": "Comma-separated list of email addresses to send emails to",
+      "label": "Recipients",
+      "placeholder": "user1@example.com, user2@example.com",
+      "required": true,
+      "regex": "^\\s*[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(\\s*,\\s*[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})*\\s*$",
+      "env": "EMAIL_RECIPIENTS"
+    }
+  },
+  "capabilities": {
+    "mcp": {
+      "connection": {
+        "type": "local"
+      },
+      "serverPath": "mcp/index.js",
+      "tools": [
+        {
+          "name": "healthcheck",
+          "label": "Health Check",
+          "description": "Check if the email plugin is working correctly and return configuration status",
+          "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+          }
+        },
+        {
+          "name": "send-email",
+          "label": "Send Email",
+          "description": "Send an email to configured recipients using the platform's email service. The email will be sent from the platform's default sender address.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "subject": {
+                "type": "string",
+                "description": "Email subject line",
+                "minLength": 1
+              },
+              "body": {
+                "type": "string",
+                "description": "Email body content (plain text)",
+                "minLength": 1
+              }
+            },
+            "required": ["subject", "body"]
+          }
+        }
+      ],
+      "transport": "stdio",
+      "installCommand": "npm install",
+      "startCommand": "node mcp/index.js"
+    }
+  }
+}
