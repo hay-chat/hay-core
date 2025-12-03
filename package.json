@@ -49,8 +49,6 @@
     "generate:trpc": "cd dashboard && npm run generate:trpc",
     "postinstall": "git submodule update --init --recursive && cd dashboard && nuxt prepare"
   },
-  "dependencies": {},
-  "devDependencies": {},
   "overrides": {
     "vite": "^6.0.0"
   },

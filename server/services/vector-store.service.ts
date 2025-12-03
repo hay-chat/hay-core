@@ -12,7 +12,7 @@ import { TypeORMVectorStore } from "@langchain/community/vectorstores/typeorm";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
-import type { DataSourceOptions } from "typeorm";
+import type { DataSourceOptions, EntityManager } from "typeorm";
 
 export interface VectorChunk {
   content: string;
@@ -183,10 +183,19 @@ export class VectorStoreService {
    *
    * @param orgId - Organization ID for additional security
    * @param docId - Document ID whose embeddings should be deleted
+   * @param manager - Optional transaction manager for atomic operations
    * @returns Number of deleted embeddings
    */
-  async deleteByDocumentId(orgId: string, docId: string): Promise<number> {
-    const result = await AppDataSource.query(
+  async deleteByDocumentId(orgId: string, docId: string, manager?: EntityManager): Promise<number> {
+    // Validate UUIDs
+    const { validateUuid } = await import("../lib/validation/uuid");
+    validateUuid(orgId, "organizationId");
+    validateUuid(docId, "documentId");
+
+    // Use transaction manager if provided, otherwise use AppDataSource
+    const queryRunner = manager?.queryRunner || AppDataSource;
+
+    const result = await queryRunner.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
       [orgId, docId],
     );
@@ -199,15 +208,155 @@ export class VectorStoreService {
    * Use with caution - this deletes all embeddings for an organization
    *
    * @param orgId - Organization ID whose embeddings should be deleted
+   * @param manager - Optional transaction manager for atomic operations
    * @returns Number of deleted embeddings
    */
-  async deleteByOrganizationId(orgId: string): Promise<number> {
-    const result = await AppDataSource.query(
+  async deleteByOrganizationId(orgId: string, manager?: EntityManager): Promise<number> {
+    // Validate UUID
+    const { validateUuid } = await import("../lib/validation/uuid");
+    validateUuid(orgId, "organizationId");
+
+    // Use transaction manager if provided, otherwise use AppDataSource
+    const queryRunner = manager?.queryRunner || AppDataSource;
+
+    const result = await queryRunner.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1`,
       [orgId],
     );
 
     return result[1]; // Returns affected row count
+  }
+
+  /**
+   * Delete embeddings by conversation IDs (GDPR erasure)
+   * Searches for embeddings where metadata contains any of the given conversation IDs
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param conversationIds - Array of conversation IDs whose embeddings should be deleted
+   * @param manager - Optional transaction manager for atomic operations
+   * @returns Number of deleted embeddings
+   */
+  async deleteByConversationIds(
+    orgId: string,
+    conversationIds: string[],
+    manager?: EntityManager,
+  ): Promise<number> {
+    if (!conversationIds.length) {
+      return 0;
+    }
+
+    // Validate UUIDs
+    const { validateUuid, validateUuidArray } = await import("../lib/validation/uuid");
+    validateUuid(orgId, "organizationId");
+    const validIds = validateUuidArray(conversationIds, "conversationIds");
+
+    if (!validIds.length) {
+      return 0;
+    }
+
+    // Use transaction manager if provided, otherwise use AppDataSource
+    const queryRunner = manager?.queryRunner || AppDataSource;
+
+    const result = await queryRunner.query(
+      `DELETE FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+      [orgId, validIds],
+    );
+
+    return result[1] || 0;
+  }
+
+  /**
+   * Delete embeddings by message IDs (GDPR erasure)
+   * Searches for embeddings where metadata contains any of the given message IDs
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param messageIds - Array of message IDs whose embeddings should be deleted
+   * @param manager - Optional transaction manager for atomic operations
+   * @returns Number of deleted embeddings
+   */
+  async deleteByMessageIds(
+    orgId: string,
+    messageIds: string[],
+    manager?: EntityManager,
+  ): Promise<number> {
+    if (!messageIds.length) {
+      return 0;
+    }
+
+    // Validate UUIDs
+    const { validateUuid, validateUuidArray } = await import("../lib/validation/uuid");
+    validateUuid(orgId, "organizationId");
+    const validIds = validateUuidArray(messageIds, "messageIds");
+
+    if (!validIds.length) {
+      return 0;
+    }
+
+    // Use transaction manager if provided, otherwise use AppDataSource
+    const queryRunner = manager?.queryRunner || AppDataSource;
+
+    const result = await queryRunner.query(
+      `DELETE FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+      [orgId, validIds],
+    );
+
+    return result[1] || 0;
+  }
+
+  /**
+   * Find embeddings by conversation IDs (for GDPR export)
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param conversationIds - Array of conversation IDs
+   * @returns Array of embeddings with their metadata
+   */
+  async findByConversationIds(
+    orgId: string,
+    conversationIds: string[],
+  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+    if (!conversationIds.length) {
+      return [];
+    }
+
+    const results = await AppDataSource.query(
+      `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
+       FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'conversationId')::uuid = ANY($2::uuid[])`,
+      [orgId, conversationIds],
+    );
+
+    return results || [];
+  }
+
+  /**
+   * Find embeddings by message IDs (for GDPR export)
+   *
+   * @param orgId - Organization ID for security filtering
+   * @param messageIds - Array of message IDs
+   * @returns Array of embeddings with their metadata
+   */
+  async findByMessageIds(
+    orgId: string,
+    messageIds: string[],
+  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+    if (!messageIds.length) {
+      return [];
+    }
+
+    const results = await AppDataSource.query(
+      `SELECT id, page_content as "pageContent", metadata, created_at as "createdAt"
+       FROM embeddings
+       WHERE "organization_id" = $1
+       AND (metadata->>'messageId')::uuid = ANY($2::uuid[])`,
+      [orgId, messageIds],
+    );
+
+    return results || [];
   }
 
   /**
