@@ -101,8 +101,8 @@ interface DocumentPreview {
   categories?: string[];
   sourceUrl?: string;
   importMethod?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const props = defineProps<{
