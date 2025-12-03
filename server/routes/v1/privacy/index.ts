@@ -320,6 +320,7 @@ export const privacyRouter = t.router({
    * Download export data
    * Requires valid request ID and download token
    * Supports both JSON (legacy) and ZIP (new) formats
+   * Rate limited: 20 downloads per hour per IP
    */
   downloadExport: publicProcedure
     .input(
@@ -329,8 +330,24 @@ export const privacyRouter = t.router({
       }),
     )
     .query(async ({ input, ctx }) => {
+      const ipAddress = ctx.ipAddress || "unknown";
+
       try {
-        const ipAddress = ctx.ipAddress || "unknown";
+        // Rate limit: 20 download attempts per hour per IP
+        const rateLimitResult = await rateLimitService.checkIpRateLimit(
+          ipAddress,
+          20, // max 20 attempts
+          3600, // per hour
+          false, // fail-open (don't block if Redis is down)
+        );
+
+        if (rateLimitResult.limited) {
+          const timeRemaining = formatTimeRemaining(rateLimitResult.resetAt);
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `Too many download attempts. Please try again in ${timeRemaining}.`,
+          });
+        }
 
         const result = await privacyService.downloadExport(
           input.requestId,
@@ -363,8 +380,8 @@ export const privacyRouter = t.router({
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
+          code: error instanceof TRPCError ? error.code : "INTERNAL_SERVER_ERROR",
+          message: `Failed to download export: ${message}`,
         });
       }
     }),
