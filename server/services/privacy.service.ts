@@ -5,6 +5,7 @@ import { User } from "@server/entities/user.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Document } from "@server/entities/document.entity";
+import { Upload } from "@server/entities/upload.entity";
 import { Job, JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
@@ -625,6 +626,7 @@ export class PrivacyService {
     const apiKeyRepository = AppDataSource.getRepository(ApiKey);
     const auditLogRepository = AppDataSource.getRepository(AuditLog);
     const documentRepository = AppDataSource.getRepository(Document);
+    const uploadRepository = AppDataSource.getRepository(Upload);
 
     // Get user profile
     const user = await userRepository.findOne({
@@ -647,10 +649,16 @@ export class PrivacyService {
       take: 1000, // Limit to last 1000 events
     });
 
-    // Get documents
+    // Get documents created/updated by this user
     const documents = await documentRepository.find({
       where: [{ createdBy: userId }, { updatedBy: userId }],
-      select: ["id", "title", "createdAt", "updatedAt", "metadata"],
+      select: ["id", "title", "createdAt", "updatedAt", "metadata", "attachments"],
+    });
+
+    // Get files uploaded by this user
+    const uploads = await uploadRepository.find({
+      where: { uploadedById: userId },
+      order: { createdAt: "DESC" },
     });
 
     return {
@@ -701,7 +709,23 @@ export class PrivacyService {
           createdAt: doc.createdAt,
           updatedAt: doc.updatedAt,
           metadata: doc.metadata,
+          attachments: doc.attachments || [],
         })),
+        uploads: uploads.map((upload) => ({
+          id: upload.id,
+          filename: upload.filename,
+          originalName: upload.originalName,
+          path: upload.path,
+          mimeType: upload.mimeType,
+          size: upload.size,
+          folder: upload.folder,
+          createdAt: upload.createdAt,
+        })),
+        statistics: {
+          totalDocuments: documents.length,
+          totalUploads: uploads.length,
+          totalAuditLogs: auditLogs.length,
+        },
       },
     };
   }
@@ -1749,6 +1773,39 @@ export class PrivacyService {
       }
     }
 
+    // Handle user uploads (for user exports)
+    const userUploads: Array<{ id: string; path: string; originalName: string; folder: string }> = [];
+    if (exportData.personalData?.uploads) {
+      for (const upload of exportData.personalData.uploads) {
+        userUploads.push({
+          id: upload.id,
+          path: upload.path,
+          originalName: upload.originalName,
+          folder: upload.folder,
+        });
+      }
+    }
+
+    // Download user uploads
+    for (const upload of userUploads) {
+      try {
+        const { config } = await import("@server/config/env");
+        const localPath = path.join(config.storage.local.uploadDir, upload.path);
+        try {
+          const fileBuffer = await fs.readFile(localPath);
+          downloadedFiles.push({
+            path: `uploads/${upload.folder}/${upload.originalName}`,
+            buffer: fileBuffer,
+            originalUrl: upload.path,
+          });
+        } catch (err) {
+          console.warn(`[Privacy] Could not read upload file: ${localPath}`, err);
+        }
+      } catch (err) {
+        console.warn(`[Privacy] Error processing upload ${upload.id}:`, err);
+      }
+    }
+
     // Prepare JSON data
     const dataJson = JSON.stringify(exportData, null, 2);
 
@@ -1766,7 +1823,8 @@ export class PrivacyService {
       statistics: {
         ...exportData.personalData.statistics,
         totalAttachments: attachments.length,
-        downloadedAttachments: downloadedFiles.length,
+        totalUserUploads: userUploads.length,
+        downloadedFiles: downloadedFiles.length,
       },
       format: "GDPR DSAR Export",
       files: fileList,
@@ -1778,6 +1836,12 @@ export class PrivacyService {
         type: a.type,
         size: a.size,
         included: downloadedFiles.some((f) => f.originalUrl === a.url),
+      })),
+      uploads: userUploads.map((u) => ({
+        id: u.id,
+        originalName: u.originalName,
+        folder: u.folder,
+        included: downloadedFiles.some((f) => f.originalUrl === u.path),
       })),
     };
     const manifestJson = JSON.stringify(manifest, null, 2);
