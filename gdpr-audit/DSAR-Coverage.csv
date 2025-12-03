@@ -1,7 +1,8 @@
 System,Entity/Table,Personal Data Fields,Export Supported,Erasure Supported,Rectification Supported,Notes,Priority
 Core API,customers,email|phone|name|external_metadata,Yes,Yes,No,Primary customer identity records - Full DSAR support,P0
 Core API,conversations,metadata (may contain PII references),Yes,Yes,No,Conversation metadata and state - Full DSAR support,P0
-Core API,messages,content (chat messages),Yes,Yes,No,Primary PII content - message bodies - Full DSAR support,P0
+Core API,messages,content (chat messages)|attachments,Yes,Yes,No,Primary PII content - message bodies and file attachments - Full DSAR support,P0
+Core API,message_attachments,files uploaded by customers,Yes,Yes,No,File attachments included in ZIP export - Full DSAR support,P0
 Core API,users,email|name|phone,Yes,Yes,No,Dashboard user accounts (tenant employees),P1
 Core API,organizations,name|email|phone,No,No,No,Tenant organization details,P2
 Embeddings,embeddings,page_content (message fragments)|metadata,Yes,Yes,No,Vector embeddings of message content - Full DSAR support,P0
@@ -30,18 +31,18 @@ Right to Object (Art.21),Not Implemented,Medium,1 week,Art.21
 Restrict Processing (Art.18),Not Implemented,Medium,1 week,Art.18
 
 Coverage_Summary,Value,Notes
-Total Systems Analyzed,21,Including external subprocessors
-Systems with PII,18,86% of systems process personal data
-Export Coverage,100%,Full customer DSAR export (customers|conversations|messages|embeddings)
-Erasure Coverage,100%,Full customer DSAR erasure (customers|conversations|messages|embeddings)
+Total Systems Analyzed,22,Including external subprocessors
+Systems with PII,19,86% of systems process personal data
+Export Coverage,100%,Full customer DSAR export (customers|conversations|messages|attachments|embeddings)
+Erasure Coverage,100%,Full customer DSAR erasure (customers|conversations|messages|attachments|embeddings)
 Rectification Coverage,0%,No DSAR rectification implemented
 High-Priority Gaps,0,All P0 customer systems have DSAR support
 External Dependencies,3,OpenAI|AWS|Redis - limited direct control
 
 Implementation_Details,Status,Notes
-Customer Data Export,Complete,"Traverses: customers → conversations → messages → embeddings"
-Customer Data Erasure,Complete,"Deletes: embeddings → messages → conversations → customers"
-Export Format,ZIP Archive,"Contains: data.json, README.md, manifest.json, signature.txt"
+Customer Data Export,Complete,"Traverses: customers → conversations → messages → attachments → embeddings"
+Customer Data Erasure,Complete,"Deletes: embeddings → messages (with attachments) → conversations → customers"
+Export Format,ZIP Archive,"Contains: data.json, README.md, manifest.json, signature.txt, attachments/"
 Export Signing,HMAC-SHA256,Cryptographic signature for data integrity
 Embedding Deletion,Complete,No orphaned vectors remain after deletion
 Unit Tests,Complete,"Tests verify ""post-delete search returns 0"" in embeddings"
