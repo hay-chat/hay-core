@@ -53,9 +53,9 @@ export const documentsRouter = t.router({
 
       const documents =
         documentIds.length > 0
-          ? (await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))).filter(
-              (doc) => doc && doc.organizationId === ctx.organizationId,
-            )
+          ? (
+              await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))
+            ).filter((doc) => doc && doc.organizationId === ctx.organizationId)
           : [];
 
       // Map results with document details
@@ -92,7 +92,9 @@ export const documentsRouter = t.router({
       }
       let processedContent = input.content;
       let metadata: Record<string, unknown> = {};
-      let attachments: Array<{ type: string; url: string; name: string; size?: number }> | undefined;
+      let attachments:
+        | Array<{ type: string; url: string; name: string; size?: number }>
+        | undefined;
 
       // Process file if provided
       if (input.fileBuffer && input.mimeType) {
@@ -110,7 +112,7 @@ export const documentsRouter = t.router({
             mimeType: input.mimeType,
             folder: `documents/${ctx.organizationId}`,
             organizationId: ctx.organizationId,
-            uploadedById: ctx.userId,
+            uploadedById: ctx.user.id,
           });
 
           attachments = [
@@ -783,7 +785,7 @@ async function processWebImport(
           pageTitle: page.title || placeholderDoc.title,
           metadata: {
             type: (metadata?.type as DocumentationType) || placeholderDoc.type,
-            status: (metadata?.status as DocumentationStatus),
+            status: metadata?.status as DocumentationStatus,
             tags: metadata?.tags as string[] | undefined,
             categories: metadata?.categories as string[] | undefined,
           },
@@ -840,7 +842,7 @@ async function processWebImport(
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -914,7 +916,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -995,7 +997,7 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
