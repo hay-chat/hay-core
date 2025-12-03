@@ -216,7 +216,17 @@
                     <Eye class="mr-2 h-4 w-4" />
                     View
                   </DropdownMenuItem>
-                  <DropdownMenuItem @click="downloadDocument(document)">
+                  <DropdownMenuItem
+                    v-if="document.importMethod === 'web' && document.sourceUrl"
+                    @click="visitSourcePage(document)"
+                  >
+                    <ExternalLink class="mr-2 h-4 w-4" />
+                    Visit Page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-else-if="document.hasAttachment"
+                    @click="downloadDocument(document)"
+                  >
                     <Download class="mr-2 h-4 w-4" />
                     Download
                   </DropdownMenuItem>
@@ -374,6 +384,12 @@
         </div>
       </DialogContent>
     </Dialog>
+
+    <!-- Document Preview Sheet -->
+    <DocumentPreviewSheet
+      v-model:open="showPreview"
+      :document-id="previewDocumentId"
+    />
   </Page>
 </template>
 
@@ -398,6 +414,7 @@ import {
   File,
   RotateCw,
   AlertCircle,
+  ExternalLink,
 } from "lucide-vue-next";
 
 // State
@@ -430,7 +447,8 @@ interface Document {
   createdAt: Date;
   updatedAt: Date;
   sourceUrl?: string;
-  importMethod?: string;
+  importMethod?: "upload" | "web" | "plugin";
+  hasAttachment?: boolean;
 }
 
 const documents = ref<Document[]>([]);
@@ -447,6 +465,10 @@ const deleteDialogTitle = ref("");
 const deleteDialogDescription = ref("");
 const documentToDelete = ref<Document | null>(null);
 const isBulkDelete = ref(false);
+
+// Document preview state
+const showPreview = ref(false);
+const previewDocumentId = ref<string | null>(null);
 
 const uploadForm = ref({
   title: "",
@@ -556,6 +578,9 @@ const refreshData = async () => {
       status: (doc.status as string) || "draft",
       createdAt: new Date((doc.created_at || doc.createdAt) as string),
       updatedAt: new Date((doc.updated_at || doc.updatedAt) as string),
+      sourceUrl: doc.sourceUrl as string | undefined,
+      importMethod: doc.importMethod as "upload" | "web" | "plugin" | undefined,
+      hasAttachment: !!(doc.attachments as Array<unknown>)?.length,
     }));
     totalDocuments.value = result.pagination.total;
   } catch (error) {
@@ -682,15 +707,37 @@ const toggleAllSelection = () => {
 };
 
 const viewDocument = (document: Document) => {
-  // TODO: Open document viewer
-  console.log("View document:", document);
+  previewDocumentId.value = document.id;
+  showPreview.value = true;
+};
+
+const visitSourcePage = (document: Document) => {
+  if (document.sourceUrl) {
+    window.open(document.sourceUrl, "_blank", "noopener,noreferrer");
+  }
 };
 
 const downloadDocument = async (document: Document) => {
   try {
-    // TODO: Download document via API
-    console.log("Download document:", document);
-    toast.info("Document download started");
+    // Get the download URL from the API
+    const result = await HayApi.documents.getDownloadUrl.query({
+      documentId: document.id,
+    });
+
+    if (result.type === "web") {
+      // For web documents, open the source URL
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    } else if (result.type === "file" && result.url) {
+      // For file uploads, trigger a download
+      const link = window.document.createElement("a");
+      link.href = result.url;
+      link.download = result.fileName || "document";
+      link.target = "_blank";
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
+      toast.success("Download started");
+    }
   } catch (error) {
     console.error("Error downloading document:", error);
     toast.error("Failed to download document");
