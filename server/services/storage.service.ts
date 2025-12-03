@@ -90,16 +90,23 @@ export class StorageService {
 
   /**
    * Main upload function
+   * Files are stored in structure: {organizationId}/{folder}/{uuid}.{ext}
+   *
+   * Local storage: files stored at {uploadDir}/{orgId}/{folder}/{uuid}.{ext}
+   *                served at /uploads/{orgId}/{folder}/{uuid}.{ext}
+   * S3 storage:    files stored at key {orgId}/{folder}/{uuid}.{ext}
+   *                URL: {endpoint}/{key}
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
     // 1. Validate file
     this.validateFile(options.mimeType, options.buffer.length, options.maxSize);
 
-    // 2. Generate filename
+    // 2. Generate filename (UUID + extension only)
     const filename = this.generateFilename(options.originalName);
 
-    // 3. Build path
-    const filePath = `${options.folder}/${filename}`;
+    // 3. Build path: {orgId}/{folder}/{filename}
+    // Note: The "uploads/" prefix comes from the serving route (local) or bucket structure (S3)
+    const filePath = `${options.organizationId}/${options.folder}/${filename}`;
 
     // 4. Detect storage type
     const storageType = this.getStorageType();
@@ -172,6 +179,8 @@ export class StorageService {
 
   /**
    * Specialized upload for plugin ZIP files
+   * Final path: {orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Served at: /uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
    */
   async uploadPluginZip(options: {
     buffer: Buffer;
@@ -186,8 +195,9 @@ export class StorageService {
     // Validate ZIP
     this.validateFile("application/zip", options.buffer.length, maxSize);
 
-    // Fixed folder structure for easy management
-    const folder = `plugin-zips/${options.organizationId}/${options.pluginId}`;
+    // Folder structure: plugin-zips/{pluginId}
+    // Final path: {orgId}/plugin-zips/{pluginId}/{uuid}.zip
+    const folder = `plugin-zips/${options.pluginId}`;
 
     // Upload ZIP
     return await this.upload({
@@ -258,23 +268,15 @@ export class StorageService {
   }
 
   /**
-   * Generate unique filename
+   * Generate unique filename using UUID only
+   * Format: {uuid}.{ext}
    */
   private generateFilename(originalName: string): string {
-    // Extract extension
+    // Extract extension from original filename
     const ext = path.extname(originalName).toLowerCase();
 
-    // Sanitize filename (remove extension first)
-    const nameWithoutExt = path.basename(originalName, ext);
-    const sanitized = nameWithoutExt
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .substring(0, 50); // Limit length
-
-    // Generate unique filename
-    return `${uuidv4()}-${sanitized}${ext}`;
+    // Generate filename with UUID only
+    return `${uuidv4()}${ext}`;
   }
 
   /**
