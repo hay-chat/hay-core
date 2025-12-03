@@ -384,6 +384,12 @@
         </div>
       </DialogContent>
     </Dialog>
+
+    <!-- Document Preview Sheet -->
+    <DocumentPreviewSheet
+      v-model:open="showPreview"
+      :document-id="previewDocumentId"
+    />
   </Page>
 </template>
 
@@ -459,6 +465,10 @@ const deleteDialogTitle = ref("");
 const deleteDialogDescription = ref("");
 const documentToDelete = ref<Document | null>(null);
 const isBulkDelete = ref(false);
+
+// Document preview state
+const showPreview = ref(false);
+const previewDocumentId = ref<string | null>(null);
 
 const uploadForm = ref({
   title: "",
@@ -697,8 +707,8 @@ const toggleAllSelection = () => {
 };
 
 const viewDocument = (document: Document) => {
-  // TODO: Open document viewer
-  console.log("View document:", document);
+  previewDocumentId.value = document.id;
+  showPreview.value = true;
 };
 
 const visitSourcePage = (document: Document) => {
