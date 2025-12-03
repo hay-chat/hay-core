@@ -726,14 +726,12 @@ export class PrivacyService {
       // Collect user data
       const exportData = await this.collectUserData(request.userId, request.email);
 
-      // Save export to file
-      const exportDir = path.join(process.cwd(), "exports");
-      await fs.mkdir(exportDir, { recursive: true });
-
-      const fileName = `export-${requestId}.json`;
-      const filePath = path.join(exportDir, fileName);
-
-      await fs.writeFile(filePath, JSON.stringify(exportData, null, 2), "utf-8");
+      // Create signed ZIP export
+      const { filePath, signature } = await this.createSignedZipExport(
+        exportData,
+        requestId,
+        request.email,
+      );
 
       // Generate download token
       const downloadToken = crypto.randomBytes(32).toString("hex");
@@ -741,6 +739,11 @@ export class PrivacyService {
 
       // Update request with export metadata
       request.setExportMetadata(filePath, downloadToken, expiresAt);
+      request.metadata = {
+        ...request.metadata,
+        signature,
+        exportFormat: "zip",
+      };
       request.markCompleted();
       await requestRepository.save(request);
 
