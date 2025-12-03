@@ -313,6 +313,15 @@ plugins/{plugin-name}/
 - `workflow` - Advanced workflow capabilities
 - `analytics` - Analytics and reporting
 
+### Plugin Documentation
+
+**Comprehensive guides for plugin development:**
+
+- **[docs/PLUGIN_API.md](docs/PLUGIN_API.md)** - Complete plugin API reference with architecture, manifest structure, best practices, and troubleshooting
+- **[docs/PLUGIN_QUICK_REFERENCE.md](docs/PLUGIN_QUICK_REFERENCE.md)** - Fast reference for common development tasks and code patterns
+- **[docs/PLUGIN_CHANNEL_REGISTRATION.md](docs/PLUGIN_CHANNEL_REGISTRATION.md)** - Guide for registering communication channels
+- **[.claude/PLUGIN_GENERATION_WORKFLOW.md](.claude/PLUGIN_GENERATION_WORKFLOW.md)** - Workflow for generating plugins from MCP servers
+
 ### Plugin Generation
 
 See `.claude/PLUGIN_GENERATION_WORKFLOW.md` for creating plugins from MCP servers.

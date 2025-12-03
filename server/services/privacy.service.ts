@@ -1,10 +1,14 @@
 import { AppDataSource } from "@server/database/data-source";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
-import type { PrivacyRequestType, PrivacyRequestIdentifierType } from "@server/entities/privacy-request.entity";
+import type {
+  PrivacyRequestType,
+  PrivacyRequestIdentifierType,
+} from "@server/entities/privacy-request.entity";
 import { User } from "@server/entities/user.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Document } from "@server/entities/document.entity";
+import { Upload } from "@server/entities/upload.entity";
 import { Job, JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
@@ -54,7 +58,12 @@ export class PrivacyService {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
 
-      const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
+      const combinedLimit = await rateLimitService.checkCombinedRateLimit(
+        ipAddress,
+        email,
+        2,
+        86400,
+      );
       if (combinedLimit.limited) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
@@ -238,7 +247,12 @@ export class PrivacyService {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
 
-      const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
+      const combinedLimit = await rateLimitService.checkCombinedRateLimit(
+        ipAddress,
+        email,
+        2,
+        86400,
+      );
       if (combinedLimit.limited) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
@@ -625,6 +639,7 @@ export class PrivacyService {
     const apiKeyRepository = AppDataSource.getRepository(ApiKey);
     const auditLogRepository = AppDataSource.getRepository(AuditLog);
     const documentRepository = AppDataSource.getRepository(Document);
+    const uploadRepository = AppDataSource.getRepository(Upload);
 
     // Get user profile
     const user = await userRepository.findOne({
@@ -647,10 +662,16 @@ export class PrivacyService {
       take: 1000, // Limit to last 1000 events
     });
 
-    // Get documents
+    // Get documents created/updated by this user
     const documents = await documentRepository.find({
       where: [{ createdBy: userId }, { updatedBy: userId }],
-      select: ["id", "title", "createdAt", "updatedAt", "metadata"],
+      select: ["id", "title", "createdAt", "updatedAt", "metadata", "attachments"],
+    });
+
+    // Get files uploaded by this user
+    const uploads = await uploadRepository.find({
+      where: { uploadedById: userId },
+      order: { createdAt: "DESC" },
     });
 
     return {
@@ -702,13 +723,22 @@ export class PrivacyService {
           createdAt: doc.createdAt,
           updatedAt: doc.updatedAt,
           metadata: doc.metadata,
+          attachments: doc.attachments || [],
+        })),
+        uploads: uploads.map((upload) => ({
+          id: upload.id,
+          filename: upload.filename,
+          originalName: upload.originalName,
+          path: upload.path,
+          mimeType: upload.mimeType,
+          size: upload.size,
+          folder: upload.folder,
+          createdAt: upload.createdAt,
         })),
         statistics: {
-          totalConversations: 0,
-          totalMessages: 0,
-          totalEmbeddings: 0,
-          totalAuditLogs: auditLogs.length,
           totalDocuments: documents.length,
+          totalUploads: uploads.length,
+          totalAuditLogs: auditLogs.length,
         },
       },
     };
@@ -920,7 +950,8 @@ export class PrivacyService {
     const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const subject = type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
+    const subject =
+      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
 
     await emailService.sendTemplateEmail({
       to: email,
@@ -1491,6 +1522,7 @@ export class PrivacyService {
             metadata: msg.metadata,
             sentiment: msg.sentiment,
             intent: msg.intent,
+            attachments: msg.attachments || [],
           })),
         };
       }),
@@ -1581,6 +1613,12 @@ export class PrivacyService {
             (sum, conv) => sum + conv.messages.length,
             0,
           ),
+          totalAttachments: conversationsWithMessages.reduce(
+            (sum, conv) =>
+              sum +
+              conv.messages.reduce((msgSum, msg) => msgSum + (msg.attachments?.length || 0), 0),
+            0,
+          ),
           totalEmbeddings: embeddings.length,
         },
       },
@@ -1669,7 +1707,7 @@ export class PrivacyService {
   }
 
   /**
-   * Create a signed ZIP export file containing data.json, README.md, and manifest.json
+   * Create a signed ZIP export file containing data.json, README.md, manifest.json, and attachments
    */
   private async createSignedZipExport(
     exportData: any,
@@ -1682,23 +1720,160 @@ export class PrivacyService {
     const zipFileName = `customer-export-${requestId}.zip`;
     const zipFilePath = path.join(exportDir, zipFileName);
 
+    // Collect all attachments from conversations/messages
+    const attachments: Array<{
+      messageId: string;
+      conversationId: string;
+      id: string;
+      name: string;
+      url: string;
+      type: string;
+      size: number;
+    }> = [];
+
+    if (exportData.personalData?.conversations) {
+      for (const conv of exportData.personalData.conversations) {
+        for (const msg of conv.messages || []) {
+          for (const attachment of msg.attachments || []) {
+            attachments.push({
+              messageId: msg.id,
+              conversationId: conv.id,
+              ...attachment,
+            });
+          }
+        }
+      }
+    }
+
+    // Download attachments and prepare for archive
+    const downloadedFiles: Array<{
+      path: string;
+      buffer: Buffer;
+      originalUrl: string;
+    }> = [];
+
+    for (const attachment of attachments) {
+      try {
+        // Handle local file paths vs URLs
+        if (attachment.url.startsWith("/") || attachment.url.startsWith("./")) {
+          // Local file - read directly
+          const localPath = path.join(
+            process.cwd(),
+            "uploads",
+            attachment.url.replace(/^\.?\//, ""),
+          );
+          try {
+            const fileBuffer = await fs.readFile(localPath);
+            downloadedFiles.push({
+              path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
+              buffer: fileBuffer,
+              originalUrl: attachment.url,
+            });
+          } catch (err) {
+            console.warn(`[Privacy] Could not read local attachment: ${localPath}`, err);
+          }
+        } else if (attachment.url.startsWith("http")) {
+          // Remote URL - download
+          try {
+            const response = await fetch(attachment.url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              downloadedFiles.push({
+                path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
+                buffer: Buffer.from(arrayBuffer),
+                originalUrl: attachment.url,
+              });
+            }
+          } catch (err) {
+            console.warn(`[Privacy] Could not download attachment: ${attachment.url}`, err);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Privacy] Error processing attachment ${attachment.id}:`, err);
+      }
+    }
+
+    // Handle user uploads (for user exports)
+    const userUploads: Array<{ id: string; path: string; originalName: string; folder: string }> =
+      [];
+    if (exportData.personalData?.uploads) {
+      for (const upload of exportData.personalData.uploads) {
+        userUploads.push({
+          id: upload.id,
+          path: upload.path,
+          originalName: upload.originalName,
+          folder: upload.folder,
+        });
+      }
+    }
+
+    // Download user uploads
+    for (const upload of userUploads) {
+      try {
+        const { config } = await import("@server/config/env");
+        const localPath = path.join(config.storage.local.uploadDir, upload.path);
+        try {
+          const fileBuffer = await fs.readFile(localPath);
+          downloadedFiles.push({
+            path: `uploads/${upload.folder}/${upload.originalName}`,
+            buffer: fileBuffer,
+            originalUrl: upload.path,
+          });
+        } catch (err) {
+          console.warn(`[Privacy] Could not read upload file: ${localPath}`, err);
+        }
+      } catch (err) {
+        console.warn(`[Privacy] Error processing upload ${upload.id}:`, err);
+      }
+    }
+
     // Prepare JSON data
     const dataJson = JSON.stringify(exportData, null, 2);
 
-    // Generate manifest
+    // Generate manifest with attachments
+    const fileList = ["data.json", "README.md", "manifest.json", "signature.txt"];
+    if (downloadedFiles.length > 0) {
+      fileList.push(...downloadedFiles.map((f) => f.path));
+    }
+
     const manifest = {
       version: "2.0",
       exportId: requestId,
       exportDate: exportData.exportDate,
       dataSubject: exportData.dataSubject,
-      statistics: exportData.personalData.statistics,
+      statistics: {
+        ...exportData.personalData.statistics,
+        totalAttachments: attachments.length,
+        totalUserUploads: userUploads.length,
+        downloadedFiles: downloadedFiles.length,
+      },
       format: "GDPR DSAR Export",
-      files: ["data.json", "README.md", "manifest.json"],
+      files: fileList,
+      attachments: attachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        messageId: a.messageId,
+        conversationId: a.conversationId,
+        type: a.type,
+        size: a.size,
+        included: downloadedFiles.some((f) => f.originalUrl === a.url),
+      })),
+      uploads: userUploads.map((u) => ({
+        id: u.id,
+        originalName: u.originalName,
+        folder: u.folder,
+        included: downloadedFiles.some((f) => f.originalUrl === u.path),
+      })),
     };
     const manifestJson = JSON.stringify(manifest, null, 2);
 
-    // Generate README
-    const readme = this.generateExportReadme(exportData, requestId);
+    // Generate README with attachment info
+    const readme = this.generateExportReadme(
+      exportData,
+      requestId,
+      attachments.length,
+      downloadedFiles.length,
+    );
 
     // Sign the data (HMAC-SHA256 of data.json content)
     const signature = this.signExportData(dataJson);
@@ -1718,6 +1893,12 @@ export class PrivacyService {
       archive.append(readme, { name: "README.md" });
       archive.append(manifestJson, { name: "manifest.json" });
       archive.append(signature, { name: "signature.txt" });
+
+      // Add downloaded attachments
+      for (const file of downloadedFiles) {
+        archive.append(file.buffer, { name: file.path });
+      }
+
       archive.finalize();
     });
 
@@ -1727,7 +1908,12 @@ export class PrivacyService {
   /**
    * Generate README.md for the export package
    */
-  private generateExportReadme(exportData: any, requestId: string): string {
+  private generateExportReadme(
+    exportData: any,
+    requestId: string,
+    totalAttachments: number = 0,
+    downloadedAttachments: number = 0,
+  ): string {
     const stats = exportData.personalData.statistics;
     const exportDate = new Date(exportData.exportDate).toLocaleString("en-US", {
       dateStyle: "full",
@@ -1741,8 +1927,25 @@ export class PrivacyService {
       : exportData.dataSubject.userId;
     const subjectType = isCustomerExport ? "Customer" : "User";
 
+    const attachmentSection =
+      totalAttachments > 0
+        ? `
+### File Attachments
+${totalAttachments} file attachment(s) found:
+- ${downloadedAttachments} successfully included in this archive
+- Located in the \`attachments/\` folder, organized by conversation ID
+${totalAttachments !== downloadedAttachments ? `- ${totalAttachments - downloadedAttachments} file(s) could not be retrieved (may have been deleted or are inaccessible)` : ""}
+`
+        : "";
+
+    const attachmentFilesRow =
+      downloadedAttachments > 0
+        ? `| attachments/ | File attachments from your conversations |
+`
+        : "";
+
     // Build data sections based on what's included
-    let dataIncludedSections = '';
+    let dataIncludedSections = "";
 
     if (isCustomerExport) {
       dataIncludedSections = `### Profile Information
@@ -1753,16 +1956,19 @@ Your customer profile data including:
 - Any custom metadata
 
 ### Conversations
-${stats.totalConversations} conversation(s) containing:
-- ${stats.totalMessages} message(s)
+${stats.totalConversations || 0} conversation(s) containing:
+- ${stats.totalMessages || 0} message(s)
 - Timestamps and metadata
 - Message content and direction
-
-### Embeddings
+${attachmentSection}### Embeddings
 ${stats.totalEmbeddings || 0} embedding(s):
 - Vectorized representations of your message content
 - Used for AI-powered search and assistance`;
     } else {
+      const orgInfo =
+        stats.totalAuditLogs > 0
+          ? "Organization membership and role information"
+          : "No organization membership";
       dataIncludedSections = `### Profile Information
 Your user profile data including:
 - Email address
@@ -1772,19 +1978,30 @@ Your user profile data including:
 - Role and status
 
 ### Organization
-${stats.totalAuditLogs > 0 ? 'Organization membership and role information' : 'No organization membership'}
+${orgInfo}
 
 ### Audit Logs
-${stats.totalAuditLogs} audit log(s):
+${stats.totalAuditLogs || 0} audit log(s):
 - Actions performed on your account
 - IP addresses and timestamps
 - Changes to your data
 
 ### Documents
-${stats.totalDocuments} document(s):
+${stats.totalDocuments || 0} document(s):
 - Documents you created or updated
 - Metadata and timestamps`;
     }
+
+    // Build data structure example
+    const dataSubjectExample = isCustomerExport
+      ? '"customerId": "UUID",\n    "organizationId": "UUID"'
+      : '"userId": "UUID"';
+    const personalDataExample = isCustomerExport
+      ? '"conversations": [ ... ],\n    "embeddings": [ ... ],'
+      : '"organization": { ... },\n    "auditLogs": [ ... ],\n    "documents": [ ... ],';
+    const supportContact = isCustomerExport
+      ? "the organization through their support channels"
+      : "support through the appropriate channels";
 
     return `# GDPR Data Export
 
@@ -1793,7 +2010,7 @@ ${stats.totalDocuments} document(s):
 - **Export ID:** ${requestId}
 - **Export Date:** ${exportDate}
 - **${subjectType} ID:** ${subjectId}
-- **Export Format:** JSON (data.json)
+- **Export Format:** ZIP Archive with JSON data
 
 ## Contents
 
@@ -1805,7 +2022,7 @@ This archive contains your personal data as required under GDPR Article 15 (Righ
 | manifest.json | Export metadata and file listing |
 | README.md | This documentation file |
 | signature.txt | Cryptographic signature for data integrity verification |
-
+${attachmentFilesRow}
 ## Data Included
 
 ${dataIncludedSections}
@@ -1818,9 +2035,12 @@ The \`data.json\` file contains:
 {
   "exportDate": "ISO 8601 timestamp",
   "exportVersion": "2.0",
-  "dataSubject": { ... },
+  "dataSubject": {
+    ${dataSubjectExample}
+  },
   "personalData": {
     "profile": { ... },
+    ${personalDataExample}
     "statistics": { ... }
   }
 }
@@ -1843,7 +2063,7 @@ As a data subject, you have the following rights:
 ## Questions?
 
 If you have questions about your data or wish to exercise your other GDPR rights,
-please contact support through the appropriate channels.
+please contact ${supportContact}.
 
 ---
 
@@ -1896,17 +2116,12 @@ please contact support through the appropriate channels.
       });
 
       // Log completion
-      await this.logPrivacyAction(
-        "customer.privacy.deletion.complete",
-        request.email,
-        undefined,
-        {
-          requestId,
-          jobId,
-          customerId: request.customerId,
-          organizationId: request.organizationId,
-        },
-      );
+      await this.logPrivacyAction("customer.privacy.deletion.complete", request.email, undefined, {
+        requestId,
+        jobId,
+        customerId: request.customerId,
+        organizationId: request.organizationId,
+      });
 
       // Send confirmation email
       await this.sendCustomerDeletionCompleteEmail(request.email, request.organizationId);
@@ -2062,9 +2277,7 @@ please contact support through the appropriate channels.
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
     const subject =
-      type === "export"
-        ? "Verify Your Data Export Request"
-        : "Verify Your Data Deletion Request";
+      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
 
     await emailService.sendTemplateEmail({
       to: email,

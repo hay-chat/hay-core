@@ -22,9 +22,39 @@ import { Document } from "@server/entities/document.entity";
 import { jobQueueService } from "@server/services/job-queue.service";
 import { documentProcessorService } from "@server/services/document-processor.service";
 import { documentRetryService } from "@server/services/document-retry.service";
+import { storageService } from "@server/services/storage.service";
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
+  getById: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
+    .input(
+      z.object({
+        id: z.string().uuid(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const document = await documentRepository.findById(input.id);
+
+      if (!document || document.organizationId !== ctx.organizationId) {
+        throw new Error("Document not found");
+      }
+
+      return {
+        id: document.id,
+        title: document.title,
+        description: document.description,
+        content: document.content,
+        type: document.type,
+        status: document.status,
+        visibility: document.visibility,
+        tags: document.tags,
+        categories: document.categories,
+        sourceUrl: document.sourceUrl,
+        importMethod: document.importMethod,
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt,
+      };
+    }),
   search: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
@@ -52,9 +82,9 @@ export const documentsRouter = t.router({
 
       const documents =
         documentIds.length > 0
-          ? (await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))).filter(
-              (doc) => doc && doc.organizationId === ctx.organizationId,
-            )
+          ? (
+              await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))
+            ).filter((doc) => doc && doc.organizationId === ctx.organizationId)
           : [];
 
       // Map results with document details
@@ -91,6 +121,9 @@ export const documentsRouter = t.router({
       }
       let processedContent = input.content;
       let metadata: Record<string, unknown> = {};
+      let attachments:
+        | Array<{ type: string; url: string; name: string; size?: number }>
+        | undefined;
 
       // Process file if provided
       if (input.fileBuffer && input.mimeType) {
@@ -99,11 +132,35 @@ export const documentsRouter = t.router({
         const processed = await processor.processDocument(buffer, input.mimeType, input.fileName);
         processedContent = processed.content;
         metadata = processed.metadata;
+
+        // Save the original file to storage
+        try {
+          const uploadResult = await storageService.upload({
+            buffer,
+            originalName: input.fileName || "document",
+            mimeType: input.mimeType,
+            folder: `documents/${ctx.organizationId}`,
+            organizationId: ctx.organizationId,
+            uploadedById: ctx.user.id,
+          });
+
+          attachments = [
+            {
+              type: input.mimeType,
+              url: uploadResult.url,
+              name: input.fileName || "document",
+              size: buffer.length,
+            },
+          ];
+        } catch (uploadError) {
+          console.error("Failed to save document file to storage:", uploadError);
+          // Continue without attachment - document content will still be processed
+        }
       }
 
       // Sanitize content to remove null bytes before saving
       const sanitizedContent = sanitizeContent(processedContent);
-      
+
       // Save document to database first
       const document = await documentRepository.create({
         title: sanitizeContent(input.title),
@@ -112,6 +169,8 @@ export const documentsRouter = t.router({
         status: input.status || DocumentationStatus.DRAFT,
         visibility: input.visibility || DocumentVisibility.PRIVATE,
         organizationId: ctx.organizationId,
+        importMethod: input.fileBuffer ? ImportMethod.UPLOAD : ImportMethod.UPLOAD,
+        attachments,
       });
 
       // Ensure vector store is initialized
@@ -589,6 +648,44 @@ export const documentsRouter = t.router({
       plugins: [], // TODO: Load from plugin system
     };
   }),
+
+  getDownloadUrl: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
+    .input(
+      z.object({
+        documentId: z.string().uuid(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const document = await documentRepository.findById(input.documentId);
+
+      if (!document || document.organizationId !== ctx.organizationId) {
+        throw new Error("Document not found");
+      }
+
+      // For web imports, return the source URL
+      if (document.importMethod === ImportMethod.WEB && document.sourceUrl) {
+        return {
+          type: "web",
+          url: document.sourceUrl,
+          fileName: document.title,
+        };
+      }
+
+      // For uploaded files, return the attachment URL
+      if (document.attachments && document.attachments.length > 0) {
+        const attachment = document.attachments[0];
+        return {
+          type: "file",
+          url: attachment.url,
+          fileName: attachment.name,
+          mimeType: attachment.type,
+          size: attachment.size,
+        };
+      }
+
+      throw new Error("No downloadable file available for this document");
+    }),
+
   retryDocument: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .input(
       z.object({
@@ -717,7 +814,7 @@ async function processWebImport(
           pageTitle: page.title || placeholderDoc.title,
           metadata: {
             type: (metadata?.type as DocumentationType) || placeholderDoc.type,
-            status: (metadata?.status as DocumentationStatus),
+            status: metadata?.status as DocumentationStatus,
             tags: metadata?.tags as string[] | undefined,
             categories: metadata?.categories as string[] | undefined,
           },
@@ -774,7 +871,7 @@ async function processWebImport(
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -848,7 +945,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -929,7 +1026,7 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     await jobQueueService.failJob(
       jobId,
       organizationId,
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }

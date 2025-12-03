@@ -90,28 +90,35 @@ export class StorageService {
 
   /**
    * Main upload function
+   * Files are stored in structure: uploads/{organizationId}/{folder}/{uuid}.{ext}
+   *
+   * Local storage: files stored at {uploadDir}/{orgId}/{folder}/{uuid}.{ext}
+   *                served at /uploads/{orgId}/{folder}/{uuid}.{ext}
+   * S3 storage:    files stored at key uploads/{orgId}/{folder}/{uuid}.{ext}
+   *                URL: {endpoint}/{bucket}/uploads/{orgId}/{folder}/{uuid}.{ext}
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
     // 1. Validate file
     this.validateFile(options.mimeType, options.buffer.length, options.maxSize);
 
-    // 2. Generate filename
+    // 2. Generate filename (UUID + extension only)
     const filename = this.generateFilename(options.originalName);
 
-    // 3. Build path
-    const filePath = `${options.folder}/${filename}`;
-
-    // 4. Detect storage type
+    // 3. Build path structure
+    // For S3: Include "uploads/" prefix in the key to match bucket structure
+    // For local: Path is relative to uploadDir (which is "./server/uploads")
     const storageType = this.getStorageType();
+    const relativePath = `${options.organizationId}/${options.folder}/${filename}`;
+    const filePath = storageType === "s3" ? `uploads/${relativePath}` : relativePath;
 
-    // 5. Upload to storage
+    // 4. Upload to storage
     if (storageType === "s3") {
       await this.uploadS3(options.buffer, filePath, options.mimeType);
     } else {
       await this.uploadLocal(options.buffer, filePath);
     }
 
-    // 6. Create database record
+    // 5. Create database record
     const upload = await Upload.create({
       filename,
       originalName: options.originalName,
@@ -124,7 +131,7 @@ export class StorageService {
       uploadedById: options.uploadedById,
     }).save();
 
-    // 7. Generate public URL
+    // 6. Generate public URL
     const url = this.getPublicUrl(upload);
 
     return { upload, url };
@@ -172,6 +179,9 @@ export class StorageService {
 
   /**
    * Specialized upload for plugin ZIP files
+   * Local: {uploadDir}/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * S3: uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Served at: /uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
    */
   async uploadPluginZip(options: {
     buffer: Buffer;
@@ -186,8 +196,8 @@ export class StorageService {
     // Validate ZIP
     this.validateFile("application/zip", options.buffer.length, maxSize);
 
-    // Fixed folder structure for easy management
-    const folder = `plugin-zips/${options.organizationId}/${options.pluginId}`;
+    // Folder structure: plugin-zips/{pluginId}
+    const folder = `plugin-zips/${options.pluginId}`;
 
     // Upload ZIP
     return await this.upload({
@@ -258,23 +268,15 @@ export class StorageService {
   }
 
   /**
-   * Generate unique filename
+   * Generate unique filename using UUID only
+   * Format: {uuid}.{ext}
    */
   private generateFilename(originalName: string): string {
-    // Extract extension
+    // Extract extension from original filename
     const ext = path.extname(originalName).toLowerCase();
 
-    // Sanitize filename (remove extension first)
-    const nameWithoutExt = path.basename(originalName, ext);
-    const sanitized = nameWithoutExt
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .substring(0, 50); // Limit length
-
-    // Generate unique filename
-    return `${uuidv4()}-${sanitized}${ext}`;
+    // Generate filename with UUID only
+    return `${uuidv4()}${ext}`;
   }
 
   /**
