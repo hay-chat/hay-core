@@ -90,12 +90,12 @@ export class StorageService {
 
   /**
    * Main upload function
-   * Files are stored in structure: {organizationId}/{folder}/{uuid}.{ext}
+   * Files are stored in structure: uploads/{organizationId}/{folder}/{uuid}.{ext}
    *
    * Local storage: files stored at {uploadDir}/{orgId}/{folder}/{uuid}.{ext}
    *                served at /uploads/{orgId}/{folder}/{uuid}.{ext}
-   * S3 storage:    files stored at key {orgId}/{folder}/{uuid}.{ext}
-   *                URL: {endpoint}/{key}
+   * S3 storage:    files stored at key uploads/{orgId}/{folder}/{uuid}.{ext}
+   *                URL: {endpoint}/{bucket}/uploads/{orgId}/{folder}/{uuid}.{ext}
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
     // 1. Validate file
@@ -104,21 +104,21 @@ export class StorageService {
     // 2. Generate filename (UUID + extension only)
     const filename = this.generateFilename(options.originalName);
 
-    // 3. Build path: {orgId}/{folder}/{filename}
-    // Note: The "uploads/" prefix comes from the serving route (local) or bucket structure (S3)
-    const filePath = `${options.organizationId}/${options.folder}/${filename}`;
-
-    // 4. Detect storage type
+    // 3. Build path structure
+    // For S3: Include "uploads/" prefix in the key to match bucket structure
+    // For local: Path is relative to uploadDir (which is "./server/uploads")
     const storageType = this.getStorageType();
+    const relativePath = `${options.organizationId}/${options.folder}/${filename}`;
+    const filePath = storageType === "s3" ? `uploads/${relativePath}` : relativePath;
 
-    // 5. Upload to storage
+    // 4. Upload to storage
     if (storageType === "s3") {
       await this.uploadS3(options.buffer, filePath, options.mimeType);
     } else {
       await this.uploadLocal(options.buffer, filePath);
     }
 
-    // 6. Create database record
+    // 5. Create database record
     const upload = await Upload.create({
       filename,
       originalName: options.originalName,
@@ -131,7 +131,7 @@ export class StorageService {
       uploadedById: options.uploadedById,
     }).save();
 
-    // 7. Generate public URL
+    // 6. Generate public URL
     const url = this.getPublicUrl(upload);
 
     return { upload, url };
@@ -179,7 +179,8 @@ export class StorageService {
 
   /**
    * Specialized upload for plugin ZIP files
-   * Final path: {orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Local: {uploadDir}/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * S3: uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
    * Served at: /uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
    */
   async uploadPluginZip(options: {
@@ -196,7 +197,6 @@ export class StorageService {
     this.validateFile("application/zip", options.buffer.length, maxSize);
 
     // Folder structure: plugin-zips/{pluginId}
-    // Final path: {orgId}/plugin-zips/{pluginId}/{uuid}.zip
     const folder = `plugin-zips/${options.pluginId}`;
 
     // Upload ZIP
