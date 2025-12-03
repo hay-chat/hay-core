@@ -655,6 +655,7 @@ export class PrivacyService {
 
     return {
       exportDate: new Date().toISOString(),
+      exportVersion: "2.0",
       dataSubject: {
         email: user.email,
         userId: user.id,
@@ -702,6 +703,13 @@ export class PrivacyService {
           updatedAt: doc.updatedAt,
           metadata: doc.metadata,
         })),
+        statistics: {
+          totalConversations: 0,
+          totalMessages: 0,
+          totalEmbeddings: 0,
+          totalAuditLogs: auditLogs.length,
+          totalDocuments: documents.length,
+        },
       },
     };
   }
@@ -1726,29 +1734,18 @@ export class PrivacyService {
       timeStyle: "long",
     });
 
-    return `# GDPR Data Export
+    // Detect if this is a user or customer export
+    const isCustomerExport = !!exportData.dataSubject.customerId;
+    const subjectId = isCustomerExport
+      ? exportData.dataSubject.customerId
+      : exportData.dataSubject.userId;
+    const subjectType = isCustomerExport ? "Customer" : "User";
 
-## Export Information
+    // Build data sections based on what's included
+    let dataIncludedSections = '';
 
-- **Export ID:** ${requestId}
-- **Export Date:** ${exportDate}
-- **Customer ID:** ${exportData.dataSubject.customerId}
-- **Export Format:** JSON (data.json)
-
-## Contents
-
-This archive contains your personal data as required under GDPR Article 15 (Right of Access):
-
-| File | Description |
-|------|-------------|
-| data.json | Your personal data in machine-readable JSON format |
-| manifest.json | Export metadata and file listing |
-| README.md | This documentation file |
-| signature.txt | Cryptographic signature for data integrity verification |
-
-## Data Included
-
-### Profile Information
+    if (isCustomerExport) {
+      dataIncludedSections = `### Profile Information
 Your customer profile data including:
 - Email address
 - Phone number
@@ -1764,7 +1761,54 @@ ${stats.totalConversations} conversation(s) containing:
 ### Embeddings
 ${stats.totalEmbeddings || 0} embedding(s):
 - Vectorized representations of your message content
-- Used for AI-powered search and assistance
+- Used for AI-powered search and assistance`;
+    } else {
+      dataIncludedSections = `### Profile Information
+Your user profile data including:
+- Email address
+- First and last name
+- Account creation date
+- Last login information
+- Role and status
+
+### Organization
+${stats.totalAuditLogs > 0 ? 'Organization membership and role information' : 'No organization membership'}
+
+### Audit Logs
+${stats.totalAuditLogs} audit log(s):
+- Actions performed on your account
+- IP addresses and timestamps
+- Changes to your data
+
+### Documents
+${stats.totalDocuments} document(s):
+- Documents you created or updated
+- Metadata and timestamps`;
+    }
+
+    return `# GDPR Data Export
+
+## Export Information
+
+- **Export ID:** ${requestId}
+- **Export Date:** ${exportDate}
+- **${subjectType} ID:** ${subjectId}
+- **Export Format:** JSON (data.json)
+
+## Contents
+
+This archive contains your personal data as required under GDPR Article 15 (Right of Access):
+
+| File | Description |
+|------|-------------|
+| data.json | Your personal data in machine-readable JSON format |
+| manifest.json | Export metadata and file listing |
+| README.md | This documentation file |
+| signature.txt | Cryptographic signature for data integrity verification |
+
+## Data Included
+
+${dataIncludedSections}
 
 ## Data Structure
 
@@ -1774,14 +1818,9 @@ The \`data.json\` file contains:
 {
   "exportDate": "ISO 8601 timestamp",
   "exportVersion": "2.0",
-  "dataSubject": {
-    "customerId": "UUID",
-    "organizationId": "UUID"
-  },
+  "dataSubject": { ... },
   "personalData": {
     "profile": { ... },
-    "conversations": [ ... ],
-    "embeddings": [ ... ],
     "statistics": { ... }
   }
 }
@@ -1804,7 +1843,7 @@ As a data subject, you have the following rights:
 ## Questions?
 
 If you have questions about your data or wish to exercise your other GDPR rights,
-please contact the organization through their support channels.
+please contact support through the appropriate channels.
 
 ---
 
