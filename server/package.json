@@ -40,7 +40,7 @@
     "@langchain/core": "^0.3.72",
     "@langchain/langgraph": "^0.4.7",
     "@langchain/openai": "^0.6.9",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.24.3",
     "@nuxt/devtools": "latest",
     "@nuxt/ui": "^2.11.1",
     "@nuxtjs/tailwindcss": "^6.8.4",
@@ -50,6 +50,7 @@
     "@tanstack/vue-query": "^5.85.5",
     "@trpc/client": "^11.5.0",
     "@trpc/server": "^11.5.0",
+    "@types/adm-zip": "^0.5.7",
     "@types/bcrypt": "^5.0.2",
     "@types/cheerio": "^1.0.0",
     "@types/cors": "^2.8.19",
@@ -59,6 +60,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mime-types": "^3.0.1",
     "@types/mjml": "^4.7.4",
+    "@types/multer": "^1.4.13",
     "@types/node": "^24.9.1",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.1",
@@ -71,7 +73,6 @@
     "@vee-validate/zod": "^4.12.4",
     "@vueuse/nuxt": "^10.5.0",
     "adm-zip": "^0.5.16",
-    "ajv": "^8.17.1",
     "argon2": "^0.31.2",
     "axios": "^1.11.0",
     "bcrypt": "^5.1.1",
@@ -136,9 +137,6 @@
     "word-extractor": "^1.0.4",
     "ws": "^8.14.2",
     "xml2js": "^0.6.2",
-    "zod": "^3.25.76",
-    "@types/adm-zip": "^0.5.7",
-    "@types/multer": "^1.4.13"
-  },
-  "devDependencies": {}
+    "zod": "^3.25.76"
+  }
 }

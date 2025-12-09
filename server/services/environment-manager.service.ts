@@ -108,8 +108,10 @@ export class EnvironmentManagerService {
 
           // Inject Plugin API credentials (URL and token only, IDs already set above)
           const serverUrl = `http://${config.server.host}:${config.server.port}`;
-          env.PLUGIN_API_URL = `${serverUrl}/v1/plugin-api`;
-          env.PLUGIN_API_TOKEN = apiToken;
+          // Use HAY_ prefix for consistency with Plugin SDK expectations
+          // Include /v1 prefix so SDK paths like /plugin-api/... resolve correctly
+          env.HAY_API_URL = `${serverUrl}/v1`;
+          env.HAY_API_TOKEN = apiToken;
 
           console.log(
             `[EnvironmentManager] Injected Plugin API credentials for ${instance.plugin.name} (capabilities: ${capabilities.join(", ")})`,

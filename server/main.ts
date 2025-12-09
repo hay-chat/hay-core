@@ -185,6 +185,11 @@ async function startServer() {
     });
   });
 
+  // Plugin worker proxy route - proxy requests to plugin workers
+  // This is for the new TypeScript-based plugin system with process isolation
+  const pluginProxyRouter = require("@server/routes/v1/plugins/proxy").default;
+  server.use("/v1/plugins", pluginProxyRouter);
+
   // OAuth callback route - handle OAuth redirects from providers
   server.get("/oauth/callback", async (req, res) => {
     console.log("\n========== OAUTH CALLBACK ENDPOINT HIT ==========");
@@ -313,7 +318,7 @@ async function startServer() {
   });
 
   // Plugin API routes - secure HTTP endpoints for plugins to call back to the server
-  const pluginAPIRouter = await import("@server/routes/v1/plugin-api");
+  const pluginAPIRouter = await import("@server/routes/v1/plugin-api/index");
   server.use("/v1/plugin-api", pluginAPIRouter.default);
 
   // Create dynamic router with plugin routes (after plugins are loaded)

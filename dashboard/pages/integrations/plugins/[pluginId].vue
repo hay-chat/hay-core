@@ -136,6 +136,41 @@
         </CardHeader>
       </Card>
 
+      <!-- OAuth Connection Card (show for OAuth plugins) -->
+      <Card v-if="plugin.manifest?.ui?.auth === 'oauth2'">
+        <CardContent>
+          <PluginOAuthConnection
+            :plugin="plugin"
+            :config="{
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId,
+            }"
+            :api-base-url="apiBaseUrl"
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Plugin Extensions - Before Settings Slot (only when NOT OAuth or when enabled) -->
+      <template v-if="!enabled">
+        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <div class="text-xs text-muted-foreground mb-2">
+              Debug: Rendering extension {{ ext.id }}
+            </div>
+            <component
+              :is="ext.component"
+              :plugin="plugin"
+              :config="{
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+              v-bind="ext.props || {}"
+            />
+          </CardContent>
+        </Card>
+      </template>
+
       <!-- Connection Error Alert (when enabled and failed) -->
       <Alert
         v-if="enabled && testResult && !testResult.success"
@@ -203,7 +238,14 @@
               </div>
 
               <!-- MCP Connector Capabilities -->
-              <div v-if="plugin.manifest.capabilities.mcp" class="space-y-3">
+              <div
+                v-if="
+                  Array.isArray(plugin.manifest.capabilities)
+                    ? plugin.manifest.capabilities.includes('mcp')
+                    : plugin.manifest.capabilities.mcp
+                "
+                class="space-y-3"
+              >
                 <div class="flex items-center gap-2">
                   <Cpu class="h-5 w-5 text-primary" />
                   <h4 class="font-medium">MCP Connector</h4>
@@ -228,8 +270,10 @@
         </Card>
 
         <!-- Available Actions Card (for MCP plugins) -->
+        <!-- Note: TypeScript-first plugins don't show tools here as they're registered dynamically -->
         <Card
           v-if="
+            !Array.isArray(plugin.manifest.capabilities) &&
             plugin.manifest?.capabilities?.mcp?.tools &&
             plugin.manifest.capabilities.mcp.tools.length > 0
           "
@@ -262,10 +306,34 @@
         </Card>
       </template>
 
+      <!-- OAuth Connection Card (show when enabled for OAuth plugins) -->
+      <Card v-if="enabled && plugin.manifest?.ui?.auth === 'oauth2'">
+        <CardContent>
+          <PluginOAuthConnection
+            :plugin="plugin"
+            :config="{
+              ...formData,
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId,
+            }"
+            :api-base-url="apiBaseUrl"
+          />
+        </CardContent>
+      </Card>
+
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
+        <div v-if="beforeSettingsExtensions.length === 0" class="text-sm text-muted-foreground p-4 border border-dashed rounded">
+          Debug (enabled): No extensions. Count: {{ beforeSettingsExtensions.length }}
+        </div>
+        <div v-else class="text-xs text-muted-foreground p-2 border border-dashed rounded mb-2">
+          Debug (enabled): Found {{ beforeSettingsExtensions.length }} extension(s)
+        </div>
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
+            <div class="text-xs text-green-600 font-mono mb-2 p-2 bg-green-50 rounded">
+              Debug: Rendering enabled extension {{ ext.id }}
+            </div>
             <component
               :is="ext.component"
               :plugin="plugin"
@@ -275,6 +343,7 @@
                 organizationId: userStore.activeOrganizationId,
               }"
               :api-base-url="apiBaseUrl"
+              v-bind="ext.props || {}"
               @update:config="
                 (newConfig: any) => {
                   formData = { ...formData, ...newConfig };
@@ -465,6 +534,7 @@ import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
+import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 
 // Route and router
 const route = useRoute();
@@ -512,8 +582,8 @@ const templateHtml = ref<string | null>(null);
 const editingEncryptedFields = ref<Set<string>>(new Set());
 
 // Plugin Extensions for slots
-const beforeSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
-const afterSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
+const beforeSettingsExtensions = ref<Array<{ id: string; component: any; props?: Record<string, any> }>>([]);
+const afterSettingsExtensions = ref<Array<{ id: string; component: any; props?: Record<string, any> }>>([]);
 const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
 // Track original values to detect changes
 const originalFormData = ref<Record<string, any>>({});
@@ -532,16 +602,34 @@ const sortedTabExtensions = computed(() => {
 
 // Helper function to load plugin component dynamically using Vite's glob imports
 const loadPluginComponent = async (componentPath: string) => {
-  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix if present)
-  const pluginName = pluginId.value.replace("hay-plugin-", "");
+  // Check if component is from dashboard (starts with @/)
+  if (componentPath.startsWith("@/")) {
+    // Dashboard component - use a resolver map for known components
+    const componentResolvers: Record<string, () => Promise<any>> = {
+      "@/components/plugins/PluginOAuthConnection.vue": () =>
+        import("@/components/plugins/PluginOAuthConnection.vue"),
+    };
 
-  // Build the full path from plugin name and componentPath
-  // The glob pattern is '../../../../plugins/**/*.vue' so we need to match that
+    if (componentResolvers[componentPath]) {
+      try {
+        const module = await componentResolvers[componentPath]();
+        return module.default;
+      } catch (error) {
+        console.error(`Failed to load dashboard component: ${componentPath}`, error);
+        throw new Error(`Dashboard component not found: ${componentPath}. Error: ${error}`);
+      }
+    } else {
+      throw new Error(
+        `Dashboard component not registered: ${componentPath}. Available: ${Object.keys(componentResolvers).join(", ")}`,
+      );
+    }
+  }
+
+  // Plugin component - use discovered components
+  const pluginName = pluginId.value.replace("hay-plugin-", "");
   const fullPath = `../../../../plugins/${pluginName}/${componentPath}`;
 
-  // Check if the component exists in our discovered components
   if (pluginComponents[fullPath]) {
-    // Use defineAsyncComponent for proper async loading
     return defineAsyncComponent(pluginComponents[fullPath]);
   }
 
@@ -594,11 +682,16 @@ const handleThumbnailError = (event: Event) => {
 const loadPluginExtensions = async () => {
   // Load settings extensions from plugin manifest if defined
   if (!plugin.value?.manifest?.settingsExtensions) {
+    console.log("[PluginSettings] No settingsExtensions found in manifest");
     return;
   }
 
+  console.log("[PluginSettings] Loading extensions:", plugin.value.manifest.settingsExtensions);
+
   for (const ext of plugin.value.manifest.settingsExtensions) {
     try {
+      console.log("[PluginSettings] Processing extension:", ext);
+
       // Determine which slot array to use
       let targetExtensions: any = null;
       if (ext.slot === "before-settings") {
@@ -614,8 +707,10 @@ const loadPluginExtensions = async () => {
 
       // Check if the extension has a component file path
       if (ext.component) {
+        console.log("[PluginSettings] Loading component:", ext.component);
         // Load component using Vite's dynamic imports
         const componentModule = await loadPluginComponent(ext.component);
+        console.log("[PluginSettings] Component loaded:", componentModule);
 
         if (ext.slot === "tab") {
           targetExtensions.value.push({
@@ -623,12 +718,17 @@ const loadPluginExtensions = async () => {
             component: markRaw(componentModule),
             name: ext.tabName || "Tab",
             order: ext.tabOrder,
+            props: ext.props || {},
           });
         } else {
-          targetExtensions.value.push({
+          const extensionData = {
             id: `${pluginId.value}-${ext.slot}`,
             component: markRaw(componentModule),
-          });
+            props: ext.props || {},
+          };
+          console.log("[PluginSettings] Pushing extension to array:", extensionData);
+          targetExtensions.value.push(extensionData);
+          console.log("[PluginSettings] beforeSettingsExtensions after push:", beforeSettingsExtensions.value);
         }
       }
       // Fallback to inline template if provided (for backward compatibility)
