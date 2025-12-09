@@ -24,6 +24,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     return this.getRepository().findOne({
       where: { organizationId, pluginId: pluginRegistry.id },
       relations: ["plugin"],
+      cache: false, // Disable cache to always get fresh data
     });
   }
 

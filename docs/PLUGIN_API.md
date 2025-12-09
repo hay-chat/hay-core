@@ -85,9 +85,11 @@ Each plugin directory contains:
 ### System Components
 
 #### 1. Plugin Manager Service
+
 **Location**: `server/services/plugin-manager.service.ts`
 
 Responsible for:
+
 - Plugin discovery and registration
 - Manifest validation
 - Installation and building
@@ -95,9 +97,11 @@ Responsible for:
 - Plugin registry management
 
 #### 2. Plugin Instance Manager Service
+
 **Location**: `server/services/plugin-instance-manager.service.ts`
 
 Handles:
+
 - On-demand instance startup
 - Instance lifecycle management
 - Inactivity cleanup (5-minute timeout)
@@ -105,18 +109,22 @@ Handles:
 - Activity tracking
 
 #### 3. Process Manager Service
+
 **Location**: `server/services/process-manager.service.ts`
 
 Manages:
+
 - MCP server process lifecycle
 - Process health monitoring
 - Environment variable injection
 - Communication via stdio/SSE/WebSocket
 
 #### 4. MCP Client Factory
+
 **Location**: `server/services/mcp-client-factory.service.ts`
 
 Provides:
+
 - MCP client creation for local/remote servers
 - Connection management
 - Tool invocation
@@ -132,13 +140,13 @@ The manifest.json file is the heart of every plugin. It must conform to the sche
 
 ```json
 {
-  "id": "hay-plugin-{name}",           // Unique identifier (alphanumeric + hyphens)
-  "name": "Plugin Display Name",        // Human-readable name
-  "version": "1.0.0",                   // Semantic version
-  "description": "Plugin description",  // Brief description
-  "author": "Author Name",              // Author or organization
-  "type": ["mcp-connector"],           // Plugin type(s) - see Plugin Types
-  "entry": "./dist/index.js"           // Compiled entry point
+  "id": "hay-plugin-{name}", // Unique identifier (alphanumeric + hyphens)
+  "name": "Plugin Display Name", // Human-readable name
+  "version": "1.0.0", // Semantic version
+  "description": "Plugin description", // Brief description
+  "author": "Author Name", // Author or organization
+  "type": ["mcp-connector"], // Plugin type(s) - see Plugin Types
+  "entry": "./dist/index.js" // Compiled entry point
 }
 ```
 
@@ -146,12 +154,12 @@ The manifest.json file is the heart of every plugin. It must conform to the sche
 
 ```json
 {
-  "enabled": true,                     // Default enabled state
-  "category": "integration",           // Marketplace category
-  "icon": "shopify",                   // Icon identifier or URL
-  "autoActivate": false,               // Auto-start on server boot
-  "invisible": false,                  // Hide from marketplace
-  "trpcRouter": "./dist/router.js"    // Custom tRPC router (with autoActivate)
+  "enabled": true, // Default enabled state
+  "category": "integration", // Marketplace category
+  "icon": "shopify", // Icon identifier or URL
+  "autoActivate": false, // Auto-start on server boot
+  "invisible": false, // Hide from marketplace
+  "trpcRouter": "./dist/router.js" // Custom tRPC router (with autoActivate)
 }
 ```
 
@@ -160,9 +168,10 @@ The manifest.json file is the heart of every plugin. It must conform to the sche
 ```json
 {
   "marketplace": {
-    "featured": true,                  // Feature in marketplace
+    "featured": true, // Feature in marketplace
     "tags": ["ecommerce", "payments"], // Searchable tags
-    "screenshots": [                   // Screenshot URLs
+    "screenshots": [
+      // Screenshot URLs
       "https://example.com/screenshot1.png"
     ]
   }
@@ -180,15 +189,17 @@ The `capabilities` object defines what the plugin can do:
   "capabilities": {
     "mcp": {
       "connection": {
-        "type": "local",               // "local" or "remote"
+        "type": "local", // "local" or "remote"
         "url": "https://mcp.example.com" // Required if type=remote
       },
-      "tools": [                       // MCP tools provided
+      "tools": [
+        // MCP tools provided
         {
           "name": "tool_name",
           "label": "Tool Display Name",
           "description": "What this tool does",
-          "input_schema": {            // JSON Schema for parameters
+          "input_schema": {
+            // JSON Schema for parameters
             "type": "object",
             "properties": {
               "param1": {
@@ -201,9 +212,9 @@ The `capabilities` object defines what the plugin can do:
         }
       ],
       "transport": "sse|websocket|http", // Transport protocol(s)
-      "auth": ["apiKey"],                // Auth methods - see Authentication
-      "installCommand": "npm install",   // Install dependencies
-      "buildCommand": "npm run build",   // Build command (optional)
+      "auth": ["apiKey"], // Auth methods - see Authentication
+      "installCommand": "npm install", // Install dependencies
+      "buildCommand": "npm run build", // Build command (optional)
       "startCommand": "node mcp/index.js" // Start MCP server
     }
   }
@@ -216,7 +227,8 @@ The `capabilities` object defines what the plugin can do:
 {
   "capabilities": {
     "ui": {
-      "routes": [                      // Custom routes
+      "routes": [
+        // Custom routes
         {
           "path": "/plugins/myplugin",
           "component": "./components/Page.vue",
@@ -227,7 +239,8 @@ The `capabilities` object defines what the plugin can do:
           }
         }
       ],
-      "components": [                  // Reusable components
+      "components": [
+        // Reusable components
         {
           "name": "MyComponent",
           "path": "./components/MyComponent.vue"
@@ -244,7 +257,8 @@ The `capabilities` object defines what the plugin can do:
 {
   "capabilities": {
     "api": {
-      "routes": [                      // Custom API routes
+      "routes": [
+        // Custom API routes
         {
           "method": "POST",
           "path": "/webhook",
@@ -265,7 +279,7 @@ The `capabilities` object defines what the plugin can do:
 {
   "capabilities": {
     "mcp": {
-      "auth": ["apiKey"]               // or ["oauth2"], ["jwt"], or []
+      "auth": ["apiKey"] // or ["oauth2"], ["jwt"], or []
     }
   }
 }
@@ -282,9 +296,9 @@ The `capabilities` object defines what the plugin can do:
         "oauth": {
           "authorizationUrl": "https://provider.com/oauth/authorize",
           "tokenUrl": "https://provider.com/oauth/token",
-          "scopes": ["read", "write"],          // Required scopes
-          "optionalScopes": ["admin"],          // Optional scopes
-          "pkce": true,                         // Enable PKCE
+          "scopes": ["read", "write"], // Required scopes
+          "optionalScopes": ["admin"], // Optional scopes
+          "pkce": true, // Enable PKCE
           "clientIdEnvVar": "PLUGIN_CLIENT_ID",
           "clientSecretEnvVar": "PLUGIN_CLIENT_SECRET"
         }
@@ -307,9 +321,9 @@ Define user-configurable fields:
       "label": "API Key",
       "placeholder": "sk_live_...",
       "required": true,
-      "encrypted": true,               // Store encrypted in database
-      "env": "PLUGIN_API_KEY",        // Environment variable name
-      "regex": "^sk_(test|live)_.*"   // Validation regex (optional)
+      "encrypted": true, // Store encrypted in database
+      "env": "PLUGIN_API_KEY", // Environment variable name
+      "regex": "^sk_(test|live)_.*" // Validation regex (optional)
     },
     "webhookUrl": {
       "type": "string",
@@ -329,15 +343,18 @@ Define user-configurable fields:
 ```json
 {
   "permissions": {
-    "env": [                           // Required environment variables
+    "env": [
+      // Required environment variables
       "SHOPIFY_ACCESS_TOKEN",
       "MYSHOPIFY_DOMAIN"
     ],
-    "scopes": [                        // Required permission scopes
-      "org:<orgId>:mcp:invoke"
+    "scopes": [
+      // Required permission scopes
+      "org:<organizationId>:mcp:invoke"
     ],
-    "api": [                           // Platform APIs (Plugin API pattern)
-      "email"                          // Only declared APIs can be accessed
+    "api": [
+      // Platform APIs (Plugin API pattern)
+      "email" // Only declared APIs can be accessed
     ]
   }
 }
@@ -353,10 +370,10 @@ Add UI to plugin settings pages:
 {
   "settingsExtensions": [
     {
-      "slot": "before-settings",       // "before-settings", "after-settings", or "tab"
+      "slot": "before-settings", // "before-settings", "after-settings", or "tab"
       "component": "components/settings/CustomSection.vue",
-      "tabName": "Advanced",           // Required if slot="tab"
-      "tabOrder": 1                    // Order of tab (optional)
+      "tabName": "Advanced", // Required if slot="tab"
+      "tabOrder": 1 // Order of tab (optional)
     }
   ]
 }
@@ -370,14 +387,14 @@ Plugins can have multiple types for categorization:
 
 ### Available Types
 
-| Type | Description | Use Case |
-|------|-------------|----------|
-| `channel` | Communication channel integration | WhatsApp, Telegram, Email |
-| `mcp-connector` | Connects to MCP servers | Stripe, Shopify, remote APIs |
-| `retriever` | Data retrieval capabilities | Knowledge bases, search |
-| `playbook` | Workflow automation | Pre-defined workflows |
-| `workflow` | Advanced workflow capabilities | Complex automation |
-| `analytics` | Analytics and reporting | Dashboards, metrics |
+| Type            | Description                       | Use Case                     |
+| --------------- | --------------------------------- | ---------------------------- |
+| `channel`       | Communication channel integration | WhatsApp, Telegram, Email    |
+| `mcp-connector` | Connects to MCP servers           | Stripe, Shopify, remote APIs |
+| `retriever`     | Data retrieval capabilities       | Knowledge bases, search      |
+| `playbook`      | Workflow automation               | Pre-defined workflows        |
+| `workflow`      | Advanced workflow capabilities    | Complex automation           |
+| `analytics`     | Analytics and reporting           | Dashboards, metrics          |
 
 ### Categories
 
@@ -415,6 +432,7 @@ Plugin hosts its own MCP server:
 ```
 
 The MCP server:
+
 - Runs as a child process
 - Receives environment variables from configuration
 - Communicates via specified transport
@@ -447,10 +465,11 @@ Each tool must specify:
 
 ```json
 {
-  "name": "create_product",            // Function identifier
-  "label": "Create Product",           // Human-readable name
+  "name": "create_product", // Function identifier
+  "label": "Create Product", // Human-readable name
   "description": "Creates a new product in the store",
-  "input_schema": {                    // JSON Schema
+  "input_schema": {
+    // JSON Schema
     "type": "object",
     "properties": {
       "title": {
@@ -557,19 +576,19 @@ const plugins = await Hay.plugins.getAll.query();
 
 // Returns:
 interface Plugin {
-  id: string;                  // Plugin ID
-  dbId: number;               // Database ID
-  name: string;               // Display name
-  version: string;            // Version
-  type: string[];             // Plugin types
-  description: string;        // Description
-  installed: boolean;         // Installation status
-  built: boolean;             // Build status
-  enabled: boolean;           // Enabled for this org
-  hasConfiguration: boolean;  // Has configSchema
-  hasCustomUI: boolean;       // Has UI components
-  capabilities: object;       // Capabilities object
-  sourceType: 'core' | 'custom';
+  id: string; // Plugin ID
+  dbId: number; // Database ID
+  name: string; // Display name
+  version: string; // Version
+  type: string[]; // Plugin types
+  description: string; // Description
+  installed: boolean; // Installation status
+  built: boolean; // Build status
+  enabled: boolean; // Enabled for this org
+  hasConfiguration: boolean; // Has configSchema
+  hasCustomUI: boolean; // Has UI components
+  capabilities: object; // Capabilities object
+  sourceType: "core" | "custom";
   isCustom: boolean;
 }
 ```
@@ -578,7 +597,7 @@ interface Plugin {
 
 ```typescript
 const plugin = await Hay.plugins.get.query({
-  pluginId: 'hay-plugin-shopify'
+  pluginId: "hay-plugin-shopify",
 });
 ```
 
@@ -586,11 +605,11 @@ const plugin = await Hay.plugins.get.query({
 
 ```typescript
 const result = await Hay.plugins.enable.mutate({
-  pluginId: 'hay-plugin-shopify',
+  pluginId: "hay-plugin-shopify",
   configuration: {
-    shopifyAccessToken: 'shpat_xxxxx',
-    myshopifyDomain: 'my-store.myshopify.com'
-  }
+    shopifyAccessToken: "shpat_xxxxx",
+    myshopifyDomain: "my-store.myshopify.com",
+  },
 });
 ```
 
@@ -598,7 +617,7 @@ const result = await Hay.plugins.enable.mutate({
 
 ```typescript
 await Hay.plugins.disable.mutate({
-  pluginId: 'hay-plugin-shopify'
+  pluginId: "hay-plugin-shopify",
 });
 ```
 
@@ -606,10 +625,10 @@ await Hay.plugins.disable.mutate({
 
 ```typescript
 await Hay.plugins.updateConfig.mutate({
-  pluginId: 'hay-plugin-shopify',
+  pluginId: "hay-plugin-shopify",
   configuration: {
-    shopifyAccessToken: 'new-token'
-  }
+    shopifyAccessToken: "new-token",
+  },
 });
 ```
 
@@ -617,7 +636,7 @@ await Hay.plugins.updateConfig.mutate({
 
 ```typescript
 const config = await Hay.plugins.getConfig.query({
-  pluginId: 'hay-plugin-shopify'
+  pluginId: "hay-plugin-shopify",
 });
 
 // Returns decrypted configuration
@@ -627,12 +646,12 @@ const config = await Hay.plugins.getConfig.query({
 
 ```typescript
 const result = await Hay.plugins.invokeTool.mutate({
-  pluginId: 'hay-plugin-shopify',
-  toolName: 'get-products',
+  pluginId: "hay-plugin-shopify",
+  toolName: "get-products",
   arguments: {
-    searchTitle: 'T-Shirt',
-    limit: 10
-  }
+    searchTitle: "T-Shirt",
+    limit: 10,
+  },
 });
 ```
 
@@ -640,13 +659,13 @@ const result = await Hay.plugins.invokeTool.mutate({
 
 ```typescript
 const health = await Hay.plugins.healthCheck.query({
-  pluginId: 'hay-plugin-shopify'
+  pluginId: "hay-plugin-shopify",
 });
 
 // Returns:
 interface HealthCheck {
   success: boolean;
-  status: 'healthy' | 'unhealthy' | 'unconfigured';
+  status: "healthy" | "unhealthy" | "unconfigured";
   message?: string;
   error?: string;
   testedAt: Date;
@@ -657,15 +676,15 @@ interface HealthCheck {
 
 ```typescript
 const formData = new FormData();
-formData.append('file', zipFile);
+formData.append("file", zipFile);
 
-const result = await fetch('/v1/plugins/upload', {
-  method: 'POST',
+const result = await fetch("/v1/plugins/upload", {
+  method: "POST",
   body: formData,
   headers: {
-    'Authorization': `Bearer ${token}`,
-    'x-organization-id': organizationId
-  }
+    Authorization: `Bearer ${token}`,
+    "x-organization-id": organizationId,
+  },
 });
 ```
 
@@ -674,41 +693,35 @@ const result = await fetch('/v1/plugins/upload', {
 #### Plugin Manager
 
 ```typescript
-import { pluginManagerService } from '@server/services/plugin-manager.service';
+import { pluginManagerService } from "@server/services/plugin-manager.service";
 
 // Get all plugins
 const plugins = pluginManagerService.getAllPlugins();
 
 // Get specific plugin
-const plugin = pluginManagerService.getPlugin('hay-plugin-shopify');
+const plugin = pluginManagerService.getPlugin("hay-plugin-shopify");
 
 // Install plugin
-await pluginManagerService.installPlugin('hay-plugin-shopify');
+await pluginManagerService.installPlugin("hay-plugin-shopify");
 
 // Build plugin
-await pluginManagerService.buildPlugin('hay-plugin-shopify');
+await pluginManagerService.buildPlugin("hay-plugin-shopify");
 
 // Check if needs installation/build
-const needsInstall = pluginManagerService.needsInstallation('hay-plugin-shopify');
-const needsBuild = pluginManagerService.needsBuilding('hay-plugin-shopify');
+const needsInstall = pluginManagerService.needsInstallation("hay-plugin-shopify");
+const needsBuild = pluginManagerService.needsBuilding("hay-plugin-shopify");
 ```
 
 #### Plugin Instance Manager
 
 ```typescript
-import { pluginInstanceManagerService } from '@server/services/plugin-instance-manager.service';
+import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
 
 // Ensure instance is running (starts on-demand)
-await pluginInstanceManagerService.ensureInstanceRunning(
-  organizationId,
-  'hay-plugin-shopify'
-);
+await pluginInstanceManagerService.ensureInstanceRunning(organizationId, "hay-plugin-shopify");
 
 // Update activity timestamp (keeps instance alive)
-await pluginInstanceManagerService.updateActivityTimestamp(
-  organizationId,
-  'hay-plugin-shopify'
-);
+await pluginInstanceManagerService.updateActivityTimestamp(organizationId, "hay-plugin-shopify");
 
 // Get statistics
 const stats = await pluginInstanceManagerService.getStatistics();
@@ -720,16 +733,16 @@ await pluginInstanceManagerService.stopAllForOrganization(organizationId);
 #### Process Manager
 
 ```typescript
-import { processManagerService } from '@server/services/process-manager.service';
+import { processManagerService } from "@server/services/process-manager.service";
 
 // Start plugin process
-await processManagerService.startPlugin(organizationId, 'hay-plugin-shopify');
+await processManagerService.startPlugin(organizationId, "hay-plugin-shopify");
 
 // Stop plugin process
-await processManagerService.stopPlugin(organizationId, 'hay-plugin-shopify');
+await processManagerService.stopPlugin(organizationId, "hay-plugin-shopify");
 
 // Check if running
-const isRunning = processManagerService.isRunning(organizationId, 'hay-plugin-shopify');
+const isRunning = processManagerService.isRunning(organizationId, "hay-plugin-shopify");
 
 // Get running processes
 const processes = processManagerService.getRunningProcesses();
@@ -750,6 +763,7 @@ const processes = processManagerService.getRunningProcesses();
 ### Encryption
 
 Fields marked `encrypted: true` are:
+
 - Encrypted at rest using AES-256-GCM
 - Decrypted only when needed
 - Never exposed in API responses
@@ -764,7 +778,7 @@ Configuration fields map to environment variables:
   "configSchema": {
     "apiKey": {
       "type": "string",
-      "env": "SHOPIFY_API_KEY",     // Maps to SHOPIFY_API_KEY
+      "env": "SHOPIFY_API_KEY", // Maps to SHOPIFY_API_KEY
       "encrypted": true
     }
   }
@@ -772,6 +786,7 @@ Configuration fields map to environment variables:
 ```
 
 When the MCP server starts:
+
 ```bash
 SHOPIFY_API_KEY=decrypted_value node mcp/index.js
 ```
@@ -830,16 +845,16 @@ Your Vue components have access to:
 
 ```vue
 <script setup lang="ts">
-import { Hay } from '@/utils/api';
-import { usePluginStore } from '@/stores/plugin';
+import { Hay } from "@/utils/api";
+import { usePluginStore } from "@/stores/plugin";
 
 // Access plugin configuration
-const config = await Hay.plugins.getConfig.query({ pluginId: 'hay-plugin-myplugin' });
+const config = await Hay.plugins.getConfig.query({ pluginId: "hay-plugin-myplugin" });
 
 // Update configuration
 await Hay.plugins.updateConfig.mutate({
-  pluginId: 'hay-plugin-myplugin',
-  configuration: { newValue: 'updated' }
+  pluginId: "hay-plugin-myplugin",
+  configuration: { newValue: "updated" },
 });
 
 // Use Nuxt features
@@ -854,10 +869,7 @@ For OAuth-enabled plugins, use the OAuthConnection component:
 
 ```vue
 <template>
-  <OAuthConnection
-    :plugin-id="pluginId"
-    :oauth-config="oauthConfig"
-  />
+  <OAuthConnection :plugin-id="pluginId" :oauth-config="oauthConfig" />
 </template>
 ```
 
@@ -871,22 +883,22 @@ Plugins can register custom communication channels (sources) for handling messag
 
 ```typescript
 interface Source {
-  id: string;                    // Unique identifier
-  name: string;                  // Display name
-  description?: string;          // Channel description
-  category: SourceCategory;      // Category enum
-  pluginId?: string;             // Plugin that registered this
-  isActive: boolean;             // Active status
-  icon?: string;                 // Icon identifier
+  id: string; // Unique identifier
+  name: string; // Display name
+  description?: string; // Channel description
+  category: SourceCategory; // Category enum
+  pluginId?: string; // Plugin that registered this
+  isActive: boolean; // Active status
+  icon?: string; // Icon identifier
   metadata?: Record<string, unknown>; // Plugin-specific config
 }
 
 enum SourceCategory {
-  TEST = 'test',
-  MESSAGING = 'messaging',
-  SOCIAL = 'social',
-  EMAIL = 'email',
-  HELPDESK = 'helpdesk',
+  TEST = "test",
+  MESSAGING = "messaging",
+  SOCIAL = "social",
+  EMAIL = "email",
+  HELPDESK = "helpdesk",
 }
 ```
 
@@ -895,16 +907,16 @@ enum SourceCategory {
 ```typescript
 // In your plugin initialization
 const source = await trpc.sources.register.mutate({
-  id: 'whatsapp',                    // or 'my-plugin:whatsapp'
-  name: 'WhatsApp Business',
-  description: 'WhatsApp Business API integration',
-  category: 'messaging',
-  pluginId: 'whatsapp-plugin',
-  icon: 'whatsapp',
+  id: "whatsapp", // or 'my-plugin:whatsapp'
+  name: "WhatsApp Business",
+  description: "WhatsApp Business API integration",
+  category: "messaging",
+  pluginId: "whatsapp-plugin",
+  icon: "whatsapp",
   metadata: {
-    apiVersion: '2.0',
-    capabilities: ['text', 'media', 'templates']
-  }
+    apiVersion: "2.0",
+    capabilities: ["text", "media", "templates"],
+  },
 });
 ```
 
@@ -919,27 +931,27 @@ const source = await trpc.sources.register.mutate({
 When creating messages from your plugin, specify the sourceId:
 
 ```typescript
-import { MessageService } from '@server/services/core/message.service';
+import { MessageService } from "@server/services/core/message.service";
 
 const messageService = new MessageService();
 
 // Create message with test mode handling
 const message = await messageService.createAssistantMessageWithTestMode(
   conversation,
-  'Hello from WhatsApp!',
-  'whatsapp',  // sourceId
+  "Hello from WhatsApp!",
+  "whatsapp", // sourceId
   agent,
   organization,
   {
-    whatsappMessageId: 'wamid.xxxxx',
-    phoneNumber: '+1234567890'
-  }
+    whatsappMessageId: "wamid.xxxxx",
+    phoneNumber: "+1234567890",
+  },
 );
 
 // Check delivery state
-if (message.deliveryState === 'queued') {
+if (message.deliveryState === "queued") {
   // Message needs approval (test mode)
-  console.log('Message queued for approval');
+  console.log("Message queued for approval");
 } else {
   // Message approved automatically
   await sendToExternalPlatform(message);
@@ -950,17 +962,17 @@ if (message.deliveryState === 'queued') {
 
 ```typescript
 // Deactivate source
-await trpc.sources.deactivate.mutate({ id: 'whatsapp' });
+await trpc.sources.deactivate.mutate({ id: "whatsapp" });
 
 // Activate source
-await trpc.sources.activate.mutate({ id: 'whatsapp' });
+await trpc.sources.activate.mutate({ id: "whatsapp" });
 
 // List all sources
 const sources = await trpc.sources.list.query();
 
 // Get by category
 const messagingSources = await trpc.sources.getByCategory.query({
-  category: 'messaging'
+  category: "messaging",
 });
 ```
 
@@ -1039,10 +1051,11 @@ The `permissions.api` field uses the Plugin API pattern - plugins can only acces
 4. **Document**: Add to API reference
 
 Example:
+
 ```json
 {
   "permissions": {
-    "api": ["email", "sms"]  // Plugin can access email and SMS APIs
+    "api": ["email", "sms"] // Plugin can access email and SMS APIs
   }
 }
 ```
@@ -1060,16 +1073,18 @@ Example:
 Plugins can provide their own tRPC routers:
 
 1. **Create Router**: Export router from plugin
+
 ```typescript
 // plugins/my-plugin/dist/router.js
 export const router = trpcRouter({
   myEndpoint: publicProcedure.query(() => {
-    return { message: 'Hello from plugin' };
-  })
+    return { message: "Hello from plugin" };
+  }),
 });
 ```
 
 2. **Reference in Manifest**:
+
 ```json
 {
   "autoActivate": true,
@@ -1088,6 +1103,7 @@ export const router = trpcRouter({
 **Problem**: Plugin not visible in marketplace
 
 **Solutions**:
+
 - Check manifest.json exists and is valid JSON
 - Verify plugin ID matches pattern `/^[a-z0-9-]+$/`
 - Check `invisible` field is not `true`
@@ -1099,6 +1115,7 @@ export const router = trpcRouter({
 **Problem**: Plugin installation fails
 
 **Solutions**:
+
 - Check `installCommand` in manifest
 - Verify package.json exists in plugin directory
 - Ensure network access for npm install
@@ -1110,6 +1127,7 @@ export const router = trpcRouter({
 **Problem**: Plugin build fails
 
 **Solutions**:
+
 - Check `buildCommand` in manifest
 - Verify TypeScript configuration
 - Check for compilation errors
@@ -1121,6 +1139,7 @@ export const router = trpcRouter({
 **Problem**: Plugin instance fails to start
 
 **Solutions**:
+
 - Verify `startCommand` is correct
 - Check MCP server code for errors
 - Ensure required environment variables set
@@ -1133,6 +1152,7 @@ export const router = trpcRouter({
 **Problem**: Tool calls fail or timeout
 
 **Solutions**:
+
 - Verify tool name matches manifest
 - Check input_schema validation
 - Ensure MCP server is running
@@ -1145,6 +1165,7 @@ export const router = trpcRouter({
 **Problem**: Configuration changes not taking effect
 
 **Solutions**:
+
 - Stop and restart the plugin instance
 - Verify configuration saved in database
 - Check environment variable mapping
@@ -1156,6 +1177,7 @@ export const router = trpcRouter({
 **Problem**: OAuth flow fails
 
 **Solutions**:
+
 - Verify OAuth URLs are correct
 - Check client ID and secret configuration
 - Ensure redirect URI is registered

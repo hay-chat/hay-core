@@ -79,12 +79,16 @@ export class VectorStoreService {
   /**
    * Add text chunks to the vector store
    *
-   * @param orgId - Organization ID for multi-tenancy
+   * @param organizationId - Organization ID for multi-tenancy
    * @param docId - Optional document ID for linking embeddings to documents
    * @param chunks - Array of text chunks with optional metadata
    * @returns Array of embedding IDs
    */
-  async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {
+  async addChunks(
+    organizationId: string,
+    docId: string | null,
+    chunks: VectorChunk[],
+  ): Promise<string[]> {
     if (!this.embeddings) {
       throw new Error("Embeddings not initialized.");
     }
@@ -110,7 +114,7 @@ export class VectorStoreService {
 
     for (let i = 0; i < chunks.length; i++) {
       const result = await AppDataSource.query(insertQuery, [
-        orgId,
+        organizationId,
         docId,
         chunks[i].content,
         chunks[i].metadata || {},
@@ -126,12 +130,12 @@ export class VectorStoreService {
   /**
    * Search for similar content filtered by organization
    *
-   * @param orgId - Organization ID to filter results
+   * @param organizationId - Organization ID to filter results
    * @param query - Search query text
    * @param k - Number of results to return (default: 10)
    * @returns Array of search results with similarity scores
    */
-  async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {
+  async search(organizationId: string, query: string, k: number = 10): Promise<SearchResult[]> {
     if (!this.vectorStore) {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
@@ -156,7 +160,7 @@ export class VectorStoreService {
 
     const results = await AppDataSource.query(searchQuery, [
       `[${queryVector.join(",")}]`,
-      orgId,
+      organizationId,
       k,
     ]);
 
@@ -181,14 +185,14 @@ export class VectorStoreService {
   /**
    * Delete embeddings by document ID
    *
-   * @param orgId - Organization ID for additional security
+   * @param organizationId - Organization ID for additional security
    * @param docId - Document ID whose embeddings should be deleted
    * @returns Number of deleted embeddings
    */
-  async deleteByDocumentId(orgId: string, docId: string): Promise<number> {
+  async deleteByDocumentId(organizationId: string, docId: string): Promise<number> {
     const result = await AppDataSource.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
-      [orgId, docId],
+      [organizationId, docId],
     );
 
     return result[1]; // Returns affected row count
@@ -198,13 +202,13 @@ export class VectorStoreService {
    * Delete embeddings by organization ID
    * Use with caution - this deletes all embeddings for an organization
    *
-   * @param orgId - Organization ID whose embeddings should be deleted
+   * @param organizationId - Organization ID whose embeddings should be deleted
    * @returns Number of deleted embeddings
    */
-  async deleteByOrganizationId(orgId: string): Promise<number> {
+  async deleteByOrganizationId(organizationId: string): Promise<number> {
     const result = await AppDataSource.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1`,
-      [orgId],
+      [organizationId],
     );
 
     return result[1]; // Returns affected row count
@@ -213,10 +217,10 @@ export class VectorStoreService {
   /**
    * Get embedding statistics for an organization
    *
-   * @param orgId - Organization ID
+   * @param organizationId - Organization ID
    * @returns Statistics object
    */
-  async getStatistics(orgId: string): Promise<{
+  async getStatistics(organizationId: string): Promise<{
     totalEmbeddings: number;
     totalDocuments: number;
     avgEmbeddingsPerDocument: number;
@@ -229,7 +233,7 @@ export class VectorStoreService {
       FROM embeddings
       WHERE "organization_id" = $1
     `,
-      [orgId],
+      [organizationId],
     );
 
     const result = stats[0];

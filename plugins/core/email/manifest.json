@@ -15,7 +15,7 @@
     "tags": ["email", "notifications", "communication", "smtp", "utility"]
   },
   "permissions": {
-    "api": ["email"]
+    "api": ["email", "mcp"]
   },
   "configSchema": {
     "recipients": {
@@ -28,48 +28,5 @@
       "env": "EMAIL_RECIPIENTS"
     }
   },
-  "capabilities": {
-    "mcp": {
-      "connection": {
-        "type": "local"
-      },
-      "serverPath": "mcp/index.js",
-      "tools": [
-        {
-          "name": "healthcheck",
-          "label": "Health Check",
-          "description": "Check if the email plugin is working correctly and return configuration status",
-          "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-          }
-        },
-        {
-          "name": "send-email",
-          "label": "Send Email",
-          "description": "Send an email to configured recipients using the platform's email service. The email will be sent from the platform's default sender address.",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "subject": {
-                "type": "string",
-                "description": "Email subject line",
-                "minLength": 1
-              },
-              "body": {
-                "type": "string",
-                "description": "Email body content (plain text)",
-                "minLength": 1
-              }
-            },
-            "required": ["subject", "body"]
-          }
-        }
-      ],
-      "transport": "stdio",
-      "installCommand": "npm install",
-      "startCommand": "node mcp/index.js"
-    }
-  }
+  "capabilities": ["mcp"]
 }

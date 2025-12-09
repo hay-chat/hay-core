@@ -22,9 +22,18 @@ export class OAuthService {
 
   /**
    * Check if OAuth is available for a plugin
-   * OAuth is available if client_id env var is set
+   * OAuth is available if:
+   * 1. Plugin manifest has ui.auth === "oauth2"
+   * 2. Client ID environment variable is set
    */
   isOAuthAvailable(pluginId: string, manifest: HayPluginManifest): boolean {
+    // Check if plugin supports OAuth via ui.auth field (TypeScript-first plugins)
+    if (manifest.ui?.auth === "oauth2") {
+      const credentials = this.getClientCredentials(pluginId, manifest);
+      return credentials.clientId !== null;
+    }
+
+    // Legacy: Check old object-based capabilities format
     const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
     if (!oauthConfig) {
       return false;
@@ -46,6 +55,19 @@ export class OAuthService {
     clientId: string | null;
     clientSecret: string | null;
   } {
+    // For TypeScript-first plugins: Look for CLIENT_ID and CLIENT_SECRET in permissions.env
+    if (manifest.ui?.auth === "oauth2" && manifest.permissions?.env) {
+      const envVars = manifest.permissions.env;
+      const clientIdVar = envVars.find((v: string) => v.includes("CLIENT_ID"));
+      const clientSecretVar = envVars.find((v: string) => v.includes("CLIENT_SECRET"));
+
+      return {
+        clientId: clientIdVar ? (process.env[clientIdVar] || null) : null,
+        clientSecret: clientSecretVar ? (process.env[clientSecretVar] || null) : null,
+      };
+    }
+
+    // Legacy: Check old object-based capabilities format
     const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
     if (!oauthConfig) {
       return { clientId: null, clientSecret: null };
@@ -82,8 +104,38 @@ export class OAuthService {
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
-    console.log("OAuth Config:", JSON.stringify(oauthConfig, null, 2));
+    console.log("Manifest ui.auth:", manifest.ui?.auth);
+
+    // For TypeScript-first plugins, get OAuth config from plugin instance
+    let oauthConfig: any = null;
+
+    if (manifest.ui?.auth === "oauth2") {
+      console.log("TypeScript-first plugin detected, checking instance config...");
+      // Get plugin instance to access registered MCP config
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+      console.log("Instance found:", !!instance);
+      if (instance && instance.config) {
+        const config = instance.config as any;
+        console.log("Instance config:", JSON.stringify(config, null, 2));
+        // Check for remote MCP servers with OAuth
+        if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
+          const remoteMcp = config.mcpServers.remote[0];
+          console.log("Remote MCP found:", JSON.stringify(remoteMcp, null, 2));
+          if (remoteMcp.auth?.type === "oauth2") {
+            oauthConfig = remoteMcp.auth;
+            console.log("OAuth config extracted from instance");
+          }
+        } else {
+          console.log("No remote MCP servers found in instance config");
+        }
+      }
+    } else {
+      console.log("Legacy plugin, checking capabilities...");
+      // Legacy: Check old object-based capabilities format
+      oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+    }
+
+    console.log("Final OAuth Config:", JSON.stringify(oauthConfig, null, 2));
 
     if (!oauthConfig) {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
@@ -220,7 +272,39 @@ export class OAuthService {
       }
 
       const manifest = plugin.manifest as HayPluginManifest;
-      const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+      console.log("Manifest ui.auth:", manifest.ui?.auth);
+
+      // For TypeScript-first plugins, get OAuth config from plugin instance
+      let oauthConfig: any = null;
+
+      if (manifest.ui?.auth === "oauth2") {
+        console.log("TypeScript-first plugin detected, checking instance config...");
+        // Get plugin instance to access registered MCP config
+        const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+        console.log("Instance found:", !!instance);
+        if (instance && instance.config) {
+          const config = instance.config as any;
+          console.log("Instance config:", JSON.stringify(config, null, 2));
+          // Check for remote MCP servers with OAuth
+          if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
+            const remoteMcp = config.mcpServers.remote[0];
+            console.log("Remote MCP found:", JSON.stringify(remoteMcp, null, 2));
+            if (remoteMcp.auth?.type === "oauth2") {
+              oauthConfig = remoteMcp.auth;
+              console.log("OAuth config extracted from instance");
+            }
+          } else {
+            console.log("No remote MCP servers found in instance config");
+          }
+        }
+      } else {
+        console.log("Legacy plugin, checking capabilities...");
+        // Legacy: Check old object-based capabilities format
+        oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+      }
+
+      console.log("Final OAuth Config:", JSON.stringify(oauthConfig, null, 2));
+
       if (!oauthConfig) {
         throw new Error(`Plugin ${pluginId} does not support OAuth`);
       }
@@ -533,7 +617,27 @@ export class OAuthService {
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+
+    // For TypeScript-first plugins, get OAuth config from plugin instance
+    let oauthConfig: any = null;
+
+    if (manifest.ui?.auth === "oauth2") {
+      // Get plugin instance to access registered MCP config
+      if (instance && instance.config) {
+        const config = instance.config as any;
+        // Check for remote MCP servers with OAuth
+        if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
+          const remoteMcp = config.mcpServers.remote[0];
+          if (remoteMcp.auth?.type === "oauth2") {
+            oauthConfig = remoteMcp.auth;
+          }
+        }
+      }
+    } else {
+      // Legacy: Check old object-based capabilities format
+      oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+    }
+
     if (!oauthConfig) {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }

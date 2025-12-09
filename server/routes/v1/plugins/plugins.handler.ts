@@ -17,6 +17,7 @@ interface PluginHealthCheckResult {
   status: "healthy" | "unhealthy" | "unconfigured";
   message?: string;
   error?: string;
+  tools?: Array<{ name: string; description: string }>;
   testedAt: Date;
 }
 
@@ -154,6 +155,22 @@ export const enablePlugin = authenticatedProcedure
       );
 
       console.log(`✅ [HAY OK] Plugin ${plugin.name} successfully enabled`);
+
+      // For MCP plugins, start the worker immediately so it can register its MCP servers
+      const manifest = plugin.manifest as any;
+      const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+      if (capabilities.includes('mcp')) {
+        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        try {
+          await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+          console.log(`✅ [HAY OK] Worker started for ${plugin.name}`);
+        } catch (workerError) {
+          console.error(`⚠️ [HAY WARNING] Failed to start worker for ${plugin.name}:`, workerError);
+          // Don't fail the entire enable operation if worker fails to start
+          // The worker can be started later on-demand
+        }
+      }
 
       return {
         success: true,
@@ -384,15 +401,16 @@ export const getPluginUITemplate = authenticatedProcedure
 
 /**
  * Get all available MCP tools from enabled plugins
+ * Tools are now registered dynamically by plugins at runtime
  */
 export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
   // Get all enabled plugin instances for this organization
   const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
   const enabledInstances = instances.filter((i) => i.enabled);
 
-  // Get all plugins and filter to only enabled ones
+  // Get all plugins
   const allPlugins = pluginManagerService.getAllPlugins();
-  const enabledPluginIds = new Set(enabledInstances.map((i) => i.pluginId));
+  const pluginMap = new Map(allPlugins.map(p => [p.id, p]));
 
   const mcpTools: Array<{
     id: string;
@@ -403,28 +421,54 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
     pluginName: string;
   }> = [];
 
-  // Process each enabled plugin
-  for (const plugin of allPlugins) {
-    // Check if this plugin is enabled for the organization
-    if (!enabledPluginIds.has(plugin.id)) {
+  // Process each enabled plugin instance
+  for (const instance of enabledInstances) {
+    const plugin = pluginMap.get(instance.pluginId);
+    if (!plugin) {
       continue;
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
 
-    // Check if plugin has MCP capabilities with tools
-    if (!manifest.capabilities?.mcp?.tools) {
+    // Check if plugin has MCP capability
+    const capabilities = Array.isArray(manifest.capabilities)
+      ? manifest.capabilities
+      : [];
+
+    if (!capabilities.includes("mcp")) {
       continue;
     }
 
-    // Extract tools from this plugin
-    for (const tool of manifest.capabilities.mcp.tools) {
+    // Get tools from instance config (registered dynamically at runtime)
+    const config = instance.config as any;
+    let tools: any[] = [];
+
+    // Check local MCP servers
+    if (config?.mcpServers?.local && Array.isArray(config.mcpServers.local)) {
+      for (const server of config.mcpServers.local) {
+        if (server.tools && Array.isArray(server.tools)) {
+          tools = tools.concat(server.tools);
+        }
+      }
+    }
+
+    // Check remote MCP servers
+    if (config?.mcpServers?.remote && Array.isArray(config.mcpServers.remote)) {
+      for (const server of config.mcpServers.remote) {
+        if (server.tools && Array.isArray(server.tools)) {
+          tools = tools.concat(server.tools);
+        }
+      }
+    }
+
+    // Add tools to result
+    for (const tool of tools) {
       mcpTools.push({
-        id: `${plugin.pluginId}:${tool.name}`,
+        id: `${plugin.id}:${tool.name}`,
         name: tool.name,
-        label: tool.label || tool.name,
+        label: tool.name,
         description: tool.description || "",
-        pluginId: plugin.pluginId,
+        pluginId: plugin.id,
         pluginName: plugin.name,
       });
     }
@@ -503,8 +547,12 @@ export const testConnection = authenticatedProcedure
 
     const manifest = plugin.manifest as HayPluginManifest;
 
-    // Check if plugin has MCP capabilities
-    if (!manifest.capabilities?.mcp) {
+    // Check if plugin has MCP capabilities (support both TypeScript-first array and legacy object format)
+    const hasMcpCapability = Array.isArray(manifest.capabilities)
+      ? manifest.capabilities.includes('mcp')
+      : !!manifest.capabilities?.mcp;
+
+    if (!hasMcpCapability) {
       return {
         success: false,
         status: "unhealthy",
@@ -529,196 +577,49 @@ export const testConnection = authenticatedProcedure
     }
 
     try {
-      // Get available MCP tools from manifest
-      const mcpTools = manifest.capabilities.mcp.tools || [];
+      // Get MCP tools from database (all plugins now register tools dynamically)
+      let mcpTools: any[] = [];
+      const config = instance.config as any;
 
-      // Determine which tool to use for health check (priority order)
-      let testTool: string | null = null;
-      let testArgs: Record<string, unknown> = {};
-
-      // Priority 1: Look for health check tools
-      const healthCheckTools = mcpTools.filter(
-        (tool) =>
-          tool.name.toLowerCase().includes("health") || tool.name.toLowerCase().includes("check"),
-      );
-      if (healthCheckTools.length > 0) {
-        testTool = healthCheckTools[0].name;
-      }
-
-      // Priority 2: Look for info/support tools
-      if (!testTool) {
-        const infoTools = mcpTools.filter(
-          (tool) =>
-            tool.name.toLowerCase().includes("info") || tool.name.toLowerCase().includes("support"),
-        );
-        if (infoTools.length > 0) {
-          testTool = infoTools[0].name;
-        }
-      }
-
-      // Priority 3: Look for list tools (with minimal parameters)
-      if (!testTool) {
-        const listTools = mcpTools.filter(
-          (tool) =>
-            tool.name.toLowerCase().startsWith("list") || tool.name.toLowerCase().startsWith("get"),
-        );
-        if (listTools.length > 0) {
-          testTool = listTools[0].name;
-          // Use minimal parameters for list tools
-          testArgs = { limit: 1 };
-        }
-      }
-
-      // Priority 4: Use initialize if no tools found
-      if (!testTool) {
-        testTool = "initialize";
-        testArgs = {};
-      }
-
-      // Prepare MCP request
-      const mcpRequest = {
-        jsonrpc: "2.0",
-        id: uuidv4(),
-        method: testTool === "initialize" ? "initialize" : "tools/call",
-        params:
-          testTool === "initialize"
-            ? {}
-            : {
-                name: testTool,
-                arguments: testArgs,
-              },
-      };
-
-      // Check connection type and use appropriate method
-      const connectionType = manifest.capabilities.mcp.connection?.type || "local";
-      let mcpResponse: any;
-
-      if (connectionType === "remote") {
-        // Use MCP client factory for remote plugins
-        const client = await MCPClientFactory.createClient(ctx.organizationId!, input.pluginId);
-
-        try {
-          // First, list available tools to see what the server actually provides
-          const availableTools = await client.listTools();
-
-          if (testTool === "initialize") {
-            // For initialize, just check if we can connect and list tools
-            mcpResponse = {
-              result: {
-                capabilities: {
-                  tools: availableTools.length > 0,
-                },
-              },
-            };
-          } else {
-            // Check if the test tool exists in available tools
-            const toolExists = availableTools.some((t) => t.name === testTool);
-
-            if (!toolExists && availableTools.length > 0) {
-              // Use the first available tool instead
-              testTool = availableTools[0].name;
-              testArgs = {};
-            }
-
-            // Call the actual tool
-            const toolResult = await client.callTool(testTool, testArgs);
-            mcpResponse = {
-              result: toolResult,
-            };
+      // Check local MCP servers
+      if (config?.mcpServers?.local && config.mcpServers.local.length > 0) {
+        for (const server of config.mcpServers.local) {
+          if (server.tools && Array.isArray(server.tools)) {
+            mcpTools = mcpTools.concat(server.tools);
           }
-        } finally {
-          await client.close();
         }
+      }
+
+      // Check remote MCP servers (e.g., HubSpot, Stripe)
+      if (config?.mcpServers?.remote && config.mcpServers.remote.length > 0) {
+        for (const server of config.mcpServers.remote) {
+          if (server.tools && Array.isArray(server.tools)) {
+            mcpTools = mcpTools.concat(server.tools);
+          }
+        }
+      }
+
+      // All plugins now use TypeScript-first: verify tools are registered
+      // The plugin worker has already validated connectivity by registering successfully
+      if (mcpTools.length > 0) {
+        return {
+          success: true,
+          status: "healthy",
+          message: `Plugin is running with ${mcpTools.length} MCP tools registered`,
+          tools: mcpTools.map(t => ({
+            name: t.name,
+            description: t.description,
+          })),
+          testedAt: new Date(),
+        };
       } else {
-        // Use process manager for local plugins
-        const result = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Connection timeout - verify server is accessible"));
-          }, 10000); // 10 second timeout for health checks
-
-          processManagerService
-            .sendToPlugin(ctx.organizationId!, input.pluginId, "mcp_call", mcpRequest)
-            .then((response) => {
-              clearTimeout(timeout);
-              resolve(response);
-            })
-            .catch((error) => {
-              clearTimeout(timeout);
-              reject(error);
-            });
-        });
-        mcpResponse = result as any;
+        return {
+          success: false,
+          status: "unhealthy",
+          message: "No MCP tools registered yet - plugin may still be initializing",
+          testedAt: new Date(),
+        };
       }
-
-      // Check if the response contains an error
-      if (mcpResponse && typeof mcpResponse === "object") {
-        // Check for JSON-RPC error response
-        if (mcpResponse.error) {
-          return {
-            success: false,
-            status: "unhealthy",
-            message: mcpResponse.error.message || "MCP server returned an error",
-            error:
-              mcpResponse.error.message || JSON.stringify(mcpResponse.error) || "Unknown MCP error",
-            testedAt: new Date(),
-          };
-        }
-
-        // Check for result with isError flag
-        if (mcpResponse.result && mcpResponse.result.isError) {
-          const errorText = mcpResponse.result.content?.[0]?.text || "Unknown MCP error";
-
-          // Check if it's an authentication error
-          const isAuthError =
-            errorText.includes("401") ||
-            errorText.includes("Couldn't authenticate") ||
-            errorText.includes("Authentication failed") ||
-            errorText.includes("Unauthorized");
-
-          return {
-            success: false,
-            status: isAuthError ? "unconfigured" : "unhealthy",
-            message: isAuthError
-              ? "Authentication failed - check credentials"
-              : "MCP server returned an error",
-            error: errorText,
-            testedAt: new Date(),
-          };
-        }
-
-        // Check for authentication errors in the content (for responses without isError flag)
-        if (mcpResponse.result && mcpResponse.result.content) {
-          const content = mcpResponse.result.content;
-          if (Array.isArray(content)) {
-            for (const item of content) {
-              if (item.type === "text" && item.text) {
-                // Check for common authentication error patterns
-                if (
-                  item.text.includes("401") ||
-                  item.text.includes("Couldn't authenticate") ||
-                  item.text.includes("Authentication failed") ||
-                  item.text.includes("Unauthorized")
-                ) {
-                  return {
-                    success: false,
-                    status: "unconfigured",
-                    message: "Authentication failed - check credentials",
-                    error: item.text,
-                    testedAt: new Date(),
-                  };
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return {
-        success: true,
-        status: "healthy",
-        message: `Connection successful using ${testTool}`,
-        testedAt: new Date(),
-      };
     } catch (error) {
       let errorMessage = "Unknown error";
       let status: "unhealthy" | "unconfigured" = "unhealthy";

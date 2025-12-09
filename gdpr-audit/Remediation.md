@@ -10,34 +10,38 @@
 ## Remediation Roadmap
 
 ### Phase 1: Critical Security & Quick Wins (Week 1)
+
 **Effort:** 3 days | **Risk Reduction:** 30%
 
 #### 1.1 GDPR-003: Enforce Strong JWT Secrets ⚡ IMMEDIATE
+
 **Priority:** P0 | **Effort:** 1 day | **Severity:** High
 
 **What to Do:**
+
 ```typescript
 // server/config/env.ts
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error(
-    'JWT_SECRET must be set and at least 32 characters. Generate with: openssl rand -base64 32'
+    "JWT_SECRET must be set and at least 32 characters. Generate with: openssl rand -base64 32",
   );
 }
 if (!process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET.length < 32) {
-  throw new Error('JWT_REFRESH_SECRET must be set and at least 32 characters.');
+  throw new Error("JWT_REFRESH_SECRET must be set and at least 32 characters.");
 }
 
 export const config = {
   jwt: {
     secret: process.env.JWT_SECRET, // Remove || 'default...'
     refreshSecret: process.env.JWT_REFRESH_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 };
 ```
 
 **Steps:**
+
 1. Remove default fallbacks from `server/config/env.ts:86-89`
 2. Add validation at startup (fail fast)
 3. Update `.env.example` with generation instructions
@@ -45,11 +49,13 @@ export const config = {
 5. Update deployment docs to require secrets
 
 **Testing:**
+
 - Unset `JWT_SECRET`, verify server fails to start with clear error
 - Set weak secret, verify validation rejects
 - Generate strong secret, verify startup succeeds
 
 **Files to Modify:**
+
 - [server/config/env.ts:86](server/config/env.ts#L86)
 - `.env.example` (create if missing)
 - `README.md` or `docs/DEPLOYMENT.md`
@@ -57,6 +63,7 @@ export const config = {
 ---
 
 #### 1.2 GDPR-008: Document Subprocessors ⚡ IMMEDIATE
+
 **Priority:** P0 | **Effort:** 2 days | **Severity:** Medium
 
 **What to Do:**
@@ -69,26 +76,31 @@ Last updated: 2025-10-08
 
 ## Active Subprocessors
 
-| Subprocessor | Purpose | Data Processed | DPA Link | Region | Added |
-|-------------|---------|----------------|----------|--------|-------|
-| OpenAI LLC | LLM embeddings, chat completion | Message content, metadata | [OpenAI DPA](https://openai.com/enterprise-privacy) | US (SCCs) | 2024-01 |
-| Amazon Web Services | Database hosting (RDS), storage (S3) | All platform data | [AWS GDPR](https://aws.amazon.com/compliance/gdpr-center/) | Configurable | 2024-01 |
-| Redis Labs | Cache, pub/sub messaging | Session data, temporary message cache | [Redis DPA](https://redis.io/legal/dpa/) | Configurable | 2024-01 |
+| Subprocessor        | Purpose                              | Data Processed                        | DPA Link                                                   | Region       | Added   |
+| ------------------- | ------------------------------------ | ------------------------------------- | ---------------------------------------------------------- | ------------ | ------- |
+| OpenAI LLC          | LLM embeddings, chat completion      | Message content, metadata             | [OpenAI DPA](https://openai.com/enterprise-privacy)        | US (SCCs)    | 2024-01 |
+| Amazon Web Services | Database hosting (RDS), storage (S3) | All platform data                     | [AWS GDPR](https://aws.amazon.com/compliance/gdpr-center/) | Configurable | 2024-01 |
+| Redis Labs          | Cache, pub/sub messaging             | Session data, temporary message cache | [Redis DPA](https://redis.io/legal/dpa/)                   | Configurable | 2024-01 |
 
 ## Notification Policy
+
 Customers will be notified 30 days before any new subprocessor is added via email to organization administrators.
 
 ## Data Processing Addendum (DPA)
+
 Hay's standard DPA is available at [link]. It incorporates Standard Contractual Clauses (SCCs) for EEA transfers.
 
 ## Subprocessor Security Standards
+
 All subprocessors must meet:
+
 - ISO 27001 or SOC 2 Type II certification
 - GDPR-compliant data processing agreements
 - Encryption in transit (TLS 1.2+) and at rest (AES-256)
 ```
 
 **Steps:**
+
 1. Create `docs/SUBPROCESSORS.md`
 2. Verify OpenAI DPA terms (check openai.com/enterprise-privacy)
 3. Add subprocessor list to privacy policy
@@ -96,20 +108,24 @@ All subprocessors must meet:
 5. Add UI in dashboard settings (optional)
 
 **Testing:**
+
 - Verify all DPA links accessible
 - Review OpenAI, AWS, Redis terms
 - Validate SCCs in place for non-EEA transfers
 
 **Files to Create:**
+
 - `docs/SUBPROCESSORS.md`
 - `docs/DPA-TEMPLATE.md` (optional)
 
 ---
 
 ### Phase 2: DSAR Infrastructure (Weeks 2-4)
+
 **Effort:** 3 weeks | **Risk Reduction:** 40%
 
 #### 2.1 GDPR-001: Implement DSAR Endpoints
+
 **Priority:** P0 | **Effort:** 3-4 weeks | **Severity:** Critical
 
 **Architecture:**
@@ -138,62 +154,68 @@ All subprocessors must meet:
 **Implementation:**
 
 **Step 1: Create DSAR Router**
+
 ```typescript
 // server/routes/v1/privacy/index.ts
-import { router, publicProcedure } from '@server/trpc/init';
-import { z } from 'zod';
-import { dsarService } from '@server/services/dsar.service';
+import { router, publicProcedure } from "@server/trpc/init";
+import { z } from "zod";
+import { dsarService } from "@server/services/dsar.service";
 
 export const privacyRouter = router({
   // Request data export
   requestExport: publicProcedure
-    .input(z.object({
-      email: z.string().email(),
-      phone: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        email: z.string().email(),
+        phone: z.string().optional(),
+      }),
+    )
     .mutation(async ({ input }) => {
       // Send verification code
       const requestId = await dsarService.initiateExport(input.email);
-      return { requestId, message: 'Verification code sent to email' };
+      return { requestId, message: "Verification code sent to email" };
     }),
 
   // Verify and execute export
   confirmExport: publicProcedure
-    .input(z.object({
-      requestId: z.string().uuid(),
-      verificationCode: z.string().length(6),
-    }))
+    .input(
+      z.object({
+        requestId: z.string().uuid(),
+        verificationCode: z.string().length(6),
+      }),
+    )
     .mutation(async ({ input }) => {
       const exportJob = await dsarService.confirmAndExecuteExport(
         input.requestId,
-        input.verificationCode
+        input.verificationCode,
       );
-      return { jobId: exportJob.id, estimatedTime: '5-10 minutes' };
+      return { jobId: exportJob.id, estimatedTime: "5-10 minutes" };
     }),
 
   // Request data deletion
   requestDeletion: publicProcedure
-    .input(z.object({
-      email: z.string().email(),
-      confirm: z.literal(true),
-    }))
+    .input(
+      z.object({
+        email: z.string().email(),
+        confirm: z.literal(true),
+      }),
+    )
     .mutation(async ({ input }) => {
       const requestId = await dsarService.initiateDeletion(input.email);
-      return { requestId, message: 'Verification code sent' };
+      return { requestId, message: "Verification code sent" };
     }),
 
   // Confirm deletion
   confirmDeletion: publicProcedure
-    .input(z.object({
-      requestId: z.string().uuid(),
-      verificationCode: z.string().length(6),
-    }))
+    .input(
+      z.object({
+        requestId: z.string().uuid(),
+        verificationCode: z.string().length(6),
+      }),
+    )
     .mutation(async ({ input }) => {
-      await dsarService.confirmAndExecuteDeletion(
-        input.requestId,
-        input.verificationCode
-      );
-      return { message: 'Deletion complete' };
+      await dsarService.confirmAndExecuteDeletion(input.requestId, input.verificationCode);
+      return { message: "Deletion complete" };
     }),
 
   // Check status
@@ -205,10 +227,12 @@ export const privacyRouter = router({
 
   // Download export
   downloadExport: publicProcedure
-    .input(z.object({
-      jobId: z.string().uuid(),
-      token: z.string(),
-    }))
+    .input(
+      z.object({
+        jobId: z.string().uuid(),
+        token: z.string(),
+      }),
+    )
     .query(async ({ input }) => {
       return await dsarService.getExportDownloadUrl(input.jobId, input.token);
     }),
@@ -216,15 +240,16 @@ export const privacyRouter = router({
 ```
 
 **Step 2: Create DSAR Service**
+
 ```typescript
 // server/services/dsar.service.ts
-import { customerRepository } from '@server/repositories/customer.repository';
-import { conversationRepository } from '@server/repositories/conversation.repository';
-import { vectorStoreService } from '@server/services/vector-store.service';
-import { AppDataSource } from '@server/database/data-source';
-import { createWriteStream } from 'fs';
-import archiver from 'archiver';
-import crypto from 'crypto';
+import { customerRepository } from "@server/repositories/customer.repository";
+import { conversationRepository } from "@server/repositories/conversation.repository";
+import { vectorStoreService } from "@server/services/vector-store.service";
+import { AppDataSource } from "@server/database/data-source";
+import { createWriteStream } from "fs";
+import archiver from "archiver";
+import crypto from "crypto";
 
 export class DSARService {
   async initiateExport(email: string): Promise<string> {
@@ -235,15 +260,15 @@ export class DSARService {
     await AppDataSource.query(
       `INSERT INTO dsar_requests (id, email, type, verification_code, expires_at, status)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [requestId, email, 'export', verificationCode, new Date(Date.now() + 3600000), 'pending']
+      [requestId, email, "export", verificationCode, new Date(Date.now() + 3600000), "pending"],
     );
 
     // Send verification email
     await emailService.send({
       to: email,
-      subject: 'Verify Your Data Export Request',
-      template: 'dsar-verification',
-      variables: { code: verificationCode, expiresIn: '1 hour' },
+      subject: "Verify Your Data Export Request",
+      template: "dsar-verification",
+      variables: { code: verificationCode, expiresIn: "1 hour" },
     });
 
     return requestId;
@@ -254,8 +279,8 @@ export class DSARService {
 
     // Create background job
     const job = await jobRepository.create({
-      type: 'dsar_export',
-      status: 'queued',
+      type: "dsar_export",
+      status: "queued",
       payload: { email: request.email },
     });
 
@@ -267,7 +292,7 @@ export class DSARService {
 
   private async executeExport(jobId: string, email: string) {
     try {
-      await jobRepository.update(jobId, { status: 'running' });
+      await jobRepository.update(jobId, { status: "running" });
 
       // Gather all data
       const customers = await customerRepository.findByEmail(email);
@@ -300,44 +325,46 @@ export class DSARService {
 
           // Get messages
           const messages = conv.messages || [];
-          data.messages.push(...messages.map(m => ({
-            id: m.id,
-            conversation_id: conv.id,
-            content: m.content,
-            type: m.type,
-            direction: m.direction,
-            created_at: m.created_at,
-          })));
+          data.messages.push(
+            ...messages.map((m) => ({
+              id: m.id,
+              conversation_id: conv.id,
+              content: m.content,
+              type: m.type,
+              direction: m.direction,
+              created_at: m.created_at,
+            })),
+          );
         }
       }
 
       // Create ZIP
       const zipPath = `/tmp/dsar-${jobId}.zip`;
       const output = createWriteStream(zipPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = archiver("zip", { zlib: { level: 9 } });
 
       archive.pipe(output);
-      archive.append(JSON.stringify(data, null, 2), { name: 'data.json' });
-      archive.append(this.generateReadme(email), { name: 'README.txt' });
+      archive.append(JSON.stringify(data, null, 2), { name: "data.json" });
+      archive.append(this.generateReadme(email), { name: "README.txt" });
       await archive.finalize();
 
       // Upload to S3 or store securely
       const downloadUrl = await this.uploadExport(zipPath, jobId);
 
       await jobRepository.update(jobId, {
-        status: 'completed',
+        status: "completed",
         result: { downloadUrl, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });
 
       // Send download email
       await emailService.send({
         to: email,
-        subject: 'Your Data Export is Ready',
-        template: 'dsar-export-ready',
-        variables: { downloadUrl, expiresIn: '7 days' },
+        subject: "Your Data Export is Ready",
+        template: "dsar-export-ready",
+        variables: { downloadUrl, expiresIn: "7 days" },
       });
     } catch (error) {
-      await jobRepository.update(jobId, { status: 'failed', error: error.message });
+      await jobRepository.update(jobId, { status: "failed", error: error.message });
     }
   }
 
@@ -364,7 +391,7 @@ export class DSARService {
     // Log deletion
     await AppDataSource.query(
       `INSERT INTO audit_log (action, email, timestamp) VALUES ($1, $2, $3)`,
-      ['dsar_deletion', request.email, new Date()]
+      ["dsar_deletion", request.email, new Date()],
     );
 
     return { deleted: customers.length };
@@ -375,6 +402,7 @@ export const dsarService = new DSARService();
 ```
 
 **Step 3: Create Database Entities**
+
 ```sql
 -- server/database/migrations/YYYYMMDD-AddDSARTables.ts
 CREATE TABLE dsar_requests (
@@ -405,6 +433,7 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp);
 ```
 
 **Testing Checklist:**
+
 - [ ] Create customer with conversations and messages
 - [ ] Request export via API, verify verification email sent
 - [ ] Confirm export, verify ZIP created with all data
@@ -415,6 +444,7 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp);
 - [ ] Test rate limiting on DSAR endpoints
 
 **Files to Create:**
+
 - `server/routes/v1/privacy/index.ts`
 - `server/services/dsar.service.ts`
 - `server/database/migrations/[timestamp]-AddDSARTables.ts`
@@ -422,15 +452,18 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp);
 - `server/templates/email/dsar-export-ready.template.html`
 
 **Dependencies:**
+
 - `archiver` (for ZIP creation)
 - `@aws-sdk/client-s3` (for export storage, optional)
 
 ---
 
 ### Phase 3: Data Retention & Lifecycle (Weeks 5-6)
+
 **Effort:** 2 weeks | **Risk Reduction:** 20%
 
 #### 3.1 GDPR-002: Implement Retention Policies
+
 **Priority:** P0 | **Effort:** 2 weeks | **Severity:** High
 
 **Architecture:**
@@ -451,6 +484,7 @@ CREATE INDEX idx_audit_timestamp ON audit_log(timestamp);
 **Implementation:**
 
 **Step 1: Add Retention Configuration**
+
 ```typescript
 // server/database/migrations/[timestamp]-AddRetentionSettings.ts
 ALTER TABLE organizations ADD COLUMN retention_days INTEGER DEFAULT 90;
@@ -459,15 +493,16 @@ ALTER TABLE conversations ADD COLUMN deleted_at TIMESTAMP;
 ```
 
 **Step 2: Create Retention Worker**
+
 ```typescript
 // server/workers/retention.worker.ts
-import { conversationRepository } from '@server/repositories/conversation.repository';
-import { vectorStoreService } from '@server/services/vector-store.service';
-import { LessThan } from 'typeorm';
+import { conversationRepository } from "@server/repositories/conversation.repository";
+import { vectorStoreService } from "@server/services/vector-store.service";
+import { LessThan } from "typeorm";
 
 export class RetentionWorker {
   async run() {
-    console.log('[RetentionWorker] Starting retention cleanup...');
+    console.log("[RetentionWorker] Starting retention cleanup...");
 
     const orgs = await organizationRepository.findAll();
     let totalDeleted = 0;
@@ -486,7 +521,9 @@ export class RetentionWorker {
         },
       });
 
-      console.log(`[RetentionWorker] Found ${expired.length} expired conversations for org ${org.id}`);
+      console.log(
+        `[RetentionWorker] Found ${expired.length} expired conversations for org ${org.id}`,
+      );
 
       for (const conversation of expired) {
         // Delete embeddings
@@ -506,7 +543,7 @@ export class RetentionWorker {
     // Log to audit
     await AppDataSource.query(
       `INSERT INTO audit_log (action, metadata, timestamp) VALUES ($1, $2, $3)`,
-      ['retention_cleanup', { totalDeleted }, new Date()]
+      ["retention_cleanup", { totalDeleted }, new Date()],
     );
   }
 }
@@ -529,6 +566,7 @@ export function startRetentionWorker() {
 ```
 
 **Step 3: Update Queries to Respect Soft Deletes**
+
 ```typescript
 // server/repositories/conversation.repository.ts
 override async findByOrganization(organizationId: string): Promise<Conversation[]> {
@@ -543,6 +581,7 @@ override async findByOrganization(organizationId: string): Promise<Conversation[
 ```
 
 **Step 4: Add Retention UI in Dashboard**
+
 ```vue
 <!-- dashboard/pages/settings/retention.vue -->
 <template>
@@ -566,6 +605,7 @@ override async findByOrganization(organizationId: string): Promise<Conversation[
 ```
 
 **Testing:**
+
 - [ ] Set org retention to 7 days
 - [ ] Create conversation, close it, backdate `closed_at` to 8 days ago
 - [ ] Run retention worker
@@ -575,6 +615,7 @@ override async findByOrganization(organizationId: string): Promise<Conversation[
 - [ ] Test `legal_hold=true` exempts conversation from deletion
 
 **Files to Modify/Create:**
+
 - `server/workers/retention.worker.ts` (create)
 - `server/database/migrations/[timestamp]-AddRetentionSettings.ts` (create)
 - `server/repositories/conversation.repository.ts` (update queries)
@@ -583,16 +624,18 @@ override async findByOrganization(organizationId: string): Promise<Conversation[
 ---
 
 ### Phase 4: Security Hardening (Week 7)
+
 **Effort:** 1 week | **Risk Reduction:** 5%
 
 #### 4.1 GDPR-007: Fix Embedding Cascade Deletion
+
 **Priority:** P1 | **Effort:** 1 week | **Severity:** High
 
 **Implementation:**
 
 ```typescript
 // server/services/vector-store.service.ts
-async deleteByConversationId(orgId: string, conversationId: string): Promise<number> {
+async deleteByConversationId(organizationId: string, conversationId: string): Promise<number> {
   // Delete embeddings linked to conversation messages
   const result = await AppDataSource.query(
     `DELETE FROM embeddings
@@ -603,7 +646,7 @@ async deleteByConversationId(orgId: string, conversationId: string): Promise<num
          SELECT id FROM documents WHERE conversation_id = $2
        )
      )`,
-    [orgId, conversationId]
+    [organizationId, conversationId]
   );
 
   console.log(`[VectorStore] Deleted ${result[1]} embeddings for conversation ${conversationId}`);
@@ -629,6 +672,7 @@ override async delete(id: string, organizationId: string): Promise<void> {
 ```
 
 **Testing:**
+
 - [ ] Create conversation with 3 messages
 - [ ] Verify embeddings created (count > 0 in embeddings table)
 - [ ] Delete conversation via repository method
@@ -639,6 +683,7 @@ override async delete(id: string, organizationId: string): Promise<void> {
 ---
 
 #### 4.2 GDPR-004: Add Webhook Replay Protection
+
 **Priority:** P1 | **Effort:** 1 week | **Severity:** Medium
 
 **Implementation:**
@@ -703,6 +748,7 @@ private async storeNonce(nonce: string, ttl: number): Promise<void> {
 ```
 
 **Update Webhook Config:**
+
 ```typescript
 // server/types/plugin.types.ts
 export interface WebhookConfig {
@@ -715,6 +761,7 @@ export interface WebhookConfig {
 ```
 
 **Testing:**
+
 - [ ] Send webhook with old timestamp (6 min old), verify rejection
 - [ ] Send webhook twice with same timestamp/payload, verify second rejected
 - [ ] Send webhook with fresh timestamp, verify acceptance
@@ -724,22 +771,27 @@ export interface WebhookConfig {
 ---
 
 ### Phase 5: Compliance Documentation (Week 8)
+
 **Effort:** 1 week | **Risk Reduction:** 5%
 
 #### 5.1 GDPR-005: Incident Response Runbook
+
 **Priority:** P1 | **Effort:** 1 week | **Severity:** High
 
 **Deliverables:**
+
 1. `docs/INCIDENT-RESPONSE.md` - Runbook for breach detection and response
 2. `server/services/incident.service.ts` - Incident logging and notification
 3. Email templates for breach notification
 4. Breach assessment worksheet
 
 **Runbook Outline:**
+
 ```markdown
 # Incident Response Plan
 
 ## 1. Detection
+
 - Failed authentication spike (>100 failures in 5 min)
 - Mass data export (>1000 records in 1 hour)
 - Unauthorized privilege escalation
@@ -747,6 +799,7 @@ export interface WebhookConfig {
 - Suspicious vector search patterns
 
 ## 2. Assessment (within 72 hours)
+
 - [ ] Identify affected data categories
 - [ ] Count affected data subjects
 - [ ] Determine severity (low/medium/high/critical)
@@ -754,30 +807,35 @@ export interface WebhookConfig {
 - [ ] Document timeline
 
 ## 3. Containment
+
 - [ ] Revoke compromised credentials
 - [ ] Block attacker IPs
 - [ ] Rotate API keys/secrets
 - [ ] Isolate affected systems
 
 ## 4. Notification
+
 - [ ] Notify DPO/security team immediately
 - [ ] If critical, notify supervisory authority within 72h (Art.33)
 - [ ] If high risk to data subjects, notify affected individuals (Art.34)
 - [ ] Notify affected tenants (processors duty)
 
 ## 5. Remediation
+
 - [ ] Patch vulnerability
 - [ ] Restore from clean backup if needed
 - [ ] Re-apply deletions (DSAR log)
 - [ ] Update security controls
 
 ## 6. Documentation
+
 - [ ] Incident report in audit log
 - [ ] Lessons learned document
 - [ ] Update security measures
 ```
 
 **Implementation:**
+
 ```typescript
 // server/services/incident.service.ts
 export async function reportBreach(incident: {
@@ -785,7 +843,7 @@ export async function reportBreach(incident: {
   affectedDataSubjects: number;
   dataCategories: string[];
   detectedAt: Date;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: "low" | "medium" | "high" | "critical";
 }) {
   // Log incident
   const incidentId = await AppDataSource.query(
@@ -797,20 +855,20 @@ export async function reportBreach(incident: {
       incident.dataCategories,
       incident.detectedAt,
       incident.severity,
-      'open',
-    ]
+      "open",
+    ],
   );
 
   // Notify security team
   await emailService.send({
-    to: config.security.dpoEmail || 'security@hay.chat',
+    to: config.security.dpoEmail || "security@hay.chat",
     subject: `[URGENT] Data Breach Detected: ${incident.description}`,
-    template: 'breach-notification',
+    template: "breach-notification",
     variables: { ...incident, incidentId: incidentId[0].id },
   });
 
   // If critical, prepare Art.33 notification
-  if (incident.severity === 'critical' && incident.affectedDataSubjects > 100) {
+  if (incident.severity === "critical" && incident.affectedDataSubjects > 100) {
     await this.generateArt33Report(incidentId[0].id);
   }
 }
@@ -819,12 +877,15 @@ export async function reportBreach(incident: {
 ---
 
 ### Phase 6: Optional Enhancements (Weeks 9-12)
+
 **Effort:** 4 weeks | **Risk Reduction:** 5%
 
 #### 6.1 GDPR-006: Data Residency Controls
+
 **Priority:** P2 | **Effort:** 2 weeks | **Severity:** Medium
 
 **Implementation Summary:**
+
 - Add `REGION` config (`eu`, `us`, `global`)
 - Validate DB host resolves to desired region
 - Use region-specific OpenAI endpoints (if available)
@@ -832,27 +893,33 @@ export async function reportBreach(incident: {
 - Enforce region affinity in queries
 
 #### 6.2 GDPR-012: Centralized Logging with PII Redaction
+
 **Priority:** P2 | **Effort:** 1 week | **Severity:** Low
 
 **Implementation Summary:**
+
 - Replace `console.error` with Winston logger
 - Add PII redaction formatter (mask emails, phones, content)
 - Configure production log retention (30 days)
 - Add `beforeSend` filter for observability exports
 
 #### 6.3 GDPR-010: Consent Management for Web Chat
+
 **Priority:** P3 | **Effort:** 1 week | **Severity:** Low
 
 **Implementation Summary:**
+
 - Add `consent: 'strict'` mode to widget config
 - Delay sessionStorage writes until first message (implied consent)
 - Provide sample consent banner code in docs
 - Document sessionStorage use as strictly necessary
 
 #### 6.4 GDPR-011: OpenAI Training Opt-Out Verification
+
 **Priority:** P2 | **Effort:** 1 day | **Severity:** Medium
 
 **Implementation Summary:**
+
 - Verify OpenAI Enterprise agreement includes training opt-out
 - Add code comment documenting opt-out status
 - Add startup validation for training opt-out flag (if needed)
@@ -863,18 +930,21 @@ export async function reportBreach(incident: {
 ## Testing Strategy
 
 ### Unit Tests
+
 - DSAR service methods (export, delete, verify)
 - Retention worker logic
 - Webhook signature verification with timestamp
 - Embedding cascade deletion
 
 ### Integration Tests
+
 - End-to-end DSAR flow (request → verify → download)
 - Retention cleanup across multiple orgs
 - Webhook replay attack prevention
 - Cross-tenant isolation (no data leakage)
 
 ### Security Tests
+
 - Penetration test DSAR endpoints (auth bypass, rate limiting)
 - Test JWT secret validation (reject weak secrets)
 - Test incident detection (trigger breach, verify alerts)
@@ -884,12 +954,14 @@ export async function reportBreach(incident: {
 ## Rollout Plan
 
 ### Pre-Deployment
+
 - [ ] Legal review of DSAR workflows
 - [ ] Privacy policy update with retention periods
 - [ ] DPA template for tenants (Art.28 compliance)
 - [ ] Customer communication plan
 
 ### Deployment
+
 - [ ] Phase 1: Security fixes (JWT, subprocessors docs)
 - [ ] Phase 2: DSAR endpoints (beta, limited orgs)
 - [ ] Phase 3: Retention policies (opt-in, then default)
@@ -897,6 +969,7 @@ export async function reportBreach(incident: {
 - [ ] Phase 5: Incident response live
 
 ### Post-Deployment
+
 - [ ] Monitor DSAR request volume
 - [ ] Review retention cleanup logs
 - [ ] Conduct GDPR compliance audit (external)
@@ -907,12 +980,14 @@ export async function reportBreach(incident: {
 ## Metrics & KPIs
 
 **Compliance Metrics:**
+
 - DSAR request processing time (target: <30 days)
 - Retention policy coverage (target: 100% of orgs)
 - Incident detection latency (target: <1 hour)
 - Data deletion completeness (target: 100%)
 
 **Engineering Metrics:**
+
 - DSAR API uptime (target: 99.9%)
 - Export generation time (target: <10 min)
 - Retention worker execution time (target: <1 hour)

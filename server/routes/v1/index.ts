@@ -20,6 +20,7 @@ import { apiTokensRouter } from "./api-tokens";
 import { auditLogsRouter } from "./audit-logs";
 import { webchatRouter } from "./webchat";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
+import { pluginApiTrpcRouter } from "./plugin-api/trpc";
 
 // Core routers - always available
 const coreRouters = {
@@ -43,6 +44,7 @@ const coreRouters = {
   apiTokens: apiTokensRouter,
   auditLogs: auditLogsRouter,
   webchat: webchatRouter,
+  pluginApi: pluginApiTrpcRouter,
 };
 
 // Create v1Router with core + plugin routers

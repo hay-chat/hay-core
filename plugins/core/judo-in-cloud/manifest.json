@@ -6,96 +6,18 @@
   "version": "1.0.0",
   "author": "Hay",
   "type": ["mcp-connector"],
-  "entry": "./mcp/index.js",
+  "entry": "./dist/index.js",
   "enabled": true,
   "category": "utility",
+  "icon": "cloud",
   "marketplace": {
-    "featured": false
-  },
-  "capabilities": {
-    "mcp": {
-      "tools": [
-        {
-          "name": "healthcheck",
-          "label": "Health Check",
-          "description": "Check if the Judo in Cloud plugin is working correctly and return status",
-          "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-          }
-        },
-        {
-          "name": "reset_password",
-          "label": "Reset Password",
-          "description": "Reset the password for a user",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "email": {
-                "type": "string",
-                "description": "Email of the user to reset the password for"
-              }
-            },
-            "required": ["email"]
-          }
-        },
-        {
-          "name": "contact",
-          "label": "Contact",
-          "description": "Contact the Judo in Cloud team",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "region": {
-                "type": "string",
-                "description": "Region of the company to contact"
-              },
-              "subject": {
-                "type": "string",
-                "description": "Needs to be one of the following: 'support', 'sales', 'technical', 'other'"
-              },
-              "company_name": {
-                "type": "string",
-                "description": "Name of the company to contact"
-              },
-              "email": {
-                "type": "string",
-                "description": "Email of the user to include in the contact"
-              },
-              "phone": {
-                "type": "string",
-                "description": "Phone number of the user to include in the contact"
-              }
-            },
-            "required": ["name", "subject"]
-          }
-        },
-        {
-          "name": "check_email",
-          "label": "Check Email",
-          "description": "Check if an email is registered in the system",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "email": {
-                "type": "string",
-                "description": "Email address to check"
-              }
-            },
-            "required": ["email"]
-          }
-        }
-      ],
-      "transport": "stdio",
-      "auth": [],
-      "installCommand": "npm install",
-      "startCommand": "node mcp/index.js"
-    }
+    "featured": false,
+    "tags": ["judo", "password-reset", "email", "contact", "utility"]
   },
   "permissions": {
+    "api": ["mcp"],
     "env": ["JUDO_IN_CLOUD_API_KEY"],
-    "scopes": ["org:<orgId>:mcp:invoke"]
+    "scopes": ["org:<organizationId>:mcp:invoke"]
   },
   "configSchema": {
     "judoInCloudApiKey": {
@@ -108,6 +30,7 @@
       "env": "JUDO_IN_CLOUD_API_KEY"
     }
   },
+  "capabilities": ["mcp"],
   "ui": {
     "settings": false
   }

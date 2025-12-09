@@ -1,24 +1,39 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
-import { execSync } from "child_process";
-import Ajv from "ajv";
+import { execSync, spawn, type ChildProcess } from "child_process";
+import * as jwt from "jsonwebtoken";
+import * as net from "net";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
+import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { decryptConfig } from "@server/lib/auth/utils/encryption";
+
+interface WorkerInfo {
+  process: ChildProcess;
+  port: number;
+  startedAt: Date;
+  lastActivity: Date;
+  metadata: PluginRegistry;
+  organizationId: string;
+  pluginId: string;
+  instanceId: string;
+}
 
 export class PluginManagerService {
   private pluginsDir: string;
   public registry: Map<string, PluginRegistry> = new Map();
-  private ajv: Ajv;
-  private manifestSchema: Record<string, unknown> | null = null;
+
+  // Worker management
+  private workers: Map<string, WorkerInfo> = new Map(); // key: organizationId:pluginId
+  private allocatedPorts: Set<number> = new Set();
+  private readonly PORT_RANGE_START = 5000;
+  private readonly PORT_RANGE_END = 6000;
 
   constructor() {
     // Look for plugins in the root /plugins directory
     this.pluginsDir = path.join(process.cwd(), "..", "plugins");
-
-    // Initialize AJV for JSON schema validation
-    this.ajv = new Ajv({ allErrors: true });
   }
 
   /**
@@ -26,9 +41,6 @@ export class PluginManagerService {
    */
   async initialize(): Promise<void> {
     console.log("🔍 Discovering plugins...");
-
-    // Load the manifest schema
-    await this.loadManifestSchema();
 
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
@@ -40,23 +52,6 @@ export class PluginManagerService {
 
     // Initialize auto-activated plugins
     await this.initializeAutoActivatedPlugins();
-  }
-
-  /**
-   * Load the JSON schema for plugin manifests
-   */
-  private async loadManifestSchema(): Promise<void> {
-    try {
-      const schemaPath = path.join(this.pluginsDir, "base", "plugin-manifest.schema.json");
-      const schemaContent = await fs.readFile(schemaPath, "utf-8");
-      this.manifestSchema = JSON.parse(schemaContent);
-      if (this.manifestSchema) {
-        this.ajv.compile(this.manifestSchema);
-      }
-      console.log("✅ Loaded plugin manifest schema");
-    } catch (error) {
-      console.warn("⚠️  Could not load plugin manifest schema, validation will be skipped:", error);
-    }
   }
 
   /**
@@ -131,6 +126,9 @@ export class PluginManagerService {
 
   /**
    * Register a single plugin from its directory
+   *
+   * Note: manifest.json is now used only for metadata (name, description, category, etc).
+   * Plugin capabilities are defined in TypeScript and registered dynamically at runtime.
    */
   public async registerPlugin(
     pluginPath: string,
@@ -138,53 +136,23 @@ export class PluginManagerService {
     organizationId: string | null,
   ): Promise<void> {
     try {
-      // First, try to load manifest.json
-      const jsonManifestPath = path.join(pluginPath, "manifest.json");
-      const jsonExists = await fs
-        .access(jsonManifestPath)
+      // Load manifest.json for plugin metadata
+      const manifestPath = path.join(pluginPath, "manifest.json");
+      const manifestExists = await fs
+        .access(manifestPath)
         .then(() => true)
         .catch(() => false);
 
-      let manifest: HayPluginManifest;
-
-      if (jsonExists) {
-        // Load and validate JSON manifest
-        const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
-        manifest = JSON.parse(manifestContent);
-
-        // Validate manifest against schema if available
-        if (this.manifestSchema) {
-          const validate = this.ajv.compile(this.manifestSchema);
-          const valid = validate(manifest);
-
-          if (!valid) {
-            console.warn(`⚠️  Invalid manifest at ${pluginPath}:`);
-            console.warn(validate.errors);
-            return;
-          }
-        }
-      } else {
-        // Fallback to TypeScript manifest for backward compatibility
-        const tsManifestPath = path.join(pluginPath, "manifest.ts");
-        const tsExists = await fs
-          .access(tsManifestPath)
-          .then(() => true)
-          .catch(() => false);
-
-        if (tsExists) {
-          console.warn(
-            `⚠️  Plugin at ${pluginPath} is using deprecated manifest.ts. Please migrate to manifest.json`,
-          );
-          const manifestModule = await import(tsManifestPath);
-          manifest = manifestModule.manifest || manifestModule.default;
-        } else {
-          console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
-          return;
-        }
+      if (!manifestExists) {
+        console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
+        return;
       }
 
+      const manifestContent = await fs.readFile(manifestPath, "utf-8");
+      const manifest: HayPluginManifest = JSON.parse(manifestContent);
+
       if (!manifest || !manifest.id) {
-        console.warn(`⚠️  Invalid manifest at ${pluginPath}`);
+        console.warn(`⚠️  Invalid manifest (missing id) at ${pluginPath}`);
         return;
       }
 
@@ -199,7 +167,7 @@ export class PluginManagerService {
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
-        pluginPath: relativePath, // e.g., "core/stripe" or "custom/{orgId}/{pluginId}"
+        pluginPath: relativePath, // e.g., "core/stripe" or "custom/{organizationId}/{pluginId}"
         manifest: manifest as any,
         checksum,
         sourceType,
@@ -286,7 +254,12 @@ export class PluginManagerService {
 
             // Create organization directory if needed
             const orgDir = path.dirname(pluginPath);
-            if (!(await fs.access(orgDir).then(() => true).catch(() => false))) {
+            if (
+              !(await fs
+                .access(orgDir)
+                .then(() => true)
+                .catch(() => false))
+            ) {
               await fs.mkdir(orgDir, { recursive: true });
             }
 
@@ -329,7 +302,7 @@ export class PluginManagerService {
       execSync(installCommand, {
         cwd: pluginPath,
         stdio: "inherit",
-        env: { ...process.env },
+        env: this.buildMinimalEnv(),
       });
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
@@ -369,7 +342,7 @@ export class PluginManagerService {
       execSync(buildCommand, {
         cwd: pluginPath,
         stdio: "inherit",
-        env: { ...process.env },
+        env: this.buildMinimalEnv(),
       });
 
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
@@ -422,6 +395,13 @@ export class PluginManagerService {
     if (!plugin) return undefined;
 
     const manifest = plugin.manifest as HayPluginManifest;
+
+    // TypeScript-first plugins: capabilities is an array and entry field is used
+    if (Array.isArray(manifest.capabilities) && manifest.entry) {
+      return `node ${manifest.entry}`;
+    }
+
+    // Legacy MCP plugins: capabilities.mcp.startCommand
     return manifest.capabilities?.mcp?.startCommand;
   }
 
@@ -469,10 +449,7 @@ export class PluginManagerService {
       }
 
       // Fallback: scan directories
-      const dirsToScan = [
-        path.join(this.pluginsDir, "core"),
-        path.join(this.pluginsDir, "custom"),
-      ];
+      const dirsToScan = [path.join(this.pluginsDir, "core"), path.join(this.pluginsDir, "custom")];
 
       for (const baseDir of dirsToScan) {
         const baseDirExists = await fs
@@ -563,6 +540,465 @@ export class PluginManagerService {
     } catch (error) {
       return null;
     }
+  }
+
+  // =========================================================================
+  // Worker Management (for TypeScript-based plugins)
+  // =========================================================================
+
+  /**
+   * Start plugin worker for an organization
+   */
+  async startPluginWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
+    const key = `${organizationId}:${pluginId}`;
+
+    // Return existing worker if already running
+    if (this.workers.has(key)) {
+      const worker = this.workers.get(key)!;
+      worker.lastActivity = new Date();
+
+      // Update last activity in database
+      await pluginInstanceRepository.updateHealthCheck(worker.instanceId);
+
+      return worker;
+    }
+
+    // Get plugin definition from registry
+    const plugin = this.registry.get(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found in registry`);
+    }
+
+    // Get plugin instance from database
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    if (!instance || !instance.enabled) {
+      throw new Error(`Plugin ${pluginId} not enabled for organization ${organizationId}`);
+    }
+
+    // Get available port
+    const port = await this.getAvailablePort();
+
+    // Extract capabilities from manifest
+    const manifest = plugin.manifest as HayPluginManifest;
+    const capabilities = this.extractCapabilities(manifest);
+
+    // Create JWT token for this plugin+org
+    const apiToken = jwt.sign(
+      {
+        organizationId: organizationId,
+        pluginId,
+        scope: "plugin-api",
+        capabilities,
+      },
+      process.env.JWT_SECRET!,
+      {
+        expiresIn: "24h",
+        issuer: "hay-plugin-api",
+        audience: "plugin",
+      },
+    );
+
+    // Prepare environment variables (SECURITY: explicit allowlist only)
+    const env = this.buildSafeEnv({
+      organizationId,
+      pluginId,
+      port,
+      apiToken,
+      pluginConfig: this.configToEnvVars(instance.config || {}, manifest.configSchema),
+      capabilities,
+    });
+
+    // Get plugin path
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+
+    // Update instance status to starting
+    await pluginInstanceRepository.updateStatus(instance.id, "starting");
+
+    try {
+      // Spawn worker process
+      const workerProcess = spawn("node", ["dist/index.js"], {
+        cwd: pluginPath,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      // Log stdout
+      workerProcess.stdout?.on("data", (data) => {
+        console.log(`[Worker:${organizationId}:${pluginId}] ${data.toString().trim()}`);
+      });
+
+      // Log stderr
+      workerProcess.stderr?.on("data", (data) => {
+        console.error(`[Worker:${organizationId}:${pluginId}] ${data.toString().trim()}`);
+      });
+
+      // Handle process exit
+      workerProcess.on("exit", async (code, signal) => {
+        console.log(
+          `[Worker:${organizationId}:${pluginId}] Exited with code ${code}, signal ${signal}`,
+        );
+        this.workers.delete(key);
+        this.allocatedPorts.delete(port);
+
+        // Update instance status
+        await pluginInstanceRepository.updateStatus(
+          instance.id,
+          "stopped",
+          code !== 0 ? `Process exited with code ${code}` : undefined,
+        );
+        await pluginInstanceRepository.updateProcessId(instance.id, null);
+      });
+
+      // Handle process errors
+      workerProcess.on("error", async (error) => {
+        console.error(`[Worker:${organizationId}:${pluginId}] Process error:`, error);
+        this.workers.delete(key);
+        this.allocatedPorts.delete(port);
+
+        await pluginInstanceRepository.updateStatus(instance.id, "error", error.message);
+      });
+
+      // Store worker info
+      const workerInfo: WorkerInfo = {
+        process: workerProcess,
+        port,
+        startedAt: new Date(),
+        lastActivity: new Date(),
+        metadata: plugin,
+        organizationId,
+        pluginId,
+        instanceId: instance.id,
+      };
+
+      this.workers.set(key, workerInfo);
+
+      console.log(
+        `[PluginManager] Started worker: ${key} on port ${port} (PID: ${workerProcess.pid})`,
+      );
+
+      // Wait for worker to be ready
+      // For MCP-only plugins (no HTTP server), skip HTTP health check
+      const isMcpOnly = capabilities.includes("mcp") && !capabilities.includes("routes");
+
+      if (isMcpOnly) {
+        console.log(
+          `[PluginManager] MCP-only plugin, waiting for initialization without HTTP health check...`,
+        );
+        // Just wait a bit for the process to initialize
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        // HTTP-based plugin, do health check
+        await this.waitForWorkerReady(port, 20);
+      }
+
+      // Update instance status to running
+      await pluginInstanceRepository.updateStatus(instance.id, "running");
+      await pluginInstanceRepository.updateProcessId(
+        instance.id,
+        workerProcess.pid?.toString() || null,
+      );
+
+      return workerInfo;
+    } catch (error) {
+      // Clean up on error
+      this.allocatedPorts.delete(port);
+      await pluginInstanceRepository.updateStatus(
+        instance.id,
+        "error",
+        error instanceof Error ? error.message : "Failed to start worker",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get worker info (or start if not running)
+   */
+  async getOrStartWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
+    const key = `${organizationId}:${pluginId}`;
+
+    if (this.workers.has(key)) {
+      const worker = this.workers.get(key)!;
+      worker.lastActivity = new Date();
+      await pluginInstanceRepository.updateHealthCheck(worker.instanceId);
+      return worker;
+    }
+
+    return await this.startPluginWorker(organizationId, pluginId);
+  }
+
+  /**
+   * Stop plugin worker
+   */
+  async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
+    const key = `${organizationId}:${pluginId}`;
+    const worker = this.workers.get(key);
+
+    if (worker) {
+      console.log(`[PluginManager] Stopping worker: ${key}`);
+
+      // Update status to stopping
+      await pluginInstanceRepository.updateStatus(worker.instanceId, "stopping");
+
+      // Send SIGTERM for graceful shutdown
+      worker.process.kill("SIGTERM");
+
+      // Wait up to 5 seconds for graceful shutdown
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          // Force kill if still running
+          if (this.workers.has(key)) {
+            console.log(`[PluginManager] Force killing worker: ${key}`);
+            worker.process.kill("SIGKILL");
+          }
+          resolve();
+        }, 5000);
+
+        worker.process.once("exit", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+
+      this.workers.delete(key);
+      this.allocatedPorts.delete(worker.port);
+
+      // Update status to stopped
+      await pluginInstanceRepository.updateStatus(worker.instanceId, "stopped");
+      await pluginInstanceRepository.updateProcessId(worker.instanceId, null);
+
+      console.log(`[PluginManager] Stopped worker: ${key}`);
+    }
+  }
+
+  /**
+   * Get available port for worker
+   */
+  private async getAvailablePort(): Promise<number> {
+    for (let port = this.PORT_RANGE_START; port <= this.PORT_RANGE_END; port++) {
+      if (!this.allocatedPorts.has(port) && (await this.isPortAvailable(port))) {
+        this.allocatedPorts.add(port);
+        return port;
+      }
+    }
+    throw new Error("No available ports in range");
+  }
+
+  /**
+   * Check if port is available
+   */
+  private async isPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const server = net.createServer();
+      server.once("error", () => resolve(false));
+      server.once("listening", () => {
+        server.close();
+        resolve(true);
+      });
+      server.listen(port);
+    });
+  }
+
+  /**
+   * Wait for worker to be ready (health check)
+   */
+  private async waitForWorkerReady(port: number, maxAttempts: number = 10): Promise<void> {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await fetch(`http://localhost:${port}/health`);
+        if (response.ok) {
+          console.log(`[PluginManager] Worker ready on port ${port}`);
+          return;
+        }
+      } catch (error) {
+        // Worker not ready yet, continue
+      }
+
+      // Wait 500ms before next attempt
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    throw new Error(`Worker failed to start after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Build safe environment for plugin worker
+   * SECURITY: Never spread process.env - explicit allowlist only
+   *
+   * This method ensures plugins only receive the environment variables they need,
+   * preventing access to sensitive system secrets like OPENAI_API_KEY, DB_PASSWORD, etc.
+   */
+  private buildSafeEnv(params: {
+    organizationId: string;
+    pluginId: string;
+    port?: number;
+    apiToken?: string;
+    pluginConfig: Record<string, string>;
+    capabilities: string[];
+  }): Record<string, string> {
+    const { organizationId, pluginId, port, apiToken, pluginConfig, capabilities } = params;
+
+    // Explicit allowlist - only safe variables
+    const safeEnv: Record<string, string> = {
+      // Node.js runtime essentials
+      NODE_ENV: process.env.NODE_ENV || "production",
+      PATH: process.env.PATH || "",
+
+      // Plugin context
+      ORGANIZATION_ID: organizationId,
+      PLUGIN_ID: pluginId,
+
+      // Plugin capabilities (for self-awareness)
+      HAY_CAPABILITIES: capabilities.join(","),
+    };
+
+    // Add Hay API access only if plugin has routes/messages/mcp capabilities
+    if (
+      capabilities.includes("routes") ||
+      capabilities.includes("messages") ||
+      capabilities.includes("mcp")
+    ) {
+      safeEnv.HAY_API_URL = process.env.API_URL || "http://localhost:3001";
+      if (apiToken) {
+        safeEnv.HAY_API_TOKEN = apiToken;
+      }
+    }
+
+    // Add worker port only if plugin has routes capability
+    if (port && capabilities.includes("routes")) {
+      safeEnv.HAY_WORKER_PORT = port.toString();
+    }
+
+    // Add plugin-specific config from database (already scoped and decrypted)
+    Object.assign(safeEnv, pluginConfig);
+
+    // SECURITY: NEVER include these sensitive variables:
+    // - OPENAI_API_KEY (AI API credentials)
+    // - DB_* (database credentials)
+    // - JWT_SECRET, JWT_REFRESH_SECRET (authentication secrets)
+    // - STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (payment credentials)
+    // - SMTP_AUTH_PASS (email service credentials)
+    // - PLUGIN_ENCRYPTION_KEY (encryption key for configs)
+    // - *_OAUTH_CLIENT_SECRET (OAuth secrets)
+    // - REDIS_* (Redis credentials)
+    // - Any other core system secrets
+
+    return safeEnv;
+  }
+
+  /**
+   * Build minimal environment for build/install operations
+   * Only includes what npm/node needs to build, no sensitive credentials
+   */
+  private buildMinimalEnv(): Record<string, string> {
+    return {
+      NODE_ENV: process.env.NODE_ENV || "production",
+      PATH: process.env.PATH || "",
+      HOME: process.env.HOME || "",
+      // Only what npm/node needs to build
+    };
+  }
+
+  /**
+   * Convert plugin config to environment variables
+   */
+  private configToEnvVars(
+    config: Record<string, unknown>,
+    schema?: HayPluginManifest["configSchema"],
+  ): Record<string, string> {
+    const env: Record<string, string> = {};
+
+    if (!schema) return env;
+
+    // Decrypt config first
+    const decryptedConfig = decryptConfig(config);
+
+    for (const [key, value] of Object.entries(decryptedConfig)) {
+      const fieldDef = schema[key];
+      if (fieldDef?.env) {
+        // Convert value to string (handle different types)
+        if (typeof value === "object") {
+          env[fieldDef.env] = JSON.stringify(value);
+        } else if (value !== undefined && value !== null) {
+          env[fieldDef.env] = String(value);
+        }
+      }
+    }
+
+    return env;
+  }
+
+  /**
+   * Extract capabilities from manifest
+   */
+  private extractCapabilities(manifest: HayPluginManifest): string[] {
+    const capabilities: string[] = [];
+
+    // TypeScript-first plugins: capabilities is an array
+    if (Array.isArray(manifest.capabilities)) {
+      capabilities.push(...manifest.capabilities);
+    } else {
+      // Legacy format: capabilities is an object
+      // Check for MCP capability
+      if (manifest.capabilities?.mcp) {
+        capabilities.push("mcp");
+      }
+
+      // Check for channel capability
+      if (manifest.capabilities?.chat_connector) {
+        capabilities.push("routes", "messages", "customers", "sources");
+      }
+    }
+
+    // Merge with permissions.api (TypeScript-first plugins)
+    if (manifest.permissions?.api && Array.isArray(manifest.permissions.api)) {
+      capabilities.push(...manifest.permissions.api);
+    }
+
+    // Always allow routes if the plugin has any
+    if (manifest.apiEndpoints && manifest.apiEndpoints.length > 0) {
+      capabilities.push("routes");
+    }
+
+    return [...new Set(capabilities)]; // Remove duplicates
+  }
+
+  /**
+   * Cleanup inactive workers
+   */
+  async cleanupInactiveWorkers(): Promise<void> {
+    const now = new Date();
+
+    for (const [key, worker] of this.workers.entries()) {
+      const manifest = worker.metadata.manifest as HayPluginManifest;
+
+      // Determine timeout based on plugin type
+      const isChannelPlugin = manifest.type.includes("channel");
+      const TIMEOUT_MS = isChannelPlugin ? 30 * 60 * 1000 : 5 * 60 * 1000; // 30min for channels, 5min for others
+
+      const inactiveTime = now.getTime() - worker.lastActivity.getTime();
+
+      if (inactiveTime > TIMEOUT_MS) {
+        console.log(
+          `[PluginManager] Cleaning up inactive worker: ${key} (inactive for ${Math.round(inactiveTime / 1000)}s)`,
+        );
+        await this.stopPluginWorker(worker.organizationId, worker.pluginId);
+      }
+    }
+  }
+
+  /**
+   * Get all active workers
+   */
+  getActiveWorkers(): WorkerInfo[] {
+    return Array.from(this.workers.values());
+  }
+
+  /**
+   * Get worker by organization and plugin
+   */
+  getWorker(organizationId: string, pluginId: string): WorkerInfo | undefined {
+    return this.workers.get(`${organizationId}:${pluginId}`);
   }
 }
 

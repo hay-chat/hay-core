@@ -1,0 +1,391 @@
+[
+  {
+    "name": "get-products",
+    "label": "Get Products",
+    "description": "Retrieve a list of products from your Shopify store with optional title search filtering",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchTitle": {
+          "type": "string",
+          "description": "Optional search term to filter products by title"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of products to retrieve (default: 10)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 250
+        }
+      }
+    }
+  },
+  {
+    "name": "get-product-by-id",
+    "label": "Get Product by ID",
+    "description": "Retrieve detailed information about a specific product by its Shopify product ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "description": "Shopify product ID (e.g., 'gid://shopify/Product/123456789')"
+        }
+      },
+      "required": [
+        "productId"
+      ]
+    }
+  },
+  {
+    "name": "create-product",
+    "label": "Create Product",
+    "description": "Create a new product in your Shopify store",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Product title"
+        },
+        "descriptionHtml": {
+          "type": "string",
+          "description": "Product description in HTML format"
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Product vendor/brand name"
+        },
+        "productType": {
+          "type": "string",
+          "description": "Product type/category"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of product tags"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "DRAFT",
+            "ARCHIVED"
+          ],
+          "description": "Product status",
+          "default": "DRAFT"
+        }
+      },
+      "required": [
+        "title"
+      ]
+    }
+  },
+  {
+    "name": "get-customers",
+    "label": "Get Customers",
+    "description": "Retrieve a list of customers from your Shopify store with optional search filtering",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "searchQuery": {
+          "type": "string",
+          "description": "Optional search query to filter customers by name, email, or other attributes"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of customers to retrieve (default: 10)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 250
+        }
+      }
+    }
+  },
+  {
+    "name": "update-customer",
+    "label": "Update Customer",
+    "description": "Update customer information including personal details, contact info, and metadata",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "description": "Shopify customer ID (numeric, excluding gid prefix)"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "Customer's first name"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Customer's last name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer's email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Customer's phone number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of customer tags"
+        },
+        "note": {
+          "type": "string",
+          "description": "Internal note about the customer"
+        },
+        "taxExempt": {
+          "type": "boolean",
+          "description": "Whether the customer is exempt from taxes"
+        },
+        "metafields": {
+          "type": "array",
+          "description": "Customer metafields for custom data",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Metafield ID (for updates)"
+              },
+              "namespace": {
+                "type": "string",
+                "description": "Metafield namespace"
+              },
+              "key": {
+                "type": "string",
+                "description": "Metafield key"
+              },
+              "value": {
+                "type": "string",
+                "description": "Metafield value"
+              },
+              "type": {
+                "type": "string",
+                "description": "Metafield type"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get-orders",
+    "label": "Get Orders",
+    "description": "Retrieve orders from your Shopify store with optional status filtering",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "any",
+            "open",
+            "closed",
+            "cancelled"
+          ],
+          "description": "Filter orders by status",
+          "default": "any"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of orders to retrieve (default: 10)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 250
+        }
+      }
+    }
+  },
+  {
+    "name": "get-order-by-id",
+    "label": "Get Order by ID",
+    "description": "Retrieve detailed information about a specific order by its Shopify order ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "Shopify order ID (e.g., 'gid://shopify/Order/123456789')"
+        }
+      },
+      "required": [
+        "orderId"
+      ]
+    }
+  },
+  {
+    "name": "update-order",
+    "label": "Update Order",
+    "description": "Update order information including tags, notes, customer details, and shipping address",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Shopify order ID"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of order tags"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer email for the order"
+        },
+        "note": {
+          "type": "string",
+          "description": "Internal note about the order"
+        },
+        "customAttributes": {
+          "type": "array",
+          "description": "Custom attributes for the order",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Attribute key"
+              },
+              "value": {
+                "type": "string",
+                "description": "Attribute value"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ]
+          }
+        },
+        "metafields": {
+          "type": "array",
+          "description": "Order metafields for custom data",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Metafield ID (for updates)"
+              },
+              "namespace": {
+                "type": "string",
+                "description": "Metafield namespace"
+              },
+              "key": {
+                "type": "string",
+                "description": "Metafield key"
+              },
+              "value": {
+                "type": "string",
+                "description": "Metafield value"
+              },
+              "type": {
+                "type": "string",
+                "description": "Metafield type"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          }
+        },
+        "shippingAddress": {
+          "type": "object",
+          "description": "Shipping address for the order",
+          "properties": {
+            "address1": {
+              "type": "string",
+              "description": "Street address line 1"
+            },
+            "address2": {
+              "type": "string",
+              "description": "Street address line 2"
+            },
+            "city": {
+              "type": "string",
+              "description": "City"
+            },
+            "company": {
+              "type": "string",
+              "description": "Company name"
+            },
+            "country": {
+              "type": "string",
+              "description": "Country"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "First name"
+            },
+            "lastName": {
+              "type": "string",
+              "description": "Last name"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Phone number"
+            },
+            "province": {
+              "type": "string",
+              "description": "Province/state"
+            },
+            "zip": {
+              "type": "string",
+              "description": "ZIP/postal code"
+            }
+          }
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get-customer-orders",
+    "label": "Get Customer Orders",
+    "description": "Retrieve all orders for a specific customer by their customer ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "customerId": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "description": "Shopify customer ID (numeric, excluding gid prefix)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of orders to retrieve (default: 10)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 250
+        }
+      },
+      "required": [
+        "customerId"
+      ]
+    }
+  }
+]

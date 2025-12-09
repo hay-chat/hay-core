@@ -92,10 +92,10 @@ export class StorageService {
    * Main upload function
    * Files are stored in structure: uploads/{organizationId}/{folder}/{uuid}.{ext}
    *
-   * Local storage: files stored at {uploadDir}/{orgId}/{folder}/{uuid}.{ext}
-   *                served at /uploads/{orgId}/{folder}/{uuid}.{ext}
-   * S3 storage:    files stored at key uploads/{orgId}/{folder}/{uuid}.{ext}
-   *                URL: {endpoint}/{bucket}/uploads/{orgId}/{folder}/{uuid}.{ext}
+   * Local storage: files stored at {uploadDir}/{organizationId}/{folder}/{uuid}.{ext}
+   *                served at /uploads/{organizationId}/{folder}/{uuid}.{ext}
+   * S3 storage:    files stored at key uploads/{organizationId}/{folder}/{uuid}.{ext}
+   *                URL: {endpoint}/{bucket}/uploads/{organizationId}/{folder}/{uuid}.{ext}
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
     // 1. Validate file
@@ -179,9 +179,9 @@ export class StorageService {
 
   /**
    * Specialized upload for plugin ZIP files
-   * Local: {uploadDir}/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
-   * S3: uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
-   * Served at: /uploads/{orgId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Local: {uploadDir}/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
+   * S3: uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Served at: /uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
    */
   async uploadPluginZip(options: {
     buffer: Buffer;
@@ -254,7 +254,7 @@ export class StorageService {
     // Check MIME type
     if (!ALLOWED_MIME_TYPES[mimeType]) {
       throw new Error(
-        `File type not allowed: ${mimeType}. Allowed types: ${Object.keys(ALLOWED_MIME_TYPES).join(", ")}`
+        `File type not allowed: ${mimeType}. Allowed types: ${Object.keys(ALLOWED_MIME_TYPES).join(", ")}`,
       );
     }
 

@@ -4,7 +4,7 @@
 
 ## Quick Start Checklist
 
-- [ ] Create plugin directory in `plugins/core/` or `plugins/custom/{orgId}/`
+- [ ] Create plugin directory in `plugins/core/` or `plugins/custom/{organizationId}/`
 - [ ] Create `manifest.json` following schema
 - [ ] Create `package.json` with dependencies
 - [ ] Create `tsconfig.json` for TypeScript
@@ -49,7 +49,7 @@
   },
   "permissions": {
     "env": ["MYSERVICE_API_KEY"],
-    "scopes": ["org:<orgId>:mcp:invoke"]
+    "scopes": ["org:<organizationId>:mcp:invoke"]
   }
 }
 ```
@@ -160,45 +160,45 @@
 ### Frontend (Dashboard)
 
 ```typescript
-import { Hay } from '@/utils/api';
+import { Hay } from "@/utils/api";
 
 // Get all plugins
 const plugins = await Hay.plugins.getAll.query();
 
 // Enable plugin
 await Hay.plugins.enable.mutate({
-  pluginId: 'hay-plugin-myservice',
+  pluginId: "hay-plugin-myservice",
   configuration: {
-    apiKey: 'sk_test_123'
-  }
+    apiKey: "sk_test_123",
+  },
 });
 
 // Get configuration
 const config = await Hay.plugins.getConfig.query({
-  pluginId: 'hay-plugin-myservice'
+  pluginId: "hay-plugin-myservice",
 });
 
 // Update configuration
 await Hay.plugins.updateConfig.mutate({
-  pluginId: 'hay-plugin-myservice',
+  pluginId: "hay-plugin-myservice",
   configuration: {
-    apiKey: 'new_key'
-  }
+    apiKey: "new_key",
+  },
 });
 
 // Invoke tool
 const result = await Hay.plugins.invokeTool.mutate({
-  pluginId: 'hay-plugin-myservice',
-  toolName: 'create_resource',
+  pluginId: "hay-plugin-myservice",
+  toolName: "create_resource",
   arguments: {
-    name: 'My Resource',
-    amount: 1000
-  }
+    name: "My Resource",
+    amount: 1000,
+  },
 });
 
 // Disable plugin
 await Hay.plugins.disable.mutate({
-  pluginId: 'hay-plugin-myservice'
+  pluginId: "hay-plugin-myservice",
 });
 ```
 
@@ -206,24 +206,24 @@ await Hay.plugins.disable.mutate({
 
 ```typescript
 // Plugin Manager
-import { pluginManagerService } from '@server/services/plugin-manager.service';
+import { pluginManagerService } from "@server/services/plugin-manager.service";
 
-const plugin = pluginManagerService.getPlugin('hay-plugin-myservice');
-await pluginManagerService.installPlugin('hay-plugin-myservice');
-await pluginManagerService.buildPlugin('hay-plugin-myservice');
+const plugin = pluginManagerService.getPlugin("hay-plugin-myservice");
+await pluginManagerService.installPlugin("hay-plugin-myservice");
+await pluginManagerService.buildPlugin("hay-plugin-myservice");
 
 // Plugin Instance Manager
-import { pluginInstanceManagerService } from '@server/services/plugin-instance-manager.service';
+import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
 
-await pluginInstanceManagerService.ensureInstanceRunning(orgId, 'hay-plugin-myservice');
-await pluginInstanceManagerService.updateActivityTimestamp(orgId, 'hay-plugin-myservice');
+await pluginInstanceManagerService.ensureInstanceRunning(organizationId, "hay-plugin-myservice");
+await pluginInstanceManagerService.updateActivityTimestamp(organizationId, "hay-plugin-myservice");
 
 // Process Manager
-import { processManagerService } from '@server/services/process-manager.service';
+import { processManagerService } from "@server/services/process-manager.service";
 
-await processManagerService.startPlugin(orgId, 'hay-plugin-myservice');
-await processManagerService.stopPlugin(orgId, 'hay-plugin-myservice');
-const isRunning = processManagerService.isRunning(orgId, 'hay-plugin-myservice');
+await processManagerService.startPlugin(organizationId, "hay-plugin-myservice");
+await processManagerService.stopPlugin(organizationId, "hay-plugin-myservice");
+const isRunning = processManagerService.isRunning(organizationId, "hay-plugin-myservice");
 ```
 
 ---
@@ -264,6 +264,7 @@ Configuration fields automatically map to environment variables:
 ```
 
 When MCP server starts:
+
 ```bash
 SERVICE_API_KEY=decrypted_value node mcp/index.js
 ```
@@ -275,23 +276,23 @@ SERVICE_API_KEY=decrypted_value node mcp/index.js
 ```typescript
 // Register a communication channel
 await trpc.sources.register.mutate({
-  id: 'whatsapp',
-  name: 'WhatsApp Business',
-  category: 'messaging',
-  pluginId: 'my-plugin',
-  metadata: { version: '1.0' }
+  id: "whatsapp",
+  name: "WhatsApp Business",
+  category: "messaging",
+  pluginId: "my-plugin",
+  metadata: { version: "1.0" },
 });
 
 // Create messages with source
-import { MessageService } from '@server/services/core/message.service';
+import { MessageService } from "@server/services/core/message.service";
 
 const message = await messageService.createAssistantMessageWithTestMode(
   conversation,
-  'Hello!',
-  'whatsapp',  // sourceId
+  "Hello!",
+  "whatsapp", // sourceId
   agent,
   organization,
-  metadata
+  metadata,
 );
 ```
 
@@ -333,7 +334,7 @@ const message = await messageService.createAssistantMessageWithTestMode(
 
 ```typescript
 // Import plugin types
-import type { HayPluginManifest } from '@server/types/plugin.types';
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 // Plugin manifest type
 interface HayPluginManifest {
@@ -352,7 +353,7 @@ interface HayPluginManifest {
 
 // Configuration field type
 interface ConfigField {
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  type: "string" | "number" | "boolean" | "array" | "object";
   description: string;
   label: string;
   placeholder?: string;
@@ -398,13 +399,13 @@ npm run dev
 
 ## Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Plugin not appearing | Check manifest.json is valid, check console for errors |
-| Install failed | Verify installCommand, check network, review logs |
-| MCP won't start | Check startCommand, verify env vars, check ports |
-| Tool invocation fails | Verify tool name, check input schema, ensure running |
-| Config not working | Restart instance, verify env mapping |
+| Issue                 | Solution                                               |
+| --------------------- | ------------------------------------------------------ |
+| Plugin not appearing  | Check manifest.json is valid, check console for errors |
+| Install failed        | Verify installCommand, check network, review logs      |
+| MCP won't start       | Check startCommand, verify env vars, check ports       |
+| Tool invocation fails | Verify tool name, check input schema, ensure running   |
+| Config not working    | Restart instance, verify env mapping                   |
 
 ---
 
@@ -441,6 +442,7 @@ cd plugins/core/my-plugin && npm install && cd mcp && npm install
 ## Version Management
 
 Follow semantic versioning:
+
 - **MAJOR**: Breaking changes (2.0.0)
 - **MINOR**: New features (1.1.0)
 - **PATCH**: Bug fixes (1.0.1)

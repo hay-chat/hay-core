@@ -1,0 +1,337 @@
+import express from 'express';
+import { PluginSDK } from './PluginSDK';
+import { MCPServerManager } from './MCPServerManager';
+import {
+  PluginMetadata,
+  RouteMethod,
+  RouteHandler,
+} from './types';
+
+/**
+ * HayPlugin Base Class
+ *
+ * All Hay plugins extend this base class. It provides:
+ * - Express HTTP server for receiving webhooks/requests
+ * - Plugin SDK for communicating with main Hay application
+ * - Route registration helpers
+ * - Configuration management from environment variables
+ * - Lifecycle hooks (onInitialize, onEnable, onDisable, onConfigUpdate)
+ *
+ * Example:
+ * ```typescript
+ * export default class WhatsAppPlugin extends HayPlugin {
+ *   constructor() {
+ *     super({
+ *       id: 'whatsapp',
+ *       name: 'WhatsApp Business',
+ *       version: '1.0.0',
+ *       capabilities: ['routes', 'messages', 'customers', 'sources']
+ *     });
+ *   }
+ *
+ *   async onInitialize(): Promise<void> {
+ *     await this.sdk.registerSource({ ... });
+ *     this.registerRoute('POST', '/webhook', this.handleWebhook.bind(this));
+ *   }
+ * }
+ * ```
+ */
+export abstract class HayPlugin {
+  public readonly metadata: PluginMetadata;
+  protected config: Record<string, any>;
+  protected sdk: PluginSDK;
+  protected mcpManager?: MCPServerManager;
+
+  private app: express.Application;
+  private server: any;
+
+  constructor(metadata: PluginMetadata) {
+    this.metadata = metadata;
+
+    // Initialize Express app
+    this.app = express();
+    this.app.use(express.json());
+    this.app.use(express.urlencoded({ extended: true }));
+
+    // Add health check endpoint
+    this.app.get('/health', (_req, res) => {
+      res.json({
+        status: 'ok',
+        plugin: this.metadata.id,
+        version: this.metadata.version,
+      });
+    });
+
+    // Load config from environment variables
+    this.config = this.loadConfigFromEnv();
+
+    // Validate required environment variables first
+    this.validateEnvironment();
+
+    // Initialize SDK (HTTP client to main app)
+    this.sdk = new PluginSDK({
+      apiUrl: process.env.HAY_API_URL!,
+      apiToken: process.env.HAY_API_TOKEN!,
+      capabilities: metadata.capabilities,
+    });
+  }
+
+  // =========================================================================
+  // Lifecycle Hooks (implemented by plugin)
+  // =========================================================================
+
+  /**
+   * Called when plugin worker starts
+   * Use this to register routes, sources, and perform initialization
+   */
+  abstract onInitialize(): Promise<void>;
+
+  /**
+   * Called when plugin is enabled for an organization
+   */
+  async onEnable?(): Promise<void>;
+
+  /**
+   * Called when plugin is disabled for an organization
+   */
+  async onDisable?(): Promise<void>;
+
+  /**
+   * Called when plugin configuration is updated
+   */
+  async onConfigUpdate?(newConfig: Record<string, any>): Promise<void>;
+
+  // =========================================================================
+  // Route Registration
+  // =========================================================================
+
+  /**
+   * Register an HTTP route (Express-like)
+   *
+   * Example:
+   * ```typescript
+   * this.registerRoute('POST', '/webhook', async (req, res) => {
+   *   const data = req.body;
+   *   await this.sdk.messages.receive({ ... });
+   *   res.json({ success: true });
+   * });
+   * ```
+   */
+  protected registerRoute(
+    method: RouteMethod,
+    path: string,
+    handler: RouteHandler
+  ): void {
+    const methodLower = method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
+
+    this.app[methodLower](path, async (req, res, next) => {
+      try {
+        await handler(req, res, next);
+      } catch (error) {
+        console.error(`[${this.metadata.id}] Error in route ${method} ${path}:`, error);
+
+        // Only send error response if headers haven't been sent
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+    });
+
+    console.log(`[${this.metadata.id}] Registered route: ${method} ${path}`);
+  }
+
+  // =========================================================================
+  // Internal: Server Lifecycle (called by startPluginWorker)
+  // =========================================================================
+
+  /**
+   * Internal: Start HTTP server
+   * Called by startPluginWorker() - do not call directly
+   */
+  async _start(): Promise<void> {
+    // Check if plugin needs HTTP server (has routes or messages capability)
+    const needsHttpServer = this.metadata.capabilities?.includes('routes') ||
+                           this.metadata.capabilities?.includes('messages');
+
+    // Initialize MCP manager if plugin has MCP capability
+    if (this.metadata.capabilities.includes('mcp')) {
+      console.log(`[${this.metadata.id}] Initializing MCP manager...`);
+      this.mcpManager = new MCPServerManager({
+        workingDir: process.cwd(),
+        logger: console,
+      });
+      await this.mcpManager.initialize();
+    }
+
+    // Register MCP servers if plugin implements registerMCP()
+    if (this.metadata.capabilities.includes('mcp') && 'registerMCP' in this) {
+      console.log(`[${this.metadata.id}] Registering MCP servers...`);
+      await (this as any).registerMCP();
+    }
+
+    // Call plugin's initialization
+    console.log(`[${this.metadata.id}] Initializing plugin...`);
+    await this.onInitialize();
+
+    // Start HTTP server only if plugin has routes or messages capability
+    if (needsHttpServer) {
+      const port = parseInt(process.env.HAY_WORKER_PORT || '0');
+
+      if (!port) {
+        throw new Error('HAY_WORKER_PORT environment variable not set');
+      }
+
+      return new Promise<void>((resolve, reject) => {
+        this.server = this.app.listen(port, () => {
+          console.log(`[${this.metadata.id}] Worker listening on port ${port}`);
+          resolve();
+        });
+
+        this.server.on('error', (error: Error) => {
+          console.error(`[${this.metadata.id}] Server error:`, error);
+          reject(error);
+        });
+      });
+    } else {
+      // MCP-only plugin - no HTTP server needed, just keep process alive
+      console.log(`[${this.metadata.id}] MCP-only plugin initialized (no HTTP server)`);
+
+      // Keep process alive for MCP-only plugins
+      return new Promise<void>(() => {
+        // This promise never resolves, keeping the process running
+        // The worker will handle SIGTERM/SIGINT for graceful shutdown
+      });
+    }
+  }
+
+  /**
+   * Internal: Stop HTTP server
+   * Called during graceful shutdown - do not call directly
+   */
+  async _stop(): Promise<void> {
+    // Shutdown MCP manager if active
+    if (this.mcpManager) {
+      console.log(`[${this.metadata.id}] Shutting down MCP manager...`);
+      await this.mcpManager.shutdown();
+    }
+
+    // Stop HTTP server
+    if (this.server) {
+      return new Promise<void>((resolve) => {
+        this.server.close(() => {
+          console.log(`[${this.metadata.id}] Worker stopped`);
+          resolve();
+        });
+      });
+    }
+  }
+
+  // =========================================================================
+  // Configuration Management
+  // =========================================================================
+
+  /**
+   * Load config from environment variables
+   * Maps config field definitions to actual env vars
+   */
+  private loadConfigFromEnv(): Record<string, any> {
+    const config: Record<string, any> = {};
+
+    for (const [configKey, def] of Object.entries(this.metadata.config || {})) {
+      if (def.envVar && process.env[def.envVar]) {
+        const value = process.env[def.envVar]!; // Non-null assertion since we checked above
+
+        // Type conversion based on field type
+        switch (def.type) {
+          case 'number':
+            config[configKey] = parseFloat(value);
+            break;
+          case 'boolean':
+            config[configKey] = value === 'true' || value === '1';
+            break;
+          case 'array':
+          case 'object':
+            try {
+              config[configKey] = JSON.parse(value);
+            } catch (error) {
+              console.warn(
+                `[${this.metadata.id}] Failed to parse ${configKey} as JSON, using raw value`
+              );
+              config[configKey] = value;
+            }
+            break;
+          default:
+            config[configKey] = value;
+        }
+      } else if (def.default !== undefined) {
+        // Use default value if env var not set
+        config[configKey] = def.default;
+      }
+    }
+
+    return config;
+  }
+
+  /**
+   * Validate required environment variables
+   */
+  private validateEnvironment(): void {
+    const missing: string[] = [];
+
+    // Check SDK environment variables
+    if (!process.env.HAY_API_URL) {
+      missing.push('HAY_API_URL');
+    }
+    if (!process.env.HAY_API_TOKEN) {
+      missing.push('HAY_API_TOKEN');
+    }
+
+    // HAY_WORKER_PORT is only required for plugins with 'routes' or 'messages' capabilities
+    const hasRoutesOrMessages = this.metadata.capabilities?.includes('routes') ||
+                                this.metadata.capabilities?.includes('messages');
+    if (hasRoutesOrMessages && !process.env.HAY_WORKER_PORT) {
+      missing.push('HAY_WORKER_PORT');
+    }
+
+    // Check required config fields
+    for (const [, def] of Object.entries(this.metadata.config || {})) {
+      if (def.required && def.envVar && !process.env[def.envVar]) {
+        missing.push(def.envVar);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missing.join(', ')}`
+      );
+    }
+  }
+
+  // =========================================================================
+  // Utilities
+  // =========================================================================
+
+  /**
+   * Get Express app instance (for advanced usage)
+   */
+  protected getApp(): express.Application {
+    return this.app;
+  }
+
+  /**
+   * Log with plugin prefix
+   */
+  protected log(message: string, ...args: any[]): void {
+    console.log(`[${this.metadata.id}]`, message, ...args);
+  }
+
+  /**
+   * Log error with plugin prefix
+   */
+  protected logError(message: string, error?: Error | unknown): void {
+    console.error(`[${this.metadata.id}]`, message, error);
+  }
+}

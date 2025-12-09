@@ -1,16 +1,12 @@
 {
-  "name": "@hay/judo-in-cloud-mcp-server",
+  "name": "@hay/plugin-judo-in-cloud",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Judo in Cloud MCP server for customer support operations (demo/fake plugin)",
-  "main": "mcp/index.js",
-  "bin": {
-    "judo-in-cloud-mcp": "mcp/index.js"
-  },
+  "description": "Judo in Cloud MCP plugin for customer support operations",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node mcp/index.js",
-    "dev": "node --watch mcp/index.js",
-    "inspect": "npx -y @modelcontextprotocol/inspector node mcp/index.js"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
   },
   "keywords": [
     "mcp",
@@ -20,8 +16,10 @@
     "demo"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "dotenv": "^16.4.5",
-    "zod": "^3.25.76"
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
   }
 }
