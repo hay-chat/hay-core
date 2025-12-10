@@ -140,9 +140,6 @@
       <template v-if="!enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
-            <div class="text-xs text-muted-foreground mb-2">
-              Debug: Rendering extension {{ ext.id }}
-            </div>
             <component
               :is="ext.component"
               :plugin="plugin"
@@ -309,7 +306,10 @@
 
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
-        <div v-if="beforeSettingsExtensions.length === 0" class="text-sm text-muted-foreground p-4 border border-dashed rounded">
+        <div
+          v-if="beforeSettingsExtensions.length === 0"
+          class="text-sm text-muted-foreground p-4 border border-dashed rounded"
+        >
           Debug (enabled): No extensions. Count: {{ beforeSettingsExtensions.length }}
         </div>
         <div v-else class="text-xs text-muted-foreground p-2 border border-dashed rounded mb-2">
@@ -569,8 +569,12 @@ const templateHtml = ref<string | null>(null);
 const editingEncryptedFields = ref<Set<string>>(new Set());
 
 // Plugin Extensions for slots
-const beforeSettingsExtensions = ref<Array<{ id: string; component: any; props?: Record<string, any> }>>([]);
-const afterSettingsExtensions = ref<Array<{ id: string; component: any; props?: Record<string, any> }>>([]);
+const beforeSettingsExtensions = ref<
+  Array<{ id: string; component: any; props?: Record<string, any> }>
+>([]);
+const afterSettingsExtensions = ref<
+  Array<{ id: string; component: any; props?: Record<string, any> }>
+>([]);
 const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
 // Track original values to detect changes
 const originalFormData = ref<Record<string, any>>({});
@@ -715,7 +719,10 @@ const loadPluginExtensions = async () => {
           };
           console.log("[PluginSettings] Pushing extension to array:", extensionData);
           targetExtensions.value.push(extensionData);
-          console.log("[PluginSettings] beforeSettingsExtensions after push:", beforeSettingsExtensions.value);
+          console.log(
+            "[PluginSettings] beforeSettingsExtensions after push:",
+            beforeSettingsExtensions.value,
+          );
         }
       }
       // Fallback to inline template if provided (for backward compatibility)
@@ -964,24 +971,24 @@ const handleDisablePlugin = async () => {
 const handleOAuthCallback = () => {
   const oauthStatus = route.query.oauth as string | undefined;
 
-  if (oauthStatus === 'success') {
-    toast.success('OAuth connection established successfully');
+  if (oauthStatus === "success") {
+    toast.success("OAuth connection established successfully");
 
     // Clean up URL by removing query params
     router.replace({
       path: route.path,
-      query: {}
+      query: {},
     });
 
     // Reload plugin data to refresh OAuth connection status
     fetchPlugin();
-  } else if (oauthStatus === 'error') {
-    toast.error('OAuth connection failed. Please try again.');
+  } else if (oauthStatus === "error") {
+    toast.error("OAuth connection failed. Please try again.");
 
     // Clean up URL
     router.replace({
       path: route.path,
-      query: {}
+      query: {},
     });
   }
 };
