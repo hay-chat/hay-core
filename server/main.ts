@@ -12,11 +12,8 @@ async function startServer() {
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
 
-  // Initialize database connection (optional)
-  const dbConnected = await initializeDatabase();
-  if (!dbConnected) {
-    console.warn("⚠️  Starting server without database connection");
-  }
+  // Initialize database connection (required - will retry 3 times with 2s delay)
+  await initializeDatabase();
 
   // Initialize Redis service
   const { redisService } = await import("@server/services/redis.service");
@@ -144,7 +141,12 @@ async function startServer() {
   );
 
   // Plugin thumbnail route - serve thumbnail.jpg files
-  server.get("/plugins/thumbnails/:pluginName", (req, res) => {
+  // Use catch-all pattern to handle plugin IDs with slashes (e.g., @hay/plugin-name)
+  server.get(/^\/plugins\/thumbnails\/(.+)$/, (req, res) => {
+    // Set params manually for regex routes
+    req.params = {
+      pluginName: decodeURIComponent(req.params[0]),
+    };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
       console.error("Thumbnail serving error:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -224,7 +226,8 @@ async function startServer() {
       if (result.success) {
         // Redirect to dashboard plugin settings page with success message
         const dashboardUrl = getDashboardUrl();
-        const redirectUrl = `${dashboardUrl}/integrations/plugins/${result.pluginId}?oauth=success&pluginId=${result.pluginId}`;
+        const encodedPluginId = encodeURIComponent(result.pluginId!);
+        const redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
         console.log("✅ OAuth successful, redirecting to:", redirectUrl);
         console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
         return res.redirect(redirectUrl);
@@ -264,13 +267,11 @@ async function startServer() {
   server.use(wellKnownRouter.default);
 
   // Initialize plugin system BEFORE creating the router
-  if (dbConnected) {
-    try {
-      await pluginManagerService.initialize();
-      console.log("🔌 Plugin manager initialized");
-    } catch (error) {
-      console.error("Failed to initialize plugin system:", error);
-    }
+  try {
+    await pluginManagerService.initialize();
+    console.log("🔌 Plugin manager initialized");
+  } catch (error) {
+    console.error("Failed to initialize plugin system:", error);
   }
 
   // Plugin upload endpoints
@@ -363,32 +364,30 @@ async function startServer() {
     console.log(`🚀 Server is running on port http://localhost:${config.server.port}`);
     console.log(`🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`);
 
-    // Start the orchestrator worker if database is connected
-    if (dbConnected) {
-      orchestratorWorker.start(config.orchestrator.interval); // Check every second
-      console.log("🤖 Orchestrator worker started");
+    // Start the orchestrator worker
+    orchestratorWorker.start(config.orchestrator.interval); // Check every second
+    console.log("🤖 Orchestrator worker started");
 
-      // Initialize plugin pages management (plugin system already initialized)
-      try {
-        // Initialize plugin pages management
-        const { pluginPagesService } = await import("./services/plugin-pages.service");
-        await pluginPagesService.initialize();
-        console.log("📄 Plugin pages synced with dashboard");
+    // Initialize plugin pages management (plugin system already initialized)
+    try {
+      // Initialize plugin pages management
+      const { pluginPagesService } = await import("./services/plugin-pages.service");
+      await pluginPagesService.initialize();
+      console.log("📄 Plugin pages synced with dashboard");
 
-        // Start plugin route service cleanup
-        pluginRouteService.startCleanup();
-        console.log("🔌 Plugin route service started");
+      // Start plugin route service cleanup
+      pluginRouteService.startCleanup();
+      console.log("🔌 Plugin route service started");
 
-        // Start plugin instance lifecycle management
-        pluginInstanceManagerService.startCleanup();
-        console.log("🔌 Plugin instance lifecycle manager started");
+      // Start plugin instance lifecycle management
+      pluginInstanceManagerService.startCleanup();
+      console.log("🔌 Plugin instance lifecycle manager started");
 
-        // Note: Plugins will now be started on-demand when needed
-        // This improves scalability and resource usage
-        console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
-      } catch (error) {
-        console.error("Failed to initialize plugin system:", error);
-      }
+      // Note: Plugins will now be started on-demand when needed
+      // This improves scalability and resource usage
+      console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
+    } catch (error) {
+      console.error("Failed to initialize plugin system:", error);
     }
   });
 

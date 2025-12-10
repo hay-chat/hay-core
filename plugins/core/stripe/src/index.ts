@@ -8,15 +8,7 @@ import * as tools from './tools.json';
  */
 export class StripePlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-stripe',
-      name: 'Stripe',
-      version: '1.0.0',
-      description: 'Connect your Stripe account to manage payments, customers, subscriptions, and more through Stripe\'s Model Context Protocol server.',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   async onInitialize() {

@@ -8,15 +8,7 @@ import { HayPlugin, startPluginWorker } from '@hay/plugin-sdk';
  */
 export class EmailPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'email',
-      name: 'Email',
-      version: '1.0.0',
-      description: 'Send emails using the platform email service with configurable recipient lists',
-      author: 'Hay',
-      category: 'utility',
-      capabilities: ['mcp'], // MCP-only plugin
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   /**

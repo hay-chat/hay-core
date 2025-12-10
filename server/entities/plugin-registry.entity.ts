@@ -13,11 +13,18 @@ import { Organization } from "./organization.entity";
 import { Upload } from "./upload.entity";
 import { User } from "./user.entity";
 
+export enum PluginStatus {
+  AVAILABLE = "available",
+  NOT_FOUND = "not_found",
+  DISABLED = "disabled",
+}
+
 @Entity("plugin_registry")
 @Index(["pluginId"], { unique: true })
 @Index(["sourceType"])
 @Index(["organizationId"])
 @Index(["organizationId", "sourceType"])
+@Index(["status"])
 export class PluginRegistry {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -60,6 +67,9 @@ export class PluginRegistry {
 
   @Column({ type: "integer", default: 10 })
   maxConcurrentInstances!: number;
+
+  @Column({ type: "varchar", length: 50, default: PluginStatus.AVAILABLE })
+  status!: PluginStatus;
 
   // Custom plugin fields
   @Column({ type: "varchar", length: 50, default: "core" })

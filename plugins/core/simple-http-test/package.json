@@ -15,5 +15,12 @@
   "devDependencies": {
     "@types/node": "^20.10.0",
     "typescript": "^5.3.3"
+  },
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Simple HTTP Test",
+    "category": "utility",
+    "capabilities": ["routes"],
+    "env": []
   }
 }

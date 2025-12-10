@@ -11,6 +11,7 @@ import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
+import { PluginStatus } from "@server/entities/plugin-registry.entity";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -36,7 +37,12 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
     .filter((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
       // Filter out invisible plugins from the marketplace listing
-      return !manifest.invisible;
+      if (manifest.invisible) return false;
+
+      // Filter out plugins marked as not_found (source files removed)
+      if (plugin.status === PluginStatus.NOT_FOUND) return false;
+
+      return true;
     })
     .map((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
@@ -60,6 +66,7 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         isCustom: plugin.sourceType === "custom",
         uploadedAt: plugin.uploadedAt,
         uploadedBy: plugin.uploadedBy,
+        status: plugin.status || PluginStatus.AVAILABLE, // Include status field
       };
 
       return result;
@@ -85,6 +92,14 @@ export const getPlugin = authenticatedProcedure
       });
     }
 
+    // Check if plugin source files are missing
+    if (plugin.status === PluginStatus.NOT_FOUND) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} source files not found. The plugin may have been removed.`,
+      });
+    }
+
     const manifest = plugin.manifest as HayPluginManifest;
     return {
       id: plugin.pluginId, // Use pluginId as the identifier
@@ -95,6 +110,7 @@ export const getPlugin = authenticatedProcedure
       manifest: manifest,
       installed: plugin.installed,
       built: plugin.built,
+      status: plugin.status || PluginStatus.AVAILABLE,
     };
   });
 
@@ -367,10 +383,23 @@ export const getPluginConfiguration = authenticatedProcedure
       }
     }
 
+    // Extract auth config from MCP servers if present
+    let authConfig = undefined;
+    if (decryptedConfig.mcpServers && typeof decryptedConfig.mcpServers === 'object' && decryptedConfig.mcpServers !== null) {
+      const mcpServers = decryptedConfig.mcpServers as any;
+      if (mcpServers.remote && Array.isArray(mcpServers.remote) && mcpServers.remote.length > 0) {
+        const remoteMcp = mcpServers.remote[0];
+        if (remoteMcp.auth?.type === "oauth2") {
+          authConfig = remoteMcp.auth;
+        }
+      }
+    }
+
     return {
       configuration: maskedConfig,
       enabled: instance.enabled,
       instanceId: instance.id,
+      auth: authConfig, // Include auth config from MCP servers
     };
   });
 

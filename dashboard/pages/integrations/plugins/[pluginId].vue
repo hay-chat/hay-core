@@ -136,21 +136,7 @@
         </CardHeader>
       </Card>
 
-      <!-- OAuth Connection Card (show for OAuth plugins) -->
-      <Card v-if="plugin.manifest?.ui?.auth === 'oauth2'">
-        <CardContent>
-          <PluginOAuthConnection
-            :plugin="plugin"
-            :config="{
-              instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId,
-            }"
-            :api-base-url="apiBaseUrl"
-          />
-        </CardContent>
-      </Card>
-
-      <!-- Plugin Extensions - Before Settings Slot (only when NOT OAuth or when enabled) -->
+      <!-- Plugin Extensions - Before Settings Slot (only when NOT enabled) -->
       <template v-if="!enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
@@ -307,7 +293,7 @@
       </template>
 
       <!-- OAuth Connection Card (show when enabled for OAuth plugins) -->
-      <Card v-if="enabled && plugin.manifest?.ui?.auth === 'oauth2'">
+      <Card v-if="enabled && plugin.manifest?.auth?.type === 'oauth2'">
         <CardContent>
           <PluginOAuthConnection
             :plugin="plugin"
@@ -543,8 +529,8 @@ const userStore = useUserStore();
 const toast = useToast();
 const runtimeConfig = useRuntimeConfig();
 
-// Plugin ID from route
-const pluginId = computed(() => route.params.pluginId as string);
+// Plugin ID from route (decode in case it contains special characters like /)
+const pluginId = computed(() => decodeURIComponent(route.params.pluginId as string));
 
 // API Base URL from runtime config
 const apiBaseUrl = computed(() => {
@@ -571,6 +557,7 @@ const disabling = ref(false);
 const showDisableConfirm = ref(false);
 const testResult = ref<{ success: boolean; message?: string; error?: string } | null>(null);
 const instanceId = ref<string | null>(null);
+const instanceAuth = ref<any>(null); // Auth config from plugin instance
 
 // Configuration
 const hasConfiguration = ref(false);
@@ -665,7 +652,7 @@ const getPluginDisplayName = (name: string) => {
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();
-  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
 };
 
 const handleThumbnailError = (event: Event) => {
@@ -782,6 +769,11 @@ const fetchPlugin = async () => {
     instanceId.value = "instanceId" in configData ? configData.instanceId : null;
     formData.value = { ...configData.configuration };
     originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
+
+    // Store runtime auth config from instance
+    if ("auth" in configData) {
+      instanceAuth.value = configData.auth;
+    }
 
     // Set config schema from manifest
     if (pluginData.manifest?.configSchema) {

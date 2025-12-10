@@ -8,15 +8,7 @@ import * as tools from './tools.json';
  */
 export class WooCommercePlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-woocommerce',
-      name: 'WooCommerce',
-      version: '1.0.0',
-      description: 'Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   async onInitialize() {

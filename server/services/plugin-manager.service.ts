@@ -6,7 +6,7 @@ import * as jwt from "jsonwebtoken";
 import * as net from "net";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
-import { PluginRegistry } from "@server/entities/plugin-registry.entity";
+import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 
@@ -31,6 +31,9 @@ export class PluginManagerService {
   private readonly PORT_RANGE_START = 5000;
   private readonly PORT_RANGE_END = 6000;
 
+  // Track discovered plugins during initialization
+  private discoveredPluginIds: Set<string> = new Set();
+
   constructor() {
     // Look for plugins in the root /plugins directory
     this.pluginsDir = path.join(process.cwd(), "..", "plugins");
@@ -42,8 +45,14 @@ export class PluginManagerService {
   async initialize(): Promise<void> {
     console.log("🔍 Discovering plugins...");
 
+    // Clear discovered set for fresh initialization
+    this.discoveredPluginIds.clear();
+
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
+
+    // Validate existing plugins and mark missing ones
+    await this.validateExistingPlugins();
 
     // Restore plugins from ZIP if directories are missing
     await this.restorePluginsFromZip();
@@ -127,8 +136,8 @@ export class PluginManagerService {
   /**
    * Register a single plugin from its directory
    *
-   * Note: manifest.json is now used only for metadata (name, description, category, etc).
-   * Plugin capabilities are defined in TypeScript and registered dynamically at runtime.
+   * Reads package.json to discover plugins (TypeScript-first approach).
+   * Full metadata is fetched from the plugin worker when it starts.
    */
   public async registerPlugin(
     pluginPath: string,
@@ -136,25 +145,59 @@ export class PluginManagerService {
     organizationId: string | null,
   ): Promise<void> {
     try {
-      // Load manifest.json for plugin metadata
-      const manifestPath = path.join(pluginPath, "manifest.json");
-      const manifestExists = await fs
-        .access(manifestPath)
+      // Load package.json for plugin discovery
+      const packagePath = path.join(pluginPath, "package.json");
+      const packageExists = await fs
+        .access(packagePath)
         .then(() => true)
         .catch(() => false);
 
-      if (!manifestExists) {
-        console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
+      if (!packageExists) {
+        console.warn(`⚠️  No package.json found for plugin at ${pluginPath}`);
         return;
       }
 
-      const manifestContent = await fs.readFile(manifestPath, "utf-8");
-      const manifest: HayPluginManifest = JSON.parse(manifestContent);
+      const packageContent = await fs.readFile(packagePath, "utf-8");
+      const packageJson = JSON.parse(packageContent);
 
-      if (!manifest || !manifest.id) {
-        console.warn(`⚠️  Invalid manifest (missing id) at ${pluginPath}`);
+      // Check if this is a Hay plugin
+      if (!packageJson["hay-plugin"]) {
+        // Not a Hay plugin, skip silently
         return;
       }
+
+      const hayPlugin = packageJson["hay-plugin"];
+
+      // Plugin ID comes from NPM package name
+      const pluginId = packageJson.name;
+
+      if (!pluginId) {
+        console.warn(`⚠️  No package name found at ${pluginPath}`);
+        return;
+      }
+
+      // Display name from hay-plugin or parse from package name
+      const displayName = hayPlugin.displayName || this.parseDisplayName(pluginId);
+
+      // Build full manifest from package.json
+      const manifest: any = {
+        id: pluginId,
+        name: displayName,
+        version: packageJson.version || "1.0.0",
+        description: packageJson.description || "",
+        author: packageJson.author,
+        category: hayPlugin.category,
+        icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
+        type: this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+        entry: hayPlugin.entry,
+        capabilities: hayPlugin.capabilities || [],
+        configSchema: hayPlugin.config || {},
+        permissions: {
+          env: hayPlugin.env || [],
+          api: hayPlugin.capabilities || [],
+        },
+        auth: hayPlugin.auth || undefined, // Include auth config if present
+      };
 
       // Calculate checksum of plugin files
       const checksum = await this.calculatePluginChecksum(pluginPath);
@@ -175,9 +218,50 @@ export class PluginManagerService {
       });
 
       this.registry.set(manifest.id, plugin);
+      this.discoveredPluginIds.add(manifest.id); // Track as discovered
+      console.log(`✅ Registered plugin: ${pluginId} from ${relativePath}`);
     } catch (error) {
       console.error(`Failed to register plugin at ${pluginPath}:`, error);
     }
+  }
+
+  /**
+   * Parse display name from package name
+   * @example "@hay/plugin-hubspot" => "HubSpot"
+   * @example "my-plugin" => "My Plugin"
+   */
+  private parseDisplayName(packageName: string): string {
+    // Remove scope (@hay/)
+    let name = packageName.replace(/^@[^/]+\//, "");
+
+    // Remove plugin- prefix
+    name = name.replace(/^plugin-/, "");
+
+    // Convert kebab-case to Title Case
+    return name
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  /**
+   * Infer plugin type from capabilities
+   * Maintains backward compatibility with type field
+   */
+  private inferTypeFromCapabilities(capabilities: string[]): string[] {
+    const types: string[] = [];
+
+    if (capabilities.includes("mcp")) {
+      types.push("mcp-connector");
+    }
+    if (capabilities.includes("routes") || capabilities.includes("messages")) {
+      types.push("channel");
+    }
+    if (capabilities.includes("sources")) {
+      types.push("retriever");
+    }
+
+    return types.length > 0 ? types : ["mcp-connector"];
   }
 
   /**
@@ -212,6 +296,42 @@ export class PluginManagerService {
     const plugins = await pluginRegistryRepository.getAllPlugins();
     for (const plugin of plugins) {
       this.registry.set(plugin.pluginId, plugin);
+    }
+  }
+
+  /**
+   * Validate existing plugins in database and mark missing ones as not_found
+   */
+  private async validateExistingPlugins(): Promise<void> {
+    try {
+      // Get all plugins from database
+      const allPlugins = await pluginRegistryRepository.findAll();
+
+      // Find plugins in DB but not discovered on filesystem
+      const missingPlugins = allPlugins.filter(
+        (plugin) => !this.discoveredPluginIds.has(plugin.pluginId),
+      );
+
+      if (missingPlugins.length > 0) {
+        console.log(
+          `⚠️  Found ${missingPlugins.length} plugin(s) in database but not on filesystem`,
+        );
+
+        // Mark each missing plugin as not_found
+        for (const plugin of missingPlugins) {
+          await pluginRegistryRepository.updateStatus(plugin.id, PluginStatus.NOT_FOUND);
+
+          // Update in-memory registry as well
+          const registryPlugin = this.registry.get(plugin.pluginId);
+          if (registryPlugin) {
+            registryPlugin.status = PluginStatus.NOT_FOUND;
+          }
+
+          console.log(`   - ${plugin.pluginId} marked as not_found`);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to validate existing plugins:", error);
     }
   }
 
@@ -838,6 +958,15 @@ export class PluginManagerService {
   }): Record<string, string> {
     const { organizationId, pluginId, port, apiToken, pluginConfig, capabilities } = params;
 
+    // Get plugin manifest from registry
+    const plugin = this.registry.get(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found in registry`);
+    }
+
+    const manifest = plugin.manifest as any;
+    const allowedEnvVars = manifest.permissions?.env || [];
+
     // Explicit allowlist - only safe variables
     const safeEnv: Record<string, string> = {
       // Node.js runtime essentials
@@ -871,6 +1000,13 @@ export class PluginManagerService {
 
     // Add plugin-specific config from database (already scoped and decrypted)
     Object.assign(safeEnv, pluginConfig);
+
+    // Add explicitly allowed env vars from package.json (permissions.env)
+    for (const envVar of allowedEnvVars) {
+      if (process.env[envVar]) {
+        safeEnv[envVar] = process.env[envVar]!;
+      }
+    }
 
     // SECURITY: NEVER include these sensitive variables:
     // - OPENAI_API_KEY (AI API credentials)

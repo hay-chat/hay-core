@@ -1,5 +1,5 @@
 import { BaseRepository } from "./base.repository";
-import { PluginRegistry } from "@server/entities/plugin-registry.entity";
+import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
 
 export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   constructor() {
@@ -57,11 +57,15 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     if (existing) {
       await this.getRepository().update(existing.id, {
         ...plugin,
+        status: PluginStatus.AVAILABLE, // Plugin exists on filesystem
         updatedAt: new Date(),
       } as any);
       return (await this.getRepository().findOne({ where: { id: existing.id } }))!;
     } else {
-      const entity = this.getRepository().create(plugin as PluginRegistry);
+      const entity = this.getRepository().create({
+        ...plugin,
+        status: PluginStatus.AVAILABLE, // New plugin is available
+      } as PluginRegistry);
       return await this.getRepository().save(entity);
     }
   }
@@ -96,6 +100,32 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       pluginId,
       organizationId,
       sourceType: "custom",
+    });
+  }
+
+  /**
+   * Update plugin status
+   */
+  async updateStatus(id: string, status: PluginStatus): Promise<void> {
+    await this.getRepository().update(id, { status } as any);
+  }
+
+  /**
+   * Find plugins by status
+   */
+  async findByStatus(status: PluginStatus): Promise<PluginRegistry[]> {
+    return this.getRepository().find({
+      where: { status },
+      order: { name: "ASC" },
+    });
+  }
+
+  /**
+   * Find all plugins (no filters)
+   */
+  async findAll(): Promise<PluginRegistry[]> {
+    return this.getRepository().find({
+      order: { name: "ASC" },
     });
   }
 }

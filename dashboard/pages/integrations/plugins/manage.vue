@@ -214,7 +214,7 @@ const totalSize = computed(() => {
 
 // Methods
 const getPluginThumbnail = (pluginId: string) => {
-  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
 };
 
 const handleThumbnailError = (event: Event) => {
@@ -312,7 +312,7 @@ const updatePlugin = (pluginId: string) => {
 };
 
 const navigateToSettings = (pluginId: string) => {
-  router.push(`/integrations/plugins/${pluginId}`);
+  router.push(`/integrations/plugins/${encodeURIComponent(pluginId)}`);
 };
 
 const navigateToUpload = () => {

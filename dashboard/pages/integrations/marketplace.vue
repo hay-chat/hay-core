@@ -356,7 +356,7 @@ const formatPluginType = (type: string) => {
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();
-  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
 };
 
 const handleThumbnailError = (event: Event) => {
@@ -441,7 +441,7 @@ const disablePlugin = async (pluginId: string) => {
 };
 
 const navigateToSettings = (pluginId: string) => {
-  router.push(`/integrations/plugins/${pluginId}`);
+  router.push(`/integrations/plugins/${encodeURIComponent(pluginId)}`);
 };
 
 const navigateToUpload = () => {

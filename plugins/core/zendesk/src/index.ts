@@ -8,15 +8,7 @@ import * as tools from './tools.json';
  */
 export class ZendeskPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-zendesk',
-      name: 'Zendesk',
-      version: '1.2.0',
-      description: 'Connect your Zendesk account to manage tickets, customers, and support workflows',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   /**

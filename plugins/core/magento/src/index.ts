@@ -8,15 +8,7 @@ import * as tools from './tools.json';
  */
 export class MagentoPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-magento',
-      name: 'Magento',
-      version: '1.0.0',
-      description: 'Connect your Magento 2 e-commerce store to manage products, orders, customers, inventory, and analyze sales performance through Magento\'s REST API',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   async onInitialize() {
