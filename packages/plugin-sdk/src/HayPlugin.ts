@@ -1,11 +1,9 @@
-import express from 'express';
-import { PluginSDK } from './PluginSDK';
-import { MCPServerManager } from './MCPServerManager';
-import {
-  PluginMetadata,
-  RouteMethod,
-  RouteHandler,
-} from './types';
+import express from "express";
+import path from "path";
+import fs from "fs";
+import { PluginSDK } from "./PluginSDK";
+import { MCPServerManager } from "./MCPServerManager";
+import { PluginMetadata, RouteMethod, RouteHandler } from "./types";
 
 /**
  * HayPlugin Base Class
@@ -21,12 +19,7 @@ import {
  * ```typescript
  * export default class WhatsAppPlugin extends HayPlugin {
  *   constructor() {
- *     super({
- *       id: 'whatsapp',
- *       name: 'WhatsApp Business',
- *       version: '1.0.0',
- *       capabilities: ['routes', 'messages', 'customers', 'sources']
- *     });
+ *     super(); // Metadata loaded from package.json automatically
  *   }
  *
  *   async onInitialize(): Promise<void> {
@@ -44,9 +37,11 @@ export abstract class HayPlugin {
 
   private app: express.Application;
   private server: any;
+  private registeredRoutes: Array<{ method: string; path: string }> = [];
 
-  constructor(metadata: PluginMetadata) {
-    this.metadata = metadata;
+  constructor() {
+    // Load metadata from package.json
+    this.metadata = this.loadMetadataFromPackageJson();
 
     // Initialize Express app
     this.app = express();
@@ -54,11 +49,20 @@ export abstract class HayPlugin {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Add health check endpoint
-    this.app.get('/health', (_req, res) => {
+    this.app.get("/health", (_req, res) => {
       res.json({
-        status: 'ok',
+        status: "ok",
         plugin: this.metadata.id,
         version: this.metadata.version,
+      });
+    });
+
+    // Add metadata endpoint - returns runtime-only data
+    this.app.get("/metadata", (_req, res) => {
+      res.json({
+        auth: this.getAuthConfig(),
+        tools: this.getMCPTools(),
+        routes: this.registeredRoutes,
       });
     });
 
@@ -72,7 +76,7 @@ export abstract class HayPlugin {
     this.sdk = new PluginSDK({
       apiUrl: process.env.HAY_API_URL!,
       apiToken: process.env.HAY_API_TOKEN!,
-      capabilities: metadata.capabilities,
+      capabilities: this.metadata.capabilities,
     });
   }
 
@@ -117,12 +121,8 @@ export abstract class HayPlugin {
    * });
    * ```
    */
-  protected registerRoute(
-    method: RouteMethod,
-    path: string,
-    handler: RouteHandler
-  ): void {
-    const methodLower = method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
+  protected registerRoute(method: RouteMethod, path: string, handler: RouteHandler): void {
+    const methodLower = method.toLowerCase() as "get" | "post" | "put" | "delete" | "patch";
 
     this.app[methodLower](path, async (req, res, next) => {
       try {
@@ -133,12 +133,15 @@ export abstract class HayPlugin {
         // Only send error response if headers haven't been sent
         if (!res.headersSent) {
           res.status(500).json({
-            error: 'Internal server error',
-            message: error instanceof Error ? error.message : 'Unknown error',
+            error: "Internal server error",
+            message: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }
     });
+
+    // Track registered route for /metadata endpoint
+    this.registeredRoutes.push({ method, path });
 
     console.log(`[${this.metadata.id}] Registered route: ${method} ${path}`);
   }
@@ -153,11 +156,12 @@ export abstract class HayPlugin {
    */
   async _start(): Promise<void> {
     // Check if plugin needs HTTP server (has routes or messages capability)
-    const needsHttpServer = this.metadata.capabilities?.includes('routes') ||
-                           this.metadata.capabilities?.includes('messages');
+    const needsHttpServer =
+      this.metadata.capabilities?.includes("routes") ||
+      this.metadata.capabilities?.includes("messages");
 
     // Initialize MCP manager if plugin has MCP capability
-    if (this.metadata.capabilities.includes('mcp')) {
+    if (this.metadata.capabilities.includes("mcp")) {
       console.log(`[${this.metadata.id}] Initializing MCP manager...`);
       this.mcpManager = new MCPServerManager({
         workingDir: process.cwd(),
@@ -167,7 +171,7 @@ export abstract class HayPlugin {
     }
 
     // Register MCP servers if plugin implements registerMCP()
-    if (this.metadata.capabilities.includes('mcp') && 'registerMCP' in this) {
+    if (this.metadata.capabilities.includes("mcp") && "registerMCP" in this) {
       console.log(`[${this.metadata.id}] Registering MCP servers...`);
       await (this as any).registerMCP();
     }
@@ -178,10 +182,10 @@ export abstract class HayPlugin {
 
     // Start HTTP server only if plugin has routes or messages capability
     if (needsHttpServer) {
-      const port = parseInt(process.env.HAY_WORKER_PORT || '0');
+      const port = parseInt(process.env.HAY_WORKER_PORT || "0");
 
       if (!port) {
-        throw new Error('HAY_WORKER_PORT environment variable not set');
+        throw new Error("HAY_WORKER_PORT environment variable not set");
       }
 
       return new Promise<void>((resolve, reject) => {
@@ -190,7 +194,7 @@ export abstract class HayPlugin {
           resolve();
         });
 
-        this.server.on('error', (error: Error) => {
+        this.server.on("error", (error: Error) => {
           console.error(`[${this.metadata.id}] Server error:`, error);
           reject(error);
         });
@@ -246,19 +250,19 @@ export abstract class HayPlugin {
 
         // Type conversion based on field type
         switch (def.type) {
-          case 'number':
+          case "number":
             config[configKey] = parseFloat(value);
             break;
-          case 'boolean':
-            config[configKey] = value === 'true' || value === '1';
+          case "boolean":
+            config[configKey] = value === "true" || value === "1";
             break;
-          case 'array':
-          case 'object':
+          case "array":
+          case "object":
             try {
               config[configKey] = JSON.parse(value);
             } catch (error) {
               console.warn(
-                `[${this.metadata.id}] Failed to parse ${configKey} as JSON, using raw value`
+                `[${this.metadata.id}] Failed to parse ${configKey} as JSON, using raw value`,
               );
               config[configKey] = value;
             }
@@ -283,17 +287,18 @@ export abstract class HayPlugin {
 
     // Check SDK environment variables
     if (!process.env.HAY_API_URL) {
-      missing.push('HAY_API_URL');
+      missing.push("HAY_API_URL");
     }
     if (!process.env.HAY_API_TOKEN) {
-      missing.push('HAY_API_TOKEN');
+      missing.push("HAY_API_TOKEN");
     }
 
     // HAY_WORKER_PORT is only required for plugins with 'routes' or 'messages' capabilities
-    const hasRoutesOrMessages = this.metadata.capabilities?.includes('routes') ||
-                                this.metadata.capabilities?.includes('messages');
+    const hasRoutesOrMessages =
+      this.metadata.capabilities?.includes("routes") ||
+      this.metadata.capabilities?.includes("messages");
     if (hasRoutesOrMessages && !process.env.HAY_WORKER_PORT) {
-      missing.push('HAY_WORKER_PORT');
+      missing.push("HAY_WORKER_PORT");
     }
 
     // Check required config fields
@@ -304,9 +309,7 @@ export abstract class HayPlugin {
     }
 
     if (missing.length > 0) {
-      throw new Error(
-        `Missing required environment variables: ${missing.join(', ')}`
-      );
+      throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
     }
   }
 
@@ -333,5 +336,93 @@ export abstract class HayPlugin {
    */
   protected logError(message: string, error?: Error | unknown): void {
     console.error(`[${this.metadata.id}]`, message, error);
+  }
+
+  // =========================================================================
+  // Metadata Loading
+  // =========================================================================
+
+  /**
+   * Load plugin metadata from package.json
+   * Package.json is the single source of truth for static metadata
+   */
+  private loadMetadataFromPackageJson(): PluginMetadata {
+    const packagePath = path.join(process.cwd(), "package.json");
+
+    if (!fs.existsSync(packagePath)) {
+      throw new Error(`package.json not found at ${packagePath}`);
+    }
+
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
+    const hayPlugin = packageJson["hay-plugin"];
+
+    if (!hayPlugin) {
+      throw new Error("Missing hay-plugin configuration in package.json");
+    }
+
+    // Plugin ID comes from NPM package name
+    const id = packageJson.name;
+
+    // Display name from hay-plugin or parse from package name
+    const name = hayPlugin.displayName || this.parseDisplayName(packageJson.name);
+
+    return {
+      id,
+      name,
+      version: packageJson.version,
+      description: packageJson.description,
+      author: packageJson.author,
+      category: hayPlugin.category,
+      icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
+      capabilities: hayPlugin.capabilities || [],
+      config: hayPlugin.config || {},
+    };
+  }
+
+  /**
+   * Parse display name from package name
+   * @example "@hay/plugin-hubspot" => "HubSpot"
+   * @example "my-plugin" => "My Plugin"
+   */
+  private parseDisplayName(packageName: string): string {
+    // Remove scope (@hay/)
+    let name = packageName.replace(/^@[^/]+\//, "");
+
+    // Remove plugin- prefix
+    name = name.replace(/^plugin-/, "");
+
+    // Convert kebab-case to Title Case
+    return name
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  // =========================================================================
+  // Runtime Metadata (for /metadata endpoint)
+  // =========================================================================
+
+  /**
+   * Get runtime auth configuration
+   * Override this in your plugin if it uses authentication
+   *
+   * @returns Auth config or null if not configured
+   */
+  protected getAuthConfig(): any | null {
+    // Override in plugin if auth is configured
+    // Example: return { type: 'oauth2', authorizationUrl: '...', ... }
+    return null;
+  }
+
+  /**
+   * Get runtime MCP tools
+   * Override this in your plugin to return registered MCP tools
+   *
+   * @returns Array of MCP tools or null
+   */
+  protected getMCPTools(): any[] | null {
+    // Override in plugin if MCP tools are configured
+    // Or get from MCPServerManager if available
+    return null;
   }
 }

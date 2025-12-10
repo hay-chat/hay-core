@@ -117,10 +117,19 @@ export interface HayPluginManifest {
     }
   >;
   ui?: {
-    auth?: string;
     settings?: boolean;
     configuration?: string;
     templates?: Record<string, string>;
+  };
+  auth?: {
+    type: 'oauth2' | 'apiKey' | 'basic' | 'none';
+    authorizationUrl?: string;
+    tokenUrl?: string;
+    scopes?: string[];
+    optionalScopes?: string[];
+    pkce?: boolean;
+    clientIdEnvVar?: string;
+    clientSecretEnvVar?: string;
   };
 }
 

@@ -82,7 +82,7 @@
                   v-for="plugin in marketplacePlugins"
                   :key="plugin.id"
                   class="flex items-center gap-2 p-3 rounded-lg border border-border hover:border-primary hover:bg-accent transition-colors"
-                  @click="navigateTo(`/integrations/plugins/${plugin.id}`)"
+                  @click="navigateTo(`/integrations/plugins/${encodeURIComponent(plugin.id)}`)"
                 >
                   <div
                     class="w-12 h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden"
@@ -440,7 +440,7 @@ const isStepOpen = (stepId: string) => {
 // Helper to get plugin thumbnail from API
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();
-  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
 };
 
 // Handle thumbnail load error - show fallback

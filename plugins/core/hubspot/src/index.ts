@@ -8,15 +8,7 @@ import tools from './tools.json';
  */
 export class HubSpotPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-hubspot',
-      name: 'HubSpot',
-      version: '1.0.0',
-      description: 'Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   async onInitialize() {

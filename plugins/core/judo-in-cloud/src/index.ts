@@ -8,15 +8,7 @@ import { HayPlugin, startPluginWorker } from '@hay/plugin-sdk';
  */
 export class JudoInCloudPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'judo-in-cloud',
-      name: 'Judo in Cloud',
-      version: '1.0.0',
-      description: 'Judo in Cloud MCP plugin',
-      author: 'Hay',
-      category: 'utility',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   /**

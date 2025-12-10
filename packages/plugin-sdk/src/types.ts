@@ -14,6 +14,26 @@ export interface PluginMetadata {
   icon?: string;
   capabilities: PluginCapabilityType[];
   config?: Record<string, ConfigFieldDefinition>;
+  auth?: PluginAuthConfig;
+  ui?: {
+    settings?: boolean;
+  };
+  marketplace?: {
+    featured?: boolean;
+    tags?: string[];
+  };
+}
+
+export interface PluginAuthConfig {
+  type: 'oauth2' | 'apiKey' | 'basic' | 'none';
+  // OAuth2 specific fields
+  authorizationUrl?: string;
+  tokenUrl?: string;
+  scopes?: string[];
+  optionalScopes?: string[];
+  pkce?: boolean;
+  clientIdEnvVar?: string;
+  clientSecretEnvVar?: string;
 }
 
 export type PluginCapabilityType =

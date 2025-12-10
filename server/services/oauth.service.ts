@@ -23,24 +23,17 @@ export class OAuthService {
   /**
    * Check if OAuth is available for a plugin
    * OAuth is available if:
-   * 1. Plugin manifest has ui.auth === "oauth2"
+   * 1. Plugin manifest has auth.type === "oauth2"
    * 2. Client ID environment variable is set
    */
   isOAuthAvailable(pluginId: string, manifest: HayPluginManifest): boolean {
-    // Check if plugin supports OAuth via ui.auth field (TypeScript-first plugins)
-    if (manifest.ui?.auth === "oauth2") {
+    // Check if plugin supports OAuth via auth.type field (TypeScript-first plugins)
+    if (manifest.auth?.type === "oauth2") {
       const credentials = this.getClientCredentials(pluginId, manifest);
       return credentials.clientId !== null;
     }
 
-    // Legacy: Check old object-based capabilities format
-    const oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
-    if (!oauthConfig) {
-      return false;
-    }
-
-    const credentials = this.getClientCredentials(pluginId, manifest);
-    return credentials.clientId !== null;
+    return false;
   }
 
   /**
@@ -55,16 +48,27 @@ export class OAuthService {
     clientId: string | null;
     clientSecret: string | null;
   } {
-    // For TypeScript-first plugins: Look for CLIENT_ID and CLIENT_SECRET in permissions.env
-    if (manifest.ui?.auth === "oauth2" && manifest.permissions?.env) {
-      const envVars = manifest.permissions.env;
-      const clientIdVar = envVars.find((v: string) => v.includes("CLIENT_ID"));
-      const clientSecretVar = envVars.find((v: string) => v.includes("CLIENT_SECRET"));
+    // For TypeScript-first plugins: Look for CLIENT_ID and CLIENT_SECRET in permissions.env or auth config
+    if (manifest.auth?.type === "oauth2") {
+      // First check auth config for env var names
+      if (manifest.auth.clientIdEnvVar && manifest.auth.clientSecretEnvVar) {
+        return {
+          clientId: process.env[manifest.auth.clientIdEnvVar] || null,
+          clientSecret: process.env[manifest.auth.clientSecretEnvVar] || null,
+        };
+      }
 
-      return {
-        clientId: clientIdVar ? (process.env[clientIdVar] || null) : null,
-        clientSecret: clientSecretVar ? (process.env[clientSecretVar] || null) : null,
-      };
+      // Fallback: check permissions.env
+      if (manifest.permissions?.env) {
+        const envVars = manifest.permissions.env;
+        const clientIdVar = envVars.find((v: string) => v.includes("CLIENT_ID"));
+        const clientSecretVar = envVars.find((v: string) => v.includes("CLIENT_SECRET"));
+
+        return {
+          clientId: clientIdVar ? (process.env[clientIdVar] || null) : null,
+          clientSecret: clientSecretVar ? (process.env[clientSecretVar] || null) : null,
+        };
+      }
     }
 
     // Legacy: Check old object-based capabilities format
@@ -104,12 +108,12 @@ export class OAuthService {
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    console.log("Manifest ui.auth:", manifest.ui?.auth);
+    console.log("Manifest auth.type:", manifest.auth?.type);
 
     // For TypeScript-first plugins, get OAuth config from plugin instance
     let oauthConfig: any = null;
 
-    if (manifest.ui?.auth === "oauth2") {
+    if (manifest.auth?.type === "oauth2") {
       console.log("TypeScript-first plugin detected, checking instance config...");
       // Get plugin instance to access registered MCP config
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -272,12 +276,12 @@ export class OAuthService {
       }
 
       const manifest = plugin.manifest as HayPluginManifest;
-      console.log("Manifest ui.auth:", manifest.ui?.auth);
+      console.log("Manifest auth.type:", manifest.auth?.type);
 
       // For TypeScript-first plugins, get OAuth config from plugin instance
       let oauthConfig: any = null;
 
-      if (manifest.ui?.auth === "oauth2") {
+      if (manifest.auth?.type === "oauth2") {
         console.log("TypeScript-first plugin detected, checking instance config...");
         // Get plugin instance to access registered MCP config
         const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -621,7 +625,7 @@ export class OAuthService {
     // For TypeScript-first plugins, get OAuth config from plugin instance
     let oauthConfig: any = null;
 
-    if (manifest.ui?.auth === "oauth2") {
+    if (manifest.auth?.type === "oauth2") {
       // Get plugin instance to access registered MCP config
       if (instance && instance.config) {
         const config = instance.config as any;

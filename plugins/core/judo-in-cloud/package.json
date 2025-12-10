@@ -2,7 +2,15 @@
   "name": "@hay/plugin-judo-in-cloud",
   "version": "1.0.0",
   "description": "Judo in Cloud MCP plugin for customer support operations",
+  "author": "Hay",
   "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Judo in Cloud",
+    "category": "utility",
+    "capabilities": ["mcp"],
+    "env": []
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

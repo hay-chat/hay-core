@@ -1,8 +1,16 @@
 {
   "name": "@hay/plugin-zendesk",
-  "version": "1.0.0",
-  "description": "zendesk plugin for Hay",
+  "version": "1.2.0",
+  "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
+  "author": "Hay",
   "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Zendesk",
+    "category": "integration",
+    "capabilities": ["mcp"],
+    "env": ["ZENDESK_CLIENT_ID", "ZENDESK_CLIENT_SECRET"]
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

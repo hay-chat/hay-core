@@ -8,15 +8,7 @@ import * as tools from './tools.json';
  */
 export class ShopifyPlugin extends HayPlugin {
   constructor() {
-    super({
-      id: 'hay-plugin-shopify',
-      name: 'Shopify',
-      version: '1.0.0',
-      description: 'Connect your Shopify store to manage products, orders, customers, and e-commerce operations through Shopify\'s GraphQL Admin API',
-      author: 'Hay',
-      category: 'integration',
-      capabilities: ['mcp'],
-    });
+    super(); // Metadata loaded from package.json automatically
   }
 
   async onInitialize() {
