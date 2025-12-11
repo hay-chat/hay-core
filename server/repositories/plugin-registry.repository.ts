@@ -128,6 +128,21 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       order: { name: "ASC" },
     });
   }
+
+  /**
+   * Update plugin manifest (runtime metadata from worker)
+   */
+  async updateManifest(pluginId: string, manifest: any): Promise<void> {
+    const plugin = await this.findByPluginId(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found`);
+    }
+
+    await this.getRepository().update(plugin.id, {
+      manifest,
+      updatedAt: new Date(),
+    } as any);
+  }
 }
 
 export const pluginRegistryRepository = new PluginRegistryRepository();

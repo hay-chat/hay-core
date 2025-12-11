@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { PluginSDK } from "./PluginSDK";
 import { MCPServerManager } from "./MCPServerManager";
-import { PluginMetadata, RouteMethod, RouteHandler } from "./types";
+import { PluginMetadata, RouteMethod, RouteHandler, ConfigFieldSchema } from "./types";
 
 /**
  * HayPlugin Base Class
@@ -38,6 +38,7 @@ export abstract class HayPlugin {
   private app: express.Application;
   private server: any;
   private registeredRoutes: Array<{ method: string; path: string }> = [];
+  private configSchema: Record<string, any> = {};
 
   constructor() {
     // Load metadata from package.json
@@ -63,6 +64,7 @@ export abstract class HayPlugin {
         auth: this.getAuthConfig(),
         tools: this.getMCPTools(),
         routes: this.registeredRoutes,
+        configSchema: this.configSchema,
       });
     });
 
@@ -155,11 +157,6 @@ export abstract class HayPlugin {
    * Called by startPluginWorker() - do not call directly
    */
   async _start(): Promise<void> {
-    // Check if plugin needs HTTP server (has routes or messages capability)
-    const needsHttpServer =
-      this.metadata.capabilities?.includes("routes") ||
-      this.metadata.capabilities?.includes("messages");
-
     // Initialize MCP manager if plugin has MCP capability
     if (this.metadata.capabilities.includes("mcp")) {
       console.log(`[${this.metadata.id}] Initializing MCP manager...`);
@@ -180,35 +177,24 @@ export abstract class HayPlugin {
     console.log(`[${this.metadata.id}] Initializing plugin...`);
     await this.onInitialize();
 
-    // Start HTTP server only if plugin has routes or messages capability
-    if (needsHttpServer) {
-      const port = parseInt(process.env.HAY_WORKER_PORT || "0");
+    // All plugins now get an HTTP server for metadata endpoint
+    const port = parseInt(process.env.HAY_WORKER_PORT || "0");
 
-      if (!port) {
-        throw new Error("HAY_WORKER_PORT environment variable not set");
-      }
-
-      return new Promise<void>((resolve, reject) => {
-        this.server = this.app.listen(port, () => {
-          console.log(`[${this.metadata.id}] Worker listening on port ${port}`);
-          resolve();
-        });
-
-        this.server.on("error", (error: Error) => {
-          console.error(`[${this.metadata.id}] Server error:`, error);
-          reject(error);
-        });
-      });
-    } else {
-      // MCP-only plugin - no HTTP server needed, just keep process alive
-      console.log(`[${this.metadata.id}] MCP-only plugin initialized (no HTTP server)`);
-
-      // Keep process alive for MCP-only plugins
-      return new Promise<void>(() => {
-        // This promise never resolves, keeping the process running
-        // The worker will handle SIGTERM/SIGINT for graceful shutdown
-      });
+    if (!port) {
+      throw new Error("HAY_WORKER_PORT environment variable not set");
     }
+
+    return new Promise<void>((resolve, reject) => {
+      this.server = this.app.listen(port, () => {
+        console.log(`[${this.metadata.id}] Worker listening on port ${port}`);
+        resolve();
+      });
+
+      this.server.on("error", (error: Error) => {
+        console.error(`[${this.metadata.id}] Server error:`, error);
+        reject(error);
+      });
+    });
   }
 
   /**
@@ -236,6 +222,27 @@ export abstract class HayPlugin {
   // =========================================================================
   // Configuration Management
   // =========================================================================
+
+  /**
+   * Register a configuration option
+   * Call this in onInitialize() to define configuration fields for your plugin
+   *
+   * Example:
+   * ```typescript
+   * this.registerConfigOption('apiKey', {
+   *   type: 'string',
+   *   label: 'API Key',
+   *   description: 'Your API key for authentication',
+   *   required: true,
+   *   encrypted: true,
+   *   env: 'MY_API_KEY'
+   * });
+   * ```
+   */
+  protected registerConfigOption(name: string, schema: ConfigFieldSchema): void {
+    this.configSchema[name] = schema;
+    this.log(`Registered config option: ${name}`);
+  }
 
   /**
    * Load config from environment variables
@@ -293,11 +300,8 @@ export abstract class HayPlugin {
       missing.push("HAY_API_TOKEN");
     }
 
-    // HAY_WORKER_PORT is only required for plugins with 'routes' or 'messages' capabilities
-    const hasRoutesOrMessages =
-      this.metadata.capabilities?.includes("routes") ||
-      this.metadata.capabilities?.includes("messages");
-    if (hasRoutesOrMessages && !process.env.HAY_WORKER_PORT) {
+    // HAY_WORKER_PORT is required for all plugins (for metadata endpoint)
+    if (!process.env.HAY_WORKER_PORT) {
       missing.push("HAY_WORKER_PORT");
     }
 
