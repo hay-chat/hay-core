@@ -797,19 +797,8 @@ export class PluginManagerService {
       );
 
       // Wait for worker to be ready
-      // For MCP-only plugins (no HTTP server), skip HTTP health check
-      const isMcpOnly = capabilities.includes("mcp") && !capabilities.includes("routes");
-
-      if (isMcpOnly) {
-        console.log(
-          `[PluginManager] MCP-only plugin, waiting for initialization without HTTP health check...`,
-        );
-        // Just wait a bit for the process to initialize
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } else {
-        // HTTP-based plugin, do health check
-        await this.waitForWorkerReady(port, 20);
-      }
+      // All plugins now have HTTP server for metadata endpoint
+      await this.waitForWorkerReady(port, 20);
 
       // Update instance status to running
       await pluginInstanceRepository.updateStatus(instance.id, "running");
@@ -817,6 +806,9 @@ export class PluginManagerService {
         instance.id,
         workerProcess.pid?.toString() || null,
       );
+
+      // Fetch runtime metadata from worker (configSchema, auth, tools, etc.)
+      await this.fetchAndStoreWorkerMetadata(pluginId, port);
 
       return workerInfo;
     } catch (error) {
@@ -939,6 +931,52 @@ export class PluginManagerService {
     }
 
     throw new Error(`Worker failed to start after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Fetch runtime metadata from plugin worker and update registry
+   * This includes configSchema, auth config, tools, etc.
+   */
+  private async fetchAndStoreWorkerMetadata(pluginId: string, port: number): Promise<void> {
+    try {
+      console.log(`[PluginManager] Fetching metadata from worker ${pluginId} on port ${port}...`);
+
+      const response = await fetch(`http://localhost:${port}/metadata`);
+      if (!response.ok) {
+        console.warn(`[PluginManager] Failed to fetch metadata from worker ${pluginId}: ${response.status}`);
+        return;
+      }
+
+      const metadata = await response.json();
+
+      // Update plugin registry with runtime metadata
+      const plugin = this.registry.get(pluginId);
+      if (!plugin) {
+        console.warn(`[PluginManager] Plugin ${pluginId} not found in registry`);
+        return;
+      }
+
+      // Merge runtime metadata into manifest
+      const manifest = plugin.manifest as HayPluginManifest;
+      const updatedManifest: HayPluginManifest = {
+        ...manifest,
+        configSchema: metadata.configSchema || manifest.configSchema || {},
+        auth: metadata.auth || manifest.auth,
+        // Note: tools are stored in metadata, not in manifest (they're dynamic)
+      };
+
+      // Update registry in memory and database
+      plugin.manifest = updatedManifest;
+      await pluginRegistryRepository.updateManifest(pluginId, updatedManifest);
+
+      console.log(`[PluginManager] Updated metadata for plugin ${pluginId}`, {
+        hasConfigSchema: Object.keys(updatedManifest.configSchema || {}).length > 0,
+        hasAuth: !!updatedManifest.auth,
+      });
+    } catch (error) {
+      console.error(`[PluginManager] Error fetching metadata from worker ${pluginId}:`, error);
+      // Don't throw - metadata fetch is not critical for worker startup
+    }
   }
 
   /**

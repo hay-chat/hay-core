@@ -13,6 +13,25 @@ export class StripePlugin extends HayPlugin {
 
   async onInitialize() {
     console.log('[hay-plugin-stripe] Plugin initialized');
+
+    // Register configuration options
+    this.registerConfigOption('oauthClientId', {
+      type: 'string',
+      label: 'OAuth Client ID',
+      description: 'Your Stripe OAuth client ID for MCP server authentication',
+      required: true,
+      encrypted: false,
+      env: 'STRIPE_OAUTH_CLIENT_ID'
+    });
+
+    this.registerConfigOption('oauthClientSecret', {
+      type: 'string',
+      label: 'OAuth Client Secret',
+      description: 'Your Stripe OAuth client secret for MCP server authentication',
+      required: true,
+      encrypted: true,
+      env: 'STRIPE_OAUTH_CLIENT_SECRET'
+    });
   }
 
   protected async registerMCP() {

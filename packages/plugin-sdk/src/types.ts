@@ -59,6 +59,22 @@ export interface ConfigFieldDefinition {
   };
 }
 
+/**
+ * Configuration field schema for UI form generation
+ * Used by registerConfigOption() to define configuration fields
+ */
+export interface ConfigFieldSchema {
+  type: 'string' | 'number' | 'boolean' | 'select' | 'textarea';
+  label?: string;
+  description?: string;
+  placeholder?: string;
+  required?: boolean;
+  encrypted?: boolean;  // Marks as sensitive (password field, masked after save)
+  env?: string;         // Maps to environment variable name
+  default?: any;        // Default value
+  options?: Array<{ label: string; value: any }>;  // For select type
+}
+
 // ============================================================================
 // Plugin SDK Configuration
 // ============================================================================
