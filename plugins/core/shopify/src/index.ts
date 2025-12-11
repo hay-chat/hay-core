@@ -1,5 +1,4 @@
 import { HayPlugin, startPluginWorker } from '@hay/plugin-sdk';
-import * as tools from './tools.json';
 
 /**
  * Shopify Plugin
@@ -13,14 +12,23 @@ export class ShopifyPlugin extends HayPlugin {
 
   async onInitialize() {
     console.log('[hay-plugin-shopify] Plugin initialized');
+
+    // Register setup instructions UI
+    this.registerUIExtension({
+      slot: 'after-settings',
+      component: 'components/settings/AfterSettings.vue',
+    });
   }
 
+  /**
+   * Register MCP server
+   * Tools will be discovered automatically from the MCP server via listTools()
+   */
   protected async registerMCP() {
     await this.sdk.mcp.registerLocalMCP({
       serverPath: './mcp',
       startCommand: 'node index.js',
       installCommand: 'npm install',
-      tools: tools as any,
     });
   }
 }

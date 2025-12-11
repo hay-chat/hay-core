@@ -131,6 +131,13 @@ export interface HayPluginManifest {
     clientIdEnvVar?: string;
     clientSecretEnvVar?: string;
   };
+  settingsExtensions?: Array<{
+    slot: 'before-settings' | 'after-settings' | 'tab';
+    component: string;
+    tabName?: string;
+    tabOrder?: number;
+    props?: Record<string, any>;
+  }>;
 }
 
 export interface WebhookRequest {
@@ -171,7 +178,7 @@ export interface LocalMCPServerConfig {
   startCommand: string;
   installCommand?: string;
   buildCommand?: string;
-  tools: MCPToolDefinition[];
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
   env?: Record<string, string>;
 }
 
@@ -188,7 +195,7 @@ export interface RemoteMCPServerConfig {
     token?: string;
     apiKey?: string;
   };
-  tools: MCPToolDefinition[];
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
 }
 
 /**

@@ -1,5 +1,4 @@
 import { HayPlugin, startPluginWorker } from '@hay/plugin-sdk';
-import * as tools from './tools.json';
 
 /**
  * Zendesk Plugin
@@ -16,17 +15,23 @@ export class ZendeskPlugin extends HayPlugin {
    */
   async onInitialize() {
     console.log('[zendesk] Plugin initialized');
+
+    // Register setup instructions UI
+    this.registerUIExtension({
+      slot: 'after-settings',
+      component: 'components/settings/AfterSettings.vue',
+    });
   }
 
   /**
-   * Register MCP server with tools
+   * Register MCP server
+   * Tools will be discovered automatically from the MCP server via listTools()
    */
   protected async registerMCP() {
     await this.sdk.mcp.registerLocalMCP({
       serverPath: './mcp',
       startCommand: 'node index.js',
       installCommand: 'npm install',
-      tools: tools as any,
     });
   }
 }

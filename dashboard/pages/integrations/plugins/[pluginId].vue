@@ -306,15 +306,6 @@
 
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
-        <div
-          v-if="beforeSettingsExtensions.length === 0"
-          class="text-sm text-muted-foreground p-4 border border-dashed rounded"
-        >
-          Debug (enabled): No extensions. Count: {{ beforeSettingsExtensions.length }}
-        </div>
-        <div v-else class="text-xs text-muted-foreground p-2 border border-dashed rounded mb-2">
-          Debug (enabled): Found {{ beforeSettingsExtensions.length }} extension(s)
-        </div>
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
             <div class="text-xs text-green-600 font-mono mb-2 p-2 bg-green-50 rounded">
