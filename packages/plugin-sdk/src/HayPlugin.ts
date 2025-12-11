@@ -3,7 +3,13 @@ import path from "path";
 import fs from "fs";
 import { PluginSDK } from "./PluginSDK";
 import { MCPServerManager } from "./MCPServerManager";
-import { PluginMetadata, RouteMethod, RouteHandler, ConfigFieldSchema } from "./types";
+import {
+  PluginMetadata,
+  RouteMethod,
+  RouteHandler,
+  ConfigFieldSchema,
+  SettingsExtension,
+} from "./types";
 
 /**
  * HayPlugin Base Class
@@ -39,6 +45,7 @@ export abstract class HayPlugin {
   private server: any;
   private registeredRoutes: Array<{ method: string; path: string }> = [];
   private configSchema: Record<string, any> = {};
+  private settingsExtensions: SettingsExtension[] = [];
 
   constructor() {
     // Load metadata from package.json
@@ -65,6 +72,8 @@ export abstract class HayPlugin {
         tools: this.getMCPTools(),
         routes: this.registeredRoutes,
         configSchema: this.configSchema,
+        settingsExtensions:
+          this.settingsExtensions.length > 0 ? this.settingsExtensions : undefined,
       });
     });
 
@@ -157,34 +166,18 @@ export abstract class HayPlugin {
    * Called by startPluginWorker() - do not call directly
    */
   async _start(): Promise<void> {
-    // Initialize MCP manager if plugin has MCP capability
-    if (this.metadata.capabilities.includes("mcp")) {
-      console.log(`[${this.metadata.id}] Initializing MCP manager...`);
-      this.mcpManager = new MCPServerManager({
-        workingDir: process.cwd(),
-        logger: console,
-      });
-      await this.mcpManager.initialize();
-    }
-
-    // Register MCP servers if plugin implements registerMCP()
-    if (this.metadata.capabilities.includes("mcp") && "registerMCP" in this) {
-      console.log(`[${this.metadata.id}] Registering MCP servers...`);
-      await (this as any).registerMCP();
-    }
-
-    // Call plugin's initialization
+    // Call plugin's initialization FIRST (registers UI extensions, config, etc.)
     console.log(`[${this.metadata.id}] Initializing plugin...`);
     await this.onInitialize();
 
-    // All plugins now get an HTTP server for metadata endpoint
+    // Start HTTP server IMMEDIATELY so metadata endpoint is available
     const port = parseInt(process.env.HAY_WORKER_PORT || "0");
 
     if (!port) {
       throw new Error("HAY_WORKER_PORT environment variable not set");
     }
 
-    return new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       this.server = this.app.listen(port, () => {
         console.log(`[${this.metadata.id}] Worker listening on port ${port}`);
         resolve();
@@ -195,6 +188,29 @@ export abstract class HayPlugin {
         reject(error);
       });
     });
+
+    // Initialize MCP manager if plugin has MCP capability (non-blocking)
+    if (this.metadata.capabilities.includes("mcp")) {
+      console.log(`[${this.metadata.id}] Initializing MCP manager...`);
+      this.mcpManager = new MCPServerManager({
+        workingDir: process.cwd(),
+        logger: console,
+      });
+
+      try {
+        await this.mcpManager.initialize();
+
+        // Register MCP servers if plugin implements registerMCP()
+        if ("registerMCP" in this) {
+          console.log(`[${this.metadata.id}] Registering MCP servers...`);
+          await (this as any).registerMCP();
+        }
+      } catch (error) {
+        // Log MCP errors but don't crash the worker
+        console.error(`[${this.metadata.id}] MCP initialization failed:`, error);
+        console.log(`[${this.metadata.id}] Worker will continue without MCP functionality`);
+      }
+    }
   }
 
   /**
@@ -242,6 +258,28 @@ export abstract class HayPlugin {
   protected registerConfigOption(name: string, schema: ConfigFieldSchema): void {
     this.configSchema[name] = schema;
     this.log(`Registered config option: ${name}`);
+  }
+
+  /**
+   * Register a UI extension for the plugin settings page
+   * Call this in onInitialize() to add custom components to the settings page
+   *
+   * Example:
+   * ```typescript
+   * this.registerUIExtension({
+   *   slot: 'after-settings',
+   *   component: 'components/settings/AfterSettings.vue',
+   * });
+   * ```
+   */
+  protected registerUIExtension(extension: SettingsExtension): void {
+    // Validate slot-specific requirements
+    if (extension.slot === "tab" && !extension.tabName) {
+      throw new Error("tabName is required for tab slot");
+    }
+
+    this.settingsExtensions.push(extension);
+    this.log(`Registered UI extension: ${extension.slot} - ${extension.component}`);
   }
 
   /**

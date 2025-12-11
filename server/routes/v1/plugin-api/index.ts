@@ -179,11 +179,19 @@ router.post(
 
     const { serverPath, startCommand, installCommand, buildCommand, tools, env, serverId } = req.body;
 
-    // Validate required fields
-    if (!serverPath || !startCommand || !tools || !Array.isArray(tools)) {
+    // Validate required fields (tools is optional - will be discovered from MCP server)
+    if (!serverPath || !startCommand) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: serverPath, startCommand, tools",
+        error: "Missing required fields: serverPath, startCommand",
+      } as PluginAPIHttpResponse);
+    }
+
+    // If tools provided, validate it's an array
+    if (tools !== undefined && !Array.isArray(tools)) {
+      return res.status(400).json({
+        success: false,
+        error: "tools must be an array if provided",
       } as PluginAPIHttpResponse);
     }
 
@@ -196,7 +204,8 @@ router.post(
         organizationId,
         pluginId,
         serverId: finalServerId,
-        toolCount: tools.length,
+        toolCount: tools?.length || 0,
+        toolsProvided: !!tools,
       });
 
       // Get plugin instance
@@ -239,8 +248,10 @@ router.post(
       // Save to database
       await pluginInstanceRepository.updateConfig(instance.id, config);
 
-      // Register tools in registry
-      await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
+      // Register tools in registry (only if tools provided)
+      if (tools && tools.length > 0) {
+        await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
+      }
 
       debugLog("plugin-api", "Local MCP server registered successfully", {
         organizationId,
@@ -296,11 +307,19 @@ router.post(
 
     const { url, transport, auth, tools, serverId } = req.body;
 
-    // Validate required fields
-    if (!url || !transport || !tools || !Array.isArray(tools)) {
+    // Validate required fields (tools is optional - will be discovered from MCP server)
+    if (!url || !transport) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: url, transport, tools",
+        error: "Missing required fields: url, transport",
+      } as PluginAPIHttpResponse);
+    }
+
+    // If tools provided, validate it's an array
+    if (tools !== undefined && !Array.isArray(tools)) {
+      return res.status(400).json({
+        success: false,
+        error: "tools must be an array if provided",
       } as PluginAPIHttpResponse);
     }
 
@@ -316,14 +335,16 @@ router.post(
       console.log("URL:", url);
       console.log("Transport:", transport);
       console.log("Auth:", JSON.stringify(auth, null, 2));
-      console.log("Tools count:", tools.length);
+      console.log("Tools count:", tools?.length || 0);
+      console.log("Tools provided:", !!tools);
 
       debugLog("plugin-api", "Registering remote MCP server", {
         organizationId,
         pluginId,
         serverId: finalServerId,
         url,
-        toolCount: tools.length,
+        toolCount: tools?.length || 0,
+        toolsProvided: !!tools,
       });
 
       // Get plugin instance
@@ -366,22 +387,26 @@ router.post(
       console.log("✅ Config saved to database successfully");
       console.log("Final config:", JSON.stringify(config, null, 2));
 
-      // Register tools in registry
-      await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
-      console.log("✅ Tools registered in registry");
+      // Register tools in registry (only if tools provided)
+      if (tools && tools.length > 0) {
+        await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
+        console.log("✅ Tools registered in registry");
+      } else {
+        console.log("ℹ️  No tools provided - will be discovered from MCP server");
+      }
 
       debugLog("plugin-api", "Remote MCP server registered successfully", {
         organizationId,
         pluginId,
         serverId: finalServerId,
-        toolsRegistered: tools.length,
+        toolsRegistered: tools?.length || 0,
       });
 
       return res.status(200).json({
         success: true,
         data: {
           serverId: finalServerId,
-          toolsRegistered: tools.length,
+          toolsRegistered: tools?.length || 0,
         },
       } as PluginAPIHttpResponse);
     } catch (error) {

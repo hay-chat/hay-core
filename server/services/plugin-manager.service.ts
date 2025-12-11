@@ -962,6 +962,7 @@ export class PluginManagerService {
         ...manifest,
         configSchema: metadata.configSchema || manifest.configSchema || {},
         auth: metadata.auth || manifest.auth,
+        settingsExtensions: metadata.settingsExtensions || manifest.settingsExtensions,
         // Note: tools are stored in metadata, not in manifest (they're dynamic)
       };
 
@@ -1031,8 +1032,8 @@ export class PluginManagerService {
       }
     }
 
-    // Add worker port only if plugin has routes capability
-    if (port && capabilities.includes("routes")) {
+    // Add worker port (all plugins now have HTTP server for metadata endpoint)
+    if (port) {
       safeEnv.HAY_WORKER_PORT = port.toString();
     }
 

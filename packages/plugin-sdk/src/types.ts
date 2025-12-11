@@ -75,6 +75,18 @@ export interface ConfigFieldSchema {
   options?: Array<{ label: string; value: any }>;  // For select type
 }
 
+/**
+ * Settings extension for plugin UI customization
+ * Used by registerUIExtension() to add custom components to the settings page
+ */
+export interface SettingsExtension {
+  slot: 'before-settings' | 'after-settings' | 'tab';
+  component: string;
+  tabName?: string;
+  tabOrder?: number;
+  props?: Record<string, any>;
+}
+
 // ============================================================================
 // Plugin SDK Configuration
 // ============================================================================
@@ -172,7 +184,7 @@ export interface LocalMCPConfig {
   startCommand: string;
   installCommand?: string;
   buildCommand?: string;
-  tools: MCPToolDefinition[];
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server
   env?: Record<string, string>;
 }
 
@@ -193,7 +205,7 @@ export interface RemoteMCPConfig {
     clientIdEnvVar?: string;
     clientSecretEnvVar?: string;
   };
-  tools: MCPToolDefinition[];
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server
 }
 
 export interface MCPToolDefinition {

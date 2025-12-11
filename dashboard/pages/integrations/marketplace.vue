@@ -133,9 +133,7 @@
                   <CardTitle class="text-lg">
                     {{ plugin.name }}
                   </CardTitle>
-                  <Badge v-if="plugin.isCustom" variant="outline" class="text-xs">
-                    Custom
-                  </Badge>
+                  <Badge v-if="plugin.isCustom" variant="outline" class="text-xs"> Custom </Badge>
                 </div>
               </div>
             </div>
@@ -148,39 +146,6 @@
               <Badge v-for="type in plugin.type" :key="type" variant="outline" class="text-xs">
                 {{ formatPluginType(type) }}
               </Badge>
-            </div>
-
-            <!-- Status -->
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-neutral-muted">Status:</span>
-                <Badge :variant="plugin.enabled ? 'default' : 'secondary'">
-                  {{ plugin.enabled ? "Installed" : "Not Installed" }}
-                </Badge>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-neutral-muted">Version:</span>
-                <span class="font-medium">{{ plugin.version }}</span>
-              </div>
-            </div>
-
-            <!-- Features for channels -->
-            <div v-if="plugin.type.includes('channel')" class="space-y-2">
-              <div class="text-sm font-medium">Features:</div>
-              <div class="flex flex-wrap gap-1">
-                <Badge v-if="plugin.features?.fileUpload" variant="outline" class="text-xs">
-                  File Upload
-                </Badge>
-                <Badge v-if="plugin.features?.typing" variant="outline" class="text-xs">
-                  Typing Indicators
-                </Badge>
-                <Badge v-if="plugin.features?.readReceipts" variant="outline" class="text-xs">
-                  Read Receipts
-                </Badge>
-                <Badge v-if="plugin.features?.voiceMessages" variant="outline" class="text-xs">
-                  Voice Messages
-                </Badge>
-              </div>
             </div>
 
             <!-- Actions -->
