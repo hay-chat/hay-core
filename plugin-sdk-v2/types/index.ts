@@ -100,6 +100,12 @@ export type { HayRegisterAPI } from './register';
 export type { HayOrg } from './org';
 
 // ============================================================================
-// Additional types to be exported in future phases:
+// Manifest Types (Phase 2.7) ✅
 // ============================================================================
-// - Phase 2.7: Manifest types (HayPluginManifest)
+
+export type {
+  HayPluginManifest,
+  HayPluginPackageJson,
+  PluginCategory,
+  PluginCapability,
+} from './manifest';

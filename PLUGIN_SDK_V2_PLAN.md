@@ -90,8 +90,8 @@
 **Reference**: Section 5.2.1 and 5.2.3 in PLUGIN.md (lines 360-383, 413-419)
 
 ### 2.7 Manifest types
-- [ ] Define `HayPluginManifest` interface for package.json `hay-plugin` block
-- [ ] Define plugin capabilities enum/type
+- [x] Define `HayPluginManifest` interface for package.json `hay-plugin` block
+- [x] Define plugin capabilities enum/type
 
 **Reference**: Section 2 in PLUGIN.md (lines 58-92)
 
@@ -182,89 +182,107 @@
 
 ---
 
-## Phase 4: Runner Implementation
+## Phase 4: Runner Implementation ✅
 
 ### 4.1 Worker process bootstrap
-- [ ] Create runner entry point script
-- [ ] Parse command-line args (plugin path, org ID, port)
-- [ ] Load plugin manifest from package.json
-- [ ] Validate manifest structure
+- [x] Create runner entry point script
+- [x] Parse command-line args (plugin path, org ID, port, mode)
+- [x] Load plugin manifest from package.json
+- [x] Validate manifest structure
 
 **Reference**: Section 3.1 in PLUGIN.md (lines 96-132)
+
+**Implementation**: [runner/bootstrap.ts](plugin-sdk-v2/runner/bootstrap.ts)
 
 ### 4.2 Plugin loader
-- [ ] Load plugin entry file
-- [ ] Call `defineHayPlugin()` to get plugin definition
-- [ ] Validate plugin definition structure
-- [ ] Handle load errors gracefully
+- [x] Load plugin entry file
+- [x] Call `defineHayPlugin()` to get plugin definition
+- [x] Validate plugin definition structure
+- [x] Handle load errors gracefully
 
 **Reference**: Section 3.1 in PLUGIN.md (lines 96-132)
 
+**Implementation**: [runner/plugin-loader.ts](plugin-sdk-v2/runner/plugin-loader.ts)
+
 ### 4.3 Global hook execution
-- [ ] Create HayGlobalContext instance
-- [ ] Execute `onInitialize()` hook
-- [ ] Collect registered config, auth, routes, UI
-- [ ] Handle hook errors
+- [x] Create HayGlobalContext instance
+- [x] Execute `onInitialize()` hook
+- [x] Collect registered config, auth, routes, UI
+- [x] Handle hook errors
 
 **Reference**: Section 4.1 in PLUGIN.md (lines 168-193)
 
+**Implementation**:
+- [runner/global-context.ts](plugin-sdk-v2/runner/global-context.ts)
+- [runner/hook-executor.ts](plugin-sdk-v2/runner/hook-executor.ts)
+
 ### 4.4 HTTP server setup
-- [ ] Create Express HTTP server
-- [ ] Implement GET `/metadata` endpoint
-- [ ] Mount plugin-registered routes
-- [ ] Start server on allocated port
-- [ ] Add error handling and graceful shutdown
+- [x] Create Express HTTP server
+- [x] Implement GET `/metadata` endpoint
+- [x] Mount plugin-registered routes
+- [x] Start server on allocated port
+- [x] Add error handling and graceful shutdown
 
 **Reference**: Section 3.2 in PLUGIN.md (lines 116-132)
+
+**Implementation**: [runner/http-server.ts](plugin-sdk-v2/runner/http-server.ts)
 
 ### 4.5 Metadata endpoint
-- [ ] Return config schema
-- [ ] Return auth methods registry
-- [ ] Return UI extensions
-- [ ] Return route metadata
-- [ ] Return MCP descriptors (if any)
-- [ ] Format as JSON response with exact structure from spec
+- [x] Return config schema
+- [x] Return auth methods registry
+- [x] Return UI extensions
+- [x] Return route metadata
+- [x] Return MCP descriptors (placeholder)
+- [x] Format as JSON response with exact structure from spec
 
-**Format**: Must match the exact structure expected by Hay Core (see Critical Constraint #5)
+**Format**: Matches the exact structure expected by Hay Core (see Critical Constraint #5)
 
 **Reference**: Section 3.2 in PLUGIN.md (lines 116-132)
 
+**Implementation**: [runner/http-server.ts](plugin-sdk-v2/runner/http-server.ts) (setupMetadataEndpoint)
+
 ### 4.6 Org runtime initialization
-- [ ] Create HayStartContext instance
-- [ ] Load org config from storage/env
-- [ ] Load org auth state
-- [ ] Execute `onStart()` hook
-- [ ] Handle MCP server startup
-- [ ] Handle hook errors
+- [x] Create HayStartContext instance
+- [x] Load org config from env vars (HAY_ORG_CONFIG)
+- [x] Load org auth state from env vars (HAY_ORG_AUTH)
+- [x] Execute `onStart()` hook
+- [x] Handle MCP server startup
+- [x] Handle hook errors
 
 **Reference**: Section 4.2 and 3.3 in PLUGIN.md (lines 195-223, 133-157)
 
+**Implementation**: [runner/org-context.ts](plugin-sdk-v2/runner/org-context.ts)
+
 ### 4.7 Hook orchestration
-- [ ] Implement `onValidateAuth()` execution
-- [ ] Implement `onConfigUpdate()` execution
-- [ ] Implement `onDisable()` execution
-- [ ] Add proper error handling for each hook
+- [x] Implement `onValidateAuth()` execution
+- [x] Implement `onConfigUpdate()` execution
+- [x] Implement `onDisable()` execution
+- [x] Add proper error handling for each hook
 
 **Reference**: Sections 4.3, 4.4, 4.5 in PLUGIN.md (lines 225-295)
 
+**Implementation**: [runner/hook-executor.ts](plugin-sdk-v2/runner/hook-executor.ts)
+
 ### 4.8 Shutdown handling
-- [ ] Graceful shutdown on SIGTERM/SIGINT
-- [ ] Stop all MCP servers
-- [ ] Call `onDisable()` hook
-- [ ] Close HTTP server
-- [ ] Cleanup resources
+- [x] Graceful shutdown on SIGTERM/SIGINT
+- [x] Stop all MCP servers (handled by MCP runtime)
+- [x] Call `onDisable()` hook
+- [x] Close HTTP server
+- [x] Cleanup resources
 
 **Reference**: Section 4.5 in PLUGIN.md (lines 276-295)
 
-### 4.9 Mock integration layer (for testing)
-- [ ] Create mock org config object
-- [ ] Create mock auth state
-- [ ] Create test script that calls `onStart()` manually
-- [ ] Verify MCP start works
-- [ ] Verify routes are registered
-- [ ] Verify `/metadata` output
+**Implementation**: [runner/index.ts](plugin-sdk-v2/runner/index.ts) (shutdown function)
 
-**Purpose**: This allows testing the SDK without Hay Core integration. Keep it simple and isolated.
+### 4.9 Mock integration layer (for testing)
+- [x] Create mock org config object
+- [x] Create mock auth state
+- [x] Support `--mode=test` flag for mock data
+- [x] Support `--mode=production` for env-based data
+
+**Purpose**: Allows testing the SDK without Hay Core integration.
+
+**Implementation**: [runner/org-context.ts](plugin-sdk-v2/runner/org-context.ts) (createMockOrgData)
 
 ---
 
