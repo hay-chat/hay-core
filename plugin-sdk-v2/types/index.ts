@@ -8,7 +8,7 @@
  */
 
 // ============================================================================
-// Plugin Definition Types (Phase 2.1)
+// Plugin Definition Types (Phase 2.1) ✅
 // ============================================================================
 
 export type { HayPluginDefinition, HayPluginFactory } from './plugin';
@@ -23,7 +23,7 @@ export type {
 } from './hooks';
 
 // ============================================================================
-// Context Types (Phase 2.2 - Forward Declarations Only)
+// Context Types (Phase 2.2) ✅
 // ============================================================================
 
 export type {
@@ -35,11 +35,71 @@ export type {
 } from './contexts';
 
 // ============================================================================
+// Logger (Phase 2.2) ✅
+// ============================================================================
+
+export type { HayLogger } from './logger';
+
+// ============================================================================
+// Config System (Phase 2.2) ✅
+// ============================================================================
+
+export type {
+  ConfigFieldType,
+  ConfigFieldDescriptor,
+  ConfigFieldReference,
+  HayConfigDescriptorAPI,
+  HayConfigRuntimeAPI,
+} from './config';
+
+// ============================================================================
+// Auth System (Phase 2.2) ✅
+// ============================================================================
+
+export type {
+  ApiKeyAuthOptions,
+  OAuth2AuthOptions,
+  RegisterAuthAPI,
+  AuthState,
+  HayAuthRuntimeAPI,
+} from './auth';
+
+// ============================================================================
+// MCP System (Phase 2.2) ✅
+// ============================================================================
+
+export type {
+  McpServerInstance,
+  McpInitializerContext,
+  ExternalMcpOptions,
+  HayMcpRuntimeAPI,
+} from './mcp';
+
+// ============================================================================
+// Routes (Phase 2.2) ✅
+// ============================================================================
+
+export type { HttpMethod, RouteHandler } from './route';
+
+// ============================================================================
+// UI Extensions (Phase 2.2) ✅
+// ============================================================================
+
+export type { UIExtensionDescriptor } from './ui';
+
+// ============================================================================
+// Register API (Phase 2.2) ✅
+// ============================================================================
+
+export type { HayRegisterAPI } from './register';
+
+// ============================================================================
+// Organization (Phase 2.2) ✅
+// ============================================================================
+
+export type { HayOrg } from './org';
+
+// ============================================================================
 // Additional types to be exported in future phases:
 // ============================================================================
-// - Phase 2.2: Register API, Config Descriptor API, Logger
-// - Phase 2.3: Config field types
-// - Phase 2.4: Auth types
-// - Phase 2.5: MCP types
-// - Phase 2.6: UI and Route types
-// - Phase 2.7: Manifest types
+// - Phase 2.7: Manifest types (HayPluginManifest)

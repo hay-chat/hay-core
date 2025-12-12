@@ -37,55 +37,55 @@
 ### 2.2 Context types
 
 #### Global Context (onInitialize)
-- [ ] Define `HayGlobalContext` interface
-- [ ] Define `HayRegisterAPI` interface
-- [ ] Define `HayConfigDescriptorAPI` interface
-- [ ] Define `HayLogger` interface
+- [x] Define `HayGlobalContext` interface
+- [x] Define `HayRegisterAPI` interface
+- [x] Define `HayConfigDescriptorAPI` interface
+- [x] Define `HayLogger` interface
 
 **Reference**: Section 5.2 in PLUGIN.md (lines 350-449)
 
 #### Org Runtime Context (onStart)
-- [ ] Define `HayStartContext` interface
-- [ ] Define `HayOrg` interface
-- [ ] Define `HayConfigRuntimeAPI` interface
-- [ ] Define `HayAuthRuntimeAPI` interface
-- [ ] Define `HayMcpRuntimeAPI` interface
-- [ ] Define `AuthState` interface
+- [x] Define `HayStartContext` interface
+- [x] Define `HayOrg` interface
+- [x] Define `HayConfigRuntimeAPI` interface
+- [x] Define `HayAuthRuntimeAPI` interface
+- [x] Define `HayMcpRuntimeAPI` interface
+- [x] Define `AuthState` interface
 
 **Reference**: Section 5.3 in PLUGIN.md (lines 453-577)
 
 #### Other Hook Contexts
-- [ ] Define `HayAuthValidationContext` interface
-- [ ] Define `HayConfigUpdateContext` interface
-- [ ] Define `HayDisableContext` interface
+- [x] Define `HayAuthValidationContext` interface
+- [x] Define `HayConfigUpdateContext` interface
+- [x] Define `HayDisableContext` interface
 
 **Reference**: Sections 5.4, 5.5, 5.6 in PLUGIN.md (lines 580-613)
 
 ### 2.3 Config system types
-- [ ] Define `ConfigFieldDescriptor` interface
-- [ ] Define `ConfigFieldReference` interface
-- [ ] Define config field types (string, number, boolean, json)
+- [x] Define `ConfigFieldDescriptor` interface
+- [x] Define `ConfigFieldReference` interface
+- [x] Define config field types (string, number, boolean, json)
 
 **Reference**: Section 5.2.2 in PLUGIN.md (lines 386-409)
 
 ### 2.4 Auth system types
-- [ ] Define `RegisterAuthAPI` interface
-- [ ] Define `ApiKeyAuthOptions` interface
-- [ ] Define `OAuth2AuthOptions` interface
+- [x] Define `RegisterAuthAPI` interface
+- [x] Define `ApiKeyAuthOptions` interface
+- [x] Define `OAuth2AuthOptions` interface
 
 **Reference**: Section 5.2.4 in PLUGIN.md (lines 422-449)
 
 ### 2.5 MCP system types
-- [ ] Define `McpServerInstance` interface
-- [ ] Define `ExternalMcpOptions` interface
-- [ ] Define MCP initializer function types
+- [x] Define `McpServerInstance` interface
+- [x] Define `ExternalMcpOptions` interface
+- [x] Define MCP initializer function types
 
 **Reference**: Section 5.3.4 in PLUGIN.md (lines 525-564)
 
 ### 2.6 UI and Route types
-- [ ] Define `UIExtensionDescriptor` interface
-- [ ] Define `HttpMethod` type
-- [ ] Define `RouteHandler` type
+- [x] Define `UIExtensionDescriptor` interface
+- [x] Define `HttpMethod` type
+- [x] Define `RouteHandler` type
 
 **Reference**: Section 5.2.1 and 5.2.3 in PLUGIN.md (lines 360-383, 413-419)
 
@@ -100,83 +100,83 @@
 ## Phase 3: SDK Implementation
 
 ### 3.1 Core factory function
-- [ ] Implement `defineHayPlugin()` factory function
-- [ ] Add type guards and validation
+- [x] Implement `defineHayPlugin()` factory function
+- [x] Add type guards and validation
 
 **Reference**: Section 5.1 in PLUGIN.md (lines 302-327)
 
 ### 3.2 Logger implementation
-- [ ] Implement `HayLogger` class
-- [ ] Support debug, info, warn, error levels
-- [ ] Add metadata support
-- [ ] Add org/plugin context to log messages (e.g., `[org:abc123][plugin:stripe]`)
-- [ ] Format output for stdout/stderr (runner will capture)
+- [x] Implement `HayLogger` class
+- [x] Support debug, info, warn, error levels
+- [x] Add metadata support
+- [x] Add org/plugin context to log messages (e.g., `[org:abc123][plugin:stripe]`)
+- [x] Format output for stdout/stderr (runner will capture)
 
 **Reference**: Section 5.3.5 in PLUGIN.md (lines 569-577)
 
 ### 3.3 Register API implementation
 
 #### Config Registration
-- [ ] Implement `register.config()` method
-- [ ] Validate config schema
-- [ ] Validate `env` fields against manifest allowlist
-- [ ] Store config schema for metadata endpoint
+- [x] Implement `register.config()` method
+- [x] Validate config schema
+- [x] Validate `env` fields against manifest allowlist
+- [x] Store config schema for metadata endpoint
 
 **Reference**: Section 7.1 in PLUGIN.md (lines 663-698)
 
 #### Auth Registration
-- [ ] Implement `register.auth.apiKey()` method
-- [ ] Implement `register.auth.oauth2()` method
-- [ ] Validate auth options
-- [ ] Store auth methods registry
+- [x] Implement `register.auth.apiKey()` method
+- [x] Implement `register.auth.oauth2()` method
+- [x] Validate auth options
+- [x] Store auth methods registry
 
 **Reference**: Section 6 in PLUGIN.md (lines 616-658)
 
 #### Route Registration
-- [ ] Implement `register.route()` method
-- [ ] Store route definitions
-- [ ] Validate HTTP methods
+- [x] Implement `register.route()` method
+- [x] Store route definitions
+- [x] Validate HTTP methods
 
 **Reference**: Section 5.2.1 in PLUGIN.md (lines 360-383)
 
 #### UI Registration
-- [ ] Implement `register.ui()` method
-- [ ] Store UI extension descriptors
+- [x] Implement `register.ui()` method
+- [x] Store UI extension descriptors
 
 **Reference**: Section 5.2.3 in PLUGIN.md (lines 413-419)
 
 ### 3.4 Config descriptor API
-- [ ] Implement `config.field()` method for creating field references
-- [ ] Return ConfigFieldReference objects
-- [ ] This API is ONLY available in HayGlobalContext (onInitialize)
+- [x] Implement `config.field()` method for creating field references
+- [x] Return ConfigFieldReference objects
+- [x] This API is ONLY available in HayGlobalContext (onInitialize)
 
 **CONSTRAINT**: This is for schema definition only, NOT for reading values.
 
 **Reference**: Section 5.2.2 in PLUGIN.md (lines 386-409)
 
 ### 3.5 Runtime config API
-- [ ] Implement `config.get()` method with resolution pipeline
-- [ ] Implement org config → env var fallback logic
-- [ ] Implement `config.getOptional()` method
-- [ ] Implement `config.keys()` method
-- [ ] Validate env var access against manifest allowlist
-- [ ] This API is ONLY available in org runtime contexts (onStart, onValidateAuth, etc.)
+- [x] Implement `config.get()` method with resolution pipeline
+- [x] Implement org config → env var fallback logic
+- [x] Implement `config.getOptional()` method
+- [x] Implement `config.keys()` method
+- [x] Validate env var access against manifest allowlist
+- [x] This API is ONLY available in org runtime contexts (onStart, onValidateAuth, etc.)
 
 **CONSTRAINT**: Must NOT be callable from onInitialize. Enforce separation between descriptor and runtime APIs.
 
 **Reference**: Section 7.2 and 5.3.2 in PLUGIN.md (lines 476-503, 694-698)
 
 ### 3.6 Runtime auth API
-- [ ] Implement `auth.get()` method
-- [ ] Return AuthState with methodId and credentials
+- [x] Implement `auth.get()` method
+- [x] Return AuthState with methodId and credentials
 
 **Reference**: Section 5.3.3 in PLUGIN.md (lines 505-521)
 
 ### 3.7 MCP runtime API
-- [ ] Implement `mcp.startLocal()` method
-- [ ] Implement `mcp.startExternal()` method
-- [ ] Track running MCP instances
-- [ ] Implement automatic cleanup on shutdown
+- [x] Implement `mcp.startLocal()` method
+- [x] Implement `mcp.startExternal()` method
+- [x] Track running MCP instances
+- [x] Implement automatic cleanup on shutdown
 
 **Reference**: Section 8 and 5.3.4 in PLUGIN.md (lines 525-564, 701-750)
 
