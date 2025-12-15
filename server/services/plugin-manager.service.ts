@@ -8,7 +8,9 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { HayPluginManifestV2, PluginMetadata } from "@server/types/plugin-sdk-v2.types";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
+import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
 
 interface WorkerInfo {
   process: ChildProcess;
@@ -19,6 +21,7 @@ interface WorkerInfo {
   organizationId: string;
   pluginId: string;
   instanceId: string;
+  sdkVersion?: "v1" | "v2"; // Track SDK version
 }
 
 export class PluginManagerService {
@@ -33,6 +36,9 @@ export class PluginManagerService {
 
   // Track discovered plugins during initialization
   private discoveredPluginIds: Set<string> = new Set();
+
+  // SDK v2 runner service
+  private runnerV2Service = getPluginRunnerV2Service();
 
   constructor() {
     // Look for plugins in the root /plugins directory
@@ -667,7 +673,96 @@ export class PluginManagerService {
   // =========================================================================
 
   /**
+   * Detect if a plugin uses SDK v2
+   *
+   * SDK v2 plugins have a minimal manifest in package.json with entry point
+   * Legacy plugins have full manifest with configSchema, auth, etc.
+   */
+  private isSDKv2Plugin(plugin: PluginRegistry): boolean {
+    const manifest = plugin.manifest as any;
+
+    // SDK v2 check: Has entry field but NO configSchema/auth in manifest
+    // (metadata will be fetched from /metadata endpoint instead)
+    const hasEntry = !!manifest.entry;
+    const hasConfigSchema = !!manifest.configSchema && Object.keys(manifest.configSchema).length > 0;
+    const hasAuth = !!manifest.auth;
+
+    // SDK v2 = has entry, no embedded schema/auth
+    return hasEntry && !hasConfigSchema && !hasAuth;
+  }
+
+  /**
+   * Fetch and store metadata from SDK v2 plugin worker
+   *
+   * Implements retry logic with AbortController-based timeouts
+   */
+  private async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 5000);
+
+      try {
+        const response = await fetch(`http://localhost:${port}/metadata`, {
+          signal: abortController.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const metadata: PluginMetadata = await response.json();
+
+        // Validate metadata structure
+        if (!metadata || typeof metadata !== 'object') {
+          throw new Error('Invalid metadata structure');
+        }
+
+        // Store in database
+        await pluginRegistryRepository.updateMetadata(pluginId, {
+          metadata,
+          metadataFetchedAt: new Date(),
+          metadataState: "fresh",
+        });
+
+        // Update in-memory registry
+        const plugin = this.registry.get(pluginId);
+        if (plugin) {
+          plugin.metadata = metadata;
+          plugin.metadataFetchedAt = new Date();
+          plugin.metadataState = "fresh";
+        }
+
+        console.log(`✅ Fetched metadata for ${pluginId}`, {
+          configFields: Object.keys(metadata.configSchema || {}).length,
+          authMethods: metadata.authMethods?.length || 0,
+          routes: metadata.routes?.length || 0,
+          uiExtensions: metadata.uiExtensions?.length || 0,
+        });
+
+        return; // Success
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error as Error;
+        console.warn(`Metadata fetch attempt ${attempt}/${maxRetries} failed for ${pluginId}`, error);
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+
+    throw new Error(`Failed to fetch metadata after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
+  /**
    * Start plugin worker for an organization
+   *
+   * Automatically detects SDK version and routes to appropriate worker implementation
    */
   async startPluginWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
     const key = `${organizationId}:${pluginId}`;
@@ -688,6 +783,70 @@ export class PluginManagerService {
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found in registry`);
     }
+
+    // Detect SDK version and route to appropriate implementation
+    if (this.isSDKv2Plugin(plugin)) {
+      console.log(`[PluginManager] Starting SDK v2 worker: ${pluginId}`);
+      return await this.startPluginWorkerV2(organizationId, pluginId, plugin);
+    } else {
+      console.log(`[PluginManager] Starting legacy worker: ${pluginId}`);
+      return await this.startPluginWorkerLegacy(organizationId, pluginId, plugin);
+    }
+  }
+
+  /**
+   * Start SDK v2 plugin worker
+   *
+   * Uses PluginRunnerV2Service for isolated worker management
+   */
+  private async startPluginWorkerV2(
+    organizationId: string,
+    pluginId: string,
+    plugin: PluginRegistry
+  ): Promise<WorkerInfo> {
+    const key = `${organizationId}:${pluginId}`;
+
+    try {
+      // Start worker using SDK v2 runner service
+      const workerInfo = await this.runnerV2Service.startWorker(organizationId, pluginId);
+
+      // Fetch and cache metadata (plugin-global, not per org)
+      // Only fetch if: missing, stale (checksum changed), or error
+      if (plugin.metadataState !== "fresh") {
+        try {
+          await this.fetchAndStoreMetadata(pluginId, workerInfo.port);
+        } catch (error) {
+          await pluginRegistryRepository.updateMetadataState(plugin.id, "error");
+          console.warn(`Metadata fetch failed for ${pluginId}, cached metadata may be stale`, error);
+          // Don't throw - use cached metadata if available
+        }
+      }
+
+      // Store worker in plugin manager's map (for compatibility)
+      this.workers.set(key, {
+        ...workerInfo,
+        metadata: plugin,
+        sdkVersion: "v2"
+      });
+
+      return workerInfo;
+    } catch (error) {
+      console.error(`Failed to start SDK v2 worker for ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start legacy plugin worker
+   *
+   * Original implementation for backward compatibility
+   */
+  private async startPluginWorkerLegacy(
+    organizationId: string,
+    pluginId: string,
+    plugin: PluginRegistry
+  ): Promise<WorkerInfo> {
+    const key = `${organizationId}:${pluginId}`;
 
     // Get plugin instance from database
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -788,6 +947,7 @@ export class PluginManagerService {
         organizationId,
         pluginId,
         instanceId: instance.id,
+        sdkVersion: "v1", // Legacy worker
       };
 
       this.workers.set(key, workerInfo);
@@ -841,46 +1001,70 @@ export class PluginManagerService {
 
   /**
    * Stop plugin worker
+   *
+   * Automatically detects SDK version and routes to appropriate stop implementation
    */
   async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
     const key = `${organizationId}:${pluginId}`;
     const worker = this.workers.get(key);
 
-    if (worker) {
-      console.log(`[PluginManager] Stopping worker: ${key}`);
-
-      // Update status to stopping
-      await pluginInstanceRepository.updateStatus(worker.instanceId, "stopping");
-
-      // Send SIGTERM for graceful shutdown
-      worker.process.kill("SIGTERM");
-
-      // Wait up to 5 seconds for graceful shutdown
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
-          // Force kill if still running
-          if (this.workers.has(key)) {
-            console.log(`[PluginManager] Force killing worker: ${key}`);
-            worker.process.kill("SIGKILL");
-          }
-          resolve();
-        }, 5000);
-
-        worker.process.once("exit", () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
-
-      this.workers.delete(key);
-      this.allocatedPorts.delete(worker.port);
-
-      // Update status to stopped
-      await pluginInstanceRepository.updateStatus(worker.instanceId, "stopped");
-      await pluginInstanceRepository.updateProcessId(worker.instanceId, null);
-
-      console.log(`[PluginManager] Stopped worker: ${key}`);
+    if (!worker) {
+      console.log(`[PluginManager] Worker not found: ${key}`);
+      return;
     }
+
+    // Route to appropriate stop implementation based on SDK version
+    if (worker.sdkVersion === "v2") {
+      console.log(`[PluginManager] Stopping SDK v2 worker: ${key}`);
+      await this.runnerV2Service.stopWorker(organizationId, pluginId);
+      this.workers.delete(key);
+    } else {
+      console.log(`[PluginManager] Stopping legacy worker: ${key}`);
+      await this.stopPluginWorkerLegacy(organizationId, pluginId, worker);
+    }
+  }
+
+  /**
+   * Stop legacy plugin worker
+   */
+  private async stopPluginWorkerLegacy(
+    organizationId: string,
+    pluginId: string,
+    worker: WorkerInfo
+  ): Promise<void> {
+    const key = `${organizationId}:${pluginId}`;
+
+    // Update status to stopping
+    await pluginInstanceRepository.updateStatus(worker.instanceId, "stopping");
+
+    // Send SIGTERM for graceful shutdown
+    worker.process.kill("SIGTERM");
+
+    // Wait up to 5 seconds for graceful shutdown
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        // Force kill if still running
+        if (this.workers.has(key)) {
+          console.log(`[PluginManager] Force killing worker: ${key}`);
+          worker.process.kill("SIGKILL");
+        }
+        resolve();
+      }, 5000);
+
+      worker.process.once("exit", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+
+    this.workers.delete(key);
+    this.allocatedPorts.delete(worker.port);
+
+    // Update status to stopped
+    await pluginInstanceRepository.updateStatus(worker.instanceId, "stopped");
+    await pluginInstanceRepository.updateProcessId(worker.instanceId, null);
+
+    console.log(`[PluginManager] Stopped worker: ${key}`);
   }
 
   /**
