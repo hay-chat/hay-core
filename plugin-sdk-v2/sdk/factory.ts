@@ -10,7 +10,7 @@ import type {
   HayPluginFactory,
   HayPluginDefinition,
   HayGlobalContext,
-} from '../types';
+} from '../types/index.js';
 
 /**
  * Define a Hay plugin.

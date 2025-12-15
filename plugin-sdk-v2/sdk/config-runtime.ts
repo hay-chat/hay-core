@@ -6,10 +6,10 @@
  * @module @hay/plugin-sdk-v2/sdk/config-runtime
  */
 
-import type { HayConfigRuntimeAPI } from '../types';
-import type { PluginRegistry } from './registry';
-import type { HayLogger } from '../types';
-import type { PluginManifest } from './register';
+import type { HayConfigRuntimeAPI } from '../types/index.js';
+import type { PluginRegistry } from './registry.js';
+import type { HayLogger } from '../types/index.js';
+import type { PluginManifest } from './register.js';
 
 /**
  * Runtime config API options.

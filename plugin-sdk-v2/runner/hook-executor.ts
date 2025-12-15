@@ -13,8 +13,8 @@ import type {
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
-} from '../types';
-import type { HayLogger } from '../types';
+} from '../types/index.js';
+import type { HayLogger } from '../types/index.js';
 
 /**
  * Execute the onInitialize hook.

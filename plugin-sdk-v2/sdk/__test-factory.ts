@@ -5,8 +5,8 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { defineHayPlugin, PluginDefinitionError } from './factory';
-import type { HayGlobalContext, HayPluginDefinition } from '../types';
+import { defineHayPlugin, PluginDefinitionError } from './factory.js';
+import type { HayGlobalContext, HayPluginDefinition } from '../types/index.js';
 
 // Test 1: Basic factory usage
 const testPlugin = defineHayPlugin((_ctx: HayGlobalContext) => ({

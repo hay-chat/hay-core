@@ -9,8 +9,8 @@
 
 import express, { type Express, type Request, type Response } from 'express';
 import type { Server } from 'http';
-import type { HayLogger } from '../types';
-import { PluginRegistry } from '../sdk/registry';
+import type { HayLogger } from '../types/index.js';
+import { PluginRegistry } from '../sdk/registry.js';
 
 /**
  * Plugin HTTP server instance.

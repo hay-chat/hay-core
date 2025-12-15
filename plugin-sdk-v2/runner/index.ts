@@ -13,21 +13,21 @@
  * @module @hay/plugin-sdk-v2/runner
  */
 
-import { parseArgs, loadManifest } from './bootstrap';
-import { loadPlugin } from './plugin-loader';
-import { createGlobalContext } from './global-context';
-import { executeOnInitialize, executeOnStart, executeOnDisable } from './hook-executor';
-import { PluginHttpServer } from './http-server';
+import { parseArgs, loadManifest } from './bootstrap.js';
+import { loadPlugin } from './plugin-loader.js';
+import { createGlobalContext } from './global-context.js';
+import { executeOnInitialize, executeOnStart, executeOnDisable } from './hook-executor.js';
+import { PluginHttpServer } from './http-server.js';
 import {
   loadOrgDataFromEnv,
   createMockOrgData,
   createStartContext,
   createDisableContext,
   type OrgRuntimeData,
-} from './org-context';
-import { PluginRegistry } from '../sdk/registry';
-import { createLogger } from '../sdk/logger';
-import type { HayPluginDefinition } from '../types';
+} from './org-context.js';
+import { PluginRegistry } from '../sdk/registry.js';
+import { createLogger } from '../sdk/logger.js';
+import type { HayPluginDefinition } from '../types/index.js';
 
 /**
  * Runner state.
@@ -86,13 +86,21 @@ async function main(): Promise<void> {
   logger.info('Starting plugin worker', { pluginPath, orgId, port, mode });
 
   let manifest;
+  let registry: PluginRegistry;
+
   try {
     const validated = loadManifest(pluginPath);
     manifest = validated.manifest;
     logger.info('Loaded plugin manifest', { displayName: manifest.displayName });
 
-    // Load plugin code
-    state.plugin = await loadPlugin(validated.entryPath, manifest.displayName);
+    // Create registry and global context BEFORE loading plugin
+    // This is required because plugins using defineHayPlugin export a factory
+    // function that needs the global context to produce the plugin definition
+    registry = new PluginRegistry();
+    const globalCtx = createGlobalContext(logger, registry, manifest);
+
+    // Load plugin code (will call factory function with globalCtx if needed)
+    state.plugin = await loadPlugin(validated.entryPath, manifest.displayName, globalCtx);
     logger.info('Loaded plugin code', { name: state.plugin.name });
   } catch (err) {
     logger.error('Failed to load plugin', { error: err instanceof Error ? err.message : String(err) });
@@ -102,8 +110,6 @@ async function main(): Promise<void> {
   // ============================================================================
   // Phase 2: Global Initialization (onInitialize)
   // ============================================================================
-
-  const registry = new PluginRegistry();
 
   try {
     const globalCtx = createGlobalContext(logger, registry, manifest);
@@ -205,7 +211,8 @@ async function main(): Promise<void> {
 // Run the main function
 // ============================================================================
 
-if (require.main === module) {
+// In ES modules, check if this is the main module using import.meta.url
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((err) => {
     console.error('❌ Fatal error in runner:', err);
     process.exit(1);

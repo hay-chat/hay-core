@@ -11,8 +11,8 @@ import type {
   McpServerInstance,
   McpInitializerContext,
   ExternalMcpOptions,
-} from '../types';
-import type { HayConfigRuntimeAPI, HayAuthRuntimeAPI, HayLogger } from '../types';
+} from '../types/index.js';
+import type { HayConfigRuntimeAPI, HayAuthRuntimeAPI, HayLogger } from '../types/index.js';
 
 /**
  * Registered MCP server (local or external).

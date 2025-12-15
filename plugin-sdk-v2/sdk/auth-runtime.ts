@@ -6,8 +6,8 @@
  * @module @hay/plugin-sdk-v2/sdk/auth-runtime
  */
 
-import type { HayAuthRuntimeAPI, AuthState } from '../types';
-import type { HayLogger } from '../types';
+import type { HayAuthRuntimeAPI, AuthState } from '../types/index.js';
+import type { HayLogger } from '../types/index.js';
 
 /**
  * Runtime auth API options.

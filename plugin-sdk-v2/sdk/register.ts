@@ -15,9 +15,9 @@ import type {
   HttpMethod,
   RouteHandler,
   UIExtensionDescriptor,
-} from '../types';
-import { PluginRegistry } from './registry';
-import type { HayLogger } from '../types';
+} from '../types/index.js';
+import { PluginRegistry } from './registry.js';
+import type { HayLogger } from '../types/index.js';
 
 /**
  * Plugin manifest structure (minimal).

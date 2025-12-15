@@ -6,13 +6,14 @@
  * @module @hay/plugin-sdk-v2/runner/plugin-loader
  */
 
-import type { HayPluginDefinition } from '../types';
+import type { HayPluginDefinition, HayGlobalContext } from '../types/index.js';
 
 /**
  * Load a plugin from its entry file.
  *
  * @param entryPath - Absolute path to the plugin entry file
  * @param pluginName - Plugin name for error messages
+ * @param globalContext - Global context to pass to plugin factory
  * @returns Plugin definition
  * @throws Error if plugin fails to load or is invalid
  *
@@ -20,14 +21,17 @@ import type { HayPluginDefinition } from '../types';
  * This function:
  * 1. Dynamically imports the plugin entry file
  * 2. Expects a default export (the result of `defineHayPlugin()`)
- * 3. Validates the plugin definition structure
- * 4. Returns the validated plugin definition
+ * 3. If the export is a factory function, calls it with global context
+ * 4. Validates the plugin definition structure
+ * 5. Returns the validated plugin definition
  *
  * @see PLUGIN.md Section 3.1 (lines 96-132)
+ * @see PLUGIN.md Section 5.1 (lines 302-327) - Factory pattern
  */
 export async function loadPlugin(
   entryPath: string,
-  pluginName: string
+  pluginName: string,
+  globalContext: HayGlobalContext
 ): Promise<HayPluginDefinition> {
   let pluginModule: any;
 
@@ -49,7 +53,21 @@ export async function loadPlugin(
     );
   }
 
-  const pluginDefinition = pluginModule.default;
+  let pluginDefinition = pluginModule.default;
+
+  // Check if export is a factory function (result of defineHayPlugin)
+  if (typeof pluginDefinition === 'function') {
+    try {
+      // Call factory with global context to get plugin definition
+      pluginDefinition = pluginDefinition(globalContext);
+    } catch (err) {
+      throw new Error(
+        `Plugin "${pluginName}" factory function failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  }
 
   // Validate plugin definition structure
   validatePluginDefinition(pluginDefinition, pluginName);
