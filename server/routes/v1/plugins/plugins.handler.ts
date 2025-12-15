@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
+import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -262,7 +263,7 @@ export const disablePlugin = authenticatedProcedure
   });
 
 /**
- * Configure a plugin
+ * Configure a plugin (SDK v2 with auth separation)
  */
 export const configurePlugin = authenticatedProcedure
   .input(
@@ -285,6 +286,10 @@ export const configurePlugin = authenticatedProcedure
       ctx.organizationId!,
       input.pluginId,
     );
+
+    // Get plugin registry to access SDK v2 metadata (if available)
+    const pluginRegistry = await pluginRegistryRepository.findByPluginId(input.pluginId);
+    const metadata = pluginRegistry?.metadata; // SDK v2 metadata from /metadata endpoint
 
     // When updating configuration, we need to handle partial updates properly
     let finalConfig = input.configuration;
@@ -309,13 +314,89 @@ export const configurePlugin = authenticatedProcedure
       }
     }
 
+    // SDK v2: Separate config and auth
+    const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
+
+    // SDK v2: Validate auth if auth fields changed
+    if (metadata && authState && hasAuthChanges(input.configuration, metadata)) {
+      console.log(`🔐 Auth fields changed for ${plugin.name}, validating credentials...`);
+
+      try {
+        const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+
+        // Only validate if worker is running (SDK v2)
+        if (worker && worker.sdkVersion === "v2") {
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => abortController.abort(), 10000);
+
+          try {
+            const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ authState }),
+              signal: abortController.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error("Validation request failed");
+            }
+
+            const result = await response.json();
+
+            if (!result.valid) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Auth validation failed: ${result.error || "Invalid credentials"}`,
+              });
+            }
+
+            console.log(`✅ Auth validated for ${plugin.name}`);
+          } catch (error: any) {
+            clearTimeout(timeoutId);
+            if (error.name === "AbortError") {
+              throw new TRPCError({
+                code: "TIMEOUT",
+                message: "Auth validation timeout (>10s)",
+              });
+            }
+            throw error;
+          }
+        } else {
+          console.log(`ℹ️ Worker not running or SDK v1, skipping auth validation for ${plugin.name}`);
+        }
+      } catch (error: any) {
+        // If it's already a TRPCError, rethrow it
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        // Otherwise wrap it
+        console.error(`❌ Auth validation failed for ${plugin.name}:`, error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Auth validation failed: ${error.message}`,
+        });
+      }
+    }
+
     if (!instance) {
       // Create new instance if it doesn't exist
       const newInstance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
-        finalConfig,
+        config,
       );
+
+      // SDK v2: Save auth state separately
+      if (authState) {
+        await pluginInstanceRepository.updateAuthState(
+          newInstance.id,
+          ctx.organizationId!,
+          authState
+        );
+      }
 
       return {
         success: true,
@@ -323,7 +404,17 @@ export const configurePlugin = authenticatedProcedure
       };
     }
 
-    await pluginInstanceRepository.updateConfig(instance.id, finalConfig);
+    // Update config (without auth fields)
+    await pluginInstanceRepository.updateConfig(instance.id, config);
+
+    // SDK v2: Update auth state separately if present
+    if (authState) {
+      await pluginInstanceRepository.updateAuthState(
+        instance.id,
+        ctx.organizationId!,
+        authState
+      );
+    }
 
     // Restart the plugin if it's currently running to apply new configuration
     if (processManagerService.isRunning(ctx.organizationId!, input.pluginId)) {
@@ -344,7 +435,7 @@ export const configurePlugin = authenticatedProcedure
 
     return {
       success: true,
-      instance: { ...instance, config: finalConfig },
+      instance: { ...instance, config, authState },
     };
   });
 

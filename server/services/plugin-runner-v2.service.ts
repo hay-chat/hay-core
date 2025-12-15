@@ -78,8 +78,8 @@ export class PluginRunnerV2Service {
     await instanceRepo.update(instance.id, {
       runtimeState: "starting",
       lastStartedAt: new Date(),
-      lastError: null
-    });
+      lastError: undefined
+    } as any);
 
     try {
       // Allocate port
@@ -132,9 +132,9 @@ export class PluginRunnerV2Service {
         // Update runtime state
         await instanceRepo.update(instance.id, {
           runtimeState: code === 0 ? "stopped" : "error",
-          lastError: code !== 0 ? `Process exited with code ${code}` : null,
+          lastError: code !== 0 ? `Process exited with code ${code}` : undefined,
           lastStoppedAt: new Date()
-        });
+        } as any);
       });
 
       // Wait for /metadata endpoint to be ready (not /health)

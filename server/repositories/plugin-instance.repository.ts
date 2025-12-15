@@ -195,6 +195,64 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       });
     }
   }
+
+  /**
+   * Update auth state for a plugin instance (SDK v2)
+   */
+  async updateAuthState(
+    instanceId: string,
+    orgId: string,
+    authState: { methodId: string; credentials: Record<string, any> }
+  ): Promise<void> {
+    await this.getRepository().update(
+      { id: instanceId, organizationId: orgId },
+      {
+        authState,
+        authMethod: authState.methodId as any,
+        authValidatedAt: new Date(),
+      } as any
+    );
+  }
+
+  /**
+   * Get auth state for a plugin instance (SDK v2)
+   */
+  async getAuthState(
+    orgId: string,
+    pluginId: string
+  ): Promise<{ methodId: string; credentials: Record<string, any> } | null> {
+    const instance = await this.findByOrgAndPlugin(orgId, pluginId);
+    return instance?.authState || null;
+  }
+
+  /**
+   * Update org-scoped runtime state (SDK v2)
+   */
+  async updateRuntimeState(
+    instanceId: string,
+    runtimeState: "stopped" | "starting" | "ready" | "degraded" | "error",
+    error?: string
+  ): Promise<void> {
+    const updates: any = {
+      runtimeState,
+      updatedAt: new Date(),
+    };
+
+    if (runtimeState === "starting") {
+      updates.lastStartedAt = new Date();
+    }
+
+    if (runtimeState === "error" && error) {
+      updates.lastError = error;
+    }
+
+    // Clear error when transitioning to ready
+    if (runtimeState === "ready") {
+      updates.lastError = null;
+    }
+
+    await this.getRepository().update(instanceId, updates);
+  }
 }
 
 export const pluginInstanceRepository = new PluginInstanceRepository();
