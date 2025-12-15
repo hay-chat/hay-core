@@ -697,66 +697,32 @@ export class PluginManagerService {
    * Implements retry logic with AbortController-based timeouts
    */
   private async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
-    const maxRetries = 3;
-    let lastError: Error | null = null;
+    const { fetchMetadataFromWorker } = await import("./plugin-metadata.service");
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 5000);
+    try {
+      // Fetch metadata using shared service with retry logic
+      const metadata = await fetchMetadataFromWorker(port, pluginId);
 
-      try {
-        const response = await fetch(`http://localhost:${port}/metadata`, {
-          signal: abortController.signal,
-        });
+      // Store in database
+      await pluginRegistryRepository.updateMetadata(pluginId, {
+        metadata,
+        metadataFetchedAt: new Date(),
+        metadataState: "fresh",
+      });
 
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const metadata: PluginMetadata = await response.json();
-
-        // Validate metadata structure
-        if (!metadata || typeof metadata !== 'object') {
-          throw new Error('Invalid metadata structure');
-        }
-
-        // Store in database
-        await pluginRegistryRepository.updateMetadata(pluginId, {
-          metadata,
-          metadataFetchedAt: new Date(),
-          metadataState: "fresh",
-        });
-
-        // Update in-memory registry
-        const plugin = this.registry.get(pluginId);
-        if (plugin) {
-          plugin.metadata = metadata;
-          plugin.metadataFetchedAt = new Date();
-          plugin.metadataState = "fresh";
-        }
-
-        console.log(`✅ Fetched metadata for ${pluginId}`, {
-          configFields: Object.keys(metadata.configSchema || {}).length,
-          authMethods: metadata.authMethods?.length || 0,
-          routes: metadata.routes?.length || 0,
-          uiExtensions: metadata.uiExtensions?.length || 0,
-        });
-
-        return; // Success
-      } catch (error) {
-        clearTimeout(timeoutId);
-        lastError = error as Error;
-        console.warn(`Metadata fetch attempt ${attempt}/${maxRetries} failed for ${pluginId}`, error);
-
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
+      // Update in-memory registry
+      const plugin = this.registry.get(pluginId);
+      if (plugin) {
+        plugin.metadata = metadata;
+        plugin.metadataFetchedAt = new Date();
+        plugin.metadataState = "fresh";
       }
-    }
 
-    throw new Error(`Failed to fetch metadata after ${maxRetries} attempts: ${lastError?.message}`);
+      console.log(`✅ Fetched and cached metadata for ${pluginId}`);
+    } catch (error) {
+      console.error(`Failed to fetch metadata for ${pluginId}:`, error);
+      throw error;
+    }
   }
 
   /**
