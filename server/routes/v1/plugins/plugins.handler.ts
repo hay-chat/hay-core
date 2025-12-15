@@ -230,6 +230,30 @@ export const disablePlugin = authenticatedProcedure
       });
     }
 
+    // SDK v2: Call plugin's disable hook (if worker running)
+    const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+    if (worker && worker.sdkVersion === "v2") {
+      try {
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 5000);
+
+        await fetch(`http://localhost:${worker.port}/disable`, {
+          method: "POST",
+          signal: abortController.signal,
+        });
+
+        clearTimeout(timeoutId);
+        console.log(`✅ Called /disable hook for ${plugin.name}`);
+      } catch (error) {
+        console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+        // Continue anyway - cleanup failure should not block disable
+      }
+    }
+
+    // Stop worker (handles both SDK v1 and v2)
+    await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
+
+    // Disable in database
     await pluginInstanceRepository.disablePlugin(ctx.organizationId!, input.pluginId);
 
     return {
@@ -752,4 +776,74 @@ export const revokeOAuth = authenticatedProcedure
   .mutation(async ({ ctx, input }) => {
     await oauthService.revokeOAuth(ctx.organizationId!, input.pluginId);
     return { success: true };
+  });
+
+/**
+ * Validate auth credentials (SDK v2)
+ *
+ * Calls the plugin worker's /validate-auth endpoint to validate credentials
+ */
+export const validateAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+      authState: z.object({
+        methodId: z.string(),
+        credentials: z.record(z.any()),
+      }),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Get or start worker
+    const worker = await pluginManagerService.getOrStartWorker(
+      ctx.organizationId!,
+      input.pluginId
+    );
+
+    // Call plugin's validation endpoint with timeout
+    // SDK v2 runner exposes: POST /validate-auth
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 second timeout
+
+    try {
+      const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authState: input.authState,
+        }),
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error("Validation request failed");
+      }
+
+      const result = await response.json();
+
+      // Return validation result
+      return {
+        valid: result.valid,
+        error: result.error,
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as any).name === "AbortError") {
+        return {
+          valid: false,
+          error: "Validation timeout (>10s)",
+        };
+      }
+      throw error;
+    }
   });
