@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { PluginRegistry } from "./plugin-registry.entity";
 import { Organization } from "./organization.entity";
+import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk-v2.types";
 
 @Entity("plugin_instances")
 @Index(["organizationId", "pluginId"], { unique: true })
@@ -22,6 +23,13 @@ export class PluginInstance extends OrganizationScopedEntity {
 
   @Column({ type: "jsonb", nullable: true })
   config?: Record<string, unknown>;
+
+  // SDK v2: Auth state (separate from config)
+  @Column({ type: "jsonb", nullable: true })
+  authState?: AuthState;
+
+  @Column({ type: "timestamptz", nullable: true })
+  authValidatedAt?: Date;
 
   @Column({ type: "boolean", default: false })
   running!: boolean;
@@ -44,8 +52,17 @@ export class PluginInstance extends OrganizationScopedEntity {
   @Column({ type: "timestamptz", nullable: true })
   lastHealthCheck?: Date;
 
+  // Legacy status field (kept for backwards compatibility)
   @Column({ type: "varchar", length: 50, default: "stopped" })
   status!: "stopped" | "starting" | "running" | "stopping" | "error";
+
+  // SDK v2: Org-scoped runtime state (worker lifecycle per org+plugin)
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: "stopped"
+  })
+  runtimeState!: PluginInstanceRuntimeState;
 
   @Column({ type: "timestamptz", nullable: true })
   lastActivityAt?: Date;
