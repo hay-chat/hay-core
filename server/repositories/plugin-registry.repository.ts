@@ -143,6 +143,43 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       updatedAt: new Date(),
     } as any);
   }
+
+  /**
+   * Update SDK v2 metadata (plugin-global)
+   */
+  async updateMetadata(
+    pluginId: string,
+    data: {
+      metadata: any;
+      metadataFetchedAt: Date;
+      metadataState: "missing" | "fresh" | "stale" | "error";
+    }
+  ): Promise<void> {
+    const plugin = await this.findByPluginId(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found`);
+    }
+
+    await this.getRepository().update(plugin.id, {
+      metadata: data.metadata,
+      metadataFetchedAt: data.metadataFetchedAt,
+      metadataState: data.metadataState,
+      updatedAt: new Date(),
+    } as any);
+  }
+
+  /**
+   * Update metadata state only
+   */
+  async updateMetadataState(
+    id: string,
+    metadataState: "missing" | "fresh" | "stale" | "error"
+  ): Promise<void> {
+    await this.getRepository().update(id, {
+      metadataState,
+      updatedAt: new Date(),
+    } as any);
+  }
 }
 
 export const pluginRegistryRepository = new PluginRegistryRepository();

@@ -308,9 +308,6 @@
       <template v-if="enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
-            <div class="text-xs text-green-600 font-mono mb-2 p-2 bg-green-50 rounded">
-              Debug: Rendering enabled extension {{ ext.id }}
-            </div>
             <component
               :is="ext.component"
               :plugin="plugin"

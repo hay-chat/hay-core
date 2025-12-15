@@ -96,8 +96,10 @@ export class PluginRunnerV2Service {
         allowedEnvVars: (plugin.manifest as any).env || []
       });
 
-      // Plugin path
-      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+      // Plugin path - if already absolute, use as-is; otherwise join with pluginsDir
+      const pluginPath = path.isAbsolute(plugin.pluginPath)
+        ? plugin.pluginPath
+        : path.join(this.pluginsDir, plugin.pluginPath);
 
       // Spawn SDK v2 runner
       const useNode = this.runnerPath.endsWith(".ts");
