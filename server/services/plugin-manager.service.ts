@@ -11,8 +11,10 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { HayPluginManifestV2, PluginMetadata } from "@server/types/plugin-sdk-v2.types";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
+import type { WorkerInfo as WorkerInfoV2 } from "@server/types/plugin-sdk-v2.types";
 
-interface WorkerInfo {
+// Legacy WorkerInfo interface (for SDK v1 compatibility)
+interface WorkerInfoLegacy {
   process: ChildProcess;
   port: number;
   startedAt: Date;
@@ -23,6 +25,9 @@ interface WorkerInfo {
   instanceId: string;
   sdkVersion?: "v1" | "v2"; // Track SDK version
 }
+
+// Union type for both SDK versions
+type WorkerInfo = WorkerInfoV2 | WorkerInfoLegacy;
 
 export class PluginManagerService {
   private pluginsDir: string;
