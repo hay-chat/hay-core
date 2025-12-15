@@ -13,13 +13,13 @@ import type {
   HayDisableContext,
   HayOrg,
   AuthState,
-} from '../types';
-import { PluginRegistry } from '../sdk/registry';
-import { createConfigRuntimeAPI } from '../sdk/config-runtime';
-import { createAuthRuntimeAPI } from '../sdk/auth-runtime';
-import { createMcpRuntimeAPI } from '../sdk/mcp-runtime';
-import type { HayLogger } from '../types';
-import type { HayPluginManifest } from '../types';
+} from '../types/index.js';
+import { PluginRegistry } from '../sdk/registry.js';
+import { createConfigRuntimeAPI } from '../sdk/config-runtime.js';
+import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
+import { createMcpRuntimeAPI } from '../sdk/mcp-runtime.js';
+import type { HayLogger } from '../types/index.js';
+import type { HayPluginManifest } from '../types/index.js';
 
 /**
  * Org runtime data loaded from environment or mock.

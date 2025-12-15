@@ -14,7 +14,7 @@ import type {
   HttpMethod,
   RouteHandler,
   UIExtensionDescriptor,
-} from '../types';
+} from '../types/index.js';
 
 /**
  * Registered route definition.

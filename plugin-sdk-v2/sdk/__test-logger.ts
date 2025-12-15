@@ -5,8 +5,8 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { Logger, createLogger, type LoggerContext } from './logger';
-import type { HayLogger } from '../types';
+import { Logger, createLogger, type LoggerContext } from './logger.js';
+import type { HayLogger } from '../types/index.js';
 
 // Test 1: Basic logger creation
 const basicLogger = new Logger();

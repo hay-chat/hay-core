@@ -6,11 +6,11 @@
  * @module @hay/plugin-sdk-v2/runner/global-context
  */
 
-import type { HayGlobalContext, HayPluginManifest } from '../types';
-import { PluginRegistry } from '../sdk/registry';
-import { createRegisterAPI } from '../sdk/register';
-import { createConfigDescriptorAPI } from '../sdk/config-descriptor';
-import type { HayLogger } from '../types';
+import type { HayGlobalContext, HayPluginManifest } from '../types/index.js';
+import { PluginRegistry } from '../sdk/registry.js';
+import { createRegisterAPI } from '../sdk/register.js';
+import { createConfigDescriptorAPI } from '../sdk/config-descriptor.js';
+import type { HayLogger } from '../types/index.js';
 
 /**
  * Create a global context for onInitialize.

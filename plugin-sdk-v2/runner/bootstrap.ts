@@ -7,8 +7,8 @@
  */
 
 import { readFileSync } from 'fs';
-import { resolve, join } from 'path';
-import type { HayPluginManifest, HayPluginPackageJson } from '../types';
+import { resolve } from 'path';
+import type { HayPluginManifest, HayPluginPackageJson } from '../types/index.js';
 
 /**
  * Runner mode.
@@ -83,19 +83,28 @@ export function parseArgs(argv: string[]): RunnerArgs {
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
+    if (typeof arg !== 'string') continue;
 
     if (arg.startsWith('--plugin-path=')) {
-      args.pluginPath = arg.split('=')[1];
+      const value = arg.split('=')[1];
+      if (!value) throw new Error('--plugin-path requires a value');
+      args.pluginPath = value;
     } else if (arg.startsWith('--org-id=')) {
-      args.orgId = arg.split('=')[1];
+      const value = arg.split('=')[1];
+      if (!value) throw new Error('--org-id requires a value');
+      args.orgId = value;
     } else if (arg.startsWith('--port=')) {
-      const port = parseInt(arg.split('=')[1], 10);
+      const value = arg.split('=')[1];
+      if (!value) throw new Error('--port requires a value');
+      const port = parseInt(value, 10);
       if (isNaN(port) || port < 1 || port > 65535) {
-        throw new Error(`Invalid port number: ${arg.split('=')[1]}`);
+        throw new Error(`Invalid port number: ${value}`);
       }
       args.port = port;
     } else if (arg.startsWith('--mode=')) {
-      const mode = arg.split('=')[1] as RunnerMode;
+      const value = arg.split('=')[1];
+      if (!value) throw new Error('--mode requires a value');
+      const mode = value as RunnerMode;
       if (mode !== 'production' && mode !== 'test') {
         throw new Error(`Invalid mode: ${mode}. Must be 'production' or 'test'.`);
       }

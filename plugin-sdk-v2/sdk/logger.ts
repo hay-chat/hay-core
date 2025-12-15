@@ -6,7 +6,7 @@
  * @module @hay/plugin-sdk-v2/sdk/logger
  */
 
-import type { HayLogger } from '../types';
+import type { HayLogger } from '../types/index.js';
 
 /**
  * Log level enumeration.

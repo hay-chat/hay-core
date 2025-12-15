@@ -9,7 +9,7 @@
 import type {
   HayConfigDescriptorAPI,
   ConfigFieldReference,
-} from '../types';
+} from '../types/index.js';
 
 /**
  * Create a Config Descriptor API instance.

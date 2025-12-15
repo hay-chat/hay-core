@@ -26,13 +26,13 @@
 // Core Factory (Phase 3.1) ✅
 // ============================================================================
 
-export { defineHayPlugin, PluginDefinitionError } from './factory';
+export { defineHayPlugin, PluginDefinitionError } from './factory.js';
 
 // ============================================================================
 // Logger (Phase 3.2) ✅
 // ============================================================================
 
-export { Logger, createLogger, type LoggerContext } from './logger';
+export { Logger, createLogger, type LoggerContext } from './logger.js';
 
 // ============================================================================
 // Re-export types for convenience
@@ -85,7 +85,7 @@ export type {
   UIExtensionDescriptor,
   HttpMethod,
   RouteHandler,
-} from '../types';
+} from '../types/index.js';
 
 // ============================================================================
 // Future SDK exports (upcoming phases):
