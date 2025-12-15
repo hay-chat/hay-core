@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import type { HayPluginManifest } from "../types/plugin.types";
+import type { PluginMetadata, PluginMetadataState } from "../types/plugin-sdk-v2.types";
 import { Organization } from "./organization.entity";
 import { Upload } from "./upload.entity";
 import { User } from "./user.entity";
@@ -67,6 +68,21 @@ export class PluginRegistry {
 
   @Column({ type: "integer", default: 10 })
   maxConcurrentInstances!: number;
+
+  // SDK v2: Plugin-global metadata cache (from /metadata endpoint)
+  @Column({ type: "jsonb", nullable: true })
+  metadata?: PluginMetadata;
+
+  @Column({ type: "timestamptz", nullable: true })
+  metadataFetchedAt?: Date;
+
+  // SDK v2: Plugin-global metadata state (not org-specific)
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: "missing"
+  })
+  metadataState!: PluginMetadataState;
 
   @Column({ type: "varchar", length: 50, default: PluginStatus.AVAILABLE })
   status!: PluginStatus;
