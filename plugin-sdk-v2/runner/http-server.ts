@@ -9,8 +9,16 @@
 
 import express, { type Express, type Request, type Response } from 'express';
 import type { Server } from 'http';
-import type { HayLogger } from '../types/index.js';
+import type { HayLogger, HayMcpRuntimeAPI } from '../types/index.js';
 import { PluginRegistry } from '../sdk/registry.js';
+import type { HayPluginDefinition } from '../types/plugin.js';
+import {
+  executeOnValidateAuth,
+  executeOnConfigUpdate,
+  executeOnDisable,
+} from './hook-executor.js';
+import { createConfigRuntimeAPI } from '../sdk/config-runtime.js';
+import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
 
 /**
  * Plugin HTTP server instance.
@@ -23,6 +31,11 @@ export class PluginHttpServer {
   private port: number;
   private logger: HayLogger;
   private registry: PluginRegistry;
+  private plugin: HayPluginDefinition | null = null;
+  private mcpRuntime: HayMcpRuntimeAPI | null = null;
+  private orgId: string | null = null;
+  private manifest: any | null = null; // Plugin manifest for runtime API creation
+  private orgConfig: Record<string, any> | null = null;
 
   constructor(port: number, registry: PluginRegistry, logger: HayLogger) {
     this.port = port;
@@ -36,8 +49,38 @@ export class PluginHttpServer {
 
     // Setup routes
     this.setupMetadataEndpoint();
+    this.setupLifecycleEndpoints();
+    this.setupMcpEndpoints();
     this.setupPluginRoutes();
     this.setupErrorHandler();
+  }
+
+  /**
+   * Set the plugin definition (needed for hook execution).
+   *
+   * @param plugin - Plugin definition
+   */
+  setPlugin(plugin: HayPluginDefinition): void {
+    this.plugin = plugin;
+  }
+
+  /**
+   * Set runtime data (needed for context creation in endpoints).
+   *
+   * @param data - Runtime data
+   */
+  setRuntimeData(data: {
+    orgId: string;
+    manifest: any;
+    mcpRuntime: HayMcpRuntimeAPI;
+    orgConfig: Record<string, any>;
+    orgAuth: any;
+  }): void {
+    this.orgId = data.orgId;
+    this.manifest = data.manifest;
+    this.mcpRuntime = data.mcpRuntime;
+    this.orgConfig = data.orgConfig;
+    // Note: orgAuth currently unused but kept in signature for future MCP implementations
   }
 
   /**
@@ -104,6 +147,262 @@ export class PluginHttpServer {
         const errorMsg = err instanceof Error ? err.message : String(err);
         this.logger.error('Error serving /metadata endpoint', { error: errorMsg });
         res.status(500).json({ error: 'Failed to generate metadata' });
+      }
+    });
+  }
+
+  /**
+   * Setup lifecycle hook endpoints.
+   *
+   * These endpoints allow Hay Core to trigger plugin hooks:
+   * - POST /validate-auth - Validate auth credentials
+   * - POST /config-update - Notify config change
+   * - POST /disable - Cleanup before shutdown
+   *
+   * @see PLUGIN_SDK_V2_MIGRATION_PLAN.md Section 0
+   */
+  private setupLifecycleEndpoints(): void {
+    // POST /validate-auth
+    this.app.post('/validate-auth', async (req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.plugin) {
+          res.status(500).json({
+            valid: false,
+            error: 'Plugin not initialized'
+          });
+          return;
+        }
+
+        if (!this.orgId || !this.manifest || this.orgConfig === null) {
+          res.status(400).json({
+            valid: false,
+            error: 'Runtime data not set'
+          });
+          return;
+        }
+
+        const { authState } = req.body;
+
+        if (!authState || !authState.methodId || !authState.credentials) {
+          res.status(400).json({
+            valid: false,
+            error: 'Invalid auth state format'
+          });
+          return;
+        }
+
+        // Create runtime APIs for validation context
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: this.orgConfig,
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+
+        const authAPI = createAuthRuntimeAPI({
+          authState,
+          logger: this.logger,
+        });
+
+        // Build auth validation context
+        const authCtx = {
+          org: { id: this.orgId },
+          config: configAPI,
+          auth: authAPI,
+          logger: this.logger,
+        };
+
+        // Execute validation hook
+        const isValid = await executeOnValidateAuth(
+          this.plugin,
+          authCtx as any,
+          this.logger
+        );
+
+        res.json({ valid: isValid });
+        this.logger.debug('Handled /validate-auth', { valid: isValid });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error in /validate-auth endpoint', { error: errorMsg });
+        res.status(500).json({
+          valid: false,
+          error: errorMsg
+        });
+      }
+    });
+
+    // POST /config-update
+    this.app.post('/config-update', async (req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.plugin) {
+          res.status(500).json({
+            success: false,
+            error: 'Plugin not initialized'
+          });
+          return;
+        }
+
+        if (!this.orgId || !this.manifest || this.orgConfig === null) {
+          res.status(400).json({
+            success: false,
+            error: 'Runtime data not set'
+          });
+          return;
+        }
+
+        const { config } = req.body;
+
+        if (!config) {
+          res.status(400).json({
+            success: false,
+            error: 'Config object required'
+          });
+          return;
+        }
+
+        // Create config runtime API with updated config
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: config,
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+
+        // Build config update context
+        const configCtx = {
+          org: { id: this.orgId },
+          config: configAPI,
+          logger: this.logger,
+        };
+
+        // Execute config update hook
+        await executeOnConfigUpdate(
+          this.plugin,
+          configCtx as any,
+          this.logger
+        );
+
+        res.json({ success: true });
+        this.logger.debug('Handled /config-update');
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error in /config-update endpoint', { error: errorMsg });
+        res.status(500).json({
+          success: false,
+          error: errorMsg
+        });
+      }
+    });
+
+    // POST /disable
+    this.app.post('/disable', async (_req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.plugin) {
+          res.status(500).json({
+            success: false,
+            error: 'Plugin not initialized'
+          });
+          return;
+        }
+
+        if (!this.orgId) {
+          res.status(400).json({
+            success: false,
+            error: 'Organization ID not set'
+          });
+          return;
+        }
+
+        // Build disable context
+        const disableCtx = {
+          org: { id: this.orgId },
+          logger: this.logger,
+        };
+
+        // Execute disable hook
+        await executeOnDisable(
+          this.plugin,
+          disableCtx as any,
+          this.logger
+        );
+
+        res.json({ success: true });
+        this.logger.info('Handled /disable, plugin cleanup completed');
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error in /disable endpoint', { error: errorMsg });
+        res.status(500).json({
+          success: false,
+          error: errorMsg
+        });
+      }
+    });
+  }
+
+  /**
+   * Setup MCP proxy endpoints.
+   *
+   * These endpoints allow Hay Core to interact with MCP servers:
+   * - POST /mcp/call-tool - Proxy MCP tool calls
+   * - GET /mcp/list-tools - List available MCP tools
+   *
+   * @see PLUGIN_SDK_V2_MIGRATION_PLAN.md Section 0
+   */
+  private setupMcpEndpoints(): void {
+    // POST /mcp/call-tool
+    this.app.post('/mcp/call-tool', async (req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.mcpRuntime) {
+          res.status(500).json({
+            error: 'MCP runtime not initialized'
+          });
+          return;
+        }
+
+        const { toolName, arguments: toolArgs } = req.body;
+
+        if (!toolName || typeof toolName !== 'string') {
+          res.status(400).json({
+            error: 'Tool name is required and must be a string'
+          });
+          return;
+        }
+
+        // TODO: Implement actual MCP tool call routing
+        // For now, return a placeholder response
+        this.logger.debug('MCP tool call requested', { toolName, arguments: toolArgs });
+
+        res.status(501).json({
+          error: 'MCP tool calling not yet implemented in SDK v2'
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error in /mcp/call-tool endpoint', { error: errorMsg });
+        res.status(500).json({ error: errorMsg });
+      }
+    });
+
+    // GET /mcp/list-tools
+    this.app.get('/mcp/list-tools', async (_req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.mcpRuntime) {
+          res.status(500).json({
+            error: 'MCP runtime not initialized'
+          });
+          return;
+        }
+
+        // TODO: Implement MCP tool discovery
+        // For now, return empty list
+        this.logger.debug('MCP tools list requested');
+
+        res.json({
+          tools: []
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error in /mcp/list-tools endpoint', { error: errorMsg });
+        res.status(500).json({ error: errorMsg });
       }
     });
   }
