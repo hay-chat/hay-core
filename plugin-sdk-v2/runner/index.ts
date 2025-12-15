@@ -127,6 +127,10 @@ async function main(): Promise<void> {
 
   try {
     state.httpServer = new PluginHttpServer(port, registry, logger);
+
+    // Set plugin on HTTP server (for lifecycle hooks)
+    state.httpServer.setPlugin(state.plugin);
+
     await state.httpServer.start();
     logger.info('HTTP server started successfully');
   } catch (err) {
@@ -153,6 +157,15 @@ async function main(): Promise<void> {
     // Create start context and execute onStart
     const startCtx = createStartContext(state.orgData, registry, manifest, logger);
     const startSuccess = await executeOnStart(state.plugin, startCtx, logger);
+
+    // Set runtime data on HTTP server (for lifecycle endpoint hooks)
+    state.httpServer.setRuntimeData({
+      orgId: state.orgData.org.id,
+      manifest,
+      mcpRuntime: startCtx.mcp,
+      orgConfig: state.orgData.config,
+      orgAuth: state.orgData.auth,
+    });
 
     if (!startSuccess) {
       logger.warn('onStart hook failed - plugin is running but may be degraded');
