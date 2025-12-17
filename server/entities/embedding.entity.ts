@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, PrimaryGeneratedColumn } from "typeorm";
+import { Entity, Column, ManyToOne, JoinColumn, Index, PrimaryGeneratedColumn, CreateDateColumn } from "typeorm";
 import { Document } from "./document.entity";
 import { Organization } from "./organization.entity";
 
@@ -44,6 +44,9 @@ export class Embedding {
     },
   })
   embedding?: number[] | null;
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt!: Date;
 
   // Relationships
   @ManyToOne(() => Organization, { onDelete: "CASCADE" })

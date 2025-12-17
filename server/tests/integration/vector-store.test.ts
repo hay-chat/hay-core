@@ -199,8 +199,8 @@ describe("VectorStore Integration Tests", () => {
    * Ticket: DSAR Data Traversal and Erasure
    */
   describe("GDPR - deleteByConversationIds", () => {
-    const testConversationId1 = "conv0001-e89b-12d3-a456-426614174000";
-    const testConversationId2 = "conv0002-e89b-12d3-a456-426614174000";
+    const testConversationId1 = "a0000001-e89b-12d3-a456-426614174000";
+    const testConversationId2 = "a0000002-e89b-12d3-a456-426614174000";
 
     beforeAll(async () => {
       // Add test embeddings with conversation metadata
@@ -260,27 +260,27 @@ describe("VectorStore Integration Tests", () => {
       const chunks: VectorChunk[] = [
         {
           content: "Multi-delete test message 1",
-          metadata: { conversationId: "multi0001-e89b-12d3-a456-426614174000", type: "test" },
+          metadata: { conversationId: "f0000001-e89b-12d3-a456-426614174000", type: "test" },
         },
         {
           content: "Multi-delete test message 2",
-          metadata: { conversationId: "multi0002-e89b-12d3-a456-426614174000", type: "test" },
+          metadata: { conversationId: "f0000002-e89b-12d3-a456-426614174000", type: "test" },
         },
       ];
       await vectorStoreService.addChunks(testOrgId, null, chunks);
 
       // Delete multiple conversations
       const deletedCount = await vectorStoreService.deleteByConversationIds(testOrgId, [
-        "multi0001-e89b-12d3-a456-426614174000",
-        "multi0002-e89b-12d3-a456-426614174000",
+        "f0000001-e89b-12d3-a456-426614174000",
+        "f0000002-e89b-12d3-a456-426614174000",
       ]);
 
       expect(deletedCount).toBe(2);
 
       // Verify both are deleted
       const results = await vectorStoreService.findByConversationIds(testOrgId, [
-        "multi0001-e89b-12d3-a456-426614174000",
-        "multi0002-e89b-12d3-a456-426614174000",
+        "f0000001-e89b-12d3-a456-426614174000",
+        "f0000002-e89b-12d3-a456-426614174000",
       ]);
       expect(results.length).toBe(0);
     });
@@ -299,8 +299,8 @@ describe("VectorStore Integration Tests", () => {
   });
 
   describe("GDPR - deleteByMessageIds", () => {
-    const testMessageId1 = "msg00001-e89b-12d3-a456-426614174000";
-    const testMessageId2 = "msg00002-e89b-12d3-a456-426614174000";
+    const testMessageId1 = "b0000001-e89b-12d3-a456-426614174000";
+    const testMessageId2 = "b0000002-e89b-12d3-a456-426614174000";
 
     beforeAll(async () => {
       // Add test embeddings with message metadata
@@ -343,7 +343,7 @@ describe("VectorStore Integration Tests", () => {
   });
 
   describe("GDPR - findByConversationIds", () => {
-    const findTestConvId = "findconv-e89b-12d3-a456-426614174000";
+    const findTestConvId = "c0000001-e89b-12d3-a456-426614174000";
 
     beforeAll(async () => {
       // Add test embeddings
@@ -371,7 +371,7 @@ describe("VectorStore Integration Tests", () => {
     it("should return empty array for non-existent conversations", async () => {
       const results = await vectorStoreService.findByConversationIds(
         testOrgId,
-        ["nonexist-e89b-12d3-a456-426614174000"],
+        ["d0000000-e89b-12d3-a456-426614174000"],
       );
       expect(results.length).toBe(0);
     });
@@ -395,10 +395,10 @@ describe("VectorStore Integration Tests", () => {
      * 3. Delete all embeddings for the customer
      * 4. Verify "post-delete search returns 0" (per ticket AC)
      */
-    const customerConvId = "custdel-e89b-12d3-a456-426614174000";
+    const customerConvId = "e0000001-e89b-12d3-a456-426614174000";
     const customerMessageIds = [
-      "custmsg1-e89b-12d3-a456-426614174000",
-      "custmsg2-e89b-12d3-a456-426614174000",
+      "e0000001-e89b-12d3-a456-426614174001",
+      "e0000001-e89b-12d3-a456-426614174002",
     ];
 
     beforeAll(async () => {
