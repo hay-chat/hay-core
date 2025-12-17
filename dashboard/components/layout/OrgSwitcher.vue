@@ -100,16 +100,14 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronsUpDown, Plus, Building2, Check } from "lucide-vue-next";
+import { ChevronsUpDown, Plus, Check } from "lucide-vue-next";
 import { useUserStore } from "@/stores/user";
-import { useRouter } from "vue-router";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { ref } from "vue";
 import CreateOrganizationDialog from "./CreateOrganizationDialog.vue";
 
 const userStore = useUserStore();
-const router = useRouter();
 const { toast } = useToast();
 const isSwitching = ref(false);
 const createDialogOpen = ref(false);
@@ -141,8 +139,14 @@ const switchOrganization = async (organizationId: string) => {
     const org = await userStore.switchOrganization(organizationId);
 
     if (org) {
-      // Show success notification
-      toast.success("Organization switched", `Now viewing ${org.name}`);
+      // Store the success message in session storage to show after reload
+      sessionStorage.setItem(
+        "org-switch-success",
+        JSON.stringify({
+          title: "Organization switched",
+          message: `Now viewing ${org.name}`,
+        })
+      );
 
       // Force a full page reload to refresh all data with the new organization context
       window.location.href = "/dashboard";
