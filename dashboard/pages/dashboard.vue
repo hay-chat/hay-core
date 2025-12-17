@@ -240,6 +240,9 @@
           </div>
         </CardContent>
       </Card>
+      <!-- Attention Needed Conversations -->
+      <AttentionNeededWidget />
+
       <!-- Sentiment Score Gauge -->
       <Card>
         <CardHeader>

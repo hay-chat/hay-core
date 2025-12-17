@@ -27,42 +27,54 @@ export const config = {
       (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat"),
     protocol: process.env.APP_PROTOCOL || "http",
     // Service-specific domains
-    api: process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat"),
-    dashboard: process.env.DASHBOARD_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat"),
+    api:
+      process.env.API_DOMAIN ||
+      (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat"),
+    dashboard:
+      process.env.DASHBOARD_DOMAIN ||
+      (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat"),
     cdn: process.env.CDN_DOMAIN || "cdn.hay.chat",
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || (() => {
-      const useSSL = process.env.USE_SSL === "true" || process.env.NODE_ENV === "production";
-      const protocol = useSSL ? "https" : "http";
-      const apiDomain = process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat");
-      const dashboardDomain = process.env.DASHBOARD_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat");
-      const baseDomain = process.env.BASE_DOMAIN || (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat");
+    origin:
+      process.env.CORS_ORIGIN?.split(",") ||
+      (() => {
+        const useSSL = process.env.USE_SSL === "true" || process.env.NODE_ENV === "production";
+        const protocol = useSSL ? "https" : "http";
+        const apiDomain =
+          process.env.API_DOMAIN ||
+          (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat");
+        const dashboardDomain =
+          process.env.DASHBOARD_DOMAIN ||
+          (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat");
+        const baseDomain =
+          process.env.BASE_DOMAIN ||
+          (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat");
 
-      // Build dynamic CORS origins
-      const origins = [
-        // Development localhost origins
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:5173",
-      ];
+        // Build dynamic CORS origins
+        const origins = [
+          // Development localhost origins
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://localhost:5173",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:3001",
+          "http://127.0.0.1:5173",
+        ];
 
-      // Add production/configured domains
-      if (process.env.NODE_ENV !== "development") {
-        origins.push(
-          `${protocol}://${baseDomain}`,
-          `${protocol}://${dashboardDomain}`,
-          `${protocol}://${apiDomain}`,
-        );
-      }
+        // Add production/configured domains
+        if (process.env.NODE_ENV !== "development") {
+          origins.push(
+            `${protocol}://${baseDomain}`,
+            `${protocol}://${dashboardDomain}`,
+            `${protocol}://${apiDomain}`,
+          );
+        }
 
-      return origins;
-    })(),
+        return origins;
+      })(),
     credentials: true,
   },
 
@@ -219,12 +231,12 @@ export function getWebSocketUrl(): string {
 
 export function getDashboardUrl(): string {
   // Remove protocol if accidentally included in domain config
-  const domain = config.domain.dashboard.replace(/^https?:\/\//, '');
+  const domain = config.domain.dashboard.replace(/^https?:\/\//, "");
   return `${getProtocol()}://${domain}`;
 }
 
 export function getCdnUrl(): string {
   // Remove protocol if accidentally included in domain config
-  const domain = config.domain.cdn.replace(/^https?:\/\//, '');
+  const domain = config.domain.cdn.replace(/^https?:\/\//, "");
   return `${getProtocol()}://${domain}`;
 }

@@ -13,7 +13,7 @@
           label="Organization Name"
           placeholder="Acme Corporation"
           :error="error"
-          @keydown.enter="handleCreate"
+          @keydown.enter.prevent="handleCreate"
         />
       </div>
       <DialogFooter>
@@ -28,7 +28,6 @@
 import { ref, watch } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
-import { useUserStore } from "@/stores/user";
 
 const props = defineProps<{
   open: boolean;
@@ -40,7 +39,6 @@ const emit = defineEmits<{
 }>();
 
 const { toast } = useToast();
-const userStore = useUserStore();
 
 const isOpen = ref(props.open);
 const organizationName = ref("");
@@ -72,6 +70,11 @@ const handleClose = () => {
 };
 
 const handleCreate = async () => {
+  // Prevent multiple submissions
+  if (isCreating.value) {
+    return;
+  }
+
   // Validate
   if (!organizationName.value.trim()) {
     error.value = "Organization name is required";
