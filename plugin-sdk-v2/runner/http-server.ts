@@ -25,6 +25,14 @@ import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
  *
  * Wraps Express server with plugin-specific functionality.
  */
+// Track registered MCP servers
+interface RegisteredMcpServer {
+  id: string;
+  type: 'local' | 'external';
+  instance?: any; // McpServerInstance for local servers
+  options?: any; // ExternalMcpOptions for external servers
+}
+
 export class PluginHttpServer {
   private app: Express;
   private server: Server | null = null;
@@ -32,10 +40,12 @@ export class PluginHttpServer {
   private logger: HayLogger;
   private registry: PluginRegistry;
   private plugin: HayPluginDefinition | null = null;
-  private mcpRuntime: HayMcpRuntimeAPI | null = null;
   private orgId: string | null = null;
   private manifest: any | null = null; // Plugin manifest for runtime API creation
   private orgConfig: Record<string, any> | null = null;
+
+  // Track MCP servers registered via mcp.startLocal() or mcp.startExternal()
+  private mcpServers: Map<string, RegisteredMcpServer> = new Map();
 
   constructor(port: number, registry: PluginRegistry, logger: HayLogger) {
     this.port = port;
@@ -48,6 +58,7 @@ export class PluginHttpServer {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Setup routes
+    this.setupHealthEndpoint();
     this.setupMetadataEndpoint();
     this.setupLifecycleEndpoints();
     this.setupMcpEndpoints();
@@ -78,9 +89,65 @@ export class PluginHttpServer {
   }): void {
     this.orgId = data.orgId;
     this.manifest = data.manifest;
-    this.mcpRuntime = data.mcpRuntime;
     this.orgConfig = data.orgConfig;
-    // Note: orgAuth currently unused but kept in signature for future MCP implementations
+    // Note: orgAuth and mcpRuntime are passed but not stored -
+    // MCP servers are tracked via registerMcpServer() callback instead
+  }
+
+  /**
+   * Register an MCP server (called by MCP runtime when plugin calls mcp.startLocal/startExternal)
+   *
+   * @param server - MCP server metadata
+   * @internal
+   */
+  registerMcpServer(server: RegisteredMcpServer): void {
+    this.mcpServers.set(server.id, server);
+    this.logger.debug(`Registered MCP server: ${server.id} (${server.type})`);
+  }
+
+  /**
+   * Setup the /health endpoint.
+   *
+   * Lightweight healthcheck endpoint for monitoring worker status.
+   * Returns basic worker health information including uptime, MCP server count, etc.
+   *
+   * This is the standard endpoint for:
+   * - Docker HEALTHCHECK directives
+   * - Kubernetes readiness/liveness probes
+   * - Monitoring systems (Prometheus, Datadog, etc.)
+   */
+  private setupHealthEndpoint(): void {
+    this.app.get('/health', (_req: Request, res: Response) => {
+      try {
+        const health = {
+          status: 'healthy',
+          uptime: process.uptime(),
+          timestamp: new Date().toISOString(),
+          pid: process.pid,
+          orgId: this.orgId,
+          mcpServers: {
+            count: this.mcpServers.size,
+            servers: Array.from(this.mcpServers.keys()),
+          },
+          memory: {
+            heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024), // MB
+            heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024), // MB
+            rss: Math.round(process.memoryUsage().rss / 1024 / 1024), // MB
+          },
+        };
+
+        res.status(200).json(health);
+        this.logger.debug('Served /health endpoint', { orgId: this.orgId });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error('Error serving /health endpoint', { error: errorMsg });
+        res.status(503).json({
+          status: 'unhealthy',
+          error: errorMsg,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
   }
 
   /**
@@ -352,13 +419,6 @@ export class PluginHttpServer {
     // POST /mcp/call-tool
     this.app.post('/mcp/call-tool', async (req: Request, res: Response): Promise<void> => {
       try {
-        if (!this.mcpRuntime) {
-          res.status(500).json({
-            error: 'MCP runtime not initialized'
-          });
-          return;
-        }
-
         const { toolName, arguments: toolArgs } = req.body;
 
         if (!toolName || typeof toolName !== 'string') {
@@ -368,13 +428,45 @@ export class PluginHttpServer {
           return;
         }
 
-        // TODO: Implement actual MCP tool call routing
-        // For now, return a placeholder response
         this.logger.debug('MCP tool call requested', { toolName, arguments: toolArgs });
 
-        res.status(501).json({
-          error: 'MCP tool calling not yet implemented in SDK v2'
-        });
+        // Find which MCP server has this tool
+        let targetServer: RegisteredMcpServer | null = null;
+
+        for (const server of this.mcpServers.values()) {
+          if (server.type === 'local' && server.instance?.callTool) {
+            // Check if this server has the tool
+            // For now, we'll try the first local server (could be enhanced with tool registry)
+            targetServer = server;
+            break;
+          }
+        }
+
+        if (!targetServer) {
+          res.status(404).json({
+            error: `No MCP server found for tool: ${toolName}`
+          });
+          return;
+        }
+
+        // Call the tool on the MCP server instance
+        if (targetServer.instance?.callTool) {
+          try {
+            const result = await targetServer.instance.callTool(toolName, toolArgs || {});
+            res.json(result);
+            this.logger.debug('MCP tool call successful', { toolName, serverId: targetServer.id });
+          } catch (toolErr: any) {
+            const errorMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+            this.logger.error('MCP tool execution failed', { toolName, error: errorMsg });
+            res.status(500).json({
+              error: `Tool execution failed: ${errorMsg}`
+            });
+          }
+        } else {
+          res.status(500).json({
+            error: 'MCP server does not support tool calling'
+          });
+        }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         this.logger.error('Error in /mcp/call-tool endpoint', { error: errorMsg });
@@ -385,20 +477,34 @@ export class PluginHttpServer {
     // GET /mcp/list-tools
     this.app.get('/mcp/list-tools', async (_req: Request, res: Response): Promise<void> => {
       try {
-        if (!this.mcpRuntime) {
-          res.status(500).json({
-            error: 'MCP runtime not initialized'
-          });
-          return;
-        }
-
-        // TODO: Implement MCP tool discovery
-        // For now, return empty list
         this.logger.debug('MCP tools list requested');
 
-        res.json({
-          tools: []
-        });
+        const tools: any[] = [];
+
+        // Collect tools from all registered MCP servers
+        for (const server of this.mcpServers.values()) {
+          if (server.type === 'local' && server.instance?.listTools) {
+            try {
+              const serverTools = await server.instance.listTools();
+
+              // Add serverId to each tool
+              for (const tool of serverTools) {
+                tools.push({
+                  ...tool,
+                  serverId: server.id
+                });
+              }
+
+              this.logger.debug(`Collected ${serverTools.length} tools from MCP server ${server.id}`);
+            } catch (listErr: any) {
+              const errorMsg = listErr instanceof Error ? listErr.message : String(listErr);
+              this.logger.warn(`Failed to list tools from MCP server ${server.id}`, { error: errorMsg });
+            }
+          }
+        }
+
+        res.json({ tools });
+        this.logger.debug(`Returned ${tools.length} total MCP tools`);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         this.logger.error('Error in /mcp/list-tools endpoint', { error: errorMsg });

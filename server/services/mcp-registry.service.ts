@@ -1,5 +1,6 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { MCPToolDefinition } from "../types/plugin.types";
+import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
 
 /**
  * MCP Tool with metadata
@@ -13,14 +14,20 @@ export interface MCPTool extends MCPToolDefinition {
 }
 
 /**
- * MCP Registry Service
+ * MCP Registry Service (SDK v2 Compatible)
  *
  * Central registry for managing MCP tools across all plugin instances.
- * Handles tool registration, discovery, and routing to appropriate MCP servers.
+ * For SDK v2 plugins, tools are fetched dynamically from worker /mcp/list-tools endpoint.
+ * Handles tool discovery and routing to appropriate MCP servers via worker HTTP API.
  */
 export class MCPRegistryService {
+  private runnerService = getPluginRunnerV2Service();
+
   /**
-   * Register tools from a plugin's MCP server
+   * Register tools from a plugin's MCP server (Legacy - deprecated for SDK v2)
+   *
+   * Note: SDK v2 plugins no longer use this method. Tools are discovered
+   * dynamically via /mcp/list-tools endpoint.
    */
   async registerTools(
     organizationId: string,
@@ -41,53 +48,94 @@ export class MCPRegistryService {
 
   /**
    * Get all tools available for an organization
+   *
+   * For SDK v2 plugins: Fetches tools from running workers via /mcp/list-tools endpoint
+   * For legacy plugins: Reads from plugin_instances.config.mcpServers (fallback)
    */
   async getToolsForOrg(organizationId: string): Promise<MCPTool[]> {
     const instances = await pluginInstanceRepository.findByOrganization(organizationId);
     const tools: MCPTool[] = [];
 
     for (const instance of instances) {
-      if (!instance.enabled || !instance.config?.mcpServers) {
+      if (!instance.enabled) {
         continue;
       }
 
-      const mcpServers = instance.config.mcpServers as any;
-      const { local = [], remote = [] } = mcpServers;
+      // Check if worker is running (SDK v2)
+      const worker = this.runnerService.getWorker(organizationId, instance.pluginId);
 
-      // Collect tools from local MCP servers
-      for (const server of local) {
-        for (const tool of server.tools) {
-          tools.push({
-            id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
-            organizationId: organizationId,
-            pluginId: instance.pluginId,
-            serverId: server.serverId,
-            name: tool.name,
-            description: tool.description,
-            input_schema: tool.input_schema,
-            createdAt: instance.updatedAt || instance.createdAt,
+      if (worker && worker.sdkVersion === "v2" && instance.runtimeState === "ready") {
+        // SDK v2: Fetch tools from worker /mcp/list-tools endpoint
+        try {
+          const response = await fetch(`http://localhost:${worker.port}/mcp/list-tools`, {
+            signal: AbortSignal.timeout(5000)
           });
-        }
-      }
 
-      // Collect tools from remote MCP servers
-      for (const server of remote) {
-        for (const tool of server.tools) {
-          tools.push({
-            id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
-            organizationId: organizationId,
-            pluginId: instance.pluginId,
-            serverId: server.serverId,
-            name: tool.name,
-            description: tool.description,
-            input_schema: tool.input_schema,
-            createdAt: instance.updatedAt || instance.createdAt,
-          });
+          if (response.ok) {
+            const data = await response.json() as { tools: any[] };
+
+            for (const tool of data.tools || []) {
+              tools.push({
+                id: `${instance.pluginId}:${tool.serverId || 'default'}:${tool.name}`,
+                organizationId,
+                pluginId: instance.pluginId,
+                serverId: tool.serverId || 'default',
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.input_schema,
+                createdAt: instance.updatedAt || instance.createdAt,
+              });
+            }
+
+            console.log(`[MCPRegistry] Fetched ${data.tools?.length || 0} tools from ${instance.pluginId} worker`);
+          } else {
+            console.warn(`[MCPRegistry] Failed to fetch tools from ${instance.pluginId}: HTTP ${response.status}`);
+          }
+        } catch (error: any) {
+          console.warn(`[MCPRegistry] Failed to fetch tools from ${instance.pluginId}:`, error.message);
         }
+      } else if (instance.config?.mcpServers) {
+        // Legacy: Read from config
+        const mcpServers = instance.config.mcpServers as any;
+        const { local = [], remote = [] } = mcpServers;
+
+        // Collect tools from local MCP servers
+        for (const server of local) {
+          for (const tool of server.tools) {
+            tools.push({
+              id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
+              organizationId: organizationId,
+              pluginId: instance.pluginId,
+              serverId: server.serverId,
+              name: tool.name,
+              description: tool.description,
+              input_schema: tool.input_schema,
+              createdAt: instance.updatedAt || instance.createdAt,
+            });
+          }
+        }
+
+        // Collect tools from remote MCP servers
+        for (const server of remote) {
+          for (const tool of server.tools) {
+            tools.push({
+              id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
+              organizationId: organizationId,
+              pluginId: instance.pluginId,
+              serverId: server.serverId,
+              name: tool.name,
+              description: tool.description,
+              input_schema: tool.input_schema,
+              createdAt: instance.updatedAt || instance.createdAt,
+            });
+          }
+        }
+
+        console.log(`[MCPRegistry] Loaded ${local.length + remote.length} servers from ${instance.pluginId} config (legacy)`);
       }
     }
 
-    console.log(`[MCPRegistry] Found ${tools.length} tools for organization ${organizationId}`);
+    console.log(`[MCPRegistry] Found ${tools.length} total tools for organization ${organizationId}`);
     return tools;
   }
 
@@ -100,10 +148,9 @@ export class MCPRegistryService {
   }
 
   /**
-   * Execute a tool
+   * Execute a tool (SDK v2 Compatible)
    *
-   * Routes the tool call to the appropriate MCP server via the plugin manager.
-   * This is a placeholder - actual execution happens through the plugin worker/MCP client.
+   * Routes the tool call to the appropriate plugin worker via /mcp/call-tool endpoint.
    */
   async executeTool(
     organizationId: string,
@@ -116,13 +163,47 @@ export class MCPRegistryService {
       throw new Error(`Tool ${toolName} not found for organization ${organizationId}`);
     }
 
-    // TODO: Route to plugin manager to execute tool via MCP client
-    // For now, this is a placeholder that will be implemented when
-    // agent system integration is added
+    // Get worker for this plugin
+    const worker = this.runnerService.getWorker(organizationId, tool.pluginId);
 
-    console.log(`[MCPRegistry] Executing tool ${toolName} for ${organizationId} with args:`, args);
+    if (!worker) {
+      throw new Error(
+        `Plugin worker not running for ${tool.pluginId} (org: ${organizationId})`
+      );
+    }
 
-    throw new Error("Tool execution not yet implemented - requires MCP client integration");
+    if (worker.sdkVersion === "v2") {
+      // SDK v2: Route to worker /mcp/call-tool endpoint
+      console.log(`[MCPRegistry] Executing tool ${toolName} via worker ${tool.pluginId} on port ${worker.port}`);
+
+      try {
+        const response = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toolName,
+            arguments: args,
+          }),
+          signal: AbortSignal.timeout(30000), // 30 second timeout for tool execution
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`MCP tool call failed: HTTP ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log(`[MCPRegistry] Tool ${toolName} executed successfully`);
+        return result;
+      } catch (error: any) {
+        console.error(`[MCPRegistry] Tool execution failed for ${toolName}:`, error.message);
+        throw new Error(`Tool execution failed: ${error.message}`);
+      }
+    } else {
+      // Legacy: Not yet implemented
+      console.log(`[MCPRegistry] Legacy tool execution for ${toolName} not yet implemented`);
+      throw new Error("Tool execution not yet implemented for legacy plugins");
+    }
   }
 
   /**

@@ -154,8 +154,18 @@ async function main(): Promise<void> {
 
     logger.info('Org runtime data loaded', { orgId: state.orgData.org.id });
 
-    // Create start context and execute onStart
-    const startCtx = createStartContext(state.orgData, registry, manifest, logger);
+    // Create start context with MCP server registration callback
+    const startCtx = createStartContext(
+      state.orgData,
+      registry,
+      manifest,
+      logger,
+      // MCP server registration callback
+      (server) => {
+        state.httpServer?.registerMcpServer(server as any);
+      }
+    );
+
     const startSuccess = await executeOnStart(state.plugin, startCtx, logger);
 
     // Set runtime data on HTTP server (for lifecycle endpoint hooks)

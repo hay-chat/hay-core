@@ -1,4 +1,4 @@
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync, spawn, type ChildProcess } from "child_process";
@@ -450,6 +450,9 @@ export class PluginManagerService {
 
   /**
    * Build a plugin (run build command)
+   *
+   * Supports both legacy SDK v1 plugins (buildCommand in manifest.capabilities.mcp)
+   * and SDK v2 plugins (build script in package.json)
    */
   async buildPlugin(pluginId: string): Promise<void> {
     const plugin = this.registry.get(pluginId);
@@ -458,7 +461,27 @@ export class PluginManagerService {
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    const buildCommand = manifest.capabilities?.mcp?.buildCommand;
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+
+    // Try to get build command from multiple sources:
+    // 1. Legacy SDK v1: manifest.capabilities.mcp.buildCommand
+    // 2. SDK v2: package.json scripts.build (run via npm run build)
+    let buildCommand = manifest.capabilities?.mcp?.buildCommand;
+
+    // If no legacy build command, check for SDK v2 package.json scripts.build
+    if (!buildCommand) {
+      try {
+        const packageJsonPath = path.join(pluginPath, 'package.json');
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+        if (packageJson.scripts?.build) {
+          buildCommand = 'npm run build';
+          console.log(`ℹ️  Detected SDK v2 plugin with build script: ${plugin.name}`);
+        }
+      } catch (error) {
+        // Ignore - package.json might not exist or be malformed
+      }
+    }
 
     if (!buildCommand) {
       console.log(`ℹ️  No build command for plugin ${plugin.name}`);
@@ -468,7 +491,8 @@ export class PluginManagerService {
 
     try {
       console.log(`🔨 Building plugin ${plugin.name}...`);
-      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+      console.log(`   Command: ${buildCommand}`);
+      console.log(`   Path: ${pluginPath}`);
 
       execSync(buildCommand, {
         cwd: pluginPath,
