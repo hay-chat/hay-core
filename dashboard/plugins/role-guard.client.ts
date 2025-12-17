@@ -7,9 +7,12 @@ import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 
 export default defineNuxtPlugin(() => {
-  const userStore = useUserStore();
-  const authStore = useAuthStore();
   const router = useRouter();
+
+  // Wait for stores to be ready before accessing them
+  // This ensures persisted state is loaded
+  let userStore: ReturnType<typeof useUserStore> | null = null;
+  let authStore: ReturnType<typeof useAuthStore> | null = null;
 
   // Define role-protected routes (same as middleware)
   const roleProtectedRoutes: Record<string, string[]> = {
@@ -66,6 +69,12 @@ export default defineNuxtPlugin(() => {
 
   // Add router guard that runs after each navigation
   router.afterEach((to, from) => {
+    // Lazily initialize stores on first use to ensure persistence has loaded
+    if (!userStore || !authStore) {
+      userStore = useUserStore();
+      authStore = useAuthStore();
+    }
+
     // Skip if not authenticated
     if (!authStore.isAuthenticated || !userStore.user?.id) {
       return;
@@ -84,8 +93,6 @@ export default defineNuxtPlugin(() => {
     // Check role-based access
     const currentOrganization = userStore.currentOrganization;
     const userRole = currentOrganization?.role;
-
-    console.log("[Role Guard Plugin] Checking access to:", to.path, "Role:", userRole);
 
     if (!hasRouteAccess(to.path, userRole)) {
       console.warn(`[Role Guard Plugin] Access denied to ${to.path} for role: ${userRole}`);
