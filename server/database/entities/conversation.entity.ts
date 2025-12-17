@@ -245,21 +245,29 @@ export class Conversation {
       });
     }
 
-    // Get tool schemas from plugin manager service
+    // Get tool schemas from MCP Registry Service (SDK v2 compatible)
+    // This will fetch tools dynamically from running SDK v2 workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
-      const { pluginManagerService } = await import("../../services/plugin-manager.service");
-      const allPlugins = pluginManagerService.getAllPlugins();
+      const { mcpRegistryService } = await import("../../services/mcp-registry.service");
+      const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
-      // Extract tool schemas from all plugins
-      for (const plugin of allPlugins) {
-        const manifest = plugin.manifest as any;
-        if (manifest?.capabilities?.mcp?.tools) {
-          toolSchemas.push(...manifest.capabilities.mcp.tools);
-        }
+      // Convert MCP tools to schema format expected by playbook system
+      for (const tool of tools) {
+        toolSchemas.push({
+          name: `${tool.pluginId}:${tool.name}`, // Full namespaced name (e.g., "email:send-email")
+          description: tool.description,
+          input_schema: tool.input_schema,
+        });
       }
+
+      debugLog("conversation", "Fetched tool schemas from MCP registry", {
+        conversationId: this.id,
+        toolCount: tools.length,
+        tools: tools.map((t) => `${t.pluginId}:${t.name}`),
+      });
     } catch (error) {
-      console.warn("Could not fetch tool schemas:", error);
+      console.warn("Could not fetch tool schemas from MCP registry:", error);
     }
 
     let content = "";
@@ -411,20 +419,29 @@ The following tools are available for you to use. You MUST return only valid JSO
       referencedDocuments,
     });
 
-    // Get tool schemas from plugin manager service
+    // Get tool schemas from MCP Registry Service (SDK v2 compatible)
+    // This will fetch tools dynamically from running SDK v2 workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
-      const { pluginManagerService } = await import("../../services/plugin-manager.service");
-      const allPlugins = pluginManagerService.getAllPlugins();
+      const { mcpRegistryService } = await import("../../services/mcp-registry.service");
+      const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
-      for (const plugin of allPlugins) {
-        const manifest = plugin.manifest as any;
-        if (manifest?.capabilities?.mcp?.tools) {
-          toolSchemas.push(...manifest.capabilities.mcp.tools);
-        }
+      // Convert MCP tools to schema format expected by handoff system
+      for (const tool of tools) {
+        toolSchemas.push({
+          name: `${tool.pluginId}:${tool.name}`, // Full namespaced name (e.g., "email:send-email")
+          description: tool.description,
+          input_schema: tool.input_schema,
+        });
       }
+
+      debugLog("conversation", "Fetched tool schemas from MCP registry for handoff", {
+        conversationId: this.id,
+        toolCount: tools.length,
+        tools: tools.map((t) => `${t.pluginId}:${t.name}`),
+      });
     } catch (error) {
-      console.warn("Could not fetch tool schemas:", error);
+      console.warn("Could not fetch tool schemas from MCP registry:", error);
     }
 
     let content = `From this message forward you should follow these handoff instructions:

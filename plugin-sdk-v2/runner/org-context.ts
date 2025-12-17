@@ -48,6 +48,7 @@ export interface OrgRuntimeData {
  * @param registry - Plugin registry
  * @param manifest - Plugin manifest
  * @param logger - Logger instance
+ * @param onMcpServerStarted - Optional callback when MCP server is started
  * @returns Start context instance
  *
  * @see PLUGIN.md Section 5.3 (lines 453-577)
@@ -56,7 +57,8 @@ export function createStartContext(
   orgData: OrgRuntimeData,
   registry: PluginRegistry,
   manifest: HayPluginManifest,
-  logger: HayLogger
+  logger: HayLogger,
+  onMcpServerStarted?: (server: any) => void | Promise<void>
 ): HayStartContext {
   const configAPI = createConfigRuntimeAPI({
     orgConfig: orgData.config,
@@ -74,9 +76,12 @@ export function createStartContext(
     config: configAPI,
     auth: authAPI,
     logger,
-    // Platform callback (not implemented in SDK, just logged)
+    // Platform callback - registers MCP servers with HTTP server
     onMcpServerStarted: async (server) => {
       logger.info('MCP server started', { id: server.id, type: server.type });
+      if (onMcpServerStarted) {
+        await Promise.resolve(onMcpServerStarted(server));
+      }
     },
   });
 
