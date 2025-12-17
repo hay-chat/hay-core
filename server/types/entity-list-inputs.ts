@@ -43,7 +43,7 @@ export const documentListInputSchema = baseListInputSchema.extend({
 // Conversation-specific filters
 export const conversationFiltersSchema = z
   .object({
-    status: z.enum(["open", "processing", "pending-human", "resolved", "closed"]).optional(),
+    status: z.enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"]).optional(),
     agentId: z.string().uuid().optional(),
     playbookId: z.string().uuid().optional(),
     hasMessages: z.boolean().optional(),

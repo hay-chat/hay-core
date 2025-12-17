@@ -99,6 +99,17 @@ export const organizationsRouter = t.router({
           orgSlug = await organizationService.generateUniqueSlug(name);
         }
 
+        // Double-check slug doesn't exist within transaction to prevent race condition
+        const existingOrgInTransaction = await organizationRepository.findOne({
+          where: { slug: orgSlug },
+        });
+        if (existingOrgInTransaction) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Organization with this slug already exists. Please try again.",
+          });
+        }
+
         // Create the organization
         const organization = organizationRepository.create({
           name,
