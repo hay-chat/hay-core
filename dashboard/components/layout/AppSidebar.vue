@@ -96,6 +96,9 @@ onMounted(async () => {
 const navMain = computed(() => {
   const items = [];
 
+  // Get current user role
+  const isAdminOrOwner = userStore.isAdmin;
+
   // Only show "Getting Started" if onboarding is not completed
   if (!appStore.onboardingCompleted) {
     items.push({
@@ -144,7 +147,11 @@ const navMain = computed(() => {
     //   icon: BarChart,
     //   isActive: isPathActive("/insights"),
     // },
-    {
+  );
+
+  // Only show Integrations if admin or owner
+  if (isAdminOrOwner) {
+    items.push({
       title: "Integrations",
       url: "#",
       icon: Puzzle,
@@ -162,64 +169,82 @@ const navMain = computed(() => {
           isActive: route.path === `/integrations/plugins/${plugin.id}`,
         })),
       ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings,
-      isActive: isPathActive("/settings"),
-      items: [
-        {
-          title: "General",
-          url: "/settings/general",
-          isActive: route.path === "/settings/general",
-        },
-        {
-          title: "Agents",
-          url: "/agents",
-          isActive: isPathActive("/agents"),
-        },
-        {
-          title: "Users",
-          url: "/settings/users",
-          isActive: route.path === "/settings/users",
-        },
-        {
-          title: "Privacy & Data",
-          url: "/settings/privacy",
-          isActive: route.path === "/settings/privacy",
-        },
-        {
-          title: "Customer Privacy",
-          url: "/settings/customer-privacy",
-          isActive: route.path === "/settings/customer-privacy",
-        },
-        {
-          title: "API Tokens",
-          url: "/settings/api-tokens",
-          isActive: route.path === "/settings/api-tokens",
-        },
-        {
-          title: "Webchat",
-          url: "/settings/webchat",
-          isActive: route.path === "/settings/webchat",
-        },
-        {
-          title: "My Profile",
-          url: "/settings/profile",
-          isActive: route.path === "/settings/profile",
-        },
-        // Add plugin menu items for settings
-        ...pluginMenuItems.value
-          .filter((item) => item.parent === "settings")
-          .map((item) => ({
-            title: item.title,
-            url: item.url,
-            isActive: route.path === item.url,
-          })),
-      ],
-    },
-  );
+    });
+  }
+
+  // Build Settings submenu based on role
+  const settingsItems = [];
+
+  // Admin/Owner only settings
+  if (isAdminOrOwner) {
+    settingsItems.push(
+      {
+        title: "General",
+        url: "/settings/general",
+        isActive: route.path === "/settings/general",
+      },
+      {
+        title: "Agents",
+        url: "/agents",
+        isActive: isPathActive("/agents"),
+      },
+      {
+        title: "Users",
+        url: "/settings/users",
+        isActive: route.path === "/settings/users",
+      },
+      {
+        title: "Privacy & Data",
+        url: "/settings/privacy",
+        isActive: route.path === "/settings/privacy",
+      },
+      {
+        title: "API Tokens",
+        url: "/settings/api-tokens",
+        isActive: route.path === "/settings/api-tokens",
+      },
+      {
+        title: "Webchat",
+        url: "/settings/webchat",
+        isActive: route.path === "/settings/webchat",
+      },
+    );
+  }
+
+  // Customer Privacy is available to all roles
+  settingsItems.push({
+    title: "Customer Privacy",
+    url: "/settings/customer-privacy",
+    isActive: route.path === "/settings/customer-privacy",
+  });
+
+  // My Profile is available to all roles
+  settingsItems.push({
+    title: "My Profile",
+    url: "/settings/profile",
+    isActive: route.path === "/settings/profile",
+  });
+
+  // Add plugin menu items for settings (if admin/owner)
+  if (isAdminOrOwner) {
+    settingsItems.push(
+      ...pluginMenuItems.value
+        .filter((item) => item.parent === "settings")
+        .map((item) => ({
+          title: item.title,
+          url: item.url,
+          isActive: route.path === item.url,
+        })),
+    );
+  }
+
+  items.push({
+    title: "Settings",
+    url: "#",
+    icon: Settings,
+    isActive: isPathActive("/settings"),
+    items: settingsItems,
+  });
 
   return items;
 });

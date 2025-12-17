@@ -10,6 +10,9 @@ const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/api-tokens": ["owner", "admin"],
   "/settings/general": ["owner", "admin"],
   "/settings/billing": ["owner", "admin"],
+  "/settings/privacy": ["owner", "admin"],
+  "/settings/webchat": ["owner", "admin"],
+  "/agents": ["owner", "admin"],
 
   // Analytics - all except agent
   "/analytics": ["owner", "admin", "contributor", "member", "viewer"],
@@ -27,6 +30,7 @@ const roleProtectedRoutes: Record<string, string[]> = {
 
   // Plugins - admin+
   "/integrations/marketplace": ["owner", "admin"],
+  "/integrations/plugins": ["owner", "admin"],
   "/plugins": ["owner", "admin"],
 };
 
@@ -54,8 +58,11 @@ function hasRouteAccess(path: string, userRole: string | undefined): boolean {
 
 export default defineNuxtRouteMiddleware(
   (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
+    console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
+
     // Skip auth check if staying on the same page (e.g., opening modals)
     if (to.path === from.path) {
+      console.log("[Auth Middleware] Same page, skipping");
       return;
     }
 
@@ -71,16 +78,27 @@ export default defineNuxtRouteMiddleware(
       return;
     }
 
+    // Only run on client side - SSR doesn't have access to stores properly
+    if (!process.client) {
+      console.log("[Auth Middleware] Running on server side, skipping role check");
+      return;
+    }
+
     const authStore = useAuthStore();
     const userStore = useUserStore();
 
+    console.log("[Auth Middleware] Auth initialized:", authStore.isInitialized);
+    console.log("[Auth Middleware] Authenticated:", authStore.isAuthenticated);
+
     // Check if auth is still initializing - only on client side
-    if (process.client && !authStore.isInitialized) {
+    if (!authStore.isInitialized) {
       // For client-side navigation, wait for auth initialization
       // but immediately redirect if we know there's no token
       if (!authStore.tokens?.accessToken) {
+        console.log("[Auth Middleware] No token, redirecting to login");
         return navigateTo("/login");
       }
+      console.log("[Auth Middleware] Auth not initialized yet, waiting");
       return; // Let AuthProvider handle the loading state
     }
 
@@ -102,15 +120,24 @@ export default defineNuxtRouteMiddleware(
     const currentOrganization = userStore.currentOrganization;
     const userRole = currentOrganization?.role;
 
+    console.log("[Auth Middleware] User role:", userRole);
+    console.log("[Auth Middleware] Has access:", hasRouteAccess(to.path, userRole));
+
     if (!hasRouteAccess(to.path, userRole)) {
       console.warn(
         `[Auth Middleware] Access denied to ${to.path} for role: ${userRole}`,
       );
-      // Redirect to home page with error message
-      return navigateTo({
-        path: "/",
-        query: { error: "unauthorized" },
-      });
+
+      // Prevent navigation to unauthorized page itself
+      if (to.path === "/unauthorized") {
+        return;
+      }
+
+      // Redirect to unauthorized page with the attempted path
+      console.log("[Auth Middleware] Redirecting to unauthorized page");
+      return navigateTo("/unauthorized?from=" + encodeURIComponent(to.path));
     }
+
+    console.log("[Auth Middleware] Access granted");
   },
 );
