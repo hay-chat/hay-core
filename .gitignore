@@ -48,7 +48,7 @@ node_modules/
 /playwright/.cache/
 
 # Privacy Export Files (contain sensitive user data)
-server/exports/*.json
+server/exports/
 
 # Custom uploaded plugins (organization-specific)
 plugins/custom/

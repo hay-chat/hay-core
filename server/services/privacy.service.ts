@@ -2472,15 +2472,25 @@ please contact ${supportContact}.
           return "0000:0000:0000::";
         }
 
-        // Split and filter empty parts (from :: compression)
-        const parts = ip.split(":").filter((p) => p !== "");
+        // Expand compressed IPv6 addresses (e.g., fe80::1 -> fe80:0000:0000:0000:0000:0000:0000:0001)
+        // For anonymization, we only keep the first 3 groups (48 bits)
 
-        // Ensure we have at least some parts to work with
-        if (parts.length === 0) {
-          return "0000:0000:0000::";
+        // Split by :: to handle compression
+        if (ip.includes("::")) {
+          const [left, right] = ip.split("::");
+          const leftParts = left ? left.split(":") : [];
+          const rightParts = right ? right.split(":") : [];
+
+          // Keep only the first 3 hextets from the left side
+          const firstHextet = leftParts[0] || "0000";
+          const secondHextet = leftParts[1] || "0000";
+          const thirdHextet = leftParts[2] || "0000";
+
+          return `${firstHextet}:${secondHextet}:${thirdHextet}::`;
         }
 
-        // Keep first 3 hextets (48 bits), zero out the rest
+        // No compression - just take first 3 groups
+        const parts = ip.split(":");
         const firstHextet = parts[0] || "0000";
         const secondHextet = parts[1] || "0000";
         const thirdHextet = parts[2] || "0000";

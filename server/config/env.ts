@@ -159,7 +159,9 @@ export const config = {
       email: process.env.SMTP_FROM_EMAIL || "noreply@updates.hay.chat",
       name: process.env.SMTP_FROM_NAME || "Hay",
     },
-    enabled: process.env.SMTP_ENABLED === "true",
+    // Automatically disable SMTP in test environment (unless explicitly enabled via SMTP_ENABLED=true)
+    // In other environments, require explicit SMTP_ENABLED=true to send emails
+    enabled: process.env.NODE_ENV === "test" ? false : process.env.SMTP_ENABLED === "true",
   },
 
   storage: {
