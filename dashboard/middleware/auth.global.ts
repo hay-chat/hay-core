@@ -58,7 +58,7 @@ function hasRouteAccess(path: string, userRole: string | undefined): boolean {
 }
 
 export default defineNuxtRouteMiddleware(
-  (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
+  async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
 
     // Skip auth check if staying on the same page (e.g., opening modals)
