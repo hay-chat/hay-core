@@ -74,6 +74,73 @@ export default defineNuxtRouteMiddleware(
     const authStore = useAuthStore();
     const userStore = useUserStore();
 
+    // URL Token Auth for E2E Testing (Development Only)
+    if (
+      process.client &&
+      to.query.auth_token &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      console.log(
+        "[Auth Middleware] 🔐 URL token authentication detected (E2E testing mode)",
+      );
+
+      const token = to.query.auth_token as string;
+
+      // Temporarily set token to validate
+      authStore.tokens = {
+        accessToken: token,
+        refreshToken: "", // Not needed for validation
+        expiresAt: Date.now() + 900000, // 15 minutes
+      };
+
+      try {
+        // Validate by fetching user data
+        const user = await Hay.auth.me.query();
+
+        // Store valid auth state
+        userStore.setUser(user as any);
+        authStore.isAuthenticated = true;
+        authStore.isInitialized = true;
+        authStore.updateActivity();
+
+        console.log("[Auth Middleware] ✅ URL token validated successfully");
+        console.log(
+          "[Auth Middleware] ⚠️  Warning: URL token auth is for development/testing only!",
+        );
+
+        // Remove token from URL for security
+        const cleanPath = to.path;
+        const cleanQuery = { ...to.query };
+        delete cleanQuery.auth_token;
+
+        return navigateTo(
+          {
+            path: cleanPath || "/",
+            query: Object.keys(cleanQuery).length > 0 ? cleanQuery : undefined,
+          },
+          { replace: true },
+        );
+      } catch (error) {
+        console.error("[Auth Middleware] ❌ URL token validation failed:", error);
+
+        // Clear invalid auth state
+        authStore.tokens = null;
+        authStore.isAuthenticated = false;
+
+        // Show error to user
+        if (process.client) {
+          const { $toast } = useNuxtApp() as {
+            $toast?: { error: (msg: string) => void };
+          };
+          if ($toast) {
+            $toast.error("Invalid authentication token. Please login.");
+          }
+        }
+
+        // Continue to normal login flow (don't return, let code below handle it)
+      }
+    }
+
     // Check if auth is still initializing - only on client side
     if (process.client && !authStore.isInitialized) {
       // For client-side navigation, wait for auth initialization
