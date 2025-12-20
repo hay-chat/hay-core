@@ -68,12 +68,7 @@ export default defineNuxtConfig({
   css: ["@/assets/css/main.css"],
 
   // Modules
-  modules: [
-    "@nuxtjs/tailwindcss",
-    "@pinia/nuxt",
-    "pinia-plugin-persistedstate/nuxt",
-    "@vueuse/nuxt",
-  ],
+  modules: ["@nuxtjs/tailwindcss", "@pinia/nuxt", "@vueuse/nuxt"],
 
   // Auto-import configuration
   imports: {

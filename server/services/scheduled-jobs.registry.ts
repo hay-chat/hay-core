@@ -168,6 +168,9 @@ const jobRegistry: CronJobConfig[] = [
     description: "Delete GDPR export files older than 7 days",
     schedule: "0 2 * * *", // Daily at 2 AM
     handler: async () => privacyService.cleanupExpiredExports(),
+    // NOTE: Retention period is 7 days (configurable via PRIVACY_EXPORT_RETENTION_DAYS)
+    // Supports both legacy JSON and new ZIP export formats
+    // Files are cleaned up after expiration OR after max download count reached
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
     maxRetries: 3,

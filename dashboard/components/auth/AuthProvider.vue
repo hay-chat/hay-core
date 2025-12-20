@@ -90,6 +90,8 @@ const initializeAuth = async () => {
 
 // Initialize auth on mount
 onMounted(async () => {
+  // Wait a tick to ensure Pinia persistence has hydrated the stores
+  await nextTick();
   await initializeAuth();
 });
 

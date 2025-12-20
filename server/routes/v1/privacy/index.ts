@@ -319,6 +319,8 @@ export const privacyRouter = t.router({
   /**
    * Download export data
    * Requires valid request ID and download token
+   * Supports both JSON (legacy) and ZIP (new) formats
+   * Rate limited: 20 downloads per hour per IP
    */
   downloadExport: publicProcedure
     .input(
@@ -328,8 +330,24 @@ export const privacyRouter = t.router({
       }),
     )
     .query(async ({ input, ctx }) => {
+      const ipAddress = ctx.ipAddress || "unknown";
+
       try {
-        const ipAddress = ctx.ipAddress || "unknown";
+        // Rate limit: 20 download attempts per hour per IP
+        const rateLimitResult = await rateLimitService.checkIpRateLimit(
+          ipAddress,
+          20, // max 20 attempts
+          3600, // per hour
+          false, // fail-open (don't block if Redis is down)
+        );
+
+        if (rateLimitResult.limited) {
+          const timeRemaining = formatTimeRemaining(rateLimitResult.resetAt);
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `Too many download attempts. Please try again in ${timeRemaining}.`,
+          });
+        }
 
         const result = await privacyService.downloadExport(
           input.requestId,
@@ -337,16 +355,33 @@ export const privacyRouter = t.router({
           ipAddress,
         );
 
+        // Handle ZIP format - read file and return as base64
+        if (result.isZip && result.filePath) {
+          const fs = await import("fs/promises");
+          const fileBuffer = await fs.readFile(result.filePath);
+          const base64Data = fileBuffer.toString("base64");
+
+          return {
+            success: true,
+            data: null,
+            fileName: result.fileName,
+            isZip: true,
+            base64Data,
+          };
+        }
+
+        // Legacy JSON format
         return {
           success: true,
           data: result.data,
           fileName: result.fileName,
+          isZip: false,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
+          code: error instanceof TRPCError ? error.code : "INTERNAL_SERVER_ERROR",
+          message: `Failed to download export: ${message}`,
         });
       }
     }),

@@ -254,6 +254,7 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { useConversationTakeover } from "@/composables/useConversationTakeover";
+import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
 import Avatar from "@/components/ui/Avatar.vue";
 
 // Router
@@ -447,78 +448,10 @@ const getInitials = (user: any) => {
   return "?";
 };
 
-// Calculate wait time for a conversation
-const getWaitTime = (conversation: Conversation) => {
-  // Only calculate wait time for open conversations
-  if (conversation.status !== "open" && conversation.status !== "processing") {
-    return null;
-  }
-
-  // Check if last message was from customer
-  if (!conversation.messages || conversation.messages.length === 0) {
-    return null;
-  }
-
-  // Find last customer message
-  const lastCustomerMessage = [...conversation.messages]
-    .reverse()
-    .find((m) => m.type === "Customer");
-
-  if (!lastCustomerMessage) {
-    return null;
-  }
-
-  // Check if there's a bot response after the customer message
-  const customerMessageTime = new Date(lastCustomerMessage.created_at);
-  const lastBotMessage = [...conversation.messages]
-    .reverse()
-    .find((m) => m.type === "BotAgent" || m.type === "HumanAgent");
-
-  if (lastBotMessage) {
-    const botMessageTime = new Date(lastBotMessage.created_at);
-    if (botMessageTime > customerMessageTime) {
-      return null; // Bot already responded
-    }
-  }
-
-  // Calculate wait time in seconds
-  const now = new Date();
-  const waitTimeMs = now.getTime() - customerMessageTime.getTime();
-  const waitTimeSeconds = Math.floor(waitTimeMs / 1000);
-
-  // Only show if waiting more than 30 seconds
-  if (waitTimeSeconds < 30) {
-    return null;
-  }
-
-  return waitTimeSeconds;
-};
-
-// Get CSS class based on wait time
-const getWaitTimeClass = (waitTimeSeconds: number | null) => {
-  if (!waitTimeSeconds) return "";
-
-  if (waitTimeSeconds >= 120) {
-    return "conversation-waiting-critical";
-  } else if (waitTimeSeconds >= 60) {
-    return "conversation-waiting-urgent";
-  } else if (waitTimeSeconds >= 30) {
-    return "conversation-waiting-warning";
-  }
-
-  return "";
-};
-
-// Format wait time for display
-const formatWaitTime = (waitTimeSeconds: number) => {
-  if (waitTimeSeconds < 60) {
-    return `${waitTimeSeconds}s`;
-  } else {
-    const minutes = Math.floor(waitTimeSeconds / 60);
-    const seconds = waitTimeSeconds % 60;
-    return `${minutes}m ${seconds}s`;
-  }
-};
+// Wait time utilities imported from @/utils/conversation
+// - getWaitTime(conversation): Calculate wait time in seconds
+// - formatWaitTime(seconds): Format as "2m 30s"
+// - getWaitTimeClass(seconds): Get CSS class for color coding
 
 const toggleBulkMode = () => {
   bulkMode.value = !bulkMode.value;
@@ -612,6 +545,18 @@ let unsubscribeConversationDeleted: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
+  // Check for query params to pre-filter
+  const route = useRoute();
+  if (route.query.status) {
+    const statusParam = route.query.status as string;
+    // Support single status or comma-separated statuses
+    if (statusParam.includes("pending-human")) {
+      selectedStatus.value = "pending-human";
+    } else if (statusParam.includes("human-took-over")) {
+      selectedStatus.value = "human-took-over";
+    }
+  }
+
   await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
 
   // Setup WebSocket connection for real-time updates
