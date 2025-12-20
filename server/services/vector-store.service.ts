@@ -201,7 +201,7 @@ export class VectorStoreService {
 
     const result = await queryRunner.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
-      [organizationId, docId],
+      [orgId, docId],
     );
 
     return result[1]; // Returns affected row count
