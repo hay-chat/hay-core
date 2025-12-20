@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("InstructionsEditor - Paste and Slash Command Fixes", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the test page (no auth required)
-    await page.goto("http://localhost:3000/test/editor", { waitUntil: "networkidle" });
+    await page.goto("/test/editor", { waitUntil: "networkidle" });
 
     // Wait for the page to fully render and ensure no redirects
     await page.waitForTimeout(1000);
