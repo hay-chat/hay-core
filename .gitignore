@@ -46,6 +46,8 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+# E2E auth state (contains sensitive JWT tokens)
+playwright/.auth/
 
 # Privacy Export Files (contain sensitive user data)
 server/exports/*.json
