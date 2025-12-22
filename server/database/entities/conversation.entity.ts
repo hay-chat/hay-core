@@ -249,8 +249,20 @@ export class Conversation {
     // This will fetch tools dynamically from running SDK v2 workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
+      debugLog("conversation", "Fetching tools from MCP registry for playbook update", {
+        conversationId: this.id,
+        organizationId: this.organization_id,
+        playbookId: playbookId,
+      });
+
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
+
+      debugLog("conversation", "MCP registry returned tools", {
+        conversationId: this.id,
+        toolCount: tools.length,
+        toolNames: tools.map((t) => `${t.pluginId}:${t.name}`),
+      });
 
       // Convert MCP tools to schema format expected by playbook system
       for (const tool of tools) {
@@ -267,6 +279,12 @@ export class Conversation {
         tools: tools.map((t) => `${t.pluginId}:${t.name}`),
       });
     } catch (error) {
+      debugLog("conversation", "ERROR fetching tools from MCP registry", {
+        level: "error",
+        conversationId: this.id,
+        organizationId: this.organization_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       console.warn("Could not fetch tool schemas from MCP registry:", error);
     }
 
@@ -285,6 +303,14 @@ export class Conversation {
         **Trigger:** ${playbook.trigger}`;
 
     // Add referenced actions with tool schemas if available
+    debugLog("conversation", "Processing playbook actions", {
+      conversationId: this.id,
+      referencedActionsCount: referencedActions.length,
+      referencedActions,
+      availableToolSchemasCount: toolSchemas.length,
+      availableToolNames: toolSchemas.map((s) => s.name),
+    });
+
     if (referencedActions.length > 0 && toolSchemas && toolSchemas.length > 0) {
       content += `\n\n**Referenced Actions:**
 The following tools are available for you to use. You MUST return only valid JSON when calling tools, with no additional text:`;
@@ -292,23 +318,56 @@ The following tools are available for you to use. You MUST return only valid JSO
       const actionDetails = referencedActions.map((actionName) => {
         let toolSchema = toolSchemas.find((schema) => schema.name === actionName);
 
+        debugLog("conversation", "Looking for tool schema", {
+          conversationId: this.id,
+          actionName,
+          directMatch: !!toolSchema,
+        });
+
         if (!toolSchema && actionName.includes(":")) {
           const parts = actionName.split(":");
           if (parts.length >= 2) {
             const toolName = parts[parts.length - 1];
+
+            // Try to find tool by exact match on tool name
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
+              // Try to find tool that ends with :toolName (e.g., "@hay/email-plugin:send-email" matches "send-email")
+              toolSchema = toolSchemas.find((schema) => {
+                const schemaName = schema.name as string;
+                return schemaName.endsWith(`:${toolName}`);
+              });
+            }
+
+            if (!toolSchema) {
+              // Try suffix match (e.g., "instance-id:send-email" -> "send-email")
               const toolNameSuffix = parts.slice(1).join(":");
               toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
             }
+
+            debugLog("conversation", "Tool schema fuzzy match result", {
+              conversationId: this.id,
+              actionName,
+              toolName,
+              found: !!toolSchema,
+              matchedName: toolSchema ? toolSchema.name : undefined,
+            });
           }
         }
 
         if (toolSchema) {
-          // Add tool ID to enabled_tools list using the full namespaced name (pluginId:toolName)
-          if (!enabledToolIds.includes(actionName)) {
-            enabledToolIds.push(actionName);
+          // Add tool ID to enabled_tools list using the actual tool name from the schema
+          // This ensures we use the correct namespaced name (e.g., "@hay/email-plugin:send-email")
+          const toolNameToAdd = toolSchema.name as string;
+          if (!enabledToolIds.includes(toolNameToAdd)) {
+            enabledToolIds.push(toolNameToAdd);
+            debugLog("conversation", "Added tool to enabled list", {
+              conversationId: this.id,
+              actionName,
+              toolNameAdded: toolNameToAdd,
+              enabledToolsCount: enabledToolIds.length,
+            });
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
@@ -335,16 +394,44 @@ The following tools are available for you to use. You MUST return only valid JSO
       content += referencedActions.map((action) => `- ${action}`).join("\n");
     }
 
-    await this.addMessage({
-      content,
-      type: "Playbook",
-      metadata: {
-        playbookId: playbookId,
-        playbookTitle: playbook.title,
-      },
-    });
+    // Only add playbook message if this playbook hasn't been added before
+    // Check if there's already a Playbook message with this playbookId
+    const messages = await this.getMessages();
+    const existingPlaybookMessage = messages.find(
+      (msg) => msg.type === "Playbook" && msg.metadata?.playbookId === playbookId,
+    );
+
+    if (!existingPlaybookMessage) {
+      debugLog("conversation", "Adding playbook message to conversation", {
+        conversationId: this.id,
+        playbookId,
+      });
+
+      await this.addMessage({
+        content,
+        type: "Playbook",
+        metadata: {
+          playbookId: playbookId,
+          playbookTitle: playbook.title,
+        },
+      });
+    } else {
+      debugLog("conversation", "Playbook message already exists, skipping", {
+        conversationId: this.id,
+        playbookId,
+        existingMessageId: existingPlaybookMessage.id,
+      });
+    }
 
     // Update conversation with playbook_id and enabled_tools
+    debugLog("conversation", "Updating conversation with playbook and tools", {
+      conversationId: this.id,
+      playbookId,
+      enabledToolIds,
+      enabledToolsCount: enabledToolIds.length,
+      willSetEnabledTools: enabledToolIds.length > 0,
+    });
+
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
       enabled_tools: enabledToolIds.length > 0 ? enabledToolIds : null,
@@ -352,6 +439,12 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     this.playbook_id = playbookId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
+
+    debugLog("conversation", "Playbook update complete", {
+      conversationId: this.id,
+      playbookId: this.playbook_id,
+      enabledTools: this.enabled_tools,
+    });
 
     // Attach documents referenced in the playbook
     if (referencedDocuments.length > 0) {
@@ -463,9 +556,20 @@ The following tools are available for you to use. You MUST return only valid JSO
           const parts = actionName.split(":");
           if (parts.length >= 2) {
             const toolName = parts[parts.length - 1];
+
+            // Try to find tool by exact match on tool name
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
+              // Try to find tool that ends with :toolName (e.g., "@hay/email-plugin:send-email" matches "send-email")
+              toolSchema = toolSchemas.find((schema) => {
+                const schemaName = schema.name as string;
+                return schemaName.endsWith(`:${toolName}`);
+              });
+            }
+
+            if (!toolSchema) {
+              // Try suffix match (e.g., "instance-id:send-email" -> "send-email")
               const toolNameSuffix = parts.slice(1).join(":");
               toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
             }
@@ -473,9 +577,10 @@ The following tools are available for you to use. You MUST return only valid JSO
         }
 
         if (toolSchema) {
-          // Add tool ID to enabled_tools list using the full namespaced name (pluginId:toolName)
-          if (!enabledToolIds.includes(actionName)) {
-            enabledToolIds.push(actionName);
+          // Add tool ID to enabled_tools list using the actual tool name from the schema
+          const toolNameToAdd = toolSchema.name as string;
+          if (!enabledToolIds.includes(toolNameToAdd)) {
+            enabledToolIds.push(toolNameToAdd);
           }
 
           const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};

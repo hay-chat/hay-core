@@ -456,9 +456,19 @@ export const runConversation = async (conversationId: string) => {
       });
       await conversation.updatePlaybook(playbookCandidate.id);
     } else if (playbookCandidate) {
-      debugLog("orchestrator", "Playbook candidate matches current playbook, no update needed", {
-        playbookId: currentPlaybook,
-      });
+      // Check if enabled_tools is null despite having a playbook - this means tools were never fetched
+      if (!conversation.enabled_tools || conversation.enabled_tools.length === 0) {
+        debugLog("orchestrator", "Playbook is set but enabled_tools is null, refreshing tools", {
+          playbookId: currentPlaybook,
+          enabledTools: conversation.enabled_tools,
+        });
+        await conversation.updatePlaybook(playbookCandidate.id);
+      } else {
+        debugLog("orchestrator", "Playbook candidate matches current playbook, no update needed", {
+          playbookId: currentPlaybook,
+          enabledToolsCount: conversation.enabled_tools.length,
+        });
+      }
     } else {
       debugLog("orchestrator", "No playbook candidate selected", {
         currentPlaybookId: currentPlaybook,
@@ -514,6 +524,15 @@ export const runConversation = async (conversationId: string) => {
 
     // Update processing state to executing
     await updateProcessingState(conversation, "executing", "Generating response");
+
+    // Log current conversation state before execution
+    debugLog("orchestrator", "Conversation state before execution", {
+      conversationId: conversation.id,
+      playbookId: conversation.playbook_id,
+      enabledTools: conversation.enabled_tools,
+      enabledToolsCount: conversation.enabled_tools?.length || 0,
+      agentId: conversation.agent_id,
+    });
 
     // 04. Execution - Handle iterative execution with tool calls
     await handleExecutionLoop(conversation, language);
@@ -619,6 +638,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
   let iterations = 0;
   let emptyRetries = 0; // Track consecutive retries without valid response
   let handoffProcessed = false; // Track if handoff has been processed
+  let hasToolCallBeenMade = false; // Track if we've sent the initial processing message
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -661,13 +681,46 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     debugLog("orchestrator", "Processing execution result", {
       step: executionResult.step,
       hasUserMessage: !!executionResult.userMessage,
+      userMessagePreview: executionResult.userMessage?.substring(0, 100),
       hasTool: !!executionResult.tool,
       toolName: executionResult.tool?.name,
       hasHandoff: !!executionResult.handoff,
       hasClose: !!executionResult.close,
+      rationale: executionResult.rationale,
     });
 
-    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
+    // Handle case where LLM returns both a userMessage and a tool call
+    if (executionResult.step === "CALL_TOOL" && executionResult.userMessage && executionResult.tool) {
+      // Only send the userMessage if this is the first tool call
+      if (!hasToolCallBeenMade) {
+        await conversation.addMessage({
+          content: executionResult.userMessage,
+          type: MessageType.BOT_AGENT,
+        });
+        hasToolCallBeenMade = true;
+      }
+
+      // Then create the tool message
+      const toolMessageId = await conversation.addMessage({
+        content: `Running action: ${executionResult.tool.name}`,
+        type: MessageType.TOOL,
+        metadata: {
+          toolName: executionResult.tool.name,
+          toolInput: executionResult.tool.args,
+          toolStatus: "RUNNING",
+        },
+      });
+
+      // Execute the tool
+      await toolExecutionService.handleToolExecution(
+        conversation,
+        executionResult.tool,
+        toolMessageId?.id,
+      );
+
+      // Continue the loop to let LLM analyze the result
+      continue;
+    } else if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       // Create unified tool message with initial state
       const toolMessageId = await conversation.addMessage({
         content: `Running action: ${executionResult.tool.name}`,
@@ -911,11 +964,16 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
         // Missing userMessage for non-tool/non-handoff/non-close steps
         emptyRetries++;
         debugLog("orchestrator", "No user message in response, retrying", {
+          level: "error",
           step: executionResult.step,
           emptyRetries,
           maxEmptyRetries: MAX_EMPTY_RETRIES,
           hasTool: !!executionResult.tool,
           toolName: executionResult.tool?.name,
+          hasHandoff: !!executionResult.handoff,
+          hasClose: !!executionResult.close,
+          rationale: executionResult.rationale,
+          fullResult: JSON.stringify(executionResult),
           possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool,
         });
 

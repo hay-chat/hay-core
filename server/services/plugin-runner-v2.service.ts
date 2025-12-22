@@ -5,6 +5,7 @@ import type { WorkerInfo, AuthState } from "../types/plugin-sdk-v2.types";
 import { AppDataSource } from "../database/data-source";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
+import { fetchAndStoreTools } from "./plugin-tools.service";
 
 /**
  * Plugin Runner V2 Service
@@ -170,6 +171,12 @@ export class PluginRunnerV2Service {
       this.workers.set(workerKey, workerInfo);
 
       console.log(`✅ Worker started successfully: ${workerKey} on port ${port}`);
+
+      // Discover and cache MCP tools (non-blocking)
+      fetchAndStoreTools(port, orgId, pluginId).catch((error) => {
+        console.error(`Tool discovery failed for ${pluginId}:${orgId}:`, error);
+      });
+
       return workerInfo;
 
     } catch (error: any) {

@@ -14,6 +14,7 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
+import { fetchToolsFromWorker, fetchAndStoreTools } from "@server/services/plugin-tools.service";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -595,7 +596,11 @@ export const getPluginUITemplate = authenticatedProcedure
 
 /**
  * Get all available MCP tools from enabled plugins
- * Tools are now registered dynamically by plugins at runtime
+ *
+ * Hybrid approach:
+ * - Prefer live tools from running workers (fresh data)
+ * - Fall back to database cache when workers offline
+ * - Background refresh of cache when fetching from worker
  */
 export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
   // Get all enabled plugin instances for this organization
@@ -605,6 +610,9 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
   // Get all plugins
   const allPlugins = pluginManagerService.getAllPlugins();
   const pluginMap = new Map(allPlugins.map(p => [p.id, p]));
+
+  // Get plugin runner service for worker info
+  const runnerV2Service = getPluginRunnerV2Service();
 
   const mcpTools: Array<{
     id: string;
@@ -633,36 +641,58 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
       continue;
     }
 
-    // Get tools from instance config (registered dynamically at runtime)
-    const config = instance.config as any;
     let tools: any[] = [];
 
-    // Check local MCP servers
-    if (config?.mcpServers?.local && Array.isArray(config.mcpServers.local)) {
-      for (const server of config.mcpServers.local) {
-        if (server.tools && Array.isArray(server.tools)) {
-          tools = tools.concat(server.tools);
-        }
-      }
-    }
+    // Try to fetch from running worker first (SDK v2)
+    const workerInfo = runnerV2Service.getWorker(ctx.organizationId!, plugin.id);
 
-    // Check remote MCP servers
-    if (config?.mcpServers?.remote && Array.isArray(config.mcpServers.remote)) {
-      for (const server of config.mcpServers.remote) {
-        if (server.tools && Array.isArray(server.tools)) {
-          tools = tools.concat(server.tools);
+    if (workerInfo) {
+      // Worker is running - try to fetch fresh tools
+      try {
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 3000); // 3s timeout
+
+        const response = await fetch(
+          `http://localhost:${workerInfo.port}/mcp/list-tools`,
+          { signal: abortController.signal }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          tools = Array.isArray(data.tools) ? data.tools : [];
+
+          // Background refresh of cache (non-blocking)
+          if (tools.length > 0) {
+            fetchAndStoreTools(workerInfo.port, ctx.organizationId!, plugin.id).catch(
+              (error) => {
+                console.error(`Background tool cache refresh failed for ${plugin.id}:`, error);
+              }
+            );
+          }
+        } else {
+          // Worker fetch failed - fall back to database
+          tools = getToolsFromConfig(instance.config);
         }
+      } catch (error) {
+        // Timeout or network error - fall back to database
+        console.warn(`Failed to fetch tools from worker for ${plugin.id}:`, error);
+        tools = getToolsFromConfig(instance.config);
       }
+    } else {
+      // No worker running - use database cache
+      tools = getToolsFromConfig(instance.config);
     }
 
     // Add tools to result
     for (const tool of tools) {
       mcpTools.push({
-        id: `${plugin.id}:${tool.name}`,
+        id: `${plugin.pluginId}:${tool.name}`, // Use pluginId (package name) not id (UUID)
         name: tool.name,
         label: tool.name,
         description: tool.description || "",
-        pluginId: plugin.id,
+        pluginId: plugin.pluginId, // Plugin package ID (e.g., "@hay/email-plugin")
         pluginName: plugin.name,
       });
     }
@@ -670,6 +700,86 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
 
   return mcpTools;
 });
+
+/**
+ * Helper function to extract tools from instance config
+ */
+function getToolsFromConfig(config: any): any[] {
+  const tools: any[] = [];
+
+  // Check local MCP servers
+  if (config?.mcpServers?.local && Array.isArray(config.mcpServers.local)) {
+    for (const server of config.mcpServers.local) {
+      if (server.tools && Array.isArray(server.tools)) {
+        tools.push(...server.tools);
+      }
+    }
+  }
+
+  // Check remote MCP servers
+  if (config?.mcpServers?.remote && Array.isArray(config.mcpServers.remote)) {
+    for (const server of config.mcpServers.remote) {
+      if (server.tools && Array.isArray(server.tools)) {
+        tools.push(...server.tools);
+      }
+    }
+  }
+
+  return tools;
+}
+
+/**
+ * Manually refresh MCP tools for a specific plugin
+ *
+ * Useful after plugin updates or when tools need to be re-discovered
+ */
+export const refreshMCPTools = authenticatedProcedure
+  .input(z.object({ pluginId: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    // Get plugin
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Check if plugin has MCP capability
+    const manifest = plugin.manifest as HayPluginManifest;
+    const capabilities = Array.isArray(manifest.capabilities)
+      ? manifest.capabilities
+      : [];
+
+    if (!capabilities.includes("mcp")) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${input.pluginId} does not have MCP capability`,
+      });
+    }
+
+    // Get worker info
+    const runnerV2Service = getPluginRunnerV2Service();
+    const workerInfo = runnerV2Service.getWorker(ctx.organizationId!, input.pluginId);
+
+    if (!workerInfo) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Plugin ${input.pluginId} is not running. Please enable the plugin first.`,
+      });
+    }
+
+    // Fetch and store tools
+    try {
+      await fetchAndStoreTools(workerInfo.port, ctx.organizationId!, input.pluginId);
+      return { success: true, message: "Tools refreshed successfully" };
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to refresh tools: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  });
 
 /**
  * Get menu items from all plugins (system and organization-specific)
@@ -773,45 +883,23 @@ export const testConnection = authenticatedProcedure
     try {
       let mcpTools: any[] = [];
 
-      // For SDK v2 plugins, fetch tools from the running worker's /mcp/list-tools endpoint
+      // For SDK v2 plugins, fetch tools from the running worker
       const runnerV2 = getPluginRunnerV2Service();
       const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
 
       if (worker && worker.port) {
-        // Try to fetch tools from SDK v2 worker
+        // Use shared fetchToolsFromWorker service
         try {
-          const toolsResponse = await fetch(`http://localhost:${worker.port}/mcp/list-tools`);
-          if (toolsResponse.ok) {
-            const toolsData = await toolsResponse.json();
-            mcpTools = toolsData.tools || [];
-            console.log(`[testConnection] Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`);
-          }
+          mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
+          console.log(`[testConnection] Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`);
         } catch (workerError) {
           console.warn(`[testConnection] Failed to fetch tools from SDK v2 worker for ${input.pluginId}:`, workerError);
         }
       }
 
-      // Fallback: Get MCP tools from database config (for legacy plugins or if worker call fails)
+      // Fallback: Get MCP tools from database config (if worker call fails or no worker running)
       if (mcpTools.length === 0) {
-        const config = instance.config as any;
-
-        // Check local MCP servers
-        if (config?.mcpServers?.local && config.mcpServers.local.length > 0) {
-          for (const server of config.mcpServers.local) {
-            if (server.tools && Array.isArray(server.tools)) {
-              mcpTools = mcpTools.concat(server.tools);
-            }
-          }
-        }
-
-        // Check remote MCP servers (e.g., HubSpot, Stripe)
-        if (config?.mcpServers?.remote && config.mcpServers.remote.length > 0) {
-          for (const server of config.mcpServers.remote) {
-            if (server.tools && Array.isArray(server.tools)) {
-              mcpTools = mcpTools.concat(server.tools);
-            }
-          }
-        }
+        mcpTools = getToolsFromConfig(instance.config);
       }
 
       // Verify tools are registered

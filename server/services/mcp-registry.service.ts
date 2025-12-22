@@ -61,6 +61,10 @@ export class MCPRegistryService {
         continue;
       }
 
+      // Get the semantic plugin ID (e.g., @hay/email-plugin) from the plugin registry
+      // instance.pluginId is the UUID, instance.plugin.pluginId is the semantic ID
+      const semanticPluginId = instance.plugin?.pluginId || instance.pluginId;
+
       // Check if worker is running (SDK v2)
       const worker = this.runnerService.getWorker(organizationId, instance.pluginId);
 
@@ -76,9 +80,9 @@ export class MCPRegistryService {
 
             for (const tool of data.tools || []) {
               tools.push({
-                id: `${instance.pluginId}:${tool.serverId || 'default'}:${tool.name}`,
+                id: `${semanticPluginId}:${tool.serverId || 'default'}:${tool.name}`,
                 organizationId,
-                pluginId: instance.pluginId,
+                pluginId: semanticPluginId, // Use semantic plugin ID (e.g., @hay/email-plugin)
                 serverId: tool.serverId || 'default',
                 name: tool.name,
                 description: tool.description,
@@ -87,12 +91,12 @@ export class MCPRegistryService {
               });
             }
 
-            console.log(`[MCPRegistry] Fetched ${data.tools?.length || 0} tools from ${instance.pluginId} worker`);
+            console.log(`[MCPRegistry] Fetched ${data.tools?.length || 0} tools from ${semanticPluginId} worker`);
           } else {
-            console.warn(`[MCPRegistry] Failed to fetch tools from ${instance.pluginId}: HTTP ${response.status}`);
+            console.warn(`[MCPRegistry] Failed to fetch tools from ${semanticPluginId}: HTTP ${response.status}`);
           }
         } catch (error: any) {
-          console.warn(`[MCPRegistry] Failed to fetch tools from ${instance.pluginId}:`, error.message);
+          console.warn(`[MCPRegistry] Failed to fetch tools from ${semanticPluginId}:`, error.message);
         }
       } else if (instance.config?.mcpServers) {
         // Legacy: Read from config
@@ -103,9 +107,9 @@ export class MCPRegistryService {
         for (const server of local) {
           for (const tool of server.tools) {
             tools.push({
-              id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
+              id: `${semanticPluginId}:${server.serverId}:${tool.name}`,
               organizationId: organizationId,
-              pluginId: instance.pluginId,
+              pluginId: semanticPluginId, // Use semantic plugin ID (e.g., @hay/email-plugin)
               serverId: server.serverId,
               name: tool.name,
               description: tool.description,
@@ -119,9 +123,9 @@ export class MCPRegistryService {
         for (const server of remote) {
           for (const tool of server.tools) {
             tools.push({
-              id: `${instance.pluginId}:${server.serverId}:${tool.name}`,
+              id: `${semanticPluginId}:${server.serverId}:${tool.name}`,
               organizationId: organizationId,
-              pluginId: instance.pluginId,
+              pluginId: semanticPluginId, // Use semantic plugin ID (e.g., @hay/email-plugin)
               serverId: server.serverId,
               name: tool.name,
               description: tool.description,
@@ -131,7 +135,7 @@ export class MCPRegistryService {
           }
         }
 
-        console.log(`[MCPRegistry] Loaded ${local.length + remote.length} servers from ${instance.pluginId} config (legacy)`);
+        console.log(`[MCPRegistry] Loaded ${local.length + remote.length} servers from ${semanticPluginId} config (legacy)`);
       }
     }
 

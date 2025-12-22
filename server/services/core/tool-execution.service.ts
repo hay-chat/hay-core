@@ -233,12 +233,25 @@ export class ToolExecutionService {
       if (plugin.pluginId === pluginId) {
         console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
         const manifest = plugin.manifest as HayPluginManifest;
-        if (manifest.capabilities?.mcp?.tools) {
+
+        // Check if this is an SDK v2 plugin (has "mcp" capability but no static tool definitions)
+        const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+        const hasMCPCapability = capabilities.includes("mcp");
+
+        if (hasMCPCapability && !manifest.capabilities?.mcp?.tools) {
+          // SDK v2 plugin - tools are fetched dynamically from the running MCP server
+          console.log(`[ToolExecution] Plugin is SDK v2 - tools are dynamic, skipping manifest validation`);
+          matchingPlugin = plugin;
+          // No toolSchema needed for SDK v2 - the MCP client will handle validation
+          break;
+        } else if (manifest.capabilities?.mcp?.tools) {
+          // Legacy plugin with static tool definitions in manifest
+          const mcpTools = manifest.capabilities.mcp.tools;
           console.log(
             `[ToolExecution] Available tools in plugin:`,
-            manifest.capabilities.mcp.tools.map((t) => t.name),
+            mcpTools.map((t) => t.name),
           );
-          const tool = manifest.capabilities.mcp.tools.find((t) => t.name === actualToolName);
+          const tool = mcpTools.find((t) => t.name === actualToolName);
           if (tool) {
             matchingPlugin = plugin;
             toolSchema = tool;
@@ -248,12 +261,12 @@ export class ToolExecutionService {
             console.log(`[ToolExecution] Tool '${actualToolName}' not found in this plugin`);
           }
         } else {
-          console.log(`[ToolExecution] Plugin has no MCP tools defined`);
+          console.log(`[ToolExecution] Plugin has no MCP capability or tools defined`);
         }
       }
     }
 
-    if (!matchingPlugin || !toolSchema) {
+    if (!matchingPlugin) {
       const availableTools = allPlugins.flatMap(
         (p) =>
           (p.manifest as HayPluginManifest)?.capabilities?.mcp?.tools?.map(
@@ -261,9 +274,7 @@ export class ToolExecutionService {
           ) || [],
       );
       throw new Error(
-        `Tool '${actualToolName}' not found in plugin '${pluginId}'. Available tools: ${availableTools.join(
-          ", ",
-        )}`,
+        `Plugin '${pluginId}' not found. Available tools: ${availableTools.join(", ")}`,
       );
     }
 
@@ -271,8 +282,8 @@ export class ToolExecutionService {
       `[ToolExecution] Found tool '${actualToolName}' in plugin '${matchingPlugin.name}'`,
     );
 
-    // Validate tool arguments against input schema
-    if (toolSchema.input_schema) {
+    // Validate tool arguments against input schema (only for legacy plugins with static schemas)
+    if (toolSchema && toolSchema.input_schema) {
       // Ensure input_schema is an object before validation
       if (typeof toolSchema.input_schema === 'object') {
         const validation = this.validateToolArguments(toolArgs, toolSchema.input_schema as ToolSchema["inputSchema"]);
@@ -280,6 +291,8 @@ export class ToolExecutionService {
           throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
         }
       }
+    } else if (!toolSchema) {
+      console.log(`[ToolExecution] Skipping argument validation for SDK v2 plugin (handled by MCP server)`);
     }
 
     // Check if plugin needs installation/building

@@ -1,5 +1,6 @@
 import type { MCPClient } from "./mcp-client.interface";
 import { LocalMCPClient } from "./local-mcp-client.service";
+import { LocalHTTPMCPClient } from "./local-http-mcp-client.service";
 import { RemoteMCPClient } from "./remote-mcp-client.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import type { HayPluginManifest } from "../types/plugin.types";
@@ -22,6 +23,19 @@ export class MCPClientFactory {
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
+
+    // Check if SDK v2 plugin (uses HTTP communication)
+    const isSDKv2 = Array.isArray(manifest.capabilities) && manifest.capabilities.includes("mcp");
+
+    if (isSDKv2) {
+      debugLog("mcp-factory", `Creating local HTTP MCP client for SDK v2 plugin ${pluginId}`, {
+        organizationId,
+      });
+
+      return new LocalHTTPMCPClient(organizationId, pluginId);
+    }
+
+    // Legacy plugins
     const connectionType = manifest.capabilities?.mcp?.connection?.type || "local";
 
     if (connectionType === "remote") {
@@ -39,7 +53,7 @@ export class MCPClientFactory {
       await client.connect();
       return client;
     } else {
-      debugLog("mcp-factory", `Creating local MCP client for plugin ${pluginId}`, {
+      debugLog("mcp-factory", `Creating local stdio MCP client for plugin ${pluginId}`, {
         organizationId,
       });
 

@@ -66,10 +66,12 @@ export class RetrievalLayer {
               rationale: { type: "string" },
             },
             required: ["id", "score", "rationale"],
+            additionalProperties: false,
           },
         },
       },
       required: ["candidates"],
+      additionalProperties: false,
     };
 
     debugLog("retrieval", "Invoking LLM for playbook selection");
