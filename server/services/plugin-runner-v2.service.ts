@@ -86,11 +86,19 @@ export class PluginRunnerV2Service {
       const port = await this.portAllocator.allocate();
 
       // Build environment variables
+      // SDK v2 expects org config in this format: { org: { id }, config: {...} }
+      const orgConfig = {
+        org: {
+          id: orgId
+        },
+        config: instance.config || {}
+      };
+
       const env = this.buildSDKv2Env({
         orgId,
         pluginId,
         port,
-        orgConfig: instance.config || {},
+        orgConfig,
         orgAuth: instance.authState || null,
         capabilities: (plugin.manifest as any).capabilities || [],
         allowedEnvVars: (plugin.manifest as any).env || []

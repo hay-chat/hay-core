@@ -143,9 +143,55 @@ const hasScope = (resource: string, action: string) => {
 };
 
 /**
+ * Middleware to ensure user is authenticated without requiring organization ID
+ * Used for endpoints that need to work before organization context is established
+ */
+export const isAuthedWithoutOrg = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
+  // Check if there was an authentication error stored in the request
+  const reqWithAuth = ctx.req as RequestWithAuthError;
+  if (reqWithAuth.authError) {
+    const errorMessage = reqWithAuth.authError;
+
+    // Provide specific error for token expiration
+    if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Token has expired",
+        cause: {
+          type: "TOKEN_EXPIRED",
+        },
+      });
+    }
+  }
+
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
+
+  // Note: We don't check organizationId here, allowing this middleware
+  // to be used for endpoints that need to fetch organization data
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user as AuthUser,
+    },
+  });
+});
+
+/**
  * Protected procedure - requires authentication
  */
 export const protectedProcedure = t.procedure.use(isAuthed);
+
+/**
+ * Protected procedure without organization requirement
+ * Used for endpoints that need to work before organization context is established
+ */
+export const protectedProcedureWithoutOrg = t.procedure.use(isAuthedWithoutOrg);
 
 /**
  * Admin procedure - requires admin role

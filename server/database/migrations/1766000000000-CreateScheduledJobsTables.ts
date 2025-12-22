@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateScheduledJobsTables1729695000000 implements MigrationInterface {
-  name = "CreateScheduledJobsTables1729695000000";
+export class CreateScheduledJobsTables1766000000000 implements MigrationInterface {
+  name = "CreateScheduledJobsTables1766000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create scheduled_jobs table

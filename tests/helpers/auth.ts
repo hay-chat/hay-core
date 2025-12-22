@@ -42,17 +42,23 @@ export async function cleanupTestUsers(): Promise<void> {
   });
 
   if (testUsers.length > 0) {
-    // Delete organizations
-    const orgIds = testUsers
-      .map((u) => u.organizationId)
-      .filter((id) => id) as string[];
+    const orgIds = testUsers.map((u) => u.organizationId).filter((id) => id) as string[];
 
+    // Delete plugin instances first (to avoid FK constraint violations)
     if (orgIds.length > 0) {
-      await orgRepository.delete(orgIds);
+      await AppDataSource.query(
+        `DELETE FROM plugin_instances WHERE organization_id = ANY($1::uuid[])`,
+        [orgIds],
+      );
     }
 
     // Delete users (CASCADE will handle UserOrganization)
     await userRepository.remove(testUsers);
+
+    // Then delete organizations
+    if (orgIds.length > 0) {
+      await orgRepository.delete(orgIds);
+    }
   }
 }
 
