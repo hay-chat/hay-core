@@ -117,7 +117,9 @@
                 />
               </div>
               <div class="confidence-fallback-section">
-                <div class="confidence-fallback-section__label">Fallback Message (Sent to Customer)</div>
+                <div class="confidence-fallback-section__label">
+                  Fallback Message (Sent to Customer)
+                </div>
                 <div
                   class="confidence-fallback-section__text confidence-fallback-section__text--sent"
                   v-html="markdownToHtml(message.content)"
@@ -673,6 +675,14 @@ const getConfidenceIcon = (tier: string | undefined) => {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.7;
+}
+
+.chat-message__text p {
+  margin-bottom: 0.5rem;
+}
+
+.chat-message__text p:last-child {
+  margin-bottom: 0;
 }
 
 .confidence-fallback-section__text {

@@ -14,18 +14,11 @@ import { MessageIntent } from "@server/database/entities/message.entity";
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
-  userMessage?: string;
-  tool?: {
-    name: string;
-    args: Record<string, unknown>;
-  };
-  handoff?: {
-    reason: string;
-    fields: Record<string, unknown>;
-  };
-  close?: {
-    reason: string;
-  };
+  userMessage?: string | null;
+  toolName?: string | null;
+  toolArgs?: string | null; // JSON string of tool arguments
+  handoffReason?: string | null;
+  closeReason?: string | null;
   rationale?: string;
   // Guardrail fields
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
@@ -33,6 +26,19 @@ export interface ExecutionResult {
   recheckAttempted?: boolean;
   recheckCount?: number;
   originalMessage?: string; // Original message before fallback replacement
+
+  // Legacy fields for backward compatibility (converted from new format)
+  tool?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
+  handoff?: {
+    reason: string;
+    fields?: Record<string, unknown>;
+  };
+  close?: {
+    reason: string;
+  };
 }
 
 export class ExecutionLayer {
@@ -57,39 +63,32 @@ export class ExecutionLayer {
           enum: ["ASK", "RESPOND", "CALL_TOOL", "HANDOFF", "CLOSE"],
         },
         userMessage: {
-          type: "string",
+          type: ["string", "null"],
           description: "Message to send to user (REQUIRED for ASK and RESPOND steps)",
         },
-        tool: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            args: { type: "object" },
-          },
-          description: "Tool to call (for CALL_TOOL step)",
+        toolName: {
+          type: ["string", "null"],
+          description: "Name of the tool to call (for CALL_TOOL step only)",
         },
-        handoff: {
-          type: "object",
-          properties: {
-            reason: { type: "string" },
-            fields: { type: "object" },
-          },
-          description: "Handoff details (for HANDOFF step)",
+        toolArgs: {
+          type: ["string", "null"],
+          description: "JSON string of arguments for the tool (for CALL_TOOL step only)",
         },
-        close: {
-          type: "object",
-          properties: {
-            reason: { type: "string" },
-          },
-          description: "Close reason (for CLOSE step)",
+        handoffReason: {
+          type: ["string", "null"],
+          description: "Reason for handoff (for HANDOFF step only)",
+        },
+        closeReason: {
+          type: ["string", "null"],
+          description: "Reason for closing (for CLOSE step only)",
         },
         rationale: {
           type: "string",
           description: "Explanation of why this step was chosen",
         },
       },
-      required: ["step", "rationale"],
-      // Note: userMessage is conditionally required - validated after parsing
+      required: ["step", "rationale", "userMessage", "toolName", "toolArgs", "handoffReason", "closeReason"],
+      additionalProperties: false,
     };
   }
 
@@ -165,6 +164,36 @@ export class ExecutionLayer {
 
       const result = JSON.parse(response) as ExecutionResult;
 
+      // Convert new flat structure to legacy nested structure for backward compatibility
+      if (result.toolName && result.toolArgs) {
+        // Parse toolArgs from JSON string to object
+        let parsedArgs: Record<string, unknown> = {};
+        try {
+          parsedArgs = JSON.parse(result.toolArgs);
+        } catch (error) {
+          debugLog("execution", "Failed to parse toolArgs JSON", {
+            level: "error",
+            toolArgs: result.toolArgs,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        result.tool = {
+          name: result.toolName,
+          args: parsedArgs,
+        };
+      }
+      if (result.handoffReason) {
+        result.handoff = {
+          reason: result.handoffReason,
+        };
+      }
+      if (result.closeReason) {
+        result.close = {
+          reason: result.closeReason,
+        };
+      }
+
       // Detect and auto-correct missing step when tool is present
       if (!result.step && result.tool) {
         debugLog("execution", "Auto-correcting: Missing step with tool present → CALL_TOOL", {
@@ -225,6 +254,7 @@ export class ExecutionLayer {
         hasHandoff: !!result.handoff,
         hasClose: !!result.close,
         rationale: result.rationale,
+        fullResult: JSON.stringify(result),
       });
 
       // Apply confidence guardrails to RESPOND steps
@@ -326,7 +356,7 @@ export class ExecutionLayer {
           },
         },
         companyInterest: companyInterestAssessment,
-        originalMessage,
+        originalMessage: originalMessage || undefined,
       };
     }
 
@@ -402,12 +432,12 @@ export class ExecutionLayer {
             confidence: result.confidence,
             recheckAttempted: result.recheckAttempted,
             recheckCount: result.recheckCount,
-            originalMessage,
+            originalMessage: originalMessage || undefined,
           };
         } else {
           // Just use fallback message
           debugLog("execution", "Using fallback message");
-          result.originalMessage = originalMessage;
+          result.originalMessage = originalMessage || undefined;
           result.userMessage = fallbackMessage;
         }
       }

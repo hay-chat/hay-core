@@ -12,21 +12,25 @@ Please provide a helpful response or next step to the customer's last message th
   CLOSE - To close the conversation (optionally include userMessage)
 {{#if hasTools}}
   CALL_TOOL - To call a tool to get more information/Handle an action in the playbook.
-    IMPORTANT: When using CALL_TOOL, do NOT include a userMessage. The tool will be executed and you'll see the result in the next iteration, then you can respond to the user.
+    IMPORTANT: When using CALL_TOOL, you SHOULD include a contextual userMessage ONLY IF this is the first tool call. This message will inform the user that you're working on their request (e.g., "Let me check that for you", "I'm looking into this now"). For subsequent tool calls in the same conversation turn, set userMessage to null.
     You can call tools iteratively - you'll get the response from the tool call in the next step and be asked to continue with the conversation or call another tool.
     Available tools: {{tools}}.
 {{/if}}
 
 IMPORTANT: When choosing ASK or RESPOND, you MUST include a userMessage field with the actual message to send to the customer. Do not return ASK or RESPOND without a userMessage.
 
-IMPORTANT: When choosing CALL_TOOL, do NOT include a userMessage. Tool execution happens first, then you'll respond to the user after seeing the result.
+IMPORTANT: When choosing CALL_TOOL for the first time in this conversation turn, include a contextual userMessage to inform the user (e.g., "Let me check that for you", "I'm looking into this now"). For subsequent tool calls, set userMessage to null. Tool execution happens, then you'll see the result in the next iteration.
 
 ## Step-specific field requirements:
-- ASK: MUST have userMessage
-- RESPOND: MUST have userMessage
-- CALL_TOOL: MUST have tool (name and args), MUST NOT have userMessage
-- HANDOFF: MUST have handoff, MAY have userMessage
-- CLOSE: MUST have close, MAY have userMessage
+- ASK: MUST have userMessage (set others to null)
+- RESPOND: MUST have userMessage (set others to null)
+- CALL_TOOL: MUST have toolName and toolArgs (as JSON string), SHOULD include userMessage for the first tool call (contextual message to inform user), MUST set userMessage to null for subsequent tool calls
+- HANDOFF: MUST have handoffReason, MAY have userMessage
+- CLOSE: MUST have closeReason, MAY have userMessage
+
+Note: All fields (userMessage, toolName, toolArgs, handoffReason, closeReason) are required in the response, but should be set to null when not applicable for the chosen step.
+
+Important: For CALL_TOOL step, toolArgs must be a valid JSON string representing the arguments object. For example: "{\"email\": \"user@example.com\", \"subject\": \"Hello\"}"
 
 ## When to use HANDOFF instead of RESPOND:
 

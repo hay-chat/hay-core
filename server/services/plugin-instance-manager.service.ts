@@ -1,8 +1,10 @@
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { processManagerService } from "./process-manager.service";
+import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { debugLog } from "@server/lib/debug-logger";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 interface InstancePoolStats {
   runningCount: number;
@@ -50,8 +52,12 @@ export class PluginInstanceManagerService {
       return;
     }
 
-    // Check if already running
-    if (processManagerService.isRunning(organizationId, pluginId)) {
+    // Check if already running (check both SDK v2 and legacy)
+    const runnerV2 = getPluginRunnerV2Service();
+    const isRunningV2 = runnerV2.isRunning(organizationId, pluginId);
+    const isRunningLegacy = processManagerService.isRunning(organizationId, pluginId);
+
+    if (isRunningV2 || isRunningLegacy) {
       await this.updateActivityTimestamp(organizationId, pluginId);
       return;
     }
@@ -82,7 +88,26 @@ export class PluginInstanceManagerService {
     try {
       debugLog("plugin-manager", `Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
 
-      await processManagerService.startPlugin(organizationId, pluginId);
+      // Get plugin registry to check SDK version
+      const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+      if (!plugin) {
+        throw new Error(`Plugin ${pluginId} not found in registry`);
+      }
+
+      const manifest = plugin.manifest as HayPluginManifest;
+      const isSDKv2 = Array.isArray(manifest.capabilities) && manifest.capabilities.includes("mcp");
+
+      if (isSDKv2) {
+        // SDK v2: Use plugin-runner-v2 service
+        debugLog("plugin-manager", `Starting SDK v2 plugin ${pluginId} via plugin-runner-v2`);
+        const runnerV2 = getPluginRunnerV2Service();
+        await runnerV2.startWorker(organizationId, pluginId);
+      } else {
+        // Legacy: Use process manager (stdio MCP)
+        debugLog("plugin-manager", `Starting legacy plugin ${pluginId} via process-manager`);
+        await processManagerService.startPlugin(organizationId, pluginId);
+      }
+
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
@@ -138,18 +163,26 @@ export class PluginInstanceManagerService {
       const lastActivity = memoryActivity || instance.lastActivityAt;
 
       if (!lastActivity || lastActivity < inactiveThreshold) {
-        // Check if instance is actually running in process manager
-        if (processManagerService.isRunning(instance.organizationId, instance.plugin.pluginId)) {
+        // Check if instance is actually running (check both SDK v2 and legacy)
+        const runnerV2 = getPluginRunnerV2Service();
+        const isRunningV2 = runnerV2.isRunning(instance.organizationId, instance.plugin.pluginId);
+        const isRunningLegacy = processManagerService.isRunning(instance.organizationId, instance.plugin.pluginId);
+
+        if (isRunningV2 || isRunningLegacy) {
           debugLog(
             "plugin-manager",
             `Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
           try {
-            await processManagerService.stopPlugin(
-              instance.organizationId,
-              instance.plugin.pluginId,
-            );
+            if (isRunningV2) {
+              await runnerV2.stopWorker(instance.organizationId, instance.plugin.pluginId);
+            } else {
+              await processManagerService.stopPlugin(
+                instance.organizationId,
+                instance.plugin.pluginId,
+              );
+            }
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
