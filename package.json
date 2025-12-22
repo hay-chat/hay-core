@@ -52,6 +52,9 @@
     "migration:revert": "cd server && npm run migration:revert",
     "migration:show": "cd server && npm run migration:show",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
+    "env:local": "./scripts/switch-env.sh local",
+    "env:cloud": "./scripts/switch-env.sh cloud",
+    "env:status": "./scripts/switch-env.sh status",
     "postinstall": "git submodule update --init --recursive && cd dashboard && nuxt prepare"
   },
   "overrides": {

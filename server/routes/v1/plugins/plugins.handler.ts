@@ -6,6 +6,7 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
 import { processManagerService } from "@server/services/process-manager.service";
+import { getPluginRunnerV2Service } from "@server/services/plugin-runner-v2.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
@@ -47,19 +48,27 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
     })
     .map((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
+
+      // For SDK v2 plugins, use metadata.configSchema; for v1, use manifest.configSchema
+      // SDK v2 plugins have metadata populated, v1 plugins don't
+      const configSchema = plugin.metadata?.configSchema
+        ? plugin.metadata.configSchema
+        : (manifest.configSchema || {});
+
       const result = {
         id: plugin.pluginId, // Use pluginId as the identifier for frontend
         dbId: plugin.id, // Keep database ID for reference
         name: plugin.name,
         version: plugin.version,
         type: manifest.type,
-        description: manifest.configSchema
-          ? Object.values(manifest.configSchema)[0]?.description
+        description: configSchema
+          ? Object.values(configSchema)[0]?.description
           : `${plugin.name} plugin`,
         installed: plugin.installed,
         built: plugin.built,
         enabled: enabledPluginIds.has(plugin.id),
-        hasConfiguration: !!manifest.configSchema,
+        configSchema, // Include the actual schema for frontend
+        hasConfiguration: Object.keys(configSchema).length > 0,
         hasCustomUI: !!manifest.ui?.configuration,
         capabilities: manifest.capabilities,
         features: manifest.capabilities?.chat_connector?.features || {},
@@ -102,13 +111,25 @@ export const getPlugin = authenticatedProcedure
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
+
+    // For SDK v2 plugins, merge metadata into manifest to expose runtime config
+    // SDK v2 plugins have metadata populated, v1 plugins don't
+    const effectiveManifest = plugin.metadata
+      ? {
+          ...manifest,
+          configSchema: plugin.metadata.configSchema || {},
+          authMethods: plugin.metadata.authMethods || [],
+          uiExtensions: plugin.metadata.uiExtensions || {},
+        }
+      : manifest;
+
     return {
       id: plugin.pluginId, // Use pluginId as the identifier
       dbId: plugin.id, // Keep database ID for reference
       name: plugin.name,
       version: plugin.version,
       type: manifest.type,
-      manifest: manifest,
+      manifest: effectiveManifest,
       installed: plugin.installed,
       built: plugin.built,
       status: plugin.status || PluginStatus.AVAILABLE,
@@ -464,12 +485,41 @@ export const getPluginConfiguration = authenticatedProcedure
 
     const manifest = plugin.manifest as HayPluginManifest;
 
+    // For SDK v2 plugins, use cached metadata first, then try worker if needed
+    let configSchema = manifest.configSchema;
+
+    // Return cached metadata for SDK v2 plugins even when not enabled
+    // SDK v2 plugins have metadata populated
+    if (plugin.metadata?.configSchema) {
+      configSchema = plugin.metadata.configSchema;
+      console.log(`[getPluginConfiguration] Using cached metadata for SDK v2 plugin: ${input.pluginId}`);
+    } else if (instance && instance.enabled) {
+      // For enabled plugins, try fetching fresh metadata from worker as fallback
+      try {
+        const runnerV2 = getPluginRunnerV2Service();
+        const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
+        if (worker && worker.port) {
+          const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            if (metadata.configSchema) {
+              configSchema = metadata.configSchema;
+              console.log(`[getPluginConfiguration] Fetched fresh config schema from SDK v2 worker for ${input.pluginId}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[getPluginConfiguration] Failed to fetch metadata from SDK v2 worker for ${input.pluginId}:`, error);
+        // Fall back to manifest or cached metadata
+      }
+    }
+
     if (!instance) {
-      // Return default configuration from manifest
+      // Return default configuration from manifest or worker metadata
       const defaultConfig: Record<string, any> = {};
 
-      if (manifest.configSchema) {
-        Object.entries(manifest.configSchema).forEach(([key, field]) => {
+      if (configSchema) {
+        Object.entries(configSchema).forEach(([key, field]) => {
           if (field.default !== undefined) {
             defaultConfig[key] = field.default;
           }
@@ -489,7 +539,7 @@ export const getPluginConfiguration = authenticatedProcedure
 
     // Mask sensitive values for display
     for (const [key, value] of Object.entries(decryptedConfig)) {
-      const schema = manifest.configSchema?.[key];
+      const schema = configSchema?.[key];
       if (schema?.encrypted && value) {
         // For encrypted fields, only show masked value
         maskedConfig[key] = "*".repeat(8);
@@ -721,46 +771,124 @@ export const testConnection = authenticatedProcedure
     }
 
     try {
-      // Get MCP tools from database (all plugins now register tools dynamically)
       let mcpTools: any[] = [];
-      const config = instance.config as any;
 
-      // Check local MCP servers
-      if (config?.mcpServers?.local && config.mcpServers.local.length > 0) {
-        for (const server of config.mcpServers.local) {
-          if (server.tools && Array.isArray(server.tools)) {
-            mcpTools = mcpTools.concat(server.tools);
+      // For SDK v2 plugins, fetch tools from the running worker's /mcp/list-tools endpoint
+      const runnerV2 = getPluginRunnerV2Service();
+      const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
+
+      if (worker && worker.port) {
+        // Try to fetch tools from SDK v2 worker
+        try {
+          const toolsResponse = await fetch(`http://localhost:${worker.port}/mcp/list-tools`);
+          if (toolsResponse.ok) {
+            const toolsData = await toolsResponse.json();
+            mcpTools = toolsData.tools || [];
+            console.log(`[testConnection] Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`);
+          }
+        } catch (workerError) {
+          console.warn(`[testConnection] Failed to fetch tools from SDK v2 worker for ${input.pluginId}:`, workerError);
+        }
+      }
+
+      // Fallback: Get MCP tools from database config (for legacy plugins or if worker call fails)
+      if (mcpTools.length === 0) {
+        const config = instance.config as any;
+
+        // Check local MCP servers
+        if (config?.mcpServers?.local && config.mcpServers.local.length > 0) {
+          for (const server of config.mcpServers.local) {
+            if (server.tools && Array.isArray(server.tools)) {
+              mcpTools = mcpTools.concat(server.tools);
+            }
+          }
+        }
+
+        // Check remote MCP servers (e.g., HubSpot, Stripe)
+        if (config?.mcpServers?.remote && config.mcpServers.remote.length > 0) {
+          for (const server of config.mcpServers.remote) {
+            if (server.tools && Array.isArray(server.tools)) {
+              mcpTools = mcpTools.concat(server.tools);
+            }
           }
         }
       }
 
-      // Check remote MCP servers (e.g., HubSpot, Stripe)
-      if (config?.mcpServers?.remote && config.mcpServers.remote.length > 0) {
-        for (const server of config.mcpServers.remote) {
-          if (server.tools && Array.isArray(server.tools)) {
-            mcpTools = mcpTools.concat(server.tools);
-          }
-        }
-      }
-
-      // All plugins now use TypeScript-first: verify tools are registered
-      // The plugin worker has already validated connectivity by registering successfully
-      if (mcpTools.length > 0) {
-        return {
-          success: true,
-          status: "healthy",
-          message: `Plugin is running with ${mcpTools.length} MCP tools registered`,
-          tools: mcpTools.map(t => ({
-            name: t.name,
-            description: t.description,
-          })),
-          testedAt: new Date(),
-        };
-      } else {
+      // Verify tools are registered
+      if (mcpTools.length === 0) {
         return {
           success: false,
           status: "unhealthy",
           message: "No MCP tools registered yet - plugin may still be initializing",
+          testedAt: new Date(),
+        };
+      }
+
+      // Actually test the MCP server by calling a safe tool
+      // Prioritize list_* or get_* tools, or just use the first available tool
+      const safeToolPrefixes = ['list_', 'get_', 'search_', 'find_', 'read_'];
+      let testTool = mcpTools.find(t =>
+        safeToolPrefixes.some(prefix => t.name.toLowerCase().startsWith(prefix))
+      );
+
+      // If no safe tool found, use the first tool
+      if (!testTool) {
+        testTool = mcpTools[0];
+      }
+
+      console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
+
+      // Call the tool via worker (SDK v2) or legacy MCP client
+      if (worker && worker.port) {
+        // SDK v2: Call tool via worker HTTP API
+        try {
+          const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toolName: testTool.name,
+              arguments: {}, // Empty args for health check
+            }),
+            signal: AbortSignal.timeout(10000), // 10 second timeout
+          });
+
+          if (!callResponse.ok) {
+            const errorText = await callResponse.text();
+            return {
+              success: false,
+              status: "unhealthy",
+              message: `MCP tool call failed: HTTP ${callResponse.status} - ${errorText}`,
+              tools: mcpTools.map(t => ({ name: t.name, description: t.description })),
+              testedAt: new Date(),
+            };
+          }
+
+          const result = await callResponse.json();
+
+          // Success - MCP server is responding
+          return {
+            success: true,
+            status: "healthy",
+            message: `MCP server is healthy - successfully called ${testTool.name}`,
+            tools: mcpTools.map(t => ({ name: t.name, description: t.description })),
+            testedAt: new Date(),
+          };
+        } catch (testError: any) {
+          return {
+            success: false,
+            status: "unhealthy",
+            message: `MCP tool call failed: ${testError.message}`,
+            tools: mcpTools.map(t => ({ name: t.name, description: t.description })),
+            testedAt: new Date(),
+          };
+        }
+      } else {
+        // No worker - just return tools list as before (legacy behavior)
+        return {
+          success: true,
+          status: "healthy",
+          message: `Plugin has ${mcpTools.length} MCP tools registered (legacy mode - tool calling not tested)`,
+          tools: mcpTools.map(t => ({ name: t.name, description: t.description })),
           testedAt: new Date(),
         };
       }

@@ -1,7 +1,6 @@
 import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
-import { Hay } from "@/utils/api";
 
 // Define role-protected routes
 // Map route paths to required roles
@@ -62,7 +61,9 @@ export default defineNuxtRouteMiddleware(
     console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
 
     // Skip auth check if staying on the same page (e.g., opening modals)
-    if (to.path === from.path) {
+    // UNLESS we have URL tokens (for E2E testing)
+    const hasUrlTokens = to.query.accessToken && to.query.refreshToken && to.query.expiresIn;
+    if (to.path === from.path && !hasUrlTokens) {
       console.log("[Auth Middleware] Same page, skipping");
       return;
     }
@@ -89,45 +90,44 @@ export default defineNuxtRouteMiddleware(
     const userStore = useUserStore();
 
     // URL Token Auth for E2E Testing (Development Only)
-    if (process.client && to.query.auth_token && process.env.NODE_ENV !== "production") {
+    if (
+      process.client &&
+      process.env.NODE_ENV !== "production" &&
+      to.query.accessToken &&
+      to.query.refreshToken &&
+      to.query.expiresIn
+    ) {
       console.log("[Auth Middleware] 🔐 URL token authentication detected (E2E testing mode)");
 
-      const token = to.query.auth_token as string;
-
-      // Temporarily set token to validate
-      authStore.tokens = {
-        accessToken: token,
-        refreshToken: "", // Not needed for validation
-        expiresAt: Date.now() + 900000, // 15 minutes
-      };
+      const accessToken = to.query.accessToken as string;
+      const refreshToken = to.query.refreshToken as string;
+      const expiresIn = parseInt(to.query.expiresIn as string, 10);
 
       try {
-        // Validate by fetching user data
-        const user = await Hay.auth.me.query();
-
-        // Store valid auth state
-        userStore.setUser(user as any);
-        authStore.isAuthenticated = true;
-        authStore.isInitialized = true;
-        authStore.updateActivity();
+        await authStore.loginWithTokens({
+          accessToken,
+          refreshToken,
+          expiresIn,
+        });
 
         console.log("[Auth Middleware] ✅ URL token validated successfully");
         console.log(
           "[Auth Middleware] ⚠️  Warning: URL token auth is for development/testing only!",
         );
 
-        // Remove token from URL for security
-        const cleanPath = to.path;
-        const cleanQuery = { ...to.query };
-        delete cleanQuery.auth_token;
+        // Mark that we just did URL token auth to prevent AuthProvider from redirecting
+        if (process.client) {
+          sessionStorage.setItem("urlTokenAuthCompleted", "true");
+        }
 
-        return navigateTo(
-          {
-            path: cleanPath || "/",
-            query: Object.keys(cleanQuery).length > 0 ? cleanQuery : undefined,
-          },
-          { replace: true },
-        );
+        // Clean URL by removing tokens and navigating with replace
+        const cleanQuery = { ...to.query };
+        delete cleanQuery.accessToken;
+        delete cleanQuery.refreshToken;
+        delete cleanQuery.expiresIn;
+
+        // Navigate to the same path with clean query params
+        return navigateTo({ path: to.path, query: cleanQuery }, { replace: true });
       } catch (error) {
         console.error("[Auth Middleware] ❌ URL token validation failed:", error);
 
@@ -151,16 +151,17 @@ export default defineNuxtRouteMiddleware(
 
     console.log("[Auth Middleware] Auth initialized:", authStore.isInitialized);
     console.log("[Auth Middleware] Authenticated:", authStore.isAuthenticated);
+    console.log("[Auth Middleware] Has tokens:", !!authStore.tokens?.accessToken);
 
     // Check if auth is still initializing - only on client side
     if (!authStore.isInitialized) {
       // For client-side navigation, wait for auth initialization
       // but immediately redirect if we know there's no token
       if (!authStore.tokens?.accessToken) {
-        console.log("[Auth Middleware] No token, redirecting to login");
+        console.log("[Auth Middleware] No token and not initialized, redirecting to login");
         return navigateTo("/login");
       }
-      console.log("[Auth Middleware] Auth not initialized yet, waiting");
+      console.log("[Auth Middleware] Auth not initialized yet but has token, waiting");
       return; // Let AuthProvider handle the loading state
     }
 

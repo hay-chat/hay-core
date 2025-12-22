@@ -171,6 +171,50 @@ export const useAuthStore = defineStore("auth", {
         throw error;
       }
     },
+
+    /**
+     * Login using tokens directly (useful for automated testing and direct auth links)
+     * This mimics the regular login flow but with pre-existing tokens
+     */
+    async loginWithTokens(data: { accessToken: string; refreshToken: string; expiresIn: number }) {
+      this.isLoading = true;
+      try {
+        // Set tokens first
+        this.tokens = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: Date.now() + data.expiresIn * 1000,
+        };
+
+        // For URL token auth, we don't have organization context yet
+        // The backend will use the user's default/first organization for auth.me
+        // We'll get the full organization list from the me response
+
+        // Fetch user data to validate and complete the login
+        // Note: This call will work without x-organization-id header
+        // because auth.me uses the user's first organization by default
+        const user = await HayAuthApi.auth.me.query();
+
+        // Initialize user store and set user data
+        const userStore = useUserStore();
+        userStore.setUser(user as User);
+
+        this.isAuthenticated = true;
+        this.isInitialized = true;
+        this.updateActivity();
+
+        console.log("[Auth] Successfully logged in with tokens");
+      } catch (error) {
+        // If validation fails, clear the tokens
+        console.error("[Auth] Token validation failed:", error);
+        this.tokens = null;
+        this.isAuthenticated = false;
+        this.isInitialized = true;
+        throw error;
+      } finally {
+        this.isLoading = false;
+      }
+    },
   },
   persist: true,
 });

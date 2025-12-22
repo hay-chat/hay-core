@@ -807,10 +807,24 @@ const fetchPlugin = async () => {
     loading.value = false;
 
     // Auto-test connection asynchronously (don't block page load)
-    // We check configData here instead of enabled.value because loading.value = false happens after this
-    if (enabled.value && hasConfiguration.value && Object.keys(formData.value).length > 0) {
-      // Test connection automatically when settings exist (async, non-blocking)
-      testConnection();
+    if (enabled.value) {
+      // Check if plugin requires authentication
+      const requiresAuth = plugin.value?.manifest?.authMethods && plugin.value.manifest.authMethods.length > 0;
+
+      if (requiresAuth) {
+        // Only test connection if auth is configured
+        // instanceAuth is populated when the plugin has been authenticated
+        if (instanceAuth.value && Object.keys(instanceAuth.value).length > 0) {
+          console.log('[Plugin] Auth required and configured, testing connection...');
+          testConnection();
+        } else {
+          console.log('[Plugin] Auth required but not configured yet, skipping health check');
+        }
+      } else {
+        // No auth required, test connection immediately
+        console.log('[Plugin] No auth required, testing connection...');
+        testConnection();
+      }
     }
   }
 };
