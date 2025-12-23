@@ -1,22 +1,22 @@
 {
   "name": "@hay/email-plugin",
   "version": "2.0.0",
-  "description": "Send emails using the platform email service with configurable recipient lists (SDK v2)",
+  "description": "Send emails using the platform email service with configurable recipient lists",
   "author": "Hay",
   "license": "MIT",
   "type": "module",
-  "main": "dist/index-v2.js",
+  "main": "dist/index.js",
   "hay-plugin": {
-    "entry": "./dist/index-v2.js",
+    "entry": "./dist/index.js",
     "displayName": "Email",
     "category": "tool",
     "capabilities": ["mcp", "config"],
     "env": []
   },
   "scripts": {
-    "build": "tsc --project tsconfig-v2.json",
-    "start": "node dist/index-v2.js",
-    "dev": "npm run build && node dist/index-v2.js"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "npm run build && node dist/index.js"
   },
   "keywords": [
     "mcp",
@@ -24,8 +24,7 @@
     "smtp",
     "hay",
     "plugin",
-    "notifications",
-    "sdk-v2"
+    "notifications"
   ],
   "dependencies": {},
   "devDependencies": {
