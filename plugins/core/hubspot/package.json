@@ -1,29 +1,22 @@
 {
   "name": "@hay/plugin-hubspot",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
   "author": "Hay",
+  "license": "MIT",
+  "type": "module",
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
     "displayName": "HubSpot",
     "category": "integration",
-    "capabilities": ["mcp"],
-    "env": ["HUBSPOT_CLIENT_ID", "HUBSPOT_CLIENT_SECRET"],
-    "auth": {
-      "type": "oauth2",
-      "authorizationUrl": "https://mcp.hubspot.com/oauth/authorize/user",
-      "tokenUrl": "https://mcp.hubspot.com/oauth/v3/token",
-      "scopes": ["crm.objects.tickets.read", "crm.objects.deals.read", "crm.objects.companies.read", "crm.objects.contacts.read", "oauth"],
-      "pkce": true,
-      "clientIdEnvVar": "HUBSPOT_CLIENT_ID",
-      "clientSecretEnvVar": "HUBSPOT_CLIENT_SECRET"
-    }
+    "capabilities": ["mcp", "auth"],
+    "env": ["HUBSPOT_CLIENT_ID", "HUBSPOT_CLIENT_SECRET"]
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "npm run build && node dist/index.js"
   },
   "keywords": [
     "mcp",
@@ -32,11 +25,9 @@
     "crm",
     "sales"
   ],
-  "dependencies": {
-    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/node": "^20.10.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }
