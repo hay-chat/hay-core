@@ -139,6 +139,11 @@ function buildMessageMetadata(
     metadata.originalMessage = executionResult.originalMessage;
   }
 
+  // Add execution rationale (why the LLM chose this step type)
+  if (executionResult.rationale) {
+    metadata.executionRationale = executionResult.rationale;
+  }
+
   return metadata;
 }
 

@@ -289,8 +289,8 @@
         </Card>
       </template>
 
-      <!-- OAuth Connection Card (show when enabled for OAuth plugins) -->
-      <Card v-if="enabled && plugin.manifest?.auth?.type === 'oauth2'">
+      <!-- OAuth Connection Card (show when OAuth is available and configured) -->
+      <Card v-if="enabled && oauthAvailable && oauthConfigured">
         <CardContent>
           <PluginOAuthConnection
             :plugin="plugin"
@@ -300,6 +300,8 @@
               organizationId: userStore.activeOrganizationId,
             }"
             :api-base-url="apiBaseUrl"
+            :oauth-available="oauthAvailable"
+            :oauth-configured="oauthConfigured"
           />
         </CardContent>
       </Card>
@@ -546,6 +548,8 @@ const showDisableConfirm = ref(false);
 const testResult = ref<{ success: boolean; message?: string; error?: string } | null>(null);
 const instanceId = ref<string | null>(null);
 const instanceAuth = ref<any>(null); // Auth config from plugin instance
+const oauthAvailable = ref(false); // Plugin has OAuth2 registered
+const oauthConfigured = ref(false); // OAuth credentials configured
 
 // Configuration
 const hasConfiguration = ref(false);
@@ -770,6 +774,17 @@ const fetchPlugin = async () => {
       instanceAuth.value = configData.auth;
     }
 
+    // Store OAuth availability and configuration status
+    if ("oauthAvailable" in configData) {
+      oauthAvailable.value = configData.oauthAvailable;
+      console.log('[Plugin Settings] OAuth available:', configData.oauthAvailable);
+    }
+    if ("oauthConfigured" in configData) {
+      oauthConfigured.value = configData.oauthConfigured;
+      console.log('[Plugin Settings] OAuth configured:', configData.oauthConfigured);
+    }
+    console.log('[Plugin Settings] OAuth state:', { oauthAvailable: oauthAvailable.value, oauthConfigured: oauthConfigured.value, enabled: enabled.value });
+
     // Set config schema from manifest
     if (pluginData.manifest?.configSchema) {
       hasConfiguration.value = true;
@@ -873,8 +888,21 @@ const saveConfiguration = async () => {
     // Show success toast
     toast.success("Configuration saved successfully");
 
+    // Reload configuration to get updated OAuth state
+    const updatedConfig = await Hay.plugins.getConfiguration.query({
+      pluginId: pluginId.value,
+    });
+
+    // Update OAuth state
+    if ("oauthAvailable" in updatedConfig) {
+      oauthAvailable.value = updatedConfig.oauthAvailable;
+    }
+    if ("oauthConfigured" in updatedConfig) {
+      oauthConfigured.value = updatedConfig.oauthConfigured;
+    }
+
     // Update original form data to reflect new saved state
-    originalFormData.value = { ...cleanedConfig };
+    originalFormData.value = { ...updatedConfig.configuration };
 
     // Test connection after saving
     await testConnection();
@@ -896,6 +924,15 @@ const resetForm = async () => {
   });
   formData.value = { ...configData.configuration };
   originalFormData.value = { ...configData.configuration };
+
+  // Update OAuth state
+  if ("oauthAvailable" in configData) {
+    oauthAvailable.value = configData.oauthAvailable;
+  }
+  if ("oauthConfigured" in configData) {
+    oauthConfigured.value = configData.oauthConfigured;
+  }
+
   // Clear any editing state for encrypted fields
   editingEncryptedFields.value.clear();
 };

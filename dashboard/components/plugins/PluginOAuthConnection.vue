@@ -1,21 +1,13 @@
 <template>
   <div class="space-y-4">
-    <!-- Debug info -->
-    <div v-if="!oauthAvailable" class="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
-      <p class="font-mono">Debug: OAuth not available for this plugin</p>
-      <p class="font-mono">Plugin ID: {{ props.plugin?.id }}</p>
-      <p class="font-mono">Checked: {{ oauthCheckComplete }}</p>
-    </div>
-
-    <div v-if="oauthAvailable" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div class="space-y-1">
-          <h3 class="text-lg font-medium">Connect with OAuth</h3>
-          <p class="text-sm text-muted-foreground">
-            {{ description || `Securely connect your ${pluginName} account using OAuth` }}
-          </p>
-        </div>
+    <div class="flex items-center justify-between">
+      <div class="space-y-1">
+        <h3 class="text-lg font-medium">Connect with OAuth</h3>
+        <p class="text-sm text-muted-foreground">
+          {{ description || `Securely connect your ${pluginName} account using OAuth` }}
+        </p>
       </div>
+    </div>
 
     <!-- OAuth Connection Status -->
     <div
@@ -46,10 +38,16 @@
             <p class="font-medium">
               {{ oauthStatus.connected ? "Connected via OAuth" : "Not connected" }}
             </p>
-            <p v-if="oauthStatus.connected && oauthStatus.connectedAt" class="text-xs text-muted-foreground">
+            <p
+              v-if="oauthStatus.connected && oauthStatus.connectedAt"
+              class="text-xs text-muted-foreground"
+            >
               Connected {{ formatDate(oauthStatus.connectedAt) }}
             </p>
-            <p v-if="oauthStatus.connected && oauthStatus.expiresAt" class="text-xs text-muted-foreground">
+            <p
+              v-if="oauthStatus.connected && oauthStatus.expiresAt"
+              class="text-xs text-muted-foreground"
+            >
               Token expires {{ formatDate(oauthStatus.expiresAt) }}
             </p>
           </div>
@@ -95,7 +93,6 @@
         <span>{{ infoText }}</span>
       </div>
     </div>
-    </div>
   </div>
 </template>
 
@@ -116,12 +113,12 @@ interface Props {
   apiBaseUrl?: string;
   description?: string;
   infoText?: string;
+  oauthAvailable?: boolean; // Passed from parent
+  oauthConfigured?: boolean; // Passed from parent
 }
 
 const props = defineProps<Props>();
 
-const oauthAvailable = ref(false);
-const oauthCheckComplete = ref(false);
 const oauthStatus = ref<OAuthStatus | null>(null);
 const connecting = ref(false);
 const disconnecting = ref(false);
@@ -129,21 +126,9 @@ const disconnecting = ref(false);
 // Compute plugin name from plugin data
 const pluginName = computed(() => props.plugin?.name || props.plugin?.id || "Service");
 
-// Check if OAuth is available for this plugin
-const checkOAuthAvailability = async () => {
-  console.log("[PluginOAuthConnection] Checking OAuth availability for:", props.plugin?.id);
-  try {
-    const { Hay } = await import("@/utils/api");
-    const result = await Hay.plugins.oauth.isAvailable.query({ pluginId: props.plugin.id });
-    console.log("[PluginOAuthConnection] OAuth availability result:", result);
-    oauthAvailable.value = result.available;
-    oauthCheckComplete.value = true;
-  } catch (error) {
-    console.error("[PluginOAuthConnection] Failed to check OAuth availability:", error);
-    oauthAvailable.value = false;
-    oauthCheckComplete.value = true;
-  }
-};
+// Use OAuth availability from props (already checked by parent)
+const oauthAvailable = computed(() => props.oauthAvailable && props.oauthConfigured);
+const oauthCheckComplete = ref(true); // Always true since props are passed
 
 // Fetch OAuth status
 const fetchOAuthStatus = async () => {
@@ -215,9 +200,6 @@ const formatDate = (timestamp: number) => {
 
 // Load status on mount
 onMounted(async () => {
-  // Check if OAuth is available first
-  await checkOAuthAvailability();
-
   // Only fetch status if OAuth is available
   if (oauthAvailable.value) {
     await fetchOAuthStatus();

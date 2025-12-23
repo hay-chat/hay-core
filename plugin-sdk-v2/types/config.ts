@@ -25,7 +25,7 @@ export type ConfigFieldType = 'string' | 'number' | 'boolean' | 'json';
  * Fields can be:
  * - Required or optional (`required`)
  * - Mapped to environment variables (`env`)
- * - Marked as sensitive for UI masking (`sensitive`)
+ * - Marked as encrypted for secure storage (`encrypted`)
  * - Given default values (`default`)
  *
  * **Environment variable mapping**:
@@ -40,7 +40,7 @@ export type ConfigFieldType = 'string' | 'number' | 'boolean' | 'json';
  *     type: 'string',
  *     required: false,
  *     env: 'SHOPIFY_API_KEY',
- *     sensitive: true,
+ *     encrypted: true,
  *     label: 'API Key',
  *     description: 'Your Shopify API key',
  *   },
@@ -93,14 +93,14 @@ export interface ConfigFieldDescriptor<T = any> {
   env?: string;
 
   /**
-   * Mark field as sensitive (password, token, etc.).
+   * Mark field as encrypted (password, token, secret, etc.).
    *
    * @remarks
-   * Sensitive fields are masked in UI and logs.
+   * Encrypted fields are encrypted at rest and masked in UI and logs.
    *
    * @defaultValue false
    */
-  sensitive?: boolean;
+  encrypted?: boolean;
 
   /**
    * Default value if not configured.

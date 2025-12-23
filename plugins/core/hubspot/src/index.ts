@@ -5,7 +5,7 @@
  * tickets, and other CRM objects through HubSpot's Model Context Protocol server.
  */
 
-import { defineHayPlugin } from '../../../../plugin-sdk-v2/sdk/index.js';
+import { defineHayPlugin } from '../../../../plugin-sdk-v2/dist/sdk/index.js';
 
 export default defineHayPlugin((globalCtx) => ({
   name: 'HubSpot',
@@ -23,7 +23,7 @@ export default defineHayPlugin((globalCtx) => ({
         label: 'OAuth Client ID',
         description: 'HubSpot OAuth client ID',
         required: true,
-        sensitive: false,
+        encrypted: false,
         env: 'HUBSPOT_CLIENT_ID',
       },
       clientSecret: {
@@ -31,7 +31,7 @@ export default defineHayPlugin((globalCtx) => ({
         label: 'OAuth Client Secret',
         description: 'HubSpot OAuth client secret',
         required: true,
-        sensitive: true,
+        encrypted: true,
         env: 'HUBSPOT_CLIENT_SECRET',
       },
     });
@@ -81,6 +81,28 @@ export default defineHayPlugin((globalCtx) => ({
     });
 
     globalCtx.logger.info('HubSpot OAuth authentication registered');
+  },
+
+  /**
+   * Validate authentication credentials
+   */
+  async onValidateAuth(ctx) {
+    ctx.logger.info('Validating HubSpot auth credentials');
+
+    const authState = ctx.auth.get();
+    if (!authState) {
+      throw new Error('No authentication configured');
+    }
+
+    // For OAuth2, check if we have an access token
+    // If not present, validation still passes - user needs to complete OAuth flow
+    if (authState.credentials.accessToken) {
+      ctx.logger.info('HubSpot auth validation successful - access token present');
+    } else {
+      ctx.logger.info('HubSpot auth configuration saved - OAuth flow required to get access token');
+    }
+
+    return true;
   },
 
   /**

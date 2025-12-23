@@ -47,7 +47,7 @@ export default defineHayPlugin((globalCtx) => {
           label: 'Email Recipients',
           description: 'Comma-separated list of email addresses to send to',
           required: true,
-          sensitive: false,
+          encrypted: false,
         },
       });
 

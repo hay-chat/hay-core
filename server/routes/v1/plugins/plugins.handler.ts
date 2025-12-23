@@ -549,14 +549,33 @@ export const getPluginConfiguration = authenticatedProcedure
       }
     }
 
-    // Extract auth config from MCP servers if present
-    let authConfig = undefined;
-    if (decryptedConfig.mcpServers && typeof decryptedConfig.mcpServers === 'object' && decryptedConfig.mcpServers !== null) {
-      const mcpServers = decryptedConfig.mcpServers as any;
-      if (mcpServers.remote && Array.isArray(mcpServers.remote) && mcpServers.remote.length > 0) {
-        const remoteMcp = mcpServers.remote[0];
-        if (remoteMcp.auth?.type === "oauth2") {
-          authConfig = remoteMcp.auth;
+    // Check if plugin has OAuth2 auth method registered in metadata
+    let oauthAvailable = false;
+    let oauthConfigured = false;
+
+    // For SDK v2 plugins, check metadata.authMethods
+    if (plugin.metadata?.authMethods) {
+      const oauth2Method = plugin.metadata.authMethods.find((method: any) => method.type === "oauth2");
+      if (oauth2Method) {
+        oauthAvailable = true;
+
+        // Use the exact field names from OAuth registration
+        const clientIdFieldName = oauth2Method.clientId; // e.g., "clientId"
+        const clientSecretFieldName = oauth2Method.clientSecret; // e.g., "clientSecret"
+
+        // Check if BOTH fields are filled (check both config and authState)
+        // clientId usually in config, clientSecret might be in authState.credentials (if encrypted)
+        if (clientIdFieldName && clientSecretFieldName) {
+          const hasClientId = !!(
+            decryptedConfig[clientIdFieldName] ||
+            instance.authState?.credentials?.[clientIdFieldName]
+          );
+          const hasClientSecret = !!(
+            decryptedConfig[clientSecretFieldName] ||
+            instance.authState?.credentials?.[clientSecretFieldName]
+          );
+
+          oauthConfigured = hasClientId && hasClientSecret;
         }
       }
     }
@@ -565,7 +584,8 @@ export const getPluginConfiguration = authenticatedProcedure
       configuration: maskedConfig,
       enabled: instance.enabled,
       instanceId: instance.id,
-      auth: authConfig, // Include auth config from MCP servers
+      oauthAvailable, // Plugin has OAuth2 registered
+      oauthConfigured, // OAuth credentials are configured
     };
   });
 
@@ -1046,16 +1066,47 @@ export const isOAuthAvailable = authenticatedProcedure
       pluginId: z.string(),
     }),
   )
-  .query(async ({ input }) => {
+  .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
     if (!plugin) {
       return { available: false };
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-    const available = oauthService.isOAuthAvailable(input.pluginId, manifest);
+    // Get plugin instance to check if credentials are configured
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
 
-    return { available };
+    // Check if plugin has OAuth2 registered in metadata
+    let oauthAvailable = false;
+    let oauthConfigured = false;
+
+    if (plugin.metadata?.authMethods) {
+      const oauth2Method = plugin.metadata.authMethods.find((method: any) => method.type === "oauth2");
+      if (oauth2Method) {
+        oauthAvailable = true;
+
+        // Check if OAuth credentials are configured
+        if (instance && oauth2Method.clientId && oauth2Method.clientSecret) {
+          const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+
+          const hasClientId = !!(
+            decryptedConfig[oauth2Method.clientId] ||
+            instance.authState?.credentials?.[oauth2Method.clientId]
+          );
+          const hasClientSecret = !!(
+            decryptedConfig[oauth2Method.clientSecret] ||
+            instance.authState?.credentials?.[oauth2Method.clientSecret]
+          );
+
+          oauthConfigured = hasClientId && hasClientSecret;
+        }
+      }
+    }
+
+    // OAuth is only available if both registered AND configured
+    return { available: oauthAvailable && oauthConfigured };
   });
 
 /**

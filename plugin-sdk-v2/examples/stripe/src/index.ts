@@ -32,7 +32,7 @@ export default defineHayPlugin((globalCtx) => ({
         description: "Secret key for Stripe API. Starts with sk_test_ or sk_live_.",
         required: false,
         env: "STRIPE_API_KEY",
-        sensitive: true,
+        encrypted: true,
       },
       webhookSecret: {
         type: "string",
@@ -40,7 +40,7 @@ export default defineHayPlugin((globalCtx) => ({
         description: "Secret for verifying Stripe webhook signatures.",
         required: false,
         env: "STRIPE_WEBHOOK_SECRET",
-        sensitive: true,
+        encrypted: true,
       },
       enableTestMode: {
         type: "boolean",
