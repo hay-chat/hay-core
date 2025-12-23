@@ -138,6 +138,9 @@ export interface AuthMethodDescriptor {
   /** For OAuth2 auth: scopes */
   scopes?: string[];
 
+  /** For OAuth2 auth: optional scopes */
+  optionalScopes?: string[];
+
   /** For OAuth2 auth: client ID config field name */
   clientId?: string;
 

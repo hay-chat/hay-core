@@ -10,6 +10,7 @@ import type {
   OAuthConnectionStatus,
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
+import type { AuthMethodDescriptor } from "../types/plugin-sdk-v2.types";
 import { debugLog } from "@server/lib/debug-logger";
 
 export class OAuthService {
@@ -107,57 +108,69 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-    console.log("Manifest auth.type:", manifest.auth?.type);
-
-    // For TypeScript-first plugins, get OAuth config from plugin instance
-    let oauthConfig: any = null;
-
-    if (manifest.auth?.type === "oauth2") {
-      console.log("TypeScript-first plugin detected, checking instance config...");
-      // Get plugin instance to access registered MCP config
-      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-      console.log("Instance found:", !!instance);
-      if (instance && instance.config) {
-        const config = instance.config as any;
-        console.log("Instance config:", JSON.stringify(config, null, 2));
-        // Check for remote MCP servers with OAuth
-        if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
-          const remoteMcp = config.mcpServers.remote[0];
-          console.log("Remote MCP found:", JSON.stringify(remoteMcp, null, 2));
-          if (remoteMcp.auth?.type === "oauth2") {
-            oauthConfig = remoteMcp.auth;
-            console.log("OAuth config extracted from instance");
-          }
-        } else {
-          console.log("No remote MCP servers found in instance config");
-        }
-      }
-    } else {
-      console.log("Legacy plugin, checking capabilities...");
-      // Legacy: Check old object-based capabilities format
-      oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+    // Get plugin instance
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    if (!instance) {
+      throw new Error(`Plugin ${pluginId} not configured for this organization`);
     }
 
-    console.log("Final OAuth Config:", JSON.stringify(oauthConfig, null, 2));
+    // SDK v2: Check metadata.authMethods for OAuth2 registration
+    if (!plugin.metadata?.authMethods) {
+      throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
+    }
 
-    if (!oauthConfig) {
+    console.log("Checking metadata.authMethods for OAuth2...");
+    const oauth2Method = plugin.metadata.authMethods.find(
+      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    );
+
+    if (!oauth2Method) {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }
 
-    // Get OAuth credentials from environment
-    const credentials = this.getClientCredentials(pluginId, manifest);
-    console.log(
-      "Client ID:",
-      credentials.clientId ? credentials.clientId.substring(0, 20) + "..." : "NOT SET",
-    );
-    console.log("Client Secret:", credentials.clientSecret ? "SET (hidden)" : "NOT SET");
+    console.log("OAuth2 method found in metadata:", oauth2Method.id);
 
-    if (!credentials.clientId) {
-      throw new Error(
-        `OAuth not configured. Please set ${pluginId.toUpperCase().replace(/-/g, "_")}_OAUTH_CLIENT_ID environment variable.`,
-      );
+    // Validate required OAuth fields
+    if (!oauth2Method.authorizationUrl || !oauth2Method.tokenUrl) {
+      throw new Error(`OAuth2 method missing required fields (authorizationUrl or tokenUrl)`);
     }
+
+    // Extract OAuth configuration from metadata
+    const oauthConfig: OAuthManifestConfig = {
+      authorizationUrl: oauth2Method.authorizationUrl,
+      tokenUrl: oauth2Method.tokenUrl,
+      scopes: oauth2Method.scopes || [],
+      optionalScopes: oauth2Method.optionalScopes,
+      pkce: true, // SDK v2 always uses PKCE for security
+    };
+
+    // Get client credentials from plugin instance
+    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+    const clientIdFieldName = oauth2Method.clientId;
+    const clientSecretFieldName = oauth2Method.clientSecret;
+
+    if (!clientIdFieldName || !clientSecretFieldName) {
+      throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
+    }
+
+    // Check both config and authState.credentials
+    const clientId =
+      decryptedConfig[clientIdFieldName] ||
+      instance.authState?.credentials?.[clientIdFieldName] ||
+      null;
+    const clientSecret =
+      decryptedConfig[clientSecretFieldName] ||
+      instance.authState?.credentials?.[clientSecretFieldName] ||
+      null;
+
+    console.log("Client ID:", clientId ? clientId.substring(0, 20) + "..." : "NOT SET");
+    console.log("Client Secret:", clientSecret ? "SET (hidden)" : "NOT SET");
+
+    if (!clientId) {
+      throw new Error(`OAuth client ID not configured for plugin ${pluginId}`);
+    }
+
+    const credentials = { clientId, clientSecret };
 
     // Note: client_secret is optional (for CIMD, client_id is the redirect URI itself)
     const validCredentials = {
@@ -268,65 +281,76 @@ export class OAuthService {
     const { pluginId, organizationId, codeVerifier } = oauthState;
 
     try {
-      // Get plugin and manifest
-      console.log("Loading plugin manifest...");
+      // Get plugin
+      console.log("Loading plugin...");
       const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
       if (!plugin) {
         throw new Error(`Plugin ${pluginId} not found`);
       }
 
-      const manifest = plugin.manifest as HayPluginManifest;
-      console.log("Manifest auth.type:", manifest.auth?.type);
-
-      // For TypeScript-first plugins, get OAuth config from plugin instance
-      let oauthConfig: any = null;
-
-      if (manifest.auth?.type === "oauth2") {
-        console.log("TypeScript-first plugin detected, checking instance config...");
-        // Get plugin instance to access registered MCP config
-        const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-          organizationId,
-          pluginId,
-        );
-        console.log("Instance found:", !!instance);
-        if (instance && instance.config) {
-          const config = instance.config as any;
-          console.log("Instance config:", JSON.stringify(config, null, 2));
-          // Check for remote MCP servers with OAuth
-          if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
-            const remoteMcp = config.mcpServers.remote[0];
-            console.log("Remote MCP found:", JSON.stringify(remoteMcp, null, 2));
-            if (remoteMcp.auth?.type === "oauth2") {
-              oauthConfig = remoteMcp.auth;
-              console.log("OAuth config extracted from instance");
-            }
-          } else {
-            console.log("No remote MCP servers found in instance config");
-          }
-        }
-      } else {
-        console.log("Legacy plugin, checking capabilities...");
-        // Legacy: Check old object-based capabilities format
-        oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+      // Get plugin instance
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+      if (!instance) {
+        throw new Error(`Plugin ${pluginId} not configured for this organization`);
       }
 
-      console.log("Final OAuth Config:", JSON.stringify(oauthConfig, null, 2));
+      // SDK v2: Check metadata.authMethods for OAuth2 registration
+      if (!plugin.metadata?.authMethods) {
+        throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
+      }
 
-      if (!oauthConfig) {
+      console.log("Checking metadata.authMethods for OAuth2...");
+      const oauth2Method = plugin.metadata.authMethods.find(
+        (method: AuthMethodDescriptor) => method.type === "oauth2",
+      );
+
+      if (!oauth2Method) {
         throw new Error(`Plugin ${pluginId} does not support OAuth`);
       }
 
+      console.log("OAuth2 method found in metadata:", oauth2Method.id);
+
+      // Validate required OAuth fields
+      if (!oauth2Method.tokenUrl) {
+        throw new Error(`OAuth2 method missing tokenUrl`);
+      }
+
+      // Extract OAuth configuration from metadata
+      const oauthConfig: OAuthManifestConfig = {
+        authorizationUrl: oauth2Method.authorizationUrl || "",
+        tokenUrl: oauth2Method.tokenUrl,
+        scopes: oauth2Method.scopes || [],
+        optionalScopes: oauth2Method.optionalScopes,
+        pkce: true,
+      };
+
       console.log("Token URL:", oauthConfig.tokenUrl);
 
-      // Get OAuth credentials from environment
-      const credentials = this.getClientCredentials(pluginId, manifest);
-      if (!credentials.clientId) {
-        throw new Error("OAuth not configured");
+      // Get client credentials from plugin instance
+      const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+      const clientIdFieldName = oauth2Method.clientId;
+      const clientSecretFieldName = oauth2Method.clientSecret;
+
+      if (!clientIdFieldName || !clientSecretFieldName) {
+        throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
+      }
+
+      const clientId =
+        decryptedConfig[clientIdFieldName] ||
+        instance.authState?.credentials?.[clientIdFieldName] ||
+        null;
+      const clientSecret =
+        decryptedConfig[clientSecretFieldName] ||
+        instance.authState?.credentials?.[clientSecretFieldName] ||
+        null;
+
+      if (!clientId) {
+        throw new Error("OAuth client ID not configured");
       }
 
       const validCredentials = {
-        clientId: credentials.clientId,
-        clientSecret: credentials.clientSecret,
+        clientId,
+        clientSecret,
       };
 
       console.log("Exchanging authorization code for tokens...");
@@ -623,31 +647,26 @@ export class OAuthService {
       throw new Error("OAuth not configured for this plugin instance");
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-
-    // For TypeScript-first plugins, get OAuth config from plugin instance
-    let oauthConfig: any = null;
-
-    if (manifest.auth?.type === "oauth2") {
-      // Get plugin instance to access registered MCP config
-      if (instance && instance.config) {
-        const config = instance.config as any;
-        // Check for remote MCP servers with OAuth
-        if (config.mcpServers?.remote && config.mcpServers.remote.length > 0) {
-          const remoteMcp = config.mcpServers.remote[0];
-          if (remoteMcp.auth?.type === "oauth2") {
-            oauthConfig = remoteMcp.auth;
-          }
-        }
-      }
-    } else {
-      // Legacy: Check old object-based capabilities format
-      oauthConfig = manifest.capabilities?.mcp?.auth?.oauth;
+    // SDK v2: Check metadata.authMethods for OAuth2 registration
+    if (!plugin.metadata?.authMethods) {
+      throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
     }
 
-    if (!oauthConfig) {
+    const oauth2Method = plugin.metadata.authMethods.find(
+      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    );
+
+    if (!oauth2Method) {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }
+
+    if (!oauth2Method.tokenUrl) {
+      throw new Error(`OAuth2 method missing tokenUrl`);
+    }
+
+    const oauthConfig = {
+      tokenUrl: oauth2Method.tokenUrl,
+    };
 
     // Decrypt config
     const decryptedConfig = decryptConfig(instance.config);
@@ -660,11 +679,28 @@ export class OAuthService {
     // Decrypt refresh token
     const refreshToken = decryptValue(oauthData.tokens.refresh_token);
 
-    // Get OAuth credentials from environment
-    const credentials = this.getClientCredentials(pluginId, manifest);
-    if (!credentials.clientId) {
-      throw new Error("OAuth not configured");
+    // Get client credentials from plugin instance
+    const clientIdFieldName = oauth2Method.clientId;
+    const clientSecretFieldName = oauth2Method.clientSecret;
+
+    if (!clientIdFieldName || !clientSecretFieldName) {
+      throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
     }
+
+    const clientId =
+      decryptedConfig[clientIdFieldName] ||
+      instance.authState?.credentials?.[clientIdFieldName] ||
+      null;
+    const clientSecret =
+      decryptedConfig[clientSecretFieldName] ||
+      instance.authState?.credentials?.[clientSecretFieldName] ||
+      null;
+
+    if (!clientId) {
+      throw new Error("OAuth client ID not configured");
+    }
+
+    const credentials = { clientId, clientSecret };
 
     const validCredentials = {
       clientId: credentials.clientId,
