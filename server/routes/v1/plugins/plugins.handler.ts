@@ -11,6 +11,7 @@ import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { AuthMethodDescriptor } from "@server/types/plugin-sdk-v2.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
@@ -555,7 +556,9 @@ export const getPluginConfiguration = authenticatedProcedure
 
     // For SDK v2 plugins, check metadata.authMethods
     if (plugin.metadata?.authMethods) {
-      const oauth2Method = plugin.metadata.authMethods.find((method: any) => method.type === "oauth2");
+      const oauth2Method = plugin.metadata.authMethods.find(
+        (method: AuthMethodDescriptor) => method.type === "oauth2",
+      );
       if (oauth2Method) {
         oauthAvailable = true;
 
@@ -1083,7 +1086,9 @@ export const isOAuthAvailable = authenticatedProcedure
     let oauthConfigured = false;
 
     if (plugin.metadata?.authMethods) {
-      const oauth2Method = plugin.metadata.authMethods.find((method: any) => method.type === "oauth2");
+      const oauth2Method = plugin.metadata.authMethods.find(
+        (method: AuthMethodDescriptor) => method.type === "oauth2",
+      );
       if (oauth2Method) {
         oauthAvailable = true;
 
