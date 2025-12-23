@@ -163,3 +163,49 @@ export function hashValue(value: string): string {
 export function generateEncryptionKey(): string {
   return crypto.randomBytes(32).toString("base64");
 }
+
+/**
+ * TypeORM transformer that encrypts/decrypts specific fields in a JSONB column
+ */
+export class EncryptedTransformer {
+  constructor(private fieldsToEncrypt: string[]) {}
+
+  /**
+   * Transform value to database (encrypt)
+   */
+  to(value: any): any {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    const encrypted = { ...value };
+    for (const field of this.fieldsToEncrypt) {
+      if (encrypted[field] && typeof encrypted[field] === "string") {
+        encrypted[field] = encryptValue(encrypted[field]);
+      }
+    }
+    return encrypted;
+  }
+
+  /**
+   * Transform value from database (decrypt)
+   */
+  from(value: any): any {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    const decrypted = { ...value };
+    for (const field of this.fieldsToEncrypt) {
+      if (decrypted[field] && typeof decrypted[field] === "string") {
+        try {
+          decrypted[field] = decryptValue(decrypted[field]);
+        } catch (error) {
+          console.error(`Failed to decrypt field ${field}:`, error);
+          // Keep encrypted value if decryption fails
+        }
+      }
+    }
+    return decrypted;
+  }
+}

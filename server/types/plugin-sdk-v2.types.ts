@@ -102,7 +102,7 @@ export interface ConfigFieldDescriptor {
   label: string;
   description?: string;
   required?: boolean;
-  sensitive?: boolean;
+  encrypted?: boolean;
   default?: any;
   env?: string; // Environment variable fallback
   validation?: {
@@ -137,6 +137,12 @@ export interface AuthMethodDescriptor {
 
   /** For OAuth2 auth: scopes */
   scopes?: string[];
+
+  /** For OAuth2 auth: client ID config field name */
+  clientId?: string;
+
+  /** For OAuth2 auth: client secret config field name */
+  clientSecret?: string;
 
   /** For OAuth2 auth: client ID env var */
   clientIdEnv?: string;

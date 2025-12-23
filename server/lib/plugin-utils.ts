@@ -54,10 +54,10 @@ export function separateConfigAndAuth(
     }
   }
 
-  // Also check configSchema for sensitive fields
+  // Also check configSchema for encrypted fields
   if (metadata.configSchema) {
     for (const [key, schema] of Object.entries(metadata.configSchema)) {
-      if (schema.sensitive) {
+      if (schema.encrypted) {
         authFieldNames.add(key);
       }
     }
@@ -116,10 +116,10 @@ export function hasAuthChanges(
     return true;
   }
 
-  // Check for sensitive fields in configSchema
+  // Check for encrypted fields in configSchema
   if (metadata.configSchema) {
     for (const [key, schema] of Object.entries(metadata.configSchema)) {
-      if (schema.sensitive && input[key] !== undefined) {
+      if (schema.encrypted && input[key] !== undefined) {
         return true;
       }
     }

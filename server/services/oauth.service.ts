@@ -65,8 +65,8 @@ export class OAuthService {
         const clientSecretVar = envVars.find((v: string) => v.includes("CLIENT_SECRET"));
 
         return {
-          clientId: clientIdVar ? (process.env[clientIdVar] || null) : null,
-          clientSecret: clientSecretVar ? (process.env[clientSecretVar] || null) : null,
+          clientId: clientIdVar ? process.env[clientIdVar] || null : null,
+          clientSecret: clientSecretVar ? process.env[clientSecretVar] || null : null,
         };
       }
     }
@@ -284,7 +284,10 @@ export class OAuthService {
       if (manifest.auth?.type === "oauth2") {
         console.log("TypeScript-first plugin detected, checking instance config...");
         // Get plugin instance to access registered MCP config
-        const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+        const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+          organizationId,
+          pluginId,
+        );
         console.log("Instance found:", !!instance);
         if (instance && instance.config) {
           const config = instance.config as any;
@@ -460,25 +463,25 @@ export class OAuthService {
     tokens: OAuthTokenData,
     scopes?: string[],
   ): Promise<void> {
-    console.log('\n--- Storing OAuth tokens ---');
-    console.log('Plugin ID:', pluginId);
-    console.log('Organization ID:', organizationId);
+    console.log("\n--- Storing OAuth tokens ---");
+    console.log("Plugin ID:", pluginId);
+    console.log("Organization ID:", organizationId);
 
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    console.log('Plugin registry ID:', plugin.id);
+    console.log("Plugin registry ID:", plugin.id);
 
     // Get or create instance (pass string pluginId, not UUID)
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    console.log('Existing instance found:', !!instance);
+    console.log("Existing instance found:", !!instance);
     if (instance) {
-      console.log('  Instance ID:', instance.id);
-      console.log('  Instance enabled:', instance.enabled);
-      console.log('  Instance authMethod:', instance.authMethod);
-      console.log('  Instance has config:', !!instance.config);
+      console.log("  Instance ID:", instance.id);
+      console.log("  Instance enabled:", instance.enabled);
+      console.log("  Instance authMethod:", instance.authMethod);
+      console.log("  Instance has config:", !!instance.config);
     }
 
     const oauthData: OAuthConfig["_oauth"] = {
@@ -506,35 +509,35 @@ export class OAuthService {
     };
 
     if (instance) {
-      console.log('Updating existing instance...');
+      console.log("Updating existing instance...");
       // Update existing instance
       const currentConfig = instance.config || {};
-      console.log('  Current config keys:', Object.keys(currentConfig));
-      console.log('  New config keys:', Object.keys(configToStore));
+      console.log("  Current config keys:", Object.keys(currentConfig));
+      console.log("  New config keys:", Object.keys(configToStore));
 
       await pluginInstanceRepository.updateConfig(instance.id, {
         ...currentConfig,
         ...configToStore,
       });
-      console.log('  Config updated');
+      console.log("  Config updated");
 
       // Update auth_method
       await pluginInstanceRepository.update(instance.id, instance.organizationId, {
         authMethod: "oauth",
       });
-      console.log('  Auth method updated to oauth');
-      console.log('  Instance enabled state should remain:', instance.enabled);
+      console.log("  Auth method updated to oauth");
+      console.log("  Instance enabled state should remain:", instance.enabled);
     } else {
-      console.log('Creating new instance with enabled=false...');
+      console.log("Creating new instance with enabled=false...");
       // Create new instance
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
         config: configToStore,
         authMethod: "oauth",
         enabled: false, // Don't auto-enable
       });
-      console.log('  New instance created');
+      console.log("  New instance created");
     }
-    console.log('--- OAuth tokens stored ---\n');
+    console.log("--- OAuth tokens stored ---\n");
   }
 
   /**

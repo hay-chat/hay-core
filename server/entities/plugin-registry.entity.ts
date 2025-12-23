@@ -80,7 +80,7 @@ export class PluginRegistry {
   @Column({
     type: "varchar",
     length: 50,
-    default: "missing"
+    default: "missing",
   })
   metadataState!: PluginMetadataState;
 

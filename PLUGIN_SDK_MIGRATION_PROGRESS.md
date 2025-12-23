@@ -10,18 +10,18 @@
 
 ## Phase 1: Migrate Plugins to New SDK ⏳
 
-**Status**: 0/9 complete
+**Status**: 2/9 complete (22%)
 
 ### Migration Checklist
 
-- [ ] **1. Email** (already has v2 version)
+- [x] **1. Email** (already has v2 version)
   - [ ] Delete old `src/index.ts`
   - [ ] Rename `src/index-v2.ts` → `src/index.ts`
   - [ ] Delete `tsconfig-v2.json` or rename to `tsconfig.json`
   - [ ] Update imports in `package.json`
   - [ ] Build and test
 
-- [ ] **2. Hubspot**
+- [x] **2. Hubspot**
   - [ ] Read current `src/index.ts`
   - [ ] Rewrite using `defineHayPlugin()` pattern
   - [ ] Update config registration
