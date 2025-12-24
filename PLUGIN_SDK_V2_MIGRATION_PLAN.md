@@ -5,6 +5,7 @@
 **Goal**: Migrate Hay Core from legacy plugin system to Plugin SDK v2
 
 **Revision Notes**:
+
 - **v2 (2025-12-15)**: Corrected org-scoped runtime state, port allocation handshake, removed in-process plugin loading, metadata caching strategy, AbortController timeouts, and MCP tool discovery API.
 - **v1 (2025-12-15)**: Corrected onEnable existence, runner HTTP surface requirements, metadata state model, config update flow, and port allocation strategy.
 
@@ -31,14 +32,14 @@ This document provides a complete migration plan for updating Hay Core to use th
 
 **Critical**: The following endpoints MUST be implemented in SDK v2 runner before Core migration begins. These are not "gaps" or "assumptions" — they are hard dependencies.
 
-| Endpoint | Method | Purpose | Maps to Hook | Request Body | Response |
-|----------|--------|---------|--------------|--------------|----------|
-| `/metadata` | GET | Fetch plugin metadata | `onInitialize()` result | None | `PluginMetadata` |
-| `/validate-auth` | POST | Validate auth credentials | `onValidateAuth(ctx)` | `{ authState: AuthState }` | `{ valid: boolean, error?: string }` |
-| `/config-update` | POST | Notify config change | `onConfigUpdate(ctx)` | `{ config: Record<string, any> }` | `{ success: boolean }` |
-| `/disable` | POST | Cleanup before shutdown | `onDisable(ctx)` | None | `{ success: boolean }` |
-| `/mcp/call-tool` | POST | Proxy MCP tool calls | MCP runtime | `{ toolName: string, arguments: Record<string, any> }` | Tool result |
-| `/mcp/list-tools` | GET | List available MCP tools | MCP runtime | None | `{ tools: MCPToolDefinition[] }` |
+| Endpoint          | Method | Purpose                   | Maps to Hook            | Request Body                                           | Response                             |
+| ----------------- | ------ | ------------------------- | ----------------------- | ------------------------------------------------------ | ------------------------------------ |
+| `/metadata`       | GET    | Fetch plugin metadata     | `onInitialize()` result | None                                                   | `PluginMetadata`                     |
+| `/validate-auth`  | POST   | Validate auth credentials | `onValidateAuth(ctx)`   | `{ authState: AuthState }`                             | `{ valid: boolean, error?: string }` |
+| `/config-update`  | POST   | Notify config change      | `onConfigUpdate(ctx)`   | `{ config: Record<string, any> }`                      | `{ success: boolean }`               |
+| `/disable`        | POST   | Cleanup before shutdown   | `onDisable(ctx)`        | None                                                   | `{ success: boolean }`               |
+| `/mcp/call-tool`  | POST   | Proxy MCP tool calls      | MCP runtime             | `{ toolName: string, arguments: Record<string, any> }` | Tool result                          |
+| `/mcp/list-tools` | GET    | List available MCP tools  | MCP runtime             | None                                                   | `{ tools: MCPToolDefinition[] }`     |
 
 **Action Required**: Update `plugin-sdk-v2/runner/http-server.ts` to expose all endpoints before Core implementation begins.
 
@@ -49,12 +50,14 @@ This document provides a complete migration plan for updating Hay Core to use th
 ### 1.1 Current State (Legacy)
 
 **Files**:
+
 - `server/services/plugin-manager.service.ts` - Scans filesystem, reads `package.json`
 - `server/entities/plugin-registry.entity.ts` - Stores plugin metadata
 - `server/repositories/plugin-registry.repository.ts` - DB access
 - `server/types/plugin.types.ts` - Legacy `HayPluginManifest` type
 
 **Current Behavior**:
+
 - Scans `/plugins/core` and `/plugins/custom/{orgId}` directories
 - Reads `package.json` → `hay-plugin` block
 - Builds full manifest from `package.json` fields
@@ -63,6 +66,7 @@ This document provides a complete migration plan for updating Hay Core to use th
 - Tracks `installed`, `built`, `status` (available/not_found/disabled)
 
 **Problems**:
+
 - Legacy manifest has `configSchema`, `auth`, `settingsExtensions` baked in
 - SDK v2 says: manifest is **intentionally minimal** - NO config schema, NO auth details
 - These must be fetched from `/metadata` endpoint at runtime
@@ -78,15 +82,16 @@ This document provides a complete migration plan for updating Hay Core to use th
 ```typescript
 export interface HayPluginManifestV2 {
   // From package.json hay-plugin block
-  entry: string;                    // e.g. "./dist/index.js"
-  displayName: string;               // e.g. "Shopify"
-  category: string;                  // e.g. "integration"
-  capabilities: string[];            // e.g. ["routes", "mcp", "auth", "config", "ui"]
-  env?: string[];                    // Allowed env vars
+  entry: string; // e.g. "./dist/index.js"
+  displayName: string; // e.g. "Shopify"
+  category: string; // e.g. "integration"
+  capabilities: string[]; // e.g. ["routes", "mcp", "auth", "config", "ui"]
+  env?: string[]; // Allowed env vars
 }
 ```
 
 **Removed Fields** (now fetched from `/metadata`):
+
 - `configSchema` → fetch from `/metadata`
 - `auth` → fetch from `/metadata`
 - `settingsExtensions` → fetch from `/metadata`
@@ -107,32 +112,32 @@ export class PluginRegistry {
   // ... existing fields ...
 
   @Column({ type: "jsonb" })
-  manifest!: HayPluginManifestV2;  // ⬅️ Change type
+  manifest!: HayPluginManifestV2; // ⬅️ Change type
 
   // NEW: Plugin-global metadata cache (from /metadata endpoint)
   @Column({ type: "jsonb", nullable: true })
-  metadata?: PluginMetadata;  // ⬅️ Add this
+  metadata?: PluginMetadata; // ⬅️ Add this
 
   @Column({ type: "timestamptz", nullable: true })
-  metadataFetchedAt?: Date;  // ⬅️ Add this
+  metadataFetchedAt?: Date; // ⬅️ Add this
 
   // NEW: Plugin-global metadata state (not org-specific)
   @Column({
     type: "varchar",
     length: 50,
-    default: "missing"
+    default: "missing",
   })
-  metadataState!: PluginMetadataState;  // ⬅️ Add this
+  metadataState!: PluginMetadataState; // ⬅️ Add this
 
   @Column({ type: "varchar", length: 64, nullable: true })
-  checksum?: string;  // Code checksum for change detection
+  checksum?: string; // Code checksum for change detection
 }
 
 export type PluginMetadataState =
-  | "missing"   // Metadata not yet fetched
-  | "fresh"     // Metadata cached and valid
-  | "stale"     // Code changed (checksum mismatch), needs refetch
-  | "error";    // Metadata fetch failed
+  | "missing" // Metadata not yet fetched
+  | "fresh" // Metadata cached and valid
+  | "stale" // Code changed (checksum mismatch), needs refetch
+  | "error"; // Metadata fetch failed
 
 export interface PluginMetadata {
   // From GET /metadata endpoint
@@ -154,6 +159,7 @@ export interface PluginMetadata {
 **Method**: `registerPlugin()`
 
 **Changes**:
+
 1. Read `package.json` → extract only `hay-plugin` block (minimal)
 2. **DO NOT** build full manifest - just store the minimal manifest
 3. Calculate checksum for change detection
@@ -161,6 +167,7 @@ export interface PluginMetadata {
 5. Metadata will be fetched on first worker start (any org)
 
 **Pseudocode**:
+
 ```typescript
 async registerPlugin(pluginPath: string, sourceType: string, orgId: string | null) {
   const packageJson = await readPackageJson(pluginPath);
@@ -203,6 +210,7 @@ async registerPlugin(pluginPath: string, sourceType: string, orgId: string | nul
 **New Function**: `validateManifestV2()`
 
 **Validations**:
+
 - `entry` is required and points to a file
 - `displayName` is required
 - `category` is required
@@ -217,11 +225,13 @@ async registerPlugin(pluginPath: string, sourceType: string, orgId: string | nul
 ### 2.1 Current State (Legacy)
 
 **Files**:
+
 - `server/services/plugin-manager.service.ts` - `startPluginWorker()`, `stopPluginWorker()`
 - `server/services/plugin-instance-manager.service.ts` - On-demand startup, cleanup
 - Uses: `spawn("node", ["dist/index.js"])` directly
 
 **Current Behavior**:
+
 - Spawns plugin entry point directly
 - Passes env vars: `ORGANIZATION_ID`, `PLUGIN_ID`, `HAY_API_TOKEN`, etc.
 - Builds "safe env" with explicit allowlist
@@ -229,6 +239,7 @@ async registerPlugin(pluginPath: string, sourceType: string, orgId: string | nul
 - Tracks worker in `Map<string, WorkerInfo>`
 
 **Problems**:
+
 - No runner abstraction
 - No `/metadata` contract
 - No org context injection via env vars
@@ -244,6 +255,7 @@ async registerPlugin(pluginPath: string, sourceType: string, orgId: string | nul
 **Purpose**: Start plugin workers using SDK v2 runner
 
 **API**:
+
 ```typescript
 export class PluginRunnerV2Service {
   /**
@@ -254,11 +266,7 @@ export class PluginRunnerV2Service {
    * @param port - Allocated port (0 for OS-assigned)
    * @returns Worker info
    */
-  async startWorker(
-    orgId: string,
-    pluginId: string,
-    port: number
-  ): Promise<WorkerInfo>;
+  async startWorker(orgId: string, pluginId: string, port: number): Promise<WorkerInfo>;
 
   /**
    * Stop plugin worker gracefully
@@ -275,6 +283,7 @@ export class PluginRunnerV2Service {
 #### 2.2.2 Runner Invocation
 
 **Command**:
+
 ```bash
 node /path/to/plugin-sdk-v2/runner/index.js \
   --plugin-path=/plugins/core/shopify \
@@ -284,6 +293,7 @@ node /path/to/plugin-sdk-v2/runner/index.js \
 ```
 
 **Environment Variables Passed** (SDK v2 contract):
+
 - `HAY_ORG_ID`: Organization ID
 - `HAY_PLUGIN_ID`: Plugin ID (package name)
 - `HAY_WORKER_PORT`: Allocated port
@@ -296,6 +306,7 @@ node /path/to/plugin-sdk-v2/runner/index.js \
 - Allowed env vars from manifest `env` array
 
 **Critical**:
+
 - `HAY_ORG_CONFIG` and `HAY_ORG_AUTH` replace individual config env vars
 - SDK v2 runner reads these and injects into context
 - Config resolution (org → env fallback) happens inside SDK
@@ -310,6 +321,7 @@ node /path/to/plugin-sdk-v2/runner/index.js \
 **Rationale**: OS-assigned ports (port=0) require a handshake mechanism that adds complexity. For early-stage product, Core-side dynamic allocation is simpler and sufficient.
 
 **Implementation**:
+
 ```typescript
 class PortAllocator {
   private allocatedPorts = new Set<number>();
@@ -319,7 +331,7 @@ class PortAllocator {
   async allocate(): Promise<number> {
     // Find next available port
     for (let port = this.basePort; port < this.maxPort; port++) {
-      if (!this.allocatedPorts.has(port) && await this.isPortAvailable(port)) {
+      if (!this.allocatedPorts.has(port) && (await this.isPortAvailable(port))) {
         this.allocatedPorts.add(port);
         return port;
       }
@@ -335,8 +347,8 @@ class PortAllocator {
     // Try to bind to port, release immediately
     return new Promise((resolve) => {
       const server = net.createServer();
-      server.once('error', () => resolve(false));
-      server.once('listening', () => {
+      server.once("error", () => resolve(false));
+      server.once("listening", () => {
         server.close();
         resolve(true);
       });
@@ -347,6 +359,7 @@ class PortAllocator {
 ```
 
 **Future Enhancement** (if needed at scale):
+
 - Option: OS-assigned ports with stdout handshake
 - Runner prints `HAY_WORKER_PORT=12345` on successful bind
 - Core parses stdout to learn actual port
@@ -357,6 +370,7 @@ class PortAllocator {
 **File**: `server/services/plugin-manager.service.ts`
 
 **Changes**:
+
 ```typescript
 interface WorkerInfo {
   process: ChildProcess;
@@ -367,7 +381,7 @@ interface WorkerInfo {
   organizationId: string;
   pluginId: string;
   instanceId: string;
-  sdkVersion: "v1" | "v2";  // ⬅️ Add this to track version
+  sdkVersion: "v1" | "v2"; // ⬅️ Add this to track version
 }
 ```
 
@@ -378,6 +392,7 @@ interface WorkerInfo {
 **Method**: `startPluginWorker()`
 
 **New Flow**:
+
 ```typescript
 async startPluginWorker(orgId: string, pluginId: string): Promise<WorkerInfo> {
   // 1. Get plugin registry (plugin-global metadata cache)
@@ -471,6 +486,7 @@ async startPluginWorker(orgId: string, pluginId: string): Promise<WorkerInfo> {
 **New Method**: `buildSDKv2Env()`
 
 **Changes from Legacy**:
+
 ```typescript
 private buildSDKv2Env(params: {
   orgId: string;
@@ -514,6 +530,7 @@ private buildSDKv2Env(params: {
 ```
 
 **Key Differences**:
+
 - **No individual config env vars** (e.g. `SHOPIFY_API_KEY`) - all config in `HAY_ORG_CONFIG`
 - **Auth state** passed as `HAY_ORG_AUTH`
 - SDK handles resolution (org → env fallback) internally
@@ -572,6 +589,7 @@ private buildSDKv2Env(params: {
 **File**: `server/services/plugin-manager.service.ts`
 
 **Implementation**:
+
 ```typescript
 async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
   const maxRetries = 3;
@@ -640,24 +658,25 @@ async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
 
 **State-Driven UI** (org-scoped states from `PluginInstance.runtimeState`):
 
-| State | UI Behavior | Config Editable? | Enable/Disable |
-|-------|-------------|------------------|----------------|
-| `stopped` | Show "Not running" | Yes | Show "Start" button |
-| `starting` | Show "Starting worker..." with spinner | No | Disable all actions |
-| `ready` | Show "Running" with green indicator | Yes | Fully functional |
-| `degraded` | Show warning "Limited functionality" | Yes (basic only) | Can disable/restart |
-| `error` | Show error message from `lastError` field | No | Show "Retry" button |
+| State      | UI Behavior                               | Config Editable? | Enable/Disable      |
+| ---------- | ----------------------------------------- | ---------------- | ------------------- |
+| `stopped`  | Show "Not running"                        | Yes              | Show "Start" button |
+| `starting` | Show "Starting worker..." with spinner    | No               | Disable all actions |
+| `ready`    | Show "Running" with green indicator       | Yes              | Fully functional    |
+| `degraded` | Show warning "Limited functionality"      | Yes (basic only) | Can disable/restart |
+| `error`    | Show error message from `lastError` field | No               | Show "Retry" button |
 
 **Plugin-Global Metadata State** (from `PluginRegistry.metadataState`):
 
-| State | Behavior |
-|-------|----------|
-| `missing` | Metadata not fetched yet, wait for first worker start |
-| `fresh` | Metadata cached and valid, use for UI rendering |
-| `stale` | Code changed, metadata will refetch on next worker start |
-| `error` | Metadata fetch failed, use cached if available, show warning |
+| State     | Behavior                                                     |
+| --------- | ------------------------------------------------------------ |
+| `missing` | Metadata not fetched yet, wait for first worker start        |
+| `fresh`   | Metadata cached and valid, use for UI rendering              |
+| `stale`   | Code changed, metadata will refetch on next worker start     |
+| `error`   | Metadata fetch failed, use cached if available, show warning |
 
 **Frontend Changes Required**:
+
 - Read `instance.runtimeState` for worker status (per org)
 - Read `plugin.metadataState` and `plugin.metadata` for UI rendering (global)
 - Show appropriate UI per state combination
@@ -671,10 +690,12 @@ async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
 **New**: Reads `metadata.configSchema`
 
 **Files to Update**:
+
 - `server/routes/v1/plugins/plugins.handler.ts` - `getPlugin()`, `getAllPlugins()`
 - `dashboard/pages/plugins/[id].vue` - Settings form rendering
 
 **Change**:
+
 ```typescript
 // OLD
 const configSchema = plugin.manifest.configSchema;
@@ -701,10 +722,12 @@ if (instance.runtimeState === "error") {
 **New**: Reads `metadata.authMethods`
 
 **Files to Update**:
+
 - `server/routes/v1/plugins/plugins.handler.ts` - Auth endpoints
 - `dashboard/components/plugins/PluginAuthSetup.vue` - Auth form
 
 **Change**:
+
 ```typescript
 // OLD
 const authConfig = plugin.manifest.auth;
@@ -730,6 +753,7 @@ const authMethods = plugin.metadata?.authMethods || [];
 **File**: `server/services/plugin-route.service.ts`
 
 **Change**:
+
 ```typescript
 // OLD
 const routes = plugin.manifest.apiEndpoints || [];
@@ -741,22 +765,26 @@ const routes = plugin.metadata?.routes || [];
 ### 3.5 Metadata Refresh Strategy
 
 **Metadata is Plugin-Global** (not org-specific):
+
 - Metadata = result of `onInitialize()` which depends only on plugin code
 - Does NOT vary by org config or auth
 - Cached in `PluginRegistry` and shared across all orgs
 
 **When to Fetch**:
+
 1. **Initial load**: First worker start for any org (metadataState = "missing")
 2. **Code change**: Checksum mismatch detected (set metadataState = "stale", refetch on next start)
 3. **Manual refresh**: Admin API call (force refetch)
 4. **Error recovery**: Previous fetch failed (metadataState = "error", retry on next start)
 
 **When NOT to Fetch**:
+
 - Every worker start (use cached metadata if metadataState = "fresh")
 - Every API request (too expensive)
 - During config updates (metadata is static, unrelated to org config)
 
 **Checksum Change Detection**:
+
 ```typescript
 async checkPluginCodeChange(pluginId: string): Promise<boolean> {
   const plugin = this.registry.get(pluginId);
@@ -780,16 +808,17 @@ async checkPluginCodeChange(pluginId: string): Promise<boolean> {
 
 ### 4.1 Hook Mapping (Legacy → SDK v2)
 
-| Legacy System | SDK v2 Hook | Triggered By | Triggered When | Responsibility |
-|---------------|-------------|--------------|----------------|----------------|
-| Install/upload | `onEnable()` | **Hay Core** | Plugin installed for org | **Core-only hook** - never called by runner |
-| Worker startup | `onInitialize()` | **Runner** | Worker process starts | Plugin declares schema/auth/routes/UI |
-| Worker startup | `onStart()` | **Runner** | After `onInitialize`, with org context | Plugin starts MCP, reads config/auth |
-| Auth save | `onValidateAuth()` | **Core → Runner** | User saves auth credentials | Plugin validates credentials |
-| Config save | `onConfigUpdate()` | **Core → Runner** | User saves config | Plugin notified of config change |
-| Disable/uninstall | `onDisable()` | **Core → Runner** | Plugin uninstalled for org | Plugin cleans up resources |
+| Legacy System     | SDK v2 Hook        | Triggered By      | Triggered When                         | Responsibility                              |
+| ----------------- | ------------------ | ----------------- | -------------------------------------- | ------------------------------------------- |
+| Install/upload    | `onEnable()`       | **Hay Core**      | Plugin installed for org               | **Core-only hook** - never called by runner |
+| Worker startup    | `onInitialize()`   | **Runner**        | Worker process starts                  | Plugin declares schema/auth/routes/UI       |
+| Worker startup    | `onStart()`        | **Runner**        | After `onInitialize`, with org context | Plugin starts MCP, reads config/auth        |
+| Auth save         | `onValidateAuth()` | **Core → Runner** | User saves auth credentials            | Plugin validates credentials                |
+| Config save       | `onConfigUpdate()` | **Core → Runner** | User saves config                      | Plugin notified of config change            |
+| Disable/uninstall | `onDisable()`      | **Core → Runner** | Plugin uninstalled for org             | Plugin cleans up resources                  |
 
 **Critical Corrections**:
+
 - `onEnable()` **DOES EXIST** but is **Core-only**
 - `onEnable()` is **NEVER** called by the SDK v2 runner
 - `onEnable()` is called directly by Hay Core during installation (future use for provisioning)
@@ -802,6 +831,7 @@ async checkPluginCodeChange(pluginId: string): Promise<boolean> {
 **Method**: `enablePlugin()`
 
 **Current Flow**:
+
 ```typescript
 async enablePlugin(input: { pluginId, configuration }) {
   // 1. Install/build if needed
@@ -817,6 +847,7 @@ async enablePlugin(input: { pluginId, configuration }) {
 ```
 
 **New Flow (SDK v2)**:
+
 ```typescript
 async enablePlugin(input: { pluginId, configuration }) {
   // 1. Install/build if needed (UNCHANGED)
@@ -854,21 +885,21 @@ async enablePlugin(input: { pluginId, configuration }) {
 **New Endpoint**: `validateAuth()`
 
 **Implementation**:
+
 ```typescript
 export const validateAuth = authenticatedProcedure
-  .input(z.object({
-    pluginId: z.string(),
-    authState: z.object({
-      methodId: z.string(),
-      credentials: z.record(z.any()),
+  .input(
+    z.object({
+      pluginId: z.string(),
+      authState: z.object({
+        methodId: z.string(),
+        credentials: z.record(z.any()),
+      }),
     }),
-  }))
+  )
   .mutation(async ({ ctx, input }) => {
     // 1. Get or start worker
-    const worker = await pluginManager.getOrStartWorker(
-      ctx.organizationId!,
-      input.pluginId
-    );
+    const worker = await pluginManager.getOrStartWorker(ctx.organizationId!, input.pluginId);
 
     // 2. Call plugin's validation endpoint with timeout
     // SDK v2 runner exposes: POST /validate-auth
@@ -912,6 +943,7 @@ export const validateAuth = authenticatedProcedure
 ```
 
 **SDK v2 Runner Requirement**:
+
 - Runner MUST expose `POST /validate-auth` endpoint
 - Endpoint calls `plugin.onValidateAuth(ctx)` and returns `{ valid: boolean, error?: string }`
 
@@ -922,6 +954,7 @@ export const validateAuth = authenticatedProcedure
 **Method**: `configurePlugin()`
 
 **Current Flow**:
+
 ```typescript
 async configurePlugin(input: { pluginId, configuration }) {
   // 1. Update config in database
@@ -936,6 +969,7 @@ async configurePlugin(input: { pluginId, configuration }) {
 ```
 
 **New Flow (SDK v2) - Option A (RECOMMENDED)**:
+
 ```typescript
 async configurePlugin(input: { pluginId, configuration }) {
   // 1. Validate auth if auth fields changed
@@ -962,12 +996,14 @@ async configurePlugin(input: { pluginId, configuration }) {
 ```
 
 **Rationale for Option A**:
+
 - Simpler contract: plugin always reads config in `onStart`
 - No double-application of config changes
 - Restart ensures clean state
 - Suitable for early-stage product
 
 **Alternative Flow - Option B (Advanced)**:
+
 ```typescript
 // Only call /config-update if plugin requests it
 // Do NOT restart worker unless plugin returns { restartRequired: true }
@@ -982,6 +1018,7 @@ async configurePlugin(input: { pluginId, configuration }) {
 **Method**: `disablePlugin()`
 
 **Current Flow**:
+
 ```typescript
 async disablePlugin(input: { pluginId }) {
   // 1. Stop worker
@@ -993,6 +1030,7 @@ async disablePlugin(input: { pluginId }) {
 ```
 
 **New Flow (SDK v2)**:
+
 ```typescript
 async disablePlugin(input: { pluginId }) {
   // 1. Call plugin's disable hook (if worker running)
@@ -1017,6 +1055,7 @@ async disablePlugin(input: { pluginId }) {
 ```
 
 **SDK v2 Runner Requirement**:
+
 - Runner MUST expose `POST /disable` endpoint
 - Endpoint calls `plugin.onDisable(ctx)` if defined
 - Runner gracefully shuts down after hook completes
@@ -1030,6 +1069,7 @@ async disablePlugin(input: { pluginId }) {
 **Entity**: `PluginInstance`
 
 **Fields**:
+
 ```typescript
 @Column({ type: "jsonb", nullable: true })
 config?: Record<string, unknown>;  // All config + auth mixed
@@ -1039,6 +1079,7 @@ authMethod?: "api_key" | "oauth";  // Basic tracking
 ```
 
 **Problems**:
+
 - Auth and config are mixed in same field
 - No `authState` field
 - No structure for multiple auth methods
@@ -1050,49 +1091,50 @@ authMethod?: "api_key" | "oauth";  // Basic tracking
 **File**: `server/entities/plugin-instance.entity.ts`
 
 **Changes**:
+
 ```typescript
 @Entity("plugin_instances")
 export class PluginInstance extends OrganizationScopedEntity {
   // ... existing fields ...
 
   @Column({ type: "jsonb", nullable: true })
-  config?: Record<string, unknown>;  // Pure config (no auth)
+  config?: Record<string, unknown>; // Pure config (no auth)
 
   // NEW: Auth state (separate from config)
   @Column({ type: "jsonb", nullable: true })
   authState?: AuthState;
 
   @Column({ type: "varchar", length: 50, nullable: true })
-  authMethod?: string;  // Current method ID (e.g. "apiKey", "oauth")
+  authMethod?: string; // Current method ID (e.g. "apiKey", "oauth")
 
   @Column({ type: "timestamptz", nullable: true })
-  authValidatedAt?: Date;  // Last successful validation
+  authValidatedAt?: Date; // Last successful validation
 
   // NEW: Org-scoped runtime state (worker lifecycle per org+plugin)
   @Column({
     type: "varchar",
     length: 50,
-    default: "stopped"
+    default: "stopped",
   })
-  runtimeState!: PluginInstanceRuntimeState;  // ⬅️ Add this
+  runtimeState!: PluginInstanceRuntimeState; // ⬅️ Add this
 
   @Column({ type: "timestamptz", nullable: true })
-  lastStartedAt?: Date;  // Last worker startup time
+  lastStartedAt?: Date; // Last worker startup time
 
   @Column({ type: "text", nullable: true })
-  lastError?: string;  // Last error message (for troubleshooting)
+  lastError?: string; // Last error message (for troubleshooting)
 }
 
 export type PluginInstanceRuntimeState =
-  | "stopped"      // Worker not running
-  | "starting"     // Worker spawning, waiting for /metadata
-  | "ready"        // Worker running, healthy
-  | "degraded"     // Worker running but MCP/config issues
-  | "error";       // Worker crashed or failed to start
+  | "stopped" // Worker not running
+  | "starting" // Worker spawning, waiting for /metadata
+  | "ready" // Worker running, healthy
+  | "degraded" // Worker running but MCP/config issues
+  | "error"; // Worker crashed or failed to start
 
 export interface AuthState {
-  methodId: string;  // e.g. "apiKey", "oauth"
-  credentials: Record<string, any>;  // { apiKey: "...", ... } or { accessToken: "...", ... }
+  methodId: string; // e.g. "apiKey", "oauth"
+  credentials: Record<string, any>; // { apiKey: "...", ... } or { accessToken: "...", ... }
 }
 ```
 
@@ -1101,42 +1143,58 @@ export interface AuthState {
 **New File**: `server/database/migrations/{timestamp}-add-auth-state-to-plugin-instances.ts`
 
 **Migration**:
+
 ```typescript
 export class AddAuthStateAndRuntimeStateToPluginInstances1234567890 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Add auth state columns
-    await queryRunner.addColumn("plugin_instances", new TableColumn({
-      name: "auth_state",
-      type: "jsonb",
-      isNullable: true,
-    }));
+    await queryRunner.addColumn(
+      "plugin_instances",
+      new TableColumn({
+        name: "auth_state",
+        type: "jsonb",
+        isNullable: true,
+      }),
+    );
 
-    await queryRunner.addColumn("plugin_instances", new TableColumn({
-      name: "auth_validated_at",
-      type: "timestamptz",
-      isNullable: true,
-    }));
+    await queryRunner.addColumn(
+      "plugin_instances",
+      new TableColumn({
+        name: "auth_validated_at",
+        type: "timestamptz",
+        isNullable: true,
+      }),
+    );
 
     // 2. Add org-scoped runtime state columns
-    await queryRunner.addColumn("plugin_instances", new TableColumn({
-      name: "runtime_state",
-      type: "varchar",
-      length: "50",
-      default: "'stopped'",
-      isNullable: false,
-    }));
+    await queryRunner.addColumn(
+      "plugin_instances",
+      new TableColumn({
+        name: "runtime_state",
+        type: "varchar",
+        length: "50",
+        default: "'stopped'",
+        isNullable: false,
+      }),
+    );
 
-    await queryRunner.addColumn("plugin_instances", new TableColumn({
-      name: "last_started_at",
-      type: "timestamptz",
-      isNullable: true,
-    }));
+    await queryRunner.addColumn(
+      "plugin_instances",
+      new TableColumn({
+        name: "last_started_at",
+        type: "timestamptz",
+        isNullable: true,
+      }),
+    );
 
-    await queryRunner.addColumn("plugin_instances", new TableColumn({
-      name: "last_error",
-      type: "text",
-      isNullable: true,
-    }));
+    await queryRunner.addColumn(
+      "plugin_instances",
+      new TableColumn({
+        name: "last_error",
+        type: "text",
+        isNullable: true,
+      }),
+    );
 
     // 3. Migrate existing data (if any legacy auth in config)
     // This is plugin-specific and may need manual review
@@ -1158,33 +1216,27 @@ export class AddAuthStateAndRuntimeStateToPluginInstances1234567890 implements M
 **File**: `server/repositories/plugin-instance.repository.ts`
 
 **New Methods**:
+
 ```typescript
 class PluginInstanceRepository {
   /**
    * Update auth state for a plugin instance
    */
-  async updateAuthState(
-    instanceId: string,
-    orgId: string,
-    authState: AuthState
-  ): Promise<void> {
+  async updateAuthState(instanceId: string, orgId: string, authState: AuthState): Promise<void> {
     await this.repo.update(
       { id: instanceId, organizationId: orgId },
       {
         authState,
         authMethod: authState.methodId,
         authValidatedAt: new Date(),
-      }
+      },
     );
   }
 
   /**
    * Get auth state for a plugin instance
    */
-  async getAuthState(
-    orgId: string,
-    pluginId: string
-  ): Promise<AuthState | null> {
+  async getAuthState(orgId: string, pluginId: string): Promise<AuthState | null> {
     const instance = await this.findByOrgAndPlugin(orgId, pluginId);
     return instance?.authState || null;
   }
@@ -1194,10 +1246,12 @@ class PluginInstanceRepository {
 ### 5.3 Config vs Auth Separation
 
 **Rule**:
+
 - **Config** = non-sensitive settings (e.g. `enableTestMode`, `webhookUrl`)
 - **Auth** = credentials (e.g. `apiKey`, `accessToken`, `refreshToken`)
 
 **How to Separate**:
+
 - SDK v2 plugin declares auth methods via `register.auth.apiKey()` or `register.auth.oauth2()`
 - Auth fields are identified by `authMethods[].configField` (for API key) or OAuth flow
 - When user saves settings:
@@ -1205,6 +1259,7 @@ class PluginInstanceRepository {
   2. Extract non-auth fields → store in `config`
 
 **Example**:
+
 ```typescript
 // User saves:
 {
@@ -1242,10 +1297,12 @@ config = {
 **Current**: Individual env vars (e.g. `SHOPIFY_API_KEY=...`)
 
 **SDK v2**: JSON strings
+
 - `HAY_ORG_CONFIG='{"enableTestMode":true,"webhookUrl":"..."}'`
 - `HAY_ORG_AUTH='{"methodId":"apiKey","credentials":{"apiKey":"sk_live_xxx"}}'`
 
 **SDK Handles Resolution**:
+
 ```typescript
 // In plugin code:
 const apiKey = ctx.auth.get().credentials.apiKey;
@@ -1259,16 +1316,19 @@ const testMode = ctx.config.get<boolean>("enableTestMode");
 ### 6.1 Current State
 
 **Files**:
+
 - `server/services/mcp-registry.service.ts` - Tracks MCP tools
 - `server/services/mcp-client-factory.service.ts` - Creates MCP clients
 - `server/types/plugin.types.ts` - `MCPToolDefinition`, `LocalMCPServerConfig`, `RemoteMCPServerConfig`
 
 **Current Behavior**:
+
 - MCP servers defined in `manifest.capabilities.mcp`
 - Tools stored in `plugin_instances.config.mcpServers`
 - Core starts MCP processes separately
 
 **Problems**:
+
 - MCP lifecycle not tied to plugin lifecycle
 - No `onStart` hook to initialize MCP with org config/auth
 - MCP descriptors in manifest (static) vs runtime (dynamic)
@@ -1278,12 +1338,14 @@ const testMode = ctx.config.get<boolean>("enableTestMode");
 #### 6.2.1 MCP Lifecycle in SDK v2
 
 **SDK v2 Model**:
+
 1. Plugin calls `ctx.mcp.startLocal()` in `onStart()` hook
 2. SDK v2 runner manages MCP subprocess lifecycle
 3. MCP servers automatically stopped when worker stops
 4. Core doesn't manage MCP processes directly
 
 **Example** (from plugin code):
+
 ```typescript
 async onStart(ctx: HayStartContext) {
   // Get credentials
@@ -1304,11 +1366,13 @@ async onStart(ctx: HayStartContext) {
 #### 6.2.2 Core's Role
 
 **Core Does**:
+
 1. Fetch MCP descriptors from `/metadata` endpoint
 2. Display available MCP tools in UI
 3. Route MCP tool calls to correct worker
 
 **Core Does NOT**:
+
 - Start/stop MCP processes (SDK handles it)
 - Manage MCP server lifecycle (SDK handles it)
 - Inject MCP config (plugin handles it via `onStart`)
@@ -1316,6 +1380,7 @@ async onStart(ctx: HayStartContext) {
 #### 6.2.3 Metadata Response
 
 **From `/metadata`**:
+
 ```json
 {
   "mcp": {
@@ -1332,6 +1397,7 @@ async onStart(ctx: HayStartContext) {
 ```
 
 **Note**:
+
 - Descriptors are **static** (available servers)
 - Actual MCP tools are discovered when server starts (via `listTools()`)
 - Core doesn't need to know about MCP tools upfront
@@ -1341,6 +1407,7 @@ async onStart(ctx: HayStartContext) {
 **File**: `server/services/mcp-registry.service.ts`
 
 **Changes**:
+
 ```typescript
 export class MCPRegistryService {
   /**
@@ -1358,11 +1425,13 @@ export class MCPRegistryService {
       const metadata = plugin?.metadata;
 
       if (metadata?.mcp?.local) {
-        servers.push(...metadata.mcp.local.map(s => ({
-          ...s,
-          pluginId: instance.pluginId,
-          organizationId: orgId,
-        })));
+        servers.push(
+          ...metadata.mcp.local.map((s) => ({
+            ...s,
+            pluginId: instance.pluginId,
+            organizationId: orgId,
+          })),
+        );
       }
     }
 
@@ -1377,7 +1446,7 @@ export class MCPRegistryService {
     orgId: string,
     pluginId: string,
     toolName: string,
-    args: Record<string, any>
+    args: Record<string, any>,
   ): Promise<any> {
     // Get worker
     const worker = await pluginManager.getOrStartWorker(orgId, pluginId);
@@ -1402,6 +1471,7 @@ export class MCPRegistryService {
 ```
 
 **SDK v2 Runner Requirement**:
+
 - Runner MUST expose `POST /mcp/call-tool` endpoint
 - Endpoint routes to appropriate MCP server managed by SDK
 
@@ -1412,6 +1482,7 @@ export class MCPRegistryService {
 **Solution**: Add `GET /mcp/list-tools` endpoint to runner
 
 **Runner Endpoint**:
+
 ```typescript
 // GET /mcp/list-tools
 {
@@ -1433,6 +1504,7 @@ export class MCPRegistryService {
 ```
 
 **Core Integration**:
+
 ```typescript
 export class MCPRegistryService {
   /**
@@ -1456,11 +1528,13 @@ export class MCPRegistryService {
         const response = await fetch(`http://localhost:${worker.port}/mcp/list-tools`);
         const data = await response.json();
 
-        tools.push(...data.tools.map((t: any) => ({
-          ...t,
-          organizationId: orgId,
-          pluginId: instance.pluginId,
-        })));
+        tools.push(
+          ...data.tools.map((t: any) => ({
+            ...t,
+            organizationId: orgId,
+            pluginId: instance.pluginId,
+          })),
+        );
       } catch (error) {
         logger.warn(`Failed to fetch MCP tools for ${instance.pluginId}`, error);
       }
@@ -1472,6 +1546,7 @@ export class MCPRegistryService {
 ```
 
 **UI/Agent Usage**:
+
 ```typescript
 // In agent orchestration
 const tools = await mcpRegistryService.getToolsForOrg(orgId);
@@ -1481,6 +1556,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 #### 6.2.6 Remove Legacy MCP Process Management
 
 **Files to Remove/Deprecate**:
+
 - Any code that spawns MCP processes directly from Core
 - Any code that manages MCP server lifecycle from Core
 - Any code that injects MCP config from Core
@@ -1496,11 +1572,13 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 **Decision**: Replace legacy system at runtime, preserve code for rollback
 
 **Clarification**:
+
 - **Runtime**: All new plugin workers use SDK v2 runner
 - **Code**: Legacy code remains in repo (tagged) for 1-release rollback window
 - **DB**: Schema is backwards-compatible (new fields nullable)
 
 **Reasons**:
+
 1. SDK v2 contract is incompatible with legacy
 2. Worker lifecycle is fundamentally different
 3. Metadata model is different (minimal manifest + runtime fetch)
@@ -1510,15 +1588,18 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 ### 7.2 Rollback Window
 
 **Git Strategy**:
+
 - Tag pre-v2 commit: `plugin-sdk-v1-final`
 - Keep legacy code in repo until v2 stabilizes (1 release cycle)
 - After stabilization: remove legacy code in cleanup PR
 
 **DB Strategy**:
+
 - All new fields are nullable → backwards compatible
 - Rollback procedure: revert code, run down migrations
 
 **Ops Strategy**:
+
 - Test rollback procedure in staging before production deploy
 - Have database backup before migration
 - Monitor error rates for 48 hours post-deploy
@@ -1526,6 +1607,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 ### 7.3 Migration Phases
 
 #### Phase 1: Preparation (Week 1)
+
 - [ ] Create SDK v2 types in Hay Core (`PluginMetadataState`, `PluginInstanceRuntimeState`)
 - [ ] Add `metadata`, `metadataFetchedAt`, `metadataState`, `checksum` fields to `PluginRegistry` entity
 - [ ] Add `authState`, `authValidatedAt`, `runtimeState`, `lastStartedAt`, `lastError` fields to `PluginInstance` entity
@@ -1534,6 +1616,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] **Update SDK v2 runner to expose required HTTP endpoints** (Section 0: /metadata, /validate-auth, /disable, /mcp/call-tool, /mcp/list-tools)
 
 #### Phase 2: Worker Management (Week 2)
+
 - [ ] Update `startPluginWorker()` to use SDK v2 runner
 - [ ] Update `buildSDKv2Env()` to use new contract (HAY_ORG_CONFIG, HAY_ORG_AUTH)
 - [ ] Update `waitForMetadataEndpoint()` (replace `/health` with `/metadata`)
@@ -1543,6 +1626,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Implement Core-allocated dynamic port pool (PortAllocator class)
 
 #### Phase 3: Metadata Ingestion (Week 2-3)
+
 - [ ] Implement `fetchAndStoreMetadata()` with AbortController-based timeouts and retry logic
 - [ ] Implement checksum-based change detection for metadata staleness
 - [ ] Update `getAllPlugins()` to return metadata + both state types (metadataState + runtimeState)
@@ -1551,6 +1635,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Implement state-driven UI (Section 3.3) with proper guards for missing/stale metadata
 
 #### Phase 4: Lifecycle Hooks (Week 3)
+
 - [ ] Update `enablePlugin()` flow (NO in-process plugin loading, skip onEnable for now)
 - [ ] Implement `validateAuth()` endpoint with AbortController timeout
 - [ ] Update `configurePlugin()` flow (simplified restart-based)
@@ -1559,6 +1644,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Add documentation warning: onEnable hook exists but not executed yet (future: out-of-process)
 
 #### Phase 5: Auth Separation (Week 3-4)
+
 - [ ] Implement `updateAuthState()` repository method
 - [ ] Implement config/auth separation logic in save flows
 - [ ] Update frontend auth UI components
@@ -1566,6 +1652,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Test auth validation flow end-to-end
 
 #### Phase 6: MCP Integration (Week 4)
+
 - [ ] Update `MCPRegistryService` to read from metadata (server descriptors)
 - [ ] Implement `getToolsForOrg()` using `/mcp/list-tools` endpoint
 - [ ] Implement MCP tool call routing via `/mcp/call-tool`
@@ -1574,6 +1661,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Verify runner exposes `/mcp/list-tools` endpoint
 
 #### Phase 7: Cleanup (Week 5)
+
 - [ ] Remove legacy manifest fields from UI
 - [ ] Deprecate legacy worker startup code (keep for rollback)
 - [ ] Update documentation
@@ -1581,6 +1669,7 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 - [ ] Tag `plugin-sdk-v1-final` commit
 
 #### Phase 8: Testing & Validation (Week 5-6)
+
 - [ ] Test plugin discovery
 - [ ] Test worker startup/shutdown
 - [ ] Test metadata ingestion + retry logic
@@ -1592,16 +1681,19 @@ const tools = await mcpRegistryService.getToolsForOrg(orgId);
 ### 7.4 Backwards Compatibility
 
 **Legacy Plugins**:
+
 - Mark as "incompatible" in UI
 - Show migration instructions
 - Provide migration tool/script
 
 **Migration Tool**:
+
 ```bash
 npm run migrate-plugin -- /plugins/core/shopify
 ```
 
 **Migration Steps**:
+
 1. Update `package.json` → minimal `hay-plugin` block
 2. Update plugin code to use SDK v2 factory
 3. Implement `onInitialize()`, `onStart()`, `onValidateAuth()`, `onDisable()` hooks
@@ -1613,6 +1705,7 @@ npm run migrate-plugin -- /plugins/core/shopify
 **Recommendation**: Hard Cutover with Rollback Window
 
 **Deployment Strategy**:
+
 1. Deploy to staging
 2. Test all flows + rollback procedure
 3. Deploy to production
@@ -1621,6 +1714,7 @@ npm run migrate-plugin -- /plugins/core/shopify
 6. If critical issues: execute rollback
 
 **Rollback Trigger Criteria**:
+
 - Worker startup failure rate > 20%
 - Metadata fetch failure rate > 30%
 - User-facing errors spike > 2x baseline
@@ -1632,9 +1726,11 @@ npm run migrate-plugin -- /plugins/core/shopify
 ### 8.1 Architectural Risks
 
 #### Risk 1: Metadata Fetch Failure
+
 **Problem**: Worker starts but `/metadata` fetch fails (all 3 retries)
 **Impact**: Plugin in `degraded` state, limited functionality
 **Mitigation**:
+
 - Set `runtimeState = "degraded"`
 - Allow basic operations (disable, manual refresh)
 - Show clear warning in UI
@@ -1642,9 +1738,11 @@ npm run migrate-plugin -- /plugins/core/shopify
 - Log error details for debugging
 
 #### Risk 2: Worker Crashes After `onStart`
+
 **Problem**: Plugin throws in `onStart`, worker crashes
 **Impact**: Plugin instances for org go offline
 **Mitigation**:
+
 - SDK v2 catches errors in `onStart`
 - Core marks plugin as "error" state
 - Auto-restart with exponential backoff (max 3 attempts)
@@ -1652,36 +1750,44 @@ npm run migrate-plugin -- /plugins/core/shopify
 - Show "Retry" button in UI for manual restart
 
 #### Risk 3: Auth Validation Timeout
+
 **Problem**: `onValidateAuth` calls external API, times out (>10s)
 **Impact**: User waits, then sees timeout error
 **Mitigation**:
+
 - 10-second timeout on auth validation
 - Show "Validating..." spinner in UI
 - If timeout: return `{ valid: false, error: "Validation timeout" }`
 - Allow user to retry or skip validation (with warning)
 
 #### Risk 4: MCP Server Fails to Start
+
 **Problem**: Plugin calls `mcp.startLocal()`, MCP crashes
 **Impact**: Plugin installed but MCP unavailable
 **Mitigation**:
+
 - SDK v2 logs MCP error but doesn't crash plugin
 - Plugin continues without MCP (degraded mode)
 - UI shows "MCP unavailable" status
 - Retry on next worker restart
 
 #### Risk 5: Config/Auth Separation Confusion
+
 **Problem**: Developers confused about config vs auth fields
 **Impact**: Auth credentials stored in config, or vice versa
 **Mitigation**:
+
 - Clear documentation with examples
 - Validation in Core (reject if auth in config)
 - UI separates auth and config sections visually
 - Error messages guide users to correct section
 
 #### Risk 6: Port Allocation at Scale
+
 **Problem**: Static port pool (5000-6000) exhausted
 **Impact**: Can't start new workers
 **Mitigation**:
+
 - Implement OS-assigned ports (port=0) OR
 - Implement centralized port allocator with reuse
 - Add TODO in code for future scale
@@ -1729,6 +1835,7 @@ npm run migrate-plugin -- /plugins/core/shopify
 ### 9.1 Plugin Manifest
 
 **Before (Legacy)**:
+
 ```jsonc
 {
   "hay-plugin": {
@@ -1737,20 +1844,21 @@ npm run migrate-plugin -- /plugins/core/shopify
     "category": "integration",
     "capabilities": ["routes", "mcp"],
     "configSchema": {
-      "apiKey": { "type": "string", "env": "SHOPIFY_API_KEY" }
+      "apiKey": { "type": "string", "env": "SHOPIFY_API_KEY" },
     },
     "auth": {
       "type": "apiKey",
-      "clientIdEnvVar": "SHOPIFY_CLIENT_ID"
+      "clientIdEnvVar": "SHOPIFY_CLIENT_ID",
     },
     "permissions": {
-      "env": ["SHOPIFY_API_KEY", "SHOPIFY_CLIENT_ID"]
-    }
-  }
+      "env": ["SHOPIFY_API_KEY", "SHOPIFY_CLIENT_ID"],
+    },
+  },
 }
 ```
 
 **After (SDK v2)**:
+
 ```jsonc
 {
   "hay-plugin": {
@@ -1758,14 +1866,15 @@ npm run migrate-plugin -- /plugins/core/shopify
     "displayName": "Shopify",
     "category": "integration",
     "capabilities": ["routes", "mcp", "auth", "config"],
-    "env": ["SHOPIFY_API_KEY", "SHOPIFY_CLIENT_ID"]
-  }
+    "env": ["SHOPIFY_API_KEY", "SHOPIFY_CLIENT_ID"],
+  },
 }
 ```
 
 ### 9.2 Worker Startup
 
 **Before (Legacy)**:
+
 ```bash
 node /plugins/core/shopify/dist/index.js
 
@@ -1778,6 +1887,7 @@ HAY_API_TOKEN=jwt_token
 ```
 
 **After (SDK v2)**:
+
 ```bash
 node /plugin-sdk-v2/runner/index.js \
   --plugin-path=/plugins/core/shopify \
@@ -1798,6 +1908,7 @@ SHOPIFY_CLIENT_ID=abc123  # (allowed env var)
 ### 9.3 Plugin Code
 
 **Before (Legacy)**:
+
 ```typescript
 // No standard structure
 export function start() {
@@ -1807,6 +1918,7 @@ export function start() {
 ```
 
 **After (SDK v2)**:
+
 ```typescript
 import { defineHayPlugin } from "@hay/plugin-sdk";
 
@@ -1822,7 +1934,7 @@ export default defineHayPlugin((globalCtx) => {
     onInitialize(ctx) {
       // Declare schema
       ctx.register.config({
-        apiKey: { type: "string", env: "SHOPIFY_API_KEY", sensitive: true },
+        apiKey: { type: "string", env: "SHOPIFY_API_KEY", encrypted: true },
       });
 
       // Declare auth
@@ -1910,47 +2022,47 @@ export default defineHayPlugin((globalCtx) => {
 
 ### 11.1 New Files
 
-| File | Purpose |
-|------|---------|
-| `server/services/plugin-runner-v2.service.ts` | SDK v2 runner invocation and worker management |
-| `server/services/port-allocator.service.ts` | Core-allocated dynamic port pool |
-| `server/types/plugin-sdk-v2.types.ts` | SDK v2 type definitions (PluginMetadataState, PluginInstanceRuntimeState) |
-| `server/services/plugin-metadata.service.ts` | Metadata fetching/validation/retry logic with AbortController |
-| `server/routes/v1/plugins/validate-auth.ts` | Auth validation endpoint |
-| `server/database/migrations/{timestamp}-add-metadata-to-plugin-registry.ts` | Add metadata, metadataFetchedAt, metadataState, checksum fields |
+| File                                                                              | Purpose                                                                       |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `server/services/plugin-runner-v2.service.ts`                                     | SDK v2 runner invocation and worker management                                |
+| `server/services/port-allocator.service.ts`                                       | Core-allocated dynamic port pool                                              |
+| `server/types/plugin-sdk-v2.types.ts`                                             | SDK v2 type definitions (PluginMetadataState, PluginInstanceRuntimeState)     |
+| `server/services/plugin-metadata.service.ts`                                      | Metadata fetching/validation/retry logic with AbortController                 |
+| `server/routes/v1/plugins/validate-auth.ts`                                       | Auth validation endpoint                                                      |
+| `server/database/migrations/{timestamp}-add-metadata-to-plugin-registry.ts`       | Add metadata, metadataFetchedAt, metadataState, checksum fields               |
 | `server/database/migrations/{timestamp}-add-runtime-state-to-plugin-instances.ts` | Add authState, authValidatedAt, runtimeState, lastStartedAt, lastError fields |
-| `docs/PLUGIN_SDK_V2_MIGRATION.md` | Migration guide for plugin authors |
-| `scripts/migrate-plugin-to-sdk-v2.ts` | Automated migration tool |
-| `plugin-sdk-v2/runner/endpoints/validate-auth.ts` | Runner endpoint implementation |
-| `plugin-sdk-v2/runner/endpoints/disable.ts` | Runner endpoint implementation |
-| `plugin-sdk-v2/runner/endpoints/mcp-call-tool.ts` | Runner MCP proxy endpoint |
-| `plugin-sdk-v2/runner/endpoints/mcp-list-tools.ts` | Runner MCP tool discovery endpoint |
+| `docs/PLUGIN_SDK_V2_MIGRATION.md`                                                 | Migration guide for plugin authors                                            |
+| `scripts/migrate-plugin-to-sdk-v2.ts`                                             | Automated migration tool                                                      |
+| `plugin-sdk-v2/runner/endpoints/validate-auth.ts`                                 | Runner endpoint implementation                                                |
+| `plugin-sdk-v2/runner/endpoints/disable.ts`                                       | Runner endpoint implementation                                                |
+| `plugin-sdk-v2/runner/endpoints/mcp-call-tool.ts`                                 | Runner MCP proxy endpoint                                                     |
+| `plugin-sdk-v2/runner/endpoints/mcp-list-tools.ts`                                | Runner MCP tool discovery endpoint                                            |
 
 ### 11.2 Files to Modify
 
-| File | Changes |
-|------|---------|
-| `server/services/plugin-manager.service.ts` | Update discovery, worker startup, env building, org-scoped state transitions, metadata caching |
-| `server/entities/plugin-registry.entity.ts` | Add metadata, metadataFetchedAt, metadataState, checksum fields |
-| `server/entities/plugin-instance.entity.ts` | Add authState, authValidatedAt, runtimeState, lastStartedAt, lastError fields |
-| `server/repositories/plugin-registry.repository.ts` | Add updateMetadata(), updateMetadataState() |
-| `server/repositories/plugin-instance.repository.ts` | Add updateAuthState(), getAuthState(), updateRuntimeState() |
-| `server/routes/v1/plugins/plugins.handler.ts` | Update all flows (enable, config, disable) with SDK v2 contract, NO in-process plugin loading |
-| `server/services/mcp-registry.service.ts` | Read from metadata, implement getToolsForOrg() via /mcp/list-tools, route to /mcp/call-tool |
-| `server/types/plugin.types.ts` | Add SDK v2 types, deprecate legacy (keep for rollback) |
-| `dashboard/pages/plugins/[id].vue` | Read from metadata, show both state types (metadataState + runtimeState), guard actions |
-| `dashboard/components/plugins/PluginAuthSetup.vue` | Use authMethods array |
-| `plugin-sdk-v2/runner/http-server.ts` | Add required endpoints (Section 0: /metadata, /validate-auth, /disable, /mcp/call-tool, /mcp/list-tools) |
+| File                                                | Changes                                                                                                  |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `server/services/plugin-manager.service.ts`         | Update discovery, worker startup, env building, org-scoped state transitions, metadata caching           |
+| `server/entities/plugin-registry.entity.ts`         | Add metadata, metadataFetchedAt, metadataState, checksum fields                                          |
+| `server/entities/plugin-instance.entity.ts`         | Add authState, authValidatedAt, runtimeState, lastStartedAt, lastError fields                            |
+| `server/repositories/plugin-registry.repository.ts` | Add updateMetadata(), updateMetadataState()                                                              |
+| `server/repositories/plugin-instance.repository.ts` | Add updateAuthState(), getAuthState(), updateRuntimeState()                                              |
+| `server/routes/v1/plugins/plugins.handler.ts`       | Update all flows (enable, config, disable) with SDK v2 contract, NO in-process plugin loading            |
+| `server/services/mcp-registry.service.ts`           | Read from metadata, implement getToolsForOrg() via /mcp/list-tools, route to /mcp/call-tool              |
+| `server/types/plugin.types.ts`                      | Add SDK v2 types, deprecate legacy (keep for rollback)                                                   |
+| `dashboard/pages/plugins/[id].vue`                  | Read from metadata, show both state types (metadataState + runtimeState), guard actions                  |
+| `dashboard/components/plugins/PluginAuthSetup.vue`  | Use authMethods array                                                                                    |
+| `plugin-sdk-v2/runner/http-server.ts`               | Add required endpoints (Section 0: /metadata, /validate-auth, /disable, /mcp/call-tool, /mcp/list-tools) |
 
 ### 11.3 Files to Deprecate (Keep for Rollback)
 
-| File | Action |
-|------|--------|
+| File                             | Action                     |
+| -------------------------------- | -------------------------- |
 | Legacy MCP process spawning code | Deprecate (keep 1 release) |
-| `manifest.configSchema` usage | Deprecate (keep 1 release) |
-| `manifest.auth` usage | Deprecate (keep 1 release) |
-| Individual config env vars | Deprecate (keep 1 release) |
-| `manifest.apiEndpoints` | Deprecate (keep 1 release) |
+| `manifest.configSchema` usage    | Deprecate (keep 1 release) |
+| `manifest.auth` usage            | Deprecate (keep 1 release) |
+| Individual config env vars       | Deprecate (keep 1 release) |
+| `manifest.apiEndpoints`          | Deprecate (keep 1 release) |
 
 ---
 
@@ -1961,12 +2073,14 @@ export default defineHayPlugin((globalCtx) => {
 **Scenario**: Critical bug found in SDK v2 integration (e.g. >20% worker startup failures)
 
 **Actions**:
+
 1. Revert code to `plugin-sdk-v1-final` tag
 2. Run down migrations (drop new columns)
 3. Restart services
 4. Communicate to users: "Temporary issue resolved, plugin system restored"
 
 **Prerequisites**:
+
 - Git tag `plugin-sdk-v1-final` exists
 - Rollback tested in staging
 - Database backup from before migration
@@ -1977,6 +2091,7 @@ export default defineHayPlugin((globalCtx) => {
 **Scenario**: SDK v2 works but has performance issues (e.g. slow metadata fetch)
 
 **Actions**:
+
 1. Keep SDK v2 for new plugins
 2. Allow existing plugins to continue on v1 (if any)
 3. Fix performance issues incrementally
@@ -2033,17 +2148,17 @@ export default defineHayPlugin((globalCtx) => {
 
 ## 14. Timeline
 
-| Phase | Duration | Dependencies |
-|-------|----------|--------------|
-| Phase 1: Preparation | 3 days | None |
-| Phase 2: Worker Management | 4 days | Phase 1 |
-| Phase 3: Metadata Ingestion | 4 days | Phase 2 |
-| Phase 4: Lifecycle Hooks | 5 days | Phase 3 |
-| Phase 5: Auth Separation | 4 days | Phase 4 |
-| Phase 6: MCP Integration | 4 days | Phase 5 |
-| Phase 7: Cleanup | 3 days | Phase 6 |
-| Phase 8: Testing | 7 days | Phase 7 |
-| **Total** | **34 days (~7 weeks)** | |
+| Phase                       | Duration               | Dependencies |
+| --------------------------- | ---------------------- | ------------ |
+| Phase 1: Preparation        | 3 days                 | None         |
+| Phase 2: Worker Management  | 4 days                 | Phase 1      |
+| Phase 3: Metadata Ingestion | 4 days                 | Phase 2      |
+| Phase 4: Lifecycle Hooks    | 5 days                 | Phase 3      |
+| Phase 5: Auth Separation    | 4 days                 | Phase 4      |
+| Phase 6: MCP Integration    | 4 days                 | Phase 5      |
+| Phase 7: Cleanup            | 3 days                 | Phase 6      |
+| Phase 8: Testing            | 7 days                 | Phase 7      |
+| **Total**                   | **34 days (~7 weeks)** |              |
 
 **Target Completion**: End of Q1 2026
 
@@ -2063,6 +2178,7 @@ This migration plan provides a complete, corrected roadmap for updating Hay Core
 **Key Corrections from Reviews**:
 
 **Review v1**:
+
 - ✅ `onEnable()` exists but is Core-only (not runner-called)
 - ✅ Runner HTTP surface moved from "gaps" to hard requirements (Section 0)
 - ✅ Initial state model added (later split into metadata + runtime states in v2)
@@ -2071,6 +2187,7 @@ This migration plan provides a complete, corrected roadmap for updating Hay Core
 - ✅ Rollback window strategy clarified (big-bang runtime, preserved code)
 
 **Review v2**:
+
 - ✅ Runtime state moved to org-scoped (PluginInstance.runtimeState)
 - ✅ Metadata state added as plugin-global (PluginRegistry.metadataState)
 - ✅ Port allocation: Core-allocated dynamic pool (no handshake needed)
@@ -2080,6 +2197,7 @@ This migration plan provides a complete, corrected roadmap for updating Hay Core
 - ✅ MCP tool discovery API added (/mcp/list-tools endpoint)
 
 **Next Steps**:
+
 1. ✅ Review corrected plan v2 with team
 2. Update SDK v2 runner to expose required HTTP endpoints (Section 0)
 3. Create GitHub issues for each phase

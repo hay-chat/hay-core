@@ -102,7 +102,19 @@ export function hasAuthChanges(
     return false;
   }
 
-  // Check if any auth field is present in input
+  // For OAuth2 plugins, only validate when OAuth tokens are present
+  // Don't validate when just saving clientId/clientSecret config
+  const hasOAuth2 = metadata.authMethods.some(m => m.type === "oauth2");
+  if (hasOAuth2) {
+    // Only check for OAuth tokens (from OAuth flow)
+    if (input.accessToken !== undefined || input.refreshToken !== undefined) {
+      return true;
+    }
+    // Don't validate for encrypted config fields like clientSecret
+    return false;
+  }
+
+  // For API Key auth, check if API key field is present
   for (const method of metadata.authMethods) {
     if (method.type === "apiKey" && method.configField) {
       if (input[method.configField] !== undefined) {
@@ -111,12 +123,7 @@ export function hasAuthChanges(
     }
   }
 
-  // Check for OAuth tokens
-  if (input.accessToken !== undefined || input.refreshToken !== undefined) {
-    return true;
-  }
-
-  // Check for encrypted fields in configSchema
+  // Check for encrypted fields in configSchema (non-OAuth plugins)
   if (metadata.configSchema) {
     for (const [key, schema] of Object.entries(metadata.configSchema)) {
       if (schema.encrypted && input[key] !== undefined) {

@@ -3,7 +3,7 @@ import { OrganizationScopedEntity } from "./base.entity";
 import { PluginRegistry } from "./plugin-registry.entity";
 import { Organization } from "./organization.entity";
 import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk-v2.types";
-import { EncryptedTransformer } from "../lib/auth/utils/encryption";
+import { AuthStateEncryptedTransformer } from "../lib/auth/utils/encryption";
 
 @Entity("plugin_instances")
 @Index(["organizationId", "pluginId"], { unique: true })
@@ -26,10 +26,11 @@ export class PluginInstance extends OrganizationScopedEntity {
   config?: Record<string, unknown>;
 
   // SDK v2: Auth state (separate from config)
+  // Uses AuthStateEncryptedTransformer to encrypt ALL fields in credentials
   @Column({
     type: "jsonb",
     nullable: true,
-    transformer: new EncryptedTransformer(["apiKey", "bearerToken", "password", "token"]),
+    transformer: new AuthStateEncryptedTransformer(),
   })
   authState?: AuthState;
 

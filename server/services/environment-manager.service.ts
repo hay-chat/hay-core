@@ -39,10 +39,13 @@ export class EnvironmentManagerService {
     // Decrypt config values
     const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
 
+    // Use metadata for SDK v2, fallback to manifest for legacy
+    const configSchema = instance.plugin.metadata?.configSchema || manifest.configSchema;
+
     // Apply permitted environment variables
     for (const varName of permittedEnvVars) {
       // Check if it's defined in the config schema
-      const configKey = this.findConfigKeyForEnvVar(varName, manifest.configSchema);
+      const configKey = this.findConfigKeyForEnvVar(varName, configSchema);
 
       if (configKey && decryptedConfig[configKey] !== undefined) {
         // Use value from database config (priority)
@@ -54,8 +57,8 @@ export class EnvironmentManagerService {
     }
 
     // Add any additional environment variables from config that map to env
-    if (manifest.configSchema) {
-      for (const [key, schema] of Object.entries(manifest.configSchema)) {
+    if (configSchema) {
+      for (const [key, schema] of Object.entries(configSchema)) {
         if (schema.env && decryptedConfig[key] !== undefined) {
           env[schema.env] = String(decryptedConfig[key]);
         }

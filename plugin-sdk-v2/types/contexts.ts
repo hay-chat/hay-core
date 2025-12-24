@@ -42,7 +42,7 @@ import type { HayOrg } from './org';
  *       type: 'string',
  *       required: true,
  *       env: 'STRIPE_API_KEY',
- *       sensitive: true,
+ *       encrypted: true,
  *     },
  *   });
  *

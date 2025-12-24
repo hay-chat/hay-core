@@ -2,7 +2,7 @@ import { type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
-import { encryptConfig } from "@server/lib/auth/utils/encryption";
+import { encryptConfig, type ConfigSchema } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
@@ -104,7 +104,8 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = instance.plugin.manifest as HayPluginManifest;
-    const configSchema = manifest.configSchema || {};
+    // Use metadata for SDK v2, fallback to manifest for legacy
+    const configSchema = (instance.plugin.metadata?.configSchema || manifest.configSchema || {}) as ConfigSchema;
 
     // Encrypt sensitive fields before storing
     const encryptedConfig = encryptConfig(config, configSchema);
@@ -136,7 +137,8 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // If config is provided, encrypt sensitive fields
     if (data.config) {
       const manifest = pluginRegistry.manifest as HayPluginManifest;
-      const configSchema = manifest.configSchema || {};
+      // Use metadata for SDK v2, fallback to manifest for legacy
+      const configSchema = (pluginRegistry.metadata?.configSchema || manifest.configSchema || {}) as ConfigSchema;
       data.config = encryptConfig(data.config, configSchema);
     }
 
@@ -173,7 +175,8 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = pluginRegistry.manifest as HayPluginManifest;
-    const configSchema = manifest.configSchema || {};
+    // Use metadata for SDK v2, fallback to manifest for legacy
+    const configSchema = (pluginRegistry.metadata?.configSchema || manifest.configSchema || {}) as ConfigSchema;
 
     // Encrypt sensitive fields before storing
     const encryptedConfig = config ? encryptConfig(config, configSchema) : undefined;
@@ -198,20 +201,27 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
 
   /**
    * Update auth state for a plugin instance (SDK v2)
+   * Uses .save() to trigger TypeORM transformers for encryption
    */
   async updateAuthState(
     instanceId: string,
     orgId: string,
     authState: { methodId: string; credentials: Record<string, any> }
   ): Promise<void> {
-    await this.getRepository().update(
-      { id: instanceId, organizationId: orgId },
-      {
-        authState,
-        authMethod: authState.methodId as any,
-        authValidatedAt: new Date(),
-      } as any
-    );
+    // Use .findOne() and .save() to ensure transformers run
+    const instance = await this.getRepository().findOne({
+      where: { id: instanceId, organizationId: orgId }
+    });
+
+    if (!instance) {
+      throw new Error(`Plugin instance ${instanceId} not found for organization ${orgId}`);
+    }
+
+    instance.authState = authState;
+    instance.authMethod = authState.methodId as any;
+    instance.authValidatedAt = new Date();
+
+    await this.getRepository().save(instance);
   }
 
   /**

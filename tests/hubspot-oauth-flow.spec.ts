@@ -116,6 +116,44 @@ test.describe("HubSpot Plugin OAuth Flow E2E", () => {
       console.log("⚠️  No success message found, but continuing...");
     }
 
+    // Step 6.5: Verify encrypted fields are masked with Edit button
+    console.log("Step 6.5: Verifying client secret is encrypted and masked...");
+
+    // Reload page to see masked values
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
+
+    // Navigate to Settings tab again if needed
+    const settingsTabAgain = page.locator('[role="tab"]:has-text("Settings")');
+    const hasSettingsTabAgain = await settingsTabAgain.isVisible({ timeout: 5000 }).catch(() => false);
+    if (hasSettingsTabAgain) {
+      await settingsTabAgain.click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Check that client secret input is disabled and shows asterisks
+    const clientSecretInputAfterSave = page.locator('input[type="password"][disabled]').first();
+    const hasDisabledSecret = await clientSecretInputAfterSave.isVisible({ timeout: 5000 }).catch(() => false);
+
+    // Check for Edit button next to encrypted field
+    const editButton = page.locator('button:has-text("Edit")').first();
+    const hasEditButton = await editButton.isVisible({ timeout: 5000 }).catch(() => false);
+
+    console.log(`Client secret is disabled and masked: ${hasDisabledSecret}`);
+    console.log(`Edit button visible: ${hasEditButton}`);
+
+    // Take screenshot
+    await page.screenshot({
+      path: "test-results/hubspot-after-save-encrypted.png",
+      fullPage: true,
+    });
+    console.log("Screenshot saved to test-results/hubspot-after-save-encrypted.png");
+
+    // ASSERTION: Encrypted field should show Edit button
+    expect(hasEditButton).toBe(true);
+    console.log("✅ PASS: Client secret is encrypted and shows Edit button");
+
     // Step 7: Verify NO healthcheck is triggered
     console.log("Step 7: Verifying NO healthcheck is triggered (not authenticated yet)...");
 

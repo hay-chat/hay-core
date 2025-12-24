@@ -52,7 +52,7 @@ import type {
  *           type: 'string',
  *           required: true,
  *           env: 'SHOPIFY_API_KEY',
- *           sensitive: true,
+ *           encrypted: true,
  *         },
  *       });
  *
