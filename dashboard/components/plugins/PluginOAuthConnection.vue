@@ -99,6 +99,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { CheckCircle, Link2, Info } from "lucide-vue-next";
+import type { PluginDisplay, PluginConfig } from "@/types/plugin.types";
 
 interface OAuthStatus {
   connected: boolean;
@@ -108,8 +109,8 @@ interface OAuthStatus {
 }
 
 interface Props {
-  plugin: any;
-  config?: any;
+  plugin: PluginDisplay;
+  config?: PluginConfig;
   apiBaseUrl?: string;
   description?: string;
   infoText?: string;
@@ -156,11 +157,13 @@ const handleConnect = async () => {
 
     // Redirect to OAuth provider page
     window.location.href = authorizationUrl;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to initiate OAuth:", error);
     const { useToast } = await import("@/composables/useToast");
     const toast = useToast();
-    toast.error(error.message || `Failed to connect to ${pluginName.value}`);
+    const errorMessage =
+      error instanceof Error ? error.message : `Failed to connect to ${pluginName.value}`;
+    toast.error(errorMessage);
     connecting.value = false;
   }
 };
