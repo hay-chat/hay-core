@@ -3,7 +3,7 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { oauthService } from "./oauth.service";
 import { debugLog } from "@server/lib/debug-logger";
 import { decryptConfig } from "../lib/auth/utils/encryption";
-import type { OAuthTokenData } from "../types/oauth.types";
+import type { OAuthTokenData, PluginConfigWithOAuth } from "../types/oauth.types";
 
 /**
  * Background job to refresh OAuth tokens before they expire
@@ -25,14 +25,14 @@ export async function refreshOAuthTokens(): Promise<void> {
           continue;
         }
 
-        const decryptedConfig = decryptConfig(instance.config);
-        const oauthData = (decryptedConfig as any)._oauth;
+        const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
 
-        if (!oauthData?.tokens?.expires_at) {
+        if (!decryptedConfig._oauth?.tokens?.expires_at) {
           continue; // No expiry info, skip
         }
 
-        const expiresAt = oauthData.tokens.expires_at;
+        const oauthData = decryptedConfig._oauth;
+        const expiresAt = oauthData.tokens.expires_at!; // Already checked above
         const timeUntilExpiry = expiresAt - now;
 
         // Refresh if expiring within threshold
@@ -44,20 +44,27 @@ export async function refreshOAuthTokens(): Promise<void> {
           });
 
           try {
-            await oauthService.refreshToken(
-              instance.organizationId,
-              instance.plugin.pluginId,
+            await oauthService.refreshToken(instance.organizationId, instance.plugin.pluginId);
+            debugLog(
+              "oauth-refresh",
+              `Token refreshed successfully for plugin ${instance.plugin.pluginId}`,
             );
-            debugLog("oauth-refresh", `Token refreshed successfully for plugin ${instance.plugin.pluginId}`);
           } catch (error) {
-            debugLog("oauth-refresh", `Token refresh failed for plugin ${instance.plugin.pluginId}`, {
-              level: "error",
-              data: error instanceof Error ? error.message : String(error),
-            });
+            debugLog(
+              "oauth-refresh",
+              `Token refresh failed for plugin ${instance.plugin.pluginId}`,
+              {
+                level: "error",
+                data: error instanceof Error ? error.message : String(error),
+              },
+            );
 
             // Mark connection as expired if refresh fails and token is already expired
             if (timeUntilExpiry <= 0) {
-              debugLog("oauth-refresh", `Marking connection as expired for plugin ${instance.plugin.pluginId}`);
+              debugLog(
+                "oauth-refresh",
+                `Marking connection as expired for plugin ${instance.plugin.pluginId}`,
+              );
               // Could update instance status here if needed
             }
           }
@@ -76,5 +83,3 @@ export async function refreshOAuthTokens(): Promise<void> {
     });
   }
 }
-
-

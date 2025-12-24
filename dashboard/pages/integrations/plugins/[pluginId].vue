@@ -290,10 +290,6 @@
       </template>
 
       <!-- OAuth Connection Card (show when OAuth is available and configured) -->
-
-      {{ oauthAvailable }}
-      {{ plugin }}
-
       <Card v-if="enabled && oauthAvailable && oauthConfigured">
         <CardContent>
           <PluginOAuthConnection
@@ -554,6 +550,7 @@ const instanceId = ref<string | null>(null);
 const instanceAuth = ref<any>(null); // Auth config from plugin instance
 const oauthAvailable = ref(false); // Plugin has OAuth2 registered
 const oauthConfigured = ref(false); // OAuth credentials configured
+const oauthConnected = ref(false); // OAuth flow completed and access token exists
 
 // Configuration
 const hasConfiguration = ref(false);
@@ -780,7 +777,7 @@ const fetchPlugin = async () => {
       instanceAuth.value = configData.auth;
     }
 
-    // Store OAuth availability and configuration status
+    // Store OAuth availability, configuration, and connection status
     if ("oauthAvailable" in configData) {
       oauthAvailable.value = configData.oauthAvailable;
       console.log("[Plugin Settings] OAuth available:", configData.oauthAvailable);
@@ -789,9 +786,15 @@ const fetchPlugin = async () => {
       oauthConfigured.value = configData.oauthConfigured;
       console.log("[Plugin Settings] OAuth configured:", configData.oauthConfigured);
     }
+    if ("oauthConnected" in configData) {
+      oauthConnected.value = configData.oauthConnected;
+      console.log("[Plugin Settings] OAuth connected:", configData.oauthConnected);
+    }
+
     console.log("[Plugin Settings] OAuth state:", {
       oauthAvailable: oauthAvailable.value,
       oauthConfigured: oauthConfigured.value,
+      oauthConnected: oauthConnected.value,
       enabled: enabled.value,
     });
 
@@ -842,14 +845,13 @@ const fetchPlugin = async () => {
 
       if (requiresAuth) {
         // Only test connection if auth is configured
-        // For OAuth2, check if we have an access token (not just config credentials)
+        // For OAuth2, check if user has completed the OAuth flow
         const hasOAuth2 = authMethods?.some((m: any) => m.type === "oauth2");
-        const hasAccessToken = instanceAuth.value?.credentials?.accessToken;
 
         if (hasOAuth2) {
-          // OAuth2: only test if access token exists
-          if (hasAccessToken) {
-            console.log("[Plugin] OAuth2 access token found, testing connection...");
+          // OAuth2: only test if OAuth connection is established (access token exists)
+          if (oauthConnected.value) {
+            console.log("[Plugin] OAuth2 connected, testing connection...");
             testConnection();
           } else {
             console.log("[Plugin] OAuth2 configured but not connected yet, skipping health check");
@@ -928,6 +930,9 @@ const saveConfiguration = async () => {
     if ("oauthConfigured" in updatedConfig) {
       oauthConfigured.value = updatedConfig.oauthConfigured;
     }
+    if ("oauthConnected" in updatedConfig) {
+      oauthConnected.value = updatedConfig.oauthConnected;
+    }
 
     // Update original form data to reflect new saved state
     originalFormData.value = { ...updatedConfig.configuration };
@@ -959,6 +964,9 @@ const resetForm = async () => {
   }
   if ("oauthConfigured" in configData) {
     oauthConfigured.value = configData.oauthConfigured;
+  }
+  if ("oauthConnected" in configData) {
+    oauthConnected.value = configData.oauthConnected;
   }
 
   // Clear any editing state for encrypted fields

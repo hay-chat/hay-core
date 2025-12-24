@@ -2,7 +2,7 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { decryptConfig, decryptValue } from "../lib/auth/utils/encryption";
 import { oauthService } from "./oauth.service";
-import type { OAuthTokenData } from "../types/oauth.types";
+import type { OAuthTokenData, PluginConfigWithOAuth } from "../types/oauth.types";
 import { debugLog } from "@server/lib/debug-logger";
 
 /**
@@ -62,12 +62,13 @@ export class OAuthAuthStrategy {
     }
 
     try {
-      const decryptedConfig = decryptConfig(instance.config);
-      const oauthData = (decryptedConfig as any)._oauth;
+      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
 
-      if (!oauthData?.tokens) {
+      if (!decryptedConfig._oauth?.tokens) {
         return null;
       }
+
+      const oauthData = decryptedConfig._oauth;
 
       // Decrypt tokens (access_token and refresh_token are encrypted)
       const encryptedTokens = oauthData.tokens as OAuthTokenData;

@@ -8,6 +8,7 @@ import type {
   OAuthConfig,
   OAuthManifestConfig,
   OAuthConnectionStatus,
+  PluginConfigWithOAuth,
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor } from "../types/plugin-sdk-v2.types";
@@ -610,12 +611,13 @@ export class OAuthService {
     }
 
     try {
-      const decryptedConfig = decryptConfig(instance.config);
-      const oauthData = (decryptedConfig as any)._oauth;
+      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
 
-      if (!oauthData?.tokens) {
+      if (!decryptedConfig._oauth?.tokens) {
         return { connected: false };
       }
+
+      const oauthData = decryptedConfig._oauth;
 
       const expiresAt = oauthData.tokens.expires_at;
       const connectedAt = oauthData.connected_at;
@@ -669,15 +671,16 @@ export class OAuthService {
     };
 
     // Decrypt config
-    const decryptedConfig = decryptConfig(instance.config);
-    const oauthData = (decryptedConfig as any)._oauth;
+    const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
 
-    if (!oauthData?.tokens?.refresh_token) {
+    if (!decryptedConfig._oauth?.tokens?.refresh_token) {
       throw new Error("No refresh token available");
     }
 
-    // Decrypt refresh token
-    const refreshToken = decryptValue(oauthData.tokens.refresh_token);
+    const oauthData = decryptedConfig._oauth;
+
+    // Decrypt refresh token (already validated above that it exists)
+    const refreshToken = decryptValue(oauthData.tokens.refresh_token!);
 
     // Get client credentials from plugin instance
     const clientIdFieldName = oauth2Method.clientId;
