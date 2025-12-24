@@ -12,24 +12,19 @@
         </p>
 
         <!-- Encrypted field with edit mode -->
+        <!-- Show Edit button only if field has an existing value (not empty) -->
         <div
-          v-if="field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])"
+          v-if="
+            field.encrypted &&
+            originalFormData[key] !== undefined &&
+            originalFormData[key] !== '' &&
+            originalFormData[key] !== null
+          "
           class="space-y-2"
         >
           <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
-            <Input
-              :id="key"
-              value="••••••••"
-              type="password"
-              disabled
-              class="flex-1 bg-muted"
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              @click="handleEditEncryptedField(key)"
-            >
+            <Input :id="key" value="Encrypted value" type="text" disabled class="flex-1 bg-muted" />
+            <Button type="button" variant="outline" @click="handleEditEncryptedField(key)">
               <Edit3 class="h-4 w-4 mr-1" />
               Edit
             </Button>
@@ -46,7 +41,12 @@
               class="flex-1"
               autofocus
             />
-            <Button type="button" size="sm" variant="ghost" @click="handleCancelEditEncryptedField(key)">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              @click="handleCancelEditEncryptedField(key)"
+            >
               <X class="h-4 w-4" />
             </Button>
           </div>
@@ -55,8 +55,8 @@
           </p>
         </div>
 
-        <!-- Regular input or new encrypted field -->
-        <div v-else>
+        <!-- Regular input or empty encrypted field (first time) -->
+        <div v-else-if="field.encrypted || !field.encrypted">
           <Input
             :id="key"
             :model-value="formData[key]"
@@ -149,9 +149,7 @@
 
     <div class="flex justify-end space-x-2 pt-4">
       <Button type="button" variant="outline" @click="$emit('reset')"> Reset </Button>
-      <Button type="submit" :disabled="saving" :loading="saving">
-        Save Configuration
-      </Button>
+      <Button type="submit" :disabled="saving" :loading="saving"> Save Configuration </Button>
     </div>
   </form>
 </template>

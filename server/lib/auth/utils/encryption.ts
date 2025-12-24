@@ -85,7 +85,7 @@ export function decryptValue(encryptedText: string): string {
 /**
  * Encrypt sensitive values in a config object based on schema
  */
-interface ConfigSchema {
+export interface ConfigSchema {
   [key: string]: {
     encrypted?: boolean;
     [key: string]: unknown;
@@ -206,6 +206,91 @@ export class EncryptedTransformer {
         }
       }
     }
+    return decrypted;
+  }
+}
+
+/**
+ * TypeORM transformer specifically for AuthState that encrypts all fields in credentials
+ */
+export class AuthStateEncryptedTransformer {
+  /**
+   * Transform value to database (encrypt all credentials)
+   */
+  to(value: any): any {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    // AuthState structure: { methodId: string, credentials: Record<string, unknown> }
+    const encrypted = { ...value };
+
+    if (encrypted.credentials && typeof encrypted.credentials === "object") {
+      const encryptedCredentials: Record<string, any> = {};
+
+      for (const [key, val] of Object.entries(encrypted.credentials)) {
+        if (val !== null && val !== undefined) {
+          // Encrypt all non-null credential values
+          if (typeof val === "string") {
+            encryptedCredentials[key] = encryptValue(val);
+          } else {
+            // For non-string values, convert to JSON string then encrypt
+            encryptedCredentials[key] = encryptValue(JSON.stringify(val));
+          }
+        } else {
+          encryptedCredentials[key] = val;
+        }
+      }
+
+      encrypted.credentials = encryptedCredentials;
+    }
+
+    return encrypted;
+  }
+
+  /**
+   * Transform value from database (decrypt all credentials)
+   */
+  from(value: any): any {
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    const decrypted = { ...value };
+
+    if (decrypted.credentials && typeof decrypted.credentials === "object") {
+      const decryptedCredentials: Record<string, any> = {};
+
+      for (const [key, val] of Object.entries(decrypted.credentials)) {
+        if (val && typeof val === "string") {
+          try {
+            // Try to decrypt - all fields in credentials SHOULD be encrypted
+            const decryptedVal = decryptValue(val);
+
+            // Try to parse as JSON if it looks like JSON
+            if (decryptedVal.startsWith("{") || decryptedVal.startsWith("[")) {
+              try {
+                decryptedCredentials[key] = JSON.parse(decryptedVal);
+              } catch {
+                // Not JSON, keep as string
+                decryptedCredentials[key] = decryptedVal;
+              }
+            } else {
+              decryptedCredentials[key] = decryptedVal;
+            }
+          } catch (error) {
+            // Decryption failed - this is legacy plaintext data from before encryption
+            // Return as-is for backwards compatibility (will be encrypted on next save)
+            decryptedCredentials[key] = val;
+          }
+        } else {
+          decryptedCredentials[key] = val;
+        }
+      }
+
+      decrypted.credentials = decryptedCredentials;
+    }
+
     return decrypted;
   }
 }

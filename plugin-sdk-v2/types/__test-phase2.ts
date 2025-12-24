@@ -49,7 +49,7 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
       type: 'string',
       required: false,
       env: 'TEST_API_KEY',
-      sensitive: true,
+      encrypted: true,
       label: 'API Key',
     },
     maxRetries: {

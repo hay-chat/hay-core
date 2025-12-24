@@ -51,11 +51,10 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
     .map((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
 
-      // For SDK v2 plugins, use metadata.configSchema; for v1, use manifest.configSchema
-      // SDK v2 plugins have metadata populated, v1 plugins don't
-      const configSchema = plugin.metadata?.configSchema
-        ? plugin.metadata.configSchema
-        : (manifest.configSchema || {});
+      // Use metadata for SDK v2 runtime config
+      const configSchema = plugin.metadata?.configSchema || {};
+      // Capabilities remain in manifest for both SDK v1 and v2
+      const capabilities = manifest.capabilities;
 
       const result = {
         id: plugin.pluginId, // Use pluginId as the identifier for frontend
@@ -69,16 +68,17 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         installed: plugin.installed,
         built: plugin.built,
         enabled: enabledPluginIds.has(plugin.id),
-        configSchema, // Include the actual schema for frontend
+        configSchema, // Runtime config schema from metadata
         hasConfiguration: Object.keys(configSchema).length > 0,
         hasCustomUI: !!manifest.ui?.configuration,
-        capabilities: manifest.capabilities,
+        capabilities, // Use metadata capabilities for SDK v2
         features: manifest.capabilities?.chat_connector?.features || {},
         sourceType: plugin.sourceType,
         isCustom: plugin.sourceType === "custom",
         uploadedAt: plugin.uploadedAt,
         uploadedBy: plugin.uploadedBy,
         status: plugin.status || PluginStatus.AVAILABLE, // Include status field
+        metadata: plugin.metadata, // Include full metadata for SDK v2
       };
 
       return result;
@@ -114,24 +114,14 @@ export const getPlugin = authenticatedProcedure
 
     const manifest = plugin.manifest as HayPluginManifest;
 
-    // For SDK v2 plugins, merge metadata into manifest to expose runtime config
-    // SDK v2 plugins have metadata populated, v1 plugins don't
-    const effectiveManifest = plugin.metadata
-      ? {
-          ...manifest,
-          configSchema: plugin.metadata.configSchema || {},
-          authMethods: plugin.metadata.authMethods || [],
-          uiExtensions: plugin.metadata.uiExtensions || {},
-        }
-      : manifest;
-
     return {
       id: plugin.pluginId, // Use pluginId as the identifier
       dbId: plugin.id, // Keep database ID for reference
       name: plugin.name,
       version: plugin.version,
       type: manifest.type,
-      manifest: effectiveManifest,
+      manifest, // Keep manifest for legacy compatibility
+      metadata: plugin.metadata, // Expose metadata directly for SDK v2
       installed: plugin.installed,
       built: plugin.built,
       status: plugin.status || PluginStatus.AVAILABLE,
@@ -535,18 +525,22 @@ export const getPluginConfiguration = authenticatedProcedure
       };
     }
 
-    // Decrypt the configuration but mask sensitive values for the UI
+    // Merge config and authState.credentials for complete configuration
     const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
     const maskedConfig: Record<string, any> = {};
 
-    // Mask sensitive values for display
+    // Start with regular config fields
     for (const [key, value] of Object.entries(decryptedConfig)) {
-      const schema = configSchema?.[key];
-      if (schema?.encrypted && value) {
-        // For encrypted fields, only show masked value
-        maskedConfig[key] = "*".repeat(8);
-      } else {
-        maskedConfig[key] = value;
+      maskedConfig[key] = value;
+    }
+
+    // Add auth credentials (encrypted fields) and mask them
+    if (instance.authState?.credentials) {
+      for (const [key, value] of Object.entries(instance.authState.credentials)) {
+        if (value !== null && value !== undefined) {
+          // All fields in authState.credentials are encrypted/sensitive, so mask them
+          maskedConfig[key] = "*".repeat(8);
+        }
       }
     }
 
@@ -589,6 +583,7 @@ export const getPluginConfiguration = authenticatedProcedure
       instanceId: instance.id,
       oauthAvailable, // Plugin has OAuth2 registered
       oauthConfigured, // OAuth credentials are configured
+      auth: instance.authState || undefined, // Expose auth state for healthcheck detection
     };
   });
 

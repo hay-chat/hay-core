@@ -290,6 +290,10 @@
       </template>
 
       <!-- OAuth Connection Card (show when OAuth is available and configured) -->
+
+      {{ oauthAvailable }}
+      {{ plugin }}
+
       <Card v-if="enabled && oauthAvailable && oauthConfigured">
         <CardContent>
           <PluginOAuthConnection
@@ -663,15 +667,17 @@ const handleThumbnailError = (event: Event) => {
 };
 
 const loadPluginExtensions = async () => {
-  // Load settings extensions from plugin manifest if defined
-  if (!plugin.value?.manifest?.settingsExtensions) {
-    console.log("[PluginSettings] No settingsExtensions found in manifest");
+  // Load settings extensions from metadata (SDK v2) or manifest (legacy)
+  const settingsExtensions =
+    plugin.value?.metadata?.settingsExtensions || plugin.value?.manifest?.settingsExtensions;
+  if (!settingsExtensions) {
+    console.log("[PluginSettings] No settingsExtensions found");
     return;
   }
 
-  console.log("[PluginSettings] Loading extensions:", plugin.value.manifest.settingsExtensions);
+  console.log("[PluginSettings] Loading extensions:", settingsExtensions);
 
-  for (const ext of plugin.value.manifest.settingsExtensions) {
+  for (const ext of settingsExtensions) {
     try {
       console.log("[PluginSettings] Processing extension:", ext);
 
@@ -777,18 +783,24 @@ const fetchPlugin = async () => {
     // Store OAuth availability and configuration status
     if ("oauthAvailable" in configData) {
       oauthAvailable.value = configData.oauthAvailable;
-      console.log('[Plugin Settings] OAuth available:', configData.oauthAvailable);
+      console.log("[Plugin Settings] OAuth available:", configData.oauthAvailable);
     }
     if ("oauthConfigured" in configData) {
       oauthConfigured.value = configData.oauthConfigured;
-      console.log('[Plugin Settings] OAuth configured:', configData.oauthConfigured);
+      console.log("[Plugin Settings] OAuth configured:", configData.oauthConfigured);
     }
-    console.log('[Plugin Settings] OAuth state:', { oauthAvailable: oauthAvailable.value, oauthConfigured: oauthConfigured.value, enabled: enabled.value });
+    console.log("[Plugin Settings] OAuth state:", {
+      oauthAvailable: oauthAvailable.value,
+      oauthConfigured: oauthConfigured.value,
+      enabled: enabled.value,
+    });
 
-    // Set config schema from manifest
-    if (pluginData.manifest?.configSchema) {
+    // Set config schema from metadata (SDK v2) or manifest (legacy)
+    const effectiveConfigSchema =
+      pluginData.metadata?.configSchema || pluginData.manifest?.configSchema;
+    if (effectiveConfigSchema && Object.keys(effectiveConfigSchema).length > 0) {
       hasConfiguration.value = true;
-      configSchema.value = pluginData.manifest.configSchema;
+      configSchema.value = effectiveConfigSchema;
 
       // Initialize form data with defaults
       Object.entries(configSchema.value).forEach(([key, field]: [string, any]) => {
@@ -823,21 +835,37 @@ const fetchPlugin = async () => {
 
     // Auto-test connection asynchronously (don't block page load)
     if (enabled.value) {
-      // Check if plugin requires authentication
-      const requiresAuth = plugin.value?.manifest?.authMethods && plugin.value.manifest.authMethods.length > 0;
+      // Check if plugin requires authentication (metadata for SDK v2, manifest for legacy)
+      const authMethods =
+        plugin.value?.metadata?.authMethods || plugin.value?.manifest?.authMethods;
+      const requiresAuth = authMethods && authMethods.length > 0;
 
       if (requiresAuth) {
         // Only test connection if auth is configured
-        // instanceAuth is populated when the plugin has been authenticated
-        if (instanceAuth.value && Object.keys(instanceAuth.value).length > 0) {
-          console.log('[Plugin] Auth required and configured, testing connection...');
-          testConnection();
+        // For OAuth2, check if we have an access token (not just config credentials)
+        const hasOAuth2 = authMethods?.some((m: any) => m.type === "oauth2");
+        const hasAccessToken = instanceAuth.value?.credentials?.accessToken;
+
+        if (hasOAuth2) {
+          // OAuth2: only test if access token exists
+          if (hasAccessToken) {
+            console.log("[Plugin] OAuth2 access token found, testing connection...");
+            testConnection();
+          } else {
+            console.log("[Plugin] OAuth2 configured but not connected yet, skipping health check");
+          }
         } else {
-          console.log('[Plugin] Auth required but not configured yet, skipping health check');
+          // Non-OAuth: test if any auth credentials exist
+          if (instanceAuth.value && Object.keys(instanceAuth.value).length > 0) {
+            console.log("[Plugin] Auth required and configured, testing connection...");
+            testConnection();
+          } else {
+            console.log("[Plugin] Auth required but not configured yet, skipping health check");
+          }
         }
       } else {
         // No auth required, test connection immediately
-        console.log('[Plugin] No auth required, testing connection...');
+        console.log("[Plugin] No auth required, testing connection...");
         testConnection();
       }
     }

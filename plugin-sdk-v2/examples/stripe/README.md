@@ -15,31 +15,37 @@ This example serves as:
 ## Features Demonstrated
 
 ### ✅ Config Schema
+
 - String, boolean, and sensitive fields
 - Environment variable fallbacks
 - Required vs optional fields
 
 ### ✅ Authentication
+
 - API key auth method
 - Auth validation hook with real verification
 - Multiple auth method support (OAuth commented as example)
 
 ### ✅ HTTP Routes
+
 - Webhook endpoint (POST /webhook)
 - Health check endpoint (GET /health)
 - Request/response handling
 
 ### ✅ UI Extensions
+
 - Settings panel integration
 - Dashboard widgets
 - Symbolic component references
 
 ### ✅ MCP Integration
+
 - Local MCP server startup
 - Org-specific initialization
 - Automatic cleanup on shutdown
 
 ### ✅ All Lifecycle Hooks
+
 - `onInitialize`: Declare static metadata
 - `onStart`: Initialize org runtime
 - `onValidateAuth`: Verify credentials
@@ -107,6 +113,7 @@ In test mode (`--mode=test`), the plugin uses mock org data:
 ```
 
 Auth state:
+
 ```json
 {
   "methodId": "apiKey",
@@ -147,6 +154,7 @@ curl http://localhost:48001/metadata | jq
 ```
 
 Expected response:
+
 ```json
 {
   "configSchema": {
@@ -207,6 +215,7 @@ curl -X POST http://localhost:48001/webhook \
 Expected: `{"received":true}`
 
 Check logs for:
+
 ```
 [stripe] Received Stripe webhook
 [stripe] Processing Stripe event: payment_intent.succeeded
@@ -234,11 +243,21 @@ The plugin factory returns a `HayPluginDefinition` with all hooks:
 function createStripePlugin(globalCtx: HayGlobalContext): HayPluginDefinition {
   return {
     name: "Stripe",
-    onInitialize() { /* ... */ },
-    async onStart(ctx) { /* ... */ },
-    async onValidateAuth(ctx) { /* ... */ },
-    onConfigUpdate(ctx) { /* ... */ },
-    async onDisable(ctx) { /* ... */ },
+    onInitialize() {
+      /* ... */
+    },
+    async onStart(ctx) {
+      /* ... */
+    },
+    async onValidateAuth(ctx) {
+      /* ... */
+    },
+    onConfigUpdate(ctx) {
+      /* ... */
+    },
+    async onDisable(ctx) {
+      /* ... */
+    },
   };
 }
 ```
@@ -251,7 +270,7 @@ Declares static plugin metadata:
 onInitialize() {
   // 1. Define config schema
   register.config({
-    apiKey: { type: "string", env: "STRIPE_API_KEY", sensitive: true },
+    apiKey: { type: "string", env: "STRIPE_API_KEY", encrypted: true },
     webhookSecret: { type: "string", env: "STRIPE_WEBHOOK_SECRET" },
   });
 
@@ -314,12 +333,15 @@ Simulates Stripe API:
 export class StripeClient {
   async verify(): Promise<boolean> {
     // Mock: Valid if starts with sk_test_ or sk_live_
-    return this.apiKey.startsWith("sk_test_") ||
-           this.apiKey.startsWith("sk_live_");
+    return this.apiKey.startsWith("sk_test_") || this.apiKey.startsWith("sk_live_");
   }
 
-  async getAccount() { /* ... */ }
-  async listCharges() { /* ... */ }
+  async getAccount() {
+    /* ... */
+  }
+  async listCharges() {
+    /* ... */
+  }
 }
 ```
 
@@ -339,11 +361,7 @@ export class StripeMcpServer {
   }
 
   private getToolNames() {
-    return [
-      "stripe_create_payment_link",
-      "stripe_list_customers",
-      "stripe_refund_charge",
-    ];
+    return ["stripe_create_payment_link", "stripe_list_customers", "stripe_refund_charge"];
   }
 }
 ```
@@ -353,26 +371,25 @@ export class StripeMcpServer {
 To turn this into a real Stripe plugin:
 
 1. **Install Stripe SDK**:
+
    ```bash
    npm install stripe @types/stripe
    ```
 
 2. **Replace mock client**:
-   ```typescript
-   import Stripe from 'stripe';
 
-   const client = new Stripe(apiKey, { apiVersion: '2024-11-20.acacia' });
+   ```typescript
+   import Stripe from "stripe";
+
+   const client = new Stripe(apiKey, { apiVersion: "2024-11-20.acacia" });
    await client.balance.retrieve(); // For verification
    ```
 
 3. **Implement webhook verification**:
+
    ```typescript
-   const signature = req.headers['stripe-signature'];
-   const event = stripe.webhooks.constructEvent(
-     req.body,
-     signature,
-     webhookSecret
-   );
+   const signature = req.headers["stripe-signature"];
+   const event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
    ```
 
 4. **Build real MCP server**:
@@ -422,12 +439,14 @@ When you call `config.get("apiKey")`:
 ### Global vs Org Runtime
 
 **Global (onInitialize)**:
+
 - Runs once per worker process
 - No org data available
 - Use `register.*` APIs
 - Use `config.field()` for references
 
 **Org Runtime (onStart, onValidateAuth, etc.)**:
+
 - Runs per org
 - Has org config and auth
 - Use `config.get()` to read values
@@ -456,7 +475,7 @@ When you call `config.get("apiKey")`:
 ### Metadata endpoint returns errors
 
 - Ensure `onInitialize` completed successfully
-- Check for errors in register.* calls
+- Check for errors in register.\* calls
 - Verify server started on correct port
 
 ## Learning Resources

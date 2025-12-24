@@ -23,7 +23,7 @@ import type { ConfigFieldReference } from './config';
  *   apiKey: {
  *     type: 'string',
  *     required: true,
- *     sensitive: true,
+ *     encrypted: true,
  *     env: 'STRIPE_API_KEY',
  *   },
  * });
@@ -88,7 +88,7 @@ export interface ApiKeyAuthOptions {
  *   clientSecret: {
  *     type: 'string',
  *     required: true,
- *     sensitive: true,
+ *     encrypted: true,
  *     env: 'SHOPIFY_CLIENT_SECRET',
  *   },
  * });

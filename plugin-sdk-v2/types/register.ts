@@ -37,7 +37,7 @@ import type { UIExtensionDescriptor } from './ui';
  *     apiKey: {
  *       type: 'string',
  *       required: true,
- *       sensitive: true,
+ *       encrypted: true,
  *       env: 'STRIPE_API_KEY',
  *     },
  *   });
@@ -111,7 +111,7 @@ export interface HayRegisterAPI {
    *     type: 'string',
    *     required: false,
    *     env: 'SHOPIFY_API_KEY',
-   *     sensitive: true,
+   *     encrypted: true,
    *     label: 'API Key',
    *     description: 'Your Shopify API key',
    *   },

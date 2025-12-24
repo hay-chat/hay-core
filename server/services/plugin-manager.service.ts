@@ -710,14 +710,13 @@ export class PluginManagerService {
   private isSDKv2Plugin(plugin: PluginRegistry): boolean {
     const manifest = plugin.manifest as any;
 
-    // SDK v2 check: Has entry field but NO configSchema/auth in manifest
-    // (metadata will be fetched from /metadata endpoint instead)
+    // SDK v2 check: Has entry field OR has metadata populated
+    // SDK v2 plugins either have entry in manifest or already have metadata from /metadata endpoint
     const hasEntry = !!manifest.entry;
-    const hasConfigSchema = !!manifest.configSchema && Object.keys(manifest.configSchema).length > 0;
-    const hasAuth = !!manifest.auth;
+    const hasMetadata = !!plugin.metadata;
 
-    // SDK v2 = has entry, no embedded schema/auth
-    return hasEntry && !hasConfigSchema && !hasAuth;
+    // SDK v2 = has entry or has metadata
+    return hasEntry || hasMetadata;
   }
 
   /**
@@ -873,12 +872,22 @@ export class PluginManagerService {
     );
 
     // Prepare environment variables (SECURITY: explicit allowlist only)
+    // Use metadata for SDK v2, fallback to manifest for legacy
+    const configSchema = plugin.metadata?.configSchema || manifest.configSchema;
+
+    // Merge config and authState.credentials for complete configuration
+    // (encrypted fields are stored in authState.credentials)
+    const fullConfig = {
+      ...(instance.config || {}),
+      ...(instance.authState?.credentials || {}),
+    };
+
     const env = this.buildSafeEnv({
       organizationId,
       pluginId,
       port,
       apiToken,
-      pluginConfig: this.configToEnvVars(instance.config || {}, manifest.configSchema),
+      pluginConfig: this.configToEnvVars(fullConfig, configSchema),
       capabilities,
     });
 
