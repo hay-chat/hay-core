@@ -866,9 +866,13 @@ export const testConnection = authenticatedProcedure
     }),
   )
   .query(async ({ ctx, input }): Promise<PluginHealthCheckResult> => {
+    console.log(`[testConnection] ===== Starting test for ${input.pluginId} =====`);
+    console.log(`[testConnection] Organization ID: ${ctx.organizationId}`);
+
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
     if (!plugin) {
+      console.log(`[testConnection] ❌ Plugin ${input.pluginId} not found in registry`);
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
@@ -876,6 +880,8 @@ export const testConnection = authenticatedProcedure
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
+    console.log(`[testConnection] Plugin manifest capabilities:`, manifest.capabilities);
+    console.log(`[testConnection] Plugin type:`, manifest.type);
 
     // Check if plugin has MCP capabilities (support both TypeScript-first array and legacy object format)
     const hasMcpCapability = Array.isArray(manifest.capabilities)
@@ -883,6 +889,7 @@ export const testConnection = authenticatedProcedure
       : !!manifest.capabilities?.mcp;
 
     if (!hasMcpCapability) {
+      console.log(`[testConnection] ❌ Plugin ${input.pluginId} does not have MCP capability`);
       return {
         success: false,
         status: "unhealthy",
@@ -891,13 +898,24 @@ export const testConnection = authenticatedProcedure
       };
     }
 
+    console.log(`[testConnection] ✅ Plugin has MCP capability`);
+
     // Check if plugin instance exists and has configuration
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
       input.pluginId,
     );
 
+    console.log(`[testConnection] Plugin instance status:`, {
+      exists: !!instance,
+      enabled: instance?.enabled,
+      hasConfig: !!instance?.config,
+      hasAuthState: !!instance?.authState,
+      configKeys: instance?.config ? Object.keys(instance.config) : [],
+    });
+
     if (!instance || !instance.config) {
+      console.log(`[testConnection] ❌ Plugin has no instance or config`);
       return {
         success: false,
         status: "unconfigured",
@@ -909,32 +927,59 @@ export const testConnection = authenticatedProcedure
     try {
       let mcpTools: any[] = [];
 
-      // For SDK v2 plugins, fetch tools from the running worker
-      const runnerV2 = getPluginRunnerV2Service();
-      const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
+      // For SDK v2 plugins, start the worker if not already running
+      console.log(`[testConnection] 🚀 Starting or getting existing worker...`);
+      let worker;
+      try {
+        worker = await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+        console.log(`[testConnection] ✅ Worker is running:`, {
+          port: worker.port,
+          startedAt: worker.startedAt,
+        });
+      } catch (workerStartError) {
+        console.error(`[testConnection] ❌ Failed to start worker:`, workerStartError);
+        return {
+          success: false,
+          status: "unhealthy",
+          message: `Failed to start plugin worker: ${workerStartError instanceof Error ? workerStartError.message : String(workerStartError)}`,
+          testedAt: new Date(),
+        };
+      }
 
       if (worker && worker.port) {
         // Use shared fetchToolsFromWorker service
         try {
+          console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
           mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
           console.log(
-            `[testConnection] Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`,
+            `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`,
           );
+          if (mcpTools.length > 0) {
+            console.log(`[testConnection] Tool names:`, mcpTools.map((t: any) => t.name));
+          }
         } catch (workerError) {
           console.warn(
-            `[testConnection] Failed to fetch tools from SDK v2 worker for ${input.pluginId}:`,
-            workerError,
+            `[testConnection] ⚠️  Failed to fetch tools from SDK v2 worker for ${input.pluginId}:`,
+            workerError instanceof Error ? workerError.message : workerError,
           );
         }
+      } else {
+        console.log(`[testConnection] ⚠️  No worker running for ${input.pluginId}`);
       }
 
       // Fallback: Get MCP tools from database config (if worker call fails or no worker running)
       if (mcpTools.length === 0) {
+        console.log(`[testConnection] 📦 Checking for cached tools in database config...`);
         mcpTools = getToolsFromConfig(instance.config);
+        console.log(`[testConnection] Found ${mcpTools.length} cached tools in database`);
+        if (mcpTools.length > 0) {
+          console.log(`[testConnection] Cached tool names:`, mcpTools.map((t: any) => t.name));
+        }
       }
 
       // Verify tools are registered
       if (mcpTools.length === 0) {
+        console.log(`[testConnection] ❌ No tools found (neither from worker nor from database cache)`);
         return {
           success: false,
           status: "unhealthy",

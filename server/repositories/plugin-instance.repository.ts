@@ -117,9 +117,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     await this.getRepository().increment({ id }, "restartCount", 1);
   }
 
-  async updateHealthCheck(id: string): Promise<void> {
+  async updateHealthCheck(
+    id: string,
+    status: "healthy" | "unhealthy" | "unknown" = "healthy",
+  ): Promise<void> {
     await this.getRepository().update(id, {
       lastHealthCheck: new Date(),
+      healthStatus: status,
     } as any);
   }
 

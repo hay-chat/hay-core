@@ -43,32 +43,48 @@ export async function fetchToolsFromWorker(
   const timeoutMs = 5000;
   let lastError: Error | null = null;
 
+  console.log(`[Tools] ===== fetchToolsFromWorker called =====`);
+  console.log(`[Tools] Plugin: ${pluginId}, Port: ${port}`);
+  console.log(`[Tools] Max retries: ${maxRetries}, Timeout: ${timeoutMs}ms`);
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     // Create AbortController for timeout
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
+      const url = `http://localhost:${port}/mcp/list-tools`;
       console.log(
-        `[Tools] Fetching tools for ${pluginId} (attempt ${attempt}/${maxRetries}) on port ${port}`
+        `[Tools] 📡 Attempt ${attempt}/${maxRetries}: Fetching ${url}`
       );
 
-      const response = await fetch(`http://localhost:${port}/mcp/list-tools`, {
+      const response = await fetch(url, {
         signal: abortController.signal,
       });
 
       clearTimeout(timeoutId);
 
+      console.log(`[Tools] Response status: ${response.status} ${response.statusText}`);
+      console.log(`[Tools] Response headers:`, Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.log(`[Tools] Error response body:`, errorBody);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log(`[Tools] Response data:`, JSON.stringify(data, null, 2));
 
       // Worker returns { tools: [...] }
       const tools = Array.isArray(data.tools) ? data.tools : [];
 
-      console.log(`[Tools] Successfully fetched ${tools.length} tools for ${pluginId}`);
+      console.log(`[Tools] ✅ Successfully fetched ${tools.length} tools for ${pluginId}`);
+      if (tools.length > 0) {
+        console.log(`[Tools] Tool names:`, tools.map((t: MCPTool) => t.name));
+      } else {
+        console.log(`[Tools] ⚠️  No tools in response (empty array)`);
+      }
 
       return tools;
     } catch (error) {
@@ -77,30 +93,34 @@ export async function fetchToolsFromWorker(
 
       if (error instanceof Error && error.name === "AbortError") {
         console.warn(
-          `[Tools] Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`
+          `[Tools] ⏱️  Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`
         );
       } else {
         console.warn(
-          `[Tools] Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${
+          `[Tools] ❌ Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${
             error instanceof Error ? error.message : String(error)
           }`
         );
+        if (error instanceof Error && error.stack) {
+          console.warn(`[Tools] Error stack:`, error.stack);
+        }
       }
 
       // Exponential backoff between retries
       if (attempt < maxRetries) {
         const backoffMs = 1000 * attempt;
+        console.log(`[Tools] ⏳ Waiting ${backoffMs}ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
   }
 
   // All retries failed
-  throw new Error(
-    `Failed to fetch tools after ${maxRetries} attempts: ${
-      lastError?.message || "Unknown error"
-    }`
-  );
+  const errorMsg = `Failed to fetch tools after ${maxRetries} attempts: ${
+    lastError?.message || "Unknown error"
+  }`;
+  console.error(`[Tools] ❌❌❌ ${errorMsg}`);
+  throw new Error(errorMsg);
 }
 
 /**

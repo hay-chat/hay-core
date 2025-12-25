@@ -478,11 +478,15 @@ export class PluginHttpServer {
     this.app.get('/mcp/list-tools', async (_req: Request, res: Response): Promise<void> => {
       try {
         this.logger.debug('MCP tools list requested');
+        this.logger.debug(`Total MCP servers registered: ${this.mcpServers.size}`);
 
         const tools: any[] = [];
 
         // Collect tools from all registered MCP servers
         for (const server of this.mcpServers.values()) {
+          this.logger.debug(`Processing MCP server ${server.id}`, { type: server.type });
+
+          // Handle local MCP servers
           if (server.type === 'local' && server.instance?.listTools) {
             try {
               const serverTools = await server.instance.listTools();
@@ -495,10 +499,78 @@ export class PluginHttpServer {
                 });
               }
 
-              this.logger.debug(`Collected ${serverTools.length} tools from MCP server ${server.id}`);
+              this.logger.debug(`Collected ${serverTools.length} tools from local MCP server ${server.id}`);
             } catch (listErr: any) {
               const errorMsg = listErr instanceof Error ? listErr.message : String(listErr);
-              this.logger.warn(`Failed to list tools from MCP server ${server.id}`, { error: errorMsg });
+              this.logger.warn(`Failed to list tools from local MCP server ${server.id}`, { error: errorMsg });
+            }
+          }
+
+          // Handle external MCP servers
+          else if (server.type === 'external' && server.options) {
+            try {
+              const { url, authHeaders } = server.options;
+              this.logger.debug(`Fetching tools from external MCP server ${server.id}`, { url });
+
+              // MCP uses JSON-RPC 2.0 over HTTP
+              const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                ...authHeaders,
+              };
+
+              // Send JSON-RPC request for tools/list
+              const rpcRequest = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/list',
+                params: {}
+              };
+
+              this.logger.debug(`Sending JSON-RPC request to ${url}`, { method: rpcRequest.method });
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(rpcRequest),
+                signal: AbortSignal.timeout(10000), // 10 second timeout for external servers
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                this.logger.warn(`External MCP server ${server.id} returned error`, {
+                  status: response.status,
+                  statusText: response.statusText,
+                  body: errorText
+                });
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+
+              const rpcResponse: any = await response.json();
+              this.logger.debug(`Received JSON-RPC response from ${server.id}`, {
+                hasResult: !!rpcResponse.result,
+                hasError: !!rpcResponse.error
+              });
+
+              // Check for JSON-RPC error
+              if (rpcResponse.error) {
+                throw new Error(`MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`);
+              }
+
+              // Extract tools from JSON-RPC result
+              const serverTools = Array.isArray(rpcResponse.result?.tools) ? rpcResponse.result.tools : [];
+
+              // Add serverId to each tool
+              for (const tool of serverTools) {
+                tools.push({
+                  ...tool,
+                  serverId: server.id
+                });
+              }
+
+              this.logger.debug(`Collected ${serverTools.length} tools from external MCP server ${server.id}`);
+            } catch (fetchErr: any) {
+              const errorMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+              this.logger.warn(`Failed to fetch tools from external MCP server ${server.id}`, { error: errorMsg });
             }
           }
         }

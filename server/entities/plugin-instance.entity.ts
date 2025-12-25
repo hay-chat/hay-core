@@ -58,6 +58,9 @@ export class PluginInstance extends OrganizationScopedEntity {
   @Column({ type: "timestamptz", nullable: true })
   lastHealthCheck?: Date;
 
+  @Column({ type: "varchar", length: 50, nullable: true })
+  healthStatus?: "healthy" | "unhealthy" | "unknown";
+
   // Legacy status field (kept for backwards compatibility)
   @Column({ type: "varchar", length: 50, default: "stopped" })
   status!: "stopped" | "starting" | "running" | "stopping" | "error";
