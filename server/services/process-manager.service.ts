@@ -291,6 +291,8 @@ export class ProcessManagerService {
       if (code !== 0 && processInfo.restartAttempts < this.MAX_RESTART_ATTEMPTS) {
         // Schedule restart
         await this.scheduleRestart(processKey, processInfo);
+        // Mark as unhealthy when process exits with error
+        await pluginInstanceRepository.updateHealthCheck(pluginInstanceId, "unhealthy");
       } else {
         // Update status to stopped or error
         await pluginInstanceRepository.updateStatus(
@@ -299,6 +301,11 @@ export class ProcessManagerService {
           code !== 0 ? `Process exited with code ${code}` : undefined,
         );
         await pluginInstanceRepository.updateProcessId(pluginInstanceId, null);
+        // Mark as unhealthy if exited with error, otherwise unknown (stopped)
+        await pluginInstanceRepository.updateHealthCheck(
+          pluginInstanceId,
+          code === 0 ? "unknown" : "unhealthy",
+        );
       }
     });
 
@@ -307,6 +314,8 @@ export class ProcessManagerService {
       debugLog("process-manager", `Error in plugin ${pluginName} for org ${organizationId}`, { level: "error", data: error });
 
       await pluginInstanceRepository.updateStatus(pluginInstanceId, "error", error.message);
+      // Mark as unhealthy when process error occurs
+      await pluginInstanceRepository.updateHealthCheck(pluginInstanceId, "unhealthy");
     });
   }
 
@@ -323,9 +332,12 @@ export class ProcessManagerService {
     if (typeof message === "object" && message !== null && "type" in message) {
       const msg = message as { type: string; error?: string };
       if (msg.type === "health") {
-        pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId);
+        // Health message received - process is healthy
+        pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId, "healthy");
       } else if (msg.type === "error" && msg.error) {
         pluginInstanceRepository.updateStatus(processInfo.pluginInstanceId, "error", msg.error);
+        // Mark as unhealthy when error occurs
+        pluginInstanceRepository.updateHealthCheck(processInfo.pluginInstanceId, "unhealthy");
       }
     }
   }

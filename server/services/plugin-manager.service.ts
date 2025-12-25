@@ -766,8 +766,8 @@ export class PluginManagerService {
       const worker = this.workers.get(key)!;
       worker.lastActivity = new Date();
 
-      // Update last activity in database
-      await pluginInstanceRepository.updateHealthCheck(worker.instanceId);
+      // Update last activity in database - worker is healthy since it's responding
+      await pluginInstanceRepository.updateHealthCheck(worker.instanceId, "healthy");
 
       return worker;
     }
@@ -970,6 +970,8 @@ export class PluginManagerService {
         instance.id,
         workerProcess.pid?.toString() || null,
       );
+      // Mark as healthy when worker successfully starts
+      await pluginInstanceRepository.updateHealthCheck(instance.id, "healthy");
 
       // Fetch runtime metadata from worker (configSchema, auth, tools, etc.)
       await this.fetchAndStoreWorkerMetadata(pluginId, port);
@@ -983,6 +985,8 @@ export class PluginManagerService {
         "error",
         error instanceof Error ? error.message : "Failed to start worker",
       );
+      // Mark as unhealthy when worker fails to start
+      await pluginInstanceRepository.updateHealthCheck(instance.id, "unhealthy");
       throw error;
     }
   }
@@ -996,7 +1000,8 @@ export class PluginManagerService {
     if (this.workers.has(key)) {
       const worker = this.workers.get(key)!;
       worker.lastActivity = new Date();
-      await pluginInstanceRepository.updateHealthCheck(worker.instanceId);
+      // Worker is healthy since it's responding
+      await pluginInstanceRepository.updateHealthCheck(worker.instanceId, "healthy");
       return worker;
     }
 

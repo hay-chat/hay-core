@@ -5,6 +5,7 @@ import type { WorkerInfo, AuthState } from "../types/plugin-sdk-v2.types";
 import { AppDataSource } from "../database/data-source";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
 
 /**
@@ -144,6 +145,11 @@ export class PluginRunnerV2Service {
           lastError: code !== 0 ? `Process exited with code ${code}` : undefined,
           lastStoppedAt: new Date()
         } as any);
+        // Update health status - unhealthy if exited with error, unknown if stopped normally
+        await pluginInstanceRepository.updateHealthCheck(
+          instance.id,
+          code === 0 ? "unknown" : "unhealthy"
+        );
       });
 
       // Wait for /metadata endpoint to be ready (not /health)
@@ -155,6 +161,8 @@ export class PluginRunnerV2Service {
         running: true,
         processId: workerProcess.pid?.toString()
       });
+      // Mark as healthy when worker successfully starts
+      await pluginInstanceRepository.updateHealthCheck(instance.id, "healthy");
 
       // Store worker info
       const workerInfo: WorkerInfo = {
@@ -186,6 +194,8 @@ export class PluginRunnerV2Service {
         lastError: error.message,
         running: false
       });
+      // Mark as unhealthy when worker fails to start
+      await pluginInstanceRepository.updateHealthCheck(instance.id, "unhealthy");
 
       throw error;
     }
