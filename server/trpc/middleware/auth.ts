@@ -14,6 +14,7 @@ interface RequestWithAuthError extends Request {
 
 export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
   // Check if there was an authentication error stored in the request
+  // @ts-ignore - Express type definition mismatch between root and server node_modules
   const reqWithAuth = ctx.req as RequestWithAuthError;
   if (reqWithAuth.authError) {
     const errorMessage = reqWithAuth.authError;
@@ -148,6 +149,7 @@ const hasScope = (resource: string, action: string) => {
  */
 export const isAuthedWithoutOrg = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
   // Check if there was an authentication error stored in the request
+  // @ts-ignore - Express type definition mismatch between root and server node_modules
   const reqWithAuth = ctx.req as RequestWithAuthError;
   if (reqWithAuth.authError) {
     const errorMessage = reqWithAuth.authError;

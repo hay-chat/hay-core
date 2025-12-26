@@ -352,8 +352,10 @@
               <PluginConfigForm
                 v-model:formData="formData"
                 v-model:editingEncryptedFields="editingEncryptedFields"
+                v-model:editingEnvFields="editingEnvFields"
                 :configSchema="configSchema"
                 :originalFormData="originalFormData"
+                :configMetadata="configMetadata"
                 :saving="saving"
                 @submit="saveConfiguration"
                 @reset="resetForm"
@@ -404,8 +406,10 @@
           <PluginConfigForm
             v-model:formData="formData"
             v-model:editingEncryptedFields="editingEncryptedFields"
+            v-model:editingEnvFields="editingEnvFields"
             :configSchema="configSchema"
             :originalFormData="originalFormData"
+            :configMetadata="configMetadata"
             :saving="saving"
             @submit="saveConfiguration"
             @reset="resetForm"
@@ -560,6 +564,10 @@ const formData = ref<Record<string, any>>({});
 const templateHtml = ref<string | null>(null);
 // Track which encrypted fields are being edited
 const editingEncryptedFields = ref<Set<string>>(new Set());
+// Track configuration metadata (source: env, database, default)
+const configMetadata = ref<Record<string, any>>({});
+// Track which env fields are being overridden
+const editingEnvFields = ref<Set<string>>(new Set());
 
 // Plugin Extensions for slots
 const beforeSettingsExtensions = ref<
@@ -772,6 +780,11 @@ const fetchPlugin = async () => {
     formData.value = { ...configData.configuration };
     originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
 
+    // Store config metadata (source: env, database, default)
+    if ("configMetadata" in configData) {
+      configMetadata.value = configData.configMetadata;
+    }
+
     // Store runtime auth config from instance
     if ("auth" in configData) {
       instanceAuth.value = configData.auth;
@@ -883,6 +896,13 @@ const saveConfiguration = async () => {
 
     for (const [key, value] of Object.entries(formData.value)) {
       const field = configSchema.value[key];
+      const metadata = configMetadata.value[key];
+
+      // Skip env fields that haven't been overridden
+      if (metadata?.source === "env" && !editingEnvFields.value.has(key)) {
+        // Don't send to server, let it use env fallback
+        continue;
+      }
 
       // Handle encrypted fields
       if (
@@ -912,8 +932,9 @@ const saveConfiguration = async () => {
       configuration: cleanedConfig,
     });
 
-    // Clear editing state for encrypted fields
+    // Clear editing state for encrypted and env fields
     editingEncryptedFields.value.clear();
+    editingEnvFields.value.clear();
 
     // Show success toast
     toast.success("Configuration saved successfully");
@@ -958,6 +979,11 @@ const resetForm = async () => {
   formData.value = { ...configData.configuration };
   originalFormData.value = { ...configData.configuration };
 
+  // Store config metadata
+  if ("configMetadata" in configData) {
+    configMetadata.value = configData.configMetadata;
+  }
+
   // Update OAuth state
   if ("oauthAvailable" in configData) {
     oauthAvailable.value = configData.oauthAvailable;
@@ -969,8 +995,9 @@ const resetForm = async () => {
     oauthConnected.value = configData.oauthConnected;
   }
 
-  // Clear any editing state for encrypted fields
+  // Clear any editing state for encrypted and env fields
   editingEncryptedFields.value.clear();
+  editingEnvFields.value.clear();
 };
 
 const testConnection = async () => {
