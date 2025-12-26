@@ -195,6 +195,15 @@ export default defineNuxtConfig({
         // Allow serving files from one level up to access plugins directory
         allow: [".."],
       },
+      hmr: {
+        // Suppress connection errors during HMR
+        overlay: false,
+      },
+      watch: {
+        // Reduce file watching overhead
+        usePolling: false,
+        interval: 100,
+      },
     },
     define: {
       // Enable Vue runtime compilation
