@@ -1,12 +1,14 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { getPortAllocator } from "./port-allocator.service";
-import type { WorkerInfo, AuthState } from "../types/plugin-sdk-v2.types";
+import type { WorkerInfo, AuthState, ConfigFieldDescriptor } from "../types/plugin-sdk-v2.types";
 import { AppDataSource } from "../database/data-source";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
+import { resolveConfigForWorker } from "@server/lib/config-resolver";
+import { getApiUrl } from "../config/env";
 
 /**
  * Plugin Runner V2 Service
@@ -70,7 +72,7 @@ export class PluginRunnerV2Service {
     // Get plugin instance
     const instanceRepo = AppDataSource.getRepository(PluginInstance);
     const instance = await instanceRepo.findOne({
-      where: { organizationId: orgId, pluginId: plugin.id }
+      where: { organizationId: orgId, pluginId: plugin.id },
     });
     if (!instance || !instance.enabled) {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
@@ -80,7 +82,7 @@ export class PluginRunnerV2Service {
     await instanceRepo.update(instance.id, {
       runtimeState: "starting",
       lastStartedAt: new Date(),
-      lastError: undefined
+      lastError: undefined,
     } as any);
 
     try {
@@ -89,11 +91,22 @@ export class PluginRunnerV2Service {
 
       // Build environment variables
       // SDK v2 expects org config in this format: { org: { id }, config: {...} }
+      // Use config resolver to merge DB config + .env fallback + auth credentials
+      const configSchema = (plugin.metadata?.configSchema || {}) as Record<
+        string,
+        ConfigFieldDescriptor
+      >;
+      const resolvedConfig = resolveConfigForWorker(
+        instance.config,
+        instance.authState,
+        configSchema,
+      );
+
       const orgConfig = {
         org: {
-          id: orgId
+          id: orgId,
         },
-        config: instance.config || {}
+        config: resolvedConfig,
       };
 
       const env = this.buildSDKv2Env({
@@ -103,7 +116,7 @@ export class PluginRunnerV2Service {
         orgConfig,
         orgAuth: instance.authState || null,
         capabilities: (plugin.manifest as any).capabilities || [],
-        allowedEnvVars: (plugin.manifest as any).env || []
+        allowedEnvVars: (plugin.manifest as any).env || [],
       });
 
       // Plugin path - if already absolute, use as-is; otherwise join with pluginsDir
@@ -115,13 +128,26 @@ export class PluginRunnerV2Service {
       const useNode = this.runnerPath.endsWith(".ts");
       const command = useNode ? "npx" : "node";
       const args = useNode
-        ? ["tsx", this.runnerPath, `--plugin-path=${pluginPath}`, `--org-id=${orgId}`, `--port=${port}`, `--mode=production`]
-        : [this.runnerPath, `--plugin-path=${pluginPath}`, `--org-id=${orgId}`, `--port=${port}`, `--mode=production`];
+        ? [
+            "tsx",
+            this.runnerPath,
+            `--plugin-path=${pluginPath}`,
+            `--org-id=${orgId}`,
+            `--port=${port}`,
+            `--mode=production`,
+          ]
+        : [
+            this.runnerPath,
+            `--plugin-path=${pluginPath}`,
+            `--org-id=${orgId}`,
+            `--port=${port}`,
+            `--mode=production`,
+          ];
 
       const workerProcess = spawn(command, args, {
         env,
         stdio: ["ignore", "pipe", "pipe"],
-        cwd: path.dirname(this.runnerPath)
+        cwd: path.dirname(this.runnerPath),
       });
 
       // Log output for debugging
@@ -143,12 +169,12 @@ export class PluginRunnerV2Service {
         await instanceRepo.update(instance.id, {
           runtimeState: code === 0 ? "stopped" : "error",
           lastError: code !== 0 ? `Process exited with code ${code}` : undefined,
-          lastStoppedAt: new Date()
+          lastStoppedAt: new Date(),
         } as any);
         // Update health status - unhealthy if exited with error, unknown if stopped normally
         await pluginInstanceRepository.updateHealthCheck(
           instance.id,
-          code === 0 ? "unknown" : "unhealthy"
+          code === 0 ? "unknown" : "unhealthy",
         );
       });
 
@@ -159,7 +185,7 @@ export class PluginRunnerV2Service {
       await instanceRepo.update(instance.id, {
         runtimeState: "ready",
         running: true,
-        processId: workerProcess.pid?.toString()
+        processId: workerProcess.pid?.toString(),
       });
       // Mark as healthy when worker successfully starts
       await pluginInstanceRepository.updateHealthCheck(instance.id, "healthy");
@@ -173,7 +199,7 @@ export class PluginRunnerV2Service {
         organizationId: orgId,
         pluginId,
         instanceId: instance.id,
-        sdkVersion: "v2"
+        sdkVersion: "v2",
       };
 
       this.workers.set(workerKey, workerInfo);
@@ -186,13 +212,12 @@ export class PluginRunnerV2Service {
       });
 
       return workerInfo;
-
     } catch (error: any) {
       // Update runtime state to "error"
       await instanceRepo.update(instance.id, {
         runtimeState: "error",
         lastError: error.message,
-        running: false
+        running: false,
       });
       // Mark as unhealthy when worker fails to start
       await pluginInstanceRepository.updateHealthCheck(instance.id, "unhealthy");
@@ -221,7 +246,7 @@ export class PluginRunnerV2Service {
       try {
         const response = await fetch(`http://localhost:${worker.port}/disable`, {
           method: "POST",
-          signal: AbortSignal.timeout(5000)
+          signal: AbortSignal.timeout(5000),
         });
         console.log(`Called /disable for ${workerKey}: ${response.status}`);
       } catch (err) {
@@ -256,7 +281,7 @@ export class PluginRunnerV2Service {
       await instanceRepo.update(worker.instanceId, {
         runtimeState: "stopped",
         running: false,
-        lastStoppedAt: new Date()
+        lastStoppedAt: new Date(),
       });
 
       console.log(`✅ Worker stopped: ${workerKey}`);
@@ -323,12 +348,12 @@ export class PluginRunnerV2Service {
       HAY_PLUGIN_ID: pluginId,
       HAY_WORKER_PORT: port.toString(),
       HAY_ORG_CONFIG: JSON.stringify(orgConfig),
-      HAY_ORG_AUTH: JSON.stringify(orgAuth || {})
+      HAY_ORG_AUTH: JSON.stringify(orgAuth || {}),
     };
 
     // Add API access if needed
     if (capabilities.includes("routes") || capabilities.includes("mcp")) {
-      env.HAY_API_URL = process.env.API_URL || "http://localhost:3001";
+      env.HAY_API_URL = process.env.HAY_API_URL || getApiUrl();
       // TODO: Generate plugin JWT token
       // env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
     }
@@ -348,14 +373,14 @@ export class PluginRunnerV2Service {
    */
   private async waitForMetadataEndpoint(
     port: number,
-    options: { maxAttempts: number; interval: number }
+    options: { maxAttempts: number; interval: number },
   ): Promise<void> {
     const { maxAttempts, interval } = options;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const response = await fetch(`http://localhost:${port}/metadata`, {
-          signal: AbortSignal.timeout(2000)
+          signal: AbortSignal.timeout(2000),
         });
 
         if (response.ok) {
@@ -372,7 +397,7 @@ export class PluginRunnerV2Service {
     }
 
     throw new Error(
-      `Worker failed to start: /metadata endpoint not available after ${maxAttempts} attempts (port ${port})`
+      `Worker failed to start: /metadata endpoint not available after ${maxAttempts} attempts (port ${port})`,
     );
   }
 }

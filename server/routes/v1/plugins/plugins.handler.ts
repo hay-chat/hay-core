@@ -8,10 +8,11 @@ import { pluginUIService } from "@server/services/plugin-ui.service";
 import { processManagerService } from "@server/services/process-manager.service";
 import { getPluginRunnerV2Service } from "@server/services/plugin-runner-v2.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
+import { resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
-import type { AuthMethodDescriptor } from "@server/types/plugin-sdk-v2.types";
+import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk-v2.types";
 import type { PluginConfigWithOAuth } from "@server/types/oauth.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
@@ -331,6 +332,28 @@ export const configurePlugin = authenticatedProcedure
     // SDK v2: Separate config and auth
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
 
+    // Validate required fields are satisfied by either DB config or .env fallback
+    const configSchema = metadata?.configSchema || manifest.configSchema;
+    if (configSchema) {
+      const resolved = resolveConfigWithEnv(config, configSchema as Record<string, ConfigFieldDescriptor>, {
+        decrypt: false,
+        maskSecrets: false,
+      });
+
+      // Check for missing required fields
+      for (const [key, field] of Object.entries(configSchema)) {
+        if (field.required && !resolved.values[key]) {
+          const envHint = field.env
+            ? ` or set ${field.env} in your environment`
+            : "";
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Required field "${field.label || key}" is not configured. Please provide a value${envHint}.`,
+          });
+        }
+      }
+    }
+
     // SDK v2: Validate auth if auth fields changed
     if (metadata && authState && hasAuthChanges(input.configuration, metadata)) {
       console.log(`🔐 Auth fields changed for ${plugin.name}, validating credentials...`);
@@ -534,12 +557,16 @@ export const getPluginConfiguration = authenticatedProcedure
     // Merge config and authState.credentials for complete configuration
     const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
     const configWithOAuth = decryptedConfig as PluginConfigWithOAuth;
-    const maskedConfig: Record<string, any> = {};
 
-    // Start with regular config fields
-    for (const [key, value] of Object.entries(decryptedConfig)) {
-      maskedConfig[key] = value;
-    }
+    // Use config resolver to get values with .env fallback and metadata
+    const resolved = configSchema
+      ? resolveConfigWithEnv(instance.config, configSchema as Record<string, ConfigFieldDescriptor>, {
+          decrypt: true,
+          maskSecrets: true,
+        })
+      : { values: {}, metadata: {} };
+
+    const maskedConfig: Record<string, any> = { ...resolved.values };
 
     // Add auth credentials (encrypted fields) and mask them
     if (instance.authState?.credentials) {
@@ -593,6 +620,7 @@ export const getPluginConfiguration = authenticatedProcedure
 
     return {
       configuration: maskedConfig,
+      configMetadata: resolved.metadata, // Include metadata about field sources
       enabled: instance.enabled,
       instanceId: instance.id,
       oauthAvailable, // Plugin has OAuth2 registered

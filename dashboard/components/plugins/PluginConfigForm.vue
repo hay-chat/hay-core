@@ -11,14 +11,72 @@
           {{ field.description }}
         </p>
 
+        <!-- Environment variable field (not yet overridden) -->
+        <div
+          v-if="
+            configMetadata?.[key]?.source === 'env' &&
+            configMetadata[key]?.canOverride &&
+            !editingEnvFields.has(key)
+          "
+          class="space-y-2"
+        >
+          <div class="flex items-center space-x-2">
+            <Input
+              :id="key"
+              value="Environment variable"
+              type="text"
+              disabled
+              class="flex-1 bg-muted"
+            />
+            <Button type="button" variant="outline" @click="handleEditEnvField(key)">
+              <Edit3 class="h-4 w-4 mr-1" />
+              Override
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            This setting is configured locally. Click override to set an organization-specific value.
+          </p>
+        </div>
+
+        <!-- Environment variable field being edited (override mode) -->
+        <div
+          v-else-if="
+            configMetadata?.[key]?.source === 'env' &&
+            configMetadata[key]?.canOverride &&
+            editingEnvFields.has(key)
+          "
+          class="space-y-2"
+        >
+          <div class="flex items-center space-x-2">
+            <Input
+              :id="key"
+              :model-value="formData[key]"
+              @update:model-value="updateFormData(key, $event)"
+              :type="field.encrypted ? 'password' : 'text'"
+              :placeholder="'Enter ' + (field.label || key).toLowerCase()"
+              :required="field.required"
+              class="flex-1"
+              autofocus
+            />
+            <Button type="button" size="sm" variant="ghost" @click="handleCancelEditEnvField(key)">
+              <X class="h-4 w-4" />
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            Overriding environment variable. Click X to revert to local configuration.
+          </p>
+        </div>
+
         <!-- Encrypted field with edit mode -->
         <!-- Show Edit button only if field has an existing value (not empty) -->
+        <!-- Don't show for env-sourced fields (handled above) -->
         <div
           v-if="
             field.encrypted &&
             originalFormData[key] !== undefined &&
             originalFormData[key] !== '' &&
-            originalFormData[key] !== null
+            originalFormData[key] !== null &&
+            configMetadata?.[key]?.source !== 'env'
           "
           class="space-y-2"
         >
@@ -167,19 +225,29 @@ interface FieldSchema {
   options?: Array<{ value: string; label: string }>;
 }
 
+interface ConfigFieldMetadata {
+  source: "env" | "database" | "default";
+  canOverride: boolean;
+  isEncrypted: boolean;
+}
+
 interface Props {
   configSchema: Record<string, FieldSchema>;
   formData: Record<string, any>;
   originalFormData: Record<string, any>;
   editingEncryptedFields: Set<string>;
+  configMetadata?: Record<string, ConfigFieldMetadata>;
   saving?: boolean;
 }
 
 const props = defineProps<Props>();
 
+const editingEnvFields = ref<Set<string>>(new Set());
+
 const emit = defineEmits<{
   "update:formData": [value: Record<string, any>];
   "update:editingEncryptedFields": [value: Set<string>];
+  "update:editingEnvFields": [value: Set<string>];
   submit: [];
   reset: [];
 }>();
@@ -202,5 +270,25 @@ function handleCancelEditEncryptedField(key: string) {
   emit("update:editingEncryptedFields", newSet);
   // Restore masked value
   updateFormData(key, props.originalFormData[key]);
+}
+
+function handleEditEnvField(key: string) {
+  const newSet = new Set(editingEnvFields.value);
+  newSet.add(key);
+  editingEnvFields.value = newSet;
+  emit("update:editingEnvFields", newSet);
+  // Clear the value to allow user to enter their own
+  updateFormData(key, "");
+}
+
+function handleCancelEditEnvField(key: string) {
+  const newSet = new Set(editingEnvFields.value);
+  newSet.delete(key);
+  editingEnvFields.value = newSet;
+  emit("update:editingEnvFields", newSet);
+  // Remove from formData to revert to env
+  const newFormData = { ...props.formData };
+  delete newFormData[key];
+  emit("update:formData", newFormData);
 }
 </script>
