@@ -10,13 +10,17 @@ interface Tokens {
 }
 
 export const useAuthStore = defineStore("auth", {
-  state: () => ({
-    tokens: null as Tokens | null,
-    isAuthenticated: false,
-    isInitialized: false,
-    lastActivity: Date.now(),
-    isLoading: false,
-  }),
+  state: () => {
+    const initialState = {
+      tokens: null as Tokens | null,
+      isAuthenticated: false,
+      isInitialized: false,
+      lastActivity: Date.now(),
+      isLoading: false,
+    };
+    console.log('[Auth Store] Initial state:', { hasTokens: !!initialState.tokens });
+    return initialState;
+  },
   getters: {
     isSessionTimedOut: (state) => {
       const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -54,6 +58,11 @@ export const useAuthStore = defineStore("auth", {
           refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
+        console.log('[Auth Store] Tokens set after login:', {
+          hasAccessToken: !!this.tokens.accessToken,
+          hasRefreshToken: !!this.tokens.refreshToken,
+          expiresAt: new Date(this.tokens.expiresAt).toISOString()
+        });
         const userStore = useUserStore();
         userStore.setUser(result.user as User);
         this.isAuthenticated = true;

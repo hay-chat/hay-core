@@ -11,9 +11,13 @@ export default defineNuxtPlugin(({ $pinia }: { $pinia: Pinia }) => {
     return
   }
 
+  console.log('[Pinia Persistence] Installing persistence plugin')
+
   // Install the persistence plugin
   $pinia.use(createPersistedState({
     storage: window.localStorage,
     auto: true, // Auto-persist stores with persist: true
   }))
+
+  console.log('[Pinia Persistence] Plugin installed successfully')
 })

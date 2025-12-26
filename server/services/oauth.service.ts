@@ -2,6 +2,7 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { oauthStateService } from "./oauth-state.service";
 import { encryptValue, decryptValue, decryptConfig } from "../lib/auth/utils/encryption";
+import { resolveConfigWithEnv } from "../lib/config-resolver";
 import { getApiUrl } from "../config/env";
 import type {
   OAuthTokenData,
@@ -11,7 +12,7 @@ import type {
   PluginConfigWithOAuth,
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
-import type { AuthMethodDescriptor } from "../types/plugin-sdk-v2.types";
+import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk-v2.types";
 import { debugLog } from "@server/lib/debug-logger";
 
 export class OAuthService {
@@ -145,8 +146,7 @@ export class OAuthService {
       pkce: true, // SDK v2 always uses PKCE for security
     };
 
-    // Get client credentials from plugin instance
-    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+    // Get client credentials from plugin instance using config resolver with env fallback
     const clientIdFieldName = oauth2Method.clientId;
     const clientSecretFieldName = oauth2Method.clientSecret;
 
@@ -154,13 +154,24 @@ export class OAuthService {
       throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
     }
 
-    // Check both config and authState.credentials
+    // Use config resolver to get values with .env fallback
+    const configSchema = plugin.metadata?.configSchema || {};
+    const resolved = resolveConfigWithEnv(
+      instance.config,
+      configSchema as Record<string, ConfigFieldDescriptor>,
+      {
+        decrypt: true,
+        maskSecrets: false, // We need actual values for OAuth flow
+      },
+    );
+
+    // Check resolved metadata for values (includes env fallback)
     const clientId =
-      decryptedConfig[clientIdFieldName] ||
+      resolved.metadata[clientIdFieldName]?.value ||
       instance.authState?.credentials?.[clientIdFieldName] ||
       null;
     const clientSecret =
-      decryptedConfig[clientSecretFieldName] ||
+      resolved.metadata[clientSecretFieldName]?.value ||
       instance.authState?.credentials?.[clientSecretFieldName] ||
       null;
 
@@ -327,8 +338,7 @@ export class OAuthService {
 
       console.log("Token URL:", oauthConfig.tokenUrl);
 
-      // Get client credentials from plugin instance
-      const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+      // Get client credentials from plugin instance using config resolver with env fallback
       const clientIdFieldName = oauth2Method.clientId;
       const clientSecretFieldName = oauth2Method.clientSecret;
 
@@ -336,12 +346,23 @@ export class OAuthService {
         throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
       }
 
+      // Use config resolver to get values with .env fallback
+      const configSchema = plugin.metadata?.configSchema || {};
+      const resolved = resolveConfigWithEnv(
+        instance.config,
+        configSchema as Record<string, ConfigFieldDescriptor>,
+        {
+          decrypt: true,
+          maskSecrets: false, // We need actual values for OAuth flow
+        },
+      );
+
       const clientId =
-        decryptedConfig[clientIdFieldName] ||
+        resolved.metadata[clientIdFieldName]?.value ||
         instance.authState?.credentials?.[clientIdFieldName] ||
         null;
       const clientSecret =
-        decryptedConfig[clientSecretFieldName] ||
+        resolved.metadata[clientSecretFieldName]?.value ||
         instance.authState?.credentials?.[clientSecretFieldName] ||
         null;
 
@@ -682,7 +703,7 @@ export class OAuthService {
     // Decrypt refresh token (already validated above that it exists)
     const refreshToken = decryptValue(oauthData.tokens.refresh_token!);
 
-    // Get client credentials from plugin instance
+    // Get client credentials from plugin instance using config resolver with env fallback
     const clientIdFieldName = oauth2Method.clientId;
     const clientSecretFieldName = oauth2Method.clientSecret;
 
@@ -690,12 +711,23 @@ export class OAuthService {
       throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
     }
 
+    // Use config resolver to get values with .env fallback
+    const configSchema = plugin.metadata?.configSchema || {};
+    const resolved = resolveConfigWithEnv(
+      instance.config,
+      configSchema as Record<string, ConfigFieldDescriptor>,
+      {
+        decrypt: true,
+        maskSecrets: false, // We need actual values for OAuth flow
+      },
+    );
+
     const clientId =
-      decryptedConfig[clientIdFieldName] ||
+      resolved.metadata[clientIdFieldName]?.value ||
       instance.authState?.credentials?.[clientIdFieldName] ||
       null;
     const clientSecret =
-      decryptedConfig[clientSecretFieldName] ||
+      resolved.metadata[clientSecretFieldName]?.value ||
       instance.authState?.credentials?.[clientSecretFieldName] ||
       null;
 
