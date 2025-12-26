@@ -91,12 +91,8 @@
           </p>
         </div>
 
-        <!-- Remember me and Forgot password -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <Checkbox id="remember" v-model:checked="form.rememberMe" />
-            <Label for="remember" class="text-sm text-gray-700 cursor-pointer"> Remember me </Label>
-          </div>
+        <!-- Forgot password -->
+        <div class="flex items-center justify-end">
           <NuxtLink
             to="/forgot-password"
             class="text-sm text-primary hover:text-primary/80 font-medium"
@@ -218,7 +214,6 @@ onMounted(() => {
 const form = reactive({
   email: "",
   password: "",
-  rememberMe: false,
 });
 
 const errors = reactive({
