@@ -359,6 +359,7 @@
                 :saving="saving"
                 @submit="saveConfiguration"
                 @reset="resetForm"
+                @reset-to-env="handleResetToEnv"
               />
             </TabsContent>
 
@@ -413,6 +414,7 @@
             :saving="saving"
             @submit="saveConfiguration"
             @reset="resetForm"
+            @reset-to-env="handleResetToEnv"
           />
         </CardContent>
       </Card>
@@ -939,27 +941,8 @@ const saveConfiguration = async () => {
     // Show success toast
     toast.success("Configuration saved successfully");
 
-    // Reload configuration to get updated OAuth state
-    const updatedConfig = await Hay.plugins.getConfiguration.query({
-      pluginId: pluginId.value,
-    });
-
-    // Update OAuth state
-    if ("oauthAvailable" in updatedConfig) {
-      oauthAvailable.value = updatedConfig.oauthAvailable;
-    }
-    if ("oauthConfigured" in updatedConfig) {
-      oauthConfigured.value = updatedConfig.oauthConfigured;
-    }
-    if ("oauthConnected" in updatedConfig) {
-      oauthConnected.value = updatedConfig.oauthConnected;
-    }
-
-    // Update original form data to reflect new saved state
-    originalFormData.value = { ...updatedConfig.configuration };
-
-    // Test connection after saving
-    await testConnection();
+    // Reload the entire plugin configuration to get fresh state
+    await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
 
@@ -998,6 +981,30 @@ const resetForm = async () => {
   // Clear any editing state for encrypted and env fields
   editingEncryptedFields.value.clear();
   editingEnvFields.value.clear();
+};
+
+const handleResetToEnv = async (key: string) => {
+  try {
+    // Remove the field from formData
+    const newFormData = { ...formData.value };
+    delete newFormData[key];
+
+    // Save immediately with the field removed
+    await Hay.plugins.configure.mutate({
+      pluginId: pluginId.value,
+      configuration: newFormData,
+    });
+
+    // Show success toast
+    toast.success("Reset to environment variable");
+
+    // Reload plugin configuration to refresh state
+    await fetchPlugin();
+  } catch (err: any) {
+    console.error("Failed to reset to env:", err);
+    const errorMessage = err?.message || err?.data?.message || "Failed to reset to environment variable";
+    toast.error(errorMessage);
+  }
 };
 
 const testConnection = async () => {

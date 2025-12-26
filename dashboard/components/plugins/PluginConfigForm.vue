@@ -68,15 +68,14 @@
         </div>
 
         <!-- Encrypted field with edit mode -->
-        <!-- Show Edit button only if field has an existing value (not empty) -->
-        <!-- Don't show for env-sourced fields (handled above) -->
+        <!-- Show for database-sourced encrypted fields only -->
         <div
           v-if="
             field.encrypted &&
             originalFormData[key] !== undefined &&
             originalFormData[key] !== '' &&
             originalFormData[key] !== null &&
-            configMetadata?.[key]?.source !== 'env'
+            configMetadata?.[key]?.source === 'database'
           "
           class="space-y-2"
         >
@@ -85,6 +84,16 @@
             <Button type="button" variant="outline" @click="handleEditEncryptedField(key)">
               <Edit3 class="h-4 w-4 mr-1" />
               Edit
+            </Button>
+            <!-- Show Reset button if field has env fallback -->
+            <Button
+              v-if="configMetadata?.[key]?.hasEnvFallback"
+              type="button"
+              variant="ghost"
+              @click="handleResetToEnv(key)"
+            >
+              <RotateCcw class="h-4 w-4 mr-1" />
+              Reset
             </Button>
           </div>
 
@@ -109,12 +118,48 @@
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            This value is encrypted and stored securely. Click edit to update it.
+            This value is encrypted and stored securely.
+            {{ configMetadata?.[key]?.hasEnvFallback ? ' Click Reset to revert to environment variable.' : ' Click edit to update it.' }}
+          </p>
+        </div>
+
+        <!-- Non-encrypted database field with env fallback (show with reset button) -->
+        <div
+          v-else-if="
+            !field.encrypted &&
+            configMetadata?.[key]?.source === 'database' &&
+            configMetadata?.[key]?.hasEnvFallback
+          "
+          class="space-y-2"
+        >
+          <div class="flex items-center space-x-2">
+            <Input
+              :id="key"
+              :model-value="formData[key]"
+              @update:model-value="updateFormData(key, $event)"
+              type="text"
+              :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+              :required="field.required"
+              class="flex-1"
+            />
+            <Button type="button" variant="ghost" @click="handleResetToEnv(key)">
+              <RotateCcw class="h-4 w-4 mr-1" />
+              Reset
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            Overriding environment variable. Click Reset to revert to local configuration.
           </p>
         </div>
 
         <!-- Regular input or empty encrypted field (first time) -->
-        <div v-else-if="field.encrypted || !field.encrypted">
+        <!-- Don't show if it's an env-sourced field (already handled above) -->
+        <div
+          v-else-if="
+            (field.encrypted || !field.encrypted) &&
+            configMetadata?.[key]?.source !== 'env'
+          "
+        >
           <Input
             :id="key"
             :model-value="formData[key]"
@@ -213,7 +258,7 @@
 </template>
 
 <script setup lang="ts">
-import { Lock, Edit3, X } from "lucide-vue-next";
+import { Lock, Edit3, X, RotateCcw } from "lucide-vue-next";
 
 interface FieldSchema {
   type: "string" | "select" | "boolean" | "textarea" | "number";
@@ -222,6 +267,7 @@ interface FieldSchema {
   placeholder?: string;
   required?: boolean;
   encrypted?: boolean;
+  env?: string;
   options?: Array<{ value: string; label: string }>;
 }
 
@@ -229,6 +275,7 @@ interface ConfigFieldMetadata {
   source: "env" | "database" | "default";
   canOverride: boolean;
   isEncrypted: boolean;
+  hasEnvFallback?: boolean;
 }
 
 interface Props {
@@ -250,6 +297,7 @@ const emit = defineEmits<{
   "update:editingEnvFields": [value: Set<string>];
   submit: [];
   reset: [];
+  "reset-to-env": [key: string];
 }>();
 
 function updateFormData(key: string, value: any) {
@@ -290,5 +338,10 @@ function handleCancelEditEnvField(key: string) {
   const newFormData = { ...props.formData };
   delete newFormData[key];
   emit("update:formData", newFormData);
+}
+
+function handleResetToEnv(key: string) {
+  // Emit event to parent to handle the reset and save
+  emit("reset-to-env", key);
 }
 </script>

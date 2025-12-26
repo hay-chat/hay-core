@@ -308,6 +308,7 @@ export const configurePlugin = authenticatedProcedure
 
     // When updating configuration, we need to handle partial updates properly
     let finalConfig = input.configuration;
+    const configSchema = metadata?.configSchema || manifest.configSchema;
 
     if (instance && instance.config) {
       // Get existing decrypted config
@@ -322,9 +323,18 @@ export const configurePlugin = authenticatedProcedure
       }
 
       // Also preserve any fields not included in the update
+      // BUT: don't preserve fields that have env fallbacks (allow reset to env)
       for (const [key, value] of Object.entries(existingDecrypted)) {
         if (!(key in finalConfig)) {
-          finalConfig[key] = value;
+          // Check if field has env fallback
+          const fieldSchema = configSchema?.[key];
+          const hasEnvFallback = fieldSchema?.env && process.env[fieldSchema.env];
+
+          // Only preserve if no env fallback (can't reset to env)
+          if (!hasEnvFallback) {
+            finalConfig[key] = value;
+          }
+          // Otherwise, omit it to allow falling back to env
         }
       }
     }
@@ -333,7 +343,6 @@ export const configurePlugin = authenticatedProcedure
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
 
     // Validate required fields are satisfied by either DB config or .env fallback
-    const configSchema = metadata?.configSchema || manifest.configSchema;
     if (configSchema) {
       const resolved = resolveConfigWithEnv(config, configSchema as Record<string, ConfigFieldDescriptor>, {
         decrypt: false,
@@ -509,8 +518,11 @@ export const getPluginConfiguration = authenticatedProcedure
       console.log(
         `[getPluginConfiguration] Using cached metadata for SDK v2 plugin: ${input.pluginId}`,
       );
-    } else if (instance && instance.enabled) {
-      // For enabled plugins, try fetching fresh metadata from worker as fallback
+    }
+
+    // For enabled plugins, try fetching fresh metadata from worker
+    // This is important for getting proper env field mappings for OAuth detection
+    if (instance && instance.enabled) {
       try {
         const runnerV2 = getPluginRunnerV2Service();
         const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
@@ -523,6 +535,22 @@ export const getPluginConfiguration = authenticatedProcedure
               console.log(
                 `[getPluginConfiguration] Fetched fresh config schema from SDK v2 worker for ${input.pluginId}`,
               );
+            }
+          }
+        } else {
+          // Worker not running, try to start it to get fresh metadata with env mappings
+          console.log(`[getPluginConfiguration] Worker not found, attempting to start for ${input.pluginId}`);
+          const newWorker = await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
+          if (newWorker && newWorker.port) {
+            const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
+            if (metadataResponse2.ok) {
+              const metadata2 = await metadataResponse2.json();
+              if (metadata2.configSchema) {
+                configSchema = metadata2.configSchema;
+                console.log(
+                  `[getPluginConfiguration] Fetched fresh config schema from newly started SDK v2 worker for ${input.pluginId}`,
+                );
+              }
             }
           }
         }
@@ -595,15 +623,15 @@ export const getPluginConfiguration = authenticatedProcedure
         const clientIdFieldName = oauth2Method.clientId; // e.g., "clientId"
         const clientSecretFieldName = oauth2Method.clientSecret; // e.g., "clientSecret"
 
-        // Check if BOTH fields are filled (check both config and authState)
-        // clientId usually in config, clientSecret might be in authState.credentials (if encrypted)
+        // Check if BOTH fields are filled (check resolved config with env fallback, and authState)
+        // Note: When maskSecrets=true, env values are in metadata.value, not values
         if (clientIdFieldName && clientSecretFieldName) {
           const hasClientId = !!(
-            decryptedConfig[clientIdFieldName] ||
+            resolved.metadata[clientIdFieldName]?.value ||
             instance.authState?.credentials?.[clientIdFieldName]
           );
           const hasClientSecret = !!(
-            decryptedConfig[clientSecretFieldName] ||
+            resolved.metadata[clientSecretFieldName]?.value ||
             instance.authState?.credentials?.[clientSecretFieldName]
           );
 

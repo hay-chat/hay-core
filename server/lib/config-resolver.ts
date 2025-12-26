@@ -6,6 +6,7 @@ export interface ResolvedConfigField {
   source: "env" | "database" | "default";
   isEncrypted: boolean;
   canOverride: boolean;
+  hasEnvFallback?: boolean; // Whether field has env variable fallback available
 }
 
 export interface ResolvedConfig {
@@ -59,21 +60,18 @@ export function resolveConfigWithEnv(
         source: "database",
         isEncrypted: !!fieldDef.encrypted,
         canOverride: false, // Already overridden
+        hasEnvFallback: hasEnvFallback && envValue !== undefined, // Can reset to env if available
       };
     } else if (hasEnvFallback && envValue !== undefined) {
       // Fallback to environment variable
-      // For masked mode (frontend), don't expose the value - just indicate it's from env
-      // Only mask encrypted fields with ********, non-encrypted fields get undefined
-      resolved.values[key] = maskSecrets
-        ? fieldDef.encrypted
-          ? "********"
-          : undefined
-        : envValue;
+      // For masked mode (frontend), don't expose any value - just indicate source via metadata
+      resolved.values[key] = maskSecrets ? undefined : envValue;
       resolved.metadata[key] = {
         value: envValue,
         source: "env",
         isEncrypted: !!fieldDef.encrypted,
         canOverride: true, // Can override with org-specific value
+        hasEnvFallback: true,
       };
     } else if (fieldDef.default !== undefined) {
       // Use default from schema

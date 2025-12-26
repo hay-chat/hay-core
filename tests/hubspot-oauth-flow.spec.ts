@@ -5,7 +5,130 @@ import { randomUUID } from "crypto";
 test.describe.configure({ mode: "serial" });
 
 test.describe("HubSpot Plugin OAuth Flow E2E", () => {
-  test("should install HubSpot plugin, configure OAuth credentials, and show OAuth login card", async ({
+  test("should show OAuth card when credentials are configured via environment variables", async ({
+    page,
+  }) => {
+    test.setTimeout(60000);
+
+    // This test verifies that when HUBSPOT_CLIENT_ID and HUBSPOT_CLIENT_SECRET
+    // are set in .env, the OAuth card shows up without needing to fill in the form
+
+    console.log("Step 1: Navigating to HubSpot plugin page...");
+    await navigateWithAuth(page, "/integrations/plugins/%40hay%2Fplugin-hubspot");
+    await page.waitForLoadState("networkidle");
+
+    console.log("Step 2: Verifying plugin page loaded...");
+    await expect(page).toHaveURL(/\/integrations\/plugins\/%40hay%2Fplugin-hubspot/, {
+      timeout: 10000,
+    });
+
+    await page.waitForTimeout(2000);
+
+    // Step 3: Check if plugin is enabled, enable if not
+    console.log("Step 3: Checking if plugin is enabled...");
+    const enableButton = page.locator('button:has-text("Enable"), button:has-text("Enable Plugin")');
+    const isDisabled = await enableButton.isVisible({ timeout: 5000 }).catch(() => false);
+
+    if (isDisabled) {
+      console.log("Plugin is disabled, enabling it...");
+      await enableButton.click();
+      await page.waitForTimeout(3000);
+      // Reload to see settings
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(2000);
+    } else {
+      console.log("Plugin is already enabled");
+    }
+
+    // Step 4: Check if .env variables are set
+    console.log("Step 4: Checking if environment variables are configured...");
+
+    // Navigate to Settings tab (if exists)
+    const settingsTab = page.locator('[role="tab"]:has-text("Settings")');
+    const hasSettingsTab = await settingsTab.isVisible({ timeout: 5000 }).catch(() => false);
+
+    if (hasSettingsTab) {
+      console.log("Found Settings tab, clicking it...");
+      await settingsTab.click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Check for environment variable indicators
+    const envIndicator = page.locator('text=/Environment variable/i');
+    const hasEnvIndicator = await envIndicator.isVisible({ timeout: 5000 }).catch(() => false);
+
+    console.log(`Environment variable indicator visible: ${hasEnvIndicator}`);
+
+    // Take screenshot to see current state
+    await page.screenshot({
+      path: "test-results/hubspot-env-vars-state.png",
+      fullPage: true,
+    });
+
+    // Step 5: Scroll down to see OAuth card (it might be below the fold)
+    console.log("Step 5: Scrolling to see OAuth card...");
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(1000);
+
+    // Step 6: Check API response for oauthConfigured value
+    console.log("Step 6: Checking API response for oauthConfigured...");
+
+    // Intercept API calls to see what the backend is returning
+    let apiResponse: any = null;
+    page.on('response', async (response) => {
+      if (response.url().includes('plugins.getConfiguration') || response.url().includes('plugin-hubspot')) {
+        try {
+          const json = await response.json();
+          if (json.result?.data) {
+            apiResponse = json.result.data;
+            console.log(`API Response - oauthConfigured: ${apiResponse.oauthConfigured}`);
+            console.log(`API Response - oauthAvailable: ${apiResponse.oauthAvailable}`);
+            console.log(`API Response - enabled: ${apiResponse.enabled}`);
+          }
+        } catch (e) {
+          // Not JSON or parse error, ignore
+        }
+      }
+    });
+
+    // Reload to trigger API call
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
+
+    // Step 7: Verify OAuth card IS showing (even without manual configuration)
+    console.log("Step 7: Verifying OAuth authentication card is showing...");
+
+    const oauthCard = page.locator(
+      'h3:has-text("Authentication"), h2:has-text("Authentication"), h3:has-text("OAuth"), h2:has-text("OAuth"), h3:has-text("Connect"), h2:has-text("Connect")'
+    );
+    const connectButton = page.locator('button:has-text("Connect"), button:has-text("Connect to HubSpot")');
+
+    const hasOAuthCard = await oauthCard.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasConnectButton = await connectButton.isVisible({ timeout: 5000 }).catch(() => false);
+
+    console.log(`OAuth card visible: ${hasOAuthCard}`);
+    console.log(`Connect button visible: ${hasConnectButton}`);
+
+    // ASSERTION: OAuth card SHOULD be visible when env vars are set
+    if (hasEnvIndicator) {
+      // If we have env vars, OAuth card MUST show
+      expect(hasOAuthCard || hasConnectButton).toBe(true);
+      console.log("✅ PASS: OAuth card visible with environment variables");
+    } else {
+      console.log("⚠️  No environment variables detected - skipping OAuth card check");
+      console.log("To test with env vars, set HUBSPOT_CLIENT_ID and HUBSPOT_CLIENT_SECRET in .env");
+    }
+
+    // Take screenshot
+    await page.screenshot({
+      path: "test-results/hubspot-oauth-env-vars.png",
+      fullPage: true,
+    });
+  });
+
+  test("should show OAuth card when credentials are filled manually", async ({
     page,
   }) => {
     test.setTimeout(120000);
