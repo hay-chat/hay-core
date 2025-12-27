@@ -223,6 +223,14 @@ export const conversationsRouter = t.router({
       });
     }
 
+    // Verify organization access
+    if (conversation.organization_id !== ctx.organizationId) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Conversation not found",
+      });
+    }
+
     // Determine message type based on role and takeover status
     let messageType: MessageType;
     if (input.role === "assistant") {
@@ -529,6 +537,15 @@ export const conversationsRouter = t.router({
         });
       }
 
+      // Verify organization access through conversation
+      const conversation = await conversationRepository.findById(message.conversation_id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      }
+
       // Verify message is in queued state
       if (message.deliveryState !== DeliveryState.QUEUED) {
         throw new TRPCError({
@@ -556,9 +573,8 @@ export const conversationsRouter = t.router({
       // Broadcast message approval to WebSocket clients
       try {
         const { redisService } = await import("../../../services/redis.service");
-        const conversation = await conversationRepository.findById(message.conversation_id);
 
-        if (conversation && redisService.isConnected()) {
+        if (redisService.isConnected()) {
           await redisService.publish("websocket:events", {
             type: "message_approved",
             organizationId: conversation.organization_id,
@@ -569,7 +585,7 @@ export const conversationsRouter = t.router({
               editedContent: input.editedContent,
             },
           });
-        } else if (conversation) {
+        } else {
           // Fallback to direct WebSocket if Redis not available
           const { websocketService } = await import("../../../services/websocket.service");
           websocketService.sendToOrganization(conversation.organization_id, {
@@ -609,6 +625,15 @@ export const conversationsRouter = t.router({
         });
       }
 
+      // Verify organization access through conversation
+      const conversation = await conversationRepository.findById(message.conversation_id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      }
+
       // Verify message is in queued state
       if (message.deliveryState !== DeliveryState.QUEUED) {
         throw new TRPCError({
@@ -632,9 +657,8 @@ export const conversationsRouter = t.router({
       // Broadcast message block to WebSocket clients
       try {
         const { redisService } = await import("../../../services/redis.service");
-        const conversation = await conversationRepository.findById(message.conversation_id);
 
-        if (conversation && redisService.isConnected()) {
+        if (redisService.isConnected()) {
           await redisService.publish("websocket:events", {
             type: "message_blocked",
             organizationId: conversation.organization_id,
@@ -645,7 +669,7 @@ export const conversationsRouter = t.router({
               reason: input.reason,
             },
           });
-        } else if (conversation) {
+        } else {
           // Fallback to direct WebSocket if Redis not available
           const { websocketService } = await import("../../../services/websocket.service");
           websocketService.sendToOrganization(conversation.organization_id, {
