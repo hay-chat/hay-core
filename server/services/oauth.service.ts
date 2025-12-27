@@ -554,6 +554,19 @@ export class OAuthService {
       _oauth: encryptedOAuthData,
     };
 
+    // SDK v2: Build authState for plugins using SDK v2
+    // The authState format is what the plugin SDK expects via ctx.auth.get()
+    const authState = {
+      methodId: `${pluginId}-oauth`, // Convention: {pluginId}-oauth
+      credentials: {
+        accessToken: tokens.access_token, // Will be encrypted by AuthStateEncryptedTransformer
+        refreshToken: tokens.refresh_token,
+        expiresAt: tokens.expires_at,
+        tokenType: tokens.token_type || "Bearer",
+        scope: tokens.scope,
+      },
+    };
+
     if (instance) {
       console.log("Updating existing instance...");
       // Update existing instance
@@ -567,11 +580,13 @@ export class OAuthService {
       });
       console.log("  Config updated");
 
-      // Update auth_method
+      // Update auth_method and authState
       await pluginInstanceRepository.update(instance.id, instance.organizationId, {
         authMethod: "oauth",
+        authState,
       });
       console.log("  Auth method updated to oauth");
+      console.log("  Auth state updated with access token");
       console.log("  Instance enabled state should remain:", instance.enabled);
     } else {
       console.log("Creating new instance with enabled=false...");
@@ -579,6 +594,7 @@ export class OAuthService {
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
         config: configToStore,
         authMethod: "oauth",
+        authState,
         enabled: false, // Don't auto-enable
       });
       console.log("  New instance created");
@@ -803,9 +819,75 @@ export class OAuthService {
       _oauth: updatedOAuthData,
     });
 
+    // SDK v2: Also update authState with refreshed tokens
+    const authState = {
+      methodId: `${pluginId}-oauth`,
+      credentials: {
+        accessToken: newTokens.access_token,
+        refreshToken: newTokens.refresh_token,
+        expiresAt: newTokens.expires_at,
+        tokenType: newTokens.token_type || "Bearer",
+        scope: newTokens.scope,
+      },
+    };
+
+    await pluginInstanceRepository.update(instance.id, instance.organizationId, {
+      authState,
+    });
+
     debugLog("oauth", `Token refreshed for plugin ${pluginId}`, { organizationId });
 
     return newTokens;
+  }
+
+  /**
+   * Migrate existing OAuth instances to populate authState from config._oauth
+   * This is needed for SDK v2 plugins that expect authState.credentials.accessToken
+   */
+  async migrateOAuthToAuthState(organizationId: string, pluginId: string): Promise<boolean> {
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    if (!instance) {
+      return false;
+    }
+
+    // Check if authState is already populated
+    if (instance.authState?.credentials?.accessToken) {
+      console.log("Auth state already populated, skipping migration");
+      return true;
+    }
+
+    // Check if config has _oauth
+    const oauthData = instance.config?._oauth as OAuthConfig["_oauth"] | undefined;
+    if (!oauthData || !oauthData.tokens) {
+      console.log("No OAuth tokens found in config, skipping migration");
+      return false;
+    }
+
+    // Decrypt tokens
+    const accessToken = decryptValue(oauthData.tokens.access_token);
+    const refreshToken = oauthData.tokens.refresh_token
+      ? decryptValue(oauthData.tokens.refresh_token)
+      : undefined;
+
+    // Build authState
+    const authState = {
+      methodId: `${pluginId}-oauth`,
+      credentials: {
+        accessToken,
+        refreshToken,
+        expiresAt: oauthData.tokens.expires_at,
+        tokenType: oauthData.tokens.token_type || "Bearer",
+        scope: oauthData.tokens.scope,
+      },
+    };
+
+    // Update instance
+    await pluginInstanceRepository.update(instance.id, organizationId, {
+      authState,
+    });
+
+    console.log(`✅ Migrated OAuth tokens to authState for ${pluginId}`);
+    return true;
   }
 }
 
