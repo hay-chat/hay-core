@@ -34,10 +34,10 @@ export const messageFeedbackRouter = t.router({
 
   get: authenticatedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const feedback = await feedbackService.getFeedbackById(input.id);
 
-      if (!feedback) {
+      if (!feedback || feedback.organizationId !== ctx.organizationId) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Feedback not found",
@@ -49,9 +49,10 @@ export const messageFeedbackRouter = t.router({
 
   getByMessage: authenticatedProcedure
     .input(z.object({ messageId: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const feedback = await feedbackService.getFeedbackByMessage(input.messageId);
-      return feedback;
+      // Filter to only return feedback from the user's organization
+      return feedback.filter((f) => f.organizationId === ctx.organizationId);
     }),
 
   list: authenticatedProcedure.input(listFeedbackSchema).query(async ({ ctx, input }) => {
@@ -91,7 +92,16 @@ export const messageFeedbackRouter = t.router({
 
   delete: authenticatedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership before deletion
+      const feedback = await feedbackService.getFeedbackById(input.id);
+      if (!feedback || feedback.organizationId !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Feedback not found",
+        });
+      }
+
       const success = await feedbackService.deleteFeedback(input.id);
 
       if (!success) {
