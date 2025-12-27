@@ -26,7 +26,9 @@
     "plugin",
     "notifications"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"

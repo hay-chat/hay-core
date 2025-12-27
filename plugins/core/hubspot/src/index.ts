@@ -5,7 +5,7 @@
  * tickets, and other CRM objects through HubSpot's Model Context Protocol server.
  */
 
-import { defineHayPlugin } from "../../../../plugin-sdk-v2/dist/sdk/index.js";
+import { defineHayPlugin } from "@hay/plugin-sdk-v2";
 
 export default defineHayPlugin((globalCtx) => ({
   name: "HubSpot",
@@ -146,5 +146,30 @@ export default defineHayPlugin((globalCtx) => ({
       ctx.logger.error("Failed to connect to HubSpot MCP server:", error);
       throw error;
     }
+  },
+
+  /**
+   * Config update handler
+   */
+  async onConfigUpdate(ctx) {
+    ctx.logger.info("HubSpot plugin config updated");
+    // Config changes (client ID/secret) will take effect on restart
+  },
+
+  /**
+   * Disable handler - cleanup
+   */
+  async onDisable(ctx) {
+    ctx.logger.info("HubSpot plugin disabled for org", { orgId: ctx.org.id });
+    // MCP servers are stopped automatically by the SDK
+  },
+
+  /**
+   * Enable handler - called by core when plugin is enabled
+   * Note: This is a CORE-ONLY hook, receives global context (not org context)
+   */
+  async onEnable(ctx) {
+    ctx.logger.info("HubSpot plugin enabled");
+    // Plugin will be restarted via onStart automatically for each org
   },
 }));
