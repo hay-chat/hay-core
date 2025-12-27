@@ -431,26 +431,70 @@ export class PluginHttpServer {
         this.logger.debug('MCP tool call requested', { toolName, arguments: toolArgs });
 
         // Find which MCP server has this tool
+        // First, we need to check all servers to find which one has the tool
         let targetServer: RegisteredMcpServer | null = null;
+        let toolServerId: string | null = null;
 
+        // Get list of all tools to find which server owns this tool
         for (const server of this.mcpServers.values()) {
-          if (server.type === 'local' && server.instance?.callTool) {
-            // Check if this server has the tool
-            // For now, we'll try the first local server (could be enhanced with tool registry)
-            targetServer = server;
-            break;
+          try {
+            let serverTools: any[] = [];
+
+            if (server.type === 'local' && server.instance?.listTools) {
+              serverTools = await server.instance.listTools();
+            } else if (server.type === 'external' && server.options) {
+              // List tools from external server
+              const { url, authHeaders } = server.options;
+              const rpcRequest = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/list',
+                params: {}
+              };
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...authHeaders,
+                },
+                body: JSON.stringify(rpcRequest),
+                signal: AbortSignal.timeout(5000),
+              });
+
+              if (response.ok) {
+                const rpcResponse: any = await response.json();
+                if (rpcResponse.result?.tools) {
+                  serverTools = rpcResponse.result.tools;
+                }
+              }
+            }
+
+            // Check if this server has the requested tool
+            const hasTool = serverTools.some((t: any) => t.name === toolName);
+            if (hasTool) {
+              targetServer = server;
+              toolServerId = server.id;
+              break;
+            }
+          } catch (err) {
+            // Continue checking other servers
+            this.logger.debug(`Failed to check server ${server.id} for tool ${toolName}`, { error: err });
           }
         }
 
-        if (!targetServer) {
+        if (!targetServer || !toolServerId) {
           res.status(404).json({
             error: `No MCP server found for tool: ${toolName}`
           });
           return;
         }
 
-        // Call the tool on the MCP server instance
-        if (targetServer.instance?.callTool) {
+        this.logger.debug(`Found tool ${toolName} on server ${toolServerId}`);
+
+        // Call the tool on the appropriate MCP server
+        if (targetServer.type === 'local' && targetServer.instance?.callTool) {
+          // Local MCP server
           try {
             const result = await targetServer.instance.callTool(toolName, toolArgs || {});
             res.json(result);
@@ -458,6 +502,72 @@ export class PluginHttpServer {
           } catch (toolErr: any) {
             const errorMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
             this.logger.error('MCP tool execution failed', { toolName, error: errorMsg });
+            res.status(500).json({
+              error: `Tool execution failed: ${errorMsg}`
+            });
+          }
+        } else if (targetServer.type === 'external' && targetServer.options) {
+          // External MCP server - use JSON-RPC
+          try {
+            const { url, authHeaders } = targetServer.options;
+
+            // Send JSON-RPC request for tools/call
+            const rpcRequest = {
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'tools/call',
+              params: {
+                name: toolName,
+                arguments: toolArgs || {}
+              }
+            };
+
+            this.logger.debug(`Sending JSON-RPC tool call to ${url}`, { method: rpcRequest.method, toolName });
+
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders,
+              },
+              body: JSON.stringify(rpcRequest),
+              signal: AbortSignal.timeout(30000), // 30 second timeout for tool execution
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              this.logger.error(`External MCP server ${targetServer.id} returned error`, {
+                status: response.status,
+                statusText: response.statusText,
+                body: errorText
+              });
+              res.status(500).json({
+                error: `External MCP server error: HTTP ${response.status}`
+              });
+              return;
+            }
+
+            const rpcResponse: any = await response.json();
+            this.logger.debug(`Received JSON-RPC response from ${targetServer.id}`, {
+              hasResult: !!rpcResponse.result,
+              hasError: !!rpcResponse.error
+            });
+
+            // Check for JSON-RPC error
+            if (rpcResponse.error) {
+              this.logger.error('MCP RPC error', { error: rpcResponse.error });
+              res.status(500).json({
+                error: `MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`
+              });
+              return;
+            }
+
+            // Return the result
+            res.json(rpcResponse.result);
+            this.logger.debug('External MCP tool call successful', { toolName, serverId: targetServer.id });
+          } catch (toolErr: any) {
+            const errorMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+            this.logger.error('External MCP tool execution failed', { toolName, error: errorMsg });
             res.status(500).json({
               error: `Tool execution failed: ${errorMsg}`
             });

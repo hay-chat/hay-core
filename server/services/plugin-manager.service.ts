@@ -801,6 +801,18 @@ export class PluginManagerService {
     const key = `${organizationId}:${pluginId}`;
 
     try {
+      // Check if worker is already running in the runner service
+      const existingWorker = this.runnerV2Service.getWorker(organizationId, pluginId);
+      if (existingWorker) {
+        console.log(`[PluginManager] Worker already running for ${key}, reusing existing worker`);
+        // Update last activity
+        if (this.workers.has(key)) {
+          const worker = this.workers.get(key)!;
+          worker.lastActivity = new Date();
+        }
+        return existingWorker;
+      }
+
       // Start worker using SDK v2 runner service
       const workerInfo = await this.runnerV2Service.startWorker(organizationId, pluginId);
 
@@ -825,6 +837,22 @@ export class PluginManagerService {
 
       return workerInfo;
     } catch (error) {
+      // If worker is already running (race condition), try to get it
+      if (error instanceof Error && error.message.includes('Worker already running')) {
+        console.log(`[PluginManager] Caught "already running" error, attempting to get existing worker for ${key}`);
+        const existingWorker = this.runnerV2Service.getWorker(organizationId, pluginId);
+        if (existingWorker) {
+          console.log(`[PluginManager] Successfully retrieved existing worker for ${key}`);
+          // Store in plugin manager's map
+          this.workers.set(key, {
+            ...existingWorker,
+            metadata: plugin,
+            sdkVersion: "v2"
+          });
+          return existingWorker;
+        }
+      }
+
       console.error(`Failed to start SDK v2 worker for ${key}:`, error);
       throw error;
     }

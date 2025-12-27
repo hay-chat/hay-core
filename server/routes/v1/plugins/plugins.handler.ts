@@ -536,6 +536,16 @@ export const getPluginConfiguration = authenticatedProcedure
                 `[getPluginConfiguration] Fetched fresh config schema from SDK v2 worker for ${input.pluginId}`,
               );
             }
+            // Update database metadata if it's different (especially authMethods for OAuth URLs)
+            if (metadata.authMethods) {
+              await pluginRegistryRepository.updateMetadata(input.pluginId, {
+                ...metadata,
+                updatedAt: new Date(),
+              });
+              console.log(
+                `[getPluginConfiguration] Updated database metadata for ${input.pluginId}`,
+              );
+            }
           }
         } else {
           // Worker not running, try to start it to get fresh metadata with env mappings
@@ -549,6 +559,16 @@ export const getPluginConfiguration = authenticatedProcedure
                 configSchema = metadata2.configSchema;
                 console.log(
                   `[getPluginConfiguration] Fetched fresh config schema from newly started SDK v2 worker for ${input.pluginId}`,
+                );
+              }
+              // Update database metadata
+              if (metadata2.authMethods) {
+                await pluginRegistryRepository.updateMetadata(input.pluginId, {
+                  ...metadata2,
+                  updatedAt: new Date(),
+                });
+                console.log(
+                  `[getPluginConfiguration] Updated database metadata for ${input.pluginId}`,
                 );
               }
             }
@@ -1045,23 +1065,63 @@ export const testConnection = authenticatedProcedure
       }
 
       // Actually test the MCP server by calling a safe tool
-      // Prioritize list_* or get_* tools, or just use the first available tool
+      // Priority 1: Find READ-ONLY tools with NO required parameters (safest for health checks)
       const safeToolPrefixes = ["list_", "get_", "search_", "find_", "read_"];
-      let testTool = mcpTools.find((t) =>
-        safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix)),
-      );
+      let testTool = mcpTools.find((t) => {
+        const schema = t.inputSchema;
+        const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
+        const isReadOnly = safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix));
+        return hasNoRequiredParams && isReadOnly;
+      });
 
-      // If no safe tool found, use the first tool
+      // Priority 2: Find any tool with NO required parameters
+      if (!testTool) {
+        testTool = mcpTools.find((t) => {
+          const schema = t.inputSchema;
+          if (!schema || !schema.required) return true;
+          return schema.required.length === 0;
+        });
+      }
+
+      // Priority 3: Find safe read-only tools (even if they have required params)
+      if (!testTool) {
+        testTool = mcpTools.find((t) =>
+          safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix)),
+        );
+      }
+
+      // Priority 4: Just use the first tool as last resort
       if (!testTool) {
         testTool = mcpTools[0];
       }
 
+      const hasRequiredParams = testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
       console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
+      console.log(`[testConnection] Tool has required parameters: ${hasRequiredParams}`);
 
       // Call the tool via worker (SDK v2) or legacy MCP client
       if (worker && worker.port) {
-        // SDK v2: Call tool via worker HTTP API
+        // If the selected tool has required parameters, skip the actual call
+        // and just verify the worker is responding
+        if (hasRequiredParams) {
+          console.log(
+            `[testConnection] ⚠️  Selected tool has required parameters, skipping actual tool call`,
+          );
+          console.log(
+            `[testConnection] ✅ Worker is running and tools are available - marking as healthy`,
+          );
+          return {
+            success: true,
+            status: "healthy",
+            message: `MCP server is healthy - worker running with ${mcpTools.length} tools available (tool call skipped due to required parameters)`,
+            tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
+            testedAt: new Date(),
+          };
+        }
+
+        // SDK v2: Call tool via worker HTTP API (only if no required parameters)
         try {
+          console.log(`[testConnection] 🔄 Calling tool with empty arguments for health check...`);
           const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1074,6 +1134,9 @@ export const testConnection = authenticatedProcedure
 
           if (!callResponse.ok) {
             const errorText = await callResponse.text();
+            console.log(
+              `[testConnection] ❌ Tool call failed: HTTP ${callResponse.status} - ${errorText}`,
+            );
             return {
               success: false,
               status: "unhealthy",
@@ -1083,9 +1146,10 @@ export const testConnection = authenticatedProcedure
             };
           }
 
-          const result = await callResponse.json();
+          await callResponse.json();
 
           // Success - MCP server is responding
+          console.log(`[testConnection] ✅ Tool call succeeded - MCP server is healthy`);
           return {
             success: true,
             status: "healthy",
@@ -1094,6 +1158,7 @@ export const testConnection = authenticatedProcedure
             testedAt: new Date(),
           };
         } catch (testError: any) {
+          console.log(`[testConnection] ❌ Tool call failed with error: ${testError.message}`);
           return {
             success: false,
             status: "unhealthy",
