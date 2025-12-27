@@ -7,7 +7,7 @@
  * @see PLUGIN.md for SDK v2 architecture
  */
 
-import { defineHayPlugin } from '../../../../plugin-sdk-v2/dist/sdk/factory.js';
+import { defineHayPlugin } from '@hay/plugin-sdk-v2';
 
 /**
  * MCP Tool Definition
@@ -202,6 +202,15 @@ export default defineHayPlugin((globalCtx) => {
     async onDisable(ctx) {
       ctx.logger.info('Email plugin disabled for org', { orgId: ctx.org.id });
       // MCP servers are stopped automatically by the SDK
+    },
+
+    /**
+     * Enable handler - called by core when plugin is enabled
+     * Note: This is a CORE-ONLY hook, receives global context (not org context)
+     */
+    async onEnable(ctx) {
+      ctx.logger.info('Email plugin enabled');
+      // Plugin will be restarted via onStart automatically for each org
     },
   };
 });
