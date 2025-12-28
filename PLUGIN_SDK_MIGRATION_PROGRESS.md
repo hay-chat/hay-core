@@ -12,70 +12,197 @@
 
 **Status**: 2/9 complete (22%)
 
-### Migration Checklist
+### Standard Migration Checklist (Per Plugin)
 
-- [x] **1. Email** (already has v2 version)
-  - [ ] Delete old `src/index.ts`
-  - [ ] Rename `src/index-v2.ts` → `src/index.ts`
-  - [ ] Delete `tsconfig-v2.json` or rename to `tsconfig.json`
-  - [ ] Update imports in `package.json`
-  - [ ] Build and test
+Each plugin migration should follow these steps:
 
-- [x] **2. Hubspot**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+**Core Migration**:
+- [ ] Read current `src/index.ts` to understand existing implementation
+- [ ] Rewrite using `defineHayPlugin()` factory pattern
+- [ ] Update config registration (`this.registerConfigOption` → `ctx.register.config`)
+- [ ] Update auth registration if applicable (`this.registerAuth*` → `ctx.register.auth.*`)
+- [ ] Update MCP registration (`registerMCP()` → `ctx.mcp.startLocal/startExternal` in `onStart`)
+- [ ] Update UI extension registration if applicable (`this.registerUIExtension` → `ctx.register.ui`)
+- [ ] Update route registration if applicable (`this.registerRoute` → `ctx.register.route`)
 
-- [ ] **3. Judo-in-Cloud**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+**Hook Implementation**:
+- [ ] Implement `onInitialize` - Register config, auth, routes, UI extensions
+- [ ] Implement `onStart` - Start MCP servers, connect to external services
+- [ ] Implement `onValidateAuth` - Validate credentials (if auth capability exists)
+- [ ] Implement `onConfigUpdate` - Handle config changes (if config capability exists)
+- [ ] Implement `onDisable` - Cleanup resources when plugin disabled
+- [ ] Implement `onEnable` - (Optional) Handle re-enable after disable
 
-- [ ] **4. Magento**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+**Package & Cleanup**:
+- [ ] Add SDK dependency to `package.json`: `"@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"`
+- [ ] Add TypeScript dev dependencies: `@types/node`, `typescript`
+- [ ] Update imports to use `@hay/plugin-sdk-v2` instead of direct file paths
+- [ ] Delete old test files, backup files, and legacy artifacts
+- [ ] Ensure `tsconfig.json` is properly configured
 
-- [ ] **5. Shopify**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+**Testing**:
+- [ ] Build plugin: `npm run build`
+- [ ] Verify TypeScript compilation succeeds
+- [ ] Test plugin loads in server
+- [ ] Test MCP tools are discoverable
+- [ ] Test config UI if applicable
+- [ ] Test auth flow if applicable
 
-- [ ] **6. Simple-HTTP-Test**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+---
 
-- [ ] **7. Stripe**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration (OAuth2)
-  - [ ] Build and test
+### Plugin Migration Order & Status
 
-- [ ] **8. WooCommerce**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+- [x] **1. Email** ✅ COMPLETE
+  - [x] Core migration complete
+  - [x] Add SDK dependency to package.json
+  - [x] Update import to use `@hay/plugin-sdk-v2`
+  - [x] Delete test files: `test-mcp-endpoint.js`, `test-plugin.js`, `test-worker-spawn.js`, `package-v1.json.backup`
+  - [x] Add missing hooks: `onEnable`
+  - [x] Final verification - builds successfully
 
-- [ ] **9. Zendesk**
-  - [ ] Read current `src/index.ts`
-  - [ ] Rewrite using `defineHayPlugin()` pattern
-  - [ ] Update config registration
-  - [ ] Update MCP registration
-  - [ ] Build and test
+- [x] **2. HubSpot** ✅ COMPLETE
+  - [x] Core migration complete
+  - [x] Add SDK dependency to package.json
+  - [x] Update import to use `@hay/plugin-sdk-v2`
+  - [x] Add missing hooks: `onDisable`, `onConfigUpdate`, `onEnable`
+  - [x] Final verification - builds successfully
+
+- [ ] **3. Zendesk** 🎯 NEXT PRIORITY (UI Component Architecture Decision)
+  - **Priority**: HIGH - Has UI components, needs V2 UI architecture decision
+  - **Complexity**: ⭐⭐⭐ Medium-High
+  - **Features**: Local MCP, UI Extensions (after-settings slot with Vue component)
+  - **Decision Needed**: Define how plugins will create/inject Vue components in V2
+  - **Migration Steps**:
+    - [ ] Read current implementation (local MCP + UI extension)
+    - [ ] **DESIGN PHASE**: Define V2 UI extension architecture
+      - [ ] Decide: Plugin-provided Vue components vs. server-side rendering?
+      - [ ] Decide: Component registration API in `ctx.register.ui()`
+      - [ ] Decide: How plugins bundle/serve Vue components
+      - [ ] Document pattern for future plugins
+    - [ ] Implement new UI extension pattern
+    - [ ] Migrate MCP registration (local MCP server)
+    - [ ] Test UI component rendering in dashboard
+    - [ ] Document UI migration pattern for other plugins
+
+- [ ] **4. Shopify** (UI Component Test #2)
+  - **Complexity**: ⭐⭐⭐ Medium-High
+  - **Features**: Local MCP, UI Extensions (after-settings slot)
+  - **Note**: Second plugin with UI components, validates Zendesk pattern
+  - **Migration**: Follow standard checklist + Zendesk UI pattern
+  - [ ] Apply UI extension pattern from Zendesk
+  - [ ] Migrate local MCP server
+  - [ ] Test UI components
+
+- [ ] **5. Stripe** (OAuth2 + External MCP)
+  - **Complexity**: ⭐⭐ Medium
+  - **Features**: OAuth2, External MCP, tools.json
+  - **Similar to**: HubSpot
+  - **Migration**: Follow standard checklist + HubSpot OAuth2 pattern
+  - [ ] Copy OAuth2 pattern from HubSpot
+  - [ ] Convert `registerRemoteMCP` → `ctx.mcp.startExternal`
+  - [ ] Use existing `tools.json` for tool metadata
+
+- [ ] **6. WooCommerce** (API Key + Local MCP)
+  - **Complexity**: ⭐⭐ Medium
+  - **Features**: API Key auth, Local MCP
+  - **New Pattern**: First plugin with API Key auth in V2
+  - **Migration**: Follow standard checklist + new API Key pattern
+  - [ ] Implement `ctx.register.auth.apiKey()` pattern
+  - [ ] Migrate local MCP
+  - [ ] Document API Key pattern for future plugins
+
+- [ ] **7. Magento** (API Key + Local MCP)
+  - **Complexity**: ⭐⭐ Medium
+  - **Features**: API Key auth, Local MCP
+  - **Similar to**: WooCommerce
+  - **Migration**: Follow standard checklist + WooCommerce API Key pattern
+  - [ ] Apply API Key pattern from WooCommerce
+  - [ ] Migrate local MCP
+
+- [ ] **8. Judo-in-Cloud**
+  - **Complexity**: ⭐⭐ Medium
+  - **Features**: TBD (need to investigate)
+  - **Migration**: Follow standard checklist
+  - [ ] Investigate current implementation
+  - [ ] Determine migration approach
+  - [ ] Migrate using appropriate pattern
+
+- [ ] **9. Simple-HTTP-Test** (Testing Plugin)
+  - **Complexity**: ⭐ Low
+  - **Features**: Basic HTTP testing
+  - **Note**: Simplest plugin, good for validation
+  - **Migration**: Follow standard checklist
+  - [ ] Migrate basic plugin structure
+  - [ ] Useful for testing plugin loading/lifecycle
+
+---
+
+## UI Component Architecture Decision 🎨
+
+**Status**: Not Yet Decided - To be addressed during Zendesk migration
+
+### Current V1 Approach
+Plugins register Vue components that are rendered in specific slots:
+```typescript
+this.registerUIExtension({
+  slot: 'after-settings',
+  component: 'components/settings/AfterSettings.vue',
+});
+```
+
+### V2 Architecture Options
+
+**Option 1: Plugin-Provided Vue Components** ✨ (Recommended approach to explore first)
+- Plugins ship with Vue 3 components in their `components/` directory
+- Components are registered via `ctx.register.ui()` in `onInitialize`
+- Dashboard dynamically imports and renders plugin components
+- Plugins can use Vue 3 Composition API, composables, etc.
+
+**Pros**:
+- Maximum flexibility for plugin developers
+- Plugins control their own UI/UX
+- Can use full Vue ecosystem (Pinia stores, composables, etc.)
+- Natural fit with existing V1 pattern
+
+**Cons**:
+- Need to solve: component bundling/serving
+- Need to solve: Vue version compatibility
+- Need to solve: shared dependencies (Tailwind, UI components)
+
+**Option 2: Server-Side Rendering / Configuration**
+- Plugins provide UI configuration (JSON schema)
+- Dashboard renders UI based on configuration
+- More restricted but simpler
+
+**Pros**:
+- Simpler to implement
+- No component bundling needed
+- Easier version compatibility
+
+**Cons**:
+- Less flexible for complex UIs
+- May not handle all use cases (tutorial images, custom layouts)
+
+**Option 3: Hybrid Approach**
+- Simple UIs use configuration (Option 2)
+- Complex UIs use Vue components (Option 1)
+- Plugins choose based on needs
+
+### Open Questions
+- [ ] How do plugins bundle/serve Vue components?
+- [ ] How do we handle Vue version compatibility?
+- [ ] Can plugins share Tailwind classes and UI components from dashboard?
+- [ ] How do we handle plugin component hot reload in dev?
+- [ ] Should plugins have access to dashboard composables/stores?
+- [ ] How do we prevent plugins from breaking dashboard UI?
+
+### Decision Process
+1. Review Zendesk's current UI component (tutorial with images, links)
+2. Review Shopify's current UI component
+3. Prototype Option 1 (Vue components) with Zendesk
+4. Document trade-offs and implementation details
+5. Make architectural decision for V2
+6. Update SDK types and documentation
 
 ---
 
@@ -290,7 +417,64 @@ Test each plugin individually:
 - Created progress tracking document
 - Ready to begin Phase 1
 
-### Session 2
+### Session 2 (2025-12-27)
+- **Completed comprehensive review** of Email and HubSpot migrations
+- Created `PLUGIN_SDK_V2_REVIEW.md` with detailed analysis
+- **Key Findings**:
+  - ✅ Both plugins architecturally sound and working
+  - ⚠️ Both missing SDK dependency in package.json (critical fix needed)
+  - ⚠️ Both using direct file imports instead of `@hay/plugin-sdk-v2`
+  - 📝 Email has old test files that need cleanup
+  - 📝 Both missing some optional hooks (`onEnable`, `onDisable`, `onConfigUpdate`)
+- **Updated Migration Plan**:
+  - Added comprehensive standard checklist with all hooks
+  - Added package dependency and cleanup steps
+  - Reorganized plugin order with Zendesk as #3 priority
+  - Added complexity ratings and pattern references for each plugin
+  - Added UI Component Architecture Decision section
+- **Architectural Patterns Documented** (5 patterns):
+  1. Config + Auth integration using `ctx.config.field()`
+  2. Local MCP server factory pattern
+  3. External MCP with dynamic auth headers
+  4. Graceful OAuth token handling
+  5. Config resolution with fallbacks
+- **Next Steps**:
+  - Zendesk migration will define V2 UI component architecture
+  - Need to decide: Plugin-provided Vue components vs. configuration-based UI
+  - Clean up Email and HubSpot (add dependencies, fix imports, add hooks)
+
+### Session 3 (2025-12-27)
+- **Completed Email and HubSpot cleanup**:
+  - ✅ Added SDK dependency to both package.json files
+  - ✅ Updated imports from direct file paths to `@hay/plugin-sdk-v2`
+  - ✅ Fixed SDK package.json exports (removed `.mjs` references, using `.js`)
+  - ✅ Built plugin-sdk-v2 successfully
+  - ✅ Deleted old test files from Email plugin (4 files removed)
+  - ✅ Added `onEnable` hook to Email plugin
+  - ✅ Added `onDisable`, `onConfigUpdate`, and `onEnable` hooks to HubSpot plugin
+  - ✅ Both plugins build successfully with no TypeScript errors
+- **Status**: Email and HubSpot plugins are now **COMPLETE** and ready for use
+- **Next Steps**:
+  - Zendesk migration (#3) - will define UI component architecture
+  - Continue with remaining 7 plugins
+
+### Session 4 (2025-12-28)
+- **Fixed Medium Priority Issues** from code review:
+  - ✅ **Removed legacy UI registration**: Deleted `register.ui(extension)` callable method, kept only `register.ui.page()`
+    - Updated [plugin-sdk-v2/types/register.ts](plugin-sdk-v2/types/register.ts) and [plugin-sdk-v2/sdk/register.ts](plugin-sdk-v2/sdk/register.ts)
+    - Cleaner API with single registration pattern
+  - ✅ **Replaced magic number**: Added `AUTO_TEST_DELAY_MS = 3000` constant in [dashboard/pages/integrations/plugins/[pluginId].vue](dashboard/pages/integrations/plugins/[pluginId].vue#L577)
+  - ✅ **Added validation**: `handleCancelEditEnvField()` and `handleResetToEnv()` in [PluginConfigForm.vue](dashboard/components/plugins/PluginConfigForm.vue) now validate fields exist and have correct metadata
+  - ✅ **Real API validation**: Zendesk `onValidateAuth()` now makes actual API call to `/api/v2/users/me.json` to verify credentials work
+  - ✅ **CSS load completion**: [usePluginRegistry.ts](dashboard/composables/usePluginRegistry.ts) now waits for CSS to load before loading scripts
+  - ✅ **Refactored auto-test logic**: Extracted `isAuthConfigured()` helper function, reduced complexity from 70+ lines to ~30 lines
+  - ✅ **Improved MCP feedback**: Zendesk now logs clear info message when credentials not configured, and `onConfigUpdate()` calls `ctx.requestRestart()` to apply changes
+- **Impact**: Better code quality, clearer error handling, more reliable plugin UI loading
+- **Next Steps**:
+  - Continue with remaining medium/low priority issues if needed
+  - Resume Zendesk migration for UI architecture decision
+
+### Session 5
 *Notes from next session...*
 
 ---
@@ -340,13 +524,27 @@ export default defineHayPlugin((globalCtx) => ({
 
 ## Estimated Time Remaining
 
-- Phase 1: 8-12 hours (plugin migrations)
-- Phase 2: 30 minutes (deletions)
-- Phase 3: 1 hour (renames)
-- Phase 4: 4-6 hours (server updates)
-- Phase 5: 30 minutes (package.json)
-- Phase 6: 1-2 hours (documentation)
+### Updated Estimates (Session 2)
 
-**Total**: ~15-22 hours
-**Completed**: 0 hours
-**Remaining**: ~15-22 hours
+- **Phase 1**: 10-16 hours (plugin migrations)
+  - Email cleanup: 30 min
+  - HubSpot cleanup: 30 min
+  - Zendesk (with UI architecture design): 4-6 hours ⚠️ Critical path
+  - Shopify (UI validation): 2-3 hours
+  - Stripe: 1-2 hours
+  - WooCommerce (new API Key pattern): 2-3 hours
+  - Magento: 1-2 hours
+  - Judo-in-Cloud: 1-2 hours
+  - Simple-HTTP-Test: 30 min
+
+- **Phase 2**: 30 minutes (deletions)
+- **Phase 3**: 1 hour (renames)
+- **Phase 4**: 4-6 hours (server updates)
+- **Phase 5**: 30 minutes (package.json updates)
+- **Phase 6**: 1-2 hours (documentation)
+
+**Total**: ~17-26 hours
+**Completed**: ~2 hours (Email + HubSpot core migrations)
+**Remaining**: ~15-24 hours
+
+**Critical Path**: Zendesk UI architecture decision - may add 2-4 hours if complex

@@ -85,13 +85,13 @@ export type { HttpMethod, RouteHandler } from './route';
 // UI Extensions (Phase 2.2) ✅
 // ============================================================================
 
-export type { UIExtensionDescriptor } from './ui';
+export type { UIExtensionDescriptor, PluginPage } from './ui';
 
 // ============================================================================
 // Register API (Phase 2.2) ✅
 // ============================================================================
 
-export type { HayRegisterAPI } from './register';
+export type { HayRegisterAPI, UIRegistrationAPI } from './register';
 
 // ============================================================================
 // Organization (Phase 2.2) ✅

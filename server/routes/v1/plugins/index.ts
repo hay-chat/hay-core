@@ -6,7 +6,6 @@ import {
   enablePlugin,
   disablePlugin,
   configurePlugin,
-  getPluginConfiguration,
   getPluginUITemplate,
   getMCPTools,
   refreshMCPTools,
@@ -26,13 +25,13 @@ export const pluginsRouter = t.router({
   enable: enablePlugin,
   disable: disablePlugin,
   configure: configurePlugin,
-  getConfiguration: getPluginConfiguration,
   getUITemplate: getPluginUITemplate,
   getMCPTools: getMCPTools,
   refreshMCPTools: refreshMCPTools,
   getMenuItems: getMenuItems,
   testConnection: testConnection,
   validateAuth: validateAuth,
+  // Note: Plugin UI assets are served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
   oauth: {
     initiate: initiateOAuth,
     isAvailable: isOAuthAvailable,

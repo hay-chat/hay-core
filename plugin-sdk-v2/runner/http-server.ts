@@ -168,6 +168,7 @@ export class PluginHttpServer {
         const configSchema = this.registry.getConfigSchema();
         const authMethods = this.registry.getAuthMethods();
         const uiExtensions = this.registry.getUIExtensions();
+        const uiPages = this.registry.getUIPages();
         const routes = this.registry.getRoutes();
 
         // Build metadata response
@@ -198,6 +199,7 @@ export class PluginHttpServer {
             }
           }),
           uiExtensions,
+          pages: uiPages, // SDK V2 UI pages registered via ctx.register.ui.page()
           routes: routes.map((route) => ({
             method: route.method,
             path: route.path,

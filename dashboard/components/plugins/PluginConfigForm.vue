@@ -7,7 +7,7 @@
           {{ field.label || key }}
           <Lock v-if="field.encrypted" class="inline-block h-3 w-3 ml-1 text-neutral-muted" />
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
+        <p v-if="field.description" class="text-xs text-neutral-muted !mt-0">
           {{ field.description }}
         </p>
 
@@ -34,7 +34,8 @@
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            This setting is configured locally. Click override to set an organization-specific value.
+            This setting is configured locally. Click override to set an organization-specific
+            value.
           </p>
         </div>
 
@@ -53,7 +54,7 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               :type="field.encrypted ? 'password' : 'text'"
-              :placeholder="'Enter ' + (field.label || key).toLowerCase()"
+              :placeholder="field.placeholder || undefined"
               :required="field.required"
               class="flex-1"
               autofocus
@@ -103,7 +104,7 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               type="password"
-              :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
+              :placeholder="field.placeholder || undefined"
               :required="field.required"
               class="flex-1"
               autofocus
@@ -119,7 +120,11 @@
           </div>
           <p class="text-xs text-neutral-muted">
             This value is encrypted and stored securely.
-            {{ configMetadata?.[key]?.hasEnvFallback ? ' Click Reset to revert to environment variable.' : ' Click edit to update it.' }}
+            {{
+              configMetadata?.[key]?.hasEnvFallback
+                ? " Click Reset to revert to environment variable."
+                : " Click edit to update it."
+            }}
           </p>
         </div>
 
@@ -138,7 +143,7 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               type="text"
-              :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+              :placeholder="field.placeholder || undefined"
               :required="field.required"
               class="flex-1"
             />
@@ -156,8 +161,7 @@
         <!-- Don't show if it's an env-sourced field (already handled above) -->
         <div
           v-else-if="
-            (field.encrypted || !field.encrypted) &&
-            configMetadata?.[key]?.source !== 'env'
+            (field.encrypted || !field.encrypted) && configMetadata?.[key]?.source !== 'env'
           "
         >
           <Input
@@ -165,7 +169,7 @@
             :model-value="formData[key]"
             @update:model-value="updateFormData(key, $event)"
             :type="field.encrypted ? 'password' : 'text'"
-            :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+            :placeholder="field.placeholder || undefined"
             :required="field.required"
           />
           <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
@@ -179,7 +183,7 @@
         <Label :for="key" :required="field.required">
           {{ field.label || key }}
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
+        <p v-if="field.description" class="text-sm mt-0 text-neutral-muted">
           {{ field.description }}
         </p>
         <select
@@ -225,7 +229,7 @@
           :id="key"
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event)"
-          :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+          :placeholder="field.placeholder || undefined"
           :rows="4"
           :required="field.required"
         />
@@ -244,7 +248,7 @@
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event === '' ? undefined : Number($event))"
           type="number"
-          :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+          :placeholder="field.placeholder || undefined"
           :required="field.required"
         />
       </template>
@@ -330,6 +334,18 @@ function handleEditEnvField(key: string) {
 }
 
 function handleCancelEditEnvField(key: string) {
+  // Validate that the field exists in configSchema
+  if (!props.configSchema[key]) {
+    console.error(`Cannot cancel edit for non-existent field: ${key}`);
+    return;
+  }
+
+  // Validate that it's actually an env field
+  if (props.configMetadata?.[key]?.source !== 'env') {
+    console.error(`Cannot cancel edit for non-env field: ${key}`);
+    return;
+  }
+
   const newSet = new Set(editingEnvFields.value);
   newSet.delete(key);
   editingEnvFields.value = newSet;
@@ -341,6 +357,18 @@ function handleCancelEditEnvField(key: string) {
 }
 
 function handleResetToEnv(key: string) {
+  // Validate that the field exists in configSchema
+  if (!props.configSchema[key]) {
+    console.error(`Cannot reset non-existent field: ${key}`);
+    return;
+  }
+
+  // Validate that the field has an env fallback
+  if (!props.configMetadata?.[key]?.hasEnvFallback) {
+    console.error(`Cannot reset field without env fallback: ${key}`);
+    return;
+  }
+
   // Emit event to parent to handle the reset and save
   emit("reset-to-env", key);
 }

@@ -9,12 +9,13 @@
 import type {
   HayRegisterAPI,
   RegisterAuthAPI,
+  UIRegistrationAPI,
   ConfigFieldDescriptor,
   ApiKeyAuthOptions,
   OAuth2AuthOptions,
   HttpMethod,
   RouteHandler,
-  UIExtensionDescriptor,
+  PluginPage,
 } from '../types/index.js';
 import { PluginRegistry } from './registry.js';
 import type { HayLogger } from '../types/index.js';
@@ -90,6 +91,19 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
     },
   };
 
+  // Create UI registration API
+  const uiRegistrationAPI: UIRegistrationAPI = {
+    page(page: PluginPage): void {
+      // Validate page
+      validatePluginPage(page);
+
+      // Register the UI page
+      registry.registerUIPage(page);
+
+      logger.debug('Registered UI page', { id: page.id, slot: page.slot });
+    },
+  };
+
   // Create main register API
   const registerAPI: HayRegisterAPI = {
     route(method: HttpMethod, path: string, handler: RouteHandler): void {
@@ -115,15 +129,7 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       logger.debug('Registered config schema', { fields: fieldCount });
     },
 
-    ui(extension: UIExtensionDescriptor): void {
-      // Validate extension
-      validateUIExtension(extension);
-
-      // Register the UI extension
-      registry.registerUIExtension(extension);
-
-      logger.debug('Registered UI extension', { slot: extension.slot });
-    },
+    ui: uiRegistrationAPI,
 
     auth,
   };
@@ -413,25 +419,50 @@ function validateOAuth2AuthOptions(
 }
 
 /**
- * Validate UI extension.
+ * Validate plugin page.
  *
- * @param extension - UI extension to validate
- * @throws {Error} If extension is invalid
+ * @param page - Plugin page to validate
+ * @throws {Error} If page is invalid
  *
  * @internal
  */
-function validateUIExtension(extension: UIExtensionDescriptor): void {
-  if (!extension || typeof extension !== 'object') {
-    throw new Error('UI extension must be an object');
+function validatePluginPage(page: PluginPage): void {
+  if (!page || typeof page !== 'object') {
+    throw new Error('Plugin page must be an object');
   }
 
-  // Validate slot
-  if (!extension.slot || typeof extension.slot !== 'string') {
-    throw new Error('UI extension slot must be a non-empty string');
+  // Validate id
+  if (!page.id || typeof page.id !== 'string') {
+    throw new Error('Plugin page id must be a non-empty string');
+  }
+
+  // Validate title
+  if (!page.title || typeof page.title !== 'string') {
+    throw new Error('Plugin page title must be a non-empty string');
   }
 
   // Validate component
-  if (!extension.component || typeof extension.component !== 'string') {
-    throw new Error('UI extension component must be a non-empty string');
+  if (!page.component || typeof page.component !== 'string') {
+    throw new Error('Plugin page component must be a non-empty string');
+  }
+
+  // Validate slot (if provided)
+  if (page.slot !== undefined) {
+    const validSlots = ['standalone', 'after-settings', 'before-settings'];
+    if (!validSlots.includes(page.slot)) {
+      throw new Error(
+        `Plugin page slot must be one of: ${validSlots.join(', ')}. Got: ${page.slot}`,
+      );
+    }
+  }
+
+  // Validate icon (if provided)
+  if (page.icon !== undefined && typeof page.icon !== 'string') {
+    throw new Error('Plugin page icon must be a string');
+  }
+
+  // Validate requiresSetup (if provided)
+  if (page.requiresSetup !== undefined && typeof page.requiresSetup !== 'boolean') {
+    throw new Error('Plugin page requiresSetup must be a boolean');
   }
 }

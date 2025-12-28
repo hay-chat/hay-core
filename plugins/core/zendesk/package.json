@@ -1,26 +1,33 @@
 {
   "name": "@hay/plugin-zendesk",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
   "author": "Hay",
+  "type": "module",
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
     "displayName": "Zendesk",
     "category": "integration",
     "capabilities": ["mcp"],
-    "env": ["ZENDESK_CLIENT_ID", "ZENDESK_CLIENT_SECRET"]
+    "env": ["ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN"]
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:ui && npm run build:mcp",
+    "build:mcp": "tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "npm run build:ui && npm run build:mcp",
+    "dev:ui": "vite build --watch --config vite.config.ui.ts"
   },
   "dependencies": {
-    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+    "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
   },
   "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.0",
     "typescript": "^5.3.3",
-    "@types/node": "^20.10.0"
+    "vite": "^5.0.0",
+    "vue": "^3.4.0"
   }
 }

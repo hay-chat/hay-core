@@ -14,7 +14,8 @@ import type {
   HttpMethod,
   RouteHandler,
   UIExtensionDescriptor,
-} from '../types/index.js';
+  PluginPage,
+} from "../types/index.js";
 
 /**
  * Registered route definition.
@@ -74,6 +75,12 @@ export class PluginRegistry {
   private uiExtensions: UIExtensionDescriptor[] = [];
 
   /**
+   * Registered UI pages (SDK V2 enhanced system).
+   * Array of plugin page descriptors.
+   */
+  private uiPages: PluginPage[] = [];
+
+  /**
    * Register config schema.
    *
    * @param schema - Config field descriptors
@@ -95,9 +102,7 @@ export class PluginRegistry {
     // Check for duplicate auth method IDs
     const existing = this.authMethods.find((m) => m.id === method.id);
     if (existing) {
-      throw new Error(
-        `Auth method with id "${method.id}" is already registered`,
-      );
+      throw new Error(`Auth method with id "${method.id}" is already registered`);
     }
 
     this.authMethods.push(method);
@@ -110,25 +115,36 @@ export class PluginRegistry {
    */
   registerRoute(route: RegisteredRoute): void {
     // Check for duplicate routes (same method + path)
-    const existing = this.routes.find(
-      (r) => r.method === route.method && r.path === route.path,
-    );
+    const existing = this.routes.find((r) => r.method === route.method && r.path === route.path);
     if (existing) {
-      throw new Error(
-        `Route ${route.method} ${route.path} is already registered`,
-      );
+      throw new Error(`Route ${route.method} ${route.path} is already registered`);
     }
 
     this.routes.push(route);
   }
 
   /**
-   * Register a UI extension.
+   * Register a UI extension (legacy).
    *
    * @param extension - UI extension descriptor
    */
   registerUIExtension(extension: UIExtensionDescriptor): void {
     this.uiExtensions.push(extension);
+  }
+
+  /**
+   * Register a UI page (SDK V2 enhanced system).
+   *
+   * @param page - Plugin page descriptor
+   */
+  registerUIPage(page: PluginPage): void {
+    // Check for duplicate page IDs
+    const existing = this.uiPages.find((p) => p.id === page.id);
+    if (existing) {
+      throw new Error(`UI page with id "${page.id}" is already registered`);
+    }
+
+    this.uiPages.push(page);
   }
 
   /**
@@ -159,12 +175,21 @@ export class PluginRegistry {
   }
 
   /**
-   * Get registered UI extensions.
+   * Get registered UI extensions (legacy).
    *
    * @returns Array of UI extension descriptors
    */
   getUIExtensions(): UIExtensionDescriptor[] {
     return [...this.uiExtensions];
+  }
+
+  /**
+   * Get registered UI pages (SDK V2 enhanced system).
+   *
+   * @returns Array of plugin page descriptors
+   */
+  getUIPages(): PluginPage[] {
+    return [...this.uiPages];
   }
 
   /**
