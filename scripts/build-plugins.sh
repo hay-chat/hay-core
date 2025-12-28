@@ -53,4 +53,8 @@ for plugin_dir in plugins/*/; do
   echo "✅ Built $plugin_name"
 done
 
+echo ""
 echo "✅ All plugins built successfully"
+echo ""
+echo "ℹ️  Plugin UI assets are served directly from plugins/ directory"
+echo "ℹ️  No copying needed - changes are reflected immediately after rebuild"

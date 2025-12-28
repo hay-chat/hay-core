@@ -166,6 +166,28 @@ async function startServer() {
     });
   });
 
+  // Plugin UI assets route - serve dist/ files (ui.js, etc.)
+  // Pattern: /plugins/ui/:pluginName/:assetPath
+  // Example: /plugins/ui/@hay/plugin-zendesk/ui.js
+  // Note: Public endpoint - UI bundles are just JavaScript code with no secrets
+  server.get(/^\/plugins\/ui\/([^/]+(?:\/[^/]+)?)\/(.+)$/, async (req, res) => {
+    // Set params manually for regex routes
+    // params[0] = pluginName (may contain slash for scoped packages like @hay/plugin-zendesk)
+    // params[1] = assetPath (e.g., ui.js or images/screenshot.png)
+    req.params = {
+      pluginName: decodeURIComponent(req.params[0]),
+      assetPath: req.params[1],
+    };
+
+    try {
+      // Serve the file (no authentication required for UI bundles)
+      await pluginAssetService.serveUIAsset(req, res);
+    } catch (error) {
+      console.error("UI asset serving error:", error);
+      res.status(500).json({ error: "Failed to load UI asset" });
+    }
+  });
+
   // Plugin webhook routes - handle incoming webhooks from external services
   server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
     // Set params manually for regex routes

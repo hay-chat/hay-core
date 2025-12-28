@@ -6,10 +6,39 @@
  * @module @hay/plugin-sdk-v2/types/register
  */
 
-import type { ConfigFieldDescriptor } from './config';
-import type { RegisterAuthAPI } from './auth';
-import type { HttpMethod, RouteHandler } from './route';
-import type { UIExtensionDescriptor } from './ui';
+import type { ConfigFieldDescriptor } from "./config";
+import type { RegisterAuthAPI } from "./auth";
+import type { HttpMethod, RouteHandler } from "./route";
+import type { PluginPage } from "./ui";
+
+/**
+ * UI registration API.
+ *
+ * Provides methods for registering plugin UI components.
+ */
+export interface UIRegistrationAPI {
+  /**
+   * Register a plugin page with metadata.
+   *
+   * Plugin pages are Vue components built into bundles and loaded dynamically
+   * by the dashboard. They can be rendered in specific slots (before/after settings)
+   * or as standalone pages (future enhancement).
+   *
+   * @param page - Plugin page descriptor
+   *
+   * @example
+   * ```typescript
+   * register.ui.page({
+   *   id: 'setup-guide',
+   *   title: 'Setup Guide',
+   *   component: './components/settings/AfterSettings.vue',
+   *   slot: 'after-settings',
+   *   icon: 'book',
+   * });
+   * ```
+   */
+  page(page: PluginPage): void;
+}
 
 /**
  * Register API for global context.
@@ -55,10 +84,18 @@ import type { UIExtensionDescriptor } from './ui';
  *     res.status(200).json({ ok: true });
  *   });
  *
- *   // Register UI extension
+ *   // Register UI extension (legacy)
  *   register.ui({
  *     slot: 'after-settings',
  *     component: 'components/Settings.vue',
+ *   });
+ *
+ *   // Register UI page (new)
+ *   register.ui.page({
+ *     id: 'setup-guide',
+ *     title: 'Setup Guide',
+ *     component: './components/settings/AfterSettings.vue',
+ *     slot: 'after-settings',
  *   });
  * }
  * ```
@@ -132,21 +169,21 @@ export interface HayRegisterAPI {
   config(schema: Record<string, ConfigFieldDescriptor>): void;
 
   /**
-   * Register a UI extension.
+   * UI registration API.
    *
-   * UI extensions allow plugins to add custom Vue components to the dashboard.
-   *
-   * @param extension - UI extension descriptor
+   * Used to register plugin UI components and pages.
    *
    * @example
    * ```typescript
-   * register.ui({
+   * register.ui.page({
+   *   id: 'setup-guide',
+   *   title: 'Setup Guide',
+   *   component: './components/settings/AfterSettings.vue',
    *   slot: 'after-settings',
-   *   component: 'components/AdvancedSettings.vue',
    * });
    * ```
    */
-  ui(extension: UIExtensionDescriptor): void;
+  ui: UIRegistrationAPI;
 
   /**
    * Auth registration API.

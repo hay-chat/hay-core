@@ -18,6 +18,9 @@ import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
 import { fetchToolsFromWorker, fetchAndStoreTools } from "@server/services/plugin-tools.service";
+import { readFile } from "fs/promises";
+import { join, resolve } from "path";
+import { existsSync } from "fs";
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -96,7 +99,7 @@ export const getPlugin = authenticatedProcedure
       pluginId: z.string(),
     }),
   )
-  .query(async ({ input }) => {
+  .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
     if (!plugin) {
@@ -116,17 +119,168 @@ export const getPlugin = authenticatedProcedure
 
     const manifest = plugin.manifest as HayPluginManifest;
 
+    // Get plugin instance for this organization
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
+
+    // For SDK v2 plugins, use cached metadata first, then try worker if needed
+    let configSchema = manifest.configSchema;
+
+    // Return cached metadata for SDK v2 plugins even when not enabled
+    if (plugin.metadata?.configSchema) {
+      configSchema = plugin.metadata.configSchema;
+    }
+
+    // For enabled plugins, try fetching fresh metadata from worker
+    if (instance && instance.enabled) {
+      try {
+        const runnerV2 = getPluginRunnerV2Service();
+        const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
+        if (worker && worker.port) {
+          const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            if (metadata.configSchema) {
+              configSchema = metadata.configSchema;
+            }
+            // Update database metadata
+            await pluginRegistryRepository.updateMetadata(input.pluginId, {
+              ...metadata,
+              updatedAt: new Date(),
+            });
+
+            // Update in-memory registry
+            const updatedPlugin = pluginManagerService.getPlugin(input.pluginId);
+            if (updatedPlugin) {
+              updatedPlugin.metadata = metadata;
+            }
+          }
+        } else {
+          // Worker not running, try to start it
+          const newWorker = await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
+          if (newWorker && newWorker.port) {
+            const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
+            if (metadataResponse2.ok) {
+              const metadata2 = await metadataResponse2.json();
+              if (metadata2.configSchema) {
+                configSchema = metadata2.configSchema;
+              }
+              // Update database metadata
+              await pluginRegistryRepository.updateMetadata(input.pluginId, {
+                ...metadata2,
+                updatedAt: new Date(),
+              });
+
+              // Update in-memory registry
+              const updatedPlugin2 = pluginManagerService.getPlugin(input.pluginId);
+              if (updatedPlugin2) {
+                updatedPlugin2.metadata = metadata2;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `[getPlugin] Failed to fetch metadata from SDK v2 worker for ${input.pluginId}:`,
+          error,
+        );
+      }
+    }
+
+    // Build configuration data
+    let configuration: Record<string, any> = {};
+    let configMetadata: Record<string, any> = {};
+    let oauthAvailable = false;
+    let oauthConfigured = false;
+    let oauthConnected = false;
+
+    if (!instance) {
+      // Return default configuration from manifest or worker metadata
+      if (configSchema) {
+        Object.entries(configSchema).forEach(([key, field]) => {
+          if (field.default !== undefined) {
+            configuration[key] = field.default;
+          }
+        });
+      }
+    } else {
+      // Use config resolver to get values with .env fallback and metadata
+      const resolved = configSchema
+        ? resolveConfigWithEnv(instance.config, configSchema as Record<string, ConfigFieldDescriptor>, {
+            decrypt: true,
+            maskSecrets: true,
+          })
+        : { values: {}, metadata: {} };
+
+      configuration = { ...resolved.values };
+      configMetadata = resolved.metadata;
+
+      // Add auth credentials (encrypted fields) and mask them
+      if (instance.authState?.credentials) {
+        for (const [key, value] of Object.entries(instance.authState.credentials)) {
+          if (value !== null && value !== undefined) {
+            configuration[key] = "*".repeat(8);
+          }
+        }
+      }
+
+      // Check OAuth status
+      if (plugin.metadata?.authMethods) {
+        const oauth2Method = plugin.metadata.authMethods.find(
+          (method: AuthMethodDescriptor) => method.type === "oauth2",
+        );
+        if (oauth2Method) {
+          oauthAvailable = true;
+
+          const clientIdFieldName = oauth2Method.clientId;
+          const clientSecretFieldName = oauth2Method.clientSecret;
+
+          if (clientIdFieldName && clientSecretFieldName) {
+            const hasClientId = !!(
+              resolved.metadata[clientIdFieldName]?.value ||
+              instance.authState?.credentials?.[clientIdFieldName]
+            );
+            const hasClientSecret = !!(
+              resolved.metadata[clientSecretFieldName]?.value ||
+              instance.authState?.credentials?.[clientSecretFieldName]
+            );
+
+            oauthConfigured = hasClientId && hasClientSecret;
+          }
+
+          const configWithOAuth = instance.config ? (decryptConfig(instance.config) as PluginConfigWithOAuth) : {};
+          if (configWithOAuth._oauth?.tokens?.access_token) {
+            oauthConnected = true;
+          }
+        }
+      }
+    }
+
     return {
-      id: plugin.pluginId, // Use pluginId as the identifier
-      dbId: plugin.id, // Keep database ID for reference
+      // Plugin metadata
+      id: plugin.pluginId,
+      dbId: plugin.id,
       name: plugin.name,
       version: plugin.version,
       type: manifest.type,
-      manifest, // Keep manifest for legacy compatibility
-      metadata: plugin.metadata, // Expose metadata directly for SDK v2
+      pluginPath: plugin.pluginPath,
+      manifest,
+      metadata: plugin.metadata,
       installed: plugin.installed,
       built: plugin.built,
       status: plugin.status || PluginStatus.AVAILABLE,
+
+      // Configuration data (from getPluginConfiguration)
+      configuration,
+      configMetadata,
+      enabled: instance ? instance.enabled : false,
+      instanceId: instance ? instance.id : null,
+      oauthAvailable,
+      oauthConfigured,
+      oauthConnected,
+      auth: instance ? instance.authState : undefined,
     };
   });
 
@@ -484,201 +638,6 @@ export const configurePlugin = authenticatedProcedure
   });
 
 /**
- * Get plugin configuration
- */
-export const getPluginConfiguration = authenticatedProcedure
-  .input(
-    z.object({
-      pluginId: z.string(),
-    }),
-  )
-  .query(async ({ ctx, input }) => {
-    const plugin = pluginManagerService.getPlugin(input.pluginId);
-    if (!plugin) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Plugin ${input.pluginId} not found`,
-      });
-    }
-
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      ctx.organizationId!,
-      input.pluginId,
-    );
-
-    const manifest = plugin.manifest as HayPluginManifest;
-
-    // For SDK v2 plugins, use cached metadata first, then try worker if needed
-    let configSchema = manifest.configSchema;
-
-    // Return cached metadata for SDK v2 plugins even when not enabled
-    // SDK v2 plugins have metadata populated
-    if (plugin.metadata?.configSchema) {
-      configSchema = plugin.metadata.configSchema;
-      console.log(
-        `[getPluginConfiguration] Using cached metadata for SDK v2 plugin: ${input.pluginId}`,
-      );
-    }
-
-    // For enabled plugins, try fetching fresh metadata from worker
-    // This is important for getting proper env field mappings for OAuth detection
-    if (instance && instance.enabled) {
-      try {
-        const runnerV2 = getPluginRunnerV2Service();
-        const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
-        if (worker && worker.port) {
-          const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
-          if (metadataResponse.ok) {
-            const metadata = await metadataResponse.json();
-            if (metadata.configSchema) {
-              configSchema = metadata.configSchema;
-              console.log(
-                `[getPluginConfiguration] Fetched fresh config schema from SDK v2 worker for ${input.pluginId}`,
-              );
-            }
-            // Update database metadata if it's different (especially authMethods for OAuth URLs)
-            if (metadata.authMethods) {
-              await pluginRegistryRepository.updateMetadata(input.pluginId, {
-                ...metadata,
-                updatedAt: new Date(),
-              });
-              console.log(
-                `[getPluginConfiguration] Updated database metadata for ${input.pluginId}`,
-              );
-            }
-          }
-        } else {
-          // Worker not running, try to start it to get fresh metadata with env mappings
-          console.log(`[getPluginConfiguration] Worker not found, attempting to start for ${input.pluginId}`);
-          const newWorker = await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
-          if (newWorker && newWorker.port) {
-            const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
-            if (metadataResponse2.ok) {
-              const metadata2 = await metadataResponse2.json();
-              if (metadata2.configSchema) {
-                configSchema = metadata2.configSchema;
-                console.log(
-                  `[getPluginConfiguration] Fetched fresh config schema from newly started SDK v2 worker for ${input.pluginId}`,
-                );
-              }
-              // Update database metadata
-              if (metadata2.authMethods) {
-                await pluginRegistryRepository.updateMetadata(input.pluginId, {
-                  ...metadata2,
-                  updatedAt: new Date(),
-                });
-                console.log(
-                  `[getPluginConfiguration] Updated database metadata for ${input.pluginId}`,
-                );
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(
-          `[getPluginConfiguration] Failed to fetch metadata from SDK v2 worker for ${input.pluginId}:`,
-          error,
-        );
-        // Fall back to manifest or cached metadata
-      }
-    }
-
-    if (!instance) {
-      // Return default configuration from manifest or worker metadata
-      const defaultConfig: Record<string, any> = {};
-
-      if (configSchema) {
-        Object.entries(configSchema).forEach(([key, field]) => {
-          if (field.default !== undefined) {
-            defaultConfig[key] = field.default;
-          }
-        });
-      }
-
-      return {
-        configuration: defaultConfig,
-        enabled: false,
-        instanceId: null,
-      };
-    }
-
-    // Merge config and authState.credentials for complete configuration
-    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
-    const configWithOAuth = decryptedConfig as PluginConfigWithOAuth;
-
-    // Use config resolver to get values with .env fallback and metadata
-    const resolved = configSchema
-      ? resolveConfigWithEnv(instance.config, configSchema as Record<string, ConfigFieldDescriptor>, {
-          decrypt: true,
-          maskSecrets: true,
-        })
-      : { values: {}, metadata: {} };
-
-    const maskedConfig: Record<string, any> = { ...resolved.values };
-
-    // Add auth credentials (encrypted fields) and mask them
-    if (instance.authState?.credentials) {
-      for (const [key, value] of Object.entries(instance.authState.credentials)) {
-        if (value !== null && value !== undefined) {
-          // All fields in authState.credentials are encrypted/sensitive, so mask them
-          maskedConfig[key] = "*".repeat(8);
-        }
-      }
-    }
-
-    // Check if plugin has OAuth2 auth method registered in metadata
-    let oauthAvailable = false;
-    let oauthConfigured = false;
-    let oauthConnected = false;
-
-    // For SDK v2 plugins, check metadata.authMethods
-    if (plugin.metadata?.authMethods) {
-      const oauth2Method = plugin.metadata.authMethods.find(
-        (method: AuthMethodDescriptor) => method.type === "oauth2",
-      );
-      if (oauth2Method) {
-        oauthAvailable = true;
-
-        // Use the exact field names from OAuth registration
-        const clientIdFieldName = oauth2Method.clientId; // e.g., "clientId"
-        const clientSecretFieldName = oauth2Method.clientSecret; // e.g., "clientSecret"
-
-        // Check if BOTH fields are filled (check resolved config with env fallback, and authState)
-        // Note: When maskSecrets=true, env values are in metadata.value, not values
-        if (clientIdFieldName && clientSecretFieldName) {
-          const hasClientId = !!(
-            resolved.metadata[clientIdFieldName]?.value ||
-            instance.authState?.credentials?.[clientIdFieldName]
-          );
-          const hasClientSecret = !!(
-            resolved.metadata[clientSecretFieldName]?.value ||
-            instance.authState?.credentials?.[clientSecretFieldName]
-          );
-
-          oauthConfigured = hasClientId && hasClientSecret;
-        }
-
-        // Check if OAuth is connected (user has completed OAuth flow)
-        // OAuth tokens are stored in config._oauth.tokens
-        if (configWithOAuth._oauth?.tokens?.access_token) {
-          oauthConnected = true;
-        }
-      }
-    }
-
-    return {
-      configuration: maskedConfig,
-      configMetadata: resolved.metadata, // Include metadata about field sources
-      enabled: instance.enabled,
-      instanceId: instance.id,
-      oauthAvailable, // Plugin has OAuth2 registered
-      oauthConfigured, // OAuth credentials are configured
-      oauthConnected, // OAuth flow completed and access token exists
-      auth: instance.authState || undefined, // Expose auth state for healthcheck detection
-    };
-  });
-
-/**
  * Get UI template for plugin configuration
  */
 export const getPluginUITemplate = authenticatedProcedure
@@ -982,22 +941,48 @@ export const testConnection = authenticatedProcedure
       input.pluginId,
     );
 
+    // Check if plugin requires authentication and if auth is configured
+    // Use in-memory plugin metadata (more up-to-date than database)
+    const authMethods = plugin.metadata?.authMethods;
+
     console.log(`[testConnection] Plugin instance status:`, {
       exists: !!instance,
       enabled: instance?.enabled,
       hasConfig: !!instance?.config,
       hasAuthState: !!instance?.authState,
       configKeys: instance?.config ? Object.keys(instance.config) : [],
+      authMethods: authMethods?.map((m: any) => ({ type: m.type, id: m.id })) || [],
     });
 
-    if (!instance || !instance.config) {
-      console.log(`[testConnection] ❌ Plugin has no instance or config`);
+    if (!instance) {
+      console.log(`[testConnection] ❌ Plugin has no instance`);
       return {
         success: false,
         status: "unconfigured",
-        message: "Plugin configuration is missing",
+        message: "Plugin is not configured for this organization",
         testedAt: new Date(),
       };
+    }
+
+    // Check if plugin requires authentication
+    if (authMethods && authMethods.length > 0) {
+      // Plugin requires authentication - check if credentials are provided
+      const configKeys = Object.keys(instance.config || {});
+      const hasCredentials = configKeys.length > 0 && configKeys.some(key => {
+        const value = instance.config![key];
+        return value !== null && value !== undefined && value !== '';
+      });
+
+      if (!hasCredentials) {
+        console.log(`[testConnection] ❌ Plugin requires authentication but no credentials configured`);
+        return {
+          success: false,
+          status: "unconfigured",
+          message: "Plugin requires authentication. Please configure your credentials.",
+          testedAt: new Date(),
+        };
+      }
+      console.log(`[testConnection] ✅ Plugin has required credentials configured`);
     }
 
     try {
@@ -1381,3 +1366,6 @@ export const validateAuth = authenticatedProcedure
       throw error;
     }
   });
+
+// Note: Plugin UI assets are now served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
+// See server/main.ts for the Express route handler and server/services/plugin-asset.service.ts for implementation

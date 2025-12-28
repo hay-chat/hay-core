@@ -101,6 +101,7 @@ export interface ConfigFieldDescriptor {
   type: "string" | "number" | "boolean" | "json";
   label: string;
   description?: string;
+  placeholder?: string; // Placeholder text for input field in UI
   required?: boolean;
   encrypted?: boolean;
   default?: any;

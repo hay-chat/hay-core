@@ -72,6 +72,25 @@ export interface ConfigFieldDescriptor<T = any> {
   description?: string;
 
   /**
+   * Placeholder text for input field in UI.
+   *
+   * @remarks
+   * Optional hint text shown in the input field when it's empty.
+   * If not provided, the input will have no placeholder.
+   *
+   * @example
+   * ```typescript
+   * subdomain: {
+   *   type: 'string',
+   *   label: 'Zendesk Subdomain',
+   *   placeholder: 'example (from example.zendesk.com)',
+   *   required: true,
+   * }
+   * ```
+   */
+  placeholder?: string;
+
+  /**
    * Whether this field is required.
    *
    * @remarks

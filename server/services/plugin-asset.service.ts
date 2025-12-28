@@ -254,6 +254,107 @@ export class PluginAssetService {
   }
 
   /**
+   * Serve UI asset files (from dist/ directory) with authentication
+   * Only allows whitelisted file types for security
+   */
+  async serveUIAsset(req: Request, res: Response): Promise<void> {
+    const { pluginName, assetPath } = req.params;
+    const cacheKey = `${pluginName}/ui/${assetPath}`;
+
+    // Security: Whitelist allowed file types
+    const allowedExtensions = ['.js', '.mjs', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+    const ext = path.extname(assetPath).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      res.status(403).json({ error: "File type not allowed" });
+      return;
+    }
+
+    // Check cache first
+    if (this.assetCache.has(cacheKey)) {
+      const cached = this.assetCache.get(cacheKey)!;
+
+      // Check if-none-match header for etag
+      if (req.headers["if-none-match"] === cached.etag) {
+        res.status(304).end();
+        return;
+      }
+
+      res.setHeader("Content-Type", cached.contentType);
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Last-Modified", cached.lastModified.toUTCString());
+      res.send(cached.content);
+      return;
+    }
+
+    // Find the plugin
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
+
+    if (!plugin) {
+      res.status(404).json({ error: "Plugin not found" });
+      return;
+    }
+
+    // Sanitize the file path to prevent directory traversal
+    const sanitizedPath = assetPath.replace(/\.\./g, "");
+
+    // Build path to plugin dist directory
+    const pluginDir = path.join(
+      process.cwd(),
+      "..",
+      "plugins",
+      plugin.pluginPath,
+    );
+    const distDir = path.join(pluginDir, "dist");
+    const fullPath = path.join(distDir, sanitizedPath);
+
+    // Ensure the path is within the dist directory
+    if (!fullPath.startsWith(distDir)) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+
+    try {
+      const content = await fs.readFile(fullPath);
+      const contentType = this.getContentTypeFromPath(fullPath);
+      const etag = this.generateETag(content);
+      const lastModified = new Date();
+
+      // Cache the file
+      this.assetCache.set(cacheKey, {
+        content,
+        contentType,
+        etag,
+        lastModified,
+      });
+
+      // Set cache timeout
+      setTimeout(() => {
+        this.assetCache.delete(cacheKey);
+      }, this.cacheTimeout);
+
+      // Check if-none-match header for etag
+      if (req.headers["if-none-match"] === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Last-Modified", lastModified.toUTCString());
+      res.send(content);
+    } catch (error: any) {
+      if (error.code === "ENOENT") {
+        res.status(404).json({ error: "File not found" });
+      } else {
+        console.error(`Failed to serve UI asset ${assetPath} for plugin ${pluginName}:`, error);
+        res.status(500).json({ error: "Failed to load file" });
+      }
+    }
+  }
+
+  /**
    * Get content type from file path
    */
   private getContentTypeFromPath(filePath: string): string {

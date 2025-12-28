@@ -39,6 +39,7 @@ export default defineNuxtConfig({
     typeCheck: process.env["NODE_ENV"] !== "production", // Disable type check in production builds
     tsConfig: {
       compilerOptions: {
+        module: "esnext",
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
         types: ["vite/client"],
