@@ -145,6 +145,27 @@ export class ConversationService {
   }
 
   async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {
+    // Get the conversation first to access message IDs for embedding cleanup
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== organizationId) {
+      return false;
+    }
+
+    // Delete embeddings linked to this conversation and its messages (GDPR compliance)
+    // Embeddings are linked via metadata fields, not foreign keys, so they won't be
+    // automatically deleted by database CASCADE
+    const { vectorStoreService } = await import("./vector-store.service");
+    if (vectorStoreService.initialized) {
+      // Delete embeddings by conversation ID
+      await vectorStoreService.deleteByConversationIds(organizationId, [conversationId]);
+
+      // Delete embeddings by message IDs
+      const messageIds = conversation.messages?.map((m) => m.id) || [];
+      if (messageIds.length > 0) {
+        await vectorStoreService.deleteByMessageIds(organizationId, messageIds);
+      }
+    }
+
     return await this.conversationRepository.delete(conversationId, organizationId);
   }
 
