@@ -153,16 +153,26 @@ export class ConversationService {
 
     // Delete embeddings linked to this conversation and its messages (GDPR compliance)
     // Embeddings are linked via metadata fields, not foreign keys, so they won't be
-    // automatically deleted by database CASCADE
+    // automatically deleted by database CASCADE.
+    // If embedding deletion fails, we abort the conversation deletion to ensure no
+    // personal data remains orphaned in vector storage.
     const { vectorStoreService } = await import("./vector-store.service");
     if (vectorStoreService.initialized) {
-      // Delete embeddings by conversation ID
-      await vectorStoreService.deleteByConversationIds(organizationId, [conversationId]);
+      try {
+        // Delete embeddings by conversation ID
+        await vectorStoreService.deleteByConversationIds(organizationId, [conversationId]);
 
-      // Delete embeddings by message IDs
-      const messageIds = conversation.messages?.map((m) => m.id) || [];
-      if (messageIds.length > 0) {
-        await vectorStoreService.deleteByMessageIds(organizationId, messageIds);
+        // Delete embeddings by message IDs
+        const messageIds = conversation.messages?.map((m) => m.id) || [];
+        if (messageIds.length > 0) {
+          await vectorStoreService.deleteByMessageIds(organizationId, messageIds);
+        }
+      } catch (error) {
+        console.error(
+          `[ConversationService] Failed to delete embeddings for conversation ${conversationId}:`,
+          error,
+        );
+        throw error; // Re-throw to abort conversation deletion for GDPR compliance
       }
     }
 
