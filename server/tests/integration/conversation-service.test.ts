@@ -235,9 +235,18 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
         await vectorStoreService.addChunks(testOrgId, null, [
           {
             content: `Embedding for message: ${msg.content}`,
-            metadata: { messageId: msg.id, conversationId: conversation.id },
+            metadata: { messageId: msg.id },
           },
         ]);
+      }
+      
+      // Add embeddings linked only to the conversation (not messages)
+      await vectorStoreService.addChunks(testOrgId, null, [
+        {
+          content: "Conversation-level embedding",
+          metadata: { conversationId: conversation.id },
+        },
+      ]);
       }
 
       // Verify all embeddings exist
