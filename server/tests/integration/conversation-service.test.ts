@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { vectorStoreService } from "../../services/vector-store.service";
 import { ConversationService } from "../../services/conversation.service";
