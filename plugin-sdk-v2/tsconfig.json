@@ -47,8 +47,7 @@
   "include": [
     "sdk/**/*",
     "runner/**/*",
-    "types/**/*",
-    "examples/**/*"
+    "types/**/*"
   ],
   "exclude": [
     "node_modules",

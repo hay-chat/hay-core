@@ -250,7 +250,7 @@ export class PluginHttpServer {
           return;
         }
 
-        const { authState } = req.body;
+        const { config, authState } = req.body;
 
         if (!authState || !authState.methodId || !authState.credentials) {
           res.status(400).json({
@@ -260,9 +260,17 @@ export class PluginHttpServer {
           return;
         }
 
+        // Merge config (non-auth fields) with auth credentials for validation
+        // This allows onValidateAuth to access ALL fields via ctx.config.get()
+        const mergedConfig = {
+          ...this.orgConfig,  // Existing org config
+          ...(config || {}),  // New non-auth config fields being validated
+          ...authState.credentials  // New auth credentials being validated
+        };
+
         // Create runtime APIs for validation context
         const configAPI = createConfigRuntimeAPI({
-          orgConfig: this.orgConfig,
+          orgConfig: mergedConfig,
           registry: this.registry,
           manifest: { env: this.manifest.env },
           logger: this.logger,

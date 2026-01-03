@@ -17,6 +17,10 @@
     "./runner": {
       "types": "./dist/runner/index.d.ts",
       "import": "./dist/runner/index.js"
+    },
+    "./sdk/stdio-mcp-client": {
+      "types": "./dist/sdk/stdio-mcp-client.d.ts",
+      "import": "./dist/sdk/stdio-mcp-client.js"
     }
   },
   "bin": {

@@ -35,6 +35,12 @@ export { defineHayPlugin, PluginDefinitionError } from './factory.js';
 export { Logger, createLogger, type LoggerContext } from './logger.js';
 
 // ============================================================================
+// Stdio MCP Client
+// ============================================================================
+
+export { StdioMcpClient, type StdioMcpClientOptions, type McpTool } from './stdio-mcp-client.js';
+
+// ============================================================================
 // Re-export types for convenience
 // ============================================================================
 

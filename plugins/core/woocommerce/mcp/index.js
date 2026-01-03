@@ -13,28 +13,21 @@ const DEFAULT_USERNAME = process.env.WORDPRESS_USERNAME || "";
 const DEFAULT_PASSWORD = process.env.WORDPRESS_PASSWORD || "";
 const DEFAULT_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY || "";
 const DEFAULT_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET || "";
-async function handleWooCommerceRequest(method, params) {
-    try {
-        const siteUrl = params.siteUrl || DEFAULT_SITE_URL;
-        const username = params.username || DEFAULT_USERNAME;
-        const password = params.password || DEFAULT_PASSWORD;
-        const consumerKey = params.consumerKey || DEFAULT_CONSUMER_KEY;
-        const consumerSecret = params.consumerSecret || DEFAULT_CONSUMER_SECRET;
-        if (!siteUrl) {
-            throw new Error("WordPress site URL not provided in environment variables or request parameters");
-        }
-        // For standard WordPress API endpoints
-        const wpMethods = [
-            "create_post",
-            "get_posts",
-            "update_post",
-            "get_post_meta",
-            "update_post_meta",
-            "create_post_meta",
-            "delete_post_meta",
-        ];
-        // For WooCommerce API endpoints
-        const wooMethods = [
+
+// For standard WordPress API endpoints
+const wpMethods = [
+    "create_post",
+    "get_posts",
+    "update_post",
+    "get_post_meta",
+    "update_post_meta",
+    "create_post_meta",
+    "delete_post_meta",
+];
+
+// For WooCommerce API endpoints
+const wooMethods = [
+            "healthcheck",
             "get_products",
             "get_product",
             "create_product",
@@ -165,7 +158,18 @@ async function handleWooCommerceRequest(method, params) {
             "update_customer_meta",
             "create_customer_meta",
             "delete_customer_meta",
-        ];
+];
+
+async function handleWooCommerceRequest(method, params) {
+    try {
+        const siteUrl = params.siteUrl || DEFAULT_SITE_URL;
+        const username = params.username || DEFAULT_USERNAME;
+        const password = params.password || DEFAULT_PASSWORD;
+        const consumerKey = params.consumerKey || DEFAULT_CONSUMER_KEY;
+        const consumerSecret = params.consumerSecret || DEFAULT_CONSUMER_SECRET;
+        if (!siteUrl) {
+            throw new Error("WordPress site URL not provided in environment variables or request parameters");
+        }
         // Create WordPress REST API client
         let client;
         if (wpMethods.includes(method)) {
@@ -234,6 +238,35 @@ async function handleWooCommerceRequest(method, params) {
                 const updateResponse = await client.post(`/posts/${params.postId}`, updateData);
                 return updateResponse.data;
             // Handle WooCommerce API methods
+            // Health check
+            case "healthcheck":
+                try {
+                    // Try to fetch a simple endpoint to verify credentials
+                    // Using /products with minimal params to test connection
+                    const healthResponse = await client.get("/products", {
+                        params: {
+                            per_page: 1,
+                            page: 1
+                        }
+                    });
+                    return {
+                        status: "success",
+                        message: "WooCommerce API credentials are valid",
+                        connected: true,
+                        timestamp: new Date().toISOString(),
+                        apiVersion: "v3",
+                        productCount: Array.isArray(healthResponse.data) ? healthResponse.data.length : 0
+                    };
+                } catch (error) {
+                    return {
+                        status: "error",
+                        message: "Failed to authenticate with WooCommerce API",
+                        connected: false,
+                        timestamp: new Date().toISOString(),
+                        error: error.response?.data?.message || error.message,
+                        errorCode: error.response?.status || null
+                    };
+                }
             // Products
             case "get_products":
                 const productsResponse = await client.get("/products", {
@@ -1375,7 +1408,42 @@ rl.on("line", async (line) => {
         return;
     }
     try {
-        const result = await handleWooCommerceRequest(request.method, request.params);
+        let result;
+
+        // Handle MCP protocol methods
+        if (request.method === "tools/list") {
+            // Dynamically generate tool list from wpMethods and wooMethods arrays
+            const tools = [];
+
+            // Add WordPress methods
+            for (const method of wpMethods) {
+                tools.push({
+                    name: method,
+                    description: `WordPress: ${method.replace(/_/g, ' ')}`,
+                    input_schema: { type: "object", properties: {}, required: [] }
+                });
+            }
+
+            // Add WooCommerce methods
+            for (const method of wooMethods) {
+                tools.push({
+                    name: method,
+                    description: `WooCommerce: ${method.replace(/_/g, ' ')}`,
+                    input_schema: { type: "object", properties: {}, required: [] }
+                });
+            }
+
+            result = { tools };
+        } else if (request.method === "tools/call") {
+            // Handle tool execution via MCP protocol
+            const toolName = request.params.name;
+            const toolArgs = request.params.arguments || {};
+            result = await handleWooCommerceRequest(toolName, toolArgs);
+        } else {
+            // Legacy direct method call
+            result = await handleWooCommerceRequest(request.method, request.params);
+        }
+
         console.log(JSON.stringify({
             jsonrpc: "2.0",
             id: request.id,
