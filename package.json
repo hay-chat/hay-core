@@ -65,6 +65,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
+    "@hay/plugin-sdk-v2": "file:plugin-sdk-v2",
     "@types/archiver": "^7.0.0"
   }
 }

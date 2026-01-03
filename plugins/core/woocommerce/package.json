@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows",
   "author": "Hay",
+  "type": "module",
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
@@ -17,7 +18,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+    "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

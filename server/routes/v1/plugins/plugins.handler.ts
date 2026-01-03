@@ -497,8 +497,14 @@ export const configurePlugin = authenticatedProcedure
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
 
     // Validate required fields are satisfied by either DB config or .env fallback
+    // Need to merge config + auth credentials to check all required fields
     if (configSchema) {
-      const resolved = resolveConfigWithEnv(config, configSchema as Record<string, ConfigFieldDescriptor>, {
+      const mergedForValidation = {
+        ...config,
+        ...(authState?.credentials || {})
+      };
+
+      const resolved = resolveConfigWithEnv(mergedForValidation, configSchema as Record<string, ConfigFieldDescriptor>, {
         decrypt: false,
         maskSecrets: false,
       });
@@ -533,7 +539,7 @@ export const configurePlugin = authenticatedProcedure
             const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ authState }),
+              body: JSON.stringify({ config, authState }),
               signal: abortController.signal,
             });
 
@@ -1050,14 +1056,23 @@ export const testConnection = authenticatedProcedure
       }
 
       // Actually test the MCP server by calling a safe tool
-      // Priority 1: Find READ-ONLY tools with NO required parameters (safest for health checks)
       const safeToolPrefixes = ["list_", "get_", "search_", "find_", "read_"];
+
+      // Priority 0: Check if there's a dedicated health/healthcheck tool
       let testTool = mcpTools.find((t) => {
-        const schema = t.inputSchema;
-        const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
-        const isReadOnly = safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix));
-        return hasNoRequiredParams && isReadOnly;
+        const name = t.name.toLowerCase();
+        return name === "health" || name === "healthcheck";
       });
+
+      // Priority 1: Find READ-ONLY tools with NO required parameters (safest for health checks)
+      if (!testTool) {
+        testTool = mcpTools.find((t) => {
+          const schema = t.inputSchema;
+          const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
+          const isReadOnly = safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix));
+          return hasNoRequiredParams && isReadOnly;
+        });
+      }
 
       // Priority 2: Find any tool with NO required parameters
       if (!testTool) {
