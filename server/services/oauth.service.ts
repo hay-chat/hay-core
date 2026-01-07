@@ -686,17 +686,14 @@ export class OAuthService {
       throw new Error("Plugin instance not found");
     }
 
-    // Support both SDK v1 (config._oauth) and SDK v2 (authState)
-    const hasSDKv1OAuth = !!instance.config?._oauth;
-    const hasSDKv2OAuth = !!instance.authState?.credentials?.refreshToken;
-
-    if (!hasSDKv1OAuth && !hasSDKv2OAuth) {
+    // Check for OAuth credentials in authState
+    if (!instance.authState?.credentials?.refreshToken) {
       throw new Error("OAuth not configured for this plugin instance");
     }
 
-    // SDK v2: Check metadata.authMethods for OAuth2 registration
+    // Check metadata.authMethods for OAuth2 registration
     if (!plugin.metadata?.authMethods) {
-      throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
+      throw new Error(`Plugin ${pluginId} does not have metadata`);
     }
 
     const oauth2Method = plugin.metadata.authMethods.find(
@@ -715,35 +712,9 @@ export class OAuthService {
       tokenUrl: oauth2Method.tokenUrl,
     };
 
-    // Get refresh token from SDK v2 authState or SDK v1 config._oauth
-    let refreshToken: string;
-    let oldTokenData: Partial<OAuthTokenData> = {}; // For preserving scope, etc.
-    let oldOAuthMeta: { connected_at: number; provider: string; scopes?: string[] } | null = null;
-
-    if (hasSDKv2OAuth && instance.authState?.credentials?.refreshToken) {
-      // SDK v2: Get refresh token from authState
-      refreshToken = decryptValue(instance.authState.credentials.refreshToken);
-      oldTokenData = {
-        scope: instance.authState.credentials.scope,
-      };
-    } else if (hasSDKv1OAuth) {
-      // SDK v1: Get refresh token from config._oauth (legacy)
-      const decryptedConfig = decryptConfig(
-        (instance.config ?? {}) as Record<string, unknown>,
-      ) as PluginConfigWithOAuth;
-      if (!decryptedConfig._oauth?.tokens?.refresh_token) {
-        throw new Error("No refresh token available");
-      }
-      refreshToken = decryptValue(decryptedConfig._oauth.tokens.refresh_token);
-      oldTokenData = decryptedConfig._oauth.tokens;
-      oldOAuthMeta = {
-        connected_at: decryptedConfig._oauth.connected_at,
-        provider: decryptedConfig._oauth.provider,
-        scopes: decryptedConfig._oauth.scopes,
-      };
-    } else {
-      throw new Error("No refresh token available");
-    }
+    // Get refresh token from authState
+    const refreshToken = decryptValue(instance.authState.credentials.refreshToken);
+    const oldScope = instance.authState.credentials.scope;
 
     // Get client credentials from plugin instance using config resolver with env fallback
     const clientIdFieldName = oauth2Method.clientId;
@@ -823,36 +794,15 @@ export class OAuthService {
       expires_in: data.expires_in,
       expires_at: expiresAt,
       token_type: data.token_type || "Bearer",
-      scope: data.scope || oldTokenData.scope,
+      scope: data.scope || oldScope,
     };
 
-    // Encrypt tokens before storing
-    const encryptedTokens: OAuthTokenData = {
-      ...newTokens,
-      access_token: encryptValue(newTokens.access_token),
-      refresh_token: newTokens.refresh_token ? encryptValue(newTokens.refresh_token) : undefined,
-    };
-
-    // Update stored tokens (for SDK v1 compatibility)
-    const updatedOAuthData = {
-      tokens: encryptedTokens,
-      connected_at: oldOAuthMeta?.connected_at ?? Math.floor(Date.now() / 1000),
-      provider: oldOAuthMeta?.provider ?? pluginId,
-      scopes: oldOAuthMeta?.scopes,
-    };
-
-    const currentConfig = instance.config || {};
-    await pluginInstanceRepository.updateConfig(instance.id, {
-      ...currentConfig,
-      _oauth: updatedOAuthData,
-    });
-
-    // SDK v2: Also update authState with refreshed tokens
+    // Update authState with refreshed tokens
     const authState = {
       methodId: `${pluginId}-oauth`,
       credentials: {
-        accessToken: newTokens.access_token,
-        refreshToken: newTokens.refresh_token,
+        accessToken: encryptValue(newTokens.access_token),
+        refreshToken: newTokens.refresh_token ? encryptValue(newTokens.refresh_token) : undefined,
         expiresAt: newTokens.expires_at,
         tokenType: newTokens.token_type || "Bearer",
         scope: newTokens.scope,
@@ -866,56 +816,6 @@ export class OAuthService {
     debugLog("oauth", `Token refreshed for plugin ${pluginId}`, { organizationId });
 
     return newTokens;
-  }
-
-  /**
-   * Migrate existing OAuth instances to populate authState from config._oauth
-   * This is needed for SDK v2 plugins that expect authState.credentials.accessToken
-   */
-  async migrateOAuthToAuthState(organizationId: string, pluginId: string): Promise<boolean> {
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance) {
-      return false;
-    }
-
-    // Check if authState is already populated
-    if (instance.authState?.credentials?.accessToken) {
-      console.log("Auth state already populated, skipping migration");
-      return true;
-    }
-
-    // Check if config has _oauth
-    const oauthData = instance.config?._oauth as OAuthConfig["_oauth"] | undefined;
-    if (!oauthData || !oauthData.tokens) {
-      console.log("No OAuth tokens found in config, skipping migration");
-      return false;
-    }
-
-    // Decrypt tokens
-    const accessToken = decryptValue(oauthData.tokens.access_token);
-    const refreshToken = oauthData.tokens.refresh_token
-      ? decryptValue(oauthData.tokens.refresh_token)
-      : undefined;
-
-    // Build authState
-    const authState = {
-      methodId: `${pluginId}-oauth`,
-      credentials: {
-        accessToken,
-        refreshToken,
-        expiresAt: oauthData.tokens.expires_at,
-        tokenType: oauthData.tokens.token_type || "Bearer",
-        scope: oauthData.tokens.scope,
-      },
-    };
-
-    // Update instance
-    await pluginInstanceRepository.update(instance.id, organizationId, {
-      authState,
-    });
-
-    console.log(`✅ Migrated OAuth tokens to authState for ${pluginId}`);
-    return true;
   }
 }
 

@@ -9,7 +9,6 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
 import { getApiUrl } from "../config/env";
-import { oauthService } from "./oauth.service";
 
 /**
  * Plugin Runner V2 Service
@@ -77,18 +76,6 @@ export class PluginRunnerV2Service {
     });
     if (!instance || !instance.enabled) {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
-    }
-
-    // Migrate OAuth tokens to authState if needed (for SDK v2 compatibility)
-    if (instance.authMethod === 'oauth' && !instance.authState?.credentials?.accessToken) {
-      await oauthService.migrateOAuthToAuthState(orgId, pluginId);
-      // Refetch instance to get updated authState
-      const updatedInstance = await instanceRepo.findOne({
-        where: { organizationId: orgId, pluginId: plugin.id },
-      });
-      if (updatedInstance) {
-        Object.assign(instance, updatedInstance);
-      }
     }
 
     // Update runtime state to "starting"

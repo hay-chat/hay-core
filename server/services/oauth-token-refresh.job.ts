@@ -1,9 +1,6 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
-import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { oauthService } from "./oauth.service";
 import { debugLog } from "@server/lib/debug-logger";
-import { decryptConfig } from "../lib/auth/utils/encryption";
-import type { OAuthTokenData, PluginConfigWithOAuth } from "../types/oauth.types";
 
 /**
  * Background job to refresh OAuth tokens before they expire
@@ -21,21 +18,9 @@ export async function refreshOAuthTokens(): Promise<void> {
 
     for (const instance of instances) {
       try {
-        // Support both SDK v1 (config._oauth) and SDK v2 (authState)
-        let expiresAt: number | undefined;
-        let hasRefreshToken = false;
-
         // SDK v2: Check authState for OAuth credentials
-        if (instance.authState?.credentials) {
-          expiresAt = instance.authState.credentials.expiresAt;
-          hasRefreshToken = !!instance.authState.credentials.refreshToken;
-        }
-        // SDK v1: Check config._oauth for OAuth credentials (fallback)
-        else if (instance.config?._oauth) {
-          const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
-          expiresAt = decryptedConfig._oauth?.tokens?.expires_at;
-          hasRefreshToken = !!decryptedConfig._oauth?.tokens?.refresh_token;
-        }
+        const expiresAt = instance.authState?.credentials?.expiresAt;
+        const hasRefreshToken = !!instance.authState?.credentials?.refreshToken;
 
         // Skip if no expiry info or no refresh token
         if (!expiresAt || !hasRefreshToken) {
