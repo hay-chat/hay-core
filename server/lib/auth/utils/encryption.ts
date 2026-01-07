@@ -278,9 +278,16 @@ export class AuthStateEncryptedTransformer {
             } else {
               decryptedCredentials[key] = decryptedVal;
             }
+            console.log(
+              `[AuthStateTransformer] Decrypted credential '${key}': ${String(decryptedVal).substring(0, 20)}...`,
+            );
           } catch (error) {
             // Decryption failed - this is legacy plaintext data from before encryption
             // Return as-is for backwards compatibility (will be encrypted on next save)
+            console.warn(
+              `[AuthStateTransformer] Failed to decrypt credential '${key}', using as-is (legacy data?):`,
+              error instanceof Error ? error.message : String(error),
+            );
             decryptedCredentials[key] = val;
           }
         } else {
