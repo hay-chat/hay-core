@@ -13,13 +13,10 @@ export class PluginManagerService {
   private pluginsDir: string;
   public registry: Map<string, PluginRegistry> = new Map();
 
-  // Worker management - delegates to RunnerV2Service
-  private workers: Map<string, WorkerInfo> = new Map(); // key: organizationId:pluginId
-
   // Track discovered plugins during initialization
   private discoveredPluginIds: Set<string> = new Set();
 
-  // SDK v2 runner service (source of truth for workers)
+  // SDK v2 runner service - single source of truth for all worker management
   private runnerV2Service = getPluginRunnerV2Service();
 
   constructor() {
@@ -684,6 +681,7 @@ export class PluginManagerService {
 
   /**
    * Start plugin worker for an organization
+   * Delegates to PluginRunnerV2Service (single source of truth)
    */
   async startPluginWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
     const key = `${organizationId}:${pluginId}`;
@@ -706,7 +704,7 @@ export class PluginManagerService {
     console.log(`[PluginManager] Starting worker: ${pluginId}`);
 
     try {
-      // Start worker using SDK v2 runner service
+      // Start worker using SDK v2 runner service (source of truth)
       const workerInfo = await this.runnerV2Service.startWorker(organizationId, pluginId);
 
       // Fetch and cache metadata (plugin-global, not per org)
@@ -724,9 +722,6 @@ export class PluginManagerService {
         }
       }
 
-      // Store worker in our cache for quick access
-      this.workers.set(key, workerInfo);
-
       return workerInfo;
     } catch (error) {
       // If worker is already running (race condition), try to get it
@@ -737,7 +732,6 @@ export class PluginManagerService {
         const existingWorker = this.runnerV2Service.getWorker(organizationId, pluginId);
         if (existingWorker) {
           console.log(`[PluginManager] Successfully retrieved existing worker for ${key}`);
-          this.workers.set(key, existingWorker);
           return existingWorker;
         }
       }
@@ -749,59 +743,29 @@ export class PluginManagerService {
 
   /**
    * Get worker info (or start if not running)
-   *
-   * This method ensures consistency between PluginManagerService's cache and
-   * the actual worker state in PluginRunnerV2Service.
+   * Delegates to PluginRunnerV2Service (single source of truth)
    */
   async getOrStartWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
-    const key = `${organizationId}:${pluginId}`;
+    // Check the RunnerV2 service for worker state (single source of truth)
+    const existingWorker = this.runnerV2Service.getWorker(organizationId, pluginId);
 
-    // Check the RunnerV2 service for actual worker state (source of truth)
-    const runnerV2Worker = this.runnerV2Service.getWorker(organizationId, pluginId);
-
-    if (runnerV2Worker) {
-      // Worker is running - ensure our cache is in sync
-      runnerV2Worker.lastActivity = new Date();
-
-      // Update or set our cache to match
-      if (this.workers.has(key)) {
-        const cachedWorker = this.workers.get(key)!;
-        // If ports don't match, our cache is stale - update it
-        if (cachedWorker.port !== runnerV2Worker.port) {
-          console.log(
-            `[PluginManager] Syncing stale worker cache for ${key}: port ${cachedWorker.port} -> ${runnerV2Worker.port}`,
-          );
-          this.workers.set(key, runnerV2Worker);
-        } else {
-          cachedWorker.lastActivity = new Date();
-        }
-      } else {
-        // No cache entry, add one
-        this.workers.set(key, runnerV2Worker);
-      }
-
-      await pluginInstanceRepository.updateHealthCheck(runnerV2Worker.instanceId, "healthy");
-      return runnerV2Worker;
+    if (existingWorker) {
+      existingWorker.lastActivity = new Date();
+      await pluginInstanceRepository.updateHealthCheck(existingWorker.instanceId, "healthy");
+      return existingWorker;
     }
 
-    // No worker in RunnerV2 - clean up any stale cache entry
-    if (this.workers.has(key)) {
-      console.log(`[PluginManager] Removing stale worker cache entry for ${key}`);
-      this.workers.delete(key);
-    }
-
+    // No worker running - start one
     return await this.startPluginWorker(organizationId, pluginId);
   }
 
   /**
    * Stop plugin worker
+   * Delegates to PluginRunnerV2Service (single source of truth)
    */
   async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
-    const key = `${organizationId}:${pluginId}`;
-
-    console.log(`[PluginManager] Stopping worker: ${key}`);
+    console.log(`[PluginManager] Stopping worker: ${organizationId}:${pluginId}`);
     await this.runnerV2Service.stopWorker(organizationId, pluginId);
-    this.workers.delete(key);
   }
 
   /**
@@ -816,18 +780,19 @@ export class PluginManagerService {
   }
 
   /**
-   * Cleanup inactive workers (delegates to instance manager)
+   * Cleanup inactive workers
+   * Uses PluginRunnerV2Service as the source of truth for active workers
    */
   async cleanupInactiveWorkers(): Promise<void> {
-    // Note: Actual cleanup is handled by PluginInstanceManagerService
-    // This method is kept for compatibility but delegates the work
     const now = new Date();
+    const allWorkers = this.runnerV2Service.getAllWorkers();
 
-    for (const [key, worker] of this.workers.entries()) {
+    for (const worker of allWorkers) {
       const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
       const inactiveTime = now.getTime() - worker.lastActivity.getTime();
 
       if (inactiveTime > TIMEOUT_MS) {
+        const key = `${worker.organizationId}:${worker.pluginId}`;
         console.log(
           `[PluginManager] Cleaning up inactive worker: ${key} (inactive for ${Math.round(inactiveTime / 1000)}s)`,
         );
@@ -838,16 +803,18 @@ export class PluginManagerService {
 
   /**
    * Get all active workers
+   * Delegates to PluginRunnerV2Service (single source of truth)
    */
   getActiveWorkers(): WorkerInfo[] {
-    return Array.from(this.workers.values());
+    return this.runnerV2Service.getAllWorkers();
   }
 
   /**
    * Get worker by organization and plugin
+   * Delegates to PluginRunnerV2Service (single source of truth)
    */
   getWorker(organizationId: string, pluginId: string): WorkerInfo | undefined {
-    return this.workers.get(`${organizationId}:${pluginId}`);
+    return this.runnerV2Service.getWorker(organizationId, pluginId);
   }
 }
 
