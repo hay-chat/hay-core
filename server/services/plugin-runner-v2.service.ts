@@ -9,6 +9,7 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
 import { getApiUrl } from "../config/env";
+import { oauthService } from "./oauth.service";
 
 /**
  * Plugin Runner V2 Service
@@ -71,11 +72,70 @@ export class PluginRunnerV2Service {
 
     // Get plugin instance
     const instanceRepo = AppDataSource.getRepository(PluginInstance);
-    const instance = await instanceRepo.findOne({
+    let instance = await instanceRepo.findOne({
       where: { organizationId: orgId, pluginId: plugin.id },
     });
     if (!instance || !instance.enabled) {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
+    }
+
+    // Debug: Log authState before any processing
+    console.log(`[PluginRunner] authState for ${pluginId}:`, {
+      methodId: instance.authState?.methodId,
+      hasAccessToken: !!instance.authState?.credentials?.accessToken,
+      accessTokenPreview: instance.authState?.credentials?.accessToken
+        ? String(instance.authState.credentials.accessToken).substring(0, 30) + "..."
+        : "NONE",
+      expiresAt: instance.authState?.credentials?.expiresAt,
+    });
+
+    // Check if OAuth token needs refresh before starting worker
+    if (instance.authMethod === "oauth" && instance.authState?.credentials?.expiresAt) {
+      const expiresAt = instance.authState.credentials.expiresAt as number;
+      const now = Math.floor(Date.now() / 1000);
+      const bufferSeconds = 5 * 60; // 5 minutes buffer
+
+      if (expiresAt - now < bufferSeconds) {
+        console.log(
+          `[PluginRunner] OAuth token expired or expiring soon for ${pluginId}, refreshing...`,
+        );
+        try {
+          await oauthService.refreshToken(orgId, pluginId);
+          // Reload instance to get fresh authState
+          const refreshedInstance = await instanceRepo.findOne({
+            where: { organizationId: orgId, pluginId: plugin.id },
+          });
+          if (!refreshedInstance) {
+            throw new Error(`Plugin instance not found after token refresh`);
+          }
+          instance = refreshedInstance;
+          console.log(`[PluginRunner] OAuth token refreshed successfully for ${pluginId}`);
+          // Debug: Log refreshed authState
+          console.log(`[PluginRunner] Refreshed authState for ${pluginId}:`, {
+            methodId: instance.authState?.methodId,
+            hasAccessToken: !!instance.authState?.credentials?.accessToken,
+            accessTokenPreview: instance.authState?.credentials?.accessToken
+              ? String(instance.authState.credentials.accessToken).substring(0, 30) + "..."
+              : "NONE",
+            expiresAt: instance.authState?.credentials?.expiresAt,
+          });
+        } catch (error: any) {
+          console.error(
+            `[PluginRunner] OAuth token refresh failed for ${pluginId}:`,
+            error.message,
+          );
+          // If token is already expired and refresh failed, throw error
+          if (expiresAt - now <= 0) {
+            throw new Error(
+              `OAuth token expired and refresh failed: ${error.message}. Please re-authenticate.`,
+            );
+          }
+          // If token hasn't expired yet, continue with existing token
+          console.warn(
+            `[PluginRunner] Continuing with existing token (expires in ${expiresAt - now}s)`,
+          );
+        }
+      }
     }
 
     // Update runtime state to "starting"

@@ -1,7 +1,7 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { oauthStateService } from "./oauth-state.service";
-import { encryptValue, decryptValue, decryptConfig } from "../lib/auth/utils/encryption";
+import { encryptValue, decryptConfig } from "../lib/auth/utils/encryption";
 import { resolveConfigWithEnv } from "../lib/config-resolver";
 import { getApiUrl } from "../config/env";
 import type {
@@ -537,7 +537,7 @@ export class OAuthService {
       scopes,
     };
 
-    // Encrypt OAuth tokens (access_token and refresh_token are sensitive)
+    // Encrypt OAuth tokens for legacy _oauth config storage
     const encryptedTokens: OAuthTokenData = {
       ...tokens,
       access_token: encryptValue(tokens.access_token),
@@ -549,18 +549,21 @@ export class OAuthService {
       tokens: encryptedTokens,
     };
 
-    // Store encrypted OAuth data (no need for encryptConfig since we manually encrypted tokens)
+    // Store encrypted OAuth data for legacy config
     const configToStore = {
       _oauth: encryptedOAuthData,
     };
 
     // SDK v2: Build authState for plugins using SDK v2
     // The authState format is what the plugin SDK expects via ctx.auth.get()
+    // NOTE: Do NOT manually encrypt here - use updateAuthState() which uses .save()
+    // and triggers the TypeORM AuthStateEncryptedTransformer automatically.
+    // Manual encryption would cause DOUBLE encryption.
     const authState = {
       methodId: `${pluginId}-oauth`, // Convention: {pluginId}-oauth
       credentials: {
-        accessToken: tokens.access_token, // Will be encrypted by AuthStateEncryptedTransformer
-        refreshToken: tokens.refresh_token,
+        accessToken: tokens.access_token, // Plain text - transformer will encrypt
+        refreshToken: tokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: tokens.expires_at,
         tokenType: tokens.token_type || "Bearer",
         scope: tokens.scope,
@@ -580,17 +583,17 @@ export class OAuthService {
       });
       console.log("  Config updated");
 
-      // Update auth_method and authState
-      await pluginInstanceRepository.update(instance.id, instance.organizationId, {
-        authMethod: "oauth",
+      // Update authState using updateAuthState which uses .save() to trigger transformer
+      await pluginInstanceRepository.updateAuthState(
+        instance.id,
+        instance.organizationId,
         authState,
-      });
-      console.log("  Auth method updated to oauth");
-      console.log("  Auth state updated with access token");
+      );
+      console.log("  Auth state updated with access token (via updateAuthState)");
       console.log("  Instance enabled state should remain:", instance.enabled);
     } else {
       console.log("Creating new instance with enabled=false...");
-      // Create new instance
+      // Create new instance - upsertInstance uses .save() which triggers transformer
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
         config: configToStore,
         authMethod: "oauth",
@@ -712,8 +715,8 @@ export class OAuthService {
       tokenUrl: oauth2Method.tokenUrl,
     };
 
-    // Get refresh token from authState
-    const refreshToken = decryptValue(instance.authState.credentials.refreshToken);
+    // Get refresh token from authState (already decrypted by TypeORM transformer)
+    const refreshToken = instance.authState.credentials.refreshToken as string;
     const oldScope = instance.authState.credentials.scope;
 
     // Get client credentials from plugin instance using config resolver with env fallback
@@ -798,20 +801,20 @@ export class OAuthService {
     };
 
     // Update authState with refreshed tokens
+    // NOTE: Do NOT manually encrypt - use updateAuthState() which uses .save()
+    // and triggers the TypeORM AuthStateEncryptedTransformer automatically.
     const authState = {
       methodId: `${pluginId}-oauth`,
       credentials: {
-        accessToken: encryptValue(newTokens.access_token),
-        refreshToken: newTokens.refresh_token ? encryptValue(newTokens.refresh_token) : undefined,
+        accessToken: newTokens.access_token, // Plain text - transformer will encrypt
+        refreshToken: newTokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: newTokens.expires_at,
         tokenType: newTokens.token_type || "Bearer",
         scope: newTokens.scope,
       },
     };
 
-    await pluginInstanceRepository.update(instance.id, instance.organizationId, {
-      authState,
-    });
+    await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, authState);
 
     debugLog("oauth", `Token refreshed for plugin ${pluginId}`, { organizationId });
 
