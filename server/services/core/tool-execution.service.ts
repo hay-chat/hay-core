@@ -4,7 +4,6 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import type { ConversationContext } from "@server/orchestrator/types";
 import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
-import { processManagerService } from "@server/services/process-manager.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
@@ -240,7 +239,9 @@ export class ToolExecutionService {
 
         if (hasMCPCapability && !manifest.capabilities?.mcp?.tools) {
           // SDK v2 plugin - tools are fetched dynamically from the running MCP server
-          console.log(`[ToolExecution] Plugin is SDK v2 - tools are dynamic, skipping manifest validation`);
+          console.log(
+            `[ToolExecution] Plugin is SDK v2 - tools are dynamic, skipping manifest validation`,
+          );
           matchingPlugin = plugin;
           // No toolSchema needed for SDK v2 - the MCP client will handle validation
           break;
@@ -285,14 +286,19 @@ export class ToolExecutionService {
     // Validate tool arguments against input schema (only for legacy plugins with static schemas)
     if (toolSchema && toolSchema.input_schema) {
       // Ensure input_schema is an object before validation
-      if (typeof toolSchema.input_schema === 'object') {
-        const validation = this.validateToolArguments(toolArgs, toolSchema.input_schema as ToolSchema["inputSchema"]);
+      if (typeof toolSchema.input_schema === "object") {
+        const validation = this.validateToolArguments(
+          toolArgs,
+          toolSchema.input_schema as ToolSchema["inputSchema"],
+        );
         if (!validation.valid) {
           throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
         }
       }
     } else if (!toolSchema) {
-      console.log(`[ToolExecution] Skipping argument validation for SDK v2 plugin (handled by MCP server)`);
+      console.log(
+        `[ToolExecution] Skipping argument validation for SDK v2 plugin (handled by MCP server)`,
+      );
     }
 
     // Check if plugin needs installation/building
@@ -463,9 +469,8 @@ export class ToolExecutionService {
       if (result.isError) {
         // Preserve the full error object for better error visibility
         const errorDetails = result.error || { message: "Unknown error" };
-        const errorMessage = typeof errorDetails === "object"
-          ? JSON.stringify(errorDetails)
-          : String(errorDetails);
+        const errorMessage =
+          typeof errorDetails === "object" ? JSON.stringify(errorDetails) : String(errorDetails);
 
         const error = new Error(`MCP tool error: ${errorMessage}`);
         // Attach the full error object to the error for better handling

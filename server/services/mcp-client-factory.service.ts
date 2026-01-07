@@ -1,5 +1,4 @@
 import type { MCPClient } from "./mcp-client.interface";
-import { LocalMCPClient } from "./local-mcp-client.service";
 import { LocalHTTPMCPClient } from "./local-http-mcp-client.service";
 import { RemoteMCPClient } from "./remote-mcp-client.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
@@ -8,15 +7,15 @@ import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * Factory for creating MCP clients based on plugin manifest configuration
+ *
+ * All local plugins now use SDK v2 with HTTP communication.
+ * Remote MCP servers are still supported via RemoteMCPClient.
  */
 export class MCPClientFactory {
   /**
    * Create an MCP client for a plugin instance
    */
-  static async createClient(
-    organizationId: string,
-    pluginId: string,
-  ): Promise<MCPClient> {
+  static async createClient(organizationId: string, pluginId: string): Promise<MCPClient> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
@@ -24,19 +23,8 @@ export class MCPClientFactory {
 
     const manifest = plugin.manifest as HayPluginManifest;
 
-    // Check if SDK v2 plugin (uses HTTP communication)
-    const isSDKv2 = Array.isArray(manifest.capabilities) && manifest.capabilities.includes("mcp");
-
-    if (isSDKv2) {
-      debugLog("mcp-factory", `Creating local HTTP MCP client for SDK v2 plugin ${pluginId}`, {
-        organizationId,
-      });
-
-      return new LocalHTTPMCPClient(organizationId, pluginId);
-    }
-
-    // Legacy plugins
-    const connectionType = manifest.capabilities?.mcp?.connection?.type || "local";
+    // Check for remote MCP server configuration
+    const connectionType = manifest.capabilities?.mcp?.connection?.type;
 
     if (connectionType === "remote") {
       const url = manifest.capabilities?.mcp?.connection?.url;
@@ -52,14 +40,13 @@ export class MCPClientFactory {
       const client = new RemoteMCPClient(url, organizationId, pluginId);
       await client.connect();
       return client;
-    } else {
-      debugLog("mcp-factory", `Creating local stdio MCP client for plugin ${pluginId}`, {
-        organizationId,
-      });
-
-      return new LocalMCPClient(organizationId, pluginId);
     }
+
+    // All local plugins use HTTP-based communication (SDK v2)
+    debugLog("mcp-factory", `Creating local HTTP MCP client for plugin ${pluginId}`, {
+      organizationId,
+    });
+
+    return new LocalHTTPMCPClient(organizationId, pluginId);
   }
 }
-
-

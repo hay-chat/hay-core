@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import crypto from "crypto";
-import { processManagerService } from "./process-manager.service";
+import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { environmentManagerService } from "./environment-manager.service";
-import type { WebhookRequest, WebhookResponse, HayPluginManifest } from "@server/types/plugin.types";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 interface RateLimitEntry {
   count: number;
@@ -19,6 +19,8 @@ export class PluginRouteService {
 
   /**
    * Handle webhook request for a plugin
+   *
+   * For SDK v2 plugins, webhooks are proxied to the worker's HTTP server.
    */
   async handleWebhook(req: Request, res: Response): Promise<void> {
     const { pluginName, webhookPath } = req.params;
@@ -66,7 +68,10 @@ export class PluginRouteService {
       }
 
       // Find plugin instance
-      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginName);
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+        organizationId,
+        pluginName,
+      );
 
       if (!instance || !instance.enabled) {
         res.status(404).json({ error: "Plugin instance not found or disabled" });
@@ -91,40 +96,75 @@ export class PluginRouteService {
         }
 
         if (
-          !this.verifySignature(req.body, signature, webhookSecret as string, webhookConfig.signatureHeader)
+          !this.verifySignature(
+            req.body,
+            signature,
+            webhookSecret as string,
+            webhookConfig.signatureHeader,
+          )
         ) {
           res.status(401).json({ error: "Invalid signature" });
           return;
         }
       }
 
-      // Forward request to plugin process
-      const webhookRequest: WebhookRequest = {
-        method: req.method,
-        path: fullPath,
-        headers: req.headers as Record<string, string>,
-        body: req.body,
-        query: req.query as Record<string, string>,
-      };
-
       // Update activity timestamp when webhook is called
-      await pluginInstanceManagerService.updateActivityTimestamp(organizationId, plugin.id);
+      await pluginInstanceManagerService.updateActivityTimestamp(organizationId, plugin.pluginId);
 
-      const response = (await processManagerService.sendToPlugin(
-        organizationId,
-        plugin.id,
-        "process_webhook",
-        webhookRequest,
-      )) as WebhookResponse;
+      // Get or start the worker and proxy the request to it
+      const runnerV2 = getPluginRunnerV2Service();
+      const worker = runnerV2.getWorker(organizationId, pluginName);
 
-      // Send response
-      if (response.headers) {
-        Object.entries(response.headers).forEach(([key, value]) => {
-          res.setHeader(key, value);
-        });
+      if (!worker) {
+        // Start the worker if not running
+        await runnerV2.startWorker(organizationId, pluginName);
+        const startedWorker = runnerV2.getWorker(organizationId, pluginName);
+        if (!startedWorker) {
+          res.status(500).json({ error: "Failed to start plugin worker" });
+          return;
+        }
       }
 
-      res.status(response.status).json(response.body);
+      const workerPort = runnerV2.getWorker(organizationId, pluginName)?.port;
+      if (!workerPort) {
+        res.status(500).json({ error: "Worker port not available" });
+        return;
+      }
+
+      // Proxy the request to the worker's route endpoint
+      const workerUrl = `http://localhost:${workerPort}/routes/${fullPath}`;
+
+      const proxyResponse = await fetch(workerUrl, {
+        method: req.method,
+        headers: {
+          "Content-Type": req.headers["content-type"] || "application/json",
+          "X-Organization-Id": organizationId,
+          ...Object.fromEntries(
+            Object.entries(req.headers).filter(
+              ([key]) => !["host", "connection", "content-length"].includes(key.toLowerCase()),
+            ),
+          ),
+        },
+        body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
+      });
+
+      // Forward the response
+      const responseData = await proxyResponse.text();
+      let responseBody: unknown;
+      try {
+        responseBody = JSON.parse(responseData);
+      } catch {
+        responseBody = responseData;
+      }
+
+      // Copy response headers
+      proxyResponse.headers.forEach((value, key) => {
+        if (!["content-encoding", "transfer-encoding", "connection"].includes(key.toLowerCase())) {
+          res.setHeader(key, value);
+        }
+      });
+
+      res.status(proxyResponse.status).json(responseBody);
     } catch (error) {
       console.error(`Webhook error for ${pluginName}/${fullPath}:`, error);
       res.status(500).json({ error: "Internal server error" });
