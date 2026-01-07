@@ -5,7 +5,6 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
-import { processManagerService } from "@server/services/process-manager.service";
 import { getPluginRunnerV2Service } from "@server/services/plugin-runner-v2.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { resolveConfigWithEnv } from "@server/lib/config-resolver";
@@ -726,12 +725,15 @@ export const configurePlugin = authenticatedProcedure
     }
 
     // Restart the plugin if it's currently running to apply new configuration
-    if (processManagerService.isRunning(ctx.organizationId!, input.pluginId)) {
+    const runnerV2 = getPluginRunnerV2Service();
+    if (runnerV2.isRunning(ctx.organizationId!, input.pluginId)) {
       console.log(
         `🔄 Configuration changed for ${plugin.name}, restarting plugin to apply new settings...`,
       );
       try {
-        await processManagerService.restartPlugin(ctx.organizationId!, input.pluginId);
+        // Stop and start worker to apply new configuration
+        await runnerV2.stopWorker(ctx.organizationId!, input.pluginId);
+        await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
         console.log(`✅ Plugin ${plugin.name} restarted with new configuration`);
       } catch (error) {
         console.error(

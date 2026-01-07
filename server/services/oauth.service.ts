@@ -717,7 +717,8 @@ export class OAuthService {
 
     // Get refresh token from SDK v2 authState or SDK v1 config._oauth
     let refreshToken: string;
-    let oldTokenData: any = {}; // For preserving scope, etc.
+    let oldTokenData: Partial<OAuthTokenData> = {}; // For preserving scope, etc.
+    let oldOAuthMeta: { connected_at: number; provider: string; scopes?: string[] } | null = null;
 
     if (hasSDKv2OAuth && instance.authState?.credentials?.refreshToken) {
       // SDK v2: Get refresh token from authState
@@ -727,12 +728,19 @@ export class OAuthService {
       };
     } else if (hasSDKv1OAuth) {
       // SDK v1: Get refresh token from config._oauth (legacy)
-      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+      const decryptedConfig = decryptConfig(
+        (instance.config ?? {}) as Record<string, unknown>,
+      ) as PluginConfigWithOAuth;
       if (!decryptedConfig._oauth?.tokens?.refresh_token) {
         throw new Error("No refresh token available");
       }
       refreshToken = decryptValue(decryptedConfig._oauth.tokens.refresh_token);
       oldTokenData = decryptedConfig._oauth.tokens;
+      oldOAuthMeta = {
+        connected_at: decryptedConfig._oauth.connected_at,
+        provider: decryptedConfig._oauth.provider,
+        scopes: decryptedConfig._oauth.scopes,
+      };
     } else {
       throw new Error("No refresh token available");
     }
@@ -811,11 +819,11 @@ export class OAuthService {
 
     const newTokens: OAuthTokenData = {
       access_token: data.access_token,
-      refresh_token: data.refresh_token || oauthData.tokens.refresh_token, // Keep old if not provided
+      refresh_token: data.refresh_token || refreshToken, // Keep old if not provided
       expires_in: data.expires_in,
       expires_at: expiresAt,
       token_type: data.token_type || "Bearer",
-      scope: data.scope || oauthData.tokens.scope,
+      scope: data.scope || oldTokenData.scope,
     };
 
     // Encrypt tokens before storing
@@ -825,10 +833,12 @@ export class OAuthService {
       refresh_token: newTokens.refresh_token ? encryptValue(newTokens.refresh_token) : undefined,
     };
 
-    // Update stored tokens
+    // Update stored tokens (for SDK v1 compatibility)
     const updatedOAuthData = {
-      ...oauthData,
       tokens: encryptedTokens,
+      connected_at: oldOAuthMeta?.connected_at ?? Math.floor(Date.now() / 1000),
+      provider: oldOAuthMeta?.provider ?? pluginId,
+      scopes: oldOAuthMeta?.scopes,
     };
 
     const currentConfig = instance.config || {};
