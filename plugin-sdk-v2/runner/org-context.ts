@@ -13,13 +13,13 @@ import type {
   HayDisableContext,
   HayOrg,
   AuthState,
-} from '../types/index.js';
-import { PluginRegistry } from '../sdk/registry.js';
-import { createConfigRuntimeAPI } from '../sdk/config-runtime.js';
-import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
-import { createMcpRuntimeAPI } from '../sdk/mcp-runtime.js';
-import type { HayLogger } from '../types/index.js';
-import type { HayPluginManifest } from '../types/index.js';
+} from "../types/index.js";
+import { PluginRegistry } from "../sdk/registry.js";
+import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
+import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
+import { createMcpRuntimeAPI } from "../sdk/mcp-runtime.js";
+import type { HayLogger } from "../types/index.js";
+import type { HayPluginManifest } from "../types/index.js";
 
 /**
  * Org runtime data loaded from environment or mock.
@@ -48,6 +48,7 @@ export interface OrgRuntimeData {
  * @param registry - Plugin registry
  * @param manifest - Plugin manifest
  * @param logger - Logger instance
+ * @param pluginPath - Absolute path to the plugin directory
  * @param onMcpServerStarted - Optional callback when MCP server is started
  * @returns Start context instance
  *
@@ -58,7 +59,8 @@ export function createStartContext(
   registry: PluginRegistry,
   manifest: HayPluginManifest,
   logger: HayLogger,
-  onMcpServerStarted?: (server: any) => void | Promise<void>
+  pluginPath: string,
+  onMcpServerStarted?: (server: any) => void | Promise<void>,
 ): HayStartContext {
   const configAPI = createConfigRuntimeAPI({
     orgConfig: orgData.config,
@@ -76,9 +78,10 @@ export function createStartContext(
     config: configAPI,
     auth: authAPI,
     logger,
+    pluginDir: pluginPath, // Use the absolute plugin path from runner
     // Platform callback - registers MCP servers with HTTP server
     onMcpServerStarted: async (server) => {
-      logger.info('MCP server started', { id: server.id, type: server.type });
+      logger.info("MCP server started", { id: server.id, type: server.type });
       if (onMcpServerStarted) {
         await Promise.resolve(onMcpServerStarted(server));
       }
@@ -109,7 +112,7 @@ export function createAuthValidationContext(
   orgData: OrgRuntimeData,
   registry: PluginRegistry,
   manifest: HayPluginManifest,
-  logger: HayLogger
+  logger: HayLogger,
 ): HayAuthValidationContext {
   const configAPI = createConfigRuntimeAPI({
     orgConfig: orgData.config,
@@ -146,7 +149,7 @@ export function createConfigUpdateContext(
   orgData: OrgRuntimeData,
   registry: PluginRegistry,
   manifest: HayPluginManifest,
-  logger: HayLogger
+  logger: HayLogger,
 ): HayConfigUpdateContext {
   const configAPI = createConfigRuntimeAPI({
     orgConfig: orgData.config,
@@ -173,7 +176,7 @@ export function createConfigUpdateContext(
  */
 export function createDisableContext(
   orgData: OrgRuntimeData,
-  logger: HayLogger
+  logger: HayLogger,
 ): HayDisableContext {
   return {
     org: orgData.org,
@@ -196,7 +199,7 @@ export function loadOrgDataFromEnv(): OrgRuntimeData {
   // Load org config
   const orgConfigEnv = process.env.HAY_ORG_CONFIG;
   if (!orgConfigEnv) {
-    throw new Error('Missing required environment variable: HAY_ORG_CONFIG');
+    throw new Error("Missing required environment variable: HAY_ORG_CONFIG");
   }
 
   let orgConfigData: any;
@@ -204,15 +207,13 @@ export function loadOrgDataFromEnv(): OrgRuntimeData {
     orgConfigData = JSON.parse(orgConfigEnv);
   } catch (err) {
     throw new Error(
-      `Failed to parse HAY_ORG_CONFIG as JSON: ${
-        err instanceof Error ? err.message : String(err)
-      }`
+      `Failed to parse HAY_ORG_CONFIG as JSON: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
   // Validate org config structure
   if (!orgConfigData.org || !orgConfigData.org.id) {
-    throw new Error('HAY_ORG_CONFIG must include org.id');
+    throw new Error("HAY_ORG_CONFIG must include org.id");
   }
 
   // Load org auth (optional)
@@ -223,9 +224,7 @@ export function loadOrgDataFromEnv(): OrgRuntimeData {
       authState = JSON.parse(orgAuthEnv);
     } catch (err) {
       throw new Error(
-        `Failed to parse HAY_ORG_AUTH as JSON: ${
-          err instanceof Error ? err.message : String(err)
-        }`
+        `Failed to parse HAY_ORG_AUTH as JSON: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

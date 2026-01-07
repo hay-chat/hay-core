@@ -9,7 +9,9 @@
     "entry": "./dist/index.js",
     "displayName": "WooCommerce",
     "category": "integration",
-    "capabilities": ["mcp"],
+    "capabilities": [
+      "mcp"
+    ],
     "env": []
   },
   "scripts": {
@@ -21,7 +23,7 @@
     "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/node": "^20.10.0"
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
   }
 }

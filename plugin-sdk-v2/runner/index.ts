@@ -13,21 +13,21 @@
  * @module @hay/plugin-sdk-v2/runner
  */
 
-import { parseArgs, loadManifest } from './bootstrap.js';
-import { loadPlugin } from './plugin-loader.js';
-import { createGlobalContext } from './global-context.js';
-import { executeOnInitialize, executeOnStart, executeOnDisable } from './hook-executor.js';
-import { PluginHttpServer } from './http-server.js';
+import { parseArgs, loadManifest } from "./bootstrap.js";
+import { loadPlugin } from "./plugin-loader.js";
+import { createGlobalContext } from "./global-context.js";
+import { executeOnInitialize, executeOnStart, executeOnDisable } from "./hook-executor.js";
+import { PluginHttpServer } from "./http-server.js";
 import {
   loadOrgDataFromEnv,
   createMockOrgData,
   createStartContext,
   createDisableContext,
   type OrgRuntimeData,
-} from './org-context.js';
-import { PluginRegistry } from '../sdk/registry.js';
-import { createLogger } from '../sdk/logger.js';
-import type { HayPluginDefinition } from '../types/index.js';
+} from "./org-context.js";
+import { PluginRegistry } from "../sdk/registry.js";
+import { createLogger } from "../sdk/logger.js";
+import type { HayPluginDefinition } from "../types/index.js";
 
 /**
  * Runner state.
@@ -75,7 +75,10 @@ async function main(): Promise<void> {
   try {
     args = parseArgs(process.argv);
   } catch (err) {
-    console.error('❌ Failed to parse arguments:', err instanceof Error ? err.message : String(err));
+    console.error(
+      "❌ Failed to parse arguments:",
+      err instanceof Error ? err.message : String(err),
+    );
     process.exit(1);
   }
 
@@ -83,7 +86,7 @@ async function main(): Promise<void> {
 
   // Create logger (org context added later)
   const logger = createLogger({ orgId });
-  logger.info('Starting plugin worker', { pluginPath, orgId, port, mode });
+  logger.info("Starting plugin worker", { pluginPath, orgId, port, mode });
 
   let manifest;
   let registry: PluginRegistry;
@@ -91,7 +94,7 @@ async function main(): Promise<void> {
   try {
     const validated = loadManifest(pluginPath);
     manifest = validated.manifest;
-    logger.info('Loaded plugin manifest', { displayName: manifest.displayName });
+    logger.info("Loaded plugin manifest", { displayName: manifest.displayName });
 
     // Create registry and global context BEFORE loading plugin
     // This is required because plugins using defineHayPlugin export a factory
@@ -101,9 +104,11 @@ async function main(): Promise<void> {
 
     // Load plugin code (will call factory function with globalCtx if needed)
     state.plugin = await loadPlugin(validated.entryPath, manifest.displayName, globalCtx);
-    logger.info('Loaded plugin code', { name: state.plugin.name });
+    logger.info("Loaded plugin code", { name: state.plugin.name });
   } catch (err) {
-    logger.error('Failed to load plugin', { error: err instanceof Error ? err.message : String(err) });
+    logger.error("Failed to load plugin", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     process.exit(1);
   }
 
@@ -115,9 +120,11 @@ async function main(): Promise<void> {
     const globalCtx = createGlobalContext(logger, registry, manifest);
 
     await executeOnInitialize(state.plugin, globalCtx, logger);
-    logger.info('Plugin initialized successfully');
+    logger.info("Plugin initialized successfully");
   } catch (err) {
-    logger.error('Plugin initialization failed', { error: err instanceof Error ? err.message : String(err) });
+    logger.error("Plugin initialization failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     process.exit(1);
   }
 
@@ -132,9 +139,11 @@ async function main(): Promise<void> {
     state.httpServer.setPlugin(state.plugin);
 
     await state.httpServer.start();
-    logger.info('HTTP server started successfully');
+    logger.info("HTTP server started successfully");
   } catch (err) {
-    logger.error('Failed to start HTTP server', { error: err instanceof Error ? err.message : String(err) });
+    logger.error("Failed to start HTTP server", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     process.exit(2);
   }
 
@@ -144,15 +153,15 @@ async function main(): Promise<void> {
 
   try {
     // Load org data based on mode
-    if (mode === 'production') {
-      logger.info('Loading org runtime data from environment');
+    if (mode === "production") {
+      logger.info("Loading org runtime data from environment");
       state.orgData = loadOrgDataFromEnv();
     } else {
-      logger.info('Using mock org runtime data (test mode)');
+      logger.info("Using mock org runtime data (test mode)");
       state.orgData = createMockOrgData(orgId);
     }
 
-    logger.info('Org runtime data loaded', { orgId: state.orgData.org.id });
+    logger.info("Org runtime data loaded", { orgId: state.orgData.org.id });
 
     // Create start context with MCP server registration callback
     const startCtx = createStartContext(
@@ -160,10 +169,11 @@ async function main(): Promise<void> {
       registry,
       manifest,
       logger,
+      pluginPath, // Pass the absolute plugin path for MCP server resolution
       // MCP server registration callback
       (server) => {
         state.httpServer?.registerMcpServer(server as any);
-      }
+      },
     );
 
     const startSuccess = await executeOnStart(state.plugin, startCtx, logger);
@@ -178,14 +188,16 @@ async function main(): Promise<void> {
     });
 
     if (!startSuccess) {
-      logger.warn('onStart hook failed - plugin is running but may be degraded');
+      logger.warn("onStart hook failed - plugin is running but may be degraded");
       // Continue running (don't exit) - plugin is installed but degraded
     } else {
-      logger.info('Plugin started successfully for organization');
+      logger.info("Plugin started successfully for organization");
     }
   } catch (err) {
-    logger.error('Failed to initialize org runtime', { error: err instanceof Error ? err.message : String(err) });
-    logger.warn('Plugin is running but org runtime failed to initialize');
+    logger.error("Failed to initialize org runtime", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    logger.warn("Plugin is running but org runtime failed to initialize");
     // Continue running - HTTP server is still available
   }
 
@@ -195,12 +207,12 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     if (state.isShuttingDown) {
-      logger.warn('Shutdown already in progress, ignoring signal', { signal });
+      logger.warn("Shutdown already in progress, ignoring signal", { signal });
       return;
     }
 
     state.isShuttingDown = true;
-    logger.info('Received shutdown signal, starting graceful shutdown', { signal });
+    logger.info("Received shutdown signal, starting graceful shutdown", { signal });
 
     try {
       // 1. Execute onDisable hook
@@ -214,20 +226,22 @@ async function main(): Promise<void> {
         await state.httpServer.stop();
       }
 
-      logger.info('Graceful shutdown completed');
+      logger.info("Graceful shutdown completed");
       process.exit(0);
     } catch (err) {
-      logger.error('Error during shutdown', { error: err instanceof Error ? err.message : String(err) });
+      logger.error("Error during shutdown", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       process.exit(1);
     }
   };
 
   // Register shutdown handlers
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   // Keep process running
-  logger.info('Plugin worker is ready and running');
+  logger.info("Plugin worker is ready and running");
 }
 
 // ============================================================================
@@ -237,7 +251,7 @@ async function main(): Promise<void> {
 // In ES modules, check if this is the main module using import.meta.url
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((err) => {
-    console.error('❌ Fatal error in runner:', err);
+    console.error("❌ Fatal error in runner:", err);
     process.exit(1);
   });
 }

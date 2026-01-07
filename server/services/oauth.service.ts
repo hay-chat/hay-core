@@ -682,7 +682,15 @@ export class OAuthService {
     }
 
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance || !instance.config?._oauth) {
+    if (!instance) {
+      throw new Error("Plugin instance not found");
+    }
+
+    // Support both SDK v1 (config._oauth) and SDK v2 (authState)
+    const hasSDKv1OAuth = !!instance.config?._oauth;
+    const hasSDKv2OAuth = !!instance.authState?.credentials?.refreshToken;
+
+    if (!hasSDKv1OAuth && !hasSDKv2OAuth) {
       throw new Error("OAuth not configured for this plugin instance");
     }
 
@@ -707,17 +715,27 @@ export class OAuthService {
       tokenUrl: oauth2Method.tokenUrl,
     };
 
-    // Decrypt config
-    const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+    // Get refresh token from SDK v2 authState or SDK v1 config._oauth
+    let refreshToken: string;
+    let oldTokenData: any = {}; // For preserving scope, etc.
 
-    if (!decryptedConfig._oauth?.tokens?.refresh_token) {
+    if (hasSDKv2OAuth && instance.authState?.credentials?.refreshToken) {
+      // SDK v2: Get refresh token from authState
+      refreshToken = decryptValue(instance.authState.credentials.refreshToken);
+      oldTokenData = {
+        scope: instance.authState.credentials.scope,
+      };
+    } else if (hasSDKv1OAuth) {
+      // SDK v1: Get refresh token from config._oauth (legacy)
+      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+      if (!decryptedConfig._oauth?.tokens?.refresh_token) {
+        throw new Error("No refresh token available");
+      }
+      refreshToken = decryptValue(decryptedConfig._oauth.tokens.refresh_token);
+      oldTokenData = decryptedConfig._oauth.tokens;
+    } else {
       throw new Error("No refresh token available");
     }
-
-    const oauthData = decryptedConfig._oauth;
-
-    // Decrypt refresh token (already validated above that it exists)
-    const refreshToken = decryptValue(oauthData.tokens.refresh_token!);
 
     // Get client credentials from plugin instance using config resolver with env fallback
     const clientIdFieldName = oauth2Method.clientId;

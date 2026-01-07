@@ -12,7 +12,10 @@ import { resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
-import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk-v2.types";
+import type {
+  AuthMethodDescriptor,
+  ConfigFieldDescriptor,
+} from "@server/types/plugin-sdk-v2.types";
 import type { PluginConfigWithOAuth } from "@server/types/oauth.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
@@ -208,10 +211,14 @@ export const getPlugin = authenticatedProcedure
     } else {
       // Use config resolver to get values with .env fallback and metadata
       const resolved = configSchema
-        ? resolveConfigWithEnv(instance.config, configSchema as Record<string, ConfigFieldDescriptor>, {
-            decrypt: true,
-            maskSecrets: true,
-          })
+        ? resolveConfigWithEnv(
+            instance.config,
+            configSchema as Record<string, ConfigFieldDescriptor>,
+            {
+              decrypt: true,
+              maskSecrets: true,
+            },
+          )
         : { values: {}, metadata: {} };
 
       configuration = { ...resolved.values };
@@ -250,7 +257,9 @@ export const getPlugin = authenticatedProcedure
             oauthConfigured = hasClientId && hasClientSecret;
           }
 
-          const configWithOAuth = instance.config ? (decryptConfig(instance.config) as PluginConfigWithOAuth) : {};
+          const configWithOAuth = instance.config
+            ? (decryptConfig(instance.config) as PluginConfigWithOAuth)
+            : {};
           if (configWithOAuth._oauth?.tokens?.access_token) {
             oauthConnected = true;
           }
@@ -432,6 +441,100 @@ export const disablePlugin = authenticatedProcedure
   });
 
 /**
+ * Restart a plugin worker without losing configuration
+ */
+export const restartPlugin = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Verify the plugin instance exists and is enabled
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
+
+    if (!instance) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${plugin.name} is not configured for this organization`,
+      });
+    }
+
+    if (!instance.enabled) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${plugin.name} is disabled. Enable it first before restarting.`,
+      });
+    }
+
+    try {
+      console.log(`🔄 [HAY] Restarting worker for ${plugin.name}...`);
+
+      // SDK v2: Call plugin's disable hook (if worker running)
+      const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+      if (worker && worker.sdkVersion === "v2") {
+        try {
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => abortController.abort(), 5000);
+
+          await fetch(`http://localhost:${worker.port}/disable`, {
+            method: "POST",
+            signal: abortController.signal,
+          });
+
+          clearTimeout(timeoutId);
+          console.log(`✅ Called /disable hook for ${plugin.name} before restart`);
+        } catch (error) {
+          console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+          // Continue anyway - cleanup failure should not block restart
+        }
+      }
+
+      // Stop the worker
+      await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
+      console.log(`🛑 [HAY] Worker stopped for ${plugin.name}`);
+
+      // For MCP plugins, start the worker immediately
+      const manifest = plugin.manifest as any;
+      const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+      if (capabilities.includes("mcp")) {
+        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+        console.log(`✅ [HAY OK] Worker restarted for ${plugin.name}`);
+      }
+
+      return {
+        success: true,
+        message: `Worker for ${plugin.name} restarted successfully`,
+      };
+    } catch (error) {
+      console.error(`❌ [HAY FAILED] Failed to restart plugin ${plugin.name}:`, error);
+
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to restart ${plugin.name}: ${errorMessage}`,
+      });
+    }
+  });
+
+/**
  * Configure a plugin (SDK v2 with auth separation)
  */
 export const configurePlugin = authenticatedProcedure
@@ -501,20 +604,22 @@ export const configurePlugin = authenticatedProcedure
     if (configSchema) {
       const mergedForValidation = {
         ...config,
-        ...(authState?.credentials || {})
+        ...(authState?.credentials || {}),
       };
 
-      const resolved = resolveConfigWithEnv(mergedForValidation, configSchema as Record<string, ConfigFieldDescriptor>, {
-        decrypt: false,
-        maskSecrets: false,
-      });
+      const resolved = resolveConfigWithEnv(
+        mergedForValidation,
+        configSchema as Record<string, ConfigFieldDescriptor>,
+        {
+          decrypt: false,
+          maskSecrets: false,
+        },
+      );
 
       // Check for missing required fields
       for (const [key, field] of Object.entries(configSchema)) {
         if (field.required && !resolved.values[key]) {
-          const envHint = field.env
-            ? ` or set ${field.env} in your environment`
-            : "";
+          const envHint = field.env ? ` or set ${field.env} in your environment` : "";
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Required field "${field.label || key}" is not configured. Please provide a value${envHint}.`,
@@ -719,7 +824,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
     const workerInfo = runnerV2Service.getWorker(ctx.organizationId!, plugin.id);
 
     if (workerInfo) {
-      // Worker is running - try to fetch fresh tools
+      // Worker is running - fetch fresh tools (no fallback to cache)
       try {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 3000); // 3s timeout
@@ -741,13 +846,17 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
             });
           }
         } else {
-          // Worker fetch failed - fall back to database
-          tools = getToolsFromConfig(instance.config);
+          // Worker fetch failed - log error and return empty (don't mask with cached tools)
+          const errorText = await response.text();
+          console.error(
+            `Failed to fetch tools from worker for ${plugin.id}: HTTP ${response.status} - ${errorText}`,
+          );
+          tools = [];
         }
       } catch (error) {
-        // Timeout or network error - fall back to database
-        console.warn(`Failed to fetch tools from worker for ${plugin.id}:`, error);
-        tools = getToolsFromConfig(instance.config);
+        // Timeout or network error - log and return empty (don't mask with cached tools)
+        console.error(`Failed to fetch tools from worker for ${plugin.id}:`, error);
+        tools = [];
       }
     } else {
       // No worker running - use database cache
@@ -974,13 +1083,17 @@ export const testConnection = authenticatedProcedure
     if (authMethods && authMethods.length > 0) {
       // Plugin requires authentication - check if credentials are provided
       const configKeys = Object.keys(instance.config || {});
-      const hasCredentials = configKeys.length > 0 && configKeys.some(key => {
-        const value = instance.config![key];
-        return value !== null && value !== undefined && value !== '';
-      });
+      const hasCredentials =
+        configKeys.length > 0 &&
+        configKeys.some((key) => {
+          const value = instance.config![key];
+          return value !== null && value !== undefined && value !== "";
+        });
 
       if (!hasCredentials) {
-        console.log(`[testConnection] ❌ Plugin requires authentication but no credentials configured`);
+        console.log(
+          `[testConnection] ❌ Plugin requires authentication but no credentials configured`,
+        );
         return {
           success: false,
           status: "unconfigured",
@@ -1014,39 +1127,38 @@ export const testConnection = authenticatedProcedure
       }
 
       if (worker && worker.port) {
-        // Use shared fetchToolsFromWorker service
-        try {
-          console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
-          mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
+        // Use shared fetchToolsFromWorker service - throws on error
+        console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
+        mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
+        console.log(
+          `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`,
+        );
+        if (mcpTools.length > 0) {
           console.log(
-            `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`,
-          );
-          if (mcpTools.length > 0) {
-            console.log(`[testConnection] Tool names:`, mcpTools.map((t: any) => t.name));
-          }
-        } catch (workerError) {
-          console.warn(
-            `[testConnection] ⚠️  Failed to fetch tools from SDK v2 worker for ${input.pluginId}:`,
-            workerError instanceof Error ? workerError.message : workerError,
+            `[testConnection] Tool names:`,
+            mcpTools.map((t: any) => t.name),
           );
         }
       } else {
         console.log(`[testConnection] ⚠️  No worker running for ${input.pluginId}`);
-      }
 
-      // Fallback: Get MCP tools from database config (if worker call fails or no worker running)
-      if (mcpTools.length === 0) {
+        // Only use cached tools when there's no worker at all
         console.log(`[testConnection] 📦 Checking for cached tools in database config...`);
         mcpTools = getToolsFromConfig(instance.config);
         console.log(`[testConnection] Found ${mcpTools.length} cached tools in database`);
         if (mcpTools.length > 0) {
-          console.log(`[testConnection] Cached tool names:`, mcpTools.map((t: any) => t.name));
+          console.log(
+            `[testConnection] Cached tool names:`,
+            mcpTools.map((t: any) => t.name),
+          );
         }
       }
 
       // Verify tools are registered
       if (mcpTools.length === 0) {
-        console.log(`[testConnection] ❌ No tools found (neither from worker nor from database cache)`);
+        console.log(
+          `[testConnection] ❌ No tools found (neither from worker nor from database cache)`,
+        );
         return {
           success: false,
           status: "unhealthy",
@@ -1069,7 +1181,9 @@ export const testConnection = authenticatedProcedure
         testTool = mcpTools.find((t) => {
           const schema = t.inputSchema;
           const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
-          const isReadOnly = safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix));
+          const isReadOnly = safeToolPrefixes.some((prefix) =>
+            t.name.toLowerCase().startsWith(prefix),
+          );
           return hasNoRequiredParams && isReadOnly;
         });
       }
@@ -1095,7 +1209,8 @@ export const testConnection = authenticatedProcedure
         testTool = mcpTools[0];
       }
 
-      const hasRequiredParams = testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
+      const hasRequiredParams =
+        testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
       console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
       console.log(`[testConnection] Tool has required parameters: ${hasRequiredParams}`);
 

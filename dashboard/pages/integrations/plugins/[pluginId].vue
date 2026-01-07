@@ -9,6 +9,11 @@
         </Button>
       </div>
       <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
+        <Button variant="outline" size="sm" @click="handleRestartPlugin" :disabled="restarting">
+          <Loader2 v-if="restarting" class="h-4 w-4 mr-2 animate-spin" />
+          <RotateCw v-else class="h-4 w-4 mr-2" />
+          {{ restarting ? "Restarting..." : "Restart Worker" }}
+        </Button>
         <Button
           variant="secondary"
           size="sm"
@@ -564,6 +569,7 @@ import {
   Package,
   Check,
   Info,
+  RotateCw,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -574,7 +580,7 @@ import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vu
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
 
 // Constants
-const AUTO_TEST_DELAY_MS = 3000; // Wait for metadata to be updated in database
+const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
 
 // Route and router
 const route = useRoute();
@@ -608,6 +614,7 @@ const saving = ref(false);
 const testing = ref(false);
 const enabling = ref(false);
 const disabling = ref(false);
+const restarting = ref(false);
 const showDisableConfirm = ref(false);
 const testResult = ref<{
   success: boolean;
@@ -1260,6 +1267,33 @@ const handleDisablePlugin = async () => {
     toast.error(errorMessage);
   } finally {
     disabling.value = false;
+  }
+};
+
+const handleRestartPlugin = async () => {
+  restarting.value = true;
+
+  try {
+    await Hay.plugins.restart.mutate({
+      pluginId: pluginId.value,
+    });
+
+    toast.success("Plugin worker restarted successfully");
+
+    // Refresh plugin data and test connection after restart
+    await fetchPlugin();
+
+    // Wait a moment for the worker to fully start before testing
+    setTimeout(() => {
+      testConnection();
+    }, 2000);
+  } catch (err: any) {
+    console.error("Failed to restart plugin:", err);
+
+    const errorMessage = err?.message || err?.data?.message || "Failed to restart plugin";
+    toast.error(errorMessage);
+  } finally {
+    restarting.value = false;
   }
 };
 

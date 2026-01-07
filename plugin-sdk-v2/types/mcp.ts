@@ -6,9 +6,9 @@
  * @module @hay/plugin-sdk-v2/types/mcp
  */
 
-import type { HayConfigRuntimeAPI } from './config';
-import type { HayAuthRuntimeAPI } from './auth';
-import type { HayLogger } from './logger';
+import type { HayConfigRuntimeAPI } from "./config";
+import type { HayAuthRuntimeAPI } from "./auth";
+import type { HayLogger } from "./logger";
 
 /**
  * MCP server instance.
@@ -46,6 +46,30 @@ import type { HayLogger } from './logger';
  * @see PLUGIN.md Section 8 (lines 701-750)
  */
 export interface McpServerInstance {
+  /**
+   * List all tools available from the MCP server.
+   *
+   * @returns Array of tool definitions
+   *
+   * @remarks
+   * Called by the platform to discover available tools.
+   * Required for local stdio MCP servers.
+   */
+  listTools?(): Promise<any[]>;
+
+  /**
+   * Call a tool on the MCP server.
+   *
+   * @param name - Tool name
+   * @param args - Tool arguments
+   * @returns Tool execution result
+   *
+   * @remarks
+   * Called by the platform when a tool needs to be executed.
+   * Required for local stdio MCP servers.
+   */
+  callTool?(name: string, args?: Record<string, any>): Promise<any>;
+
   /**
    * Stop the MCP server and clean up resources.
    *
@@ -85,6 +109,92 @@ export interface McpInitializerContext {
    * Logger for MCP server logs.
    */
   logger: HayLogger;
+}
+
+/**
+ * Stdio MCP server options.
+ *
+ * Configuration for spawning a local MCP server as a stdio-based child process.
+ *
+ * @remarks
+ * Use this when you have an MCP server that communicates via stdin/stdout using
+ * the JSON-RPC protocol. This is the most common pattern for local MCP servers.
+ *
+ * The SDK handles all process management, stdio communication, and lifecycle:
+ * - Spawns the child process with the specified command/args
+ * - Sets up JSON-RPC communication over stdin/stdout
+ * - Manages graceful shutdown with SIGTERM/SIGKILL
+ * - Resolves `cwd` relative to the plugin directory
+ *
+ * @example
+ * ```typescript
+ * await ctx.mcp.startLocalStdio({
+ *   id: 'zendesk-mcp',
+ *   command: 'node',
+ *   args: ['index.js'],
+ *   cwd: './mcp',
+ *   env: {
+ *     ZENDESK_SUBDOMAIN: subdomain,
+ *     ZENDESK_EMAIL: email,
+ *     ZENDESK_API_TOKEN: apiToken,
+ *   },
+ * });
+ * ```
+ *
+ * @see PLUGIN.md Section 5.3.4 (lines 525-564)
+ */
+export interface StdioMcpOptions {
+  /**
+   * Unique identifier for this MCP server instance.
+   *
+   * @example "zendesk-mcp", "magento-mcp"
+   */
+  id: string;
+
+  /**
+   * Command to execute (e.g., 'node', 'python', 'deno')
+   *
+   * @example "node", "python3", "deno"
+   */
+  command: string;
+
+  /**
+   * Arguments to pass to the command
+   *
+   * @example ["index.js"], ["server.py"], ["run", "--allow-all", "server.ts"]
+   */
+  args: string[];
+
+  /**
+   * Working directory for the process (relative to plugin directory)
+   *
+   * @remarks
+   * The SDK will resolve this path relative to the plugin's root directory.
+   *
+   * @example "./mcp", "./dist/mcp"
+   */
+  cwd: string;
+
+  /**
+   * Environment variables to pass to the process
+   *
+   * @remarks
+   * These are merged with the current process.env.
+   * Use this to pass credentials and configuration to the MCP server.
+   *
+   * @example { API_KEY: "secret", BASE_URL: "https://api.example.com" }
+   */
+  env?: Record<string, string>;
+
+  /**
+   * Request timeout in milliseconds (default: 30000)
+   *
+   * @remarks
+   * How long to wait for MCP server responses before timing out.
+   *
+   * @default 30000
+   */
+  timeout?: number;
 }
 
 /**
@@ -179,10 +289,38 @@ export interface HayMcpRuntimeAPI {
    */
   startLocal(
     id: string,
-    initializer: (
-      ctx: McpInitializerContext,
-    ) => Promise<McpServerInstance> | McpServerInstance,
+    initializer: (ctx: McpInitializerContext) => Promise<McpServerInstance> | McpServerInstance,
   ): Promise<void>;
+
+  /**
+   * Start a local stdio-based MCP server as a child process.
+   *
+   * This is the recommended way to start local MCP servers that communicate
+   * via stdin/stdout. The SDK handles all process management and JSON-RPC
+   * communication automatically.
+   *
+   * @param options - Stdio MCP server configuration
+   * @returns Promise that resolves when server is started and initialized
+   *
+   * @throws If process fails to start or initialization fails
+   *
+   * @example
+   * ```typescript
+   * await ctx.mcp.startLocalStdio({
+   *   id: 'zendesk-mcp',
+   *   command: 'node',
+   *   args: ['index.js'],
+   *   cwd: './mcp',
+   *   env: {
+   *     ZENDESK_SUBDOMAIN: ctx.config.get('subdomain'),
+   *     ZENDESK_API_TOKEN: ctx.config.get('apiToken'),
+   *   },
+   * });
+   * ```
+   *
+   * @see {@link StdioMcpOptions}
+   */
+  startLocalStdio(options: StdioMcpOptions): Promise<void>;
 
   /**
    * Connect to an external MCP server.
