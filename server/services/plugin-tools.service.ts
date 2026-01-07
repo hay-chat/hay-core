@@ -35,10 +35,7 @@ interface LocalMCPServerConfig {
  * @param pluginId - Plugin identifier for logging
  * @returns Array of tools with serverId
  */
-export async function fetchToolsFromWorker(
-  port: number,
-  pluginId: string
-): Promise<MCPTool[]> {
+export async function fetchToolsFromWorker(port: number, pluginId: string): Promise<MCPTool[]> {
   const maxRetries = 3;
   const timeoutMs = 5000;
   let lastError: Error | null = null;
@@ -54,9 +51,7 @@ export async function fetchToolsFromWorker(
 
     try {
       const url = `http://localhost:${port}/mcp/list-tools`;
-      console.log(
-        `[Tools] 📡 Attempt ${attempt}/${maxRetries}: Fetching ${url}`
-      );
+      console.log(`[Tools] 📡 Attempt ${attempt}/${maxRetries}: Fetching ${url}`);
 
       const response = await fetch(url, {
         signal: abortController.signal,
@@ -74,14 +69,16 @@ export async function fetchToolsFromWorker(
       }
 
       const data = await response.json();
-      console.log(`[Tools] Response data:`, JSON.stringify(data, null, 2));
 
       // Worker returns { tools: [...] }
       const tools = Array.isArray(data.tools) ? data.tools : [];
 
       console.log(`[Tools] ✅ Successfully fetched ${tools.length} tools for ${pluginId}`);
       if (tools.length > 0) {
-        console.log(`[Tools] Tool names:`, tools.map((t: MCPTool) => t.name));
+        console.log(
+          `[Tools] Tool names:`,
+          tools.map((t: MCPTool) => t.name),
+        );
       } else {
         console.log(`[Tools] ⚠️  No tools in response (empty array)`);
       }
@@ -92,14 +89,12 @@ export async function fetchToolsFromWorker(
       lastError = error as Error;
 
       if (error instanceof Error && error.name === "AbortError") {
-        console.warn(
-          `[Tools] ⏱️  Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`
-        );
+        console.warn(`[Tools] ⏱️  Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`);
       } else {
         console.warn(
           `[Tools] ❌ Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
         );
         if (error instanceof Error && error.stack) {
           console.warn(`[Tools] Error stack:`, error.stack);
@@ -129,10 +124,7 @@ export async function fetchToolsFromWorker(
  * @param instanceId - Plugin instance ID
  * @param tools - Tools to store (with serverId)
  */
-export async function storeToolsInConfig(
-  instanceId: string,
-  tools: MCPTool[]
-): Promise<void> {
+export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): Promise<void> {
   // Get current instance
   const instance = await pluginInstanceRepository.findById(instanceId);
   if (!instance) {
@@ -164,7 +156,7 @@ export async function storeToolsInConfig(
   for (const [serverId, serverTools] of toolsByServer.entries()) {
     // Find existing server entry
     const existingServerIndex = config.mcpServers.local.findIndex(
-      (s: LocalMCPServerConfig) => s.serverId === serverId
+      (s: LocalMCPServerConfig) => s.serverId === serverId,
     );
 
     // Remove serverId from tools before storing (it's redundant)
@@ -186,7 +178,7 @@ export async function storeToolsInConfig(
   await pluginInstanceRepository.updateConfig(instanceId, config);
 
   console.log(
-    `[Tools] Stored ${tools.length} tools for instance ${instanceId} across ${toolsByServer.size} server(s)`
+    `[Tools] Stored ${tools.length} tools for instance ${instanceId} across ${toolsByServer.size} server(s)`,
   );
 }
 
@@ -203,7 +195,7 @@ export async function storeToolsInConfig(
 export async function fetchAndStoreTools(
   port: number,
   orgId: string,
-  pluginId: string
+  pluginId: string,
 ): Promise<void> {
   try {
     console.log(`[Tools] Starting tool discovery for ${pluginId}:${orgId}`);
@@ -217,10 +209,7 @@ export async function fetchAndStoreTools(
     }
 
     // Get plugin instance
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      orgId,
-      pluginId
-    );
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(orgId, pluginId);
 
     if (!instance) {
       throw new Error(`Plugin instance not found for ${pluginId}:${orgId}`);
@@ -229,13 +218,11 @@ export async function fetchAndStoreTools(
     // Store tools in config
     await storeToolsInConfig(instance.id, tools);
 
-    console.log(
-      `[Tools] Successfully stored ${tools.length} tools for ${pluginId}:${orgId}`
-    );
+    console.log(`[Tools] Successfully stored ${tools.length} tools for ${pluginId}:${orgId}`);
   } catch (error) {
     console.error(
       `[Tools] Failed to fetch and store tools for ${pluginId}:${orgId}:`,
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
     // Don't throw - this is non-blocking
   }

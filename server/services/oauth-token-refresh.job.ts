@@ -21,18 +21,27 @@ export async function refreshOAuthTokens(): Promise<void> {
 
     for (const instance of instances) {
       try {
-        if (!instance.config?._oauth) {
+        // Support both SDK v1 (config._oauth) and SDK v2 (authState)
+        let expiresAt: number | undefined;
+        let hasRefreshToken = false;
+
+        // SDK v2: Check authState for OAuth credentials
+        if (instance.authState?.credentials) {
+          expiresAt = instance.authState.credentials.expiresAt;
+          hasRefreshToken = !!instance.authState.credentials.refreshToken;
+        }
+        // SDK v1: Check config._oauth for OAuth credentials (fallback)
+        else if (instance.config?._oauth) {
+          const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+          expiresAt = decryptedConfig._oauth?.tokens?.expires_at;
+          hasRefreshToken = !!decryptedConfig._oauth?.tokens?.refresh_token;
+        }
+
+        // Skip if no expiry info or no refresh token
+        if (!expiresAt || !hasRefreshToken) {
           continue;
         }
 
-        const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
-
-        if (!decryptedConfig._oauth?.tokens?.expires_at) {
-          continue; // No expiry info, skip
-        }
-
-        const oauthData = decryptedConfig._oauth;
-        const expiresAt = oauthData.tokens.expires_at!; // Already checked above
         const timeUntilExpiry = expiresAt - now;
 
         // Refresh if expiring within threshold

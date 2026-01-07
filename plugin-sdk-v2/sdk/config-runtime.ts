@@ -6,10 +6,10 @@
  * @module @hay/plugin-sdk-v2/sdk/config-runtime
  */
 
-import type { HayConfigRuntimeAPI } from '../types/index.js';
-import type { PluginRegistry } from './registry.js';
-import type { HayLogger } from '../types/index.js';
-import type { PluginManifest } from './register.js';
+import type { HayConfigRuntimeAPI } from "../types/index.js";
+import type { PluginRegistry } from "./registry.js";
+import type { HayLogger } from "../types/index.js";
+import type { PluginManifest } from "./register.js";
 
 /**
  * Runtime config API options.
@@ -58,9 +58,7 @@ export interface ConfigRuntimeAPIOptions {
  *
  * @internal
  */
-export function createConfigRuntimeAPI(
-  options: ConfigRuntimeAPIOptions,
-): HayConfigRuntimeAPI {
+export function createConfigRuntimeAPI(options: ConfigRuntimeAPIOptions): HayConfigRuntimeAPI {
   const { orgConfig, registry, manifest, logger } = options;
 
   return {
@@ -73,7 +71,7 @@ export function createConfigRuntimeAPI(
       if (result === undefined && descriptor?.required) {
         throw new Error(
           `Config field "${key}" is required but not configured. ` +
-          `Please set this field in the plugin settings or provide via environment variable.`,
+            `Please set this field in the plugin settings or provide via environment variable.`,
         );
       }
 
@@ -89,6 +87,22 @@ export function createConfigRuntimeAPI(
       // Return all registered config field names
       const schema = registry.getConfigSchema();
       return Object.keys(schema);
+    },
+
+    toEnv(mapping: Record<string, string>): Record<string, string> {
+      const env: Record<string, string> = {};
+
+      for (const [configKey, envVarName] of Object.entries(mapping)) {
+        const value = resolveConfigValue(configKey, orgConfig, registry, manifest, logger);
+
+        // Only add to env if value exists and is not null/undefined
+        if (value !== undefined && value !== null) {
+          // Convert value to string for environment variable
+          env[envVarName] = String(value);
+        }
+      }
+
+      return env;
     },
   };
 }
@@ -180,10 +194,10 @@ function parseEnvValue(
 ): any {
   try {
     switch (fieldType) {
-      case 'string':
+      case "string":
         return envValue;
 
-      case 'number': {
+      case "number": {
         const parsed = Number(envValue);
         if (isNaN(parsed)) {
           logger.warn(
@@ -194,12 +208,12 @@ function parseEnvValue(
         return parsed;
       }
 
-      case 'boolean': {
+      case "boolean": {
         const lower = envValue.toLowerCase().trim();
-        if (lower === 'true' || lower === '1' || lower === 'yes') {
+        if (lower === "true" || lower === "1" || lower === "yes") {
           return true;
         }
-        if (lower === 'false' || lower === '0' || lower === 'no' || lower === '') {
+        if (lower === "false" || lower === "0" || lower === "no" || lower === "") {
           return false;
         }
         logger.warn(
@@ -208,7 +222,7 @@ function parseEnvValue(
         return false;
       }
 
-      case 'json': {
+      case "json": {
         try {
           return JSON.parse(envValue);
         } catch (err) {
@@ -220,9 +234,7 @@ function parseEnvValue(
       }
 
       default:
-        logger.warn(
-          `Config field "${fieldName}" has unknown type: ${fieldType}`,
-        );
+        logger.warn(`Config field "${fieldName}" has unknown type: ${fieldType}`);
         return envValue;
     }
   } catch (err) {

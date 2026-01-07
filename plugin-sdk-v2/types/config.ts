@@ -11,7 +11,7 @@
  *
  * Supported field types for plugin configuration.
  */
-export type ConfigFieldType = 'string' | 'number' | 'boolean' | 'json';
+export type ConfigFieldType = "string" | "number" | "boolean" | "json";
 
 /**
  * Config field descriptor.
@@ -273,4 +273,31 @@ export interface HayConfigRuntimeAPI {
    * ```
    */
   keys(): string[];
+
+  /**
+   * Convert config fields to environment variable mappings.
+   *
+   * Helper method for mapping config values to environment variables when spawning
+   * child processes (e.g., MCP servers). Only includes fields that have values.
+   *
+   * @param mapping - Map of config field names to environment variable names
+   * @returns Record of environment variable names to string values
+   *
+   * @example
+   * ```typescript
+   * const env = ctx.config.toEnv({
+   *   apiKey: 'MY_SERVICE_API_KEY',
+   *   baseUrl: 'MY_SERVICE_BASE_URL',
+   *   timeout: 'MY_SERVICE_TIMEOUT',
+   * });
+   * // Result: { MY_SERVICE_API_KEY: '...', MY_SERVICE_BASE_URL: '...' }
+   * // (timeout omitted if not configured)
+   * ```
+   *
+   * @remarks
+   * - Values are converted to strings for environment variables
+   * - Undefined/null values are omitted from the result
+   * - Useful when starting child processes that need credentials
+   */
+  toEnv(mapping: Record<string, string>): Record<string, string>;
 }

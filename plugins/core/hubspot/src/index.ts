@@ -128,10 +128,19 @@ export default defineHayPlugin((globalCtx) => ({
       // Build auth headers
       const authHeaders: Record<string, string> = {};
       if (authState.credentials.accessToken) {
-        authHeaders["Authorization"] = `Bearer ${authState.credentials.accessToken}`;
-        ctx.logger.debug("Added Authorization header with access token");
+        const token = authState.credentials.accessToken as string;
+        authHeaders["Authorization"] = `Bearer ${token}`;
+        ctx.logger.info("✅ Authorization header added", {
+          tokenPreview: token.substring(0, 20) + "...",
+          tokenLength: token.length,
+        });
       } else {
-        ctx.logger.warn("No access token found in auth state - MCP server connection may fail");
+        ctx.logger.error(
+          "❌ No access token found in auth state - MCP server connection will fail",
+          {
+            credentials: authState.credentials,
+          },
+        );
       }
 
       // Connect to external MCP server
