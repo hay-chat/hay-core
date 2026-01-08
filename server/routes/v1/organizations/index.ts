@@ -726,6 +726,7 @@ export const organizationsRouter = t.router({
 
     // Log deletion event (after transaction completes)
     // Note: Can't log to audit_logs since the org is deleted
+    // TODO: Log to external audit service for compliance tracking
     console.log(`Organization deleted: ${orgName} (${orgId}) by user ${ctx.user!.id}`);
 
     return {

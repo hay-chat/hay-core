@@ -113,6 +113,7 @@ const handleDelete = async () => {
   error.value = "";
 
   try {
+    // TODO: Consider adding timeout handling for long-running delete operations
     const result = await Hay.organizations.delete.mutate();
 
     if (result.success) {
@@ -128,14 +129,15 @@ const handleDelete = async () => {
       handleClose();
 
       // Check if user has other organizations
-      const remainingOrgs = userStore.organizations.filter(
-        (org) => org.id !== userStore.activeOrganizationId,
-      );
+      const deletedOrgId = userStore.activeOrganizationId;
+      const remainingOrgs = userStore.organizations.filter((org) => org.id !== deletedOrgId);
 
       if (remainingOrgs.length > 0) {
         // Switch to another organization
-        userStore.setActiveOrganization(remainingOrgs[0].id);
+        // Note: Can't use switchOrganization() as it calls the API which would fail for the deleted org
+        // TODO: Consider adding a removeOrganization action to the store for cleaner state management
         userStore.organizations = remainingOrgs;
+        userStore.setActiveOrganization(remainingOrgs[0].id);
         // Reload the page to refresh all data
         window.location.href = "/";
       } else {

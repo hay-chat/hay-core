@@ -558,6 +558,7 @@ import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
 const toast = useToast();
+const userStore = useUserStore();
 
 const logoUpload = useFileUpload({
   accept: "image/*",
@@ -683,10 +684,7 @@ const agentOptions = computed(() => {
   }));
 });
 
-const isOwner = computed(() => {
-  const userStore = useUserStore();
-  return userStore.isOwner;
-});
+const isOwner = computed(() => userStore.isOwner);
 
 // Methods
 const formatDatePreview = () => {
@@ -824,7 +822,6 @@ const saveSettings = async () => {
 
       // Update the organization name in the user store if it changed
       if ((response.data as any).name) {
-        const userStore = useUserStore();
         const activeOrg = userStore.organizations.find(
           (org: any) => org.id === userStore.activeOrganizationId,
         );
@@ -853,7 +850,6 @@ const removeLogo = async () => {
     organizationLogo.value = null;
 
     // Update the user store to remove the logo immediately
-    const userStore = useUserStore();
     const activeOrg = userStore.organizations.find(
       (org: any) => org.id === userStore.activeOrganizationId,
     );
@@ -872,7 +868,6 @@ const loadOrganizationSettings = async () => {
     organizationLogo.value = (orgSettings as any).logoUrl || null;
 
     // Update the logo in the user store so it shows in the org switcher immediately
-    const userStore = useUserStore();
     const activeOrg = userStore.organizations.find(
       (org: any) => org.id === userStore.activeOrganizationId,
     );
