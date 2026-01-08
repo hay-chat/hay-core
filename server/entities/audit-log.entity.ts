@@ -98,11 +98,11 @@ export class AuditLog extends TypeOrmBaseEntity {
   errorMessage?: string;
 
   // Relationships
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn()
   user?: User;
 
-  @ManyToOne(() => Organization, { nullable: true })
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn()
   organization?: Organization;
 
