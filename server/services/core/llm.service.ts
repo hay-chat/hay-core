@@ -8,6 +8,7 @@ export interface ChatOptions {
   history?: string | Message[];
   prompt?: string;
   jsonSchema?: object;
+  strictSchema?: boolean; // Whether to enforce strict schema adherence (default: true for reliability)
   model?: string;
   temperature?: number;
   max_tokens?: number;
@@ -44,6 +45,7 @@ export class LLMService {
       history,
       prompt,
       jsonSchema,
+      strictSchema = true, // Default to strict mode for guaranteed schema compliance
       model = "gpt-4o",
       temperature = 0.7,
       max_tokens = 2000,
@@ -58,15 +60,23 @@ export class LLMService {
         messages: preparedMessages,
         temperature,
         max_tokens,
-        ...(jsonSchema && {
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "structured_response",
-              schema: jsonSchema as Record<string, unknown>,
-            },
-          },
-        }),
+        ...(jsonSchema && (strictSchema
+          ? {
+              // Structured Outputs with strict schema validation
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "structured_response",
+                  schema: jsonSchema as Record<string, unknown>,
+                  strict: true,
+                },
+              },
+            }
+          : {
+              // JSON mode without strict validation (schema in prompt only)
+              response_format: { type: "json_object" },
+            }
+        )),
       };
 
       if (stream) {

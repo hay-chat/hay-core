@@ -121,7 +121,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
         content.push([
           "img",
           {
-            src: `${config.apiBaseUrl}/plugins/thumbnails/${pluginId}`,
+            src: `${config.apiBaseUrl}/plugins/thumbnails/${encodeURIComponent(pluginId)}`,
             alt: node.attrs.label,
             class: "mention-thumbnail",
           },

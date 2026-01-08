@@ -117,11 +117,27 @@ export interface HayPluginManifest {
     }
   >;
   ui?: {
-    auth?: string;
     settings?: boolean;
     configuration?: string;
     templates?: Record<string, string>;
   };
+  auth?: {
+    type: 'oauth2' | 'apiKey' | 'basic' | 'none';
+    authorizationUrl?: string;
+    tokenUrl?: string;
+    scopes?: string[];
+    optionalScopes?: string[];
+    pkce?: boolean;
+    clientIdEnvVar?: string;
+    clientSecretEnvVar?: string;
+  };
+  settingsExtensions?: Array<{
+    slot: 'before-settings' | 'after-settings' | 'tab';
+    component: string;
+    tabName?: string;
+    tabOrder?: number;
+    props?: Record<string, any>;
+  }>;
 }
 
 export interface WebhookRequest {
@@ -136,4 +152,65 @@ export interface WebhookResponse {
   status: number;
   headers?: Record<string, string>;
   body?: any;
+}
+
+// ============================================================================
+// MCP (Model Context Protocol) Support
+// ============================================================================
+
+/**
+ * MCP Tool Definition
+ * Describes a tool/function that an MCP server provides
+ */
+export interface MCPToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+}
+
+/**
+ * Local MCP Server Configuration
+ * MCP server that runs as a subprocess (stdio communication)
+ */
+export interface LocalMCPServerConfig {
+  serverId: string;
+  serverPath: string;
+  startCommand: string;
+  installCommand?: string;
+  buildCommand?: string;
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
+  env?: Record<string, string>;
+}
+
+/**
+ * Remote MCP Server Configuration
+ * MCP server that runs externally (HTTP/SSE communication)
+ */
+export interface RemoteMCPServerConfig {
+  serverId: string;
+  url: string;
+  transport: "http" | "sse" | "websocket";
+  auth?: {
+    type: "bearer" | "apiKey";
+    token?: string;
+    apiKey?: string;
+  };
+  tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
+}
+
+/**
+ * MCP Servers Configuration
+ * Stored in plugin_instances.config.mcpServers
+ */
+export interface MCPServersConfig {
+  local?: LocalMCPServerConfig[];
+  remote?: RemoteMCPServerConfig[];
+}
+
+/**
+ * Plugin Instance Configuration (extended with MCP support)
+ */
+export interface PluginInstanceConfig {
+  [key: string]: any; // Plugin-specific config fields
+  mcpServers?: MCPServersConfig;
 }

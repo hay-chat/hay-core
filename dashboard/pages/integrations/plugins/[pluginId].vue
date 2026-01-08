@@ -9,6 +9,11 @@
         </Button>
       </div>
       <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
+        <Button variant="outline" size="sm" @click="handleRestartPlugin" :disabled="restarting">
+          <Loader2 v-if="restarting" class="h-4 w-4 mr-2 animate-spin" />
+          <RotateCw v-else class="h-4 w-4 mr-2" />
+          {{ restarting ? "Restarting..." : "Restart Worker" }}
+        </Button>
         <Button
           variant="secondary"
           size="sm"
@@ -136,14 +141,42 @@
         </CardHeader>
       </Card>
 
-      <!-- Connection Error Alert (when enabled and failed) -->
+      <!-- Plugin Extensions - Before Settings Slot (only when NOT enabled) -->
+      <template v-if="!enabled">
+        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
+              :plugin="plugin"
+              :config="{
+                ...formData,
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+            />
+          </CardContent>
+        </Card>
+      </template>
+
+      <!-- Connection Status Alert (when enabled) -->
       <Alert
         v-if="enabled && testResult && !testResult.success"
-        variant="danger"
-        :icon="AlertTriangle"
+        :variant="testResult.status === 'unconfigured' ? 'default' : 'danger'"
+        :icon="testResult.status === 'unconfigured' ? Info : AlertTriangle"
       >
-        <AlertTitle>{{ testResult.message || "Connection failed" }}</AlertTitle>
-        <AlertDescription>
+        <AlertTitle>
+          <span v-if="testResult.status === 'unconfigured'">
+            <Badge variant="secondary" class="mr-2">Needs Authentication</Badge>
+            {{ testResult.message || "Please configure your credentials" }}
+          </span>
+          <span v-else>
+            {{ testResult.message || "Connection failed" }}
+          </span>
+        </AlertTitle>
+        <AlertDescription v-if="testResult.status !== 'unconfigured'">
           <div
             v-if="testResult.error"
             class="font-mono text-xs bg-red-100 dark:bg-red-900/30 p-3 rounded border border-red-200 dark:border-red-800 mt-2"
@@ -203,7 +236,14 @@
               </div>
 
               <!-- MCP Connector Capabilities -->
-              <div v-if="plugin.manifest.capabilities.mcp" class="space-y-3">
+              <div
+                v-if="
+                  Array.isArray(plugin.manifest.capabilities)
+                    ? plugin.manifest.capabilities.includes('mcp')
+                    : plugin.manifest.capabilities.mcp
+                "
+                class="space-y-3"
+              >
                 <div class="flex items-center gap-2">
                   <Cpu class="h-5 w-5 text-primary" />
                   <h4 class="font-medium">MCP Connector</h4>
@@ -228,8 +268,10 @@
         </Card>
 
         <!-- Available Actions Card (for MCP plugins) -->
+        <!-- Note: TypeScript-first plugins don't show tools here as they're registered dynamically -->
         <Card
           v-if="
+            !Array.isArray(plugin.manifest.capabilities) &&
             plugin.manifest?.capabilities?.mcp?.tools &&
             plugin.manifest.capabilities.mcp.tools.length > 0
           "
@@ -262,12 +304,31 @@
         </Card>
       </template>
 
+      <!-- OAuth Connection Card (show when OAuth is available and configured) -->
+      <Card v-if="enabled && oauthAvailable && oauthConfigured">
+        <CardContent>
+          <PluginOAuthConnection
+            :plugin="plugin"
+            :config="{
+              ...formData,
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId,
+            }"
+            :api-base-url="apiBaseUrl"
+            :oauth-available="oauthAvailable"
+            :oauth-configured="oauthConfigured"
+          />
+        </CardContent>
+      </Card>
+
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
-            <component
-              :is="ext.component"
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
               :plugin="plugin"
               :config="{
                 ...formData,
@@ -307,11 +368,14 @@
               <PluginConfigForm
                 v-model:formData="formData"
                 v-model:editingEncryptedFields="editingEncryptedFields"
+                v-model:editingEnvFields="editingEnvFields"
                 :configSchema="configSchema"
                 :originalFormData="originalFormData"
+                :configMetadata="configMetadata"
                 :saving="saving"
                 @submit="saveConfiguration"
                 @reset="resetForm"
+                @reset-to-env="handleResetToEnv"
               />
             </TabsContent>
 
@@ -359,11 +423,14 @@
           <PluginConfigForm
             v-model:formData="formData"
             v-model:editingEncryptedFields="editingEncryptedFields"
+            v-model:editingEnvFields="editingEnvFields"
             :configSchema="configSchema"
             :originalFormData="originalFormData"
+            :configMetadata="configMetadata"
             :saving="saving"
             @submit="saveConfiguration"
             @reset="resetForm"
+            @reset-to-env="handleResetToEnv"
           />
         </CardContent>
       </Card>
@@ -385,32 +452,55 @@
               {{ testing ? "Testing..." : "Test Connection" }}
             </Button>
 
+            {{ testResult }}
+
             <div
               v-if="testResult"
               class="p-4 rounded-lg"
               :class="
                 testResult.success
                   ? 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-200'
-                  : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
+                  : testResult.status === 'unconfigured'
+                    ? 'bg-gray-50 text-gray-800 dark:bg-gray-950/20 dark:text-gray-200'
+                    : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
               "
             >
               <div class="flex items-center space-x-2">
                 <CheckCircle v-if="testResult.success" class="h-5 w-5" />
+                <Info v-else-if="testResult.status === 'unconfigured'" class="h-5 w-5" />
                 <XCircle v-else class="h-5 w-5" />
                 <span class="font-medium">
-                  {{ testResult.success ? "Connection successful!" : "Connection failed" }}
+                  <Badge
+                    v-if="testResult.status === 'unconfigured'"
+                    variant="secondary"
+                    class="mr-2"
+                  >
+                    Needs Authentication
+                  </Badge>
+                  {{
+                    testResult.success
+                      ? "Connection successful!"
+                      : testResult.status === "unconfigured"
+                        ? "Configuration required"
+                        : "Connection failed"
+                  }}
                 </span>
               </div>
               <p v-if="testResult.message" class="mt-2 text-sm">
                 {{ testResult.message }}
               </p>
               <p
-                v-if="!testResult.success && testResult.error"
+                v-if="
+                  !testResult.success && testResult.status !== 'unconfigured' && testResult.error
+                "
                 class="mt-2 text-sm font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800"
               >
                 {{ testResult.error }}
               </p>
-              <p v-if="!testResult.success" class="mt-2 text-xs opacity-75">
+              <p
+                v-if="!testResult.success && testResult.status !== 'unconfigured'"
+                class="mt-2 text-xs opacity-75"
+              >
                 Please check your configuration and try again.
               </p>
             </div>
@@ -422,8 +512,10 @@
       <template v-if="enabled">
         <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
           <CardContent>
-            <component
-              :is="ext.component"
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
               :plugin="plugin"
               :config="{
                 ...formData,
@@ -445,7 +537,7 @@
 </template>
 
 <script setup lang="ts">
-import { markRaw, defineAsyncComponent, computed } from "vue";
+import { markRaw, defineAsyncComponent, computed, onUnmounted } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
@@ -460,11 +552,19 @@ import {
   Database,
   Package,
   Check,
+  Info,
+  RotateCw,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
+import { sanitizeHtml } from "@/utils/sanitize";
+import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
+import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+
+// Constants
+const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
 
 // Route and router
 const route = useRoute();
@@ -473,8 +573,8 @@ const userStore = useUserStore();
 const toast = useToast();
 const runtimeConfig = useRuntimeConfig();
 
-// Plugin ID from route
-const pluginId = computed(() => route.params.pluginId as string);
+// Plugin ID from route (decode in case it contains special characters like /)
+const pluginId = computed(() => decodeURIComponent(route.params.pluginId as string));
 
 // API Base URL from runtime config
 const apiBaseUrl = computed(() => {
@@ -498,9 +598,23 @@ const saving = ref(false);
 const testing = ref(false);
 const enabling = ref(false);
 const disabling = ref(false);
+const restarting = ref(false);
 const showDisableConfirm = ref(false);
-const testResult = ref<{ success: boolean; message?: string; error?: string } | null>(null);
+const testResult = ref<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  status?: string;
+} | null>(null);
 const instanceId = ref<string | null>(null);
+
+// Cleanup tracking for auto-test race condition fix
+const autoTestTimeout = ref<NodeJS.Timeout | null>(null);
+const testAbortController = ref<AbortController | null>(null);
+const instanceAuth = ref<any>(null); // Auth config from plugin instance
+const oauthAvailable = ref(false); // Plugin has OAuth2 registered
+const oauthConfigured = ref(false); // OAuth credentials configured
+const oauthConnected = ref(false); // OAuth flow completed and access token exists
 
 // Configuration
 const hasConfiguration = ref(false);
@@ -510,10 +624,26 @@ const formData = ref<Record<string, any>>({});
 const templateHtml = ref<string | null>(null);
 // Track which encrypted fields are being edited
 const editingEncryptedFields = ref<Set<string>>(new Set());
+// Track configuration metadata (source: env, database, default)
+const configMetadata = ref<Record<string, any>>({});
+// Track which env fields are being overridden
+const editingEnvFields = ref<Set<string>>(new Set());
 
 // Plugin Extensions for slots
-const beforeSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
-const afterSettingsExtensions = ref<Array<{ id: string; component: any }>>([]);
+const beforeSettingsExtensions = ref<
+  Array<{
+    id: string;
+    componentName: string;
+    title?: string;
+  }>
+>([]);
+const afterSettingsExtensions = ref<
+  Array<{
+    id: string;
+    componentName: string;
+    title?: string;
+  }>
+>([]);
 const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
 // Track original values to detect changes
 const originalFormData = ref<Record<string, any>>({});
@@ -532,16 +662,34 @@ const sortedTabExtensions = computed(() => {
 
 // Helper function to load plugin component dynamically using Vite's glob imports
 const loadPluginComponent = async (componentPath: string) => {
-  // Extract plugin name from pluginId (remove 'hay-plugin-' prefix if present)
-  const pluginName = pluginId.value.replace("hay-plugin-", "");
+  // Check if component is from dashboard (starts with @/)
+  if (componentPath.startsWith("@/")) {
+    // Dashboard component - use a resolver map for known components
+    const componentResolvers: Record<string, () => Promise<any>> = {
+      "@/components/plugins/PluginOAuthConnection.vue": () =>
+        import("@/components/plugins/PluginOAuthConnection.vue"),
+    };
 
-  // Build the full path from plugin name and componentPath
-  // The glob pattern is '../../../../plugins/**/*.vue' so we need to match that
+    if (componentResolvers[componentPath]) {
+      try {
+        const module = await componentResolvers[componentPath]();
+        return module.default;
+      } catch (error) {
+        console.error(`Failed to load dashboard component: ${componentPath}`, error);
+        throw new Error(`Dashboard component not found: ${componentPath}. Error: ${error}`);
+      }
+    } else {
+      throw new Error(
+        `Dashboard component not registered: ${componentPath}. Available: ${Object.keys(componentResolvers).join(", ")}`,
+      );
+    }
+  }
+
+  // Plugin component - use discovered components
+  const pluginName = pluginId.value.replace("hay-plugin-", "");
   const fullPath = `../../../../plugins/${pluginName}/${componentPath}`;
 
-  // Check if the component exists in our discovered components
   if (pluginComponents[fullPath]) {
-    // Use defineAsyncComponent for proper async loading
     return defineAsyncComponent(pluginComponents[fullPath]);
   }
 
@@ -577,7 +725,7 @@ const getPluginDisplayName = (name: string) => {
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();
-  return getApiUrl(`/plugins/thumbnails/${pluginId}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
 };
 
 const handleThumbnailError = (event: Event) => {
@@ -592,73 +740,39 @@ const handleThumbnailError = (event: Event) => {
 };
 
 const loadPluginExtensions = async () => {
-  // Load settings extensions from plugin manifest if defined
-  if (!plugin.value?.manifest?.settingsExtensions) {
+  // Load dynamic pages (registered via ctx.register.ui.page())
+  const dynamicPages = plugin.value?.metadata?.pages;
+  if (!dynamicPages || dynamicPages.length === 0) {
+    console.log("[PluginSettings] No pages found in metadata");
     return;
   }
 
-  for (const ext of plugin.value.manifest.settingsExtensions) {
-    try {
-      // Determine which slot array to use
-      let targetExtensions: any = null;
-      if (ext.slot === "before-settings") {
-        targetExtensions = beforeSettingsExtensions;
-      } else if (ext.slot === "after-settings") {
-        targetExtensions = afterSettingsExtensions;
-      } else if (ext.slot === "tab") {
-        targetExtensions = tabExtensions;
-      } else {
-        console.warn(`Unknown slot: ${ext.slot}`);
-        continue;
-      }
+  console.log("[PluginSettings] Loading dynamic pages:", dynamicPages);
 
-      // Check if the extension has a component file path
-      if (ext.component) {
-        // Load component using Vite's dynamic imports
-        const componentModule = await loadPluginComponent(ext.component);
+  // Extract component name from path (e.g., './components/settings/AfterSettings.vue' -> 'AfterSettings')
+  const getComponentName = (componentPath: string): string => {
+    return componentPath.split("/").pop()?.replace(".vue", "") || "";
+  };
 
-        if (ext.slot === "tab") {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
-            component: markRaw(componentModule),
-            name: ext.tabName || "Tab",
-            order: ext.tabOrder,
-          });
-        } else {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}`,
-            component: markRaw(componentModule),
-          });
-        }
-      }
-      // Fallback to inline template if provided (for backward compatibility)
-      else if (ext.template) {
-        const inlineComponent = markRaw({
-          name: `${pluginId.value}-${ext.slot}`,
-          template: ext.template,
-          props: ["plugin", "config"],
-          emits: ["update:config"],
-          setup(props: any, { emit }: any) {
-            return { plugin: props.plugin, config: props.config };
-          },
-        });
+  for (const page of dynamicPages) {
+    const componentName = getComponentName(page.component);
 
-        if (ext.slot === "tab") {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
-            component: inlineComponent,
-            name: ext.tabName || "Tab",
-            order: ext.tabOrder,
-          });
-        } else {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}`,
-            component: inlineComponent,
-          });
-        }
-      }
-    } catch (err) {
-      console.error(`Failed to load extension for slot ${ext.slot}:`, err);
+    // Categorize by slot
+    if (page.slot === "before-settings") {
+      beforeSettingsExtensions.value.push({
+        id: page.id,
+        componentName,
+        title: page.title,
+      });
+    } else if (page.slot === "after-settings") {
+      afterSettingsExtensions.value.push({
+        id: page.id,
+        componentName,
+        title: page.title,
+      });
+    } else if (page.slot === "standalone") {
+      // Future: handle standalone pages (custom routes)
+      console.log("[PluginSettings] Standalone pages not yet supported:", page);
     }
   }
 };
@@ -668,25 +782,57 @@ const fetchPlugin = async () => {
   error.value = null;
 
   try {
-    // Get plugin details
+    // Get plugin details and configuration (consolidated endpoint)
     const pluginData = await Hay.plugins.get.query({
       pluginId: pluginId.value,
     });
+
+    // Plugin metadata
     plugin.value = pluginData;
 
-    // Get configuration
-    const configData = await Hay.plugins.getConfiguration.query({
-      pluginId: pluginId.value,
-    });
-    enabled.value = configData.enabled;
-    instanceId.value = "instanceId" in configData ? configData.instanceId : null;
-    formData.value = { ...configData.configuration };
-    originalFormData.value = { ...configData.configuration }; // Keep a copy of original values
+    // Configuration data
+    enabled.value = pluginData.enabled;
+    instanceId.value = pluginData.instanceId ?? null;
+    formData.value = { ...pluginData.configuration };
+    originalFormData.value = { ...pluginData.configuration }; // Keep a copy of original values
 
-    // Set config schema from manifest
-    if (pluginData.manifest?.configSchema) {
+    // Store config metadata (source: env, database, default)
+    if (pluginData.configMetadata) {
+      configMetadata.value = pluginData.configMetadata;
+    }
+
+    // Store runtime auth config from instance
+    if (pluginData.auth) {
+      instanceAuth.value = pluginData.auth;
+    }
+
+    // Store OAuth availability, configuration, and connection status
+    if (pluginData.oauthAvailable !== undefined) {
+      oauthAvailable.value = pluginData.oauthAvailable;
+      console.log("[Plugin Settings] OAuth available:", pluginData.oauthAvailable);
+    }
+    if (pluginData.oauthConfigured !== undefined) {
+      oauthConfigured.value = pluginData.oauthConfigured;
+      console.log("[Plugin Settings] OAuth configured:", pluginData.oauthConfigured);
+    }
+    if (pluginData.oauthConnected !== undefined) {
+      oauthConnected.value = pluginData.oauthConnected;
+      console.log("[Plugin Settings] OAuth connected:", pluginData.oauthConnected);
+    }
+
+    console.log("[Plugin Settings] OAuth state:", {
+      oauthAvailable: oauthAvailable.value,
+      oauthConfigured: oauthConfigured.value,
+      oauthConnected: oauthConnected.value,
+      enabled: enabled.value,
+    });
+
+    // Set config schema from metadata or manifest (legacy)
+    const effectiveConfigSchema =
+      pluginData.metadata?.configSchema || pluginData.manifest?.configSchema;
+    if (effectiveConfigSchema && Object.keys(effectiveConfigSchema).length > 0) {
       hasConfiguration.value = true;
-      configSchema.value = pluginData.manifest.configSchema;
+      configSchema.value = effectiveConfigSchema;
 
       // Initialize form data with defaults
       Object.entries(configSchema.value).forEach(([key, field]: [string, any]) => {
@@ -704,7 +850,8 @@ const fetchPlugin = async () => {
         });
         if (templateData.template) {
           hasCustomTemplate.value = true;
-          templateHtml.value = templateData.template;
+          // Sanitize HTML to prevent XSS attacks
+          templateHtml.value = sanitizeHtml(templateData.template);
         }
       } catch (err) {
         console.log("No custom template, using auto-generated form");
@@ -720,10 +867,10 @@ const fetchPlugin = async () => {
     loading.value = false;
 
     // Auto-test connection asynchronously (don't block page load)
-    // We check configData here instead of enabled.value because loading.value = false happens after this
-    if (enabled.value && hasConfiguration.value && Object.keys(formData.value).length > 0) {
-      // Test connection automatically when settings exist (async, non-blocking)
-      testConnection();
+    // Wait 3 seconds to ensure metadata has been updated in the database
+    if (enabled.value) {
+      console.log("[Plugin] Enabled, checking auth methods:", plugin.value);
+      scheduleAutoTest();
     }
   }
 };
@@ -737,6 +884,13 @@ const saveConfiguration = async () => {
 
     for (const [key, value] of Object.entries(formData.value)) {
       const field = configSchema.value[key];
+      const metadata = configMetadata.value[key];
+
+      // Skip env fields that haven't been overridden
+      if (metadata?.source === "env" && !editingEnvFields.value.has(key)) {
+        // Don't send to server, let it use env fallback
+        continue;
+      }
 
       // Handle encrypted fields
       if (
@@ -766,17 +920,15 @@ const saveConfiguration = async () => {
       configuration: cleanedConfig,
     });
 
-    // Clear editing state for encrypted fields
+    // Clear editing state for encrypted and env fields
     editingEncryptedFields.value.clear();
+    editingEnvFields.value.clear();
 
     // Show success toast
     toast.success("Configuration saved successfully");
 
-    // Update original form data to reflect new saved state
-    originalFormData.value = { ...cleanedConfig };
-
-    // Test connection after saving
-    await testConnection();
+    // Reload the entire plugin configuration to get fresh state
+    await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
 
@@ -790,21 +942,148 @@ const saveConfiguration = async () => {
 
 const resetForm = async () => {
   // Reload configuration from server
-  const configData = await Hay.plugins.getConfiguration.query({
+  const pluginData = await Hay.plugins.get.query({
     pluginId: pluginId.value,
   });
-  formData.value = { ...configData.configuration };
-  originalFormData.value = { ...configData.configuration };
-  // Clear any editing state for encrypted fields
+  formData.value = { ...pluginData.configuration };
+  originalFormData.value = { ...pluginData.configuration };
+
+  // Store config metadata
+  if (pluginData.configMetadata) {
+    configMetadata.value = pluginData.configMetadata;
+  }
+
+  // Update OAuth state
+  if (pluginData.oauthAvailable !== undefined) {
+    oauthAvailable.value = pluginData.oauthAvailable;
+  }
+  if (pluginData.oauthConfigured !== undefined) {
+    oauthConfigured.value = pluginData.oauthConfigured;
+  }
+  if (pluginData.oauthConnected !== undefined) {
+    oauthConnected.value = pluginData.oauthConnected;
+  }
+
+  // Clear any editing state for encrypted and env fields
   editingEncryptedFields.value.clear();
+  editingEnvFields.value.clear();
+};
+
+const handleResetToEnv = async (key: string) => {
+  try {
+    // Remove the field from formData
+    const newFormData = { ...formData.value };
+    delete newFormData[key];
+
+    // Save immediately with the field removed
+    await Hay.plugins.configure.mutate({
+      pluginId: pluginId.value,
+      configuration: newFormData,
+    });
+
+    // Show success toast
+    toast.success("Reset to environment variable");
+
+    // Reload plugin configuration to refresh state
+    await fetchPlugin();
+  } catch (err: any) {
+    console.error("Failed to reset to env:", err);
+    const errorMessage =
+      err?.message || err?.data?.message || "Failed to reset to environment variable";
+    toast.error(errorMessage);
+  }
+};
+
+/**
+ * Check if authentication is properly configured based on auth method type
+ */
+const isAuthConfigured = (): boolean => {
+  const authMethods = plugin.value?.metadata?.authMethods || plugin.value?.manifest?.authMethods;
+
+  if (!authMethods || authMethods.length === 0) {
+    // No auth required
+    return true;
+  }
+
+  const hasOAuth2 = authMethods.some((m: any) => m.type === "oauth2");
+
+  if (hasOAuth2) {
+    // OAuth2: check if OAuth flow is complete
+    return oauthConnected.value;
+  }
+
+  // API key/other auth: check if required config fields are filled
+  const authConfigFields = authMethods
+    .filter((m: any) => m.type === "apiKey")
+    .map((m: any) => m.configField)
+    .filter(Boolean);
+
+  if (authConfigFields.length === 0) {
+    return false;
+  }
+
+  // Check if all auth config fields have values
+  return authConfigFields.every((field: string) => {
+    const value = formData.value[field];
+    // Accept masked values (e.g., '********') as valid
+    return value !== null && value !== undefined && value !== "";
+  });
+};
+
+const scheduleAutoTest = () => {
+  // Clear any existing timeout to prevent duplicate tests
+  if (autoTestTimeout.value) {
+    clearTimeout(autoTestTimeout.value);
+    autoTestTimeout.value = null;
+  }
+
+  autoTestTimeout.value = setTimeout(() => {
+    // Don't run if already testing
+    if (testing.value) {
+      console.log("[Plugin] Test already in progress, skipping auto-test");
+      return;
+    }
+
+    // Check if authentication is configured
+    if (isAuthConfigured()) {
+      console.log("[Plugin] Auth configured, testing connection...");
+      testConnection();
+    } else {
+      console.log("[Plugin] Auth not configured yet, skipping auto-test");
+    }
+
+    // Clear the timeout reference after it fires
+    autoTestTimeout.value = null;
+  }, AUTO_TEST_DELAY_MS);
 };
 
 const testConnection = async () => {
+  // Prevent concurrent tests
+  if (testing.value) {
+    console.log("[Plugin] Test already in progress, skipping");
+    return;
+  }
+
+  // Abort any existing test
+  if (testAbortController.value) {
+    testAbortController.value.abort();
+  }
+
   testing.value = true;
   // Don't clear testResult immediately - keep showing previous result while testing
 
+  // Create abort controller for this test
+  testAbortController.value = new AbortController();
+  const currentController = testAbortController.value;
+
   try {
     const result = await Hay.plugins.testConnection.query({ pluginId: pluginId.value });
+
+    // Check if this request was aborted
+    if (currentController.signal.aborted) {
+      console.log("[Plugin] Test was aborted");
+      return;
+    }
 
     testResult.value = {
       success: result.success,
@@ -814,12 +1093,22 @@ const testConnection = async () => {
       error: result.error, // Include detailed error information
     };
   } catch (err: any) {
+    // Check if this was an abort
+    if (err?.name === "AbortError" || currentController.signal.aborted) {
+      console.log("[Plugin] Test aborted");
+      return;
+    }
+
     testResult.value = {
       success: false,
       message: err?.message || "Failed to establish connection. Please check your configuration.",
     };
   } finally {
-    testing.value = false;
+    // Only clear testing state if this controller is still active
+    if (testAbortController.value === currentController) {
+      testing.value = false;
+      testAbortController.value = null;
+    }
   }
 };
 
@@ -868,28 +1157,55 @@ const handleDisablePlugin = async () => {
   }
 };
 
+const handleRestartPlugin = async () => {
+  restarting.value = true;
+
+  try {
+    await Hay.plugins.restart.mutate({
+      pluginId: pluginId.value,
+    });
+
+    toast.success("Plugin worker restarted successfully");
+
+    // Refresh plugin data and test connection after restart
+    await fetchPlugin();
+
+    // Wait a moment for the worker to fully start before testing
+    setTimeout(() => {
+      testConnection();
+    }, 2000);
+  } catch (err: any) {
+    console.error("Failed to restart plugin:", err);
+
+    const errorMessage = err?.message || err?.data?.message || "Failed to restart plugin";
+    toast.error(errorMessage);
+  } finally {
+    restarting.value = false;
+  }
+};
+
 // Handle OAuth callback redirect
 const handleOAuthCallback = () => {
   const oauthStatus = route.query.oauth as string | undefined;
 
-  if (oauthStatus === 'success') {
-    toast.success('OAuth connection established successfully');
+  if (oauthStatus === "success") {
+    toast.success("OAuth connection established successfully");
 
     // Clean up URL by removing query params
     router.replace({
       path: route.path,
-      query: {}
+      query: {},
     });
 
     // Reload plugin data to refresh OAuth connection status
     fetchPlugin();
-  } else if (oauthStatus === 'error') {
-    toast.error('OAuth connection failed. Please try again.');
+  } else if (oauthStatus === "error") {
+    toast.error("OAuth connection failed. Please try again.");
 
     // Clean up URL
     router.replace({
       path: route.path,
-      query: {}
+      query: {},
     });
   }
 };
@@ -902,6 +1218,23 @@ onMounted(() => {
   // Then fetch plugin normally
   if (!route.query.oauth) {
     fetchPlugin();
+  }
+});
+
+// Cleanup on unmount to prevent race conditions
+onUnmounted(() => {
+  // Clear auto-test timeout if it exists
+  if (autoTestTimeout.value) {
+    console.log("[Plugin] Clearing auto-test timeout on unmount");
+    clearTimeout(autoTestTimeout.value);
+    autoTestTimeout.value = null;
+  }
+
+  // Abort any ongoing test requests
+  if (testAbortController.value) {
+    console.log("[Plugin] Aborting ongoing test request on unmount");
+    testAbortController.value.abort();
+    testAbortController.value = null;
   }
 });
 

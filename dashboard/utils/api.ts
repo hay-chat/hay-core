@@ -14,7 +14,14 @@ function getAuthToken(): string {
 
 function getOrganizationId(): string {
   const userStore = useUserStore();
-  return userStore.activeOrganization?.id || "";
+  const orgId = userStore.activeOrganization?.id || "";
+
+  // If no org ID and we're authenticated, try to get it from the first organization
+  if (!orgId && userStore.user?.organizations?.length) {
+    return userStore.user.organizations[0].id;
+  }
+
+  return orgId;
 }
 
 // Check if token is about to expire (within 1 minute)

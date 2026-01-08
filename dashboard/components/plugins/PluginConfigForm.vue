@@ -7,31 +7,94 @@
           {{ field.label || key }}
           <Lock v-if="field.encrypted" class="inline-block h-3 w-3 ml-1 text-neutral-muted" />
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
+        <p v-if="field.description" class="text-xs text-neutral-muted !mt-0">
           {{ field.description }}
         </p>
 
-        <!-- Encrypted field with edit mode -->
+        <!-- Environment variable field (not yet overridden) -->
         <div
-          v-if="field.encrypted && originalFormData[key] && /^\*+$/.test(originalFormData[key])"
+          v-if="
+            configMetadata?.[key]?.source === 'env' &&
+            configMetadata[key]?.canOverride &&
+            !editingEnvFields.has(key)
+          "
           class="space-y-2"
         >
-          <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2">
             <Input
               :id="key"
-              value="••••••••"
-              type="password"
+              value="Environment variable"
+              type="text"
               disabled
               class="flex-1 bg-muted"
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              @click="handleEditEncryptedField(key)"
-            >
+            <Button type="button" variant="outline" @click="handleEditEnvField(key)">
+              <Edit3 class="h-4 w-4 mr-1" />
+              Override
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            This setting is configured locally. Click override to set an organization-specific
+            value.
+          </p>
+        </div>
+
+        <!-- Environment variable field being edited (override mode) -->
+        <div
+          v-else-if="
+            configMetadata?.[key]?.source === 'env' &&
+            configMetadata[key]?.canOverride &&
+            editingEnvFields.has(key)
+          "
+          class="space-y-2"
+        >
+          <div class="flex items-center space-x-2">
+            <Input
+              :id="key"
+              :model-value="formData[key]"
+              @update:model-value="updateFormData(key, $event)"
+              :type="field.encrypted ? 'password' : 'text'"
+              :placeholder="field.placeholder || undefined"
+              :required="field.required"
+              class="flex-1"
+              autofocus
+            />
+            <Button type="button" size="sm" variant="ghost" @click="handleCancelEditEnvField(key)">
+              <X class="h-4 w-4" />
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            Overriding environment variable. Click X to revert to local configuration.
+          </p>
+        </div>
+
+        <!-- Encrypted field with edit mode -->
+        <!-- Show for database-sourced encrypted fields only -->
+        <div
+          v-if="
+            field.encrypted &&
+            originalFormData[key] !== undefined &&
+            originalFormData[key] !== '' &&
+            originalFormData[key] !== null &&
+            configMetadata?.[key]?.source === 'database'
+          "
+          class="space-y-2"
+        >
+          <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
+            <Input :id="key" value="Encrypted value" type="text" disabled class="flex-1 bg-muted" />
+            <Button type="button" variant="outline" @click="handleEditEncryptedField(key)">
               <Edit3 class="h-4 w-4 mr-1" />
               Edit
+            </Button>
+            <!-- Show Reset button if field has env fallback -->
+            <Button
+              v-if="configMetadata?.[key]?.hasEnvFallback"
+              type="button"
+              variant="ghost"
+              @click="handleResetToEnv(key)"
+            >
+              <RotateCcw class="h-4 w-4 mr-1" />
+              Reset
             </Button>
           </div>
 
@@ -41,28 +104,72 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               type="password"
-              :placeholder="'Enter new ' + (field.label || key).toLowerCase()"
+              :placeholder="field.placeholder || undefined"
               :required="field.required"
               class="flex-1"
               autofocus
             />
-            <Button type="button" size="sm" variant="ghost" @click="handleCancelEditEncryptedField(key)">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              @click="handleCancelEditEncryptedField(key)"
+            >
               <X class="h-4 w-4" />
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            This value is encrypted and stored securely. Click edit to update it.
+            This value is encrypted and stored securely.
+            {{
+              configMetadata?.[key]?.hasEnvFallback
+                ? " Click Reset to revert to environment variable."
+                : " Click edit to update it."
+            }}
           </p>
         </div>
 
-        <!-- Regular input or new encrypted field -->
-        <div v-else>
+        <!-- Non-encrypted database field with env fallback (show with reset button) -->
+        <div
+          v-else-if="
+            !field.encrypted &&
+            configMetadata?.[key]?.source === 'database' &&
+            configMetadata?.[key]?.hasEnvFallback
+          "
+          class="space-y-2"
+        >
+          <div class="flex items-center space-x-2">
+            <Input
+              :id="key"
+              :model-value="formData[key]"
+              @update:model-value="updateFormData(key, $event)"
+              type="text"
+              :placeholder="field.placeholder || undefined"
+              :required="field.required"
+              class="flex-1"
+            />
+            <Button type="button" variant="ghost" @click="handleResetToEnv(key)">
+              <RotateCcw class="h-4 w-4 mr-1" />
+              Reset
+            </Button>
+          </div>
+          <p class="text-xs text-neutral-muted">
+            Overriding environment variable. Click Reset to revert to local configuration.
+          </p>
+        </div>
+
+        <!-- Regular input or empty encrypted field (first time) -->
+        <!-- Don't show if it's an env-sourced field (already handled above) -->
+        <div
+          v-else-if="
+            (field.encrypted || !field.encrypted) && configMetadata?.[key]?.source !== 'env'
+          "
+        >
           <Input
             :id="key"
             :model-value="formData[key]"
             @update:model-value="updateFormData(key, $event)"
             :type="field.encrypted ? 'password' : 'text'"
-            :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+            :placeholder="field.placeholder || undefined"
             :required="field.required"
           />
           <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
@@ -76,7 +183,7 @@
         <Label :for="key" :required="field.required">
           {{ field.label || key }}
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
+        <p v-if="field.description" class="text-sm mt-0 text-neutral-muted">
           {{ field.description }}
         </p>
         <select
@@ -122,7 +229,7 @@
           :id="key"
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event)"
-          :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+          :placeholder="field.placeholder || undefined"
           :rows="4"
           :required="field.required"
         />
@@ -141,7 +248,7 @@
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event === '' ? undefined : Number($event))"
           type="number"
-          :placeholder="field.placeholder || 'Enter ' + (field.label || key).toLowerCase()"
+          :placeholder="field.placeholder || undefined"
           :required="field.required"
         />
       </template>
@@ -149,15 +256,13 @@
 
     <div class="flex justify-end space-x-2 pt-4">
       <Button type="button" variant="outline" @click="$emit('reset')"> Reset </Button>
-      <Button type="submit" :disabled="saving" :loading="saving">
-        Save Configuration
-      </Button>
+      <Button type="submit" :disabled="saving" :loading="saving"> Save Configuration </Button>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
-import { Lock, Edit3, X } from "lucide-vue-next";
+import { Lock, Edit3, X, RotateCcw } from "lucide-vue-next";
 
 interface FieldSchema {
   type: "string" | "select" | "boolean" | "textarea" | "number";
@@ -166,7 +271,15 @@ interface FieldSchema {
   placeholder?: string;
   required?: boolean;
   encrypted?: boolean;
+  env?: string;
   options?: Array<{ value: string; label: string }>;
+}
+
+interface ConfigFieldMetadata {
+  source: "env" | "database" | "default";
+  canOverride: boolean;
+  isEncrypted: boolean;
+  hasEnvFallback?: boolean;
 }
 
 interface Props {
@@ -174,16 +287,21 @@ interface Props {
   formData: Record<string, any>;
   originalFormData: Record<string, any>;
   editingEncryptedFields: Set<string>;
+  configMetadata?: Record<string, ConfigFieldMetadata>;
   saving?: boolean;
 }
 
 const props = defineProps<Props>();
 
+const editingEnvFields = ref<Set<string>>(new Set());
+
 const emit = defineEmits<{
   "update:formData": [value: Record<string, any>];
   "update:editingEncryptedFields": [value: Set<string>];
+  "update:editingEnvFields": [value: Set<string>];
   submit: [];
   reset: [];
+  "reset-to-env": [key: string];
 }>();
 
 function updateFormData(key: string, value: any) {
@@ -204,5 +322,54 @@ function handleCancelEditEncryptedField(key: string) {
   emit("update:editingEncryptedFields", newSet);
   // Restore masked value
   updateFormData(key, props.originalFormData[key]);
+}
+
+function handleEditEnvField(key: string) {
+  const newSet = new Set(editingEnvFields.value);
+  newSet.add(key);
+  editingEnvFields.value = newSet;
+  emit("update:editingEnvFields", newSet);
+  // Clear the value to allow user to enter their own
+  updateFormData(key, "");
+}
+
+function handleCancelEditEnvField(key: string) {
+  // Validate that the field exists in configSchema
+  if (!props.configSchema[key]) {
+    console.error(`Cannot cancel edit for non-existent field: ${key}`);
+    return;
+  }
+
+  // Validate that it's actually an env field
+  if (props.configMetadata?.[key]?.source !== 'env') {
+    console.error(`Cannot cancel edit for non-env field: ${key}`);
+    return;
+  }
+
+  const newSet = new Set(editingEnvFields.value);
+  newSet.delete(key);
+  editingEnvFields.value = newSet;
+  emit("update:editingEnvFields", newSet);
+  // Remove from formData to revert to env
+  const newFormData = { ...props.formData };
+  delete newFormData[key];
+  emit("update:formData", newFormData);
+}
+
+function handleResetToEnv(key: string) {
+  // Validate that the field exists in configSchema
+  if (!props.configSchema[key]) {
+    console.error(`Cannot reset non-existent field: ${key}`);
+    return;
+  }
+
+  // Validate that the field has an env fallback
+  if (!props.configMetadata?.[key]?.hasEnvFallback) {
+    console.error(`Cannot reset field without env fallback: ${key}`);
+    return;
+  }
+
+  // Emit event to parent to handle the reset and save
+  emit("reset-to-env", key);
 }
 </script>

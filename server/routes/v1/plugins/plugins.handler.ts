@@ -5,18 +5,27 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
-import { processManagerService } from "@server/services/process-manager.service";
+import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
+import { resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
+import { PluginStatus } from "@server/entities/plugin-registry.entity";
+import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
+import { fetchToolsFromWorker, fetchAndStoreTools } from "@server/services/plugin-tools.service";
+import { readFile } from "fs/promises";
+import { join, resolve } from "path";
+import { existsSync } from "fs";
 
 interface PluginHealthCheckResult {
   success: boolean;
   status: "healthy" | "unhealthy" | "unconfigured";
   message?: string;
   error?: string;
+  tools?: Array<{ name: string; description: string }>;
   testedAt: Date;
 }
 
@@ -35,30 +44,44 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
     .filter((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
       // Filter out invisible plugins from the marketplace listing
-      return !manifest.invisible;
+      if (manifest.invisible) return false;
+
+      // Filter out plugins marked as not_found (source files removed)
+      if (plugin.status === PluginStatus.NOT_FOUND) return false;
+
+      return true;
     })
     .map((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
+
+      // Use metadata for runtime config
+      const configSchema = plugin.metadata?.configSchema || {};
+      // Capabilities remain in manifest
+      const capabilities = manifest.capabilities;
+
       const result = {
         id: plugin.pluginId, // Use pluginId as the identifier for frontend
         dbId: plugin.id, // Keep database ID for reference
         name: plugin.name,
         version: plugin.version,
         type: manifest.type,
-        description: manifest.configSchema
-          ? Object.values(manifest.configSchema)[0]?.description
+        description: configSchema
+          ? Object.values(configSchema)[0]?.description
           : `${plugin.name} plugin`,
         installed: plugin.installed,
         built: plugin.built,
         enabled: enabledPluginIds.has(plugin.id),
-        hasConfiguration: !!manifest.configSchema,
+        configSchema, // Runtime config schema from metadata
+        hasConfiguration: Object.keys(configSchema).length > 0,
         hasCustomUI: !!manifest.ui?.configuration,
-        capabilities: manifest.capabilities,
+        capabilities, // From manifest
         features: manifest.capabilities?.chat_connector?.features || {},
         sourceType: plugin.sourceType,
         isCustom: plugin.sourceType === "custom",
         uploadedAt: plugin.uploadedAt,
         uploadedBy: plugin.uploadedBy,
+        status: plugin.status || PluginStatus.AVAILABLE, // Include status field
+        metadata: plugin.metadata, // Include full metadata
       };
 
       return result;
@@ -74,7 +97,7 @@ export const getPlugin = authenticatedProcedure
       pluginId: z.string(),
     }),
   )
-  .query(async ({ input }) => {
+  .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
     if (!plugin) {
@@ -84,16 +107,182 @@ export const getPlugin = authenticatedProcedure
       });
     }
 
+    // Check if plugin source files are missing
+    if (plugin.status === PluginStatus.NOT_FOUND) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} source files not found. The plugin may have been removed.`,
+      });
+    }
+
     const manifest = plugin.manifest as HayPluginManifest;
+
+    // Get plugin instance for this organization
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
+
+    // Use cached metadata first, then try worker if needed
+    let configSchema = manifest.configSchema;
+
+    // Return cached metadata even when not enabled
+    if (plugin.metadata?.configSchema) {
+      configSchema = plugin.metadata.configSchema;
+    }
+
+    // For enabled plugins, try fetching fresh metadata from worker
+    if (instance && instance.enabled) {
+      try {
+        const runner = getPluginRunnerService();
+        const worker = runner.getWorker(ctx.organizationId!, input.pluginId);
+        if (worker && worker.port) {
+          const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            if (metadata.configSchema) {
+              configSchema = metadata.configSchema;
+            }
+            // Update database metadata
+            await pluginRegistryRepository.updateMetadata(input.pluginId, {
+              ...metadata,
+              updatedAt: new Date(),
+            });
+
+            // Update in-memory registry
+            const updatedPlugin = pluginManagerService.getPlugin(input.pluginId);
+            if (updatedPlugin) {
+              updatedPlugin.metadata = metadata;
+            }
+          }
+        } else {
+          // Worker not running, try to start it
+          const newWorker = await runner.startWorker(ctx.organizationId!, input.pluginId);
+          if (newWorker && newWorker.port) {
+            const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
+            if (metadataResponse2.ok) {
+              const metadata2 = await metadataResponse2.json();
+              if (metadata2.configSchema) {
+                configSchema = metadata2.configSchema;
+              }
+              // Update database metadata
+              await pluginRegistryRepository.updateMetadata(input.pluginId, {
+                ...metadata2,
+                updatedAt: new Date(),
+              });
+
+              // Update in-memory registry
+              const updatedPlugin2 = pluginManagerService.getPlugin(input.pluginId);
+              if (updatedPlugin2) {
+                updatedPlugin2.metadata = metadata2;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `[getPlugin] Failed to fetch metadata from worker for ${input.pluginId}:`,
+          error,
+        );
+      }
+    }
+
+    // Build configuration data
+    let configuration: Record<string, any> = {};
+    let configMetadata: Record<string, any> = {};
+    let oauthAvailable = false;
+    let oauthConfigured = false;
+    let oauthConnected = false;
+
+    if (!instance) {
+      // Return default configuration from manifest or worker metadata
+      if (configSchema) {
+        Object.entries(configSchema).forEach(([key, field]) => {
+          if (field.default !== undefined) {
+            configuration[key] = field.default;
+          }
+        });
+      }
+    } else {
+      // Use config resolver to get values with .env fallback and metadata
+      const resolved = configSchema
+        ? resolveConfigWithEnv(
+            instance.config,
+            configSchema as Record<string, ConfigFieldDescriptor>,
+            {
+              decrypt: true,
+              maskSecrets: true,
+            },
+          )
+        : { values: {}, metadata: {} };
+
+      configuration = { ...resolved.values };
+      configMetadata = resolved.metadata;
+
+      // Add auth credentials (encrypted fields) and mask them
+      if (instance.authState?.credentials) {
+        for (const [key, value] of Object.entries(instance.authState.credentials)) {
+          if (value !== null && value !== undefined) {
+            configuration[key] = "*".repeat(8);
+          }
+        }
+      }
+
+      // Check OAuth status
+      if (plugin.metadata?.authMethods) {
+        const oauth2Method = plugin.metadata.authMethods.find(
+          (method: AuthMethodDescriptor) => method.type === "oauth2",
+        );
+        if (oauth2Method) {
+          oauthAvailable = true;
+
+          const clientIdFieldName = oauth2Method.clientId;
+          const clientSecretFieldName = oauth2Method.clientSecret;
+
+          if (clientIdFieldName && clientSecretFieldName) {
+            const hasClientId = !!(
+              resolved.metadata[clientIdFieldName]?.value ||
+              instance.authState?.credentials?.[clientIdFieldName]
+            );
+            const hasClientSecret = !!(
+              resolved.metadata[clientSecretFieldName]?.value ||
+              instance.authState?.credentials?.[clientSecretFieldName]
+            );
+
+            oauthConfigured = hasClientId && hasClientSecret;
+          }
+
+          // Check if OAuth is connected via authState
+          if (instance.authState?.credentials?.accessToken) {
+            oauthConnected = true;
+          }
+        }
+      }
+    }
+
     return {
-      id: plugin.pluginId, // Use pluginId as the identifier
-      dbId: plugin.id, // Keep database ID for reference
+      // Plugin metadata
+      id: plugin.pluginId,
+      dbId: plugin.id,
       name: plugin.name,
       version: plugin.version,
       type: manifest.type,
-      manifest: manifest,
+      pluginPath: plugin.pluginPath,
+      manifest,
+      metadata: plugin.metadata,
       installed: plugin.installed,
       built: plugin.built,
+      status: plugin.status || PluginStatus.AVAILABLE,
+
+      // Configuration data (from getPluginConfiguration)
+      configuration,
+      configMetadata,
+      enabled: instance ? instance.enabled : false,
+      instanceId: instance ? instance.id : null,
+      oauthAvailable,
+      oauthConfigured,
+      oauthConnected,
+      auth: instance ? instance.authState : undefined,
     };
   });
 
@@ -155,6 +344,22 @@ export const enablePlugin = authenticatedProcedure
 
       console.log(`✅ [HAY OK] Plugin ${plugin.name} successfully enabled`);
 
+      // For MCP plugins, start the worker immediately so it can register its MCP servers
+      const manifest = plugin.manifest as any;
+      const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+      if (capabilities.includes("mcp")) {
+        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        try {
+          await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+          console.log(`✅ [HAY OK] Worker started for ${plugin.name}`);
+        } catch (workerError) {
+          console.error(`⚠️ [HAY WARNING] Failed to start worker for ${plugin.name}:`, workerError);
+          // Don't fail the entire enable operation if worker fails to start
+          // The worker can be started later on-demand
+        }
+      }
+
       return {
         success: true,
         instance,
@@ -197,6 +402,30 @@ export const disablePlugin = authenticatedProcedure
       });
     }
 
+    // Call plugin's disable hook (if worker running)
+    const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+    if (worker) {
+      try {
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 5000);
+
+        await fetch(`http://localhost:${worker.port}/disable`, {
+          method: "POST",
+          signal: abortController.signal,
+        });
+
+        clearTimeout(timeoutId);
+        console.log(`✅ Called /disable hook for ${plugin.name}`);
+      } catch (error) {
+        console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+        // Continue anyway - cleanup failure should not block disable
+      }
+    }
+
+    // Stop worker
+    await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
+
+    // Disable in database
     await pluginInstanceRepository.disablePlugin(ctx.organizationId!, input.pluginId);
 
     return {
@@ -205,7 +434,101 @@ export const disablePlugin = authenticatedProcedure
   });
 
 /**
- * Configure a plugin
+ * Restart a plugin worker without losing configuration
+ */
+export const restartPlugin = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Verify the plugin instance exists and is enabled
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
+
+    if (!instance) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${plugin.name} is not configured for this organization`,
+      });
+    }
+
+    if (!instance.enabled) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${plugin.name} is disabled. Enable it first before restarting.`,
+      });
+    }
+
+    try {
+      console.log(`🔄 [HAY] Restarting worker for ${plugin.name}...`);
+
+      // Call plugin's disable hook (if worker running)
+      const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+      if (worker) {
+        try {
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => abortController.abort(), 5000);
+
+          await fetch(`http://localhost:${worker.port}/disable`, {
+            method: "POST",
+            signal: abortController.signal,
+          });
+
+          clearTimeout(timeoutId);
+          console.log(`✅ Called /disable hook for ${plugin.name} before restart`);
+        } catch (error) {
+          console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+          // Continue anyway - cleanup failure should not block restart
+        }
+      }
+
+      // Stop the worker
+      await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
+      console.log(`🛑 [HAY] Worker stopped for ${plugin.name}`);
+
+      // For MCP plugins, start the worker immediately
+      const manifest = plugin.manifest as any;
+      const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+      if (capabilities.includes("mcp")) {
+        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+        console.log(`✅ [HAY OK] Worker restarted for ${plugin.name}`);
+      }
+
+      return {
+        success: true,
+        message: `Worker for ${plugin.name} restarted successfully`,
+      };
+    } catch (error) {
+      console.error(`❌ [HAY FAILED] Failed to restart plugin ${plugin.name}:`, error);
+
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to restart ${plugin.name}: ${errorMessage}`,
+      });
+    }
+  });
+
+/**
+ * Configure a plugin (with auth separation)
  */
 export const configurePlugin = authenticatedProcedure
   .input(
@@ -229,8 +552,13 @@ export const configurePlugin = authenticatedProcedure
       input.pluginId,
     );
 
+    // Get plugin registry to access metadata (if available)
+    const pluginRegistry = await pluginRegistryRepository.findByPluginId(input.pluginId);
+    const metadata = pluginRegistry?.metadata; // Metadata from /metadata endpoint
+
     // When updating configuration, we need to handle partial updates properly
     let finalConfig = input.configuration;
+    const configSchema = metadata?.configSchema || manifest.configSchema;
 
     if (instance && instance.config) {
       // Get existing decrypted config
@@ -245,10 +573,117 @@ export const configurePlugin = authenticatedProcedure
       }
 
       // Also preserve any fields not included in the update
+      // BUT: don't preserve fields that have env fallbacks (allow reset to env)
       for (const [key, value] of Object.entries(existingDecrypted)) {
         if (!(key in finalConfig)) {
-          finalConfig[key] = value;
+          // Check if field has env fallback
+          const fieldSchema = configSchema?.[key];
+          const hasEnvFallback = fieldSchema?.env && process.env[fieldSchema.env];
+
+          // Only preserve if no env fallback (can't reset to env)
+          if (!hasEnvFallback) {
+            finalConfig[key] = value;
+          }
+          // Otherwise, omit it to allow falling back to env
         }
+      }
+    }
+
+    // Separate config and auth
+    const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
+
+    // Validate required fields are satisfied by either DB config or .env fallback
+    // Need to merge config + auth credentials to check all required fields
+    if (configSchema) {
+      const mergedForValidation = {
+        ...config,
+        ...(authState?.credentials || {}),
+      };
+
+      const resolved = resolveConfigWithEnv(
+        mergedForValidation,
+        configSchema as Record<string, ConfigFieldDescriptor>,
+        {
+          decrypt: false,
+          maskSecrets: false,
+        },
+      );
+
+      // Check for missing required fields
+      for (const [key, field] of Object.entries(configSchema)) {
+        if (field.required && !resolved.values[key]) {
+          const envHint = field.env ? ` or set ${field.env} in your environment` : "";
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Required field "${field.label || key}" is not configured. Please provide a value${envHint}.`,
+          });
+        }
+      }
+    }
+
+    // Validate auth if auth fields changed
+    if (metadata && authState && hasAuthChanges(input.configuration, metadata)) {
+      console.log(`🔐 Auth fields changed for ${plugin.name}, validating credentials...`);
+
+      try {
+        const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
+
+        // Only validate if worker is running
+        if (worker) {
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => abortController.abort(), 10000);
+
+          try {
+            const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ config, authState }),
+              signal: abortController.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error("Validation request failed");
+            }
+
+            const result = await response.json();
+
+            if (!result.valid) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Auth validation failed: ${result.error || "Invalid credentials"}`,
+              });
+            }
+
+            console.log(`✅ Auth validated for ${plugin.name}`);
+          } catch (error: any) {
+            clearTimeout(timeoutId);
+            if (error.name === "AbortError") {
+              throw new TRPCError({
+                code: "TIMEOUT",
+                message: "Auth validation timeout (>10s)",
+              });
+            }
+            throw error;
+          }
+        } else {
+          console.log(
+            `ℹ️ Worker not running or SDK v1, skipping auth validation for ${plugin.name}`,
+          );
+        }
+      } catch (error: any) {
+        // If it's already a TRPCError, rethrow it
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        // Otherwise wrap it
+        console.error(`❌ Auth validation failed for ${plugin.name}:`, error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Auth validation failed: ${error.message}`,
+        });
       }
     }
 
@@ -257,8 +692,17 @@ export const configurePlugin = authenticatedProcedure
       const newInstance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
-        finalConfig,
+        config,
       );
+
+      // Save auth state separately
+      if (authState) {
+        await pluginInstanceRepository.updateAuthState(
+          newInstance.id,
+          ctx.organizationId!,
+          authState,
+        );
+      }
 
       return {
         success: true,
@@ -266,15 +710,24 @@ export const configurePlugin = authenticatedProcedure
       };
     }
 
-    await pluginInstanceRepository.updateConfig(instance.id, finalConfig);
+    // Update config (without auth fields)
+    await pluginInstanceRepository.updateConfig(instance.id, config);
+
+    // Update auth state separately if present
+    if (authState) {
+      await pluginInstanceRepository.updateAuthState(instance.id, ctx.organizationId!, authState);
+    }
 
     // Restart the plugin if it's currently running to apply new configuration
-    if (processManagerService.isRunning(ctx.organizationId!, input.pluginId)) {
+    const runner = getPluginRunnerService();
+    if (runner.isRunning(ctx.organizationId!, input.pluginId)) {
       console.log(
         `🔄 Configuration changed for ${plugin.name}, restarting plugin to apply new settings...`,
       );
       try {
-        await processManagerService.restartPlugin(ctx.organizationId!, input.pluginId);
+        // Stop and start worker to apply new configuration
+        await runner.stopWorker(ctx.organizationId!, input.pluginId);
+        await runner.startWorker(ctx.organizationId!, input.pluginId);
         console.log(`✅ Plugin ${plugin.name} restarted with new configuration`);
       } catch (error) {
         console.error(
@@ -287,73 +740,7 @@ export const configurePlugin = authenticatedProcedure
 
     return {
       success: true,
-      instance: { ...instance, config: finalConfig },
-    };
-  });
-
-/**
- * Get plugin configuration
- */
-export const getPluginConfiguration = authenticatedProcedure
-  .input(
-    z.object({
-      pluginId: z.string(),
-    }),
-  )
-  .query(async ({ ctx, input }) => {
-    const plugin = pluginManagerService.getPlugin(input.pluginId);
-    if (!plugin) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Plugin ${input.pluginId} not found`,
-      });
-    }
-
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
-      ctx.organizationId!,
-      input.pluginId,
-    );
-
-    const manifest = plugin.manifest as HayPluginManifest;
-
-    if (!instance) {
-      // Return default configuration from manifest
-      const defaultConfig: Record<string, any> = {};
-
-      if (manifest.configSchema) {
-        Object.entries(manifest.configSchema).forEach(([key, field]) => {
-          if (field.default !== undefined) {
-            defaultConfig[key] = field.default;
-          }
-        });
-      }
-
-      return {
-        configuration: defaultConfig,
-        enabled: false,
-        instanceId: null,
-      };
-    }
-
-    // Decrypt the configuration but mask sensitive values for the UI
-    const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
-    const maskedConfig: Record<string, any> = {};
-
-    // Mask sensitive values for display
-    for (const [key, value] of Object.entries(decryptedConfig)) {
-      const schema = manifest.configSchema?.[key];
-      if (schema?.encrypted && value) {
-        // For encrypted fields, only show masked value
-        maskedConfig[key] = "*".repeat(8);
-      } else {
-        maskedConfig[key] = value;
-      }
-    }
-
-    return {
-      configuration: maskedConfig,
-      enabled: instance.enabled,
-      instanceId: instance.id,
+      instance: { ...instance, config, authState },
     };
   });
 
@@ -384,15 +771,23 @@ export const getPluginUITemplate = authenticatedProcedure
 
 /**
  * Get all available MCP tools from enabled plugins
+ *
+ * Hybrid approach:
+ * - Prefer live tools from running workers (fresh data)
+ * - Fall back to database cache when workers offline
+ * - Background refresh of cache when fetching from worker
  */
 export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
   // Get all enabled plugin instances for this organization
   const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
   const enabledInstances = instances.filter((i) => i.enabled);
 
-  // Get all plugins and filter to only enabled ones
+  // Get all plugins
   const allPlugins = pluginManagerService.getAllPlugins();
-  const enabledPluginIds = new Set(enabledInstances.map((i) => i.pluginId));
+  const pluginMap = new Map(allPlugins.map((p) => [p.id, p]));
+
+  // Get plugin runner service for worker info
+  const runnerService = getPluginRunnerService();
 
   const mcpTools: Array<{
     id: string;
@@ -403,28 +798,75 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
     pluginName: string;
   }> = [];
 
-  // Process each enabled plugin
-  for (const plugin of allPlugins) {
-    // Check if this plugin is enabled for the organization
-    if (!enabledPluginIds.has(plugin.id)) {
+  // Process each enabled plugin instance
+  for (const instance of enabledInstances) {
+    const plugin = pluginMap.get(instance.pluginId);
+    if (!plugin) {
       continue;
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
 
-    // Check if plugin has MCP capabilities with tools
-    if (!manifest.capabilities?.mcp?.tools) {
+    // Check if plugin has MCP capability
+    const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+    if (!capabilities.includes("mcp")) {
       continue;
     }
 
-    // Extract tools from this plugin
-    for (const tool of manifest.capabilities.mcp.tools) {
+    let tools: any[] = [];
+
+    // Try to fetch from running worker first
+    const workerInfo = runnerService.getWorker(ctx.organizationId!, plugin.id);
+
+    if (workerInfo) {
+      // Worker is running - fetch fresh tools (no fallback to cache)
+      try {
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 3000); // 3s timeout
+
+        const response = await fetch(`http://localhost:${workerInfo.port}/mcp/list-tools`, {
+          signal: abortController.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          tools = Array.isArray(data.tools) ? data.tools : [];
+
+          // Background refresh of cache (non-blocking)
+          if (tools.length > 0) {
+            fetchAndStoreTools(workerInfo.port, ctx.organizationId!, plugin.id).catch((error) => {
+              console.error(`Background tool cache refresh failed for ${plugin.id}:`, error);
+            });
+          }
+        } else {
+          // Worker fetch failed - log error and return empty (don't mask with cached tools)
+          const errorText = await response.text();
+          console.error(
+            `Failed to fetch tools from worker for ${plugin.id}: HTTP ${response.status} - ${errorText}`,
+          );
+          tools = [];
+        }
+      } catch (error) {
+        // Timeout or network error - log and return empty (don't mask with cached tools)
+        console.error(`Failed to fetch tools from worker for ${plugin.id}:`, error);
+        tools = [];
+      }
+    } else {
+      // No worker running - use database cache
+      tools = getToolsFromConfig(instance.config);
+    }
+
+    // Add tools to result
+    for (const tool of tools) {
       mcpTools.push({
-        id: `${plugin.pluginId}:${tool.name}`,
+        id: `${plugin.pluginId}:${tool.name}`, // Use pluginId (package name) not id (UUID)
         name: tool.name,
-        label: tool.label || tool.name,
+        label: tool.name,
         description: tool.description || "",
-        pluginId: plugin.pluginId,
+        pluginId: plugin.pluginId, // Plugin package ID (e.g., "@hay/email-plugin")
         pluginName: plugin.name,
       });
     }
@@ -432,6 +874,84 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
 
   return mcpTools;
 });
+
+/**
+ * Helper function to extract tools from instance config
+ */
+function getToolsFromConfig(config: any): any[] {
+  const tools: any[] = [];
+
+  // Check local MCP servers
+  if (config?.mcpServers?.local && Array.isArray(config.mcpServers.local)) {
+    for (const server of config.mcpServers.local) {
+      if (server.tools && Array.isArray(server.tools)) {
+        tools.push(...server.tools);
+      }
+    }
+  }
+
+  // Check remote MCP servers
+  if (config?.mcpServers?.remote && Array.isArray(config.mcpServers.remote)) {
+    for (const server of config.mcpServers.remote) {
+      if (server.tools && Array.isArray(server.tools)) {
+        tools.push(...server.tools);
+      }
+    }
+  }
+
+  return tools;
+}
+
+/**
+ * Manually refresh MCP tools for a specific plugin
+ *
+ * Useful after plugin updates or when tools need to be re-discovered
+ */
+export const refreshMCPTools = authenticatedProcedure
+  .input(z.object({ pluginId: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    // Get plugin
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Check if plugin has MCP capability
+    const manifest = plugin.manifest as HayPluginManifest;
+    const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+    if (!capabilities.includes("mcp")) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${input.pluginId} does not have MCP capability`,
+      });
+    }
+
+    // Get worker info
+    const runnerService = getPluginRunnerService();
+    const workerInfo = runnerService.getWorker(ctx.organizationId!, input.pluginId);
+
+    if (!workerInfo) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Plugin ${input.pluginId} is not running. Please enable the plugin first.`,
+      });
+    }
+
+    // Fetch and store tools
+    try {
+      await fetchAndStoreTools(workerInfo.port, ctx.organizationId!, input.pluginId);
+      return { success: true, message: "Tools refreshed successfully" };
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to refresh tools: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  });
 
 /**
  * Get menu items from all plugins (system and organization-specific)
@@ -492,9 +1012,13 @@ export const testConnection = authenticatedProcedure
     }),
   )
   .query(async ({ ctx, input }): Promise<PluginHealthCheckResult> => {
+    console.log(`[testConnection] ===== Starting test for ${input.pluginId} =====`);
+    console.log(`[testConnection] Organization ID: ${ctx.organizationId}`);
+
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
     if (!plugin) {
+      console.log(`[testConnection] ❌ Plugin ${input.pluginId} not found in registry`);
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
@@ -502,9 +1026,16 @@ export const testConnection = authenticatedProcedure
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
+    console.log(`[testConnection] Plugin manifest capabilities:`, manifest.capabilities);
+    console.log(`[testConnection] Plugin type:`, manifest.type);
 
-    // Check if plugin has MCP capabilities
-    if (!manifest.capabilities?.mcp) {
+    // Check if plugin has MCP capabilities (support both TypeScript-first array and legacy object format)
+    const hasMcpCapability = Array.isArray(manifest.capabilities)
+      ? manifest.capabilities.includes("mcp")
+      : !!manifest.capabilities?.mcp;
+
+    if (!hasMcpCapability) {
+      console.log(`[testConnection] ❌ Plugin ${input.pluginId} does not have MCP capability`);
       return {
         success: false,
         status: "unhealthy",
@@ -513,212 +1044,250 @@ export const testConnection = authenticatedProcedure
       };
     }
 
+    console.log(`[testConnection] ✅ Plugin has MCP capability`);
+
     // Check if plugin instance exists and has configuration
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
       ctx.organizationId!,
       input.pluginId,
     );
 
-    if (!instance || !instance.config) {
+    // Check if plugin requires authentication and if auth is configured
+    // Use in-memory plugin metadata (more up-to-date than database)
+    const authMethods = plugin.metadata?.authMethods;
+
+    console.log(`[testConnection] Plugin instance status:`, {
+      exists: !!instance,
+      enabled: instance?.enabled,
+      hasConfig: !!instance?.config,
+      hasAuthState: !!instance?.authState,
+      configKeys: instance?.config ? Object.keys(instance.config) : [],
+      authMethods: authMethods?.map((m: any) => ({ type: m.type, id: m.id })) || [],
+    });
+
+    if (!instance) {
+      console.log(`[testConnection] ❌ Plugin has no instance`);
       return {
         success: false,
         status: "unconfigured",
-        message: "Plugin configuration is missing",
+        message: "Plugin is not configured for this organization",
         testedAt: new Date(),
       };
     }
 
+    // Check if plugin requires authentication
+    if (authMethods && authMethods.length > 0) {
+      // Plugin requires authentication - check if credentials are provided
+      const configKeys = Object.keys(instance.config || {});
+      const hasCredentials =
+        configKeys.length > 0 &&
+        configKeys.some((key) => {
+          const value = instance.config![key];
+          return value !== null && value !== undefined && value !== "";
+        });
+
+      if (!hasCredentials) {
+        console.log(
+          `[testConnection] ❌ Plugin requires authentication but no credentials configured`,
+        );
+        return {
+          success: false,
+          status: "unconfigured",
+          message: "Plugin requires authentication. Please configure your credentials.",
+          testedAt: new Date(),
+        };
+      }
+      console.log(`[testConnection] ✅ Plugin has required credentials configured`);
+    }
+
     try {
-      // Get available MCP tools from manifest
-      const mcpTools = manifest.capabilities.mcp.tools || [];
+      let mcpTools: any[] = [];
 
-      // Determine which tool to use for health check (priority order)
-      let testTool: string | null = null;
-      let testArgs: Record<string, unknown> = {};
-
-      // Priority 1: Look for health check tools
-      const healthCheckTools = mcpTools.filter(
-        (tool) =>
-          tool.name.toLowerCase().includes("health") || tool.name.toLowerCase().includes("check"),
-      );
-      if (healthCheckTools.length > 0) {
-        testTool = healthCheckTools[0].name;
+      // Start the worker if not already running
+      console.log(`[testConnection] 🚀 Starting or getting existing worker...`);
+      let worker;
+      try {
+        worker = await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+        console.log(`[testConnection] ✅ Worker is running:`, {
+          port: worker.port,
+          startedAt: worker.startedAt,
+        });
+      } catch (workerStartError) {
+        console.error(`[testConnection] ❌ Failed to start worker:`, workerStartError);
+        return {
+          success: false,
+          status: "unhealthy",
+          message: `Failed to start plugin worker: ${workerStartError instanceof Error ? workerStartError.message : String(workerStartError)}`,
+          testedAt: new Date(),
+        };
       }
 
-      // Priority 2: Look for info/support tools
-      if (!testTool) {
-        const infoTools = mcpTools.filter(
-          (tool) =>
-            tool.name.toLowerCase().includes("info") || tool.name.toLowerCase().includes("support"),
+      if (worker && worker.port) {
+        // Use shared fetchToolsFromWorker service - throws on error
+        console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
+        mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
+        console.log(
+          `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from worker for ${input.pluginId}`,
         );
-        if (infoTools.length > 0) {
-          testTool = infoTools[0].name;
-        }
-      }
-
-      // Priority 3: Look for list tools (with minimal parameters)
-      if (!testTool) {
-        const listTools = mcpTools.filter(
-          (tool) =>
-            tool.name.toLowerCase().startsWith("list") || tool.name.toLowerCase().startsWith("get"),
-        );
-        if (listTools.length > 0) {
-          testTool = listTools[0].name;
-          // Use minimal parameters for list tools
-          testArgs = { limit: 1 };
-        }
-      }
-
-      // Priority 4: Use initialize if no tools found
-      if (!testTool) {
-        testTool = "initialize";
-        testArgs = {};
-      }
-
-      // Prepare MCP request
-      const mcpRequest = {
-        jsonrpc: "2.0",
-        id: uuidv4(),
-        method: testTool === "initialize" ? "initialize" : "tools/call",
-        params:
-          testTool === "initialize"
-            ? {}
-            : {
-                name: testTool,
-                arguments: testArgs,
-              },
-      };
-
-      // Check connection type and use appropriate method
-      const connectionType = manifest.capabilities.mcp.connection?.type || "local";
-      let mcpResponse: any;
-
-      if (connectionType === "remote") {
-        // Use MCP client factory for remote plugins
-        const client = await MCPClientFactory.createClient(ctx.organizationId!, input.pluginId);
-
-        try {
-          // First, list available tools to see what the server actually provides
-          const availableTools = await client.listTools();
-
-          if (testTool === "initialize") {
-            // For initialize, just check if we can connect and list tools
-            mcpResponse = {
-              result: {
-                capabilities: {
-                  tools: availableTools.length > 0,
-                },
-              },
-            };
-          } else {
-            // Check if the test tool exists in available tools
-            const toolExists = availableTools.some((t) => t.name === testTool);
-
-            if (!toolExists && availableTools.length > 0) {
-              // Use the first available tool instead
-              testTool = availableTools[0].name;
-              testArgs = {};
-            }
-
-            // Call the actual tool
-            const toolResult = await client.callTool(testTool, testArgs);
-            mcpResponse = {
-              result: toolResult,
-            };
-          }
-        } finally {
-          await client.close();
+        if (mcpTools.length > 0) {
+          console.log(
+            `[testConnection] Tool names:`,
+            mcpTools.map((t: any) => t.name),
+          );
         }
       } else {
-        // Use process manager for local plugins
-        const result = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Connection timeout - verify server is accessible"));
-          }, 10000); // 10 second timeout for health checks
+        console.log(`[testConnection] ⚠️  No worker running for ${input.pluginId}`);
 
-          processManagerService
-            .sendToPlugin(ctx.organizationId!, input.pluginId, "mcp_call", mcpRequest)
-            .then((response) => {
-              clearTimeout(timeout);
-              resolve(response);
-            })
-            .catch((error) => {
-              clearTimeout(timeout);
-              reject(error);
-            });
-        });
-        mcpResponse = result as any;
+        // Only use cached tools when there's no worker at all
+        console.log(`[testConnection] 📦 Checking for cached tools in database config...`);
+        mcpTools = getToolsFromConfig(instance.config);
+        console.log(`[testConnection] Found ${mcpTools.length} cached tools in database`);
+        if (mcpTools.length > 0) {
+          console.log(
+            `[testConnection] Cached tool names:`,
+            mcpTools.map((t: any) => t.name),
+          );
+        }
       }
 
-      // Check if the response contains an error
-      if (mcpResponse && typeof mcpResponse === "object") {
-        // Check for JSON-RPC error response
-        if (mcpResponse.error) {
+      // Verify tools are registered
+      if (mcpTools.length === 0) {
+        console.log(
+          `[testConnection] ❌ No tools found (neither from worker nor from database cache)`,
+        );
+        return {
+          success: false,
+          status: "unhealthy",
+          message: "No MCP tools registered yet - plugin may still be initializing",
+          testedAt: new Date(),
+        };
+      }
+
+      // Actually test the MCP server by calling a safe tool
+      const safeToolPrefixes = ["list_", "get_", "search_", "find_", "read_"];
+
+      // Priority 0: Check if there's a dedicated health/healthcheck tool
+      let testTool = mcpTools.find((t) => {
+        const name = t.name.toLowerCase();
+        return name === "health" || name === "healthcheck";
+      });
+
+      // Priority 1: Find READ-ONLY tools with NO required parameters (safest for health checks)
+      if (!testTool) {
+        testTool = mcpTools.find((t) => {
+          const schema = t.inputSchema;
+          const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
+          const isReadOnly = safeToolPrefixes.some((prefix) =>
+            t.name.toLowerCase().startsWith(prefix),
+          );
+          return hasNoRequiredParams && isReadOnly;
+        });
+      }
+
+      // Priority 2: Find any tool with NO required parameters
+      if (!testTool) {
+        testTool = mcpTools.find((t) => {
+          const schema = t.inputSchema;
+          if (!schema || !schema.required) return true;
+          return schema.required.length === 0;
+        });
+      }
+
+      // Priority 3: Find safe read-only tools (even if they have required params)
+      if (!testTool) {
+        testTool = mcpTools.find((t) =>
+          safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix)),
+        );
+      }
+
+      // Priority 4: Just use the first tool as last resort
+      if (!testTool) {
+        testTool = mcpTools[0];
+      }
+
+      const hasRequiredParams =
+        testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
+      console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
+      console.log(`[testConnection] Tool has required parameters: ${hasRequiredParams}`);
+
+      // Call the tool via worker or legacy MCP client
+      if (worker && worker.port) {
+        // If the selected tool has required parameters, skip the actual call
+        // and just verify the worker is responding
+        if (hasRequiredParams) {
+          console.log(
+            `[testConnection] ⚠️  Selected tool has required parameters, skipping actual tool call`,
+          );
+          console.log(
+            `[testConnection] ✅ Worker is running and tools are available - marking as healthy`,
+          );
+          return {
+            success: true,
+            status: "healthy",
+            message: `MCP server is healthy - worker running with ${mcpTools.length} tools available (tool call skipped due to required parameters)`,
+            tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
+            testedAt: new Date(),
+          };
+        }
+
+        // Call tool via worker HTTP API (only if no required parameters)
+        try {
+          console.log(`[testConnection] 🔄 Calling tool with empty arguments for health check...`);
+          const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              toolName: testTool.name,
+              arguments: {}, // Empty args for health check
+            }),
+            signal: AbortSignal.timeout(10000), // 10 second timeout
+          });
+
+          if (!callResponse.ok) {
+            const errorText = await callResponse.text();
+            console.log(
+              `[testConnection] ❌ Tool call failed: HTTP ${callResponse.status} - ${errorText}`,
+            );
+            return {
+              success: false,
+              status: "unhealthy",
+              message: `MCP tool call failed: HTTP ${callResponse.status} - ${errorText}`,
+              tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
+              testedAt: new Date(),
+            };
+          }
+
+          await callResponse.json();
+
+          // Success - MCP server is responding
+          console.log(`[testConnection] ✅ Tool call succeeded - MCP server is healthy`);
+          return {
+            success: true,
+            status: "healthy",
+            message: `MCP server is healthy - successfully called ${testTool.name}`,
+            tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
+            testedAt: new Date(),
+          };
+        } catch (testError: any) {
+          console.log(`[testConnection] ❌ Tool call failed with error: ${testError.message}`);
           return {
             success: false,
             status: "unhealthy",
-            message: mcpResponse.error.message || "MCP server returned an error",
-            error:
-              mcpResponse.error.message || JSON.stringify(mcpResponse.error) || "Unknown MCP error",
+            message: `MCP tool call failed: ${testError.message}`,
+            tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
             testedAt: new Date(),
           };
         }
-
-        // Check for result with isError flag
-        if (mcpResponse.result && mcpResponse.result.isError) {
-          const errorText = mcpResponse.result.content?.[0]?.text || "Unknown MCP error";
-
-          // Check if it's an authentication error
-          const isAuthError =
-            errorText.includes("401") ||
-            errorText.includes("Couldn't authenticate") ||
-            errorText.includes("Authentication failed") ||
-            errorText.includes("Unauthorized");
-
-          return {
-            success: false,
-            status: isAuthError ? "unconfigured" : "unhealthy",
-            message: isAuthError
-              ? "Authentication failed - check credentials"
-              : "MCP server returned an error",
-            error: errorText,
-            testedAt: new Date(),
-          };
-        }
-
-        // Check for authentication errors in the content (for responses without isError flag)
-        if (mcpResponse.result && mcpResponse.result.content) {
-          const content = mcpResponse.result.content;
-          if (Array.isArray(content)) {
-            for (const item of content) {
-              if (item.type === "text" && item.text) {
-                // Check for common authentication error patterns
-                if (
-                  item.text.includes("401") ||
-                  item.text.includes("Couldn't authenticate") ||
-                  item.text.includes("Authentication failed") ||
-                  item.text.includes("Unauthorized")
-                ) {
-                  return {
-                    success: false,
-                    status: "unconfigured",
-                    message: "Authentication failed - check credentials",
-                    error: item.text,
-                    testedAt: new Date(),
-                  };
-                }
-              }
-            }
-          }
-        }
+      } else {
+        // No worker - just return tools list as before (legacy behavior)
+        return {
+          success: true,
+          status: "healthy",
+          message: `Plugin has ${mcpTools.length} MCP tools registered (legacy mode - tool calling not tested)`,
+          tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
+          testedAt: new Date(),
+        };
       }
-
-      return {
-        success: true,
-        status: "healthy",
-        message: `Connection successful using ${testTool}`,
-        testedAt: new Date(),
-      };
     } catch (error) {
       let errorMessage = "Unknown error";
       let status: "unhealthy" | "unconfigured" = "unhealthy";
@@ -785,16 +1354,49 @@ export const isOAuthAvailable = authenticatedProcedure
       pluginId: z.string(),
     }),
   )
-  .query(async ({ input }) => {
+  .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
     if (!plugin) {
       return { available: false };
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-    const available = oauthService.isOAuthAvailable(input.pluginId, manifest);
+    // Get plugin instance to check if credentials are configured
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+      ctx.organizationId!,
+      input.pluginId,
+    );
 
-    return { available };
+    // Check if plugin has OAuth2 registered in metadata
+    let oauthAvailable = false;
+    let oauthConfigured = false;
+
+    if (plugin.metadata?.authMethods) {
+      const oauth2Method = plugin.metadata.authMethods.find(
+        (method: AuthMethodDescriptor) => method.type === "oauth2",
+      );
+      if (oauth2Method) {
+        oauthAvailable = true;
+
+        // Check if OAuth credentials are configured
+        if (instance && oauth2Method.clientId && oauth2Method.clientSecret) {
+          const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
+
+          const hasClientId = !!(
+            decryptedConfig[oauth2Method.clientId] ||
+            instance.authState?.credentials?.[oauth2Method.clientId]
+          );
+          const hasClientSecret = !!(
+            decryptedConfig[oauth2Method.clientSecret] ||
+            instance.authState?.credentials?.[oauth2Method.clientSecret]
+          );
+
+          oauthConfigured = hasClientId && hasClientSecret;
+        }
+      }
+    }
+
+    // OAuth is only available if both registered AND configured
+    return { available: oauthAvailable && oauthConfigured };
   });
 
 /**
@@ -823,3 +1425,73 @@ export const revokeOAuth = authenticatedProcedure
     await oauthService.revokeOAuth(ctx.organizationId!, input.pluginId);
     return { success: true };
   });
+
+/**
+ * Validate auth credentials
+ *
+ * Calls the plugin worker's /validate-auth endpoint to validate credentials
+ */
+export const validateAuth = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+      authState: z.object({
+        methodId: z.string(),
+        credentials: z.record(z.any()),
+      }),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    const plugin = pluginManagerService.getPlugin(input.pluginId);
+    if (!plugin) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${input.pluginId} not found`,
+      });
+    }
+
+    // Get or start worker
+    const worker = await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
+
+    // Call plugin's validation endpoint with timeout
+    // Runner exposes: POST /validate-auth
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 second timeout
+
+    try {
+      const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authState: input.authState,
+        }),
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error("Validation request failed");
+      }
+
+      const result = await response.json();
+
+      // Return validation result
+      return {
+        valid: result.valid,
+        error: result.error,
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as any).name === "AbortError") {
+        return {
+          valid: false,
+          error: "Validation timeout (>10s)",
+        };
+      }
+      throw error;
+    }
+  });
+
+// Note: Plugin UI assets are now served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
+// See server/main.ts for the Express route handler and server/services/plugin-asset.service.ts for implementation

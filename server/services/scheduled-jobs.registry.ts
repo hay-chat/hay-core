@@ -54,6 +54,19 @@ const jobRegistry: CronJobConfig[] = [
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
 
+  {
+    name: "plugin-worker-cleanup",
+    description: "Clean up inactive plugin workers (TypeScript-based plugins)",
+    schedule: 300000, // Every 5 minutes
+    handler: async () => {
+      const { pluginManagerService } = await import("./plugin-manager.service");
+      await pluginManagerService.cleanupInactiveWorkers();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true, // Don't log frequent cleanups
+  },
+
   // ============================================================
   // BACKGROUND PROCESSING JOBS
   // ============================================================

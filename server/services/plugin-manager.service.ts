@@ -1,24 +1,27 @@
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
-import Ajv from "ajv";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
-import { PluginRegistry } from "@server/entities/plugin-registry.entity";
+import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
+import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { getPluginRunnerService } from "./plugin-runner.service";
+import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 
 export class PluginManagerService {
   private pluginsDir: string;
   public registry: Map<string, PluginRegistry> = new Map();
-  private ajv: Ajv;
-  private manifestSchema: Record<string, unknown> | null = null;
+
+  // Track discovered plugins during initialization
+  private discoveredPluginIds: Set<string> = new Set();
+
+  // SDK runner service - single source of truth for all worker management
+  private runnerService = getPluginRunnerService();
 
   constructor() {
     // Look for plugins in the root /plugins directory
     this.pluginsDir = path.join(process.cwd(), "..", "plugins");
-
-    // Initialize AJV for JSON schema validation
-    this.ajv = new Ajv({ allErrors: true });
   }
 
   /**
@@ -27,11 +30,14 @@ export class PluginManagerService {
   async initialize(): Promise<void> {
     console.log("🔍 Discovering plugins...");
 
-    // Load the manifest schema
-    await this.loadManifestSchema();
+    // Clear discovered set for fresh initialization
+    this.discoveredPluginIds.clear();
 
     await this.discoverPlugins();
     await this.loadRegistryFromDatabase();
+
+    // Validate existing plugins and mark missing ones
+    await this.validateExistingPlugins();
 
     // Restore plugins from ZIP if directories are missing
     await this.restorePluginsFromZip();
@@ -40,23 +46,6 @@ export class PluginManagerService {
 
     // Initialize auto-activated plugins
     await this.initializeAutoActivatedPlugins();
-  }
-
-  /**
-   * Load the JSON schema for plugin manifests
-   */
-  private async loadManifestSchema(): Promise<void> {
-    try {
-      const schemaPath = path.join(this.pluginsDir, "base", "plugin-manifest.schema.json");
-      const schemaContent = await fs.readFile(schemaPath, "utf-8");
-      this.manifestSchema = JSON.parse(schemaContent);
-      if (this.manifestSchema) {
-        this.ajv.compile(this.manifestSchema);
-      }
-      console.log("✅ Loaded plugin manifest schema");
-    } catch (error) {
-      console.warn("⚠️  Could not load plugin manifest schema, validation will be skipped:", error);
-    }
   }
 
   /**
@@ -131,6 +120,9 @@ export class PluginManagerService {
 
   /**
    * Register a single plugin from its directory
+   *
+   * Reads package.json to discover plugins (TypeScript-first approach).
+   * Full metadata is fetched from the plugin worker when it starts.
    */
   public async registerPlugin(
     pluginPath: string,
@@ -138,55 +130,59 @@ export class PluginManagerService {
     organizationId: string | null,
   ): Promise<void> {
     try {
-      // First, try to load manifest.json
-      const jsonManifestPath = path.join(pluginPath, "manifest.json");
-      const jsonExists = await fs
-        .access(jsonManifestPath)
+      // Load package.json for plugin discovery
+      const packagePath = path.join(pluginPath, "package.json");
+      const packageExists = await fs
+        .access(packagePath)
         .then(() => true)
         .catch(() => false);
 
-      let manifest: HayPluginManifest;
-
-      if (jsonExists) {
-        // Load and validate JSON manifest
-        const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
-        manifest = JSON.parse(manifestContent);
-
-        // Validate manifest against schema if available
-        if (this.manifestSchema) {
-          const validate = this.ajv.compile(this.manifestSchema);
-          const valid = validate(manifest);
-
-          if (!valid) {
-            console.warn(`⚠️  Invalid manifest at ${pluginPath}:`);
-            console.warn(validate.errors);
-            return;
-          }
-        }
-      } else {
-        // Fallback to TypeScript manifest for backward compatibility
-        const tsManifestPath = path.join(pluginPath, "manifest.ts");
-        const tsExists = await fs
-          .access(tsManifestPath)
-          .then(() => true)
-          .catch(() => false);
-
-        if (tsExists) {
-          console.warn(
-            `⚠️  Plugin at ${pluginPath} is using deprecated manifest.ts. Please migrate to manifest.json`,
-          );
-          const manifestModule = await import(tsManifestPath);
-          manifest = manifestModule.manifest || manifestModule.default;
-        } else {
-          console.warn(`⚠️  No manifest.json found for plugin at ${pluginPath}`);
-          return;
-        }
-      }
-
-      if (!manifest || !manifest.id) {
-        console.warn(`⚠️  Invalid manifest at ${pluginPath}`);
+      if (!packageExists) {
+        console.warn(`⚠️  No package.json found for plugin at ${pluginPath}`);
         return;
       }
+
+      const packageContent = await fs.readFile(packagePath, "utf-8");
+      const packageJson = JSON.parse(packageContent);
+
+      // Check if this is a Hay plugin
+      if (!packageJson["hay-plugin"]) {
+        // Not a Hay plugin, skip silently
+        return;
+      }
+
+      const hayPlugin = packageJson["hay-plugin"];
+
+      // Plugin ID comes from NPM package name
+      const pluginId = packageJson.name;
+
+      if (!pluginId) {
+        console.warn(`⚠️  No package name found at ${pluginPath}`);
+        return;
+      }
+
+      // Display name from hay-plugin or parse from package name
+      const displayName = hayPlugin.displayName || this.parseDisplayName(pluginId);
+
+      // Build full manifest from package.json
+      const manifest: any = {
+        id: pluginId,
+        name: displayName,
+        version: packageJson.version || "1.0.0",
+        description: packageJson.description || "",
+        author: packageJson.author,
+        category: hayPlugin.category,
+        icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
+        type: this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+        entry: hayPlugin.entry,
+        capabilities: hayPlugin.capabilities || [],
+        configSchema: hayPlugin.config || {},
+        permissions: {
+          env: hayPlugin.env || [],
+          api: hayPlugin.capabilities || [],
+        },
+        auth: hayPlugin.auth || undefined, // Include auth config if present
+      };
 
       // Calculate checksum of plugin files
       const checksum = await this.calculatePluginChecksum(pluginPath);
@@ -199,7 +195,7 @@ export class PluginManagerService {
         pluginId: manifest.id,
         name: manifest.name,
         version: manifest.version,
-        pluginPath: relativePath, // e.g., "core/stripe" or "custom/{orgId}/{pluginId}"
+        pluginPath: relativePath, // e.g., "core/stripe" or "custom/{organizationId}/{pluginId}"
         manifest: manifest as any,
         checksum,
         sourceType,
@@ -207,9 +203,49 @@ export class PluginManagerService {
       });
 
       this.registry.set(manifest.id, plugin);
+      this.discoveredPluginIds.add(manifest.id); // Track as discovered
+      console.log(`✅ Registered plugin: ${pluginId} from ${relativePath}`);
     } catch (error) {
       console.error(`Failed to register plugin at ${pluginPath}:`, error);
     }
+  }
+
+  /**
+   * Parse display name from package name
+   * @example "@hay/plugin-hubspot" => "HubSpot"
+   * @example "my-plugin" => "My Plugin"
+   */
+  private parseDisplayName(packageName: string): string {
+    // Remove scope (@hay/)
+    let name = packageName.replace(/^@[^/]+\//, "");
+
+    // Remove plugin- prefix
+    name = name.replace(/^plugin-/, "");
+
+    // Convert kebab-case to Title Case
+    return name
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  /**
+   * Infer plugin type from capabilities
+   */
+  private inferTypeFromCapabilities(capabilities: string[]): string[] {
+    const types: string[] = [];
+
+    if (capabilities.includes("mcp")) {
+      types.push("mcp-connector");
+    }
+    if (capabilities.includes("routes") || capabilities.includes("messages")) {
+      types.push("channel");
+    }
+    if (capabilities.includes("sources")) {
+      types.push("retriever");
+    }
+
+    return types.length > 0 ? types : ["mcp-connector"];
   }
 
   /**
@@ -244,6 +280,42 @@ export class PluginManagerService {
     const plugins = await pluginRegistryRepository.getAllPlugins();
     for (const plugin of plugins) {
       this.registry.set(plugin.pluginId, plugin);
+    }
+  }
+
+  /**
+   * Validate existing plugins in database and mark missing ones as not_found
+   */
+  private async validateExistingPlugins(): Promise<void> {
+    try {
+      // Get all plugins from database
+      const allPlugins = await pluginRegistryRepository.findAll();
+
+      // Find plugins in DB but not discovered on filesystem
+      const missingPlugins = allPlugins.filter(
+        (plugin) => !this.discoveredPluginIds.has(plugin.pluginId),
+      );
+
+      if (missingPlugins.length > 0) {
+        console.log(
+          `⚠️  Found ${missingPlugins.length} plugin(s) in database but not on filesystem`,
+        );
+
+        // Mark each missing plugin as not_found
+        for (const plugin of missingPlugins) {
+          await pluginRegistryRepository.updateStatus(plugin.id, PluginStatus.NOT_FOUND);
+
+          // Update in-memory registry as well
+          const registryPlugin = this.registry.get(plugin.pluginId);
+          if (registryPlugin) {
+            registryPlugin.status = PluginStatus.NOT_FOUND;
+          }
+
+          console.log(`   - ${plugin.pluginId} marked as not_found`);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to validate existing plugins:", error);
     }
   }
 
@@ -286,7 +358,12 @@ export class PluginManagerService {
 
             // Create organization directory if needed
             const orgDir = path.dirname(pluginPath);
-            if (!(await fs.access(orgDir).then(() => true).catch(() => false))) {
+            if (
+              !(await fs
+                .access(orgDir)
+                .then(() => true)
+                .catch(() => false))
+            ) {
               await fs.mkdir(orgDir, { recursive: true });
             }
 
@@ -313,8 +390,21 @@ export class PluginManagerService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-    const installCommand = manifest.capabilities?.mcp?.installCommand;
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+
+    // Check for npm install in package.json
+    let installCommand: string | undefined;
+    try {
+      const packageJsonPath = path.join(pluginPath, "package.json");
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+
+      // Only run npm install if there are dependencies
+      if (packageJson.dependencies || packageJson.devDependencies) {
+        installCommand = "npm install";
+      }
+    } catch (error) {
+      // Ignore - package.json might not exist
+    }
 
     if (!installCommand) {
       console.log(`ℹ️  No install command for plugin ${plugin.name}`);
@@ -324,12 +414,11 @@ export class PluginManagerService {
 
     try {
       console.log(`📦 Installing plugin ${plugin.name}...`);
-      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
 
       execSync(installCommand, {
         cwd: pluginPath,
         stdio: "inherit",
-        env: { ...process.env },
+        env: this.buildMinimalEnv(),
       });
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
@@ -345,7 +434,7 @@ export class PluginManagerService {
   }
 
   /**
-   * Build a plugin (run build command)
+   * Build a plugin (run build command from package.json)
    */
   async buildPlugin(pluginId: string): Promise<void> {
     const plugin = this.registry.get(pluginId);
@@ -353,8 +442,20 @@ export class PluginManagerService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    const manifest = plugin.manifest as HayPluginManifest;
-    const buildCommand = manifest.capabilities?.mcp?.buildCommand;
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+
+    // Check for build script in package.json
+    let buildCommand: string | undefined;
+    try {
+      const packageJsonPath = path.join(pluginPath, "package.json");
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+
+      if (packageJson.scripts?.build) {
+        buildCommand = "npm run build";
+      }
+    } catch (error) {
+      // Ignore - package.json might not exist
+    }
 
     if (!buildCommand) {
       console.log(`ℹ️  No build command for plugin ${plugin.name}`);
@@ -364,12 +465,13 @@ export class PluginManagerService {
 
     try {
       console.log(`🔨 Building plugin ${plugin.name}...`);
-      const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+      console.log(`   Command: ${buildCommand}`);
+      console.log(`   Path: ${pluginPath}`);
 
       execSync(buildCommand, {
         cwd: pluginPath,
         stdio: "inherit",
-        env: { ...process.env },
+        env: this.buildMinimalEnv(),
       });
 
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
@@ -422,7 +524,13 @@ export class PluginManagerService {
     if (!plugin) return undefined;
 
     const manifest = plugin.manifest as HayPluginManifest;
-    return manifest.capabilities?.mcp?.startCommand;
+
+    // SDK plugins use entry field
+    if (manifest.entry) {
+      return `node ${manifest.entry}`;
+    }
+
+    return undefined;
   }
 
   /**
@@ -469,10 +577,7 @@ export class PluginManagerService {
       }
 
       // Fallback: scan directories
-      const dirsToScan = [
-        path.join(this.pluginsDir, "core"),
-        path.join(this.pluginsDir, "custom"),
-      ];
+      const dirsToScan = [path.join(this.pluginsDir, "core"), path.join(this.pluginsDir, "custom")];
 
       for (const baseDir of dirsToScan) {
         const baseDirExists = await fs
@@ -506,44 +611,17 @@ export class PluginManagerService {
         if (entry.isDirectory() && !entry.name.startsWith(".")) {
           const pluginPath = path.join(directory, entry.name);
 
-          // Check for manifest.json first
-          const jsonManifestPath = path.join(pluginPath, "manifest.json");
-          const jsonExists = await fs
-            .access(jsonManifestPath)
-            .then(() => true)
-            .catch(() => false);
+          // Check package.json for plugin ID
+          const packageJsonPath = path.join(pluginPath, "package.json");
+          try {
+            const packageContent = await fs.readFile(packageJsonPath, "utf-8");
+            const packageJson = JSON.parse(packageContent);
 
-          let manifest: HayPluginManifest | null = null;
-
-          if (jsonExists) {
-            try {
-              const manifestContent = await fs.readFile(jsonManifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch (error) {
-              // Skip this folder if manifest is invalid
-              continue;
+            if (packageJson.name === pluginId && packageJson["hay-plugin"]) {
+              return path.relative(this.pluginsDir, pluginPath);
             }
-          } else {
-            // Fallback to TypeScript manifest
-            const tsManifestPath = path.join(pluginPath, "manifest.ts");
-            const tsExists = await fs
-              .access(tsManifestPath)
-              .then(() => true)
-              .catch(() => false);
-
-            if (tsExists) {
-              try {
-                const manifestModule = await import(tsManifestPath);
-                manifest = manifestModule.manifest || manifestModule.default;
-              } catch (error) {
-                // Skip this folder if manifest is invalid
-                continue;
-              }
-            }
-          }
-
-          if (manifest && manifest.id === pluginId) {
-            return path.relative(this.pluginsDir, pluginPath);
+          } catch (error) {
+            // Skip this folder if package.json is missing/invalid
           }
 
           // Recursively search subdirectories (for custom org folders)
@@ -563,6 +641,180 @@ export class PluginManagerService {
     } catch (error) {
       return null;
     }
+  }
+
+  // =========================================================================
+  // Worker Management - Delegates to PluginRunnerService
+  // =========================================================================
+
+  /**
+   * Fetch and store metadata from plugin worker
+   */
+  private async fetchAndStoreMetadata(pluginId: string, port: number): Promise<void> {
+    const { fetchMetadataFromWorker } = await import("./plugin-metadata.service");
+
+    try {
+      // Fetch metadata using shared service with retry logic
+      const metadata = await fetchMetadataFromWorker(port, pluginId);
+
+      // Store in database
+      await pluginRegistryRepository.updateMetadata(pluginId, {
+        metadata,
+        metadataFetchedAt: new Date(),
+        metadataState: "fresh",
+      });
+
+      // Update in-memory registry
+      const plugin = this.registry.get(pluginId);
+      if (plugin) {
+        plugin.metadata = metadata;
+        plugin.metadataFetchedAt = new Date();
+        plugin.metadataState = "fresh";
+      }
+
+      console.log(`✅ Fetched and cached metadata for ${pluginId}`);
+    } catch (error) {
+      console.error(`Failed to fetch metadata for ${pluginId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start plugin worker for an organization
+   * Delegates to PluginRunnerService (single source of truth)
+   */
+  async startPluginWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
+    const key = `${organizationId}:${pluginId}`;
+
+    // Check if worker is already running in the runner service
+    const existingWorker = this.runnerService.getWorker(organizationId, pluginId);
+    if (existingWorker) {
+      console.log(`[PluginManager] Worker already running for ${key}, reusing existing worker`);
+      existingWorker.lastActivity = new Date();
+      await pluginInstanceRepository.updateHealthCheck(existingWorker.instanceId, "healthy");
+      return existingWorker;
+    }
+
+    // Get plugin definition from registry
+    const plugin = this.registry.get(pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found in registry`);
+    }
+
+    console.log(`[PluginManager] Starting worker: ${pluginId}`);
+
+    try {
+      // Start worker using SDK runner service (source of truth)
+      const workerInfo = await this.runnerService.startWorker(organizationId, pluginId);
+
+      // Fetch and cache metadata (plugin-global, not per org)
+      // Only fetch if: missing, stale (checksum changed), or error
+      if (plugin.metadataState !== "fresh") {
+        try {
+          await this.fetchAndStoreMetadata(pluginId, workerInfo.port);
+        } catch (error) {
+          await pluginRegistryRepository.updateMetadataState(plugin.id, "error");
+          console.warn(
+            `Metadata fetch failed for ${pluginId}, cached metadata may be stale`,
+            error,
+          );
+          // Don't throw - use cached metadata if available
+        }
+      }
+
+      return workerInfo;
+    } catch (error) {
+      // If worker is already running (race condition), try to get it
+      if (error instanceof Error && error.message.includes("Worker already running")) {
+        console.log(
+          `[PluginManager] Caught "already running" error, attempting to get existing worker for ${key}`,
+        );
+        const existingWorker = this.runnerService.getWorker(organizationId, pluginId);
+        if (existingWorker) {
+          console.log(`[PluginManager] Successfully retrieved existing worker for ${key}`);
+          return existingWorker;
+        }
+      }
+
+      console.error(`Failed to start worker for ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get worker info (or start if not running)
+   * Delegates to PluginRunnerService (single source of truth)
+   */
+  async getOrStartWorker(organizationId: string, pluginId: string): Promise<WorkerInfo> {
+    // Check the Runner service for worker state (single source of truth)
+    const existingWorker = this.runnerService.getWorker(organizationId, pluginId);
+
+    if (existingWorker) {
+      existingWorker.lastActivity = new Date();
+      await pluginInstanceRepository.updateHealthCheck(existingWorker.instanceId, "healthy");
+      return existingWorker;
+    }
+
+    // No worker running - start one
+    return await this.startPluginWorker(organizationId, pluginId);
+  }
+
+  /**
+   * Stop plugin worker
+   * Delegates to PluginRunnerService (single source of truth)
+   */
+  async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
+    console.log(`[PluginManager] Stopping worker: ${organizationId}:${pluginId}`);
+    await this.runnerService.stopWorker(organizationId, pluginId);
+  }
+
+  /**
+   * Build minimal environment for build/install operations
+   */
+  private buildMinimalEnv(): Record<string, string> {
+    return {
+      NODE_ENV: process.env.NODE_ENV || "production",
+      PATH: process.env.PATH || "",
+      HOME: process.env.HOME || "",
+    };
+  }
+
+  /**
+   * Cleanup inactive workers
+   * Uses PluginRunnerService as the source of truth for active workers
+   */
+  async cleanupInactiveWorkers(): Promise<void> {
+    const now = new Date();
+    const allWorkers = this.runnerService.getAllWorkers();
+
+    for (const worker of allWorkers) {
+      const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+      const inactiveTime = now.getTime() - worker.lastActivity.getTime();
+
+      if (inactiveTime > TIMEOUT_MS) {
+        const key = `${worker.organizationId}:${worker.pluginId}`;
+        console.log(
+          `[PluginManager] Cleaning up inactive worker: ${key} (inactive for ${Math.round(inactiveTime / 1000)}s)`,
+        );
+        await this.stopPluginWorker(worker.organizationId, worker.pluginId);
+      }
+    }
+  }
+
+  /**
+   * Get all active workers
+   * Delegates to PluginRunnerService (single source of truth)
+   */
+  getActiveWorkers(): WorkerInfo[] {
+    return this.runnerService.getAllWorkers();
+  }
+
+  /**
+   * Get worker by organization and plugin
+   * Delegates to PluginRunnerService (single source of truth)
+   */
+  getWorker(organizationId: string, pluginId: string): WorkerInfo | undefined {
+    return this.runnerService.getWorker(organizationId, pluginId);
   }
 }
 

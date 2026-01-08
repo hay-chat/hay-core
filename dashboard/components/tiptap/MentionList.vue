@@ -25,7 +25,7 @@
         <div class="mention-item-icon">
           <img
             v-if="item.type === 'action' && item.pluginId"
-            :src="`${apiBaseUrl}/plugins/thumbnails/${item.pluginId}`"
+            :src="`${apiBaseUrl}/plugins/thumbnails/${encodeURIComponent(item.pluginId)}`"
             :alt="item.label"
             class="mention-plugin-thumbnail"
           />

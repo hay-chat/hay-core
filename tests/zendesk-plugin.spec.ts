@@ -3,26 +3,12 @@ import { test, expect } from '@playwright/test';
 test('Zendesk plugin tutorial displays with images', async ({ page }) => {
   // Set a 15 second timeout for the entire test
   test.setTimeout(15000);
-  
+
   // Log console messages from the browser
   page.on('console', msg => console.log('Browser console:', msg.text()));
-  
-  // Navigate to login page first
-  await page.goto('http://localhost:3000/login');
-  
-  // Wait for the page to load
-  await page.waitForLoadState('networkidle');
-  
-  // Login with test credentials
-  await page.fill('input[type="email"]', 'test@test.com');
-  await page.fill('input[type="password"]', 'Test@test1234');
-  await page.click('button[type="submit"]');
-  
-  // Wait for navigation after login
-  await page.waitForTimeout(2000);
-  
-  // Navigate to the Zendesk plugin page
-  await page.goto('http://localhost:3000/integrations/plugins/hay-plugin-zendesk');
+
+  // Auth is already loaded from storage state - navigate directly to plugin page
+  await page.goto('/integrations/plugins/hay-plugin-zendesk');
   
   // Wait for the page to load
   await page.waitForLoadState('networkidle');

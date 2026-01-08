@@ -1,0 +1,749 @@
+[
+  {
+    "name": "get_products",
+    "label": "Get Products",
+    "description": "Retrieve a list of WooCommerce products",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Number of products per page (max 100)"
+        },
+        "search": {
+          "type": "string",
+          "description": "Search products by name or description"
+        },
+        "category": {
+          "type": "number",
+          "description": "Filter products by category ID"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "pending",
+            "private",
+            "publish"
+          ],
+          "description": "Filter products by status"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_product",
+    "label": "Get Product",
+    "description": "Get a specific WooCommerce product by ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Product ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_product",
+    "label": "Create Product",
+    "description": "Create a new WooCommerce product",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Product name"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "simple",
+            "grouped",
+            "external",
+            "variable"
+          ],
+          "description": "Product type"
+        },
+        "regular_price": {
+          "type": "string",
+          "description": "Product regular price"
+        },
+        "sale_price": {
+          "type": "string",
+          "description": "Product sale price"
+        },
+        "description": {
+          "type": "string",
+          "description": "Product description"
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Product short description"
+        },
+        "sku": {
+          "type": "string",
+          "description": "Product SKU"
+        },
+        "manage_stock": {
+          "type": "boolean",
+          "description": "Whether to manage stock for this product"
+        },
+        "stock_quantity": {
+          "type": "number",
+          "description": "Stock quantity"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              }
+            }
+          },
+          "description": "Product categories"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              }
+            }
+          },
+          "description": "Product tags"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "update_product",
+    "label": "Update Product",
+    "description": "Update an existing WooCommerce product",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Product ID to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "Updated product name"
+        },
+        "regular_price": {
+          "type": "string",
+          "description": "Updated regular price"
+        },
+        "sale_price": {
+          "type": "string",
+          "description": "Updated sale price"
+        },
+        "description": {
+          "type": "string",
+          "description": "Updated product description"
+        },
+        "short_description": {
+          "type": "string",
+          "description": "Updated short description"
+        },
+        "stock_quantity": {
+          "type": "number",
+          "description": "Updated stock quantity"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "pending",
+            "private",
+            "publish"
+          ],
+          "description": "Updated product status"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "delete_product",
+    "label": "Delete Product",
+    "description": "Delete a WooCommerce product",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Product ID to delete"
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Whether to permanently delete the product"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_orders",
+    "label": "Get Orders",
+    "description": "Retrieve a list of WooCommerce orders",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Number of orders per page (max 100)"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "processing",
+            "on-hold",
+            "completed",
+            "cancelled",
+            "refunded",
+            "failed"
+          ],
+          "description": "Filter orders by status"
+        },
+        "customer": {
+          "type": "number",
+          "description": "Filter orders by customer ID"
+        },
+        "product": {
+          "type": "number",
+          "description": "Filter orders by product ID"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_order",
+    "label": "Get Order",
+    "description": "Get a specific WooCommerce order by ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Order ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_order",
+    "label": "Create Order",
+    "description": "Create a new WooCommerce order",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "number",
+          "description": "Customer ID for the order"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "processing",
+            "on-hold",
+            "completed",
+            "cancelled",
+            "refunded",
+            "failed"
+          ],
+          "description": "Order status"
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "product_id": {
+                "type": "number"
+              },
+              "quantity": {
+                "type": "number"
+              }
+            }
+          },
+          "description": "Order line items"
+        },
+        "billing": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "address_1": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            }
+          },
+          "description": "Billing address"
+        },
+        "shipping": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "address_1": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            }
+          },
+          "description": "Shipping address"
+        }
+      }
+    }
+  },
+  {
+    "name": "update_order",
+    "label": "Update Order",
+    "description": "Update an existing WooCommerce order",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Order ID to update"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "processing",
+            "on-hold",
+            "completed",
+            "cancelled",
+            "refunded",
+            "failed"
+          ],
+          "description": "Updated order status"
+        },
+        "customer_note": {
+          "type": "string",
+          "description": "Customer note for the order"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_customers",
+    "label": "Get Customers",
+    "description": "Retrieve a list of WooCommerce customers",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Number of customers per page (max 100)"
+        },
+        "search": {
+          "type": "string",
+          "description": "Search customers by name or email"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "all",
+            "administrator",
+            "editor",
+            "author",
+            "contributor",
+            "subscriber",
+            "customer",
+            "shop_manager"
+          ],
+          "description": "Filter customers by role"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_customer",
+    "label": "Get Customer",
+    "description": "Get a specific WooCommerce customer by ID",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Customer ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "create_customer",
+    "label": "Create Customer",
+    "description": "Create a new WooCommerce customer",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer email address"
+        },
+        "first_name": {
+          "type": "string",
+          "description": "Customer first name"
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Customer last name"
+        },
+        "username": {
+          "type": "string",
+          "description": "Customer username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Customer password"
+        },
+        "billing": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "company": {
+              "type": "string"
+            },
+            "address_1": {
+              "type": "string"
+            },
+            "address_2": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          },
+          "description": "Customer billing address"
+        },
+        "shipping": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "company": {
+              "type": "string"
+            },
+            "address_1": {
+              "type": "string"
+            },
+            "address_2": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            }
+          },
+          "description": "Customer shipping address"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    }
+  },
+  {
+    "name": "update_customer",
+    "label": "Update Customer",
+    "description": "Update an existing WooCommerce customer",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Customer ID to update"
+        },
+        "first_name": {
+          "type": "string",
+          "description": "Updated first name"
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Updated last name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Updated email address"
+        },
+        "billing": {
+          "type": "object",
+          "description": "Updated billing address"
+        },
+        "shipping": {
+          "type": "object",
+          "description": "Updated shipping address"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "get_product_categories",
+    "label": "Get Product Categories",
+    "description": "Retrieve WooCommerce product categories",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Number of categories per page (max 100)"
+        },
+        "search": {
+          "type": "string",
+          "description": "Search categories by name"
+        },
+        "parent": {
+          "type": "number",
+          "description": "Filter categories by parent ID"
+        }
+      }
+    }
+  },
+  {
+    "name": "create_product_category",
+    "label": "Create Product Category",
+    "description": "Create a new WooCommerce product category",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Category name"
+        },
+        "slug": {
+          "type": "string",
+          "description": "Category slug"
+        },
+        "parent": {
+          "type": "number",
+          "description": "Parent category ID"
+        },
+        "description": {
+          "type": "string",
+          "description": "Category description"
+        },
+        "display": {
+          "type": "string",
+          "enum": [
+            "default",
+            "products",
+            "subcategories",
+            "both"
+          ],
+          "description": "Category display type"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_coupons",
+    "label": "Get Coupons",
+    "description": "Retrieve WooCommerce coupons",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Number of coupons per page (max 100)"
+        },
+        "search": {
+          "type": "string",
+          "description": "Search coupons by code"
+        },
+        "code": {
+          "type": "string",
+          "description": "Filter by specific coupon code"
+        }
+      }
+    }
+  },
+  {
+    "name": "create_coupon",
+    "label": "Create Coupon",
+    "description": "Create a new WooCommerce coupon",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Coupon code"
+        },
+        "discount_type": {
+          "type": "string",
+          "enum": [
+            "percent",
+            "fixed_cart",
+            "fixed_product"
+          ],
+          "description": "Coupon discount type"
+        },
+        "amount": {
+          "type": "string",
+          "description": "Coupon discount amount"
+        },
+        "description": {
+          "type": "string",
+          "description": "Coupon description"
+        },
+        "date_expires": {
+          "type": "string",
+          "description": "Coupon expiry date (ISO 8601 format)"
+        },
+        "individual_use": {
+          "type": "boolean",
+          "description": "Whether coupon can only be used individually"
+        },
+        "product_ids": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Product IDs the coupon applies to"
+        },
+        "usage_limit": {
+          "type": "number",
+          "description": "Maximum usage limit for the coupon"
+        },
+        "minimum_amount": {
+          "type": "string",
+          "description": "Minimum order amount for coupon to be valid"
+        },
+        "maximum_amount": {
+          "type": "string",
+          "description": "Maximum order amount for coupon to be valid"
+        }
+      },
+      "required": [
+        "code",
+        "discount_type",
+        "amount"
+      ]
+    }
+  }
+]

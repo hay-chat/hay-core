@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class MakePlaybookOrgIdNullable1756475900000 implements MigrationInterface {
-  name = "MakePlaybookOrgIdNullable1756475900000";
+export class MakePlaybookorganizationIdNullable1756475900000 implements MigrationInterface {
+  name = "MakePlaybookorganizationIdNullable1756475900000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Make organization_id nullable for system playbooks

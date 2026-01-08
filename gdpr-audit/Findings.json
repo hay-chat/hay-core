@@ -53,7 +53,7 @@
         {
           "path": "server/services/vector-store.service.ts",
           "line": 87,
-          "code": "async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {\n  // No TTL parameter or default expiry"
+          "code": "async addChunks(organizationId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {\n  // No TTL parameter or default expiry"
         }
       ],
       "explanation": "Conversation messages, customer PII, and vector embeddings are stored indefinitely with no automatic cleanup. Art.5(1)(e) requires data be kept only as long as necessary. Without configurable retention, tenants cannot comply with their own data retention obligations, and Hay accumulates unbounded PII liability.",
@@ -198,7 +198,7 @@
         {
           "path": "server/services/vector-store.service.ts",
           "line": 188,
-          "code": "async deleteByDocumentId(orgId: string, docId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND \"document_id\" = $2`,\n    [orgId, docId],\n  );\n  return result[1];\n}"
+          "code": "async deleteByDocumentId(organizationId: string, docId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND \"document_id\" = $2`,\n    [organizationId, docId],\n  );\n  return result[1];\n}"
         },
         {
           "path": "server/routes/v1/conversations/index.ts",
@@ -214,7 +214,7 @@
       ],
       "data_categories": ["ChatContent", "Identifiers"],
       "recommendation": "Add ON DELETE CASCADE or explicit deletion hooks. When conversation deleted, call vectorStoreService.deleteByConversationId() (implement this method). When document deleted, ensure deleteByDocumentId is called. Add database trigger or app-level hook. Verify with test that deletes conversation and confirms embeddings table has 0 rows for that ID.",
-      "sample_patch": "```typescript\n// server/services/vector-store.service.ts\nasync deleteByConversationId(orgId: string, conversationId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND metadata->>'conversationId' = $2`,\n    [orgId, conversationId]\n  );\n  return result[1];\n}\n\n// server/repositories/conversation.repository.ts\nasync delete(id: string, orgId: string): Promise<void> {\n  // Delete embeddings first\n  await vectorStoreService.deleteByConversationId(orgId, id);\n  // Delete conversation (cascades messages)\n  await this.getRepository().delete({ id, organization_id: orgId });\n}\n```",
+      "sample_patch": "```typescript\n// server/services/vector-store.service.ts\nasync deleteByConversationId(organizationId: string, conversationId: string): Promise<number> {\n  const result = await AppDataSource.query(\n    `DELETE FROM embeddings WHERE \"organization_id\" = $1 AND metadata->>'conversationId' = $2`,\n    [organizationId, conversationId]\n  );\n  return result[1];\n}\n\n// server/repositories/conversation.repository.ts\nasync delete(id: string, organizationId: string): Promise<void> {\n  // Delete embeddings first\n  await vectorStoreService.deleteByConversationId(organizationId, id);\n  // Delete conversation (cascades messages)\n  await this.getRepository().delete({ id, organization_id: organizationId });\n}\n```",
       "test_plan": "1. Create conversation with messages, verify embeddings created. 2. Delete conversation, verify embeddings table row count is 0 for that conversation. 3. Test document delete, verify associated embeddings removed. 4. Add unit test for deleteByConversationId.",
       "owner": "backend",
       "eta_complexity": "M"
@@ -411,13 +411,11 @@
         {
           "path": "server/services/vector-store.service.ts",
           "line": 134,
-          "code": "async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {\n  // ... WHERE \"organization_id\" = $2"
+          "code": "async search(organizationId: string, query: string, k: number = 10): Promise<SearchResult[]> {\n  // ... WHERE \"organization_id\" = $2"
         }
       ],
-      "explanation": "Positive finding: Repositories correctly filter by organization_id in queries. Vector store search scoped to orgId. Base repository pattern enforces tenant isolation. No evidence of cross-tenant data leakage in code. This is a strength for Art.32 security and Art.5(1)(f) integrity. Recommend ongoing testing to maintain this.",
-      "exploit_scenarios": [
-        "N/A - This is a positive finding"
-      ],
+      "explanation": "Positive finding: Repositories correctly filter by organization_id in queries. Vector store search scoped to organizationId. Base repository pattern enforces tenant isolation. No evidence of cross-tenant data leakage in code. This is a strength for Art.32 security and Art.5(1)(f) integrity. Recommend ongoing testing to maintain this.",
+      "exploit_scenarios": ["N/A - This is a positive finding"],
       "data_categories": ["All"],
       "recommendation": "Maintain current practice. Add integration tests for tenant isolation: 1) Create data in Org A, attempt access from Org B, verify 403/404. 2) Test vector search doesn't return results from other orgs. 3) Add SQL query audit in CI to detect missing organization_id filters. 4) Consider row-level security (RLS) in Postgres as defense-in-depth.",
       "sample_patch": "```sql\n-- Optional: Postgres RLS for defense-in-depth\nALTER TABLE conversations ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY org_isolation ON conversations\n  USING (organization_id = current_setting('app.current_org_id')::uuid);\n\n-- Set in connection:\n-- SET app.current_org_id = '<org-id>';\n```",

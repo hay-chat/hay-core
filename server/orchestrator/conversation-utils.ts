@@ -293,6 +293,7 @@ export async function validateConversationClosure(
           reason: { type: "string" },
         },
         required: ["shouldClose", "reason"],
+        additionalProperties: false,
       },
     });
 

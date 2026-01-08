@@ -48,20 +48,20 @@ await vectorStoreService.initialize();
 // Add embeddings
 const chunks = [
   { content: "First chunk of text", metadata: { source: "doc1" } },
-  { content: "Second chunk of text", metadata: { source: "doc1" } }
+  { content: "Second chunk of text", metadata: { source: "doc1" } },
 ];
 
 const ids = await vectorStoreService.addChunks(
   organizationId,
-  documentId,  // optional
-  chunks
+  documentId, // optional
+  chunks,
 );
 
 // Search for similar content
 const results = await vectorStoreService.search(
   organizationId,
   "search query",
-  10  // top K results
+  10, // top K results
 );
 ```
 
@@ -85,6 +85,7 @@ CLEANUP=true npx ts-node scripts/ingest-example.ts
 ### Database Schema
 
 The `embeddings` table structure:
+
 - `id`: UUID primary key
 - `organizationId`: UUID for multi-tenancy
 - `documentId`: Optional UUID linking to documents
@@ -102,6 +103,7 @@ The `embeddings` table structure:
 For large-scale deployments:
 
 1. **Partial HNSW indexes** per large organization:
+
 ```sql
 CREATE INDEX embeddings_embedding_hnsw_org_xyz
 ON embeddings USING hnsw (embedding vector_cosine_ops)
@@ -115,22 +117,31 @@ WHERE "organizationId" = 'specific-org-uuid';
 ### VectorStoreService Methods
 
 #### `initialize()`
+
 Initialize the vector store. Must be called after DataSource is initialized.
 
-#### `addChunks(orgId, docId, chunks)`
+#### `addChunks(organizationId, docId, chunks)`
+
 Add text chunks to the vector store.
+
 - Returns: Array of embedding IDs
 
-#### `search(orgId, query, k)`
+#### `search(organizationId, query, k)`
+
 Search for similar content within an organization.
+
 - Returns: Array of results with similarity scores
 
-#### `deleteByDocumentId(orgId, docId)`
+#### `deleteByDocumentId(organizationId, docId)`
+
 Delete all embeddings for a document.
+
 - Returns: Number of deleted rows
 
-#### `getStatistics(orgId)`
+#### `getStatistics(organizationId)`
+
 Get embedding statistics for an organization.
+
 - Returns: Statistics object
 
 ## Switching Embedding Models
@@ -138,14 +149,16 @@ Get embedding statistics for an organization.
 To use a different embedding model:
 
 1. Update `.env`:
+
 ```env
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIM=3072  # For large model
 ```
 
 2. Create a new migration to update the vector dimension:
+
 ```sql
-ALTER TABLE embeddings 
+ALTER TABLE embeddings
 ALTER COLUMN embedding TYPE vector(3072);
 ```
 
@@ -154,21 +167,23 @@ ALTER COLUMN embedding TYPE vector(3072);
 Currently using cosine distance (default). To switch:
 
 ### For L2 (Euclidean) distance:
+
 ```sql
 -- Drop old index
 DROP INDEX embeddings_embedding_hnsw;
 
 -- Create new index with L2
-CREATE INDEX embeddings_embedding_hnsw 
+CREATE INDEX embeddings_embedding_hnsw
 ON embeddings USING hnsw (embedding vector_l2_ops);
 
 -- Update queries to use <-> operator
 ```
 
 ### For Inner Product:
+
 ```sql
 -- Create index with inner product
-CREATE INDEX embeddings_embedding_hnsw 
+CREATE INDEX embeddings_embedding_hnsw
 ON embeddings USING hnsw (embedding vector_ip_ops);
 
 -- Update queries to use <#> operator
@@ -177,17 +192,20 @@ ON embeddings USING hnsw (embedding vector_ip_ops);
 ## Troubleshooting
 
 ### Extension not found
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ```
 
 ### Performance issues
+
 1. Check index usage: `EXPLAIN ANALYZE your_query`
 2. Consider partial indexes for large orgs
 3. Monitor `lists` and `ef_construction` HNSW parameters
 
 ### Multi-tenancy concerns
+
 - Always filter by `organizationId` first
 - Use RLS policies in Supabase deployments
 - Consider partitioning for 1000+ organizations
@@ -195,6 +213,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ## Testing
 
 Run the integration tests:
+
 ```bash
 npm test -- tests/integration/vector-store.test.ts
 ```
