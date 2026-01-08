@@ -1,7 +1,7 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 
 /**
- * Zendesk Plugin - SDK V2
+ * Zendesk Plugin
  *
  * Connect your Zendesk account to manage tickets, customers, and support workflows
  */

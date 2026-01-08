@@ -25,18 +25,18 @@ npm install @hay/plugin-sdk
 ### Basic Plugin Example
 
 ```typescript
-import { defineHayPlugin } from '@hay/plugin-sdk';
+import { defineHayPlugin } from "@hay/plugin-sdk";
 
 export default defineHayPlugin({
   // Global initialization - runs once when plugin loads
   async onInitialize(ctx) {
-    ctx.logger.info('Plugin initializing...');
+    ctx.logger.info("Plugin initializing...");
 
     // Register configuration fields
     ctx.register.config({
-      apiKey: ctx.config.field('string', {
-        label: 'API Key',
-        description: 'Your service API key',
+      apiKey: ctx.config.field("string", {
+        label: "API Key",
+        description: "Your service API key",
         required: true,
         secret: true,
       }),
@@ -44,15 +44,15 @@ export default defineHayPlugin({
 
     // Register OAuth2 authentication
     ctx.register.auth.oauth2({
-      id: 'oauth',
-      label: 'OAuth Login',
-      authorizationUrl: 'https://api.example.com/oauth/authorize',
-      tokenUrl: 'https://api.example.com/oauth/token',
-      scopes: ['read', 'write'],
+      id: "oauth",
+      label: "OAuth Login",
+      authorizationUrl: "https://api.example.com/oauth/authorize",
+      tokenUrl: "https://api.example.com/oauth/token",
+      scopes: ["read", "write"],
     });
 
     // Register a custom HTTP route
-    ctx.register.route('/webhook', 'POST', async (req, res) => {
+    ctx.register.route("/webhook", "POST", async (req, res) => {
       res.json({ received: true });
     });
   },
@@ -62,7 +62,7 @@ export default defineHayPlugin({
     ctx.logger.info(`Starting for org: ${ctx.org.id}`);
 
     // Get configuration values
-    const apiKey = ctx.config.get('apiKey');
+    const apiKey = ctx.config.get("apiKey");
 
     // Get authentication credentials
     const auth = ctx.auth.get();
@@ -72,40 +72,40 @@ export default defineHayPlugin({
 
     // Start an MCP server
     const mcp = await ctx.mcp.startLocal(async () => {
-      const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
-      const server = new Server({ name: 'my-plugin', version: '1.0.0' }, {});
+      const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
+      const server = new Server({ name: "my-plugin", version: "1.0.0" }, {});
 
       // Register MCP tools, resources, prompts here...
 
       return server;
     });
 
-    ctx.logger.info('MCP server started', { transport: mcp.transport });
+    ctx.logger.info("MCP server started", { transport: mcp.transport });
   },
 
   // Validate authentication credentials
   async onValidateAuth(ctx) {
     const auth = ctx.auth.get();
     if (!auth) {
-      throw new Error('No authentication configured');
+      throw new Error("No authentication configured");
     }
 
     // Validate credentials with external API
     const isValid = await validateCredentials(auth.credentials);
     if (!isValid) {
-      throw new Error('Invalid credentials');
+      throw new Error("Invalid credentials");
     }
   },
 
   // Handle configuration updates
   async onConfigUpdate(ctx) {
-    const apiKey = ctx.config.get('apiKey');
-    ctx.logger.info('Configuration updated');
+    const apiKey = ctx.config.get("apiKey");
+    ctx.logger.info("Configuration updated");
   },
 
   // Cleanup on shutdown
   async onDisable(ctx) {
-    ctx.logger.info('Plugin shutting down...');
+    ctx.logger.info("Plugin shutting down...");
     // MCP servers are automatically stopped
   },
 });
@@ -168,12 +168,14 @@ Add a `hay-plugin` section to your `package.json`:
 The SDK enforces strict separation between **global** and **organization runtime** contexts:
 
 #### Global Context (onInitialize)
+
 - Used for **registration** and **schema definition**
 - Available: `register`, `config.field()`, `logger`
 - **Cannot** access runtime config values or org data
 - Runs once per plugin load
 
 #### Organization Runtime Context (onStart, onValidateAuth, onConfigUpdate, onDisable)
+
 - Used for **runtime operations**
 - Available: `org`, `config.get()`, `auth.get()`, `mcp`, `logger`
 - **Cannot** register new config fields or auth methods
@@ -187,11 +189,21 @@ Define a plugin with lifecycle hooks.
 
 ```typescript
 export default defineHayPlugin({
-  onInitialize: async (ctx: HayGlobalContext) => { /* ... */ },
-  onStart: async (ctx: HayStartContext) => { /* ... */ },
-  onValidateAuth: async (ctx: HayAuthValidationContext) => { /* ... */ },
-  onConfigUpdate: async (ctx: HayConfigUpdateContext) => { /* ... */ },
-  onDisable: async (ctx: HayDisableContext) => { /* ... */ },
+  onInitialize: async (ctx: HayGlobalContext) => {
+    /* ... */
+  },
+  onStart: async (ctx: HayStartContext) => {
+    /* ... */
+  },
+  onValidateAuth: async (ctx: HayAuthValidationContext) => {
+    /* ... */
+  },
+  onConfigUpdate: async (ctx: HayConfigUpdateContext) => {
+    /* ... */
+  },
+  onDisable: async (ctx: HayDisableContext) => {
+    /* ... */
+  },
 });
 ```
 
@@ -205,19 +217,19 @@ Register configuration fields:
 
 ```typescript
 ctx.register.config({
-  apiKey: ctx.config.field('string', {
-    label: 'API Key',
-    description: 'Your service API key',
+  apiKey: ctx.config.field("string", {
+    label: "API Key",
+    description: "Your service API key",
     required: true,
     secret: true,
-    env: 'MY_SERVICE_API_KEY', // Optional env var fallback
+    env: "MY_SERVICE_API_KEY", // Optional env var fallback
   }),
-  maxRetries: ctx.config.field('number', {
-    label: 'Max Retries',
+  maxRetries: ctx.config.field("number", {
+    label: "Max Retries",
     default: 3,
   }),
-  enableFeature: ctx.config.field('boolean', {
-    label: 'Enable Feature',
+  enableFeature: ctx.config.field("boolean", {
+    label: "Enable Feature",
     default: false,
   }),
 });
@@ -229,11 +241,11 @@ Register API Key authentication:
 
 ```typescript
 ctx.register.auth.apiKey({
-  id: 'api-key',
-  label: 'API Key',
+  id: "api-key",
+  label: "API Key",
   fields: {
-    apiKey: ctx.config.field('string', {
-      label: 'API Key',
+    apiKey: ctx.config.field("string", {
+      label: "API Key",
       required: true,
       secret: true,
     }),
@@ -247,13 +259,13 @@ Register OAuth2 authentication:
 
 ```typescript
 ctx.register.auth.oauth2({
-  id: 'oauth',
-  label: 'OAuth Login',
-  authorizationUrl: 'https://api.example.com/oauth/authorize',
-  tokenUrl: 'https://api.example.com/oauth/token',
-  scopes: ['read', 'write'],
-  clientIdEnv: 'MY_PLUGIN_CLIENT_ID',
-  clientSecretEnv: 'MY_PLUGIN_CLIENT_SECRET',
+  id: "oauth",
+  label: "OAuth Login",
+  authorizationUrl: "https://api.example.com/oauth/authorize",
+  tokenUrl: "https://api.example.com/oauth/token",
+  scopes: ["read", "write"],
+  clientIdEnv: "MY_PLUGIN_CLIENT_ID",
+  clientSecretEnv: "MY_PLUGIN_CLIENT_SECRET",
 });
 ```
 
@@ -262,7 +274,7 @@ ctx.register.auth.oauth2({
 Register a custom HTTP route:
 
 ```typescript
-ctx.register.route('/webhook', 'POST', async (req, res) => {
+ctx.register.route("/webhook", "POST", async (req, res) => {
   const payload = req.body;
   // Handle webhook
   res.json({ success: true });
@@ -275,9 +287,9 @@ Register a UI extension:
 
 ```typescript
 ctx.register.ui({
-  id: 'settings-panel',
-  location: 'plugin-settings',
-  component: 'SettingsPanel.vue',
+  id: "settings-panel",
+  location: "plugin-settings",
+  component: "SettingsPanel.vue",
 });
 ```
 
@@ -299,8 +311,8 @@ const orgName = ctx.org.name;
 Get configuration value with org config → env var fallback:
 
 ```typescript
-const apiKey = ctx.config.get('apiKey'); // string
-const maxRetries = ctx.config.get('maxRetries'); // number
+const apiKey = ctx.config.get("apiKey"); // string
+const maxRetries = ctx.config.get("maxRetries"); // number
 ```
 
 #### config.getOptional(key)
@@ -308,7 +320,7 @@ const maxRetries = ctx.config.get('maxRetries'); // number
 Get optional configuration value:
 
 ```typescript
-const webhookUrl = ctx.config.getOptional('webhookUrl'); // string | null
+const webhookUrl = ctx.config.getOptional("webhookUrl"); // string | null
 ```
 
 #### config.keys()
@@ -337,19 +349,16 @@ Start a local MCP server:
 
 ```typescript
 const mcp = await ctx.mcp.startLocal(async () => {
-  const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
-  const server = new Server(
-    { name: 'my-plugin', version: '1.0.0' },
-    { capabilities: {} }
-  );
+  const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
+  const server = new Server({ name: "my-plugin", version: "1.0.0" }, { capabilities: {} });
 
   // Register tools, resources, prompts...
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
       {
-        name: 'get-data',
-        description: 'Fetch data from service',
-        inputSchema: { type: 'object', properties: {} },
+        name: "get-data",
+        description: "Fetch data from service",
+        inputSchema: { type: "object", properties: {} },
       },
     ],
   }));
@@ -364,8 +373,8 @@ Connect to an external MCP server:
 
 ```typescript
 const mcp = await ctx.mcp.startExternal({
-  command: 'npx',
-  args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
   env: { PATH: process.env.PATH },
 });
 ```
@@ -375,10 +384,10 @@ const mcp = await ctx.mcp.startExternal({
 Log messages with context:
 
 ```typescript
-ctx.logger.debug('Debug message', { key: 'value' });
-ctx.logger.info('Info message');
-ctx.logger.warn('Warning message');
-ctx.logger.error('Error message', { error: err });
+ctx.logger.debug("Debug message", { key: "value" });
+ctx.logger.info("Info message");
+ctx.logger.warn("Warning message");
+ctx.logger.error("Error message", { error: err });
 ```
 
 ## Configuration System
@@ -393,18 +402,18 @@ ctx.logger.error('Error message', { error: err });
 ### Field Options
 
 ```typescript
-ctx.config.field('string', {
-  label: 'Display Name',           // UI label
-  description: 'Help text',         // UI description
-  required: true,                   // Is required?
-  secret: true,                     // Mask in UI?
-  default: 'default-value',         // Default value
-  env: 'ENV_VAR_NAME',             // Env var fallback
+ctx.config.field("string", {
+  label: "Display Name", // UI label
+  description: "Help text", // UI description
+  required: true, // Is required?
+  secret: true, // Mask in UI?
+  default: "default-value", // Default value
+  env: "ENV_VAR_NAME", // Env var fallback
   validation: {
-    min: 1,                         // Min value (number)
-    max: 100,                       // Max value (number)
-    pattern: '^[a-z]+$',           // Regex pattern (string)
-    enum: ['opt1', 'opt2'],        // Allowed values
+    min: 1, // Min value (number)
+    max: 100, // Max value (number)
+    pattern: "^[a-z]+$", // Regex pattern (string)
+    enum: ["opt1", "opt2"], // Allowed values
   },
 });
 ```
@@ -426,11 +435,11 @@ Simple key-based authentication:
 
 ```typescript
 ctx.register.auth.apiKey({
-  id: 'api-key',
-  label: 'API Key',
+  id: "api-key",
+  label: "API Key",
   fields: {
-    apiKey: ctx.config.field('string', {
-      label: 'API Key',
+    apiKey: ctx.config.field("string", {
+      label: "API Key",
       required: true,
       secret: true,
     }),
@@ -442,7 +451,7 @@ Access credentials:
 
 ```typescript
 const auth = ctx.auth.get();
-if (auth?.methodId === 'api-key') {
+if (auth?.methodId === "api-key") {
   const apiKey = auth.credentials.apiKey;
 }
 ```
@@ -453,13 +462,13 @@ OAuth2 flow with automatic token management:
 
 ```typescript
 ctx.register.auth.oauth2({
-  id: 'oauth',
-  label: 'OAuth Login',
-  authorizationUrl: 'https://api.example.com/oauth/authorize',
-  tokenUrl: 'https://api.example.com/oauth/token',
-  scopes: ['read', 'write'],
-  clientIdEnv: 'MY_PLUGIN_CLIENT_ID',
-  clientSecretEnv: 'MY_PLUGIN_CLIENT_SECRET',
+  id: "oauth",
+  label: "OAuth Login",
+  authorizationUrl: "https://api.example.com/oauth/authorize",
+  tokenUrl: "https://api.example.com/oauth/token",
+  scopes: ["read", "write"],
+  clientIdEnv: "MY_PLUGIN_CLIENT_ID",
+  clientSecretEnv: "MY_PLUGIN_CLIENT_SECRET",
 });
 ```
 
@@ -467,7 +476,7 @@ Access credentials:
 
 ```typescript
 const auth = ctx.auth.get();
-if (auth?.methodId === 'oauth') {
+if (auth?.methodId === "oauth") {
   const accessToken = auth.credentials.access_token;
   const refreshToken = auth.credentials.refresh_token;
 }
@@ -508,10 +517,10 @@ Connect to an external MCP server process:
 
 ```typescript
 const mcp = await ctx.mcp.startExternal({
-  command: 'node',
-  args: ['./external-mcp-server.js'],
+  command: "node",
+  args: ["./external-mcp-server.js"],
   env: {
-    API_KEY: ctx.config.get('apiKey'),
+    API_KEY: ctx.config.get("apiKey"),
     PATH: process.env.PATH,
   },
 });
@@ -524,7 +533,7 @@ console.log(mcp.transport); // 'stdio'
 Register custom API endpoints:
 
 ```typescript
-ctx.register.route('/webhook', 'POST', async (req, res) => {
+ctx.register.route("/webhook", "POST", async (req, res) => {
   const payload = req.body;
 
   // Process webhook
@@ -533,12 +542,13 @@ ctx.register.route('/webhook', 'POST', async (req, res) => {
   res.json({ success: true });
 });
 
-ctx.register.route('/health', 'GET', async (req, res) => {
-  res.json({ status: 'ok' });
+ctx.register.route("/health", "GET", async (req, res) => {
+  res.json({ status: "ok" });
 });
 ```
 
 Routes are accessible at:
+
 ```
 http://localhost:<port>/<path>
 ```
@@ -549,16 +559,17 @@ Register Vue components to extend the Hay dashboard:
 
 ```typescript
 ctx.register.ui({
-  id: 'custom-settings',
-  location: 'plugin-settings',
-  component: 'CustomSettings.vue',
+  id: "custom-settings",
+  location: "plugin-settings",
+  component: "CustomSettings.vue",
   props: {
-    theme: 'dark',
+    theme: "dark",
   },
 });
 ```
 
 Supported locations:
+
 - `plugin-settings` - Plugin settings page
 - `conversation-sidebar` - Conversation sidebar
 - `agent-toolbar` - Agent toolbar
@@ -769,14 +780,14 @@ async onStart(ctx) {
 ```typescript
 // ❌ Bad: Hardcoded secrets
 ctx.register.auth.oauth2({
-  clientId: 'hardcoded-client-id',
-  clientSecret: 'hardcoded-secret',
+  clientId: "hardcoded-client-id",
+  clientSecret: "hardcoded-secret",
 });
 
 // ✅ Good: Environment variables
 ctx.register.auth.oauth2({
-  clientIdEnv: 'MY_PLUGIN_CLIENT_ID',
-  clientSecretEnv: 'MY_PLUGIN_CLIENT_SECRET',
+  clientIdEnv: "MY_PLUGIN_CLIENT_ID",
+  clientSecretEnv: "MY_PLUGIN_CLIENT_SECRET",
 });
 ```
 
@@ -827,6 +838,7 @@ The environment variable you're trying to access is not in the `environment.allo
 ### "MCP server failed to start"
 
 Check the logs for specific errors. Common issues:
+
 - Missing dependencies
 - Invalid MCP server initialization
 - Port conflicts
@@ -838,8 +850,8 @@ Ensure your `onValidateAuth` hook properly tests credentials with the external s
 
 ## Reference Documentation
 
-- **[PLUGIN.md](../PLUGIN.md)** - Complete plugin system specification
-- **[PLUGIN_SDK_V2_PLAN.md](PLUGIN_SDK_V2_PLAN.md)** - Implementation plan
+- **[docs/PLUGIN_API.md](../../docs/PLUGIN_API.md)** - Complete plugin API documentation
+- **[docs/PLUGIN_QUICK_REFERENCE.md](../../docs/PLUGIN_QUICK_REFERENCE.md)** - Quick reference for plugin development
 
 ## Contributing
 

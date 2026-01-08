@@ -145,7 +145,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   }
 
   /**
-   * Update SDK v2 metadata (plugin-global)
+   * Update SDK metadata (plugin-global)
    */
   async updateMetadata(
     pluginId: string,
@@ -153,7 +153,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       metadata: any;
       metadataFetchedAt: Date;
       metadataState: "missing" | "fresh" | "stale" | "error";
-    }
+    },
   ): Promise<void> {
     const plugin = await this.findByPluginId(pluginId);
     if (!plugin) {
@@ -173,7 +173,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
    */
   async updateMetadataState(
     id: string,
-    metadataState: "missing" | "fresh" | "stale" | "error"
+    metadataState: "missing" | "fresh" | "stale" | "error",
   ): Promise<void> {
     await this.getRepository().update(id, {
       metadataState,

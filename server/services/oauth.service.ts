@@ -113,9 +113,9 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} not configured for this organization`);
     }
 
-    // SDK v2: Check metadata.authMethods for OAuth2 registration
+    // Check metadata.authMethods for OAuth2 registration
     if (!plugin.metadata?.authMethods) {
-      throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
+      throw new Error(`Plugin ${pluginId} does not have metadata (metadata required)`);
     }
 
     console.log("Checking metadata.authMethods for OAuth2...");
@@ -140,7 +140,7 @@ export class OAuthService {
       tokenUrl: oauth2Method.tokenUrl,
       scopes: oauth2Method.scopes || [],
       optionalScopes: oauth2Method.optionalScopes,
-      pkce: true, // SDK v2 always uses PKCE for security
+      pkce: true, // Always use PKCE for security
     };
 
     // Get client credentials from plugin instance using config resolver with env fallback
@@ -303,9 +303,9 @@ export class OAuthService {
         throw new Error(`Plugin ${pluginId} not configured for this organization`);
       }
 
-      // SDK v2: Check metadata.authMethods for OAuth2 registration
+      // Check metadata.authMethods for OAuth2 registration
       if (!plugin.metadata?.authMethods) {
-        throw new Error(`Plugin ${pluginId} does not have metadata (SDK v2 required)`);
+        throw new Error(`Plugin ${pluginId} does not have metadata`);
       }
 
       console.log("Checking metadata.authMethods for OAuth2...");

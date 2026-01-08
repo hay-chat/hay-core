@@ -18,7 +18,7 @@ export async function refreshOAuthTokens(): Promise<void> {
 
     for (const instance of instances) {
       try {
-        // SDK v2: Check authState for OAuth credentials
+        // Check authState for OAuth credentials
         const expiresAt = instance.authState?.credentials?.expiresAt;
         const hasRefreshToken = !!instance.authState?.credentials?.refreshToken;
 

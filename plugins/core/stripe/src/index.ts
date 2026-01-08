@@ -1,5 +1,5 @@
 /**
- * Stripe Plugin - SDK V2
+ * Stripe Plugin
  *
  * Connect your Stripe account to manage payments, customers, subscriptions, and more
  * through Stripe's Model Context Protocol server.
@@ -67,7 +67,7 @@ export default defineHayPlugin((globalCtx) => ({
       const response = await fetch("https://api.stripe.com/v1/balance", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
       });
 
@@ -112,7 +112,7 @@ export default defineHayPlugin((globalCtx) => ({
       if (!authState) {
         ctx.logger.info(
           "Stripe credentials not configured - plugin is enabled but MCP tools are not available. " +
-          "Please configure your Stripe credentials in the plugin settings."
+            "Please configure your Stripe credentials in the plugin settings.",
         );
         return;
       }
@@ -126,7 +126,7 @@ export default defineHayPlugin((globalCtx) => ({
 
       // Build auth headers with API key
       const authHeaders: Record<string, string> = {
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       };
 
       ctx.logger.debug("Using API Key authentication for MCP connection");

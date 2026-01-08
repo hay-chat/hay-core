@@ -1,7 +1,7 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 
 /**
- * Magento Plugin - SDK V2
+ * Magento Plugin
  *
  * Connect your Magento 2 e-commerce store to manage products, orders, customers,
  * inventory, and analyze sales performance through Magento's REST API

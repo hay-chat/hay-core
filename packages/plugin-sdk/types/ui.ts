@@ -58,7 +58,7 @@ export interface UIExtensionDescriptor {
 }
 
 /**
- * Plugin page descriptor (SDK V2 enhanced UI system).
+ * Plugin page descriptor.
  *
  * Defines a UI page/component provided by the plugin with metadata
  * for dashboard rendering. Supports slots, standalone pages, and custom routes.

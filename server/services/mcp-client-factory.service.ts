@@ -8,7 +8,7 @@ import { debugLog } from "@server/lib/debug-logger";
 /**
  * Factory for creating MCP clients based on plugin manifest configuration
  *
- * All local plugins now use SDK v2 with HTTP communication.
+ * All local plugins use HTTP communication via the SDK runner.
  * Remote MCP servers are still supported via RemoteMCPClient.
  */
 export class MCPClientFactory {
@@ -42,7 +42,7 @@ export class MCPClientFactory {
       return client;
     }
 
-    // All local plugins use HTTP-based communication (SDK v2)
+    // All local plugins use HTTP-based communication via SDK runner
     debugLog("mcp-factory", `Creating local HTTP MCP client for plugin ${pluginId}`, {
       organizationId,
     });

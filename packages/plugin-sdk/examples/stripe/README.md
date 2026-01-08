@@ -481,7 +481,6 @@ When you call `config.get("apiKey")`:
 ## Learning Resources
 
 - **PLUGIN.md**: Full SDK specification
-- **PLUGIN_SDK_V2_PLAN.md**: Implementation plan and phases
 - **plugin-sdk/sdk/**: SDK implementation source code
 - **plugin-sdk/runner/**: Worker process implementation
 

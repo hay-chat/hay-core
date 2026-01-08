@@ -245,8 +245,8 @@ export class Conversation {
       });
     }
 
-    // Get tool schemas from MCP Registry Service (SDK v2 compatible)
-    // This will fetch tools dynamically from running SDK v2 workers via /mcp/list-tools
+    // Get tool schemas from MCP Registry Service
+    // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
       debugLog("conversation", "Fetching tools from MCP registry for playbook update", {
@@ -512,8 +512,8 @@ The following tools are available for you to use. You MUST return only valid JSO
       referencedDocuments,
     });
 
-    // Get tool schemas from MCP Registry Service (SDK v2 compatible)
-    // This will fetch tools dynamically from running SDK v2 workers via /mcp/list-tools
+    // Get tool schemas from MCP Registry Service
+    // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");

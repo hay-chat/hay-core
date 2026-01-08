@@ -59,7 +59,7 @@ export interface PluginManifest {
 }
 
 /**
- * Plugin SDK V2 metadata
+ * Plugin SDK metadata from /metadata endpoint
  */
 export interface PluginSDKMetadata {
   configSchema?: Record<string, ConfigFieldSchema>;
@@ -68,7 +68,7 @@ export interface PluginSDKMetadata {
 }
 
 /**
- * Plugin page descriptor (SDK V2)
+ * Plugin page descriptor
  */
 export interface PluginPage {
   id: string;
@@ -157,11 +157,8 @@ export interface SettingsExtension {
  */
 export interface PluginExtension {
   id: string;
-  component?: unknown; // Vue component (markRaw)
-  componentName?: string; // For SDK V2 dynamic loading
+  componentName: string; // Component name from /ui.js bundle
   title?: string;
-  props?: Record<string, unknown>;
-  isSDKV2?: boolean;
 }
 
 /**
