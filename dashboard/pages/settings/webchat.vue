@@ -190,11 +190,11 @@ const hasChanges = computed(() => {
 });
 
 const installationCode = computed(() => {
-  const orgId = userStore.activeOrganizationId || "YOUR_ORG_ID";
+  const organizationId = userStore.activeOrganizationId || "YOUR_ORG_ID";
   return `<${"script"}>
   window.HayChat = window.HayChat || {};
   window.HayChat.config = {
-    organizationId: '${orgId}',
+    organizationId: '${organizationId}',
     baseUrl: '${apiBaseUrl}',
     widgetTitle: '${settingsForm.value.widgetTitle}',
     widgetSubtitle: '${settingsForm.value.widgetSubtitle}',

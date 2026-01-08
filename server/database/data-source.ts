@@ -70,55 +70,72 @@ export const AppDataSource = new DataSource({
   namingStrategy: new SnakeNamingStrategy(),
 });
 
-// Initialize the data source
-export async function initializeDatabase() {
-  try {
-    await AppDataSource.initialize();
+// Initialize the data source with retry mechanism
+export async function initializeDatabase(maxRetries = 3, retryDelay = 2000) {
+  let lastError: Error | unknown;
 
-    // Enable required extensions if not already enabled
-    console.log("🔄 Enabling database extensions...");
-    await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
-    await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempting database connection (${attempt}/${maxRetries})...`);
+      await AppDataSource.initialize();
 
-    console.log("✅ Database connection established");
-    console.log("✅ pgvector and pgcrypto extensions enabled");
-    return true;
-  } catch (error) {
-    console.error("❌ Error during Data Source initialization:");
+      // Enable required extensions if not already enabled
+      console.log("🔄 Enabling database extensions...");
+      await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
+      await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
 
-    // Log detailed error information
-    interface DbError extends Error {
-      code?: string;
-      errno?: number;
-      syscall?: string;
-      address?: string;
-      port?: number;
+      console.log("✅ Database connection established");
+      console.log("✅ pgvector and pgcrypto extensions enabled");
+      return true;
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Database connection attempt ${attempt}/${maxRetries} failed:`);
+
+      // Log detailed error information
+      interface DbError extends Error {
+        code?: string;
+        errno?: number;
+        syscall?: string;
+        address?: string;
+        port?: number;
+      }
+
+      if (error instanceof Error) {
+        const dbError = error as DbError;
+        console.error("  - Error message:", dbError.message);
+        console.error("  - Error name:", dbError.name);
+        if (dbError.code) {
+          console.error("  - Error code:", dbError.code);
+        }
+        if (dbError.errno) {
+          console.error("  - Error errno:", dbError.errno);
+        }
+        if (dbError.syscall) {
+          console.error("  - Error syscall:", dbError.syscall);
+        }
+        if (dbError.address) {
+          console.error("  - Error address:", dbError.address);
+        }
+        if (dbError.port) {
+          console.error("  - Error port:", dbError.port);
+        }
+      } else {
+        console.error("  - Full error:", error);
+      }
+
+      // If this wasn't the last attempt, wait before retrying
+      if (attempt < maxRetries) {
+        console.log(`⏳ Retrying in ${retryDelay / 1000} seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
     }
-
-    if (error instanceof Error) {
-      const dbError = error as DbError;
-      console.error("  - Error message:", dbError.message);
-      console.error("  - Error name:", dbError.name);
-      if (dbError.code) {
-        console.error("  - Error code:", dbError.code);
-      }
-      if (dbError.errno) {
-        console.error("  - Error errno:", dbError.errno);
-      }
-      if (dbError.syscall) {
-        console.error("  - Error syscall:", dbError.syscall);
-      }
-      if (dbError.address) {
-        console.error("  - Error address:", dbError.address);
-      }
-      if (dbError.port) {
-        console.error("  - Error port:", dbError.port);
-      }
-    } else {
-      console.error("  - Full error:", error);
-    }
-
-    console.warn("⚠️  Running without database connection - authentication will not work properly");
-    return false;
   }
+
+  // All retries failed
+  console.error(`\n❌ Failed to connect to database after ${maxRetries} attempts`);
+  console.error("❌ Database connection is required for the application to function properly");
+  console.error("❌ Please check your database configuration and ensure PostgreSQL is running\n");
+
+  // Throw the last error to prevent server from starting
+  throw lastError;
 }

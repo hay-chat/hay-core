@@ -1,9 +1,29 @@
 {
-  "name": "@hay/woocommerce-mcp",
+  "name": "@hay/plugin-woocommerce",
   "version": "1.0.0",
+  "description": "Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows",
+  "author": "Hay",
   "type": "module",
-  "description": "MCP Server for WooCommerce REST API",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "WooCommerce",
+    "category": "integration",
+    "capabilities": [
+      "mcp"
+    ],
+    "env": []
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
   "dependencies": {
-    "axios": "^1.7.9"
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
   }
 }

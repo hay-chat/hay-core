@@ -39,6 +39,7 @@ export default defineNuxtConfig({
     typeCheck: process.env["NODE_ENV"] !== "production", // Disable type check in production builds
     tsConfig: {
       compilerOptions: {
+        module: "esnext",
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
         types: ["vite/client"],
@@ -194,6 +195,15 @@ export default defineNuxtConfig({
       fs: {
         // Allow serving files from one level up to access plugins directory
         allow: [".."],
+      },
+      hmr: {
+        // Suppress connection errors during HMR
+        overlay: false,
+      },
+      watch: {
+        // Reduce file watching overhead
+        usePolling: false,
+        interval: 100,
       },
     },
     define: {

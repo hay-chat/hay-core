@@ -5,6 +5,7 @@ This document describes the complete workflow for generating a Hay plugin from a
 ## Overview
 
 This workflow enables automated creation of Hay plugins from public MCP server repositories. The process involves:
+
 1. Cloning the MCP server repository
 2. Analyzing the MCP server to extract tools and configuration
 3. Gathering necessary authentication and configuration details
@@ -23,6 +24,7 @@ This workflow enables automated creation of Hay plugins from public MCP server r
 Before starting the generation process, gather the following information:
 
 ### 1. Plugin Metadata
+
 - [ ] **Plugin ID**: Unique identifier (format: `hay-plugin-{name}`, alphanumeric and hyphens only)
 - [ ] **Display Name**: Human-readable name (e.g., "Shopify", "Stripe")
 - [ ] **Description**: Brief description of what the plugin does
@@ -31,6 +33,7 @@ Before starting the generation process, gather the following information:
 - [ ] **Icon**: Icon identifier or URL
 
 ### 2. Plugin Classification
+
 - [ ] **Type**: One or more of:
   - `mcp-connector`: Connects to external MCP servers
   - `retriever`: Provides data retrieval capabilities
@@ -46,6 +49,7 @@ Before starting the generation process, gather the following information:
   - `utility`: Utility functions
 
 ### 3. MCP Connection Configuration
+
 - [ ] **Connection Type**:
   - `local`: MCP server runs locally via stdio
   - `remote`: MCP server is accessed via HTTP/HTTPS URL
@@ -53,6 +57,7 @@ Before starting the generation process, gather the following information:
 - [ ] **Transport Protocol**: `stdio`, `sse`, `websocket`, `http`, or combinations like `sse|websocket|http`
 
 ### 4. Authentication Configuration
+
 - [ ] **Authentication Methods**: One or more of:
   - `oauth2`: OAuth 2.0 authentication
   - `apiKey`: API key authentication
@@ -60,6 +65,7 @@ Before starting the generation process, gather the following information:
   - None: Empty array `[]` for public/unauthenticated access
 
 #### If OAuth 2.0 is used:
+
 - [ ] **Authorization URL**: OAuth authorization endpoint
 - [ ] **Token URL**: OAuth token endpoint
 - [ ] **Scopes**: Array of required OAuth scopes
@@ -68,10 +74,13 @@ Before starting the generation process, gather the following information:
 - [ ] **Client Secret Environment Variable**: Name of env var for client secret (optional for CIMD flow)
 
 #### If API Key is used:
+
 - [ ] **API Key Environment Variable(s)**: Names of required env vars
 
 ### 5. Configuration Schema
+
 For each configuration field users need to provide:
+
 - [ ] **Field Name**: Camel case identifier (e.g., "shopifyAccessToken")
 - [ ] **Type**: string, number, boolean, array, object
 - [ ] **Label**: Display label for the UI
@@ -84,15 +93,18 @@ For each configuration field users need to provide:
 - [ ] **Default**: Optional default value
 
 ### 6. Build and Runtime Configuration
+
 - [ ] **Install Command**: Command to install dependencies (default: "npm install")
 - [ ] **Build Command**: Command to build the plugin (if needed)
 - [ ] **Start Command**: Command to start the MCP server (e.g., "node mcp/index.js")
 
 ### 7. Permissions
+
 - [ ] **Environment Variables**: Array of all env var names required by the plugin
-- [ ] **Scopes**: Array of permission scopes (default: `["org:<orgId>:mcp:invoke"]`)
+- [ ] **Scopes**: Array of permission scopes (default: `["org:<organizationId>:mcp:invoke"]`)
 
 ### 8. Marketplace Configuration
+
 - [ ] **Featured**: Boolean - should this be featured in the marketplace?
 - [ ] **Tags**: Array of searchable tags (e.g., ["ecommerce", "payments", "billing"])
 
@@ -118,19 +130,24 @@ git clone {github-url} mcp
 ### Step 2: Analyze the MCP Server
 
 #### Extract Tool Definitions
+
 The MCP server should expose its tools through the MCP protocol. Analyze the code to extract:
+
 - Tool names
 - Tool descriptions
 - Input schemas (JSON Schema format)
 - Tool labels (human-readable names)
 
 Look for:
+
 - `server.listTools()` implementations
 - Tool definitions in the codebase
 - README documentation about available tools
 
 #### Determine Dependencies
+
 Check `package.json` in the MCP server directory for:
+
 - Required npm packages
 - Node.js version requirements
 - Build scripts
@@ -182,7 +199,7 @@ Using the information gathered, create `manifest.json` following this template:
   },
   "permissions": {
     "env": ["{ENV_VAR_NAME}"],
-    "scopes": ["org:<orgId>:mcp:invoke"]
+    "scopes": ["org:<organizationId>:mcp:invoke"]
   },
   "configSchema": {
     "{fieldName}": {
@@ -203,6 +220,7 @@ Using the information gathered, create `manifest.json` following this template:
 ```
 
 #### For OAuth Authentication, add to capabilities.mcp.auth:
+
 ```json
 "auth": {
   "methods": ["oauth2", "apiKey"],
@@ -309,12 +327,14 @@ npm run typecheck
 When running this workflow autonomously, the AI agent should ask these questions:
 
 ### Essential Questions (Always Required)
+
 1. "What is the GitHub repository URL for the MCP server?"
 2. "What should we name this plugin? (This will be used to create the plugin ID as hay-plugin-{name})"
 3. "What is the primary purpose of this plugin? (One sentence description)"
 4. "What category does this plugin belong to? (integration/chat/analytics/automation/utility)"
 
 ### Authentication Questions
+
 5. "What authentication method(s) does this MCP server use?"
    - If OAuth: "Please provide the OAuth authorization URL, token URL, and required scopes"
    - If API Key: "What environment variables are needed for API keys?"
@@ -322,27 +342,32 @@ When running this workflow autonomously, the AI agent should ask these questions
    - If None: "Confirmed - no authentication required"
 
 ### Configuration Questions
+
 6. "What configuration fields do users need to provide?"
    - For each field: name, label, description, placeholder, required (yes/no), encrypted (yes/no), environment variable name
 
 ### Connection Questions
+
 7. "Does this MCP server run locally or is it accessed via a remote URL?"
    - If remote: "What is the remote URL?"
 8. "What transport protocol does it use? (stdio/sse/websocket/http)"
 
 ### Optional Questions
+
 9. "Should this plugin be featured in the marketplace? (yes/no)"
 10. "What tags should be added for searchability?" (comma-separated list)
 
 ## Decision Tree for Common Scenarios
 
 ### Scenario 1: Remote MCP Server (like Stripe)
+
 - Connection type: remote
 - Entry point: ./dist/index.js (minimal wrapper)
 - No local MCP server execution
 - Focus on OAuth/API key configuration
 
 ### Scenario 2: Local MCP Server with API Key (like Shopify, WooCommerce)
+
 - Connection type: local
 - Transport: sse|websocket|http
 - Install and build MCP server in `mcp/` directory
@@ -350,6 +375,7 @@ When running this workflow autonomously, the AI agent should ask these questions
 - API key configuration in configSchema
 
 ### Scenario 3: Simple Local Server (like Hello World)
+
 - Connection type: local
 - Transport: stdio
 - Minimal authentication (empty array)
@@ -358,23 +384,27 @@ When running this workflow autonomously, the AI agent should ask these questions
 ## Error Handling and Edge Cases
 
 ### Clone Failures
+
 - Verify GitHub URL is accessible and public
 - Check if repository requires authentication
 - Handle repository structures where MCP server is in a subdirectory
 
 ### Tool Extraction Failures
+
 - Parse README for tool documentation
 - Look for OpenAPI/Swagger specs
 - Manually inspect server code for tool definitions
 - Ask user for tool list if automated extraction fails
 
 ### Build Failures
+
 - Check Node.js version compatibility
 - Verify all dependencies are available
 - Look for build scripts in MCP server's package.json
 - Fall back to runtime-only if build not required
 
 ### Missing Information
+
 - Use sensible defaults where possible
 - Ask user for critical missing information
 - Reference similar existing plugins for patterns
@@ -382,6 +412,7 @@ When running this workflow autonomously, the AI agent should ask these questions
 ## Output Checklist
 
 After completing the workflow, verify:
+
 - [ ] Plugin directory created at `/plugins/{plugin-name}/`
 - [ ] MCP server cloned into `/plugins/{plugin-name}/mcp/`
 - [ ] `manifest.json` created and follows schema

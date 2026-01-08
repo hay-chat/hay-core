@@ -23,11 +23,13 @@ The plugin implements a smart fallback system:
 **File**: [`server/services/remote-mcp-client.service.ts`](../../server/services/remote-mcp-client.service.ts)
 
 **Method**: `getAuthHeaders()` - Private method that:
+
 1. Attempts to retrieve OAuth tokens via `oauthAuthStrategy.getHeaders()`
 2. Falls back to API key from plugin config if OAuth unavailable
 3. Returns `Authorization: Bearer <token>` header with the appropriate credential
 
 **Used by**:
+
 - `connect()` - Initial MCP server connection
 - `listTools()` - Fetching available tools
 - `callTool()` - Executing tool calls
@@ -39,6 +41,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 ### Method 1: API Key (Simple, Self-Hosted)
 
 **How it works**:
+
 1. User provides Stripe API key via plugin configuration UI
 2. API key is encrypted and stored in `plugin_instances.config.stripeApiKey`
 3. When making requests to Stripe's MCP server:
@@ -47,6 +50,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 4. Stripe MCP server validates the key and processes the request
 
 **Advantages**:
+
 - ✅ **Instant setup** - No external approval needed
 - ✅ **Simple** - Just paste your API key
 - ✅ **Full control** - Use restricted keys to limit permissions
@@ -55,6 +59,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 **Setup**: See "Quick Start" in [README.md](README.md)
 
 **Recommended for**:
+
 - Self-hosted Hay installations
 - Development and testing
 - Personal or team use
@@ -63,24 +68,27 @@ All three methods use the same authentication logic, ensuring consistent auth be
 ### Method 2: OAuth 2.0 (Secure, Managed/Cloud)
 
 **How it works**:
+
 1. User clicks "Connect with OAuth" in plugin settings
 2. Hay redirects to Stripe's authorization page
 3. User authorizes access on Stripe's consent screen
 4. Stripe redirects back with authorization code
 5. Hay exchanges code for access token + refresh token
-6. Tokens encrypted and stored in `plugin_instances.config._oauth`
+6. Tokens stored in `plugin_instances.auth_state` (auto-encrypted by TypeORM transformer)
 7. When making requests:
    - Tokens decrypted
    - Access token checked for expiry (auto-refresh if < 5 min remaining)
    - Sent as `Authorization: Bearer <access_token>`
 
 **Advantages**:
+
 - ✅ **More secure** - Granular permissions, user-based auth
 - ✅ **Better UX** - One-click authorization
 - ✅ **Revocable** - Users can disconnect anytime
 - ✅ **Multi-tenant friendly** - Each org gets their own tokens
 
 **Requirements**:
+
 - Hay's redirect URI must be allowlisted by Stripe
 - OAuth client credentials configured in environment variables
 - Stripe MCP app authorization
@@ -88,6 +96,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 **Setup**: See detailed guide in [OAUTH_SETUP.md](OAUTH_SETUP.md)
 
 **Recommended for**:
+
 - Managed/cloud Hay services
 - Multi-user environments
 - SaaS products
@@ -133,6 +142,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 ```
 
 **Important notes**:
+
 - `auth.methods` lists both `oauth2` and `apiKey`
 - `stripeApiKey` in config schema is encrypted automatically
 - OAuth config references environment variables for credentials
@@ -142,6 +152,7 @@ All three methods use the same authentication logic, ensuring consistent auth be
 **File**: [`.env.example`](../../.env.example)
 
 **For OAuth** (managed/cloud):
+
 ```bash
 STRIPE_OAUTH_CLIENT_ID=ca_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 STRIPE_OAUTH_CLIENT_SECRET=sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -157,11 +168,13 @@ Users configure directly in plugin settings UI - no env vars needed!
 **File**: `server/services/remote-mcp-client.service.ts`
 
 **Added**:
+
 - New `getAuthHeaders()` private method implementing priority-based auth
 - Imports for `pluginInstanceRepository`, `pluginRegistryRepository`, `decryptConfig`
 - Logic to check for API keys in config: `stripeApiKey`, `apiKey`, or `api_key`
 
 **Changed**:
+
 - `connect()` - Uses `getAuthHeaders()` instead of inline OAuth logic
 - `listTools()` - Uses `getAuthHeaders()` instead of inline OAuth logic
 - `callTool()` - Uses `getAuthHeaders()` instead of inline OAuth logic
@@ -173,12 +186,14 @@ Users configure directly in plugin settings UI - no env vars needed!
 **File**: `plugins/stripe/manifest.json`
 
 **Updated**:
+
 - `configSchema.stripeApiKey.description` - Clarifies when to use API key vs OAuth
 - `configSchema.stripeApiKey.label` - Removed "Optional" to emphasize it's a primary method
 
 ### 3. Documentation Updates
 
 **Files updated**:
+
 - `plugins/stripe/README.md` - Complete rewrite with Quick Start, clear method comparison
 - `plugins/stripe/OAUTH_SETUP.md` - Added warning that OAuth is mainly for managed instances
 - `.env.example` - Added OAuth credentials with clear comments
@@ -251,11 +266,13 @@ To test both authentication methods:
 ### For Self-Hosted Users
 
 **Recommended**: Use API key authentication
+
 - Get Stripe API key from dashboard
 - Configure in plugin settings
 - Start using immediately
 
 **Why not OAuth?**:
+
 - Requires Stripe to allowlist your redirect URI
 - May not be approved for individual installations
 - Takes time (1-2 business days for approval)
@@ -264,17 +281,20 @@ To test both authentication methods:
 ### For Managed/Cloud Providers
 
 **Recommended**: Set up OAuth
+
 - Contact Stripe to get allowlisted
 - Configure OAuth credentials
 - Provide one-click OAuth connection to users
 
 **Benefits**:
+
 - Better user experience (one-click auth)
 - More secure (user-based permissions)
 - Can get listed in Stripe marketplace
 - Users can revoke access easily
 
 **Also support**: API key as alternative
+
 - Some users prefer API keys
 - Good for testing
 - Works for autonomous agents

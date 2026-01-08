@@ -17,7 +17,7 @@
           "Add API token"
         </p>
         <img
-          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${plugin?.id || 'hay-plugin-zendesk'}/images/Z00001.png`"
+          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${encodeURIComponent(plugin?.id || 'hay-plugin-zendesk')}/images/Z00001.png`"
           alt="Zendesk Admin Center Access"
           class="step-image"
         />
@@ -30,7 +30,7 @@
         </div>
         <p>Write a description (like "Hay AI Agent") for the token and click "Create token".</p>
         <img
-          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${plugin?.id || 'hay-plugin-zendesk'}/images/Z00002.png`"
+          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${encodeURIComponent(plugin?.id || 'hay-plugin-zendesk')}/images/Z00002.png`"
           alt="Zendesk API Settings"
           class="step-image"
         />
@@ -46,7 +46,7 @@
           >" field in this settings page.
         </p>
         <img
-          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${plugin?.id || 'hay-plugin-zendesk'}/images/Z00003.png`"
+          :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${encodeURIComponent(plugin?.id || 'hay-plugin-zendesk')}/images/Z00003.png`"
           alt="Generate Zendesk API Token"
           class="step-image"
         />

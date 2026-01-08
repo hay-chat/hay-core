@@ -79,12 +79,16 @@ export class VectorStoreService {
   /**
    * Add text chunks to the vector store
    *
-   * @param orgId - Organization ID for multi-tenancy
+   * @param organizationId - Organization ID for multi-tenancy
    * @param docId - Optional document ID for linking embeddings to documents
    * @param chunks - Array of text chunks with optional metadata
    * @returns Array of embedding IDs
    */
-  async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {
+  async addChunks(
+    organizationId: string,
+    docId: string | null,
+    chunks: VectorChunk[],
+  ): Promise<string[]> {
     if (!this.embeddings) {
       throw new Error("Embeddings not initialized.");
     }
@@ -110,7 +114,7 @@ export class VectorStoreService {
 
     for (let i = 0; i < chunks.length; i++) {
       const result = await AppDataSource.query(insertQuery, [
-        orgId,
+        organizationId,
         docId,
         chunks[i].content,
         chunks[i].metadata || {},
@@ -126,12 +130,12 @@ export class VectorStoreService {
   /**
    * Search for similar content filtered by organization
    *
-   * @param orgId - Organization ID to filter results
+   * @param organizationId - Organization ID to filter results
    * @param query - Search query text
    * @param k - Number of results to return (default: 10)
    * @returns Array of search results with similarity scores
    */
-  async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {
+  async search(organizationId: string, query: string, k: number = 10): Promise<SearchResult[]> {
     if (!this.vectorStore) {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
@@ -156,7 +160,7 @@ export class VectorStoreService {
 
     const results = await AppDataSource.query(searchQuery, [
       `[${queryVector.join(",")}]`,
-      orgId,
+      organizationId,
       k,
     ]);
 
@@ -181,7 +185,7 @@ export class VectorStoreService {
   /**
    * Delete embeddings by document ID
    *
-   * @param orgId - Organization ID for additional security
+   * @param organizationId - Organization ID for additional security
    * @param docId - Document ID whose embeddings should be deleted
    * @param manager - Optional transaction manager for atomic operations
    * @returns Number of deleted embeddings
@@ -219,10 +223,9 @@ export class VectorStoreService {
     // Use transaction manager if provided, otherwise use AppDataSource
     const queryRunner = manager?.queryRunner || AppDataSource;
 
-    const result = await queryRunner.query(
-      `DELETE FROM embeddings WHERE "organization_id" = $1`,
-      [orgId],
-    );
+    const result = await queryRunner.query(`DELETE FROM embeddings WHERE "organization_id" = $1`, [
+      orgId,
+    ]);
 
     return result[1]; // Returns affected row count
   }
@@ -317,7 +320,9 @@ export class VectorStoreService {
   async findByConversationIds(
     orgId: string,
     conversationIds: string[],
-  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+  ): Promise<
+    Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>
+  > {
     if (!conversationIds.length) {
       return [];
     }
@@ -343,7 +348,9 @@ export class VectorStoreService {
   async findByMessageIds(
     orgId: string,
     messageIds: string[],
-  ): Promise<Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>> {
+  ): Promise<
+    Array<{ id: string; pageContent: string; metadata: Record<string, unknown>; createdAt?: Date }>
+  > {
     if (!messageIds.length) {
       return [];
     }
@@ -362,10 +369,10 @@ export class VectorStoreService {
   /**
    * Get embedding statistics for an organization
    *
-   * @param orgId - Organization ID
+   * @param organizationId - Organization ID
    * @returns Statistics object
    */
-  async getStatistics(orgId: string): Promise<{
+  async getStatistics(organizationId: string): Promise<{
     totalEmbeddings: number;
     totalDocuments: number;
     avgEmbeddingsPerDocument: number;
@@ -378,7 +385,7 @@ export class VectorStoreService {
       FROM embeddings
       WHERE "organization_id" = $1
     `,
-      [orgId],
+      [organizationId],
     );
 
     const result = stats[0];

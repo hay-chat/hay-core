@@ -1,15 +1,25 @@
 {
-  "name": "hay-plugin-stripe",
+  "name": "@hay/plugin-stripe",
   "version": "1.0.0",
-  "description": "Stripe integration plugin for Hay using Model Context Protocol",
   "type": "module",
+  "description": "Connect your Stripe account to manage payments, customers, subscriptions, and more",
   "author": "Hay",
-  "license": "MIT",
-  "keywords": [
-    "stripe",
-    "payments",
-    "mcp",
-    "model-context-protocol",
-    "hay-plugin"
-  ]
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Stripe",
+    "category": "integration",
+    "capabilities": ["mcp", "auth"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
 }

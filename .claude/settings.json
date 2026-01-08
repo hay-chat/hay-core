@@ -1,0 +1,59 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-code.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(timeout:*)",
+      "Bash(gtimeout:*)",
+      "Bash(time:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(docker compose:*)",
+      "Bash(psql:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(fuser:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(killall:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(xargs:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(ln:*)",
+      "Bash(chmod:*)",
+      "Bash(unzip:*)",
+      "Bash(bash:*)",
+      "Bash(source:*)",
+      "Bash(env)",
+      "Bash(test:*)",
+      "mcp__playwright__*",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

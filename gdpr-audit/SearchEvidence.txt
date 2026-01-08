@@ -39,7 +39,7 @@ Line 87-124: addChunks() method
   - No TTL or expiry mechanism
   - Evidence:
     ```typescript
-    async addChunks(orgId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {
+    async addChunks(organizationId: string, docId: string | null, chunks: VectorChunk[]): Promise<string[]> {
       // ... no TTL parameter
       const insertQuery = `
         INSERT INTO embeddings (
@@ -96,10 +96,10 @@ Key Finding: vector-store.service.ts:188 has deleteByDocumentId but not integrat
 
 Evidence Snippet (server/services/vector-store.service.ts:188):
   ```typescript
-  async deleteByDocumentId(orgId: string, docId: string): Promise<number> {
+  async deleteByDocumentId(organizationId: string, docId: string): Promise<number> {
     const result = await AppDataSource.query(
       `DELETE FROM embeddings WHERE "organization_id" = $1 AND "document_id" = $2`,
-      [orgId, docId],
+      [organizationId, docId],
     );
     return result[1]; // Returns affected row count
   }
@@ -223,7 +223,7 @@ Evidence of proper isolation:
 
   File: server/services/vector-store.service.ts:134
     ```typescript
-    async search(orgId: string, query: string, k: number = 10): Promise<SearchResult[]> {
+    async search(organizationId: string, query: string, k: number = 10): Promise<SearchResult[]> {
       const searchQuery = `
         SELECT ... FROM embeddings
         WHERE "organization_id" = $2
@@ -232,7 +232,7 @@ Evidence of proper isolation:
       `;
       const results = await AppDataSource.query(searchQuery, [
         `[${queryVector.join(",")}]`,
-        orgId,
+        organizationId,
         k,
       ]);
     }

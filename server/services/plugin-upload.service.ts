@@ -155,9 +155,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { processManagerService } = await import("./process-manager.service");
-      if (processManagerService.isRunning(req.organizationId, pluginId)) {
-        await processManagerService.stopPlugin(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete old ZIP from storage
@@ -234,9 +235,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { processManagerService } = await import("./process-manager.service");
-      if (processManagerService.isRunning(req.organizationId, pluginId)) {
-        await processManagerService.stopPlugin(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete plugin instances
