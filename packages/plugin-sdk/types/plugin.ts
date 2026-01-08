@@ -6,7 +6,7 @@
  * @module @hay/plugin-sdk/types/plugin
  */
 
-import type { HayGlobalContext } from './contexts';
+import type { HayGlobalContext } from "./contexts";
 import type {
   OnInitializeHook,
   OnStartHook,
@@ -14,7 +14,7 @@ import type {
   OnConfigUpdateHook,
   OnDisableHook,
   OnEnableHook,
-} from './hooks';
+} from "./hooks";
 
 /**
  * Plugin definition interface.
@@ -127,7 +127,6 @@ export interface HayPluginDefinition {
    * NOT by the worker runner. Reserved for future use.
    *
    * @see {@link OnEnableHook}
-   * @see CONSTRAINT 4 in PLUGIN_SDK_V2_PLAN.md
    */
   onEnable?: OnEnableHook;
 }

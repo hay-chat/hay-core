@@ -20,7 +20,7 @@ export class PluginRouteService {
   /**
    * Handle webhook request for a plugin
    *
-   * For SDK v2 plugins, webhooks are proxied to the worker's HTTP server.
+   * Webhooks are proxied to the worker's HTTP server.
    */
   async handleWebhook(req: Request, res: Response): Promise<void> {
     const { pluginName, webhookPath } = req.params;

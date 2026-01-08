@@ -259,7 +259,6 @@ export class PluginRunnerService {
         organizationId: orgId,
         pluginId,
         instanceId: instance.id,
-        sdkVersion: "v2",
       };
 
       this.workers.set(workerKey, workerInfo);

@@ -39,7 +39,7 @@ export class EnvironmentManagerService {
     // Decrypt config values
     const decryptedConfig = instance.config ? decryptConfig(instance.config) : {};
 
-    // Use metadata for SDK v2, fallback to manifest for legacy
+    // Use metadata for SDK, fallback to manifest for legacy
     const configSchema = instance.plugin.metadata?.configSchema || manifest.configSchema;
 
     // Apply permitted environment variables
@@ -70,7 +70,10 @@ export class EnvironmentManagerService {
     const connectionType = manifest.capabilities?.mcp?.connection?.type || "local";
     if (connectionType === "local" && instance.authMethod === "oauth") {
       try {
-        const tokens = await oauthAuthStrategy.getValidTokens(organizationId, instance.plugin.pluginId);
+        const tokens = await oauthAuthStrategy.getValidTokens(
+          organizationId,
+          instance.plugin.pluginId,
+        );
         if (tokens) {
           // Inject OAuth tokens as environment variables for local MCP servers
           // Standard OAuth token env vars
@@ -87,7 +90,10 @@ export class EnvironmentManagerService {
         }
       } catch (error) {
         // Log but don't fail - plugin may handle missing tokens gracefully
-        console.warn(`Failed to inject OAuth tokens for plugin ${instance.plugin.pluginId}:`, error);
+        console.warn(
+          `Failed to inject OAuth tokens for plugin ${instance.plugin.pluginId}:`,
+          error,
+        );
       }
     }
 
@@ -121,7 +127,10 @@ export class EnvironmentManagerService {
           );
         }
       } catch (error) {
-        console.warn(`Failed to inject Plugin API credentials for plugin ${instance.plugin.pluginId}:`, error);
+        console.warn(
+          `Failed to inject Plugin API credentials for plugin ${instance.plugin.pluginId}:`,
+          error,
+        );
       }
     }
 

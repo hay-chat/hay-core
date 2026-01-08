@@ -145,15 +145,17 @@
       <template v-if="!enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
-            <component
-              :is="ext.component"
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
               :plugin="plugin"
               :config="{
+                ...formData,
                 instanceId: instanceId,
                 organizationId: userStore.activeOrganizationId,
               }"
               :api-base-url="apiBaseUrl"
-              v-bind="ext.props || {}"
             />
           </CardContent>
         </Card>
@@ -323,8 +325,10 @@
       <template v-if="enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
-            <component
-              :is="ext.component"
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
               :plugin="plugin"
               :config="{
                 ...formData,
@@ -332,7 +336,6 @@
                 organizationId: userStore.activeOrganizationId,
               }"
               :api-base-url="apiBaseUrl"
-              v-bind="ext.props || {}"
               @update:config="
                 (newConfig: any) => {
                   formData = { ...formData, ...newConfig };
@@ -509,29 +512,10 @@
       <template v-if="enabled">
         <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
           <CardContent>
-            <!-- SDK V2 Pages: Use PluginPageSlot for dynamic loading -->
             <PluginPageSlot
-              v-if="ext.isSDKV2"
               :plugin-id="plugin.id"
               :plugin-path="plugin.pluginPath"
-              :component-name="ext.componentName!"
-              :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
-              :api-base-url="apiBaseUrl"
-              @update:config="
-                (newConfig: any) => {
-                  formData = { ...formData, ...newConfig };
-                }
-              "
-            />
-            <!-- Legacy Extensions: Use pre-loaded component -->
-            <component
-              v-else
-              :is="ext.component"
+              :component-name="ext.componentName"
               :plugin="plugin"
               :config="{
                 ...formData,
@@ -649,21 +633,15 @@ const editingEnvFields = ref<Set<string>>(new Set());
 const beforeSettingsExtensions = ref<
   Array<{
     id: string;
-    component?: any;
-    componentName?: string;
+    componentName: string;
     title?: string;
-    props?: Record<string, any>;
-    isSDKV2?: boolean;
   }>
 >([]);
 const afterSettingsExtensions = ref<
   Array<{
     id: string;
-    component?: any;
-    componentName?: string;
+    componentName: string;
     title?: string;
-    props?: Record<string, any>;
-    isSDKV2?: boolean;
   }>
 >([]);
 const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
@@ -762,130 +740,39 @@ const handleThumbnailError = (event: Event) => {
 };
 
 const loadPluginExtensions = async () => {
-  // Check for SDK V2 pages (registered via ctx.register.ui.page())
-  const sdkV2Pages = plugin.value?.metadata?.pages;
-  if (sdkV2Pages && sdkV2Pages.length > 0) {
-    console.log("[PluginSettings] Loading SDK V2 pages:", sdkV2Pages);
-
-    // Extract component name from path (e.g., './components/settings/AfterSettings.vue' -> 'AfterSettings')
-    const getComponentName = (componentPath: string): string => {
-      return componentPath.split("/").pop()?.replace(".vue", "") || "";
-    };
-
-    for (const page of sdkV2Pages) {
-      const componentName = getComponentName(page.component);
-
-      // Categorize by slot
-      if (page.slot === "before-settings") {
-        beforeSettingsExtensions.value.push({
-          id: page.id,
-          componentName,
-          title: page.title,
-          isSDKV2: true,
-        });
-      } else if (page.slot === "after-settings") {
-        afterSettingsExtensions.value.push({
-          id: page.id,
-          componentName,
-          title: page.title,
-          isSDKV2: true,
-        });
-      } else if (page.slot === "standalone") {
-        // Future: handle standalone pages (custom routes)
-        console.log("[PluginSettings] Standalone pages not yet supported:", page);
-      }
-    }
-
-    // SDK V2 pages loaded, no need to check legacy extensions
+  // Load dynamic pages (registered via ctx.register.ui.page())
+  const dynamicPages = plugin.value?.metadata?.pages;
+  if (!dynamicPages || dynamicPages.length === 0) {
+    console.log("[PluginSettings] No pages found in metadata");
     return;
   }
 
-  // Fallback to legacy settings extensions from metadata or manifest
-  const settingsExtensions =
-    plugin.value?.metadata?.settingsExtensions || plugin.value?.manifest?.settingsExtensions;
-  if (!settingsExtensions) {
-    console.log("[PluginSettings] No settingsExtensions or pages found");
-    return;
-  }
+  console.log("[PluginSettings] Loading dynamic pages:", dynamicPages);
 
-  console.log("[PluginSettings] Loading legacy extensions:", settingsExtensions);
+  // Extract component name from path (e.g., './components/settings/AfterSettings.vue' -> 'AfterSettings')
+  const getComponentName = (componentPath: string): string => {
+    return componentPath.split("/").pop()?.replace(".vue", "") || "";
+  };
 
-  for (const ext of settingsExtensions) {
-    try {
-      console.log("[PluginSettings] Processing extension:", ext);
+  for (const page of dynamicPages) {
+    const componentName = getComponentName(page.component);
 
-      // Determine which slot array to use
-      let targetExtensions: any = null;
-      if (ext.slot === "before-settings") {
-        targetExtensions = beforeSettingsExtensions;
-      } else if (ext.slot === "after-settings") {
-        targetExtensions = afterSettingsExtensions;
-      } else if (ext.slot === "tab") {
-        targetExtensions = tabExtensions;
-      } else {
-        console.warn(`Unknown slot: ${ext.slot}`);
-        continue;
-      }
-
-      // Check if the extension has a component file path
-      if (ext.component) {
-        console.log("[PluginSettings] Loading component:", ext.component);
-        // Load component using Vite's dynamic imports
-        const componentModule = await loadPluginComponent(ext.component);
-        console.log("[PluginSettings] Component loaded:", componentModule);
-
-        if (ext.slot === "tab") {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
-            component: markRaw(componentModule),
-            name: ext.tabName || "Tab",
-            order: ext.tabOrder,
-            props: ext.props || {},
-          });
-        } else {
-          const extensionData = {
-            id: `${pluginId.value}-${ext.slot}`,
-            component: markRaw(componentModule),
-            props: ext.props || {},
-            isSDKV2: false,
-          };
-          console.log("[PluginSettings] Pushing extension to array:", extensionData);
-          targetExtensions.value.push(extensionData);
-          console.log(
-            "[PluginSettings] beforeSettingsExtensions after push:",
-            beforeSettingsExtensions.value,
-          );
-        }
-      }
-      // Fallback to inline template if provided (for backward compatibility)
-      else if (ext.template) {
-        const inlineComponent = markRaw({
-          name: `${pluginId.value}-${ext.slot}`,
-          template: ext.template,
-          props: ["plugin", "config"],
-          emits: ["update:config"],
-          setup(props: any, { emit }: any) {
-            return { plugin: props.plugin, config: props.config };
-          },
-        });
-
-        if (ext.slot === "tab") {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}-${ext.tabName || "tab"}`,
-            component: inlineComponent,
-            name: ext.tabName || "Tab",
-            order: ext.tabOrder,
-          });
-        } else {
-          targetExtensions.value.push({
-            id: `${pluginId.value}-${ext.slot}`,
-            component: inlineComponent,
-            isSDKV2: false,
-          });
-        }
-      }
-    } catch (err) {
-      console.error(`Failed to load extension for slot ${ext.slot}:`, err);
+    // Categorize by slot
+    if (page.slot === "before-settings") {
+      beforeSettingsExtensions.value.push({
+        id: page.id,
+        componentName,
+        title: page.title,
+      });
+    } else if (page.slot === "after-settings") {
+      afterSettingsExtensions.value.push({
+        id: page.id,
+        componentName,
+        title: page.title,
+      });
+    } else if (page.slot === "standalone") {
+      // Future: handle standalone pages (custom routes)
+      console.log("[PluginSettings] Standalone pages not yet supported:", page);
     }
   }
 };
@@ -940,7 +827,7 @@ const fetchPlugin = async () => {
       enabled: enabled.value,
     });
 
-    // Set config schema from metadata (SDK v2) or manifest (legacy)
+    // Set config schema from metadata or manifest (legacy)
     const effectiveConfigSchema =
       pluginData.metadata?.configSchema || pluginData.manifest?.configSchema;
     if (effectiveConfigSchema && Object.keys(effectiveConfigSchema).length > 0) {

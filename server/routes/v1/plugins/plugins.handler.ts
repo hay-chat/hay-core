@@ -54,9 +54,9 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
     .map((plugin) => {
       const manifest = plugin.manifest as HayPluginManifest;
 
-      // Use metadata for SDK v2 runtime config
+      // Use metadata for runtime config
       const configSchema = plugin.metadata?.configSchema || {};
-      // Capabilities remain in manifest for both SDK v1 and v2
+      // Capabilities remain in manifest
       const capabilities = manifest.capabilities;
 
       const result = {
@@ -74,14 +74,14 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         configSchema, // Runtime config schema from metadata
         hasConfiguration: Object.keys(configSchema).length > 0,
         hasCustomUI: !!manifest.ui?.configuration,
-        capabilities, // Use metadata capabilities for SDK v2
+        capabilities, // From manifest
         features: manifest.capabilities?.chat_connector?.features || {},
         sourceType: plugin.sourceType,
         isCustom: plugin.sourceType === "custom",
         uploadedAt: plugin.uploadedAt,
         uploadedBy: plugin.uploadedBy,
         status: plugin.status || PluginStatus.AVAILABLE, // Include status field
-        metadata: plugin.metadata, // Include full metadata for SDK v2
+        metadata: plugin.metadata, // Include full metadata
       };
 
       return result;
@@ -123,10 +123,10 @@ export const getPlugin = authenticatedProcedure
       input.pluginId,
     );
 
-    // For SDK v2 plugins, use cached metadata first, then try worker if needed
+    // Use cached metadata first, then try worker if needed
     let configSchema = manifest.configSchema;
 
-    // Return cached metadata for SDK v2 plugins even when not enabled
+    // Return cached metadata even when not enabled
     if (plugin.metadata?.configSchema) {
       configSchema = plugin.metadata.configSchema;
     }
@@ -181,7 +181,7 @@ export const getPlugin = authenticatedProcedure
         }
       } catch (error) {
         console.warn(
-          `[getPlugin] Failed to fetch metadata from SDK v2 worker for ${input.pluginId}:`,
+          `[getPlugin] Failed to fetch metadata from worker for ${input.pluginId}:`,
           error,
         );
       }
@@ -402,9 +402,9 @@ export const disablePlugin = authenticatedProcedure
       });
     }
 
-    // SDK v2: Call plugin's disable hook (if worker running)
+    // Call plugin's disable hook (if worker running)
     const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
-    if (worker && worker.sdkVersion === "v2") {
+    if (worker) {
       try {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 5000);
@@ -422,7 +422,7 @@ export const disablePlugin = authenticatedProcedure
       }
     }
 
-    // Stop worker (handles both SDK v1 and v2)
+    // Stop worker
     await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
 
     // Disable in database
@@ -474,9 +474,9 @@ export const restartPlugin = authenticatedProcedure
     try {
       console.log(`🔄 [HAY] Restarting worker for ${plugin.name}...`);
 
-      // SDK v2: Call plugin's disable hook (if worker running)
+      // Call plugin's disable hook (if worker running)
       const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
-      if (worker && worker.sdkVersion === "v2") {
+      if (worker) {
         try {
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => abortController.abort(), 5000);
@@ -528,7 +528,7 @@ export const restartPlugin = authenticatedProcedure
   });
 
 /**
- * Configure a plugin (SDK v2 with auth separation)
+ * Configure a plugin (with auth separation)
  */
 export const configurePlugin = authenticatedProcedure
   .input(
@@ -552,9 +552,9 @@ export const configurePlugin = authenticatedProcedure
       input.pluginId,
     );
 
-    // Get plugin registry to access SDK v2 metadata (if available)
+    // Get plugin registry to access metadata (if available)
     const pluginRegistry = await pluginRegistryRepository.findByPluginId(input.pluginId);
-    const metadata = pluginRegistry?.metadata; // SDK v2 metadata from /metadata endpoint
+    const metadata = pluginRegistry?.metadata; // Metadata from /metadata endpoint
 
     // When updating configuration, we need to handle partial updates properly
     let finalConfig = input.configuration;
@@ -589,7 +589,7 @@ export const configurePlugin = authenticatedProcedure
       }
     }
 
-    // SDK v2: Separate config and auth
+    // Separate config and auth
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
 
     // Validate required fields are satisfied by either DB config or .env fallback
@@ -621,15 +621,15 @@ export const configurePlugin = authenticatedProcedure
       }
     }
 
-    // SDK v2: Validate auth if auth fields changed
+    // Validate auth if auth fields changed
     if (metadata && authState && hasAuthChanges(input.configuration, metadata)) {
       console.log(`🔐 Auth fields changed for ${plugin.name}, validating credentials...`);
 
       try {
         const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
 
-        // Only validate if worker is running (SDK v2)
-        if (worker && worker.sdkVersion === "v2") {
+        // Only validate if worker is running
+        if (worker) {
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => abortController.abort(), 10000);
 
@@ -695,7 +695,7 @@ export const configurePlugin = authenticatedProcedure
         config,
       );
 
-      // SDK v2: Save auth state separately
+      // Save auth state separately
       if (authState) {
         await pluginInstanceRepository.updateAuthState(
           newInstance.id,
@@ -713,7 +713,7 @@ export const configurePlugin = authenticatedProcedure
     // Update config (without auth fields)
     await pluginInstanceRepository.updateConfig(instance.id, config);
 
-    // SDK v2: Update auth state separately if present
+    // Update auth state separately if present
     if (authState) {
       await pluginInstanceRepository.updateAuthState(instance.id, ctx.organizationId!, authState);
     }
@@ -816,7 +816,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
 
     let tools: any[] = [];
 
-    // Try to fetch from running worker first (SDK v2)
+    // Try to fetch from running worker first
     const workerInfo = runnerService.getWorker(ctx.organizationId!, plugin.id);
 
     if (workerInfo) {
@@ -1103,7 +1103,7 @@ export const testConnection = authenticatedProcedure
     try {
       let mcpTools: any[] = [];
 
-      // For SDK v2 plugins, start the worker if not already running
+      // Start the worker if not already running
       console.log(`[testConnection] 🚀 Starting or getting existing worker...`);
       let worker;
       try {
@@ -1127,7 +1127,7 @@ export const testConnection = authenticatedProcedure
         console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
         mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
         console.log(
-          `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from SDK v2 worker for ${input.pluginId}`,
+          `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from worker for ${input.pluginId}`,
         );
         if (mcpTools.length > 0) {
           console.log(
@@ -1210,7 +1210,7 @@ export const testConnection = authenticatedProcedure
       console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
       console.log(`[testConnection] Tool has required parameters: ${hasRequiredParams}`);
 
-      // Call the tool via worker (SDK v2) or legacy MCP client
+      // Call the tool via worker or legacy MCP client
       if (worker && worker.port) {
         // If the selected tool has required parameters, skip the actual call
         // and just verify the worker is responding
@@ -1230,7 +1230,7 @@ export const testConnection = authenticatedProcedure
           };
         }
 
-        // SDK v2: Call tool via worker HTTP API (only if no required parameters)
+        // Call tool via worker HTTP API (only if no required parameters)
         try {
           console.log(`[testConnection] 🔄 Calling tool with empty arguments for health check...`);
           const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
@@ -1427,7 +1427,7 @@ export const revokeOAuth = authenticatedProcedure
   });
 
 /**
- * Validate auth credentials (SDK v2)
+ * Validate auth credentials
  *
  * Calls the plugin worker's /validate-auth endpoint to validate credentials
  */
@@ -1454,7 +1454,7 @@ export const validateAuth = authenticatedProcedure
     const worker = await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
 
     // Call plugin's validation endpoint with timeout
-    // SDK v2 runner exposes: POST /validate-auth
+    // Runner exposes: POST /validate-auth
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 second timeout
 

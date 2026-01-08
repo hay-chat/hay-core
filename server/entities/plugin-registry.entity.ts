@@ -69,14 +69,14 @@ export class PluginRegistry {
   @Column({ type: "integer", default: 10 })
   maxConcurrentInstances!: number;
 
-  // SDK v2: Plugin-global metadata cache (from /metadata endpoint)
+  // Plugin-global metadata cache (from /metadata endpoint)
   @Column({ type: "jsonb", nullable: true })
   metadata?: PluginMetadata;
 
   @Column({ type: "timestamptz", nullable: true })
   metadataFetchedAt?: Date;
 
-  // SDK v2: Plugin-global metadata state (not org-specific)
+  // Plugin-global metadata state (not org-specific)
   @Column({
     type: "varchar",
     length: 50,

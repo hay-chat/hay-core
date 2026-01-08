@@ -92,7 +92,7 @@ export class PluginInstanceManagerService {
         throw new Error(`Plugin ${pluginId} not found in registry`);
       }
 
-      // Start using SDK v2 runner service
+      // Start using SDK runner service
       const runner = getPluginRunnerService();
       await runner.startWorker(organizationId, pluginId);
 

@@ -25,7 +25,7 @@ export class PluginInstance extends OrganizationScopedEntity {
   @Column({ type: "jsonb", nullable: true })
   config?: Record<string, unknown>;
 
-  // SDK v2: Auth state (separate from config)
+  // Auth state (separate from config)
   // Uses AuthStateEncryptedTransformer to encrypt ALL fields in credentials
   @Column({
     type: "jsonb",
@@ -65,7 +65,7 @@ export class PluginInstance extends OrganizationScopedEntity {
   @Column({ type: "varchar", length: 50, default: "stopped" })
   status!: "stopped" | "starting" | "running" | "stopping" | "error";
 
-  // SDK v2: Org-scoped runtime state (worker lifecycle per org+plugin)
+  // Org-scoped runtime state (worker lifecycle per org+plugin)
   @Column({
     type: "varchar",
     length: 50,

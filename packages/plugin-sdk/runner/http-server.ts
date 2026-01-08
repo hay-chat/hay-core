@@ -7,18 +7,14 @@
  * @module @hay/plugin-sdk/runner/http-server
  */
 
-import express, { type Express, type Request, type Response } from 'express';
-import type { Server } from 'http';
-import type { HayLogger, HayMcpRuntimeAPI } from '../types/index.js';
-import { PluginRegistry } from '../sdk/registry.js';
-import type { HayPluginDefinition } from '../types/plugin.js';
-import {
-  executeOnValidateAuth,
-  executeOnConfigUpdate,
-  executeOnDisable,
-} from './hook-executor.js';
-import { createConfigRuntimeAPI } from '../sdk/config-runtime.js';
-import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
+import express, { type Express, type Request, type Response } from "express";
+import type { Server } from "http";
+import type { HayLogger, HayMcpRuntimeAPI } from "../types/index.js";
+import { PluginRegistry } from "../sdk/registry.js";
+import type { HayPluginDefinition } from "../types/plugin.js";
+import { executeOnValidateAuth, executeOnConfigUpdate, executeOnDisable } from "./hook-executor.js";
+import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
+import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 
 /**
  * Plugin HTTP server instance.
@@ -28,7 +24,7 @@ import { createAuthRuntimeAPI } from '../sdk/auth-runtime.js';
 // Track registered MCP servers
 interface RegisteredMcpServer {
   id: string;
-  type: 'local' | 'external';
+  type: "local" | "external";
   instance?: any; // McpServerInstance for local servers
   options?: any; // ExternalMcpOptions for external servers
 }
@@ -117,10 +113,10 @@ export class PluginHttpServer {
    * - Monitoring systems (Prometheus, Datadog, etc.)
    */
   private setupHealthEndpoint(): void {
-    this.app.get('/health', (_req: Request, res: Response) => {
+    this.app.get("/health", (_req: Request, res: Response) => {
       try {
         const health = {
-          status: 'healthy',
+          status: "healthy",
           uptime: process.uptime(),
           timestamp: new Date().toISOString(),
           pid: process.pid,
@@ -137,12 +133,12 @@ export class PluginHttpServer {
         };
 
         res.status(200).json(health);
-        this.logger.debug('Served /health endpoint', { orgId: this.orgId });
+        this.logger.debug("Served /health endpoint", { orgId: this.orgId });
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error serving /health endpoint', { error: errorMsg });
+        this.logger.error("Error serving /health endpoint", { error: errorMsg });
         res.status(503).json({
-          status: 'unhealthy',
+          status: "unhealthy",
           error: errorMsg,
           timestamp: new Date().toISOString(),
         });
@@ -163,7 +159,7 @@ export class PluginHttpServer {
    * @see PLUGIN.md Section 3.2 (lines 116-132)
    */
   private setupMetadataEndpoint(): void {
-    this.app.get('/metadata', (_req: Request, res: Response) => {
+    this.app.get("/metadata", (_req: Request, res: Response) => {
       try {
         const configSchema = this.registry.getConfigSchema();
         const authMethods = this.registry.getAuthMethods();
@@ -176,10 +172,10 @@ export class PluginHttpServer {
           configSchema,
           authMethods: authMethods.map((method) => {
             // Transform auth methods to metadata format
-            if ('configField' in method) {
+            if ("configField" in method) {
               // API Key auth
               return {
-                type: 'apiKey',
+                type: "apiKey",
                 id: method.id,
                 label: method.label,
                 configField: method.configField,
@@ -187,7 +183,7 @@ export class PluginHttpServer {
             } else {
               // OAuth2 auth
               return {
-                type: 'oauth2',
+                type: "oauth2",
                 id: method.id,
                 label: method.label,
                 authorizationUrl: method.authorizationUrl,
@@ -199,7 +195,7 @@ export class PluginHttpServer {
             }
           }),
           uiExtensions,
-          pages: uiPages, // SDK V2 UI pages registered via ctx.register.ui.page()
+          pages: uiPages, // UI pages registered via ctx.register.ui.page()
           routes: routes.map((route) => ({
             method: route.method,
             path: route.path,
@@ -211,11 +207,11 @@ export class PluginHttpServer {
         };
 
         res.json(metadata);
-        this.logger.debug('Served /metadata endpoint');
+        this.logger.debug("Served /metadata endpoint");
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error serving /metadata endpoint', { error: errorMsg });
-        res.status(500).json({ error: 'Failed to generate metadata' });
+        this.logger.error("Error serving /metadata endpoint", { error: errorMsg });
+        res.status(500).json({ error: "Failed to generate metadata" });
       }
     });
   }
@@ -228,16 +224,15 @@ export class PluginHttpServer {
    * - POST /config-update - Notify config change
    * - POST /disable - Cleanup before shutdown
    *
-   * @see PLUGIN_SDK_V2_MIGRATION_PLAN.md Section 0
    */
   private setupLifecycleEndpoints(): void {
     // POST /validate-auth
-    this.app.post('/validate-auth', async (req: Request, res: Response): Promise<void> => {
+    this.app.post("/validate-auth", async (req: Request, res: Response): Promise<void> => {
       try {
         if (!this.plugin) {
           res.status(500).json({
             valid: false,
-            error: 'Plugin not initialized'
+            error: "Plugin not initialized",
           });
           return;
         }
@@ -245,7 +240,7 @@ export class PluginHttpServer {
         if (!this.orgId || !this.manifest || this.orgConfig === null) {
           res.status(400).json({
             valid: false,
-            error: 'Runtime data not set'
+            error: "Runtime data not set",
           });
           return;
         }
@@ -255,7 +250,7 @@ export class PluginHttpServer {
         if (!authState || !authState.methodId || !authState.credentials) {
           res.status(400).json({
             valid: false,
-            error: 'Invalid auth state format'
+            error: "Invalid auth state format",
           });
           return;
         }
@@ -263,9 +258,9 @@ export class PluginHttpServer {
         // Merge config (non-auth fields) with auth credentials for validation
         // This allows onValidateAuth to access ALL fields via ctx.config.get()
         const mergedConfig = {
-          ...this.orgConfig,  // Existing org config
-          ...(config || {}),  // New non-auth config fields being validated
-          ...authState.credentials  // New auth credentials being validated
+          ...this.orgConfig, // Existing org config
+          ...(config || {}), // New non-auth config fields being validated
+          ...authState.credentials, // New auth credentials being validated
         };
 
         // Create runtime APIs for validation context
@@ -290,31 +285,27 @@ export class PluginHttpServer {
         };
 
         // Execute validation hook
-        const isValid = await executeOnValidateAuth(
-          this.plugin,
-          authCtx as any,
-          this.logger
-        );
+        const isValid = await executeOnValidateAuth(this.plugin, authCtx as any, this.logger);
 
         res.json({ valid: isValid });
-        this.logger.debug('Handled /validate-auth', { valid: isValid });
+        this.logger.debug("Handled /validate-auth", { valid: isValid });
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error in /validate-auth endpoint', { error: errorMsg });
+        this.logger.error("Error in /validate-auth endpoint", { error: errorMsg });
         res.status(500).json({
           valid: false,
-          error: errorMsg
+          error: errorMsg,
         });
       }
     });
 
     // POST /config-update
-    this.app.post('/config-update', async (req: Request, res: Response): Promise<void> => {
+    this.app.post("/config-update", async (req: Request, res: Response): Promise<void> => {
       try {
         if (!this.plugin) {
           res.status(500).json({
             success: false,
-            error: 'Plugin not initialized'
+            error: "Plugin not initialized",
           });
           return;
         }
@@ -322,7 +313,7 @@ export class PluginHttpServer {
         if (!this.orgId || !this.manifest || this.orgConfig === null) {
           res.status(400).json({
             success: false,
-            error: 'Runtime data not set'
+            error: "Runtime data not set",
           });
           return;
         }
@@ -332,7 +323,7 @@ export class PluginHttpServer {
         if (!config) {
           res.status(400).json({
             success: false,
-            error: 'Config object required'
+            error: "Config object required",
           });
           return;
         }
@@ -353,31 +344,27 @@ export class PluginHttpServer {
         };
 
         // Execute config update hook
-        await executeOnConfigUpdate(
-          this.plugin,
-          configCtx as any,
-          this.logger
-        );
+        await executeOnConfigUpdate(this.plugin, configCtx as any, this.logger);
 
         res.json({ success: true });
-        this.logger.debug('Handled /config-update');
+        this.logger.debug("Handled /config-update");
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error in /config-update endpoint', { error: errorMsg });
+        this.logger.error("Error in /config-update endpoint", { error: errorMsg });
         res.status(500).json({
           success: false,
-          error: errorMsg
+          error: errorMsg,
         });
       }
     });
 
     // POST /disable
-    this.app.post('/disable', async (_req: Request, res: Response): Promise<void> => {
+    this.app.post("/disable", async (_req: Request, res: Response): Promise<void> => {
       try {
         if (!this.plugin) {
           res.status(500).json({
             success: false,
-            error: 'Plugin not initialized'
+            error: "Plugin not initialized",
           });
           return;
         }
@@ -385,7 +372,7 @@ export class PluginHttpServer {
         if (!this.orgId) {
           res.status(400).json({
             success: false,
-            error: 'Organization ID not set'
+            error: "Organization ID not set",
           });
           return;
         }
@@ -397,20 +384,16 @@ export class PluginHttpServer {
         };
 
         // Execute disable hook
-        await executeOnDisable(
-          this.plugin,
-          disableCtx as any,
-          this.logger
-        );
+        await executeOnDisable(this.plugin, disableCtx as any, this.logger);
 
         res.json({ success: true });
-        this.logger.info('Handled /disable, plugin cleanup completed');
+        this.logger.info("Handled /disable, plugin cleanup completed");
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error in /disable endpoint', { error: errorMsg });
+        this.logger.error("Error in /disable endpoint", { error: errorMsg });
         res.status(500).json({
           success: false,
-          error: errorMsg
+          error: errorMsg,
         });
       }
     });
@@ -423,22 +406,21 @@ export class PluginHttpServer {
    * - POST /mcp/call-tool - Proxy MCP tool calls
    * - GET /mcp/list-tools - List available MCP tools
    *
-   * @see PLUGIN_SDK_V2_MIGRATION_PLAN.md Section 0
    */
   private setupMcpEndpoints(): void {
     // POST /mcp/call-tool
-    this.app.post('/mcp/call-tool', async (req: Request, res: Response): Promise<void> => {
+    this.app.post("/mcp/call-tool", async (req: Request, res: Response): Promise<void> => {
       try {
         const { toolName, arguments: toolArgs } = req.body;
 
-        if (!toolName || typeof toolName !== 'string') {
+        if (!toolName || typeof toolName !== "string") {
           res.status(400).json({
-            error: 'Tool name is required and must be a string'
+            error: "Tool name is required and must be a string",
           });
           return;
         }
 
-        this.logger.debug('MCP tool call requested', { toolName, arguments: toolArgs });
+        this.logger.debug("MCP tool call requested", { toolName, arguments: toolArgs });
 
         // Find which MCP server has this tool
         // First, we need to check all servers to find which one has the tool
@@ -450,22 +432,22 @@ export class PluginHttpServer {
           try {
             let serverTools: any[] = [];
 
-            if (server.type === 'local' && server.instance?.listTools) {
+            if (server.type === "local" && server.instance?.listTools) {
               serverTools = await server.instance.listTools();
-            } else if (server.type === 'external' && server.options) {
+            } else if (server.type === "external" && server.options) {
               // List tools from external server
               const { url, authHeaders } = server.options;
               const rpcRequest = {
-                jsonrpc: '2.0',
+                jsonrpc: "2.0",
                 id: 1,
-                method: 'tools/list',
-                params: {}
+                method: "tools/list",
+                params: {},
               };
 
               const response = await fetch(url, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                  'Content-Type': 'application/json',
+                  "Content-Type": "application/json",
                   ...authHeaders,
                 },
                 body: JSON.stringify(rpcRequest),
@@ -489,13 +471,15 @@ export class PluginHttpServer {
             }
           } catch (err) {
             // Continue checking other servers
-            this.logger.debug(`Failed to check server ${server.id} for tool ${toolName}`, { error: err });
+            this.logger.debug(`Failed to check server ${server.id} for tool ${toolName}`, {
+              error: err,
+            });
           }
         }
 
         if (!targetServer || !toolServerId) {
           res.status(404).json({
-            error: `No MCP server found for tool: ${toolName}`
+            error: `No MCP server found for tool: ${toolName}`,
           });
           return;
         }
@@ -503,41 +487,44 @@ export class PluginHttpServer {
         this.logger.debug(`Found tool ${toolName} on server ${toolServerId}`);
 
         // Call the tool on the appropriate MCP server
-        if (targetServer.type === 'local' && targetServer.instance?.callTool) {
+        if (targetServer.type === "local" && targetServer.instance?.callTool) {
           // Local MCP server
           try {
             const result = await targetServer.instance.callTool(toolName, toolArgs || {});
             res.json(result);
-            this.logger.debug('MCP tool call successful', { toolName, serverId: targetServer.id });
+            this.logger.debug("MCP tool call successful", { toolName, serverId: targetServer.id });
           } catch (toolErr: any) {
             const errorMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
-            this.logger.error('MCP tool execution failed', { toolName, error: errorMsg });
+            this.logger.error("MCP tool execution failed", { toolName, error: errorMsg });
             res.status(500).json({
-              error: `Tool execution failed: ${errorMsg}`
+              error: `Tool execution failed: ${errorMsg}`,
             });
           }
-        } else if (targetServer.type === 'external' && targetServer.options) {
+        } else if (targetServer.type === "external" && targetServer.options) {
           // External MCP server - use JSON-RPC
           try {
             const { url, authHeaders } = targetServer.options;
 
             // Send JSON-RPC request for tools/call
             const rpcRequest = {
-              jsonrpc: '2.0',
+              jsonrpc: "2.0",
               id: 1,
-              method: 'tools/call',
+              method: "tools/call",
               params: {
                 name: toolName,
-                arguments: toolArgs || {}
-              }
+                arguments: toolArgs || {},
+              },
             };
 
-            this.logger.debug(`Sending JSON-RPC tool call to ${url}`, { method: rpcRequest.method, toolName });
+            this.logger.debug(`Sending JSON-RPC tool call to ${url}`, {
+              method: rpcRequest.method,
+              toolName,
+            });
 
             const response = await fetch(url, {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
                 ...authHeaders,
               },
               body: JSON.stringify(rpcRequest),
@@ -549,10 +536,10 @@ export class PluginHttpServer {
               this.logger.error(`External MCP server ${targetServer.id} returned error`, {
                 status: response.status,
                 statusText: response.statusText,
-                body: errorText
+                body: errorText,
               });
               res.status(500).json({
-                error: `External MCP server error: HTTP ${response.status}`
+                error: `External MCP server error: HTTP ${response.status}`,
               });
               return;
             }
@@ -560,44 +547,47 @@ export class PluginHttpServer {
             const rpcResponse: any = await response.json();
             this.logger.debug(`Received JSON-RPC response from ${targetServer.id}`, {
               hasResult: !!rpcResponse.result,
-              hasError: !!rpcResponse.error
+              hasError: !!rpcResponse.error,
             });
 
             // Check for JSON-RPC error
             if (rpcResponse.error) {
-              this.logger.error('MCP RPC error', { error: rpcResponse.error });
+              this.logger.error("MCP RPC error", { error: rpcResponse.error });
               res.status(500).json({
-                error: `MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`
+                error: `MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`,
               });
               return;
             }
 
             // Return the result
             res.json(rpcResponse.result);
-            this.logger.debug('External MCP tool call successful', { toolName, serverId: targetServer.id });
+            this.logger.debug("External MCP tool call successful", {
+              toolName,
+              serverId: targetServer.id,
+            });
           } catch (toolErr: any) {
             const errorMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
-            this.logger.error('External MCP tool execution failed', { toolName, error: errorMsg });
+            this.logger.error("External MCP tool execution failed", { toolName, error: errorMsg });
             res.status(500).json({
-              error: `Tool execution failed: ${errorMsg}`
+              error: `Tool execution failed: ${errorMsg}`,
             });
           }
         } else {
           res.status(500).json({
-            error: 'MCP server does not support tool calling'
+            error: "MCP server does not support tool calling",
           });
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error in /mcp/call-tool endpoint', { error: errorMsg });
+        this.logger.error("Error in /mcp/call-tool endpoint", { error: errorMsg });
         res.status(500).json({ error: errorMsg });
       }
     });
 
     // GET /mcp/list-tools
-    this.app.get('/mcp/list-tools', async (_req: Request, res: Response): Promise<void> => {
+    this.app.get("/mcp/list-tools", async (_req: Request, res: Response): Promise<void> => {
       try {
-        this.logger.debug('MCP tools list requested');
+        this.logger.debug("MCP tools list requested");
         this.logger.debug(`Total MCP servers registered: ${this.mcpServers.size}`);
 
         const tools: any[] = [];
@@ -607,7 +597,7 @@ export class PluginHttpServer {
           this.logger.debug(`Processing MCP server ${server.id}`, { type: server.type });
 
           // Handle local MCP servers
-          if (server.type === 'local' && server.instance?.listTools) {
+          if (server.type === "local" && server.instance?.listTools) {
             try {
               const serverTools = await server.instance.listTools();
 
@@ -615,41 +605,47 @@ export class PluginHttpServer {
               for (const tool of serverTools) {
                 tools.push({
                   ...tool,
-                  serverId: server.id
+                  serverId: server.id,
                 });
               }
 
-              this.logger.debug(`Collected ${serverTools.length} tools from local MCP server ${server.id}`);
+              this.logger.debug(
+                `Collected ${serverTools.length} tools from local MCP server ${server.id}`,
+              );
             } catch (listErr: any) {
               const errorMsg = listErr instanceof Error ? listErr.message : String(listErr);
-              this.logger.warn(`Failed to list tools from local MCP server ${server.id}`, { error: errorMsg });
+              this.logger.warn(`Failed to list tools from local MCP server ${server.id}`, {
+                error: errorMsg,
+              });
             }
           }
 
           // Handle external MCP servers
-          else if (server.type === 'external' && server.options) {
+          else if (server.type === "external" && server.options) {
             try {
               const { url, authHeaders } = server.options;
               this.logger.debug(`Fetching tools from external MCP server ${server.id}`, { url });
 
               // MCP uses JSON-RPC 2.0 over HTTP
               const headers: Record<string, string> = {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
                 ...authHeaders,
               };
 
               // Send JSON-RPC request for tools/list
               const rpcRequest = {
-                jsonrpc: '2.0',
+                jsonrpc: "2.0",
                 id: 1,
-                method: 'tools/list',
-                params: {}
+                method: "tools/list",
+                params: {},
               };
 
-              this.logger.debug(`Sending JSON-RPC request to ${url}`, { method: rpcRequest.method });
+              this.logger.debug(`Sending JSON-RPC request to ${url}`, {
+                method: rpcRequest.method,
+              });
 
               const response = await fetch(url, {
-                method: 'POST',
+                method: "POST",
                 headers,
                 body: JSON.stringify(rpcRequest),
                 signal: AbortSignal.timeout(10000), // 10 second timeout for external servers
@@ -660,7 +656,7 @@ export class PluginHttpServer {
                 this.logger.warn(`External MCP server ${server.id} returned error`, {
                   status: response.status,
                   statusText: response.statusText,
-                  body: errorText
+                  body: errorText,
                 });
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
               }
@@ -668,29 +664,37 @@ export class PluginHttpServer {
               const rpcResponse: any = await response.json();
               this.logger.debug(`Received JSON-RPC response from ${server.id}`, {
                 hasResult: !!rpcResponse.result,
-                hasError: !!rpcResponse.error
+                hasError: !!rpcResponse.error,
               });
 
               // Check for JSON-RPC error
               if (rpcResponse.error) {
-                throw new Error(`MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`);
+                throw new Error(
+                  `MCP RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`,
+                );
               }
 
               // Extract tools from JSON-RPC result
-              const serverTools = Array.isArray(rpcResponse.result?.tools) ? rpcResponse.result.tools : [];
+              const serverTools = Array.isArray(rpcResponse.result?.tools)
+                ? rpcResponse.result.tools
+                : [];
 
               // Add serverId to each tool
               for (const tool of serverTools) {
                 tools.push({
                   ...tool,
-                  serverId: server.id
+                  serverId: server.id,
                 });
               }
 
-              this.logger.debug(`Collected ${serverTools.length} tools from external MCP server ${server.id}`);
+              this.logger.debug(
+                `Collected ${serverTools.length} tools from external MCP server ${server.id}`,
+              );
             } catch (fetchErr: any) {
               const errorMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-              this.logger.warn(`Failed to fetch tools from external MCP server ${server.id}`, { error: errorMsg });
+              this.logger.warn(`Failed to fetch tools from external MCP server ${server.id}`, {
+                error: errorMsg,
+              });
             }
           }
         }
@@ -699,7 +703,7 @@ export class PluginHttpServer {
         this.logger.debug(`Returned ${tools.length} total MCP tools`);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Error in /mcp/list-tools endpoint', { error: errorMsg });
+        this.logger.error("Error in /mcp/list-tools endpoint", { error: errorMsg });
         res.status(500).json({ error: errorMsg });
       }
     });
@@ -717,12 +721,7 @@ export class PluginHttpServer {
       const { method, path, handler } = route;
 
       // Map HTTP method to Express method
-      const expressMethod = method.toLowerCase() as
-        | 'get'
-        | 'post'
-        | 'put'
-        | 'patch'
-        | 'delete';
+      const expressMethod = method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
 
       // Register the route
       this.app[expressMethod](path, async (req: Request, res: Response) => {
@@ -736,7 +735,7 @@ export class PluginHttpServer {
           });
 
           if (!res.headersSent) {
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: "Internal server error" });
           }
         }
       });
@@ -751,10 +750,10 @@ export class PluginHttpServer {
   private setupErrorHandler(): void {
     this.app.use((err: any, _req: Request, res: Response, _next: any) => {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.logger.error('Unhandled error in HTTP server', { error: errorMsg });
+      this.logger.error("Unhandled error in HTTP server", { error: errorMsg });
 
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: "Internal server error" });
       }
     });
   }
@@ -772,8 +771,8 @@ export class PluginHttpServer {
           resolve();
         });
 
-        this.server.on('error', (err) => {
-          this.logger.error('HTTP server error', { error: err.message });
+        this.server.on("error", (err) => {
+          this.logger.error("HTTP server error", { error: err.message });
           reject(err);
         });
       } catch (err) {
@@ -789,17 +788,17 @@ export class PluginHttpServer {
    */
   async stop(): Promise<void> {
     if (!this.server) {
-      this.logger.debug('HTTP server not running, nothing to stop');
+      this.logger.debug("HTTP server not running, nothing to stop");
       return;
     }
 
     return new Promise((resolve, reject) => {
       this.server!.close((err) => {
         if (err) {
-          this.logger.error('Error stopping HTTP server', { error: err.message });
+          this.logger.error("Error stopping HTTP server", { error: err.message });
           reject(err);
         } else {
-          this.logger.info('HTTP server stopped');
+          this.logger.info("HTTP server stopped");
           this.server = null;
           resolve();
         }

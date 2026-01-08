@@ -25,6 +25,7 @@
 ### Problem Statement
 
 The core systems contain 44 instances of type safety issues:
+
 - **3 Critical** - Cross-module boundary types causing unsafe casts
 - **9 High** - Reused internal types lacking structure
 - **13 Medium** - Implementation details with weak typing
@@ -77,7 +78,7 @@ Create these new files with shared type definitions:
  * Shared types for MCP client interfaces and tool execution
  */
 
-import type { JSONSchema7 } from 'json-schema';
+import type { JSONSchema7 } from "json-schema";
 
 // Tool Arguments - recursive structure for nested objects
 export type MCPToolArgumentValue =
@@ -101,9 +102,9 @@ export interface MCPToolSchema {
 
 // Tool Content Types
 export type MCPContentItem =
-  | { type: 'text'; text: string }
-  | { type: 'image'; data: string; mimeType: string }
-  | { type: 'resource'; uri: string; mimeType?: string };
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string }
+  | { type: "resource"; uri: string; mimeType?: string };
 
 // Tool Result
 export interface MCPCallResult {
@@ -144,16 +145,16 @@ export interface WebSocketClientMetadata {
 
 // Event Types
 export type WebSocketEventType =
-  | 'identify'
-  | 'chat'
-  | 'typing'
-  | 'loadHistory'
-  | 'subscribe'
-  | 'error'
-  | 'messageUpdate'
-  | 'conversationUpdate'
-  | 'agentTyping'
-  | 'conversationStatusChange';
+  | "identify"
+  | "chat"
+  | "typing"
+  | "loadHistory"
+  | "subscribe"
+  | "error"
+  | "messageUpdate"
+  | "conversationUpdate"
+  | "agentTyping"
+  | "conversationStatusChange";
 
 // Base Message
 export interface BaseWebSocketMessage {
@@ -163,14 +164,14 @@ export interface BaseWebSocketMessage {
 
 // Specific Message Types
 export interface IdentifyMessage extends BaseWebSocketMessage {
-  type: 'identify';
+  type: "identify";
   customerId: string;
   conversationId?: string;
   metadata?: WebSocketClientMetadata;
 }
 
 export interface ChatMessage extends BaseWebSocketMessage {
-  type: 'chat';
+  type: "chat";
   content: string;
   proof?: string;
   method?: string;
@@ -179,23 +180,23 @@ export interface ChatMessage extends BaseWebSocketMessage {
 }
 
 export interface TypingMessage extends BaseWebSocketMessage {
-  type: 'typing';
+  type: "typing";
   isTyping: boolean;
 }
 
 export interface LoadHistoryMessage extends BaseWebSocketMessage {
-  type: 'loadHistory';
+  type: "loadHistory";
   limit?: number;
   offset?: number;
 }
 
 export interface SubscribeMessage extends BaseWebSocketMessage {
-  type: 'subscribe';
+  type: "subscribe";
   events?: string[];
 }
 
 export interface ErrorMessage extends BaseWebSocketMessage {
-  type: 'error';
+  type: "error";
   code: string;
   message: string;
   details?: Record<string, unknown>;
@@ -732,6 +733,7 @@ cd server && npm run test -- plugin-manager.service
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- mcp
@@ -777,6 +779,7 @@ cd server && npm run test -- mcp
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- plugin-router
@@ -808,6 +811,7 @@ cd server && npm run test -- plugin-router
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- organization
@@ -855,7 +859,7 @@ cd server && npm run test -- organization
 - }
 ```
 
-#### File: `server/services/plugin-runner-v2.service.ts`
+#### File: `server/services/plugin-runner.service.ts`
 
 ```diff
 + import type { PluginInstanceConfig } from '@server/types/plugin-config.types';
@@ -903,6 +907,7 @@ cd server && npm run test -- organization
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- plugin-ui
@@ -976,6 +981,7 @@ cd server && npm run test -- plugin-runner
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- execution.layer
@@ -1076,6 +1082,7 @@ cd server && npm run test -- execution.layer
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- mcp-registry
@@ -1109,7 +1116,10 @@ Create a standard error handling pattern across all services.
  * Type-safe error handling utilities
  */
 
-export function handleError(error: unknown, context: string): {
+export function handleError(
+  error: unknown,
+  context: string,
+): {
   message: string;
   stack?: string;
   name: string;
@@ -1124,23 +1134,24 @@ export function handleError(error: unknown, context: string): {
 
   return {
     message: String(error),
-    name: 'UnknownError',
+    name: "UnknownError",
   };
 }
 
 export function isErrorWithCode(error: unknown): error is Error & { code: string } {
-  return error instanceof Error && 'code' in error;
+  return error instanceof Error && "code" in error;
 }
 
 export function isErrorWithStatus(error: unknown): error is Error & { status: number } {
-  return error instanceof Error && 'status' in error;
+  return error instanceof Error && "status" in error;
 }
 ```
 
 #### Apply Pattern to All Services
 
 **Files to update**:
-- `server/services/plugin-runner-v2.service.ts:200,273`
+
+- `server/services/plugin-runner.service.ts:200,273`
 - `server/services/mcp-registry.service.ts:98,202`
 - `server/services/plugin-asset.service.ts:246`
 
@@ -1163,6 +1174,7 @@ export function isErrorWithStatus(error: unknown): error is Error & { status: nu
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- error-handler
@@ -1198,12 +1210,13 @@ cd server && npm run test -- error-handler
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- conversation-utils
 ```
 
-### Step 4.3: Plugin SDK v2 Types (Day 3)
+### Step 4.3: Plugin SDK Types (Day 3)
 
 #### File: `server/types/plugin-sdk.types.ts`
 
@@ -1236,6 +1249,7 @@ cd server && npm run test -- conversation-utils
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 ```
@@ -1268,6 +1282,7 @@ npm run typecheck
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- webhook
@@ -1307,6 +1322,7 @@ cd server && npm run test -- webhook
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test -- plugin-upload
@@ -1328,9 +1344,9 @@ cd server && npm run test -- plugin-upload
   ) {
 ```
 
-#### Plugin Runner V2
+#### Plugin Runner
 
-**File**: `server/services/plugin-runner-v2.service.ts`
+**File**: `server/services/plugin-runner.service.ts`
 
 ```diff
   // Line 86, 115, 157
@@ -1354,6 +1370,7 @@ cd server && npm run test -- plugin-upload
 ```
 
 **Testing**:
+
 ```bash
 npm run typecheck
 cd server && npm run test
@@ -1404,10 +1421,10 @@ Create a type test file to ensure types remain strict:
 **File**: `server/tests/types/type-safety.test.ts`
 
 ```typescript
-import { expectType, expectError } from 'tsd';
-import type { ConversationContext } from '@server/orchestrator/types';
-import type { WebSocketMessage } from '@server/types/websocket.types';
-import type { PluginInstanceConfig } from '@server/types/plugin-config.types';
+import { expectType, expectError } from "tsd";
+import type { ConversationContext } from "@server/orchestrator/types";
+import type { WebSocketMessage } from "@server/types/websocket.types";
+import type { PluginInstanceConfig } from "@server/types/plugin-config.types";
 
 // Test: Orchestration status is properly typed
 expectType<ConversationContext | null>({
@@ -1418,20 +1435,20 @@ expectType<ConversationContext | null>({
 
 // Test: WebSocket messages are discriminated unions
 const chatMessage: WebSocketMessage = {
-  type: 'chat',
-  content: 'Hello',
+  type: "chat",
+  content: "Hello",
 };
 expectType<WebSocketMessage>(chatMessage);
 
 // Test: Invalid message type should error
 expectError<WebSocketMessage>({
-  type: 'invalid',
-  content: 'Test',
+  type: "invalid",
+  content: "Test",
 });
 
 // Test: Plugin config accepts valid values
 const config: PluginInstanceConfig = {
-  apiKey: 'test',
+  apiKey: "test",
   enabled: true,
   retryCount: 3,
 };
@@ -1439,6 +1456,7 @@ expectType<PluginInstanceConfig>(config);
 ```
 
 Run type tests:
+
 ```bash
 npm run test:types
 ```
@@ -1480,7 +1498,7 @@ For critical changes (Phase 2), consider feature flags:
 ```typescript
 // server/config/feature-flags.ts
 export const FEATURE_FLAGS = {
-  TYPE_SAFE_ORCHESTRATION: process.env.TYPE_SAFE_ORCHESTRATION === 'true',
+  TYPE_SAFE_ORCHESTRATION: process.env.TYPE_SAFE_ORCHESTRATION === "true",
 };
 
 // In code
@@ -1516,13 +1534,13 @@ npm run test  # All tests should pass
 
 ### Quantitative Metrics
 
-| Metric | Before | Target | Validation |
-|--------|--------|--------|------------|
-| `any` count in core systems | 44 | 0 | `grep -r "as any" server/{orchestrator,services}` |
-| `unknown` without type guard | 15+ | 0 | Manual code review |
-| Type errors on build | 0 | 0 | `npm run typecheck` |
-| Test coverage | ~75% | >75% | `npm run test:coverage` |
-| Build time | X seconds | ±5% | CI/CD metrics |
+| Metric                       | Before    | Target | Validation                                        |
+| ---------------------------- | --------- | ------ | ------------------------------------------------- |
+| `any` count in core systems  | 44        | 0      | `grep -r "as any" server/{orchestrator,services}` |
+| `unknown` without type guard | 15+       | 0      | Manual code review                                |
+| Type errors on build         | 0         | 0      | `npm run typecheck`                               |
+| Test coverage                | ~75%      | >75%   | `npm run test:coverage`                           |
+| Build time                   | X seconds | ±5%    | CI/CD metrics                                     |
 
 ### Qualitative Metrics
 
@@ -1569,12 +1587,7 @@ npm run test:coverage
    {
      "WebSocket Message": {
        "prefix": "ws-msg",
-       "body": [
-         "const message: WebSocketMessage = {",
-         "  type: '$1',",
-         "  $2",
-         "};"
-       ]
+       "body": ["const message: WebSocketMessage = {", "  type: '$1',", "  $2", "};"]
      }
    }
    ```
@@ -1607,13 +1620,13 @@ jobs:
 
 ## Timeline Summary
 
-| Week | Phase | Effort | Risk |
-|------|-------|--------|------|
-| 1 | Foundation Types | 1-2 days | Low |
-| 2 | Critical Cross-Module | 3-4 days | Medium |
-| 3-4 | High Priority Internal | 8-10 days | Low-Medium |
-| 5 | Medium Priority Cleanup | 4-5 days | Low |
-| 6 | Validation & Documentation | 2-3 days | Low |
+| Week | Phase                      | Effort    | Risk       |
+| ---- | -------------------------- | --------- | ---------- |
+| 1    | Foundation Types           | 1-2 days  | Low        |
+| 2    | Critical Cross-Module      | 3-4 days  | Medium     |
+| 3-4  | High Priority Internal     | 8-10 days | Low-Medium |
+| 5    | Medium Priority Cleanup    | 4-5 days  | Low        |
+| 6    | Validation & Documentation | 2-3 days  | Low        |
 
 **Total**: ~5-6 weeks (20-25 business days)
 
@@ -1622,19 +1635,24 @@ jobs:
 ## Questions & Answers
 
 ### Q: Will this break existing code?
+
 **A**: No. These are type-only changes. Runtime behavior is identical.
 
 ### Q: Do we need database migrations?
+
 **A**: No. All changes are to TypeScript types for JSONB columns.
 
 ### Q: What if a type doesn't match reality?
+
 **A**: The migration will expose it immediately via TypeScript errors. This is a good thing - it catches bugs before production.
 
 ### Q: Can we do this faster?
+
 **A**: Yes, phases can run in parallel if multiple developers work on it. Critical phase (Week 2) must complete before Week 3-4.
 
 ### Q: What about plugin compatibility?
-**A**: Plugins use the same types. SDK v2 plugins already return typed metadata. SDK v1 plugins will benefit from the new manifest types.
+
+**A**: Plugins use the same types. Plugins already return typed metadata via the `/metadata` endpoint.
 
 ---
 
@@ -1643,6 +1661,7 @@ jobs:
 This migration eliminates 44 type safety issues across core systems while maintaining 100% backward compatibility. The phased approach minimizes risk and allows for incremental validation.
 
 **Key Benefits**:
+
 - ✅ Type safety at module boundaries
 - ✅ Better IDE autocomplete and error messages
 - ✅ Catches bugs at compile time instead of runtime
@@ -1650,6 +1669,7 @@ This migration eliminates 44 type safety issues across core systems while mainta
 - ✅ Enables safer refactoring
 
 **Next Steps**:
+
 1. Review and approve this migration strategy
 2. Create tracking issues for each phase
 3. Begin Phase 1: Foundation Types

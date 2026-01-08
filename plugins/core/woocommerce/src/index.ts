@@ -1,7 +1,7 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 
 /**
- * WooCommerce Plugin - SDK V2
+ * WooCommerce Plugin
  *
  * Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows
  */

@@ -233,17 +233,15 @@ export class ToolExecutionService {
         console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
         const manifest = plugin.manifest as HayPluginManifest;
 
-        // Check if this is an SDK v2 plugin (has "mcp" capability but no static tool definitions)
+        // Check if this plugin has dynamic MCP tools (no static tool definitions)
         const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
         const hasMCPCapability = capabilities.includes("mcp");
 
         if (hasMCPCapability && !manifest.capabilities?.mcp?.tools) {
-          // SDK v2 plugin - tools are fetched dynamically from the running MCP server
-          console.log(
-            `[ToolExecution] Plugin is SDK v2 - tools are dynamic, skipping manifest validation`,
-          );
+          // Plugin with dynamic tools - fetched from the running MCP server
+          console.log(`[ToolExecution] Plugin has dynamic tools, skipping manifest validation`);
           matchingPlugin = plugin;
-          // No toolSchema needed for SDK v2 - the MCP client will handle validation
+          // No toolSchema needed - the MCP client will handle validation
           break;
         } else if (manifest.capabilities?.mcp?.tools) {
           // Legacy plugin with static tool definitions in manifest
@@ -297,7 +295,7 @@ export class ToolExecutionService {
       }
     } else if (!toolSchema) {
       console.log(
-        `[ToolExecution] Skipping argument validation for SDK v2 plugin (handled by MCP server)`,
+        `[ToolExecution] Skipping argument validation for dynamic plugin (handled by MCP server)`,
       );
     }
 

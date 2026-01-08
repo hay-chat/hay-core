@@ -224,6 +224,5 @@ export interface WorkerInfo {
   organizationId: string;
   pluginId: string;
   instanceId: string;
-  sdkVersion: "v1" | "v2";
   metadata?: any; // Plugin registry metadata (for compatibility with legacy code)
 }

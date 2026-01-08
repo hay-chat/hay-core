@@ -27,6 +27,7 @@ Hay plugins extend the platform's functionality using the **Model Context Protoc
 - Handle configuration per organization
 
 **Key Principles:**
+
 - Plugins use **SDK** with factory pattern (`defineHayPlugin`)
 - Each plugin runs per organization with isolated configuration
 - Plugins can start local MCP servers (child process) or connect to external MCP servers
@@ -58,7 +59,7 @@ plugins/core/my-plugin/
   "version": "1.0.0",
   "description": "Description of what your plugin does",
   "author": "Hay",
-  "type": "module",                  // REQUIRED for ES modules
+  "type": "module", // REQUIRED for ES modules
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
@@ -90,7 +91,7 @@ plugins/core/my-plugin/
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",              // Must be ES2020/ES2022, NOT CommonJS
+    "module": "ES2020", // Must be ES2020/ES2022, NOT CommonJS
     "moduleResolution": "node",
     "lib": ["ES2020"],
     "outDir": "./dist",
@@ -111,23 +112,23 @@ plugins/core/my-plugin/
 ### 4. Create Plugin Entry (`src/index.ts`)
 
 ```typescript
-import { defineHayPlugin } from '@hay/plugin-sdk';
+import { defineHayPlugin } from "@hay/plugin-sdk";
 
 export default defineHayPlugin((globalCtx) => ({
-  name: 'My Plugin',
+  name: "My Plugin",
 
   /**
    * Global initialization - register config and auth
    */
   onInitialize(ctx) {
-    globalCtx.logger.info('Initializing My Plugin');
+    globalCtx.logger.info("Initializing My Plugin");
 
     // Register configuration fields
     ctx.register.config({
       apiKey: {
-        type: 'string',
-        label: 'API Key',
-        description: 'Your service API key',
+        type: "string",
+        label: "API Key",
+        description: "Your service API key",
         required: true,
         encrypted: true,
       },
@@ -135,35 +136,35 @@ export default defineHayPlugin((globalCtx) => ({
 
     // Register authentication method
     ctx.register.auth.apiKey({
-      id: 'my-plugin-apikey',
-      label: 'My Plugin API Key',
-      configField: 'apiKey',
+      id: "my-plugin-apikey",
+      label: "My Plugin API Key",
+      configField: "apiKey",
     });
 
-    globalCtx.logger.info('My Plugin config and auth registered');
+    globalCtx.logger.info("My Plugin config and auth registered");
   },
 
   /**
    * Validate authentication credentials
    */
   async onValidateAuth(ctx) {
-    ctx.logger.info('Validating My Plugin credentials');
+    ctx.logger.info("Validating My Plugin credentials");
 
-    const apiKey = ctx.config.get<string>('apiKey');
+    const apiKey = ctx.config.get<string>("apiKey");
     if (!apiKey) {
-      throw new Error('API Key is required');
+      throw new Error("API Key is required");
     }
 
     // Test API connection
-    const response = await fetch('https://api.myservice.com/validate', {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
+    const response = await fetch("https://api.myservice.com/validate", {
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
 
     if (!response.ok) {
-      throw new Error('Invalid API key');
+      throw new Error("Invalid API key");
     }
 
-    ctx.logger.info('Credentials validated successfully');
+    ctx.logger.info("Credentials validated successfully");
     return true;
   },
 
@@ -171,45 +172,45 @@ export default defineHayPlugin((globalCtx) => ({
    * Org runtime initialization - start MCP server
    */
   async onStart(ctx) {
-    ctx.logger.info('Starting My Plugin for org', { orgId: ctx.org.id });
+    ctx.logger.info("Starting My Plugin for org", { orgId: ctx.org.id });
 
-    const apiKey = ctx.config.getOptional<string>('apiKey');
+    const apiKey = ctx.config.getOptional<string>("apiKey");
     if (!apiKey) {
-      ctx.logger.info('Credentials not configured - MCP tools not available');
+      ctx.logger.info("Credentials not configured - MCP tools not available");
       return;
     }
 
     // Connect to external MCP server
     await ctx.mcp.startExternal({
-      id: 'my-plugin-mcp',
-      url: 'https://mcp.myservice.com',
+      id: "my-plugin-mcp",
+      url: "https://mcp.myservice.com",
       authHeaders: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
     });
 
-    ctx.logger.info('My Plugin MCP server connected');
+    ctx.logger.info("My Plugin MCP server connected");
   },
 
   /**
    * Config update handler
    */
   async onConfigUpdate(ctx) {
-    ctx.logger.info('My Plugin config updated');
+    ctx.logger.info("My Plugin config updated");
   },
 
   /**
    * Disable handler
    */
   async onDisable(ctx) {
-    ctx.logger.info('My Plugin disabled for org', { orgId: ctx.org.id });
+    ctx.logger.info("My Plugin disabled for org", { orgId: ctx.org.id });
   },
 
   /**
    * Enable handler
    */
   async onEnable(ctx) {
-    ctx.logger.info('My Plugin enabled');
+    ctx.logger.info("My Plugin enabled");
   },
 }));
 ```
@@ -240,17 +241,30 @@ Plugins use `defineHayPlugin()` factory function:
 
 ```typescript
 export default defineHayPlugin((globalCtx) => ({
-  name: 'Plugin Name',
-  onInitialize(ctx) { /* ... */ },
-  onValidateAuth(ctx) { /* ... */ },
-  onStart(ctx) { /* ... */ },
-  onConfigUpdate(ctx) { /* ... */ },
-  onDisable(ctx) { /* ... */ },
-  onEnable(ctx) { /* ... */ },
+  name: "Plugin Name",
+  onInitialize(ctx) {
+    /* ... */
+  },
+  onValidateAuth(ctx) {
+    /* ... */
+  },
+  onStart(ctx) {
+    /* ... */
+  },
+  onConfigUpdate(ctx) {
+    /* ... */
+  },
+  onDisable(ctx) {
+    /* ... */
+  },
+  onEnable(ctx) {
+    /* ... */
+  },
 }));
 ```
 
 **Two Contexts:**
+
 - `globalCtx`: Global logger, shared across all orgs
 - `ctx`: Per-hook context with org-specific data, config, auth, logger
 
@@ -386,28 +400,28 @@ async onEnable(ctx) {
 ctx.register.config({
   // String field
   apiKey: {
-    type: 'string',
-    label: 'API Key',
-    description: 'Your service API key',
+    type: "string",
+    label: "API Key",
+    description: "Your service API key",
     required: true,
-    encrypted: true,           // Store encrypted in database
-    env: 'MY_SERVICE_API_KEY', // Load from environment variable
+    encrypted: true, // Store encrypted in database
+    env: "MY_SERVICE_API_KEY", // Load from environment variable
   },
 
   // URL field
   baseUrl: {
-    type: 'string',
-    label: 'Base URL',
-    description: 'Service base URL (e.g., https://mystore.com)',
+    type: "string",
+    label: "Base URL",
+    description: "Service base URL (e.g., https://mystore.com)",
     required: true,
     encrypted: false,
   },
 
   // Optional field
   username: {
-    type: 'string',
-    label: 'Username (Optional)',
-    description: 'Username for authentication',
+    type: "string",
+    label: "Username (Optional)",
+    description: "Username for authentication",
     required: false,
     encrypted: false,
   },
@@ -418,18 +432,18 @@ ctx.register.config({
 
 ```typescript
 // Required field (throws if not set)
-const apiKey = ctx.config.get<string>('apiKey');
+const apiKey = ctx.config.get<string>("apiKey");
 
 // Optional field (returns undefined if not set)
-const username = ctx.config.getOptional<string>('username');
+const username = ctx.config.getOptional<string>("username");
 
 // With default value
-const timeout = ctx.config.getOptional<number>('timeout') || 5000;
+const timeout = ctx.config.getOptional<number>("timeout") || 5000;
 
 // Field reference for OAuth
 ctx.register.auth.oauth2({
-  clientId: ctx.config.field('clientId'),
-  clientSecret: ctx.config.field('clientSecret'),
+  clientId: ctx.config.field("clientId"),
+  clientSecret: ctx.config.field("clientSecret"),
 });
 ```
 
@@ -650,8 +664,8 @@ Run MCP server as a child process managed by the plugin:
 
 ```typescript
 // src/my-plugin-mcp-server.ts
-import { spawn, ChildProcess } from 'child_process';
-import { HayLogger } from '@hay/plugin-sdk';
+import { spawn, ChildProcess } from "child_process";
+import { HayLogger } from "@hay/plugin-sdk";
 
 export interface MyMcpServerConfig {
   apiKey: string;
@@ -660,8 +674,8 @@ export interface MyMcpServerConfig {
 }
 
 export class MyMcpServer {
-  name = 'my-service';
-  version = '1.0.0';
+  name = "my-service";
+  version = "1.0.0";
   private process: ChildProcess | null = null;
   private config: MyMcpServerConfig;
 
@@ -673,34 +687,34 @@ export class MyMcpServer {
    * Start MCP server child process
    */
   async start(): Promise<void> {
-    this.config.logger.info('Starting MCP server child process');
+    this.config.logger.info("Starting MCP server child process");
 
-    this.process = spawn('node', ['index.js'], {
-      cwd: './mcp',  // MCP server directory
+    this.process = spawn("node", ["index.js"], {
+      cwd: "./mcp", // MCP server directory
       env: {
         ...process.env,
         API_KEY: this.config.apiKey,
         BASE_URL: this.config.baseUrl,
       },
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     // Handle stdout
-    this.process.stdout?.on('data', (data) => {
-      this.config.logger.debug('MCP stdout:', data.toString());
+    this.process.stdout?.on("data", (data) => {
+      this.config.logger.debug("MCP stdout:", data.toString());
     });
 
     // Handle stderr
-    this.process.stderr?.on('data', (data) => {
-      this.config.logger.error('MCP stderr:', data.toString());
+    this.process.stderr?.on("data", (data) => {
+      this.config.logger.error("MCP stderr:", data.toString());
     });
 
     // Handle process exit
-    this.process.on('exit', (code) => {
+    this.process.on("exit", (code) => {
       this.config.logger.info(`MCP process exited with code ${code}`);
     });
 
-    this.config.logger.info('MCP server started successfully');
+    this.config.logger.info("MCP server started successfully");
   }
 
   /**
@@ -711,18 +725,18 @@ export class MyMcpServer {
       return;
     }
 
-    this.config.logger.info('Stopping MCP server');
+    this.config.logger.info("Stopping MCP server");
 
     return new Promise((resolve) => {
-      this.process!.kill('SIGTERM');
+      this.process!.kill("SIGTERM");
 
       // Force kill after 5 seconds
       const forceKillTimer = setTimeout(() => {
-        this.process!.kill('SIGKILL');
+        this.process!.kill("SIGKILL");
         resolve();
       }, 5000);
 
-      this.process!.on('exit', () => {
+      this.process!.on("exit", () => {
         clearTimeout(forceKillTimer);
         this.process = null;
         resolve();
@@ -736,18 +750,18 @@ export class MyMcpServer {
 
 ```typescript
 // src/index.ts
-import { defineHayPlugin } from '@hay/plugin-sdk';
-import { MyMcpServer } from './my-plugin-mcp-server.js';
+import { defineHayPlugin } from "@hay/plugin-sdk";
+import { MyMcpServer } from "./my-plugin-mcp-server.js";
 
 export default defineHayPlugin((globalCtx) => ({
-  name: 'My Plugin',
+  name: "My Plugin",
 
   async onStart(ctx) {
-    const apiKey = ctx.config.get<string>('apiKey');
-    const baseUrl = ctx.config.get<string>('baseUrl');
+    const apiKey = ctx.config.get<string>("apiKey");
+    const baseUrl = ctx.config.get<string>("baseUrl");
 
     // Start local MCP server
-    await ctx.mcp.startLocal('my-mcp', async (mcpCtx) => {
+    await ctx.mcp.startLocal("my-mcp", async (mcpCtx) => {
       const server = new MyMcpServer({
         apiKey,
         baseUrl,
@@ -758,7 +772,7 @@ export default defineHayPlugin((globalCtx) => ({
       return server;
     });
 
-    ctx.logger.info('Local MCP server started');
+    ctx.logger.info("Local MCP server started");
   },
 }));
 ```
@@ -837,25 +851,28 @@ head -20 dist/index.js
 ```
 
 **Correct output (ES modules):**
+
 ```javascript
-import { defineHayPlugin } from '@hay/plugin-sdk';
-import { MyMcpServer } from './my-mcp-server.js';
+import { defineHayPlugin } from "@hay/plugin-sdk";
+import { MyMcpServer } from "./my-mcp-server.js";
 
 export default defineHayPlugin((globalCtx) => ({
-  name: 'My Plugin',
+  name: "My Plugin",
   // ...
 }));
 ```
 
 **Incorrect output (CommonJS):**
+
 ```javascript
-const plugin_sdk_v2_1 = require("@hay/plugin-sdk");
-exports.default = (0, plugin_sdk_v2_1.defineHayPlugin)((globalCtx) => ({
+const plugin_sdk_1 = require("@hay/plugin-sdk");
+exports.default = (0, plugin_sdk_1.defineHayPlugin)((globalCtx) => ({
   // ...
 }));
 ```
 
 If you see `require`/`exports`, check:
+
 - `package.json` has `"type": "module"`
 - `tsconfig.json` has `"module": "ES2020"` (not `"CommonJS"`)
 
@@ -975,6 +992,7 @@ async onValidateAuth(ctx) {
 **Cause:** `@hay/plugin-sdk` not found in node_modules
 
 **Fix:**
+
 ```bash
 # In plugin directory
 npm install
@@ -988,6 +1006,7 @@ npm install ./plugin-sdk
 **Cause:** TypeScript compiling to CommonJS while package.json declares ES module
 
 **Fix:**
+
 1. Check `package.json` has `"type": "module"`
 2. Check `tsconfig.json` has `"module": "ES2020"` (not `"CommonJS"`)
 3. Rebuild: `npm run build`
@@ -998,6 +1017,7 @@ npm install ./plugin-sdk
 **Cause:** Missing Node.js type definitions
 
 **Fix:**
+
 ```bash
 npm install --save-dev @types/node
 ```
@@ -1005,6 +1025,7 @@ npm install --save-dev @types/node
 ### Plugin Not Loading
 
 **Check:**
+
 1. Plugin built successfully (`dist/` directory exists)
 2. `package.json` has correct `hay-plugin` metadata
 3. Server logs show initialization: `"Initializing My Plugin"`
@@ -1013,6 +1034,7 @@ npm install --save-dev @types/node
 ### MCP Server Not Starting
 
 **Check:**
+
 1. Credentials configured in plugin settings
 2. `onValidateAuth` passed successfully
 3. `onStart` logs show MCP startup
@@ -1022,13 +1044,14 @@ npm install --save-dev @types/node
 ### Child Process Crashes
 
 **Debug:**
+
 ```typescript
-this.process.stderr?.on('data', (data) => {
-  this.config.logger.error('MCP stderr:', data.toString());
+this.process.stderr?.on("data", (data) => {
+  this.config.logger.error("MCP stderr:", data.toString());
 });
 
-this.process.on('exit', (code, signal) => {
-  this.config.logger.error('MCP process exited', { code, signal });
+this.process.on("exit", (code, signal) => {
+  this.config.logger.error("MCP process exited", { code, signal });
 });
 ```
 
@@ -1037,20 +1060,24 @@ this.process.on('exit', (code, signal) => {
 ## Examples by Use Case
 
 ### External MCP Server with API Key
+
 - **Stripe** (`/plugins/core/stripe/src/index.ts`)
 - Single API key, external MCP at `https://mcp.stripe.com`
 
 ### External MCP Server with OAuth2
+
 - **HubSpot** (`/plugins/core/hubspot/src/index.ts`)
 - OAuth2 with multiple scopes, external MCP at `https://mcp.hubspot.com`
 
 ### Local MCP Server (Child Process) with API Key
+
 - **WooCommerce** (`/plugins/core/woocommerce/src/index.ts`)
 - Multiple credentials, local MCP server as child process
 - **Magento** (`/plugins/core/magento/src/index.ts`)
 - API token + base URL, external MCP cloned and run locally
 
 ### In-Process MCP Server
+
 - **Email** (`/plugins/core/email/src/index.ts`)
 - Simple in-process MCP with tool implementations
 
@@ -1084,6 +1111,7 @@ this.process.on('exit', (code, signal) => {
 ## Getting Help
 
 If you encounter issues:
+
 1. Check this guide's troubleshooting section
 2. Review example plugins in `/plugins/core/`
 3. Check server logs for error details

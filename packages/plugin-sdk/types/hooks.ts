@@ -12,7 +12,7 @@ import type {
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
-} from './contexts';
+} from "./contexts";
 
 /**
  * Global initialization hook.
@@ -89,9 +89,7 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  * @see {@link HayAuthValidationContext}
  * @see PLUGIN.md Section 4.3 (lines 225-257)
  */
-export type OnValidateAuthHook = (
-  ctx: HayAuthValidationContext,
-) => Promise<boolean> | boolean;
+export type OnValidateAuthHook = (ctx: HayAuthValidationContext) => Promise<boolean> | boolean;
 
 /**
  * Configuration update hook.
@@ -109,9 +107,7 @@ export type OnValidateAuthHook = (
  * @see {@link HayConfigUpdateContext}
  * @see PLUGIN.md Section 4.4 (lines 259-274)
  */
-export type OnConfigUpdateHook = (
-  ctx: HayConfigUpdateContext,
-) => Promise<void> | void;
+export type OnConfigUpdateHook = (ctx: HayConfigUpdateContext) => Promise<void> | void;
 
 /**
  * Plugin disable/uninstall hook.
@@ -150,7 +146,5 @@ export type OnDisableHook = (ctx: HayDisableContext) => Promise<void> | void;
  * This hook is reserved for future use by Hay Core.
  * Plugin developers can implement it, but it will only be called
  * by the core system, not during normal worker lifecycle.
- *
- * @see CONSTRAINT 4 in PLUGIN_SDK_V2_PLAN.md (line 361)
  */
 export type OnEnableHook = (ctx: HayGlobalContext) => Promise<void> | void;

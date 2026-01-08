@@ -104,7 +104,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = instance.plugin.manifest as HayPluginManifest;
-    // Use metadata for SDK v2, fallback to manifest for legacy
+    // Use metadata for SDK, fallback to manifest for legacy
     const configSchema = (instance.plugin.metadata?.configSchema ||
       manifest.configSchema ||
       {}) as ConfigSchema;
@@ -143,7 +143,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // If config is provided, encrypt sensitive fields
     if (data.config) {
       const manifest = pluginRegistry.manifest as HayPluginManifest;
-      // Use metadata for SDK v2, fallback to manifest for legacy
+      // Use metadata for SDK, fallback to manifest for legacy
       const configSchema = (pluginRegistry.metadata?.configSchema ||
         manifest.configSchema ||
         {}) as ConfigSchema;
@@ -183,7 +183,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = pluginRegistry.manifest as HayPluginManifest;
-    // Use metadata for SDK v2, fallback to manifest for legacy
+    // Use metadata for SDK, fallback to manifest for legacy
     const configSchema = (pluginRegistry.metadata?.configSchema ||
       manifest.configSchema ||
       {}) as ConfigSchema;
@@ -210,7 +210,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   /**
-   * Update auth state for a plugin instance (SDK v2)
+   * Update auth state for a plugin instance
    * Uses .save() to trigger TypeORM transformers for encryption
    */
   async updateAuthState(
@@ -236,7 +236,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   /**
-   * Get auth state for a plugin instance (SDK v2)
+   * Get auth state for a plugin instance
    */
   async getAuthState(
     orgId: string,
@@ -247,7 +247,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   /**
-   * Update org-scoped runtime state (SDK v2)
+   * Update org-scoped runtime state
    */
   async updateRuntimeState(
     instanceId: string,

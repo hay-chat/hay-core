@@ -75,7 +75,7 @@ export class PluginRegistry {
   private uiExtensions: UIExtensionDescriptor[] = [];
 
   /**
-   * Registered UI pages (SDK V2 enhanced system).
+   * Registered UI pages.
    * Array of plugin page descriptors.
    */
   private uiPages: PluginPage[] = [];
@@ -133,7 +133,7 @@ export class PluginRegistry {
   }
 
   /**
-   * Register a UI page (SDK V2 enhanced system).
+   * Register a UI page.
    *
    * @param page - Plugin page descriptor
    */
@@ -184,7 +184,7 @@ export class PluginRegistry {
   }
 
   /**
-   * Get registered UI pages (SDK V2 enhanced system).
+   * Get registered UI pages.
    *
    * @returns Array of plugin page descriptors
    */
