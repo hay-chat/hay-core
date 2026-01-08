@@ -9,7 +9,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import type { HayPluginManifest } from "../types/plugin.types";
-import type { PluginMetadata, PluginMetadataState } from "../types/plugin-sdk-v2.types";
+import type { PluginMetadata, PluginMetadataState } from "../types/plugin-sdk.types";
 import { Organization } from "./organization.entity";
 import { Upload } from "./upload.entity";
 import { User } from "./user.entity";

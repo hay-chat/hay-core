@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import crypto from "crypto";
-import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
+import { getPluginRunnerService } from "./plugin-runner.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
@@ -112,20 +112,20 @@ export class PluginRouteService {
       await pluginInstanceManagerService.updateActivityTimestamp(organizationId, plugin.pluginId);
 
       // Get or start the worker and proxy the request to it
-      const runnerV2 = getPluginRunnerV2Service();
-      const worker = runnerV2.getWorker(organizationId, pluginName);
+      const runner = getPluginRunnerService();
+      const worker = runner.getWorker(organizationId, pluginName);
 
       if (!worker) {
         // Start the worker if not running
-        await runnerV2.startWorker(organizationId, pluginName);
-        const startedWorker = runnerV2.getWorker(organizationId, pluginName);
+        await runner.startWorker(organizationId, pluginName);
+        const startedWorker = runner.getWorker(organizationId, pluginName);
         if (!startedWorker) {
           res.status(500).json({ error: "Failed to start plugin worker" });
           return;
         }
       }
 
-      const workerPort = runnerV2.getWorker(organizationId, pluginName)?.port;
+      const workerPort = runner.getWorker(organizationId, pluginName)?.port;
       if (!workerPort) {
         res.status(500).json({ error: "Worker port not available" });
         return;

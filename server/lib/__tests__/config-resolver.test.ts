@@ -1,5 +1,9 @@
-import { resolveConfigWithEnv, resolveConfigForWorker, maskConfigForLogging } from "../config-resolver";
-import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk-v2.types";
+import {
+  resolveConfigWithEnv,
+  resolveConfigForWorker,
+  maskConfigForLogging,
+} from "../config-resolver";
+import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 
 describe("config-resolver", () => {
   describe("resolveConfigWithEnv", () => {

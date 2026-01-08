@@ -9,7 +9,7 @@
   "workspaces": [
     "dashboard",
     "server",
-    "plugin-sdk-v2",
+    "packages/plugin-sdk",
     "plugins/core/*"
   ],
   "scripts": {
@@ -18,8 +18,8 @@
     "dev:server": "cd server && npm run dev",
     "dev:webchat": "cd webchat && npm run dev",
     "dev:clean": "npm run clean && npm run dev",
-    "build": "npm run build:plugin-sdk-v2 && npm run build:server && npm run build:dashboard",
-    "build:plugin-sdk-v2": "cd plugin-sdk-v2 && npm run build",
+    "build": "npm run build:plugin-sdk && npm run build:server && npm run build:dashboard",
+    "build:plugin-sdk": "cd packages/plugin-sdk && npm run build",
     "build:dashboard": "cd dashboard && npm run build",
     "build:server": "npm run build:webchat &&cd server && npm run build",
     "build:webchat": "cd webchat && npm run build",
@@ -35,12 +35,12 @@
     "lint:fix": "eslint \"server/**/*.{js,ts}\" \"dashboard/**/*.{js,ts,vue}\" --cache --fix",
     "lint:dashboard": "eslint \"dashboard/**/*.{js,ts,vue}\" --cache",
     "lint:server": "eslint \"server/**/*.{js,ts}\" --cache",
-    "typecheck": "npm run typecheck:plugin-sdk-v2 && npm run typecheck:dashboard && npm run typecheck:server",
-    "typecheck:plugin-sdk-v2": "cd plugin-sdk-v2 && npm run typecheck",
+    "typecheck": "npm run typecheck:plugin-sdk && npm run typecheck:dashboard && npm run typecheck:server",
+    "typecheck:plugin-sdk": "cd packages/plugin-sdk && npm run typecheck",
     "typecheck:dashboard": "cd dashboard && npm run typecheck",
     "typecheck:server": "cd server && npm run typecheck",
-    "clean": "npm run clean:plugin-sdk-v2 && npm run clean:dashboard && npm run clean:server",
-    "clean:plugin-sdk-v2": "rm -rf plugin-sdk-v2/dist",
+    "clean": "npm run clean:plugin-sdk && npm run clean:dashboard && npm run clean:server",
+    "clean:plugin-sdk": "rm -rf packages/plugin-sdk/dist",
     "clean:dashboard": "rm -rf dashboard/.nuxt dashboard/dist dashboard/.output",
     "clean:server": "rm -rf server/dist",
     "clean:all": "npm run clean && rm -rf node_modules dashboard/node_modules server/node_modules packages/*/node_modules plugins/*/node_modules",
@@ -65,7 +65,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@hay/plugin-sdk-v2": "file:plugin-sdk-v2",
+    "@hay/plugin-sdk": "file:packages/plugin-sdk",
     "@types/archiver": "^7.0.0"
   }
 }

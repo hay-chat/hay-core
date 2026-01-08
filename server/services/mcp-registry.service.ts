@@ -1,6 +1,6 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { MCPToolDefinition } from "../types/plugin.types";
-import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
+import { getPluginRunnerService } from "./plugin-runner.service";
 
 /**
  * MCP Tool with metadata
@@ -21,7 +21,7 @@ export interface MCPTool extends MCPToolDefinition {
  * Handles tool discovery and routing to appropriate MCP servers via worker HTTP API.
  */
 export class MCPRegistryService {
-  private runnerService = getPluginRunnerV2Service();
+  private runnerService = getPluginRunnerService();
 
   /**
    * Register tools from a plugin's MCP server

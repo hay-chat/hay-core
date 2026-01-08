@@ -45,7 +45,7 @@ async function startServer() {
   // Import services after database initialization to avoid circular dependency issues
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
-  const { getPluginRunnerV2Service } = await import("@server/services/plugin-runner-v2.service");
+  const { getPluginRunnerService } = await import("@server/services/plugin-runner.service");
   const { pluginInstanceManagerService } = await import(
     "@server/services/plugin-instance-manager.service"
   );
@@ -419,7 +419,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await getPluginRunnerV2Service().stopAllWorkers();
+    await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });
 
@@ -428,7 +428,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await getPluginRunnerV2Service().stopAllWorkers();
+    await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });
 }

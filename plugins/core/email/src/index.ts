@@ -7,7 +7,7 @@
  * @see PLUGIN.md for SDK v2 architecture
  */
 
-import { defineHayPlugin } from '@hay/plugin-sdk-v2';
+import { defineHayPlugin } from '@hay/plugin-sdk';
 
 /**
  * MCP Tool Definition

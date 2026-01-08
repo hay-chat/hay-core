@@ -1,13 +1,13 @@
 # Hay Plugin Development Guide
 
-Complete guide for creating plugins for the Hay platform using SDK v2.
+Complete guide for creating plugins for the Hay platform using SDK.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Plugin Architecture](#plugin-architecture)
-- [SDK v2 Lifecycle](#sdk-v2-lifecycle)
+- [SDK Lifecycle](#sdk-v2-lifecycle)
 - [Configuration](#configuration)
 - [Authentication Patterns](#authentication-patterns)
 - [MCP Integration](#mcp-integration)
@@ -27,7 +27,7 @@ Hay plugins extend the platform's functionality using the **Model Context Protoc
 - Handle configuration per organization
 
 **Key Principles:**
-- Plugins use **SDK v2** with factory pattern (`defineHayPlugin`)
+- Plugins use **SDK** with factory pattern (`defineHayPlugin`)
 - Each plugin runs per organization with isolated configuration
 - Plugins can start local MCP servers (child process) or connect to external MCP servers
 - All code must use **ES Modules** (not CommonJS)
@@ -73,7 +73,7 @@ plugins/core/my-plugin/
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
+    "@hay/plugin-sdk": "file:../../../plugin-sdk"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
@@ -111,7 +111,7 @@ plugins/core/my-plugin/
 ### 4. Create Plugin Entry (`src/index.ts`)
 
 ```typescript
-import { defineHayPlugin } from '@hay/plugin-sdk-v2';
+import { defineHayPlugin } from '@hay/plugin-sdk';
 
 export default defineHayPlugin((globalCtx) => ({
   name: 'My Plugin',
@@ -234,7 +234,7 @@ head -20 dist/index.js
 
 ## Plugin Architecture
 
-### SDK v2 Factory Pattern
+### SDK Factory Pattern
 
 Plugins use `defineHayPlugin()` factory function:
 
@@ -256,7 +256,7 @@ export default defineHayPlugin((globalCtx) => ({
 
 ---
 
-## SDK v2 Lifecycle
+## SDK Lifecycle
 
 ### 1. `onInitialize(ctx)` - Global Setup
 
@@ -651,7 +651,7 @@ Run MCP server as a child process managed by the plugin:
 ```typescript
 // src/my-plugin-mcp-server.ts
 import { spawn, ChildProcess } from 'child_process';
-import { HayLogger } from '@hay/plugin-sdk-v2';
+import { HayLogger } from '@hay/plugin-sdk';
 
 export interface MyMcpServerConfig {
   apiKey: string;
@@ -736,7 +736,7 @@ export class MyMcpServer {
 
 ```typescript
 // src/index.ts
-import { defineHayPlugin } from '@hay/plugin-sdk-v2';
+import { defineHayPlugin } from '@hay/plugin-sdk';
 import { MyMcpServer } from './my-plugin-mcp-server.js';
 
 export default defineHayPlugin((globalCtx) => ({
@@ -838,7 +838,7 @@ head -20 dist/index.js
 
 **Correct output (ES modules):**
 ```javascript
-import { defineHayPlugin } from '@hay/plugin-sdk-v2';
+import { defineHayPlugin } from '@hay/plugin-sdk';
 import { MyMcpServer } from './my-mcp-server.js';
 
 export default defineHayPlugin((globalCtx) => ({
@@ -849,7 +849,7 @@ export default defineHayPlugin((globalCtx) => ({
 
 **Incorrect output (CommonJS):**
 ```javascript
-const plugin_sdk_v2_1 = require("@hay/plugin-sdk-v2");
+const plugin_sdk_v2_1 = require("@hay/plugin-sdk");
 exports.default = (0, plugin_sdk_v2_1.defineHayPlugin)((globalCtx) => ({
   // ...
 }));
@@ -972,15 +972,15 @@ async onValidateAuth(ctx) {
 
 ### Error: "No 'exports' main defined in package.json"
 
-**Cause:** `@hay/plugin-sdk-v2` not found in node_modules
+**Cause:** `@hay/plugin-sdk` not found in node_modules
 
 **Fix:**
 ```bash
 # In plugin directory
 npm install
 
-# In root directory (if SDK v2 needs updating)
-npm install ./plugin-sdk-v2
+# In root directory (if SDK needs updating)
+npm install ./plugin-sdk
 ```
 
 ### Error: "exports is not defined in ES module scope"
@@ -1073,7 +1073,7 @@ this.process.on('exit', (code, signal) => {
 
 ## Additional Resources
 
-- **SDK v2 Documentation:** `/plugin-sdk-v2/README.md`
+- **SDK Documentation:** `/plugin-sdk/README.md`
 - **Plugin API Reference:** `/docs/PLUGIN_API.md`
 - **Plugin Quick Reference:** `/docs/PLUGIN_QUICK_REFERENCE.md`
 - **Migration Progress:** `/PLUGIN_SDK_MIGRATION_PROGRESS.md`

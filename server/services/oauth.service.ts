@@ -9,7 +9,7 @@ import type {
   OAuthConnectionStatus,
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
-import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk-v2.types";
+import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { debugLog } from "@server/lib/debug-logger";
 
 export class OAuthService {

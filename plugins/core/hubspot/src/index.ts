@@ -5,7 +5,7 @@
  * tickets, and other CRM objects through HubSpot's Model Context Protocol server.
  */
 
-import { defineHayPlugin } from "@hay/plugin-sdk-v2";
+import { defineHayPlugin } from "@hay/plugin-sdk";
 
 export default defineHayPlugin((globalCtx) => ({
   name: "HubSpot",

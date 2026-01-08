@@ -1037,7 +1037,7 @@ cd server && npm run test -- execution.layer
 **File**: `server/services/plugin-metadata.service.ts`
 
 ```diff
-+ import type { PluginMetadata, ConfigFieldDescriptor } from '@server/types/plugin-sdk-v2.types';
++ import type { PluginMetadata, ConfigFieldDescriptor } from '@server/types/plugin-sdk.types';
 
 - export function validateMetadata(metadata: any): metadata is PluginMetadata {
 + export function validateMetadata(metadata: unknown): metadata is PluginMetadata {
@@ -1205,7 +1205,7 @@ cd server && npm run test -- conversation-utils
 
 ### Step 4.3: Plugin SDK v2 Types (Day 3)
 
-#### File: `server/types/plugin-sdk-v2.types.ts`
+#### File: `server/types/plugin-sdk.types.ts`
 
 ```diff
 + import type { CredentialValue } from '@server/types/plugin-config.types';

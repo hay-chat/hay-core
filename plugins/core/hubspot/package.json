@@ -26,7 +26,7 @@
     "sales"
   ],
   "dependencies": {
-    "@hay/plugin-sdk-v2": "file:../../../plugin-sdk-v2"
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

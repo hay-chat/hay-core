@@ -1,4 +1,4 @@
-import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk-v2.types";
+import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 
 export interface ResolvedConfigField {

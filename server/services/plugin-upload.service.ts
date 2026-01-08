@@ -155,10 +155,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { getPluginRunnerV2Service } = await import("./plugin-runner-v2.service");
-      const runnerV2 = getPluginRunnerV2Service();
-      if (runnerV2.isRunning(req.organizationId, pluginId)) {
-        await runnerV2.stopWorker(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete old ZIP from storage
@@ -235,10 +235,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { getPluginRunnerV2Service } = await import("./plugin-runner-v2.service");
-      const runnerV2 = getPluginRunnerV2Service();
-      if (runnerV2.isRunning(req.organizationId, pluginId)) {
-        await runnerV2.stopWorker(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete plugin instances
