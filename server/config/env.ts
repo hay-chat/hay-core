@@ -2,12 +2,19 @@ import dotenv from "dotenv";
 import path from "path";
 
 // Load environment variables
-// In production, the compiled code is in server/dist/server/config, so we need to go up 4 levels to project root
+// In production, the compiled code is in server/dist/config, so we need to go up 3 levels to project root
 // In development, the source is in server/config, so we need to go up 2 levels to project root
-const envPath = __dirname.includes("dist")
-  ? path.resolve(__dirname, "../../../../.env") // Production: server/dist/server/config -> project root
-  : path.resolve(__dirname, "../../.env"); // Development: server/config -> project root
-dotenv.config({ path: envPath });
+// Try to find .env file up to 4 levels above __dirname
+let envPath: string | null = null;
+for (let i = 1; i <= 4; i++) {
+  const tryPath = path.resolve(__dirname, Array(i).fill("..").join("/"), ".env");
+  if (require("fs").existsSync(tryPath)) {
+    envPath = tryPath;
+    break;
+  }
+}
+// Fallback to .env at project root even if not found, for backward compatibility
+dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env") });
 
 export const config = {
   env: process.env.NODE_ENV || "development",
