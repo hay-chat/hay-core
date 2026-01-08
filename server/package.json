@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
-    "build": "npm run build:plugins && tsc && npm run copy:templates",
+    "build": "npm run build:plugins && tsc && tsc-alias && npm run copy:templates",
     "copy:templates": "cp -r templates dist/",
     "build:plugins": "cd .. && ./scripts/build-plugins.sh",
-    "start": "node -r module-alias/register dist/main.js",
+    "start": "node dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -25,10 +25,6 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts",
     "migration:ensure": "./scripts/check-migrations.sh",
     "migration:check": "tsx scripts/ensure-migrations.ts"
-  },
-  "_moduleAliases": {
-    "@server": "dist",
-    "@plugins": "../plugins"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.932.0",
@@ -96,7 +92,6 @@
     "lucide-vue-next": "^0.294.0",
     "mammoth": "^1.11.0",
     "mjml": "^4.16.1",
-    "module-alias": "^2.2.3",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.6",
@@ -136,7 +131,8 @@
     "word-extractor": "^1.0.4",
     "ws": "^8.14.2",
     "xml2js": "^0.6.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "tsc-alias": "^1.8.16"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2"
