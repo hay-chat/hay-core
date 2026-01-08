@@ -17,6 +17,7 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
+import { vectorStoreService } from "@server/services/vector-store.service";
 
 /**
  * Helper function to count active owners in an organization
@@ -152,14 +153,10 @@ export const organizationsRouter = t.router({
         // Log audit event after transaction completes
         // This ensures the organization exists in the database before creating the audit log
         try {
-          await auditLogService.logOrganizationCreated(
-            ctx.user!.id,
-            result.data.id,
-            {
-              name: result.data.name,
-              slug: result.data.slug,
-            },
-          );
+          await auditLogService.logOrganizationCreated(ctx.user!.id, result.data.id, {
+            name: result.data.name,
+            slug: result.data.slug,
+          });
         } catch (error) {
           console.error("Failed to create audit log:", error);
         }
@@ -188,10 +185,8 @@ export const organizationsRouter = t.router({
             ...DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
             ...organization.settings.confidenceGuardrail,
             // Explicitly ensure boolean values default to true if null/undefined
-            enableRecheck:
-              organization.settings.confidenceGuardrail.enableRecheck ?? true,
-            enableEscalation:
-              organization.settings.confidenceGuardrail.enableEscalation ?? true,
+            enableRecheck: organization.settings.confidenceGuardrail.enableRecheck ?? true,
+            enableEscalation: organization.settings.confidenceGuardrail.enableEscalation ?? true,
           }
         : DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG;
 
@@ -645,6 +640,100 @@ export const organizationsRouter = t.router({
       };
     },
   ),
+
+  // ============================================================================
+  // ORGANIZATION DELETION
+  // ============================================================================
+
+  /**
+   * Delete the current organization and all associated data
+   * Requires: owner role only
+   */
+  delete: authenticatedProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization ID required",
+      });
+    }
+
+    // Verify user is an owner of this organization
+    const userOrgRepository = AppDataSource.getRepository(UserOrganization);
+    const userOrg = await userOrgRepository.findOne({
+      where: {
+        userId: ctx.user!.id,
+        organizationId: ctx.organizationId,
+        isActive: true,
+      },
+    });
+
+    if (!userOrg || userOrg.role !== "owner") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only organization owners can delete the organization",
+      });
+    }
+
+    // Get organization before deletion for logging
+    const organization = await organizationService.findOne(ctx.organizationId);
+    if (!organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
+    const orgName = organization.name;
+    const orgId = organization.id;
+
+    // Use transaction to ensure all related data is deleted
+    await AppDataSource.transaction(async (manager) => {
+      // Delete organization logo from storage if exists
+      if (organization.logoUploadId) {
+        try {
+          const storageService = new StorageService();
+          await storageService.delete(organization.logoUploadId);
+        } catch (error) {
+          console.error("Failed to delete organization logo:", error);
+          // Continue with deletion even if logo deletion fails
+        }
+      }
+
+      // Delete embeddings from vector store within the transaction
+      await vectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
+
+      // Delete organization - CASCADE will handle most related entities:
+      // - Agents (onDelete: CASCADE)
+      // - Conversations (onDelete: CASCADE) -> Messages (onDelete: CASCADE)
+      // - Documents (onDelete: CASCADE) -> Embeddings (onDelete: CASCADE)
+      // - Customers (onDelete: CASCADE)
+      // - Playbooks (onDelete: CASCADE)
+      // - Sources (onDelete: CASCADE)
+      // - WebchatSettings (onDelete: CASCADE)
+      // - UserOrganizations (onDelete: CASCADE)
+      // - OrganizationInvitations (onDelete: CASCADE)
+      // - ApiKeys (onDelete: CASCADE)
+      // - Jobs (onDelete: CASCADE)
+      // - Uploads (onDelete: CASCADE)
+      // - PluginInstances (onDelete: CASCADE)
+      // - ScheduledJobs (onDelete: CASCADE)
+      // - AuditLogs (onDelete: CASCADE)
+      // - PrivacyRequests (onDelete: CASCADE)
+
+      const orgRepository = manager.getRepository(Organization);
+      await orgRepository.delete({ id: orgId });
+    });
+
+    // Log deletion event (after transaction completes)
+    // Note: Can't log to audit_logs since the org is deleted
+    // TODO: Log to external audit service for compliance tracking
+    console.log(`Organization deleted: ${orgName} (${orgId}) by user ${ctx.user!.id}`);
+
+    return {
+      success: true,
+      message: "Organization deleted successfully",
+    };
+  }),
 
   // ============================================================================
   // ORGANIZATION SWITCHING
