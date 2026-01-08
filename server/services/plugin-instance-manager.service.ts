@@ -1,6 +1,6 @@
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
-import { processManagerService } from "./process-manager.service";
+import { getPluginRunnerService } from "./plugin-runner.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { debugLog } from "@server/lib/debug-logger";
 
@@ -51,7 +51,8 @@ export class PluginInstanceManagerService {
     }
 
     // Check if already running
-    if (processManagerService.isRunning(organizationId, pluginId)) {
+    const runner = getPluginRunnerService();
+    if (runner.isRunning(organizationId, pluginId)) {
       await this.updateActivityTimestamp(organizationId, pluginId);
       return;
     }
@@ -80,13 +81,28 @@ export class PluginInstanceManagerService {
    */
   private async startInstance(organizationId: string, pluginId: string): Promise<void> {
     try {
-      debugLog("plugin-manager", `Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
+      debugLog(
+        "plugin-manager",
+        `Starting plugin ${pluginId} for organization ${organizationId} on-demand`,
+      );
 
-      await processManagerService.startPlugin(organizationId, pluginId);
+      // Get plugin registry
+      const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+      if (!plugin) {
+        throw new Error(`Plugin ${pluginId} not found in registry`);
+      }
+
+      // Start using SDK runner service
+      const runner = getPluginRunnerService();
+      await runner.startWorker(organizationId, pluginId);
+
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
-      debugLog("plugin-manager", `Failed to start plugin ${pluginId} for org ${organizationId}`, { level: "error", data: error });
+      debugLog("plugin-manager", `Failed to start plugin ${pluginId} for org ${organizationId}`, {
+        level: "error",
+        data: error,
+      });
 
       // Extract meaningful error message
       let errorMessage = "Failed to start plugin";
@@ -129,6 +145,7 @@ export class PluginInstanceManagerService {
 
     // Get all running instances
     const runningInstances = await pluginInstanceRepository.findRunningInstances();
+    const runner = getPluginRunnerService();
 
     for (const instance of runningInstances) {
       const instanceKey = this.getInstanceKey(instance.organizationId, instance.plugin.pluginId);
@@ -138,22 +155,22 @@ export class PluginInstanceManagerService {
       const lastActivity = memoryActivity || instance.lastActivityAt;
 
       if (!lastActivity || lastActivity < inactiveThreshold) {
-        // Check if instance is actually running in process manager
-        if (processManagerService.isRunning(instance.organizationId, instance.plugin.pluginId)) {
+        // Check if instance is actually running
+        if (runner.isRunning(instance.organizationId, instance.plugin.pluginId)) {
           debugLog(
             "plugin-manager",
             `Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
           try {
-            await processManagerService.stopPlugin(
-              instance.organizationId,
-              instance.plugin.pluginId,
-            );
+            await runner.stopWorker(instance.organizationId, instance.plugin.pluginId);
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
-            debugLog("plugin-manager", `Error stopping inactive instance ${instanceKey}`, { level: "error", data: error });
+            debugLog("plugin-manager", `Error stopping inactive instance ${instanceKey}`, {
+              level: "error",
+              data: error,
+            });
           }
         }
       }
@@ -216,8 +233,9 @@ export class PluginInstanceManagerService {
    * Update pool statistics for a plugin
    */
   private updatePoolStats(pluginId: string): void {
-    const processes = processManagerService.getRunningProcesses();
-    const runningCount = processes.filter((p) => p.pluginName === pluginId).length;
+    const runner = getPluginRunnerService();
+    const allWorkers = runner.getAllWorkers();
+    const runningCount = allWorkers.filter((w) => w.pluginId === pluginId).length;
 
     const stats = this.getPoolStats(pluginId);
     stats.runningCount = runningCount;
@@ -266,10 +284,11 @@ export class PluginInstanceManagerService {
    */
   async stopAllForOrganization(organizationId: string): Promise<void> {
     const instances = await pluginInstanceRepository.findByOrganization(organizationId);
+    const runner = getPluginRunnerService();
 
     for (const instance of instances) {
-      if (processManagerService.isRunning(organizationId, instance.plugin.pluginId)) {
-        await processManagerService.stopPlugin(organizationId, instance.plugin.pluginId);
+      if (runner.isRunning(organizationId, instance.plugin.pluginId)) {
+        await runner.stopWorker(organizationId, instance.plugin.pluginId);
 
         const instanceKey = this.getInstanceKey(organizationId, instance.plugin.pluginId);
         this.instanceActivity.delete(instanceKey);

@@ -10,13 +10,17 @@ interface Tokens {
 }
 
 export const useAuthStore = defineStore("auth", {
-  state: () => ({
-    tokens: null as Tokens | null,
-    isAuthenticated: false,
-    isInitialized: false,
-    lastActivity: Date.now(),
-    isLoading: false,
-  }),
+  state: () => {
+    const initialState = {
+      tokens: null as Tokens | null,
+      isAuthenticated: false,
+      isInitialized: false,
+      lastActivity: Date.now(),
+      isLoading: false,
+    };
+    console.log('[Auth Store] Initial state:', { hasTokens: !!initialState.tokens });
+    return initialState;
+  },
   getters: {
     isSessionTimedOut: (state) => {
       const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -54,6 +58,11 @@ export const useAuthStore = defineStore("auth", {
           refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
+        console.log('[Auth Store] Tokens set after login:', {
+          hasAccessToken: !!this.tokens.accessToken,
+          hasRefreshToken: !!this.tokens.refreshToken,
+          expiresAt: new Date(this.tokens.expiresAt).toISOString()
+        });
         const userStore = useUserStore();
         userStore.setUser(result.user as User);
         this.isAuthenticated = true;
@@ -169,6 +178,50 @@ export const useAuthStore = defineStore("auth", {
         // If refresh fails, clear auth state
         console.error("[Auth] Failed to refresh token:", error);
         throw error;
+      }
+    },
+
+    /**
+     * Login using tokens directly (useful for automated testing and direct auth links)
+     * This mimics the regular login flow but with pre-existing tokens
+     */
+    async loginWithTokens(data: { accessToken: string; refreshToken: string; expiresIn: number }) {
+      this.isLoading = true;
+      try {
+        // Set tokens first
+        this.tokens = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: Date.now() + data.expiresIn * 1000,
+        };
+
+        // For URL token auth, we don't have organization context yet
+        // The backend will use the user's default/first organization for auth.me
+        // We'll get the full organization list from the me response
+
+        // Fetch user data to validate and complete the login
+        // Note: This call will work without x-organization-id header
+        // because auth.me uses the user's first organization by default
+        const user = await HayAuthApi.auth.me.query();
+
+        // Initialize user store and set user data
+        const userStore = useUserStore();
+        userStore.setUser(user as User);
+
+        this.isAuthenticated = true;
+        this.isInitialized = true;
+        this.updateActivity();
+
+        console.log("[Auth] Successfully logged in with tokens");
+      } catch (error) {
+        // If validation fails, clear the tokens
+        console.error("[Auth] Token validation failed:", error);
+        this.tokens = null;
+        this.isAuthenticated = false;
+        this.isInitialized = true;
+        throw error;
+      } finally {
+        this.isLoading = false;
       }
     },
   },

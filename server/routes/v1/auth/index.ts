@@ -12,7 +12,7 @@ import {
   generateSessionId,
 } from "@server/lib/auth/utils/hashing";
 import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
-import { protectedProcedure, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
+import { protectedProcedure, protectedProcedureWithoutOrg, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
@@ -537,7 +537,7 @@ export const authRouter = t.router({
     }),
 
   // Protected endpoints
-  me: protectedProcedure
+  me: protectedProcedureWithoutOrg
     .output(z.object({
       id: z.string(),
       email: z.string(),

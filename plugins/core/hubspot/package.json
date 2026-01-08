@@ -1,15 +1,35 @@
 {
-  "name": "hay-plugin-hubspot",
-  "version": "1.0.0",
+  "name": "@hay/plugin-hubspot",
+  "version": "2.0.0",
   "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
+  "author": "Hay",
+  "license": "MIT",
+  "type": "module",
   "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "HubSpot",
+    "category": "integration",
+    "capabilities": ["mcp", "auth"],
+    "env": ["HUBSPOT_CLIENT_ID", "HUBSPOT_CLIENT_SECRET"]
+  },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "start": "node dist/index.js",
+    "dev": "npm run build && node dist/index.js"
   },
-  "dependencies": {},
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "hubspot",
+    "crm",
+    "sales"
+  ],
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }

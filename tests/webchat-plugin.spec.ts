@@ -14,21 +14,8 @@ test.describe("Webchat Plugin Page", () => {
       console.log(`PAGE ERROR: ${error.message}`);
     });
 
-    // Navigate to login page
-    await page.goto("http://localhost:3000/login");
-
-    // Fill in login credentials
-    await page.fill('input[type="email"]', "");
-    await page.fill('input[type="password"]', "");
-
-    // Click login button
-    await page.click('button[type="submit"]');
-
-    // Wait for navigation after login
-    await page.waitForURL(/http:\/\/localhost:3000\/(?!login)/, { timeout: 10000 });
-
-    // Navigate to webchat plugin page
-    await page.goto("http://localhost:3000/integrations/plugins/hay-plugin-webchat");
+    // Auth is already loaded from storage state - navigate directly to webchat plugin page
+    await page.goto("/integrations/plugins/hay-plugin-webchat");
 
     // Wait for page to load
     await page.waitForLoadState("networkidle");

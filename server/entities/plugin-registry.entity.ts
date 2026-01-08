@@ -9,15 +9,23 @@ import {
   JoinColumn,
 } from "typeorm";
 import type { HayPluginManifest } from "../types/plugin.types";
+import type { PluginMetadata, PluginMetadataState } from "../types/plugin-sdk.types";
 import { Organization } from "./organization.entity";
 import { Upload } from "./upload.entity";
 import { User } from "./user.entity";
+
+export enum PluginStatus {
+  AVAILABLE = "available",
+  NOT_FOUND = "not_found",
+  DISABLED = "disabled",
+}
 
 @Entity("plugin_registry")
 @Index(["pluginId"], { unique: true })
 @Index(["sourceType"])
 @Index(["organizationId"])
 @Index(["organizationId", "sourceType"])
+@Index(["status"])
 export class PluginRegistry {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -60,6 +68,24 @@ export class PluginRegistry {
 
   @Column({ type: "integer", default: 10 })
   maxConcurrentInstances!: number;
+
+  // Plugin-global metadata cache (from /metadata endpoint)
+  @Column({ type: "jsonb", nullable: true })
+  metadata?: PluginMetadata;
+
+  @Column({ type: "timestamptz", nullable: true })
+  metadataFetchedAt?: Date;
+
+  // Plugin-global metadata state (not org-specific)
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: "missing",
+  })
+  metadataState!: PluginMetadataState;
+
+  @Column({ type: "varchar", length: 50, default: PluginStatus.AVAILABLE })
+  status!: PluginStatus;
 
   // Custom plugin fields
   @Column({ type: "varchar", length: 50, default: "core" })

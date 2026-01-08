@@ -1,56 +1,63 @@
 #!/bin/bash
 
-echo "🔨 Building plugins..."
+echo "Building plugins..."
 
-# Build base plugin
-echo "📦 Building base plugin..."
-cd plugins/base && npm run build && cd ../..
-
-# Build plugins that have manifests with build commands
-for plugin_dir in plugins/*/; do
+# Build plugins that have hay-plugin section in package.json
+for plugin_dir in plugins/core/*/; do
   plugin_name=$(basename "$plugin_dir")
-  manifest_file="${plugin_dir}manifest.json"
+  package_file="${plugin_dir}package.json"
 
-  # Skip if no manifest exists
-  if [ ! -f "$manifest_file" ]; then
+  # Skip if no package.json exists
+  if [ ! -f "$package_file" ]; then
     continue
   fi
 
-  # Extract install and build commands from manifest using node
-  install_cmd=$(node -e "
+  # Check if package.json has hay-plugin section
+  has_hay_plugin=$(node -e "
     const fs = require('fs');
-    const manifest = JSON.parse(fs.readFileSync('$manifest_file', 'utf8'));
-    console.log(manifest.capabilities?.mcp?.installCommand || '');
+    const pkg = JSON.parse(fs.readFileSync('$package_file', 'utf8'));
+    console.log(pkg['hay-plugin'] ? 'true' : 'false');
   ")
 
-  build_cmd=$(node -e "
-    const fs = require('fs');
-    const manifest = JSON.parse(fs.readFileSync('$manifest_file', 'utf8'));
-    console.log(manifest.capabilities?.mcp?.buildCommand || '');
-  ")
-
-  # Skip if no build command defined
-  if [ -z "$build_cmd" ]; then
+  # Skip if no hay-plugin section
+  if [ "$has_hay_plugin" != "true" ]; then
     continue
   fi
 
-  echo "📦 Building plugin: $plugin_name..."
+  # Check if build script exists
+  has_build=$(node -e "
+    const fs = require('fs');
+    const pkg = JSON.parse(fs.readFileSync('$package_file', 'utf8'));
+    console.log(pkg.scripts?.build ? 'true' : 'false');
+  ")
 
-  # Execute install command if defined
-  if [ -n "$install_cmd" ]; then
-    if ! (cd "$plugin_dir" && eval "$install_cmd" 2>&1); then
-      echo "⚠️  Install failed for $plugin_name, skipping"
+  # Skip if no build script
+  if [ "$has_build" != "true" ]; then
+    echo "Skipping $plugin_name (no build script)"
+    continue
+  fi
+
+  echo "Building plugin: $plugin_name..."
+
+  # Install dependencies if node_modules doesn't exist
+  if [ ! -d "${plugin_dir}node_modules" ]; then
+    if ! (cd "$plugin_dir" && npm install 2>&1); then
+      echo "  Install failed for $plugin_name, skipping"
       continue
     fi
   fi
 
-  # Execute build command
-  if ! (cd "$plugin_dir" && eval "$build_cmd" 2>&1); then
-    echo "⚠️  Build failed for $plugin_name, skipping"
+  # Run build
+  if ! (cd "$plugin_dir" && npm run build 2>&1); then
+    echo "  Build failed for $plugin_name, skipping"
     continue
   fi
 
-  echo "✅ Built $plugin_name"
+  echo "  Built $plugin_name"
 done
 
-echo "✅ All plugins built successfully"
+echo ""
+echo "All plugins built successfully"
+echo ""
+echo "Plugin UI assets are served directly from plugins/ directory"
+echo "No copying needed - changes are reflected immediately after rebuild"
