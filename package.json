@@ -51,6 +51,7 @@
     "migration:run": "cd server && npm run migration:run",
     "migration:revert": "cd server && npm run migration:revert",
     "migration:show": "cd server && npm run migration:show",
+    "plugins:cleanup": "tsx scripts/cleanup-missing-plugins.ts",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
     "env:local": "./scripts/switch-env.sh local",
     "env:cloud": "./scripts/switch-env.sh cloud",
