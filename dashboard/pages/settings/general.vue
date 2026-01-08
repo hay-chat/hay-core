@@ -14,6 +14,13 @@
       </div>
     </template>
 
+    <!-- Delete Organization Dialog -->
+    <DeleteOrganizationDialog
+      v-model:open="showDeleteDialog"
+      :organization-name="settings.organizationName"
+      @deleted="onOrganizationDeleted"
+    />
+
     <!-- Organization Settings -->
     <Card>
       <CardHeader>
@@ -518,6 +525,27 @@
         </div>
       </CardContent>
     </Card> -->
+
+    <!-- Danger Zone - Only visible to owners -->
+    <Card v-if="isOwner" class="border-destructive">
+      <CardHeader>
+        <CardTitle class="text-destructive">Danger Zone</CardTitle>
+        <CardDescription>Irreversible and destructive actions</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-medium">Delete organization</p>
+            <p class="text-sm text-muted-foreground">
+              Once you delete an organization, there is no going back. Please be certain.
+            </p>
+          </div>
+          <Button variant="destructive" @click="showDeleteDialog = true">
+            Delete organization
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   </Page>
 </template>
 
@@ -537,6 +565,7 @@ const logoUpload = useFileUpload({
 });
 
 const organizationLogo = ref<string | null>(null);
+const showDeleteDialog = ref(false);
 
 // Import types for proper typing
 type ConfidenceGuardrailSettings = {
@@ -652,6 +681,11 @@ const agentOptions = computed(() => {
     label: agent.name,
     value: agent.id,
   }));
+});
+
+const isOwner = computed(() => {
+  const userStore = useUserStore();
+  return userStore.isOwner;
 });
 
 // Methods
@@ -920,6 +954,11 @@ const testWebhook = async () => {
 const viewWebhookLogs = () => {
   // TODO: Navigate to webhook logs page
   console.log("View webhook logs");
+};
+
+const onOrganizationDeleted = () => {
+  // Dialog handles the redirect/logout logic
+  showDeleteDialog.value = false;
 };
 
 // Lifecycle
