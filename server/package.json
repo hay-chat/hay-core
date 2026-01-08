@@ -72,7 +72,6 @@
     "@vee-validate/zod": "^4.12.4",
     "@vueuse/nuxt": "^10.5.0",
     "adm-zip": "^0.5.16",
-    "ajv": "^8.17.1",
     "archiver": "^7.0.1",
     "argon2": "^0.31.2",
     "axios": "^1.11.0",
