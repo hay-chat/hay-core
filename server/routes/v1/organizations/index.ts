@@ -717,7 +717,7 @@ export const organizationsRouter = t.router({
       // - PrivacyRequests (onDelete: CASCADE)
 
       const orgRepository = manager.getRepository(Organization);
-      await orgRepository.delete({ id: ctx.organizationId });
+      await orgRepository.delete({ id: orgId });
     });
 
     // Log deletion event (after transaction completes)

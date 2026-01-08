@@ -527,13 +527,13 @@
     </Card> -->
 
     <!-- Danger Zone - Only visible to owners -->
-    <Card v-if="isOwner" class="border-destructive">
+    <Card v-if="isOwner" class="!border-destructive">
       <CardHeader>
         <CardTitle class="text-destructive">Danger Zone</CardTitle>
         <CardDescription>Irreversible and destructive actions</CardDescription>
       </CardHeader>
       <CardContent>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between border p-4 rounded-lg">
           <div>
             <p class="font-medium">Delete organization</p>
             <p class="text-sm text-muted-foreground">
