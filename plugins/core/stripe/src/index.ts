@@ -7,7 +7,7 @@
  * Supports API Key authentication.
  */
 
-import { defineHayPlugin } from "@hay/plugin-sdk-v2";
+import { defineHayPlugin } from "@hay/plugin-sdk";
 
 export default defineHayPlugin((globalCtx) => ({
   name: "Stripe",

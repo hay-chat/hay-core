@@ -1,11 +1,11 @@
 /**
  * Plugin Metadata Service
  *
- * Handles fetching and validation of plugin metadata from SDK v2 workers.
+ * Handles fetching and validation of plugin metadata from SDK workers.
  * Implements retry logic with AbortController-based timeouts.
  */
 
-import type { PluginMetadata } from "../types/plugin-sdk-v2.types";
+import type { PluginMetadata } from "../types/plugin-sdk.types";
 
 /**
  * Validate plugin metadata structure
@@ -106,7 +106,9 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
           throw new Error("Local MCP server must have a string serverId");
         }
         if (!["available", "unavailable"].includes(server.status)) {
-          throw new Error(`Local MCP server "${server.serverId}" has invalid status: ${server.status}`);
+          throw new Error(
+            `Local MCP server "${server.serverId}" has invalid status: ${server.status}`,
+          );
         }
       }
     }
@@ -121,7 +123,9 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
           throw new Error("External MCP server must have a string serverId");
         }
         if (!["available", "unavailable"].includes(server.status)) {
-          throw new Error(`External MCP server "${server.serverId}" has invalid status: ${server.status}`);
+          throw new Error(
+            `External MCP server "${server.serverId}" has invalid status: ${server.status}`,
+          );
         }
       }
     }
@@ -140,7 +144,7 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
  */
 export async function fetchMetadataFromWorker(
   port: number,
-  pluginId: string
+  pluginId: string,
 ): Promise<PluginMetadata> {
   const maxRetries = 3;
   const timeoutMs = 5000;
@@ -152,7 +156,9 @@ export async function fetchMetadataFromWorker(
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-      console.log(`[Metadata] Fetching metadata for ${pluginId} (attempt ${attempt}/${maxRetries}) on port ${port}`);
+      console.log(
+        `[Metadata] Fetching metadata for ${pluginId} (attempt ${attempt}/${maxRetries}) on port ${port}`,
+      );
 
       const response = await fetch(`http://localhost:${port}/metadata`, {
         signal: abortController.signal,
@@ -179,7 +185,9 @@ export async function fetchMetadataFromWorker(
       if (error instanceof Error && error.name === "AbortError") {
         console.warn(`[Metadata] Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`);
       } else {
-        console.warn(`[Metadata] Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[Metadata] Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       // Exponential backoff between retries
@@ -192,6 +200,6 @@ export async function fetchMetadataFromWorker(
 
   // All retries failed
   throw new Error(
-    `Failed to fetch metadata after ${maxRetries} attempts: ${lastError?.message || "Unknown error"}`
+    `Failed to fetch metadata after ${maxRetries} attempts: ${lastError?.message || "Unknown error"}`,
   );
 }

@@ -2,7 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { PluginRegistry } from "./plugin-registry.entity";
 import { Organization } from "./organization.entity";
-import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk-v2.types";
+import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk.types";
 import { AuthStateEncryptedTransformer } from "../lib/auth/utils/encryption";
 
 @Entity("plugin_instances")

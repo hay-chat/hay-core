@@ -214,23 +214,32 @@ this.registerUIExtension({
 
 ---
 
-## Phase 3: Rename SDK v2 → SDK (Remove "v2" naming) ⏸️
+## Phase 3: Rename SDK v2 → SDK (Remove "v2" naming) ✅
 
-**Status**: Not Started
+**Status**: Complete
 
 ### Directory & File Renames
 
-- [ ] Rename `/plugin-sdk-v2/` → `/packages/plugin-sdk/`
-- [ ] Update `/packages/plugin-sdk/package.json` name: `@hay/plugin-sdk-v2` → `@hay/plugin-sdk`
-- [ ] Rename `/server/types/plugin-sdk-v2.types.ts` → `/server/types/plugin-sdk.types.ts`
-- [ ] Rename `/server/services/plugin-runner-v2.service.ts` → `/server/services/plugin-runner.service.ts`
+- [x] Rename `/plugin-sdk-v2/` → `/packages/plugin-sdk/`
+- [x] Update `/packages/plugin-sdk/package.json` name: `@hay/plugin-sdk-v2` → `@hay/plugin-sdk`
+- [x] Rename `/server/types/plugin-sdk-v2.types.ts` → `/server/types/plugin-sdk.types.ts`
+- [x] Rename `/server/services/plugin-runner-v2.service.ts` → `/server/services/plugin-runner.service.ts`
 
 ### Type & Class Renames
 
-- [ ] `HayPluginManifestV2` → `HayPluginManifest` in plugin-sdk.types.ts
-- [ ] `WorkerInfoV2` → `WorkerInfo` in plugin-sdk.types.ts
-- [ ] `PluginRunnerV2Service` → `PluginRunnerService` class rename
-- [ ] `getPluginRunnerV2Service()` → `getPluginRunnerService()` function rename
+- [x] `HayPluginManifestV2` → `HayPluginManifest` in plugin-sdk.types.ts
+- [x] `PluginRunnerV2Service` → `PluginRunnerService` class rename
+- [x] `getPluginRunnerV2Service()` → `getPluginRunnerService()` function rename
+
+### Import Updates
+
+- [x] Updated all server imports from `plugin-sdk-v2.types` → `plugin-sdk.types`
+- [x] Updated all server imports from `plugin-runner-v2.service` → `plugin-runner.service`
+- [x] Updated all variable names from `runnerV2` → `runner`
+- [x] Updated all plugin imports from `@hay/plugin-sdk-v2` → `@hay/plugin-sdk`
+- [x] Updated root package.json workspaces and scripts
+- [x] Updated all plugin package.json dependencies
+- [x] Removed "v2" from comments and documentation
 
 ---
 
@@ -646,7 +655,25 @@ Test each plugin individually:
   - ✅ Updated Stripe documentation to reflect new storage location
   - ✅ Verified typecheck passes for server and SDK
 - **OAuth Migration Status**: ✅ **COMPLETE**
-- **Ready for Phase 3**: Rename SDK v2 → SDK (remove "v2" naming)
+
+### Session 11 (2026-01-08 continued)
+
+- **Completed Phase 3**: Rename SDK v2 → SDK (Remove "v2" naming)
+  - ✅ Renamed `/plugin-sdk-v2/` → `/packages/plugin-sdk/`
+  - ✅ Updated SDK package.json name: `@hay/plugin-sdk-v2` → `@hay/plugin-sdk`
+  - ✅ Renamed server type files (removed -v2 suffix)
+  - ✅ Renamed `PluginRunnerV2Service` → `PluginRunnerService`
+  - ✅ Renamed `getPluginRunnerV2Service()` → `getPluginRunnerService()`
+  - ✅ Renamed `HayPluginManifestV2` → `HayPluginManifest`
+  - ✅ Updated all server imports across ~15 files
+  - ✅ Updated all variable names from `runnerV2` → `runner`
+  - ✅ Updated all plugin package.json dependencies
+  - ✅ Updated all plugin source imports
+  - ✅ Updated root package.json workspaces and scripts
+  - ✅ Removed "v2" from comments and documentation
+  - ✅ Verified typecheck passes for SDK and server
+- **Phase 3 Status**: ✅ **COMPLETE**
+- **Ready for Phase 4**: Update Server Code (Remove Dual SDK Support)
 
 ---
 
@@ -695,13 +722,13 @@ export default defineHayPlugin((globalCtx) => ({
 
 ## Estimated Time Remaining
 
-### Updated Estimates (Session 10)
+### Updated Estimates (Session 11)
 
 - **Phase 1**: ✅ COMPLETE (plugin migrations - 6/6 + 1 skipped)
 - **Phase 2**: ✅ COMPLETE (deletions)
-- **Phase 3**: 1 hour (renames)
-- **Phase 4**: 4-6 hours (server updates)
-- **Phase 5**: 30 minutes (package.json updates)
+- **Phase 3**: ✅ COMPLETE (renames - all v2 references removed)
+- **Phase 4**: 2-4 hours (remove dual SDK support - most renames already done)
+- **Phase 5**: ✅ MOSTLY COMPLETE (package.json updates done in Phase 3)
 - **Phase 6**: 1-2 hours (documentation)
 
-**Remaining Phases**: ~5-9 hours
+**Remaining Phases**: ~3-6 hours

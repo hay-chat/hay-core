@@ -1,10 +1,10 @@
 import type { MCPClient, MCPTool, MCPCallResult } from "./mcp-client.interface";
-import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
+import { getPluginRunnerService } from "./plugin-runner.service";
 import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * Local HTTP MCP Client
- * Communicates with local SDK v2 plugin workers via HTTP
+ * Communicates with local SDK plugin workers via HTTP
  */
 export class LocalHTTPMCPClient implements MCPClient {
   private organizationId: string;
@@ -20,16 +20,16 @@ export class LocalHTTPMCPClient implements MCPClient {
    * Ensure worker is running and get base URL
    */
   private async ensureWorkerRunning(): Promise<string> {
-    const runnerV2 = getPluginRunnerV2Service();
+    const runner = getPluginRunnerService();
 
     // Check if worker is running
-    if (!runnerV2.isRunning(this.organizationId, this.pluginId)) {
-      debugLog("local-http-mcp", `Starting SDK v2 worker for ${this.pluginId}`);
-      await runnerV2.startWorker(this.organizationId, this.pluginId);
+    if (!runner.isRunning(this.organizationId, this.pluginId)) {
+      debugLog("local-http-mcp", `Starting SDK worker for ${this.pluginId}`);
+      await runner.startWorker(this.organizationId, this.pluginId);
     }
 
     // Get worker info
-    const worker = runnerV2.getWorker(this.organizationId, this.pluginId);
+    const worker = runner.getWorker(this.organizationId, this.pluginId);
     if (!worker) {
       throw new Error(`Failed to get worker info for ${this.pluginId}`);
     }
@@ -38,7 +38,7 @@ export class LocalHTTPMCPClient implements MCPClient {
   }
 
   /**
-   * List available tools from the SDK v2 worker
+   * List available tools from the SDK worker
    */
   async listTools(): Promise<MCPTool[]> {
     const baseUrl = await this.ensureWorkerRunning();
@@ -56,7 +56,7 @@ export class LocalHTTPMCPClient implements MCPClient {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json() as { tools: any[] };
+      const data = (await response.json()) as { tools: any[] };
       const tools: MCPTool[] = (data.tools || []).map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -75,7 +75,7 @@ export class LocalHTTPMCPClient implements MCPClient {
   }
 
   /**
-   * Call a tool on the SDK v2 worker
+   * Call a tool on the SDK worker
    */
   async callTool(toolName: string, args: Record<string, unknown>): Promise<MCPCallResult> {
     const baseUrl = await this.ensureWorkerRunning();
@@ -136,17 +136,17 @@ export class LocalHTTPMCPClient implements MCPClient {
    * Check if worker is connected/ready
    */
   isConnected(): boolean {
-    const runnerV2 = getPluginRunnerV2Service();
-    return runnerV2.isRunning(this.organizationId, this.pluginId);
+    const runner = getPluginRunnerService();
+    return runner.isRunning(this.organizationId, this.pluginId);
   }
 
   /**
    * Close/disconnect (stop the worker)
    */
   async close(): Promise<void> {
-    const runnerV2 = getPluginRunnerV2Service();
-    if (runnerV2.isRunning(this.organizationId, this.pluginId)) {
-      await runnerV2.stopWorker(this.organizationId, this.pluginId);
+    const runner = getPluginRunnerService();
+    if (runner.isRunning(this.organizationId, this.pluginId)) {
+      await runner.stopWorker(this.organizationId, this.pluginId);
     }
   }
 }

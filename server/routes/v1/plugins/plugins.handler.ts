@@ -5,16 +5,13 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
-import { getPluginRunnerV2Service } from "@server/services/plugin-runner-v2.service";
+import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
-import type {
-  AuthMethodDescriptor,
-  ConfigFieldDescriptor,
-} from "@server/types/plugin-sdk-v2.types";
+import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
@@ -137,8 +134,8 @@ export const getPlugin = authenticatedProcedure
     // For enabled plugins, try fetching fresh metadata from worker
     if (instance && instance.enabled) {
       try {
-        const runnerV2 = getPluginRunnerV2Service();
-        const worker = runnerV2.getWorker(ctx.organizationId!, input.pluginId);
+        const runner = getPluginRunnerService();
+        const worker = runner.getWorker(ctx.organizationId!, input.pluginId);
         if (worker && worker.port) {
           const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
           if (metadataResponse.ok) {
@@ -160,7 +157,7 @@ export const getPlugin = authenticatedProcedure
           }
         } else {
           // Worker not running, try to start it
-          const newWorker = await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
+          const newWorker = await runner.startWorker(ctx.organizationId!, input.pluginId);
           if (newWorker && newWorker.port) {
             const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
             if (metadataResponse2.ok) {
@@ -722,15 +719,15 @@ export const configurePlugin = authenticatedProcedure
     }
 
     // Restart the plugin if it's currently running to apply new configuration
-    const runnerV2 = getPluginRunnerV2Service();
-    if (runnerV2.isRunning(ctx.organizationId!, input.pluginId)) {
+    const runner = getPluginRunnerService();
+    if (runner.isRunning(ctx.organizationId!, input.pluginId)) {
       console.log(
         `🔄 Configuration changed for ${plugin.name}, restarting plugin to apply new settings...`,
       );
       try {
         // Stop and start worker to apply new configuration
-        await runnerV2.stopWorker(ctx.organizationId!, input.pluginId);
-        await runnerV2.startWorker(ctx.organizationId!, input.pluginId);
+        await runner.stopWorker(ctx.organizationId!, input.pluginId);
+        await runner.startWorker(ctx.organizationId!, input.pluginId);
         console.log(`✅ Plugin ${plugin.name} restarted with new configuration`);
       } catch (error) {
         console.error(
@@ -790,7 +787,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
   const pluginMap = new Map(allPlugins.map((p) => [p.id, p]));
 
   // Get plugin runner service for worker info
-  const runnerV2Service = getPluginRunnerV2Service();
+  const runnerService = getPluginRunnerService();
 
   const mcpTools: Array<{
     id: string;
@@ -820,7 +817,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
     let tools: any[] = [];
 
     // Try to fetch from running worker first (SDK v2)
-    const workerInfo = runnerV2Service.getWorker(ctx.organizationId!, plugin.id);
+    const workerInfo = runnerService.getWorker(ctx.organizationId!, plugin.id);
 
     if (workerInfo) {
       // Worker is running - fetch fresh tools (no fallback to cache)
@@ -934,8 +931,8 @@ export const refreshMCPTools = authenticatedProcedure
     }
 
     // Get worker info
-    const runnerV2Service = getPluginRunnerV2Service();
-    const workerInfo = runnerV2Service.getWorker(ctx.organizationId!, input.pluginId);
+    const runnerService = getPluginRunnerService();
+    const workerInfo = runnerService.getWorker(ctx.organizationId!, input.pluginId);
 
     if (!workerInfo) {
       throw new TRPCError({

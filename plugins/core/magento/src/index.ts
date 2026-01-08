@@ -1,4 +1,4 @@
-import { defineHayPlugin } from "@hay/plugin-sdk-v2";
+import { defineHayPlugin } from "@hay/plugin-sdk";
 
 /**
  * Magento Plugin - SDK V2

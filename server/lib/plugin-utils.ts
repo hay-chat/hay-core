@@ -1,15 +1,15 @@
 /**
- * Plugin SDK v2 Utilities
+ * Plugin SDK Utilities
  *
  * Helper functions for config/auth separation and validation
  */
 
-import type { PluginMetadata, AuthState } from "../types/plugin-sdk-v2.types";
+import type { PluginMetadata, AuthState } from "../types/plugin-sdk.types";
 
 /**
  * Separate configuration into auth and non-auth fields
  *
- * SDK v2 plugins declare auth methods via metadata.authMethods.
+ * SDK plugins declare auth methods via metadata.authMethods.
  * This function identifies auth-related fields and separates them from regular config.
  *
  * @param input User-provided configuration from UI
@@ -18,7 +18,7 @@ import type { PluginMetadata, AuthState } from "../types/plugin-sdk-v2.types";
  */
 export function separateConfigAndAuth(
   input: Record<string, any>,
-  metadata: PluginMetadata | null | undefined
+  metadata: PluginMetadata | null | undefined,
 ): {
   config: Record<string, any>;
   authState: AuthState | null;
@@ -27,7 +27,7 @@ export function separateConfigAndAuth(
   if (!metadata || !metadata.authMethods || metadata.authMethods.length === 0) {
     return {
       config: input,
-      authState: null
+      authState: null,
     };
   }
 
@@ -80,7 +80,7 @@ export function separateConfigAndAuth(
   if (Object.keys(credentials).length > 0 && primaryAuthMethod) {
     authState = {
       methodId: primaryAuthMethod,
-      credentials
+      credentials,
     };
   }
 
@@ -96,7 +96,7 @@ export function separateConfigAndAuth(
  */
 export function hasAuthChanges(
   input: Record<string, any>,
-  metadata: PluginMetadata | null | undefined
+  metadata: PluginMetadata | null | undefined,
 ): boolean {
   if (!metadata || !metadata.authMethods) {
     return false;
@@ -104,7 +104,7 @@ export function hasAuthChanges(
 
   // For OAuth2 plugins, only validate when OAuth tokens are present
   // Don't validate when just saving clientId/clientSecret config
-  const hasOAuth2 = metadata.authMethods.some(m => m.type === "oauth2");
+  const hasOAuth2 = metadata.authMethods.some((m) => m.type === "oauth2");
   if (hasOAuth2) {
     // Only check for OAuth tokens (from OAuth flow)
     if (input.accessToken !== undefined || input.refreshToken !== undefined) {
@@ -144,7 +144,7 @@ export function hasAuthChanges(
  */
 export function extractAuthState(
   input: Record<string, any>,
-  metadata: PluginMetadata | null | undefined
+  metadata: PluginMetadata | null | undefined,
 ): AuthState | null {
   const { authState } = separateConfigAndAuth(input, metadata);
   return authState;

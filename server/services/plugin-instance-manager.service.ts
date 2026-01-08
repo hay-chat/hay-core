@@ -1,6 +1,6 @@
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
-import { getPluginRunnerV2Service } from "./plugin-runner-v2.service";
+import { getPluginRunnerService } from "./plugin-runner.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { debugLog } from "@server/lib/debug-logger";
 
@@ -51,8 +51,8 @@ export class PluginInstanceManagerService {
     }
 
     // Check if already running
-    const runnerV2 = getPluginRunnerV2Service();
-    if (runnerV2.isRunning(organizationId, pluginId)) {
+    const runner = getPluginRunnerService();
+    if (runner.isRunning(organizationId, pluginId)) {
       await this.updateActivityTimestamp(organizationId, pluginId);
       return;
     }
@@ -93,8 +93,8 @@ export class PluginInstanceManagerService {
       }
 
       // Start using SDK v2 runner service
-      const runnerV2 = getPluginRunnerV2Service();
-      await runnerV2.startWorker(organizationId, pluginId);
+      const runner = getPluginRunnerService();
+      await runner.startWorker(organizationId, pluginId);
 
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
@@ -145,7 +145,7 @@ export class PluginInstanceManagerService {
 
     // Get all running instances
     const runningInstances = await pluginInstanceRepository.findRunningInstances();
-    const runnerV2 = getPluginRunnerV2Service();
+    const runner = getPluginRunnerService();
 
     for (const instance of runningInstances) {
       const instanceKey = this.getInstanceKey(instance.organizationId, instance.plugin.pluginId);
@@ -156,14 +156,14 @@ export class PluginInstanceManagerService {
 
       if (!lastActivity || lastActivity < inactiveThreshold) {
         // Check if instance is actually running
-        if (runnerV2.isRunning(instance.organizationId, instance.plugin.pluginId)) {
+        if (runner.isRunning(instance.organizationId, instance.plugin.pluginId)) {
           debugLog(
             "plugin-manager",
             `Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
           try {
-            await runnerV2.stopWorker(instance.organizationId, instance.plugin.pluginId);
+            await runner.stopWorker(instance.organizationId, instance.plugin.pluginId);
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
@@ -233,8 +233,8 @@ export class PluginInstanceManagerService {
    * Update pool statistics for a plugin
    */
   private updatePoolStats(pluginId: string): void {
-    const runnerV2 = getPluginRunnerV2Service();
-    const allWorkers = runnerV2.getAllWorkers();
+    const runner = getPluginRunnerService();
+    const allWorkers = runner.getAllWorkers();
     const runningCount = allWorkers.filter((w) => w.pluginId === pluginId).length;
 
     const stats = this.getPoolStats(pluginId);
@@ -284,11 +284,11 @@ export class PluginInstanceManagerService {
    */
   async stopAllForOrganization(organizationId: string): Promise<void> {
     const instances = await pluginInstanceRepository.findByOrganization(organizationId);
-    const runnerV2 = getPluginRunnerV2Service();
+    const runner = getPluginRunnerService();
 
     for (const instance of instances) {
-      if (runnerV2.isRunning(organizationId, instance.plugin.pluginId)) {
-        await runnerV2.stopWorker(organizationId, instance.plugin.pluginId);
+      if (runner.isRunning(organizationId, instance.plugin.pluginId)) {
+        await runner.stopWorker(organizationId, instance.plugin.pluginId);
 
         const instanceKey = this.getInstanceKey(organizationId, instance.plugin.pluginId);
         this.instanceActivity.delete(instanceKey);
