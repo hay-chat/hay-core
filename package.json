@@ -58,7 +58,9 @@
     "postinstall": "git submodule update --init --recursive && cd dashboard && nuxt prepare"
   },
   "overrides": {
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "html-minifier": "npm:html-minifier-next@^4.16.4",
+    "@modelcontextprotocol/sdk": "^1.25.2"
   },
   "engines": {
     "node": ">=18.0.0",
