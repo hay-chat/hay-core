@@ -11,9 +11,9 @@ import { Message, MessageType } from "../../database/entities/message.entity";
 import { Customer } from "../../database/entities/customer.entity";
 
 describe("ConversationService - Cascade Delete Embeddings", () => {
-  const testOrgId = "csc-e4567-e89b-12d3-a456-426614174000";
-  const testAgentId = "csc-agent-e89b-12d3-a456-426614174000";
-  const testCustomerId = "csc-cust-e89b-12d3-a456-426614174000";
+  const testOrgId = "c5ce4567-e89b-12d3-a456-426614174000";
+  const testAgentId = "a9e14567-e89b-12d3-a456-426614174000";
+  const testCustomerId = "c0574567-e89b-12d3-a456-426614174000";
   let conversationService: ConversationService;
 
   beforeAll(async () => {
