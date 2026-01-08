@@ -39,7 +39,7 @@ export class TemplateService {
 
       // Read all .mjml files from content directory
       const files = await fs.readdir(this.contentDir);
-      const mjmlFiles = files.filter(file => file.endsWith(".mjml"));
+      const mjmlFiles = files.filter((file) => file.endsWith(".mjml"));
 
       console.log(`[TemplateService] Loading ${mjmlFiles.length} MJML templates...`);
 
@@ -169,9 +169,12 @@ export class TemplateService {
     const mjmlWithVars = this.replaceVariables(fullMjml, variables);
 
     // Compile MJML to HTML
+    // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
+    // We use our own minifyHtml() method instead if needed
     const result = mjml2html(mjmlWithVars, {
       keepComments: false,
       validationLevel: "soft",
+      minify: false,
     });
 
     if (result.errors.length > 0) {
@@ -201,7 +204,9 @@ export class TemplateService {
 
     // Handle conditional blocks
     result = this.processConditionals(result, variables);
-    console.log(`[TemplateService] After conditionals: ${originalLength} -> ${result.length} bytes`);
+    console.log(
+      `[TemplateService] After conditionals: ${originalLength} -> ${result.length} bytes`,
+    );
 
     // Handle loops
     result = this.processLoops(result, variables);
@@ -220,7 +225,10 @@ export class TemplateService {
     // Count remaining unmatched variables before removal
     const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
     if (unmatchedVars) {
-      console.log(`[TemplateService] Removing ${unmatchedVars.length} unmatched variables:`, unmatchedVars.slice(0, 5));
+      console.log(
+        `[TemplateService] Removing ${unmatchedVars.length} unmatched variables:`,
+        unmatchedVars.slice(0, 5),
+      );
     }
 
     // Remove any remaining unmatched variables
@@ -241,7 +249,9 @@ export class TemplateService {
       const variable = condition.trim();
       const value = this.getNestedValue(variables, variable);
 
-      console.log(`[TemplateService] Conditional #${matchCount}: {{#if ${variable}}} = ${!!value} (value: ${JSON.stringify(value)?.substring(0, 50)})`);
+      console.log(
+        `[TemplateService] Conditional #${matchCount}: {{#if ${variable}}} = ${!!value} (value: ${JSON.stringify(value)?.substring(0, 50)})`,
+      );
 
       if (value) {
         return block; // Don't recursively replace here - will be done in main replaceVariables
@@ -255,10 +265,10 @@ export class TemplateService {
    */
   private processLoops(content: string, variables: Record<string, any>): string {
     const loopPattern = /\{\{#each\s+([^}]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
-    
+
     return content.replace(loopPattern, (_match, arrayPath, block) => {
       const array = this.getNestedValue(variables, arrayPath.trim());
-      
+
       if (Array.isArray(array)) {
         return array
           .map((item, index) => {

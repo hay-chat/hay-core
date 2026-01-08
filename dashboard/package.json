@@ -31,7 +31,7 @@
     "@tiptap/suggestion": "^2.10.5",
     "@tiptap/vue-3": "^2.10.5",
     "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.3",
+    "jspdf": "^4.0.0",
     "pinia-plugin-persistedstate": "^4.7.1",
     "sonner": "^2.0.7",
     "tippy.js": "^6.3.7",
