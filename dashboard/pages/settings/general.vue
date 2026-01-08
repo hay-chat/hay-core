@@ -14,6 +14,13 @@
       </div>
     </template>
 
+    <!-- Delete Organization Dialog -->
+    <DeleteOrganizationDialog
+      v-model:open="showDeleteDialog"
+      :organization-name="settings.organizationName"
+      @deleted="onOrganizationDeleted"
+    />
+
     <!-- Organization Settings -->
     <Card>
       <CardHeader>
@@ -518,6 +525,27 @@
         </div>
       </CardContent>
     </Card> -->
+
+    <!-- Danger Zone - Only visible to owners -->
+    <Card v-if="isOwner" class="!border-destructive">
+      <CardHeader>
+        <CardTitle class="text-destructive">Danger Zone</CardTitle>
+        <CardDescription>Irreversible and destructive actions</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-center justify-between border p-4 rounded-lg">
+          <div>
+            <p class="font-medium">Delete organization</p>
+            <p class="text-sm text-muted-foreground">
+              Once you delete an organization, there is no going back. Please be certain.
+            </p>
+          </div>
+          <Button variant="destructive" @click="showDeleteDialog = true">
+            Delete organization
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   </Page>
 </template>
 
@@ -530,6 +558,7 @@ import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
 const toast = useToast();
+const userStore = useUserStore();
 
 const logoUpload = useFileUpload({
   accept: "image/*",
@@ -537,6 +566,7 @@ const logoUpload = useFileUpload({
 });
 
 const organizationLogo = ref<string | null>(null);
+const showDeleteDialog = ref(false);
 
 // Import types for proper typing
 type ConfidenceGuardrailSettings = {
@@ -653,6 +683,8 @@ const agentOptions = computed(() => {
     value: agent.id,
   }));
 });
+
+const isOwner = computed(() => userStore.isOwner);
 
 // Methods
 const formatDatePreview = () => {
@@ -790,7 +822,6 @@ const saveSettings = async () => {
 
       // Update the organization name in the user store if it changed
       if ((response.data as any).name) {
-        const userStore = useUserStore();
         const activeOrg = userStore.organizations.find(
           (org: any) => org.id === userStore.activeOrganizationId,
         );
@@ -819,7 +850,6 @@ const removeLogo = async () => {
     organizationLogo.value = null;
 
     // Update the user store to remove the logo immediately
-    const userStore = useUserStore();
     const activeOrg = userStore.organizations.find(
       (org: any) => org.id === userStore.activeOrganizationId,
     );
@@ -838,7 +868,6 @@ const loadOrganizationSettings = async () => {
     organizationLogo.value = (orgSettings as any).logoUrl || null;
 
     // Update the logo in the user store so it shows in the org switcher immediately
-    const userStore = useUserStore();
     const activeOrg = userStore.organizations.find(
       (org: any) => org.id === userStore.activeOrganizationId,
     );
@@ -920,6 +949,11 @@ const testWebhook = async () => {
 const viewWebhookLogs = () => {
   // TODO: Navigate to webhook logs page
   console.log("View webhook logs");
+};
+
+const onOrganizationDeleted = () => {
+  // Dialog handles the redirect/logout logic
+  showDeleteDialog.value = false;
 };
 
 // Lifecycle
