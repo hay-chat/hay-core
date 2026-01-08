@@ -1,5 +1,8 @@
 /**
  * OAuth types and interfaces for plugin authentication
+ *
+ * OAuth tokens are stored in authState.credentials (automatically encrypted by TypeORM transformer)
+ * The OAuthTokenData interface is used for token exchange with OAuth providers
  */
 
 export interface OAuthTokenData {
@@ -9,15 +12,6 @@ export interface OAuthTokenData {
   expires_at?: number; // Unix timestamp
   token_type?: string;
   scope?: string;
-}
-
-export interface OAuthConfig {
-  _oauth: {
-    tokens: OAuthTokenData;
-    connected_at: number; // Unix timestamp
-    provider: string; // Plugin ID
-    scopes?: string[];
-  };
 }
 
 export interface OAuthState {
@@ -44,35 +38,4 @@ export interface OAuthConnectionStatus {
   expiresAt?: number;
   connectedAt?: number;
   error?: string;
-}
-
-/**
- * Plugin config that may contain OAuth data
- * Use this when you need to check for _oauth in decrypted config
- */
-export interface PluginConfigWithOAuth extends Record<string, unknown> {
-  _oauth?: {
-    tokens: OAuthTokenData;
-    connected_at: number;
-    provider: string;
-    scopes?: string[];
-  };
-}
-
-/**
- * Type guard to check if config contains OAuth data
- * @param config - Decrypted plugin configuration
- * @returns True if config contains valid OAuth data
- */
-export function hasOAuthData(
-  config: Record<string, unknown>,
-): config is PluginConfigWithOAuth & { _oauth: NonNullable<PluginConfigWithOAuth["_oauth"]> } {
-  return (
-    typeof config === "object" &&
-    config !== null &&
-    "_oauth" in config &&
-    typeof config._oauth === "object" &&
-    config._oauth !== null &&
-    "tokens" in config._oauth
-  );
 }

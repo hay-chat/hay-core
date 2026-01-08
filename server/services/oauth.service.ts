@@ -1,15 +1,12 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { oauthStateService } from "./oauth-state.service";
-import { encryptValue, decryptConfig } from "../lib/auth/utils/encryption";
 import { resolveConfigWithEnv } from "../lib/config-resolver";
 import { getApiUrl } from "../config/env";
 import type {
   OAuthTokenData,
-  OAuthConfig,
   OAuthManifestConfig,
   OAuthConnectionStatus,
-  PluginConfigWithOAuth,
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk-v2.types";
@@ -530,58 +527,24 @@ export class OAuthService {
       console.log("  Instance has config:", !!instance.config);
     }
 
-    const oauthData: OAuthConfig["_oauth"] = {
-      tokens,
-      connected_at: Math.floor(Date.now() / 1000),
-      provider: pluginId,
-      scopes,
-    };
-
-    // Encrypt OAuth tokens for legacy _oauth config storage
-    const encryptedTokens: OAuthTokenData = {
-      ...tokens,
-      access_token: encryptValue(tokens.access_token),
-      refresh_token: tokens.refresh_token ? encryptValue(tokens.refresh_token) : undefined,
-    };
-
-    const encryptedOAuthData: OAuthConfig["_oauth"] = {
-      ...oauthData,
-      tokens: encryptedTokens,
-    };
-
-    // Store encrypted OAuth data for legacy config
-    const configToStore = {
-      _oauth: encryptedOAuthData,
-    };
-
-    // SDK v2: Build authState for plugins using SDK v2
+    // Build authState - the standard way to store OAuth tokens
     // The authState format is what the plugin SDK expects via ctx.auth.get()
     // NOTE: Do NOT manually encrypt here - use updateAuthState() which uses .save()
     // and triggers the TypeORM AuthStateEncryptedTransformer automatically.
-    // Manual encryption would cause DOUBLE encryption.
     const authState = {
       methodId: `${pluginId}-oauth`, // Convention: {pluginId}-oauth
       credentials: {
         accessToken: tokens.access_token, // Plain text - transformer will encrypt
         refreshToken: tokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: tokens.expires_at,
+        connectedAt: Math.floor(Date.now() / 1000),
         tokenType: tokens.token_type || "Bearer",
-        scope: tokens.scope,
+        scope: tokens.scope || scopes?.join(" "),
       },
     };
 
     if (instance) {
       console.log("Updating existing instance...");
-      // Update existing instance
-      const currentConfig = instance.config || {};
-      console.log("  Current config keys:", Object.keys(currentConfig));
-      console.log("  New config keys:", Object.keys(configToStore));
-
-      await pluginInstanceRepository.updateConfig(instance.id, {
-        ...currentConfig,
-        ...configToStore,
-      });
-      console.log("  Config updated");
 
       // Update authState using updateAuthState which uses .save() to trigger transformer
       await pluginInstanceRepository.updateAuthState(
@@ -595,7 +558,6 @@ export class OAuthService {
       console.log("Creating new instance with enabled=false...");
       // Create new instance - upsertInstance uses .save() which triggers transformer
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
-        config: configToStore,
         authMethod: "oauth",
         authState,
         enabled: false, // Don't auto-enable
@@ -619,15 +581,10 @@ export class OAuthService {
       throw new Error(`Plugin instance not found`);
     }
 
-    // Remove OAuth data from config
-    const currentConfig = instance.config || {};
-    const { _oauth, ...restConfig } = currentConfig;
-
-    await pluginInstanceRepository.updateConfig(instance.id, restConfig);
-
-    // Clear auth_method
+    // Clear authState and authMethod
     await pluginInstanceRepository.update(instance.id, organizationId, {
       authMethod: undefined,
+      authState: undefined,
     });
 
     debugLog("oauth", `OAuth revoked for plugin ${pluginId}`, { organizationId });
@@ -635,6 +592,7 @@ export class OAuthService {
 
   /**
    * Get OAuth connection status
+   * Reads from authState (the standard storage location)
    */
   async getConnectionStatus(
     organizationId: string,
@@ -646,26 +604,22 @@ export class OAuthService {
     }
 
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance || !instance.config?._oauth) {
+    if (!instance || !instance.authState?.credentials) {
       return { connected: false };
     }
 
     try {
-      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+      // authState is automatically decrypted by TypeORM transformer
+      const credentials = instance.authState.credentials;
 
-      if (!decryptedConfig._oauth?.tokens) {
+      if (!credentials.accessToken) {
         return { connected: false };
       }
 
-      const oauthData = decryptedConfig._oauth;
-
-      const expiresAt = oauthData.tokens.expires_at;
-      const connectedAt = oauthData.connected_at;
-
       return {
         connected: true,
-        expiresAt,
-        connectedAt,
+        expiresAt: credentials.expiresAt as number | undefined,
+        connectedAt: credentials.connectedAt as number | undefined,
       };
     } catch (error) {
       return {

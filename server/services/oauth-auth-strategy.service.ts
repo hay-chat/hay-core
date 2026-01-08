@@ -1,13 +1,13 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import { decryptConfig, decryptValue } from "../lib/auth/utils/encryption";
 import { oauthService } from "./oauth.service";
-import type { OAuthTokenData, PluginConfigWithOAuth } from "../types/oauth.types";
+import type { OAuthTokenData } from "../types/oauth.types";
 import { debugLog } from "@server/lib/debug-logger";
 
 /**
  * OAuth Authentication Strategy
  * Handles token refresh, expiry checks, and header generation for OAuth-authenticated plugins
+ * Uses authState for token storage (automatically decrypted by TypeORM transformer)
  */
 export class OAuthAuthStrategy {
   /**
@@ -49,6 +49,7 @@ export class OAuthAuthStrategy {
 
   /**
    * Get valid OAuth tokens, refreshing if necessary
+   * Reads from authState which is automatically decrypted by TypeORM transformer
    */
   async getValidTokens(organizationId: string, pluginId: string): Promise<OAuthTokenData | null> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
@@ -57,27 +58,20 @@ export class OAuthAuthStrategy {
     }
 
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance || !instance.config?._oauth) {
+    if (!instance || !instance.authState?.credentials?.accessToken) {
       return null;
     }
 
     try {
-      const decryptedConfig = decryptConfig(instance.config) as PluginConfigWithOAuth;
+      // authState is automatically decrypted by TypeORM transformer
+      const credentials = instance.authState.credentials;
 
-      if (!decryptedConfig._oauth?.tokens) {
-        return null;
-      }
-
-      const oauthData = decryptedConfig._oauth;
-
-      // Decrypt tokens (access_token and refresh_token are encrypted)
-      const encryptedTokens = oauthData.tokens as OAuthTokenData;
       const tokens: OAuthTokenData = {
-        ...encryptedTokens,
-        access_token: decryptValue(encryptedTokens.access_token),
-        refresh_token: encryptedTokens.refresh_token
-          ? decryptValue(encryptedTokens.refresh_token)
-          : undefined,
+        access_token: credentials.accessToken as string,
+        refresh_token: credentials.refreshToken as string | undefined,
+        expires_at: credentials.expiresAt as number | undefined,
+        token_type: (credentials.tokenType as string) || "Bearer",
+        scope: credentials.scope as string | undefined,
       };
 
       // Check if token is expired or expiring soon (5 minute buffer)
@@ -133,7 +127,11 @@ export class OAuthAuthStrategy {
 
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
 
-    return !!(instance && instance.authMethod === "oauth" && instance.config?._oauth);
+    return !!(
+      instance &&
+      instance.authMethod === "oauth" &&
+      instance.authState?.credentials?.accessToken
+    );
   }
 }
 

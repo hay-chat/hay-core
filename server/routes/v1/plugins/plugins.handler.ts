@@ -15,7 +15,6 @@ import type {
   AuthMethodDescriptor,
   ConfigFieldDescriptor,
 } from "@server/types/plugin-sdk-v2.types";
-import type { PluginConfigWithOAuth } from "@server/types/oauth.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
@@ -256,10 +255,8 @@ export const getPlugin = authenticatedProcedure
             oauthConfigured = hasClientId && hasClientSecret;
           }
 
-          const configWithOAuth = instance.config
-            ? (decryptConfig(instance.config) as PluginConfigWithOAuth)
-            : {};
-          if (configWithOAuth._oauth?.tokens?.access_token) {
+          // Check if OAuth is connected via authState
+          if (instance.authState?.credentials?.accessToken) {
             oauthConnected = true;
           }
         }
