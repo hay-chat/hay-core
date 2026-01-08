@@ -17,6 +17,7 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
+import { vectorStoreService } from "@server/services/vector-store.service";
 
 /**
  * Helper function to count active owners in an organization
@@ -697,6 +698,9 @@ export const organizationsRouter = t.router({
           // Continue with deletion even if logo deletion fails
         }
       }
+
+      // Delete embeddings from vector store within the transaction
+      await vectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
 
       // Delete organization - CASCADE will handle most related entities:
       // - Agents (onDelete: CASCADE)
