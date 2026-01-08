@@ -140,7 +140,8 @@ const handleDelete = async () => {
         window.location.href = "/";
       } else {
         // No more organizations, log out
-        authStore.clearTokens();
+        authStore.tokens = null;
+        authStore.isAuthenticated = false;
         userStore.clearUser();
         window.location.href = "/login";
       }
