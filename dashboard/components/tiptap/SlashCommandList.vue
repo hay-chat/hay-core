@@ -25,7 +25,7 @@
         <div class="slash-command-icon">
           <img
             v-if="tool.pluginId"
-            :src="`${apiBaseUrl}/plugins/thumbnails/${tool.pluginId}`"
+            :src="`${apiBaseUrl}/plugins/thumbnails/${encodeURIComponent(tool.pluginId)}`"
             :alt="tool.label"
             class="slash-command-thumbnail"
           />

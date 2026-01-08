@@ -1,62 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
-  // Helper function to authenticate
-  async function authenticate(page) {
-    console.log("🔐 Attempting to authenticate...");
-
-    // First check if we're already on a login page or need to navigate to one
-    const currentUrl = page.url();
-
-    if (currentUrl.includes("/login") || currentUrl.includes("/auth")) {
-      console.log("✅ Already on auth page");
-    } else {
-      // Try to navigate to login page
-      try {
-        await page.goto("http://localhost:3000/login");
-        await page.waitForLoadState("networkidle");
-      } catch (error) {
-        console.log("⚠️  Could not navigate to login page, checking for auth elements");
-      }
-    }
-
-    // Look for common authentication elements
-    const emailInput = page
-      .locator('input[type="email"], input[name="email"], input[placeholder*="email" i]')
-      .first();
-    const passwordInput = page.locator('input[type="password"], input[name="password"]').first();
-    const loginButton = page
-      .locator("button")
-      .filter({ hasText: /sign in|login|log in/i })
-      .first();
-
-    if (await emailInput.isVisible({ timeout: 3000 })) {
-      console.log("✅ Found authentication form");
-
-      // Use test credentials - adjust these based on your test setup
-      await emailInput.fill("");
-      await passwordInput.fill("");
-      await loginButton.click();
-
-      await page.waitForLoadState("networkidle");
-      console.log("✅ Authentication attempted");
-
-      // Wait a moment for redirect/auth to complete
-      await page.waitForTimeout(2000);
-
-      return true;
-    } else {
-      console.log("⚠️  No authentication form found, continuing without auth");
-      return false;
-    }
-  }
-
   test("should handle /a shortcut and verify v-model structure", async ({ page }) => {
-    // Try to authenticate first
-    await authenticate(page);
-
-    // Navigate to the playbook creation page
-    await page.goto("http://localhost:3000/playbooks/new");
+    // Auth is already loaded from storage state - navigate directly to playbook creation
+    await page.goto("/playbooks/new");
 
     // Wait for the page to load completely
     await page.waitForLoadState("networkidle");
@@ -163,8 +110,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
   });
 
   test("should maintain v-model structure when typing regular text", async ({ page }) => {
-    await authenticate(page);
-    await page.goto("http://localhost:3000/playbooks/new");
+    // Auth is already loaded from storage state
+    await page.goto("/playbooks/new");
     await page.waitForLoadState("networkidle");
 
     const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
@@ -212,8 +159,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
   test("should preserve action format [action](id) in v-model when moving between instructions", async ({
     page,
   }) => {
-    await authenticate(page);
-    await page.goto("http://localhost:3000/playbooks/new");
+    // Auth is already loaded from storage state
+    await page.goto("/playbooks/new");
     await page.waitForLoadState("networkidle");
 
     const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
@@ -504,8 +451,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
   test("should handle indentation workflow - a/enter/tab/b/enter/enter/c with proper v-model structure", async ({
     page,
   }) => {
-    await authenticate(page);
-    await page.goto("http://localhost:3000/playbooks/new");
+    // Auth is already loaded from storage state
+    await page.goto("/playbooks/new");
     await page.waitForLoadState("networkidle");
 
     const instructionsEditor = page.locator('[data-testid="instructions-editor"]');
@@ -725,8 +672,8 @@ test.describe("InstructionsEditor - /a shortcut and v-model test", () => {
   test("should handle cursor positioning correctly on Enter and Delete operations", async ({
     page,
   }) => {
-    await authenticate(page);
-    await page.goto("http://localhost:3000/playbooks/new");
+    // Auth is already loaded from storage state
+    await page.goto("/playbooks/new");
     await page.waitForLoadState("networkidle");
 
     const instructionsEditor = page.locator('[data-testid="instructions-editor"]');

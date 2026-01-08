@@ -25,6 +25,16 @@ export interface Message {
     recheckAttempted?: boolean;
     recheckCount?: number;
     originalMessage?: string; // Original message before fallback replacement
+    // Execution & Guardrail metadata
+    executionRationale?: string; // Why the LLM chose this step type
+    companyInterest?: {
+      passed: boolean;
+      violationType?: string;
+      severity?: string;
+      shouldBlock?: boolean;
+      requiresFactCheck?: boolean;
+      reasoning?: string;
+    };
     // Tool execution metadata
     toolName?: string;
     toolInput?: Record<string, unknown>;

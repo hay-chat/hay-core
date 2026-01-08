@@ -22,9 +22,11 @@ This document is for developers working on the plugin system infrastructure, not
 ### Core Services
 
 #### Plugin Manager Service
+
 **File**: `server/services/plugin-manager.service.ts`
 
 **Responsibilities**:
+
 - Discovering plugins from filesystem
 - Loading and validating manifests
 - Managing plugin registry (database)
@@ -32,9 +34,10 @@ This document is for developers working on the plugin system infrastructure, not
 - Checksum calculation for change detection
 
 **Key Methods**:
+
 ```typescript
 async initialize(): Promise<void>
-async registerPlugin(path, sourceType, orgId): Promise<void>
+async registerPlugin(path, sourceType, organizationId): Promise<void>
 async installPlugin(pluginId): Promise<void>
 async buildPlugin(pluginId): Promise<void>
 getPlugin(pluginId): PluginRegistry | undefined
@@ -42,32 +45,37 @@ getAllPlugins(): PluginRegistry[]
 ```
 
 **Initialization Flow**:
+
 1. Load manifest schema
 2. Scan `plugins/core/` directory
-3. Scan `plugins/custom/{orgId}/` directories
+3. Scan `plugins/custom/{organizationId}/` directories
 4. Validate manifests against schema
 5. Calculate checksums
 6. Upsert to database
 7. Load auto-activated plugin routers
 
 #### Plugin Instance Manager Service
+
 **File**: `server/services/plugin-instance-manager.service.ts`
 
 **Responsibilities**:
+
 - On-demand instance startup
 - Activity tracking and timeout management
 - Instance pool management
 - Cleanup of inactive instances
 
 **Key Methods**:
+
 ```typescript
-async ensureInstanceRunning(orgId, pluginId): Promise<void>
-async updateActivityTimestamp(orgId, pluginId): Promise<void>
+async ensureInstanceRunning(organizationId, pluginId): Promise<void>
+async updateActivityTimestamp(organizationId, pluginId): Promise<void>
 async cleanupInactiveInstances(): Promise<void>
-async stopAllForOrganization(orgId): Promise<void>
+async stopAllForOrganization(organizationId): Promise<void>
 ```
 
 **Instance Lifecycle**:
+
 ```mermaid
 graph TD
     A[Tool Request] --> B{Instance Running?}
@@ -83,9 +91,11 @@ graph TD
 ```
 
 #### Process Manager Service
+
 **File**: `server/services/process-manager.service.ts`
 
 **Responsibilities**:
+
 - Managing MCP server child processes
 - Environment variable injection
 - Process health monitoring
@@ -93,23 +103,27 @@ graph TD
 - Graceful shutdown
 
 **Key Methods**:
+
 ```typescript
-async startPlugin(orgId, pluginId): Promise<void>
-async stopPlugin(orgId, pluginId): Promise<void>
-isRunning(orgId, pluginId): boolean
+async startPlugin(organizationId, pluginId): Promise<void>
+async stopPlugin(organizationId, pluginId): Promise<void>
+isRunning(organizationId, pluginId): boolean
 getRunningProcesses(): ProcessInfo[]
 ```
 
 #### MCP Client Factory
+
 **File**: `server/services/mcp-client-factory.service.ts`
 
 **Responsibilities**:
+
 - Creating MCP clients for local/remote servers
 - Transport protocol handling
 - Tool invocation
 - Connection management
 
 **Key Methods**:
+
 ```typescript
 async createClient(manifest, config): Promise<MCPClient>
 async invokeTool(client, toolName, args): Promise<any>
@@ -235,7 +249,7 @@ export interface PluginCapabilities {
   mcp?: MCPCapabilities;
   ui?: UICapabilities;
   api?: APICapabilities;
-  newCapability?: NewCapability;  // Add this
+  newCapability?: NewCapability; // Add this
 }
 
 export interface NewCapability {
@@ -249,7 +263,7 @@ export interface NewCapability {
 Create `server/services/plugin-new-capability.service.ts`:
 
 ```typescript
-import { HayPluginManifest } from '@server/types/plugin.types';
+import { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginNewCapabilityService {
   /**
@@ -258,7 +272,7 @@ export class PluginNewCapabilityService {
   async initializeCapability(
     pluginId: string,
     manifest: HayPluginManifest,
-    organizationId: string
+    organizationId: string,
   ): Promise<void> {
     const capability = manifest.capabilities?.newCapability;
 
@@ -273,10 +287,7 @@ export class PluginNewCapabilityService {
   /**
    * Execute the capability
    */
-  async execute(
-    pluginId: string,
-    params: Record<string, any>
-  ): Promise<any> {
+  async execute(pluginId: string, params: Record<string, any>): Promise<any> {
     // Implementation here
   }
 }
@@ -319,19 +330,17 @@ export const executeNewCapability = authenticatedProcedure
     z.object({
       pluginId: z.string(),
       params: z.record(z.any()),
-    })
+    }),
   )
   .mutation(async ({ ctx, input }) => {
-    return await pluginNewCapabilityService.execute(
-      input.pluginId,
-      input.params
-    );
+    return await pluginNewCapabilityService.execute(input.pluginId, input.params);
   });
 ```
 
 #### 6. Document the Capability
 
 Update `docs/PLUGIN_API.md` with:
+
 - Capability description
 - Configuration options
 - Usage examples
@@ -340,6 +349,7 @@ Update `docs/PLUGIN_API.md` with:
 #### 7. Create Example Plugin
 
 Create example in `plugins/core/example-new-capability/`:
+
 - manifest.json with the new capability
 - Implementation showing best practices
 - README.md explaining usage
@@ -367,7 +377,7 @@ Edit `plugins/base/plugin-manifest.schema.json`:
         "playbook",
         "workflow",
         "analytics",
-        "new-type"  // Add here
+        "new-type" // Add here
       ]
     }
   }
@@ -378,13 +388,13 @@ Edit `plugins/base/plugin-manifest.schema.json`:
 
 ```typescript
 export type PluginType =
-  | 'channel'
-  | 'mcp-connector'
-  | 'retriever'
-  | 'playbook'
-  | 'workflow'
-  | 'analytics'
-  | 'new-type';  // Add here
+  | "channel"
+  | "mcp-connector"
+  | "retriever"
+  | "playbook"
+  | "workflow"
+  | "analytics"
+  | "new-type"; // Add here
 ```
 
 #### 3. Add Type-Specific Behavior
@@ -393,7 +403,7 @@ If the type needs special handling:
 
 ```typescript
 // In plugin manager or instance manager
-if (manifest.type.includes('new-type')) {
+if (manifest.type.includes("new-type")) {
   // Special initialization
   await this.initializeNewType(plugin);
 }
@@ -402,6 +412,7 @@ if (manifest.type.includes('new-type')) {
 #### 4. Update UI
 
 Edit dashboard components to display new type:
+
 - Filter options in marketplace
 - Type badges
 - Type-specific icons
@@ -409,6 +420,7 @@ Edit dashboard components to display new type:
 #### 5. Document
 
 Update documentation:
+
 - Plugin types table in PLUGIN_API.md
 - Use cases and examples
 - Best practices for this type
@@ -438,10 +450,10 @@ export class MyApiService {
     const plugin = pluginManagerService.getPlugin(pluginId);
     const manifest = plugin?.manifest as HayPluginManifest;
 
-    if (!manifest.permissions?.api?.includes('myapi')) {
+    if (!manifest.permissions?.api?.includes("myapi")) {
       throw new Error(
         `Plugin ${pluginId} does not have permission to access MyAPI. ` +
-        `Add "myapi" to permissions.api in manifest.json`
+          `Add "myapi" to permissions.api in manifest.json`,
       );
     }
   }
@@ -449,11 +461,7 @@ export class MyApiService {
   /**
    * API method that plugins can call
    */
-  async doSomething(
-    pluginId: string,
-    organizationId: string,
-    params: any
-  ): Promise<any> {
+  async doSomething(pluginId: string, organizationId: string, params: any): Promise<any> {
     this.checkPermission(pluginId);
 
     // Implementation
@@ -476,7 +484,7 @@ Add to `permissions.api` enum:
         "items": {
           "enum": [
             "email",
-            "myapi"  // Add here
+            "myapi" // Add here
           ]
         }
       }
@@ -495,14 +503,10 @@ export const myApiAction = authenticatedProcedure
     z.object({
       pluginId: z.string(),
       params: z.any(),
-    })
+    }),
   )
   .mutation(async ({ ctx, input }) => {
-    return await myApiService.doSomething(
-      input.pluginId,
-      ctx.organizationId!,
-      input.params
-    );
+    return await myApiService.doSomething(input.pluginId, ctx.organizationId!, input.params);
   });
 ```
 
@@ -522,13 +526,14 @@ Update PLUGIN_API.md:
 **Usage**:
 \`\`\`json
 {
-  "permissions": {
-    "api": ["myapi"]
-  }
+"permissions": {
+"api": ["myapi"]
+}
 }
 \`\`\`
 
 **Available Methods**:
+
 - `doSomething(params)` - Does something useful
 ```
 
@@ -657,6 +662,7 @@ Consider implementing:
 ### Audit Logging
 
 Add audit logs for:
+
 - Plugin installation/uninstallation
 - Configuration changes
 - Tool invocations
@@ -669,12 +675,12 @@ export class PluginAuditService {
     pluginId: string,
     organizationId: string,
     toolName: string,
-    args: any
+    args: any,
   ): Promise<void> {
     await auditLogRepository.create({
-      entityType: 'plugin',
+      entityType: "plugin",
       entityId: pluginId,
-      action: 'tool_invocation',
+      action: "tool_invocation",
       organizationId,
       metadata: {
         toolName,
@@ -695,7 +701,7 @@ export class PluginAuditService {
 Strengthen input validation:
 
 ```typescript
-import Ajv from 'ajv';
+import Ajv from "ajv";
 
 export class PluginValidationService {
   private ajv: Ajv;
@@ -703,17 +709,14 @@ export class PluginValidationService {
   /**
    * Validate tool arguments against input schema
    */
-  validateToolInput(
-    tool: MCPTool,
-    args: any
-  ): { valid: boolean; errors?: string[] } {
+  validateToolInput(tool: MCPTool, args: any): { valid: boolean; errors?: string[] } {
     const validate = this.ajv.compile(tool.input_schema);
     const valid = validate(args);
 
     if (!valid) {
       return {
         valid: false,
-        errors: validate.errors?.map(e => e.message),
+        errors: validate.errors?.map((e) => e.message),
       };
     }
 
@@ -790,11 +793,7 @@ export class ToolCacheService {
     return `${pluginId}:${toolName}:${JSON.stringify(args)}`;
   }
 
-  async getCachedResult(
-    pluginId: string,
-    toolName: string,
-    args: any
-  ): Promise<any | null> {
+  async getCachedResult(pluginId: string, toolName: string, args: any): Promise<any | null> {
     const key = this.getCacheKey(pluginId, toolName, args);
     const cached = this.cache.get(key);
 
@@ -810,7 +809,7 @@ export class ToolCacheService {
     toolName: string,
     args: any,
     result: any,
-    ttlSeconds: number = 300
+    ttlSeconds: number = 300,
   ): void {
     const key = this.getCacheKey(pluginId, toolName, args);
     const expiry = new Date(Date.now() + ttlSeconds * 1000);
@@ -825,19 +824,13 @@ export class ToolCacheService {
 Process multiple tool calls in parallel:
 
 ```typescript
-export async function invokeToolsBatch(
-  calls: ToolCall[]
-): Promise<ToolResult[]> {
+export async function invokeToolsBatch(calls: ToolCall[]): Promise<ToolResult[]> {
   return Promise.all(
-    calls.map(call =>
+    calls.map((call) =>
       pluginInstanceManagerService
         .ensureInstanceRunning(call.organizationId, call.pluginId)
-        .then(() => mcpClientFactory.invokeTool(
-          call.pluginId,
-          call.toolName,
-          call.args
-        ))
-    )
+        .then(() => mcpClientFactory.invokeTool(call.pluginId, call.toolName, call.args)),
+    ),
   );
 }
 ```
@@ -852,19 +845,19 @@ Test individual services in isolation:
 
 ```typescript
 // plugin-manager.service.spec.ts
-describe('PluginManagerService', () => {
+describe("PluginManagerService", () => {
   let service: PluginManagerService;
 
   beforeEach(() => {
     service = new PluginManagerService();
   });
 
-  describe('registerPlugin', () => {
-    it('should register valid plugin', async () => {
+  describe("registerPlugin", () => {
+    it("should register valid plugin", async () => {
       // Test implementation
     });
 
-    it('should reject invalid manifest', async () => {
+    it("should reject invalid manifest", async () => {
       // Test implementation
     });
   });
@@ -877,21 +870,21 @@ Test plugin system end-to-end:
 
 ```typescript
 // plugin-system.integration.spec.ts
-describe('Plugin System Integration', () => {
-  it('should enable plugin and invoke tool', async () => {
+describe("Plugin System Integration", () => {
+  it("should enable plugin and invoke tool", async () => {
     // 1. Enable plugin
     const result = await Hay.plugins.enable.mutate({
-      pluginId: 'test-plugin',
-      configuration: { apiKey: 'test' }
+      pluginId: "test-plugin",
+      configuration: { apiKey: "test" },
     });
 
     expect(result.success).toBe(true);
 
     // 2. Invoke tool
     const toolResult = await Hay.plugins.invokeTool.mutate({
-      pluginId: 'test-plugin',
-      toolName: 'test_tool',
-      arguments: { param: 'value' }
+      pluginId: "test-plugin",
+      toolName: "test_tool",
+      arguments: { param: "value" },
     });
 
     expect(toolResult).toBeDefined();
@@ -945,10 +938,10 @@ async function loadTest() {
     .fill(null)
     .map(() =>
       Hay.plugins.invokeTool.mutate({
-        pluginId: 'test-plugin',
-        toolName: 'echo',
-        arguments: { message: 'test' }
-      })
+        pluginId: "test-plugin",
+        toolName: "echo",
+        arguments: { message: "test" },
+      }),
     );
 
   const start = Date.now();
@@ -988,7 +981,7 @@ export class PluginMetricsService {
     pluginId: string,
     toolName: string,
     duration: number,
-    success: boolean
+    success: boolean,
   ): Promise<void> {
     // Record to metrics service (Prometheus, StatsD, etc.)
   }

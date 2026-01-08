@@ -52,6 +52,7 @@ export class PerceptionLayer {
             score: { type: "number", minimum: 0, maximum: 1 },
           },
           required: ["label", "score"],
+          additionalProperties: false,
         },
         sentiment: {
           type: "object",
@@ -63,6 +64,7 @@ export class PerceptionLayer {
             score: { type: "number", minimum: 0, maximum: 1 },
           },
           required: ["label", "score"],
+          additionalProperties: false,
         },
         language: {
           type: "string",
@@ -71,6 +73,7 @@ export class PerceptionLayer {
         },
       },
       required: ["intent", "sentiment", "language"],
+      additionalProperties: false,
     };
 
     debugLog("perception", "Invoking LLM for perception analysis");
@@ -160,10 +163,12 @@ export class PerceptionLayer {
               rationale: { type: "string" },
             },
             required: ["id", "score", "rationale"],
+            additionalProperties: false,
           },
         },
       },
       required: ["candidates"],
+      additionalProperties: false,
     };
 
     const result = await this.llmService.invoke({

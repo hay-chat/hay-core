@@ -117,7 +117,9 @@
                 />
               </div>
               <div class="confidence-fallback-section">
-                <div class="confidence-fallback-section__label">Fallback Message (Sent to Customer)</div>
+                <div class="confidence-fallback-section__label">
+                  Fallback Message (Sent to Customer)
+                </div>
                 <div
                   class="confidence-fallback-section__text confidence-fallback-section__text--sent"
                   v-html="markdownToHtml(message.content)"
@@ -193,22 +195,38 @@
 
       <!-- Sent Message Metadata & Feedback -->
       <div v-else-if="message.type === 'BotAgent' && !isQueued" class="chat-message__metadata">
-        <div class="flex items-center gap-3 mt-1">
-          <div v-if="message.metadata?.confidence" class="chat-message__confidence-detailed">
-            <Badge
-              :variant="getConfidenceBadgeVariant(message.metadata.confidenceTier)"
-              class="text-xs"
-            >
-              {{ getConfidenceIcon(message.metadata.confidenceTier) }}
-              {{ (message.metadata.confidence * 100).toFixed(0) }}% Confidence
-              <span v-if="message.metadata.recheckAttempted" class="ml-1" title="Rechecked">↻</span>
-            </Badge>
+        <div class="flex items-center justify-between mt-1">
+          <!-- Left side: Confidence badge + Feedback controls -->
+          <div class="flex items-center gap-3">
+            <div v-if="message.metadata?.confidence" class="chat-message__confidence-detailed">
+              <Badge
+                :variant="getConfidenceBadgeVariant(message.metadata.confidenceTier)"
+                class="text-xs"
+              >
+                {{ getConfidenceIcon(message.metadata.confidenceTier) }}
+                {{ (message.metadata.confidence * 100).toFixed(0) }}% Confidence
+                <span v-if="message.metadata.recheckAttempted" class="ml-1" title="Rechecked"
+                  >↻</span
+                >
+              </Badge>
+            </div>
+            <MessageFeedbackControl
+              v-if="showFeedback"
+              :message-id="message.id"
+              @feedback-submitted="handleFeedbackSubmitted"
+            />
           </div>
-          <MessageFeedbackControl
-            v-if="showFeedback"
-            :message-id="message.id"
-            @feedback-submitted="handleFeedbackSubmitted"
-          />
+
+          <!-- Right side: Debug button -->
+          <Button
+            v-if="hasDebugData"
+            variant="ghost"
+            size="sm"
+            @click="showDebugDialog = true"
+            class="ml-auto"
+          >
+            <MoreVertical class="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
@@ -221,6 +239,180 @@
       @approved="handleMessageApproved"
       @blocked="handleMessageBlocked"
     />
+
+    <!-- Debug Dialog -->
+    <Dialog v-model:open="showDebugDialog">
+      <DialogContent class="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Reasoning overview</DialogTitle>
+          <DialogDescription>Internal diagnostic information for this message</DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <!-- Section 1: Execution Rationale -->
+          <div v-if="message.metadata?.executionRationale" class="debug-section">
+            <h3 class="debug-section__title">Execution Reasoning</h3>
+            <div class="debug-section__content">
+              <p class="text-sm">{{ message.metadata.executionRationale }}</p>
+            </div>
+          </div>
+
+          <!-- Section 2: Company Interest Guardrail -->
+          <div v-if="message.metadata?.companyInterest" class="debug-section">
+            <h3 class="debug-section__title">Company Interest Assessment</h3>
+            <div class="debug-section__content">
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span class="font-medium">Status:</span>
+                  <Badge
+                    :variant="message.metadata.companyInterest.passed ? 'success' : 'destructive'"
+                    class="ml-2"
+                  >
+                    {{ message.metadata.companyInterest.passed ? "Passed" : "Blocked" }}
+                  </Badge>
+                </div>
+                <div v-if="message.metadata.companyInterest.violationType">
+                  <span class="font-medium">Violation:</span>
+                  <span class="ml-2">{{ message.metadata.companyInterest.violationType }}</span>
+                </div>
+              </div>
+              <div v-if="message.metadata.companyInterest.reasoning" class="mt-3">
+                <span class="font-medium text-sm">Reasoning:</span>
+                <p class="text-sm mt-1 text-muted-foreground">
+                  {{ message.metadata.companyInterest.reasoning }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Confidence Score (Fact Grounding) -->
+          <div v-if="message.metadata?.confidence" class="debug-section">
+            <h3 class="debug-section__title">Confidence Assessment (Fact Grounding)</h3>
+            <div class="debug-section__content">
+              <!-- Overall Score -->
+              <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                <div>
+                  <span class="font-medium">Overall Score:</span>
+                  <span class="ml-2 font-mono">
+                    {{ (message.metadata.confidence * 100).toFixed(1) }}%
+                  </span>
+                </div>
+                <div>
+                  <span class="font-medium">Tier:</span>
+                  <Badge
+                    :variant="getConfidenceBadgeVariant(message.metadata.confidenceTier)"
+                    class="ml-2"
+                  >
+                    {{ message.metadata.confidenceTier?.toUpperCase() }}
+                  </Badge>
+                </div>
+              </div>
+
+              <!-- Breakdown -->
+              <div v-if="message.metadata.confidenceBreakdown" class="mb-3">
+                <span class="font-medium text-sm">Breakdown:</span>
+                <div class="grid grid-cols-3 gap-2 mt-2">
+                  <div class="text-sm">
+                    <span class="text-muted-foreground">Grounding:</span>
+                    <span class="ml-1 font-mono">
+                      {{ (message.metadata.confidenceBreakdown.grounding * 100).toFixed(0) }}%
+                    </span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="text-muted-foreground">Retrieval:</span>
+                    <span class="ml-1 font-mono">
+                      {{ (message.metadata.confidenceBreakdown.retrieval * 100).toFixed(0) }}%
+                    </span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="text-muted-foreground">Certainty:</span>
+                    <span class="ml-1 font-mono">
+                      {{ (message.metadata.confidenceBreakdown.certainty * 100).toFixed(0) }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- LLM Explanation -->
+              <div v-if="message.metadata.confidenceDetails">
+                <span class="font-medium text-sm">AI Explanation:</span>
+                <p class="text-sm mt-1 text-muted-foreground">
+                  {{ message.metadata.confidenceDetails }}
+                </p>
+              </div>
+
+              <!-- Recheck Info -->
+              <div v-if="message.metadata.recheckAttempted" class="mt-3 text-sm text-blue-600">
+                <span class="font-medium">Note:</span>
+                Response was rechecked ({{ message.metadata.recheckCount || 1 }} time{{
+                  message.metadata.recheckCount === 1 ? "" : "s"
+                }})
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Documents Used -->
+          <div v-if="message.metadata?.documentsUsed?.length" class="debug-section">
+            <h3 class="debug-section__title">
+              Documents Used ({{ message.metadata.documentsUsed.length }})
+            </h3>
+            <div class="debug-section__content">
+              <div class="space-y-2">
+                <div
+                  v-for="doc in message.metadata.documentsUsed"
+                  :key="doc.id"
+                  class="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                >
+                  <NuxtLink
+                    :to="`/documents/${doc.id}`"
+                    class="text-primary hover:underline font-medium"
+                  >
+                    {{ doc.title }}
+                  </NuxtLink>
+                  <span class="text-muted-foreground font-mono text-xs">
+                    {{ (doc.similarity * 100).toFixed(1) }}% match
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 5: Performance Metadata -->
+          <div
+            v-if="message.metadata?.latency_ms || message.metadata?.total_tokens"
+            class="debug-section"
+          >
+            <h3 class="debug-section__title">Performance</h3>
+            <div class="debug-section__content">
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div v-if="message.metadata.model">
+                  <span class="font-medium">Model:</span>
+                  <span class="ml-2 font-mono text-xs">{{ message.metadata.model }}</span>
+                </div>
+                <div v-if="message.metadata.latency_ms">
+                  <span class="font-medium">Latency:</span>
+                  <span class="ml-2 font-mono">{{ message.metadata.latency_ms }}ms</span>
+                </div>
+                <div v-if="message.metadata.total_tokens">
+                  <span class="font-medium">Total Tokens:</span>
+                  <span class="ml-2 font-mono">{{ message.metadata.total_tokens }}</span>
+                </div>
+                <div v-if="message.metadata.prompt_tokens">
+                  <span class="font-medium">Prompt/Completion:</span>
+                  <span class="ml-2 font-mono text-xs">
+                    {{ message.metadata.prompt_tokens }}/{{ message.metadata.completion_tokens }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showDebugDialog = false">Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -244,6 +436,7 @@ import {
   Ban,
   AlertCircle,
   RotateCcw,
+  MoreVertical,
 } from "lucide-vue-next";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
@@ -272,6 +465,18 @@ const emit = defineEmits<{
 
 // Approval dialog state
 const showApprovalDialog = ref(false);
+
+// Debug dialog state
+const showDebugDialog = ref(false);
+
+const hasDebugData = computed(() => {
+  return !!(
+    props.message.metadata?.executionRationale ||
+    props.message.metadata?.confidence ||
+    props.message.metadata?.documentsUsed?.length ||
+    props.message.metadata?.companyInterest
+  );
+});
 
 // Check if message is queued (delivery_state = 'queued')
 const isQueued = computed(() => {
@@ -675,6 +880,14 @@ const getConfidenceIcon = (tier: string | undefined) => {
   opacity: 0.7;
 }
 
+.chat-message__text p {
+  margin-bottom: 0.5rem;
+}
+
+.chat-message__text p:last-child {
+  margin-bottom: 0;
+}
+
 .confidence-fallback-section__text {
   background: rgba(255, 255, 255, 0.5);
   color: var(--color-neutral-700);
@@ -685,5 +898,27 @@ const getConfidenceIcon = (tier: string | undefined) => {
 
 .confidence-fallback-section__text--sent {
   border-left-color: var(--color-green-500);
+}
+
+/* Debug Dialog Styles */
+.debug-section {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background-color: var(--color-neutral-100);
+}
+
+.debug-section__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 1rem;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
+  letter-spacing: 0.1em;
+}
+
+.debug-section__content {
+  padding: 1rem;
+  padding-top: 0;
 }
 </style>

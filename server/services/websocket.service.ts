@@ -1,7 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { IncomingMessage } from "http";
-import { processManagerService } from "./process-manager.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { conversationRepository } from "../repositories/conversation.repository";

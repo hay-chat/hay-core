@@ -2,7 +2,7 @@ import { type FindManyOptions } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
-import { encryptConfig } from "@server/lib/auth/utils/encryption";
+import { encryptConfig, type ConfigSchema } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
@@ -24,6 +24,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     return this.getRepository().findOne({
       where: { organizationId, pluginId: pluginRegistry.id },
       relations: ["plugin"],
+      cache: false, // Disable cache to always get fresh data
     });
   }
 
@@ -103,7 +104,10 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = instance.plugin.manifest as HayPluginManifest;
-    const configSchema = manifest.configSchema || {};
+    // Use metadata for SDK, fallback to manifest for legacy
+    const configSchema = (instance.plugin.metadata?.configSchema ||
+      manifest.configSchema ||
+      {}) as ConfigSchema;
 
     // Encrypt sensitive fields before storing
     const encryptedConfig = encryptConfig(config, configSchema);
@@ -115,9 +119,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     await this.getRepository().increment({ id }, "restartCount", 1);
   }
 
-  async updateHealthCheck(id: string): Promise<void> {
+  async updateHealthCheck(
+    id: string,
+    status: "healthy" | "unhealthy" | "unknown" = "healthy",
+  ): Promise<void> {
     await this.getRepository().update(id, {
       lastHealthCheck: new Date(),
+      healthStatus: status,
     } as any);
   }
 
@@ -135,7 +143,10 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // If config is provided, encrypt sensitive fields
     if (data.config) {
       const manifest = pluginRegistry.manifest as HayPluginManifest;
-      const configSchema = manifest.configSchema || {};
+      // Use metadata for SDK, fallback to manifest for legacy
+      const configSchema = (pluginRegistry.metadata?.configSchema ||
+        manifest.configSchema ||
+        {}) as ConfigSchema;
       data.config = encryptConfig(data.config, configSchema);
     }
 
@@ -172,7 +183,10 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     }
 
     const manifest = pluginRegistry.manifest as HayPluginManifest;
-    const configSchema = manifest.configSchema || {};
+    // Use metadata for SDK, fallback to manifest for legacy
+    const configSchema = (pluginRegistry.metadata?.configSchema ||
+      manifest.configSchema ||
+      {}) as ConfigSchema;
 
     // Encrypt sensitive fields before storing
     const encryptedConfig = config ? encryptConfig(config, configSchema) : undefined;
@@ -193,6 +207,72 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
         status: "stopped",
       });
     }
+  }
+
+  /**
+   * Update auth state for a plugin instance
+   * Uses .save() to trigger TypeORM transformers for encryption
+   */
+  async updateAuthState(
+    instanceId: string,
+    orgId: string,
+    authState: { methodId: string; credentials: Record<string, any> },
+  ): Promise<void> {
+    // Use .findOne() and .save() to ensure transformers run
+    const instance = await this.getRepository().findOne({
+      where: { id: instanceId, organizationId: orgId },
+    });
+
+    if (!instance) {
+      throw new Error(`Plugin instance ${instanceId} not found for organization ${orgId}`);
+    }
+
+    instance.authState = authState;
+    // Set authMethod based on methodId pattern (e.g., "hubspot-oauth" -> "oauth")
+    instance.authMethod = authState.methodId.includes("oauth") ? "oauth" : "api_key";
+    instance.authValidatedAt = new Date();
+
+    await this.getRepository().save(instance);
+  }
+
+  /**
+   * Get auth state for a plugin instance
+   */
+  async getAuthState(
+    orgId: string,
+    pluginId: string,
+  ): Promise<{ methodId: string; credentials: Record<string, any> } | null> {
+    const instance = await this.findByOrgAndPlugin(orgId, pluginId);
+    return instance?.authState || null;
+  }
+
+  /**
+   * Update org-scoped runtime state
+   */
+  async updateRuntimeState(
+    instanceId: string,
+    runtimeState: "stopped" | "starting" | "ready" | "degraded" | "error",
+    error?: string,
+  ): Promise<void> {
+    const updates: any = {
+      runtimeState,
+      updatedAt: new Date(),
+    };
+
+    if (runtimeState === "starting") {
+      updates.lastStartedAt = new Date();
+    }
+
+    if (runtimeState === "error" && error) {
+      updates.lastError = error;
+    }
+
+    // Clear error when transitioning to ready
+    if (runtimeState === "ready") {
+      updates.lastError = null;
+    }
+
+    await this.getRepository().update(instanceId, updates);
   }
 }
 

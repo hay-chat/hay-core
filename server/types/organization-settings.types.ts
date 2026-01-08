@@ -304,5 +304,6 @@ export interface OrganizationSettings {
   companyDomain?: string; // Company's business domain/industry for context
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
+  channelAgents?: Record<string, string>; // Channel-specific agent assignments (channel -> agentId)
   [key: string]: unknown;
 }

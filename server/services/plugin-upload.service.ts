@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import AdmZip from "adm-zip";
 import path from "path";
 import fs from "fs";
-import Ajv from "ajv";
 import { AppDataSource } from "@server/database/data-source";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
@@ -12,25 +11,10 @@ import { storageService } from "./storage.service";
 import { pluginManagerService } from "./plugin-manager.service";
 
 export class PluginUploadService {
-  private ajv: Ajv;
-  private manifestSchema: any;
   private pluginsDir: string;
 
   constructor() {
-    this.ajv = new Ajv({ allErrors: true });
     this.pluginsDir = path.join(process.cwd(), "..", "plugins");
-    this.loadManifestSchema();
-  }
-
-  private async loadManifestSchema() {
-    try {
-      const schemaPath = path.join(this.pluginsDir, "base", "plugin-manifest.schema.json");
-      const schemaContent = await fs.promises.readFile(schemaPath, "utf-8");
-      this.manifestSchema = JSON.parse(schemaContent);
-      console.log("✅ Loaded plugin manifest schema for validation");
-    } catch (error) {
-      console.warn("⚠️  Could not load plugin manifest schema:", error);
-    }
   }
 
   /**
@@ -155,9 +139,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { processManagerService } = await import("./process-manager.service");
-      if (processManagerService.isRunning(req.organizationId, pluginId)) {
-        await processManagerService.stopPlugin(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete old ZIP from storage
@@ -234,9 +219,10 @@ export class PluginUploadService {
       }
 
       // Stop running instances
-      const { processManagerService } = await import("./process-manager.service");
-      if (processManagerService.isRunning(req.organizationId, pluginId)) {
-        await processManagerService.stopPlugin(req.organizationId, pluginId);
+      const { getPluginRunnerService } = await import("./plugin-runner.service");
+      const runner = getPluginRunnerService();
+      if (runner.isRunning(req.organizationId, pluginId)) {
+        await runner.stopWorker(req.organizationId, pluginId);
       }
 
       // Delete plugin instances
@@ -274,7 +260,7 @@ export class PluginUploadService {
   }
 
   /**
-   * Validate ZIP structure and manifest
+   * Validate ZIP structure and package.json with hay-plugin field
    */
   private async validateZipStructure(zipBuffer: Buffer): Promise<{
     manifest: any;
@@ -301,40 +287,56 @@ export class PluginUploadService {
         }
       }
 
-      // Find manifest.json
-      const manifestEntry = zipEntries.find(
-        (e) => e.entryName === "manifest.json" || e.entryName.endsWith("/manifest.json"),
+      // Find package.json
+      const packageEntry = zipEntries.find(
+        (e) => e.entryName === "package.json" || e.entryName.endsWith("/package.json"),
       );
 
-      if (!manifestEntry) {
-        throw new Error("manifest.json not found in ZIP root");
+      if (!packageEntry) {
+        throw new Error("package.json not found in ZIP root");
       }
 
-      // Parse manifest
-      const manifestContent = zip.readAsText(manifestEntry);
-      const manifest = JSON.parse(manifestContent);
+      // Parse package.json
+      const packageContent = zip.readAsText(packageEntry);
+      const packageJson = JSON.parse(packageContent);
 
-      // Validate against schema
-      if (this.manifestSchema) {
-        const validate = this.ajv.compile(this.manifestSchema);
-        const valid = validate(manifest);
-
-        if (!valid) {
-          throw new Error(`Invalid manifest: ${JSON.stringify(validate.errors)}`);
-        }
+      // Validate hay-plugin field exists
+      if (!packageJson["hay-plugin"]) {
+        throw new Error("package.json must contain a 'hay-plugin' field");
       }
+
+      const hayPlugin = packageJson["hay-plugin"];
 
       // Validate required fields
-      if (!manifest.id || !manifest.name || !manifest.version) {
-        throw new Error("Manifest missing required fields (id, name, version)");
+      if (!packageJson.name) {
+        throw new Error("package.json missing required 'name' field");
       }
 
-      // Validate plugin ID format
-      if (!/^[a-z0-9-]+$/.test(manifest.id)) {
-        throw new Error("Plugin ID must contain only lowercase letters, numbers, and hyphens");
+      if (!hayPlugin.entry) {
+        throw new Error("hay-plugin missing required 'entry' field");
       }
 
-      return { manifest, pluginId: manifest.id };
+      // Validate plugin ID format (npm package name)
+      const pluginId = packageJson.name;
+      if (!/^(@[a-z0-9-]+\/)?[a-z0-9-]+$/.test(pluginId)) {
+        throw new Error(
+          "Plugin ID (package name) must be a valid npm package name (lowercase letters, numbers, hyphens, optional scope)",
+        );
+      }
+
+      // Build manifest from package.json for compatibility with rest of upload flow
+      const manifest = {
+        id: pluginId,
+        name: hayPlugin.displayName || pluginId,
+        version: packageJson.version || "1.0.0",
+        description: packageJson.description || "",
+        author: packageJson.author,
+        category: hayPlugin.category,
+        entry: hayPlugin.entry,
+        capabilities: hayPlugin.capabilities || [],
+      };
+
+      return { manifest, pluginId };
     } catch (error) {
       if (error instanceof Error) {
         throw error;

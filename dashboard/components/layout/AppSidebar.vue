@@ -165,8 +165,8 @@ const navMain = computed(() => {
         // Add enabled plugins dynamically
         ...appStore.enabledPlugins.map((plugin) => ({
           title: plugin.name,
-          url: `/integrations/plugins/${plugin.id}`,
-          isActive: route.path === `/integrations/plugins/${plugin.id}`,
+          url: `/integrations/plugins/${encodeURIComponent(plugin.id)}`,
+          isActive: route.path === `/integrations/plugins/${encodeURIComponent(plugin.id)}`,
         })),
       ],
     });

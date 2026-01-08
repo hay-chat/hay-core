@@ -5,16 +5,18 @@ import {
   getPluginInstances,
   enablePlugin,
   disablePlugin,
+  restartPlugin,
   configurePlugin,
-  getPluginConfiguration,
   getPluginUITemplate,
   getMCPTools,
+  refreshMCPTools,
   getMenuItems,
   testConnection,
   initiateOAuth,
   isOAuthAvailable,
   getOAuthStatus,
   revokeOAuth,
+  validateAuth,
 } from "./plugins.handler";
 
 export const pluginsRouter = t.router({
@@ -23,12 +25,15 @@ export const pluginsRouter = t.router({
   getInstances: getPluginInstances,
   enable: enablePlugin,
   disable: disablePlugin,
+  restart: restartPlugin,
   configure: configurePlugin,
-  getConfiguration: getPluginConfiguration,
   getUITemplate: getPluginUITemplate,
   getMCPTools: getMCPTools,
+  refreshMCPTools: refreshMCPTools,
   getMenuItems: getMenuItems,
   testConnection: testConnection,
+  validateAuth: validateAuth,
+  // Note: Plugin UI assets are served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
   oauth: {
     initiate: initiateOAuth,
     isAvailable: isOAuthAvailable,

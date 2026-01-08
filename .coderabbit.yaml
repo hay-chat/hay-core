@@ -1,0 +1,7 @@
+language: "en-US"
+reviews:
+  max_files: 300
+  review_status: true
+  path_filters:
+    - "!**/package-lock.json"
+    - "!**/pnpm-lock.yaml"

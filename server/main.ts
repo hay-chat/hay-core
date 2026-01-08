@@ -12,11 +12,8 @@ async function startServer() {
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
 
-  // Initialize database connection (optional)
-  const dbConnected = await initializeDatabase();
-  if (!dbConnected) {
-    console.warn("⚠️  Starting server without database connection");
-  }
+  // Initialize database connection (required - will retry 3 times with 2s delay)
+  await initializeDatabase();
 
   // Initialize Redis service
   const { redisService } = await import("@server/services/redis.service");
@@ -48,7 +45,7 @@ async function startServer() {
   // Import services after database initialization to avoid circular dependency issues
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
-  const { processManagerService } = await import("@server/services/process-manager.service");
+  const { getPluginRunnerService } = await import("@server/services/plugin-runner.service");
   const { pluginInstanceManagerService } = await import(
     "@server/services/plugin-instance-manager.service"
   );
@@ -144,7 +141,12 @@ async function startServer() {
   );
 
   // Plugin thumbnail route - serve thumbnail.jpg files
-  server.get("/plugins/thumbnails/:pluginName", (req, res) => {
+  // Use catch-all pattern to handle plugin IDs with slashes (e.g., @hay/plugin-name)
+  server.get(/^\/plugins\/thumbnails\/(.+)$/, (req, res) => {
+    // Set params manually for regex routes
+    req.params = {
+      pluginName: decodeURIComponent(req.params[0]),
+    };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
       console.error("Thumbnail serving error:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -162,6 +164,28 @@ async function startServer() {
       console.error("Public file serving error:", error);
       res.status(500).json({ error: "Internal server error" });
     });
+  });
+
+  // Plugin UI assets route - serve dist/ files (ui.js, etc.)
+  // Pattern: /plugins/ui/:pluginName/:assetPath
+  // Example: /plugins/ui/@hay/plugin-zendesk/ui.js
+  // Note: Public endpoint - UI bundles are just JavaScript code with no secrets
+  server.get(/^\/plugins\/ui\/([^/]+(?:\/[^/]+)?)\/(.+)$/, async (req, res) => {
+    // Set params manually for regex routes
+    // params[0] = pluginName (may contain slash for scoped packages like @hay/plugin-zendesk)
+    // params[1] = assetPath (e.g., ui.js or images/screenshot.png)
+    req.params = {
+      pluginName: decodeURIComponent(req.params[0]),
+      assetPath: req.params[1],
+    };
+
+    try {
+      // Serve the file (no authentication required for UI bundles)
+      await pluginAssetService.serveUIAsset(req, res);
+    } catch (error) {
+      console.error("UI asset serving error:", error);
+      res.status(500).json({ error: "Failed to load UI asset" });
+    }
   });
 
   // Plugin webhook routes - handle incoming webhooks from external services
@@ -184,6 +208,11 @@ async function startServer() {
       res.status(500).json({ error: "Internal server error" });
     });
   });
+
+  // Plugin worker proxy route - proxy requests to plugin workers
+  // This is for the new TypeScript-based plugin system with process isolation
+  const pluginProxyRouter = require("@server/routes/v1/plugins/proxy").default;
+  server.use("/v1/plugins", pluginProxyRouter);
 
   // OAuth callback route - handle OAuth redirects from providers
   server.get("/oauth/callback", async (req, res) => {
@@ -219,7 +248,8 @@ async function startServer() {
       if (result.success) {
         // Redirect to dashboard plugin settings page with success message
         const dashboardUrl = getDashboardUrl();
-        const redirectUrl = `${dashboardUrl}/integrations/plugins/${result.pluginId}?oauth=success&pluginId=${result.pluginId}`;
+        const encodedPluginId = encodeURIComponent(result.pluginId!);
+        const redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
         console.log("✅ OAuth successful, redirecting to:", redirectUrl);
         console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
         return res.redirect(redirectUrl);
@@ -259,13 +289,11 @@ async function startServer() {
   server.use(wellKnownRouter.default);
 
   // Initialize plugin system BEFORE creating the router
-  if (dbConnected) {
-    try {
-      await pluginManagerService.initialize();
-      console.log("🔌 Plugin manager initialized");
-    } catch (error) {
-      console.error("Failed to initialize plugin system:", error);
-    }
+  try {
+    await pluginManagerService.initialize();
+    console.log("🔌 Plugin manager initialized");
+  } catch (error) {
+    console.error("Failed to initialize plugin system:", error);
   }
 
   // Plugin upload endpoints
@@ -313,7 +341,7 @@ async function startServer() {
   });
 
   // Plugin API routes - secure HTTP endpoints for plugins to call back to the server
-  const pluginAPIRouter = await import("@server/routes/v1/plugin-api");
+  const pluginAPIRouter = await import("@server/routes/v1/plugin-api/index");
   server.use("/v1/plugin-api", pluginAPIRouter.default);
 
   // Create dynamic router with plugin routes (after plugins are loaded)
@@ -358,32 +386,30 @@ async function startServer() {
     console.log(`🚀 Server is running on port http://localhost:${config.server.port}`);
     console.log(`🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`);
 
-    // Start the orchestrator worker if database is connected
-    if (dbConnected) {
-      orchestratorWorker.start(config.orchestrator.interval); // Check every second
-      console.log("🤖 Orchestrator worker started");
+    // Start the orchestrator worker
+    orchestratorWorker.start(config.orchestrator.interval); // Check every second
+    console.log("🤖 Orchestrator worker started");
 
-      // Initialize plugin pages management (plugin system already initialized)
-      try {
-        // Initialize plugin pages management
-        const { pluginPagesService } = await import("./services/plugin-pages.service");
-        await pluginPagesService.initialize();
-        console.log("📄 Plugin pages synced with dashboard");
+    // Initialize plugin pages management (plugin system already initialized)
+    try {
+      // Initialize plugin pages management
+      const { pluginPagesService } = await import("./services/plugin-pages.service");
+      await pluginPagesService.initialize();
+      console.log("📄 Plugin pages synced with dashboard");
 
-        // Start plugin route service cleanup
-        pluginRouteService.startCleanup();
-        console.log("🔌 Plugin route service started");
+      // Start plugin route service cleanup
+      pluginRouteService.startCleanup();
+      console.log("🔌 Plugin route service started");
 
-        // Start plugin instance lifecycle management
-        pluginInstanceManagerService.startCleanup();
-        console.log("🔌 Plugin instance lifecycle manager started");
+      // Start plugin instance lifecycle management
+      pluginInstanceManagerService.startCleanup();
+      console.log("🔌 Plugin instance lifecycle manager started");
 
-        // Note: Plugins will now be started on-demand when needed
-        // This improves scalability and resource usage
-        console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
-      } catch (error) {
-        console.error("Failed to initialize plugin system:", error);
-      }
+      // Note: Plugins will now be started on-demand when needed
+      // This improves scalability and resource usage
+      console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
+    } catch (error) {
+      console.error("Failed to initialize plugin system:", error);
     }
   });
 
@@ -393,7 +419,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await processManagerService.stopAll();
+    await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });
 
@@ -402,7 +428,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
-    await processManagerService.stopAll();
+    await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });
 }

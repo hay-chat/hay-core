@@ -1,5 +1,8 @@
 /**
  * OAuth types and interfaces for plugin authentication
+ *
+ * OAuth tokens are stored in authState.credentials (automatically encrypted by TypeORM transformer)
+ * The OAuthTokenData interface is used for token exchange with OAuth providers
  */
 
 export interface OAuthTokenData {
@@ -9,15 +12,6 @@ export interface OAuthTokenData {
   expires_at?: number; // Unix timestamp
   token_type?: string;
   scope?: string;
-}
-
-export interface OAuthConfig {
-  _oauth: {
-    tokens: OAuthTokenData;
-    connected_at: number; // Unix timestamp
-    provider: string; // Plugin ID
-    scopes?: string[];
-  };
 }
 
 export interface OAuthState {
@@ -45,5 +39,3 @@ export interface OAuthConnectionStatus {
   connectedAt?: number;
   error?: string;
 }
-
-
