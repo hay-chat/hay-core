@@ -247,7 +247,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
           metadata: { conversationId: conversation.id },
         },
       ]);
-      }
 
       // Verify all embeddings exist
       const allMessageIds = [message1.id, message2.id, message3.id];
