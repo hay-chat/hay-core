@@ -6,7 +6,7 @@ export class CreateScheduledJobsTables1766000000000 implements MigrationInterfac
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create scheduled_jobs table
     await queryRunner.query(`
-      CREATE TABLE "scheduled_jobs" (
+      CREATE TABLE IF NOT EXISTS "scheduled_jobs" (
         "name" VARCHAR(255) NOT NULL,
         "description" TEXT NOT NULL,
         "schedule" TEXT NOT NULL,
@@ -38,7 +38,7 @@ export class CreateScheduledJobsTables1766000000000 implements MigrationInterfac
 
     // Create scheduled_job_history table
     await queryRunner.query(`
-      CREATE TABLE "scheduled_job_history" (
+      CREATE TABLE IF NOT EXISTS "scheduled_job_history" (
         "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
         "job_name" VARCHAR(255) NOT NULL,
         "started_at" TIMESTAMPTZ NOT NULL,
@@ -54,11 +54,11 @@ export class CreateScheduledJobsTables1766000000000 implements MigrationInterfac
 
     // Add indexes for performance
     await queryRunner.query(`
-      CREATE INDEX "IDX_scheduled_job_history_job_name" ON "scheduled_job_history" ("job_name")
+      CREATE INDEX IF NOT EXISTS "IDX_scheduled_job_history_job_name" ON "scheduled_job_history" ("job_name")
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_scheduled_job_history_job_name_started_at"
+      CREATE INDEX IF NOT EXISTS "IDX_scheduled_job_history_job_name_started_at"
       ON "scheduled_job_history" ("job_name", "started_at")
     `);
 

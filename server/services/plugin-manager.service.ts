@@ -391,6 +391,7 @@ export class PluginManagerService {
     }
 
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+    const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
     // Check for npm install in package.json
     let installCommand: string | undefined;
@@ -400,7 +401,13 @@ export class PluginManagerService {
 
       // Only run npm install if there are dependencies
       if (packageJson.dependencies || packageJson.devDependencies) {
-        installCommand = "npm install";
+        if (isWorkspacePlugin) {
+          // For workspace plugins, run npm install from root to properly resolve workspace links
+          // The plugin is part of plugins/core/* workspace, so we need workspace-aware install
+          installCommand = `npm install --workspace=plugins/${plugin.pluginPath}`;
+        } else {
+          installCommand = "npm install";
+        }
       }
     } catch (error) {
       // Ignore - package.json might not exist
@@ -415,8 +422,12 @@ export class PluginManagerService {
     try {
       console.log(`📦 Installing plugin ${plugin.name}...`);
 
+      // For workspace plugins, run from root directory; otherwise run from plugin directory
+      const rootDir = path.join(this.pluginsDir, "..");
+      const execDir = isWorkspacePlugin ? rootDir : pluginPath;
+
       execSync(installCommand, {
-        cwd: pluginPath,
+        cwd: execDir,
         stdio: "inherit",
         env: this.buildMinimalEnv(),
       });
@@ -443,6 +454,7 @@ export class PluginManagerService {
     }
 
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+    const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
     // Check for build script in package.json
     let buildCommand: string | undefined;
@@ -451,7 +463,13 @@ export class PluginManagerService {
       const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 
       if (packageJson.scripts?.build) {
-        buildCommand = "npm run build";
+        if (isWorkspacePlugin) {
+          // For workspace plugins, run build from root with workspace flag
+          // This ensures TypeScript can resolve workspace dependencies like @hay/plugin-sdk
+          buildCommand = `npm run build --workspace=plugins/${plugin.pluginPath}`;
+        } else {
+          buildCommand = "npm run build";
+        }
       }
     } catch (error) {
       // Ignore - package.json might not exist
@@ -464,12 +482,16 @@ export class PluginManagerService {
     }
 
     try {
+      // For workspace plugins, run from root directory; otherwise run from plugin directory
+      const rootDir = path.join(this.pluginsDir, "..");
+      const execDir = isWorkspacePlugin ? rootDir : pluginPath;
+
       console.log(`🔨 Building plugin ${plugin.name}...`);
       console.log(`   Command: ${buildCommand}`);
-      console.log(`   Path: ${pluginPath}`);
+      console.log(`   Path: ${execDir}`);
 
       execSync(buildCommand, {
-        cwd: pluginPath,
+        cwd: execDir,
         stdio: "inherit",
         env: this.buildMinimalEnv(),
       });
