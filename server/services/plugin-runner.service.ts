@@ -31,19 +31,25 @@ export class PluginRunnerService {
   private runnerPath: string;
 
   constructor() {
-    // Plugins directory relative to server root
-    this.pluginsDir = path.join(__dirname, "../../plugins");
+    // Use process.cwd() as the root directory (should be the monorepo root or server directory)
+    // This is more reliable than __dirname which changes between source and compiled locations
+    const rootDir = process.cwd().endsWith("/server")
+      ? path.join(process.cwd(), "..")
+      : process.cwd();
 
-    // SDK runner path (TypeScript source - will use ts-node or compiled version)
-    const runnerSource = path.join(__dirname, "../../packages/plugin-sdk/runner/index.ts");
-    const runnerCompiled = path.join(__dirname, "../../packages/plugin-sdk/dist/runner/index.js");
+    // Plugins directory relative to monorepo root
+    this.pluginsDir = path.join(rootDir, "plugins");
 
-    // Prefer compiled version if exists, otherwise use ts-node with source
+    // SDK runner path - prefer compiled version for production
+    const runnerCompiled = path.join(rootDir, "packages/plugin-sdk/dist/runner/index.js");
+    const runnerSource = path.join(rootDir, "packages/plugin-sdk/runner/index.ts");
+
+    // Prefer compiled version if exists, otherwise use ts-node with source (for development)
     const fs = require("fs");
     if (fs.existsSync(runnerCompiled)) {
       this.runnerPath = runnerCompiled;
     } else {
-      // Use ts-node for development
+      // Use tsx for development
       this.runnerPath = runnerSource;
     }
   }
@@ -210,6 +216,18 @@ export class PluginRunnerService {
         cwd: path.dirname(this.runnerPath),
       });
 
+      // Track if spawn error occurred to prevent further processing
+      let spawnError: Error | null = null;
+
+      // Handle spawn errors (e.g., command not found)
+      // This prevents ENOENT errors from crashing the server
+      workerProcess.on("error", (error) => {
+        console.error(`[${pluginId}:${orgId}] Spawn error: ${error.message}`);
+        spawnError = error;
+        this.portAllocator.release(port);
+        this.workers.delete(workerKey);
+      });
+
       // Log output for debugging
       workerProcess.stdout?.on("data", (data) => {
         console.log(`[${pluginId}:${orgId}] ${data.toString().trim()}`);
@@ -237,6 +255,12 @@ export class PluginRunnerService {
           code === 0 ? "unknown" : "unhealthy",
         );
       });
+
+      // Give a moment for spawn error to propagate (ENOENT fires asynchronously)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (spawnError) {
+        throw new Error(`Failed to spawn worker process: ${(spawnError as Error).message}`);
+      }
 
       // Wait for /metadata endpoint to be ready (not /health)
       await this.waitForMetadataEndpoint(port, { maxAttempts: 20, interval: 500 });
