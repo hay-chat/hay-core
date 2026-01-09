@@ -12,15 +12,23 @@ export class AddHealthStatusToPluginInstance1766100000000 implements MigrationIn
   name = "AddHealthStatusToPluginInstance1766100000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add health_status column to plugin_instances table
-    await queryRunner.query(`
-      ALTER TABLE "plugin_instances"
-      ADD COLUMN "health_status" VARCHAR(50)
+    // Check if health_status column exists
+    const hasColumn = await queryRunner.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'plugin_instances' AND column_name = 'health_status'
     `);
+
+    if (hasColumn.length === 0) {
+      // Add health_status column to plugin_instances table
+      await queryRunner.query(`
+        ALTER TABLE "plugin_instances"
+        ADD COLUMN "health_status" VARCHAR(50)
+      `);
+    }
 
     // Create index on health_status for efficient querying
     await queryRunner.query(`
-      CREATE INDEX "idx_plugin_instances_health_status"
+      CREATE INDEX IF NOT EXISTS "idx_plugin_instances_health_status"
       ON "plugin_instances" ("health_status")
     `);
   }
@@ -36,4 +44,3 @@ export class AddHealthStatusToPluginInstance1766100000000 implements MigrationIn
     `);
   }
 }
-
