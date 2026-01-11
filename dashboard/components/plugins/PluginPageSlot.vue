@@ -81,14 +81,13 @@ const refreshPage = () => {
   <div class="plugin-page-slot">
     <!-- Error state from runtime errors -->
     <Alert v-if="hasError" variant="destructive">
-      <AlertCircle class="h-4 w-4" />
       <AlertTitle>Plugin Component Error</AlertTitle>
       <AlertDescription class="mt-2 space-y-3">
         <div>
           <p class="font-medium">{{ errorMessage }}</p>
           <p class="text-sm mt-1 opacity-90">
-            Plugin: <code class="bg-black/10 px-1 rounded">{{ pluginId }}</code> - Component:
-            <code class="bg-black/10 px-1 rounded">{{ componentName }}</code>
+            Plugin: <code>{{ pluginId }}</code> - Component:
+            <code>{{ componentName }}</code>
           </p>
         </div>
         <div class="flex gap-2">
