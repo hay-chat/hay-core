@@ -21,7 +21,7 @@
     "build": "npm run build:plugin-sdk && npm run build:server && npm run build:dashboard",
     "build:plugin-sdk": "cd packages/plugin-sdk && npm run build",
     "build:dashboard": "cd dashboard && npm run build",
-    "build:server": "npm run build:webchat &&cd server && npm run build",
+    "build:server": "npm run build:plugin-sdk && npm run build:webchat && cd server && npm run build",
     "build:webchat": "cd webchat && npm run build",
     "migration:ensure": "cd server && npm run migration:ensure",
     "preview": "cd dashboard && npm run preview",
