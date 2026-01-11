@@ -2,13 +2,16 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import { config } from "@server/config/env";
+import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import "reflect-metadata";
 import "dotenv/config";
 
 async function startServer() {
+  // Validate required environment variables in production
+  validateProductionConfig();
+
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
 
@@ -46,12 +49,10 @@ async function startServer() {
   const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
   const { pluginManagerService } = await import("@server/services/plugin-manager.service");
   const { getPluginRunnerService } = await import("@server/services/plugin-runner.service");
-  const { pluginInstanceManagerService } = await import(
-    "@server/services/plugin-instance-manager.service"
-  );
-  const { pluginInstanceRepository: _pluginInstanceRepository } = await import(
-    "@server/repositories/plugin-instance.repository"
-  );
+  const { pluginInstanceManagerService } =
+    await import("@server/services/plugin-instance-manager.service");
+  const { pluginInstanceRepository: _pluginInstanceRepository } =
+    await import("@server/repositories/plugin-instance.repository");
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
   const { pluginRouteService } = await import("@server/services/plugin-route.service");
   const { websocketService } = await import("@server/services/websocket.service");

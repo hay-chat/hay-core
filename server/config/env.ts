@@ -29,18 +29,14 @@ export const config = {
   },
 
   domain: {
-    base:
-      process.env.BASE_DOMAIN ||
-      (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat"),
+    base: process.env.BASE_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost" : ""),
     protocol: process.env.APP_PROTOCOL || "http",
-    // Service-specific domains
-    api:
-      process.env.API_DOMAIN ||
-      (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat"),
+    // Service-specific domains - required in production
+    api: process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : ""),
     dashboard:
       process.env.DASHBOARD_DOMAIN ||
-      (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat"),
-    cdn: process.env.CDN_DOMAIN || "cdn.hay.chat",
+      (process.env.NODE_ENV === "development" ? "localhost:3000" : ""),
+    cdn: process.env.CDN_DOMAIN || "",
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 
@@ -50,34 +46,31 @@ export const config = {
       (() => {
         const useSSL = process.env.USE_SSL === "true" || process.env.NODE_ENV === "production";
         const protocol = useSSL ? "https" : "http";
-        const apiDomain =
-          process.env.API_DOMAIN ||
-          (process.env.NODE_ENV === "development" ? "localhost:3001" : "api.hay.chat");
-        const dashboardDomain =
-          process.env.DASHBOARD_DOMAIN ||
-          (process.env.NODE_ENV === "development" ? "localhost:3000" : "app.hay.chat");
-        const baseDomain =
-          process.env.BASE_DOMAIN ||
-          (process.env.NODE_ENV === "development" ? "hay.local" : "hay.chat");
 
         // Build dynamic CORS origins
-        const origins = [
-          // Development localhost origins
-          "http://localhost:3000",
-          "http://localhost:3001",
-          "http://localhost:5173",
-          "http://127.0.0.1:3000",
-          "http://127.0.0.1:3001",
-          "http://127.0.0.1:5173",
-        ];
+        const origins: string[] = [];
 
-        // Add production/configured domains
-        if (process.env.NODE_ENV !== "development") {
+        // Development localhost origins
+        if (process.env.NODE_ENV === "development") {
           origins.push(
-            `${protocol}://${baseDomain}`,
-            `${protocol}://${dashboardDomain}`,
-            `${protocol}://${apiDomain}`,
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:5173",
           );
+        }
+
+        // Add configured domains (required in production)
+        if (process.env.BASE_DOMAIN) {
+          origins.push(`${protocol}://${process.env.BASE_DOMAIN}`);
+        }
+        if (process.env.DASHBOARD_DOMAIN) {
+          origins.push(`${protocol}://${process.env.DASHBOARD_DOMAIN}`);
+        }
+        if (process.env.API_DOMAIN) {
+          origins.push(`${protocol}://${process.env.API_DOMAIN}`);
         }
 
         return origins;
@@ -246,4 +239,44 @@ export function getCdnUrl(): string {
   // Remove protocol if accidentally included in domain config
   const domain = config.domain.cdn.replace(/^https?:\/\//, "");
   return `${getProtocol()}://${domain}`;
+}
+
+/**
+ * Validates that required environment variables are set in production.
+ * Throws an error if any required variables are missing.
+ * Should be called at application startup.
+ */
+export function validateProductionConfig(): void {
+  if (config.env === "development" || config.env === "test") {
+    return;
+  }
+
+  const missingVars: string[] = [];
+
+  if (!config.domain.api) {
+    missingVars.push("API_DOMAIN");
+  }
+  if (!config.domain.dashboard) {
+    missingVars.push("DASHBOARD_DOMAIN");
+  }
+  if (!config.jwt.secret || config.jwt.secret === "default-secret-change-in-production") {
+    missingVars.push("JWT_SECRET");
+  }
+  if (
+    !config.jwt.refreshSecret ||
+    config.jwt.refreshSecret === "default-refresh-secret-change-in-production"
+  ) {
+    missingVars.push("JWT_REFRESH_SECRET");
+  }
+  if (!config.openai.apiKey) {
+    missingVars.push("OPENAI_API_KEY");
+  }
+
+  if (missingVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables for production:\n` +
+        `  ${missingVars.join("\n  ")}\n\n` +
+        `Please set these variables in your .env file or environment.`,
+    );
+  }
 }
