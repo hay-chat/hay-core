@@ -27,7 +27,9 @@
     "dev:ui": "vite build --watch --config vite.config.ui.ts"
   },
   "dependencies": {
-    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
