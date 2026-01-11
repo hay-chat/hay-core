@@ -12,21 +12,28 @@ export default defineNuxtConfig({
   },
 
   // Runtime config for domain handling
+  // In development, uses separate origin (CORS). In production, uses same-origin via App Platform routing.
   runtimeConfig: {
     public: {
-      baseDomain: process.env["NODE_ENV"] === "development" ? "localhost:3000" : "hay.chat",
+      baseDomain:
+        process.env["BASE_DOMAIN"] ||
+        (process.env["NODE_ENV"] === "development" ? "localhost:3000" : ""),
       apiDomain:
         process.env["API_DOMAIN"] ||
-        (process.env["NODE_ENV"] === "development" ? "localhost:3001" : "api.hay.chat"),
+        (process.env["NODE_ENV"] === "development" ? "localhost:3001" : ""),
       useSSL: process.env["USE_SSL"] === "true" || process.env["NODE_ENV"] === "production",
       apiBaseUrl:
         process.env["API_BASE_URL"] ||
         (() => {
-          const useSSL =
-            process.env["USE_SSL"] === "true" || process.env["NODE_ENV"] === "production";
           const apiDomain =
             process.env["API_DOMAIN"] ||
-            (process.env["NODE_ENV"] === "development" ? "localhost:3001" : "api.hay.chat");
+            (process.env["NODE_ENV"] === "development" ? "localhost:3001" : "");
+          if (!apiDomain && process.env["NODE_ENV"] !== "development") {
+            console.error("ERROR: API_DOMAIN environment variable is required in production");
+            return "";
+          }
+          const useSSL =
+            process.env["USE_SSL"] === "true" || process.env["NODE_ENV"] === "production";
           const protocol = useSSL ? "https" : "http";
           return `${protocol}://${apiDomain}`;
         })(),
