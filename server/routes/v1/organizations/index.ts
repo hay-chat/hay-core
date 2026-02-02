@@ -57,6 +57,7 @@ const updateSettingsSchema = z.object({
   defaultAgentId: z.string().uuid().nullable().optional(),
   testModeDefault: z.boolean().optional(),
   confidenceGuardrail: confidenceGuardrailSchema.optional(),
+  retentionDays: z.number().int().min(1).max(3650).nullable().optional(), // Data retention in days (null = disabled)
 });
 
 export const organizationsRouter = t.router({
@@ -201,6 +202,7 @@ export const organizationsRouter = t.router({
         testModeDefault: organization.settings?.testModeDefault || false,
         logoUrl: organization.logoUrl || null,
         confidenceGuardrail,
+        retentionDays: organization.settings?.retentionDays ?? null,
       };
     },
   ),
@@ -218,7 +220,7 @@ export const organizationsRouter = t.router({
       }
 
       // Extract settings fields from input as they go into the settings JSONB field
-      const { testModeDefault, confidenceGuardrail, ...topLevelFields } = input;
+      const { testModeDefault, confidenceGuardrail, retentionDays, ...topLevelFields } = input;
 
       // Prepare update payload
       const updatePayload: any = {
@@ -226,7 +228,11 @@ export const organizationsRouter = t.router({
       };
 
       // Handle settings JSONB field updates
-      if (testModeDefault !== undefined || confidenceGuardrail !== undefined) {
+      if (
+        testModeDefault !== undefined ||
+        confidenceGuardrail !== undefined ||
+        retentionDays !== undefined
+      ) {
         updatePayload.settings = {
           ...(organization.settings || {}),
         };
@@ -240,6 +246,10 @@ export const organizationsRouter = t.router({
             ...(organization.settings?.confidenceGuardrail || {}),
             ...confidenceGuardrail,
           };
+        }
+
+        if (retentionDays !== undefined) {
+          updatePayload.settings.retentionDays = retentionDays;
         }
       }
 

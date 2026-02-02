@@ -485,6 +485,21 @@
                   <span class="text-neutral-muted">Updated:</span>
                   <span>{{ formatDate(conversation?.updated_at) }}</span>
                 </div>
+                <!-- Legal Hold Toggle -->
+                <div class="flex items-center justify-between pt-2 border-t mt-2">
+                  <div class="flex items-center gap-2">
+                    <Lock v-if="conversation?.legal_hold" class="h-4 w-4 text-amber-500" />
+                    <span class="text-neutral-muted">Legal Hold:</span>
+                  </div>
+                  <Switch
+                    :model-value="conversation?.legal_hold ?? false"
+                    @update:model-value="toggleLegalHold"
+                    :disabled="isUpdatingLegalHold"
+                  />
+                </div>
+                <p v-if="conversation?.legal_hold" class="text-xs text-amber-600">
+                  This conversation is exempt from automatic data retention anonymization.
+                </p>
               </CardContent>
             </Card>
 
@@ -659,6 +674,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   BookOpen,
+  Lock,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 
@@ -750,6 +766,7 @@ const assignedUser = ref<any>(null);
 const showReleaseDialog = ref(false);
 const showCloseDialog = ref(false);
 const releaseMode = ref<"ai" | "queue">("queue");
+const isUpdatingLegalHold = ref(false);
 
 // Check if conversation is taken over by current user
 const isTakenOverByCurrentUser = computed(() => {
@@ -776,6 +793,31 @@ const isTestMode = computed(() => {
 const isPendingHuman = computed(() => {
   return conversation.value?.status === "pending-human";
 });
+
+// Legal hold toggle handler
+const toggleLegalHold = async (newValue: boolean) => {
+  if (!conversation.value?.id || isUpdatingLegalHold.value) return;
+
+  isUpdatingLegalHold.value = true;
+  try {
+    const result = await HayApi.conversations.setLegalHold.mutate({
+      conversationId: conversation.value.id,
+      legalHold: newValue,
+    });
+
+    if (result.success) {
+      conversation.value.legal_hold = result.legalHold;
+      conversation.value.legal_hold_set_at = result.legalHoldSetAt;
+    }
+  } catch (error) {
+    console.error("Failed to update legal hold:", error);
+    const { useToast } = await import("@/composables/useToast");
+    const toast = useToast();
+    toast.error("Error", "Failed to update legal hold");
+  } finally {
+    isUpdatingLegalHold.value = false;
+  }
+};
 
 // Message approval handlers
 const handleMessageApproved = async (messageId: string) => {
@@ -1398,7 +1440,9 @@ onMounted(async () => {
         }
 
         // Check if message already exists - if so, update it (for tool call responses)
-        const existingMessageIndex = conversation.value.messages.findIndex((m: any) => m.id === messageData.id);
+        const existingMessageIndex = conversation.value.messages.findIndex(
+          (m: any) => m.id === messageData.id,
+        );
         if (existingMessageIndex !== -1) {
           console.log("[WebSocket] Updating existing message:", messageData.id);
           conversation.value.messages[existingMessageIndex] = {
