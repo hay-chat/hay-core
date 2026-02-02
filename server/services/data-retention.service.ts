@@ -161,25 +161,25 @@ export class DataRetentionService {
   ): Promise<Conversation | null> {
     const conversationRepository = AppDataSource.getRepository(Conversation);
 
-    const conversation = await conversationRepository.findOne({
-      where: { id: conversationId, organization_id: organizationId },
-    });
+    // Use atomic update to avoid race conditions
+    const result = await conversationRepository.update(
+      { id: conversationId, organization_id: organizationId },
+      { legal_hold: legalHold, legal_hold_set_at: new Date() },
+    );
 
-    if (!conversation) {
+    if (result.affected === 0) {
       return null;
     }
-
-    conversation.legal_hold = legalHold;
-    conversation.legal_hold_set_at = new Date();
-
-    await conversationRepository.save(conversation);
 
     debugLog(
       "data-retention",
       `Legal hold ${legalHold ? "enabled" : "disabled"} for conversation ${conversationId}`,
     );
 
-    return conversation;
+    // Fetch and return the updated conversation
+    return conversationRepository.findOne({
+      where: { id: conversationId, organization_id: organizationId },
+    });
   }
 }
 
