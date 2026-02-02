@@ -811,6 +811,9 @@ const toggleLegalHold = async (newValue: boolean) => {
     }
   } catch (error) {
     console.error("Failed to update legal hold:", error);
+    const { useToast } = await import("@/composables/useToast");
+    const toast = useToast();
+    toast.error("Error", "Failed to update legal hold");
   } finally {
     isUpdatingLegalHold.value = false;
   }
