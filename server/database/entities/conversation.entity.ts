@@ -161,6 +161,16 @@ export class Conversation {
   @Column({ type: "varchar", length: 10, nullable: true })
   language!: SupportedLanguage | null;
 
+  // Data retention fields
+  @Column({ type: "timestamptz", nullable: true })
+  deleted_at!: Date | null;
+
+  @Column({ type: "boolean", default: false })
+  legal_hold!: boolean;
+
+  @Column({ type: "timestamptz", nullable: true })
+  legal_hold_set_at!: Date | null;
+
   @OneToMany(() => Message, (message) => message.conversation)
   messages!: Message[];
 

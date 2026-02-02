@@ -688,4 +688,38 @@ export const conversationsRouter = t.router({
 
       return updatedMessage;
     }),
+
+  /**
+   * Set or remove legal hold on a conversation
+   * Conversations with legal hold are exempt from automatic data retention anonymization
+   */
+  setLegalHold: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        legalHold: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { dataRetentionService } = await import("../../../services/data-retention.service");
+
+      const conversation = await dataRetentionService.setLegalHold(
+        input.conversationId,
+        ctx.organizationId!,
+        input.legalHold,
+      );
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      return {
+        success: true,
+        legalHold: conversation.legal_hold,
+        legalHoldSetAt: conversation.legal_hold_set_at,
+      };
+    }),
 });

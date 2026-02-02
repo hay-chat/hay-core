@@ -441,91 +441,6 @@
       </CardContent>
     </Card> -->
 
-    <!-- Data Retention -->
-    <!-- <Card>
-      <CardHeader>
-        <CardTitle>Data Retention</CardTitle>
-        <CardDescription> Configure how long different types of data are kept </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label for="conversation-retention">Conversation Data</Label>
-            <select
-              id="conversation-retention"
-              v-model="settings.dataRetention.conversations"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="365">1 year</option>
-              <option value="730">2 years</option>
-              <option value="-1">Forever</option>
-            </select>
-          </div>
-
-          <div>
-            <Label for="analytics-retention">Analytics Data</Label>
-            <select
-              id="analytics-retention"
-              v-model="settings.dataRetention.analytics"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="90">90 days</option>
-              <option value="365">1 year</option>
-              <option value="730">2 years</option>
-              <option value="1825">5 years</option>
-              <option value="-1">Forever</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label for="logs-retention">System Logs</Label>
-            <select
-              id="logs-retention"
-              v-model="settings.dataRetention.logs"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="7">7 days</option>
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="365">1 year</option>
-            </select>
-          </div>
-
-          <div>
-            <Label for="exports-retention">Exported Reports</Label>
-            <select
-              id="exports-retention"
-              v-model="settings.dataRetention.exports"
-              class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-            >
-              <option value="7">7 days</option>
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="365">1 year</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div class="flex items-start space-x-2">
-            <AlertTriangle class="h-4 w-4 text-yellow-600 mt-0.5" />
-            <div class="text-sm">
-              <p class="font-medium text-yellow-800">Data Retention Policy</p>
-              <p class="text-yellow-700">
-                Changing retention settings will only affect new data. Existing data will be
-                retained according to previous settings. Consider compliance requirements before
-                making changes.
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card> -->
-
     <!-- Danger Zone - Only visible to owners -->
     <Card v-if="isOwner" class="!border-destructive">
       <CardHeader>
@@ -594,6 +509,7 @@ type PlatformSettings = {
   notifications: any;
   webhooks: any;
   dataRetention: any;
+  retentionDays: number | null; // null = disabled/forever
 };
 
 // Reactive state
@@ -642,6 +558,7 @@ const settings = ref<PlatformSettings>({
     secret: "",
     events: [] as string[],
   },
+  retentionDays: null, // null = disabled/forever
   dataRetention: {
     conversations: "365",
     analytics: "730",
@@ -799,6 +716,7 @@ const saveSettings = async () => {
       timeFormat: settings.value.timeFormat as any,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
+      retentionDays: settings.value.retentionDays,
       confidenceGuardrail: {
         ...settings.value.confidenceGuardrail,
         // Ensure boolean values are properly typed (Input component may return strings)
@@ -924,6 +842,7 @@ const resetToDefaults = () => {
         secret: "",
         events: [],
       },
+      retentionDays: null, // Default: disabled
       dataRetention: {
         conversations: "365",
         analytics: "730",
@@ -989,6 +908,10 @@ onMounted(async () => {
         ...(orgSettings.confidenceGuardrail as any),
       };
     }
+
+    // Load retention days setting
+    settings.value.retentionDays =
+      "retentionDays" in orgSettings ? (orgSettings.retentionDays as number | null) : null;
 
     // Store original settings for change detection
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));

@@ -34,6 +34,60 @@
       </Button>
     </Alert>
 
+    <!-- Data Retention Policy -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Data Retention Policy</CardTitle>
+        <CardDescription>
+          Configure automatic anonymization of closed conversations for GDPR compliance
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="space-y-2">
+          <Label for="retentionDays">Conversation Retention Period</Label>
+          <Select v-model="retentionDays" id="retentionDays">
+            <SelectTrigger>
+              <SelectValue placeholder="Select retention period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem :value="null">Disabled (keep forever)</SelectItem>
+              <SelectItem :value="30">30 days</SelectItem>
+              <SelectItem :value="60">60 days</SelectItem>
+              <SelectItem :value="90">90 days</SelectItem>
+              <SelectItem :value="180">180 days</SelectItem>
+              <SelectItem :value="365">365 days (1 year)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p class="text-sm text-muted-foreground">
+            After this period, closed conversations will be anonymized. Messages are deleted but
+            analytics metadata is preserved.
+          </p>
+        </div>
+
+        <div
+          class="p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg"
+        >
+          <div class="flex items-start space-x-2">
+            <AlertTriangle class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div class="text-sm">
+              <p class="font-medium text-amber-800 dark:text-amber-200">Important</p>
+              <p class="text-amber-700 dark:text-amber-300">
+                When enabled, closed conversations older than the retention period will be
+                automatically anonymized daily. Messages will be permanently deleted, but
+                conversation metadata is preserved for analytics. Conversations marked with "Legal
+                Hold" are exempt from anonymization.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Button @click="saveRetentionPolicy" :disabled="isSavingRetention">
+          <Save class="h-4 w-4 mr-2" />
+          {{ isSavingRetention ? "Saving..." : "Save Retention Policy" }}
+        </Button>
+      </CardContent>
+    </Card>
+
     <!-- Initiate Request Form -->
     <Card>
       <CardHeader>
@@ -138,8 +192,24 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { Hay } from "@/utils/api";
-import { Download, Trash2, InfoIcon, AlertCircle, CheckCircle, Loader2 } from "lucide-vue-next";
+import {
+  Download,
+  Trash2,
+  InfoIcon,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  AlertTriangle,
+  Save,
+} from "lucide-vue-next";
+import { useToast } from "@/composables/useToast";
+
+const toast = useToast();
 import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
+
+// Retention policy state
+const retentionDays = ref<number | null>(null);
+const isSavingRetention = ref(false);
 
 // Form state
 const identifierType = ref<"email" | "phone" | "externalId">("email");
@@ -326,8 +396,34 @@ const fetchRequests = async () => {
   }
 };
 
+// Retention policy methods
+const fetchRetentionPolicy = async () => {
+  try {
+    const result = await Hay.organizations.getSettings.query();
+    retentionDays.value = result.retentionDays ?? null;
+  } catch (error) {
+    console.error("Failed to fetch retention policy:", error);
+  }
+};
+
+const saveRetentionPolicy = async () => {
+  isSavingRetention.value = true;
+  try {
+    await Hay.organizations.updateSettings.mutate({
+      retentionDays: retentionDays.value,
+    });
+    toast.success("Success", "Retention policy saved successfully");
+  } catch (error) {
+    console.error("Failed to save retention policy:", error);
+    toast.error("Error", "Failed to save retention policy");
+  } finally {
+    isSavingRetention.value = false;
+  }
+};
+
 // Lifecycle
 onMounted(() => {
   fetchRequests();
+  fetchRetentionPolicy();
 });
 </script>

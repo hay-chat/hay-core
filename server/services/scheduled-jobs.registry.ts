@@ -177,6 +177,24 @@ const jobRegistry: CronJobConfig[] = [
     enabled: true,
   },
 
+  {
+    name: "conversation-retention-anonymize",
+    description: "Anonymize expired conversations based on organization retention policies",
+    schedule: "0 3 * * *", // Daily at 3 AM
+    handler: async () => {
+      const { dataRetentionService } = await import("./data-retention.service");
+      await dataRetentionService.anonymizeExpiredConversations();
+    },
+    // NOTE: Respects organization.settings.retentionDays (null = disabled)
+    // Preserves conversation metadata for analytics while removing PII
+    // Conversations with legal_hold = true are exempt from anonymization
+    timeout: 1800000, // 30 minutes max for large cleanups
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // OAUTH TOKEN MANAGEMENT
   // ============================================================
