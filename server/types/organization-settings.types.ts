@@ -59,10 +59,10 @@ export enum Timezone {
   Asia_Qatar = "Asia/Qatar",
 
   // South & Southeast Asia
-  Asia_Kolkata = "Asia/Kolkata",          // UTC+5:30
-  Asia_Kathmandu = "Asia/Kathmandu",      // UTC+5:45
+  Asia_Kolkata = "Asia/Kolkata", // UTC+5:30
+  Asia_Kathmandu = "Asia/Kathmandu", // UTC+5:45
   Asia_Dhaka = "Asia/Dhaka",
-  Asia_Yangon = "Asia/Yangon",            // UTC+6:30
+  Asia_Yangon = "Asia/Yangon", // UTC+6:30
   Asia_Bangkok = "Asia/Bangkok",
   Asia_Jakarta = "Asia/Jakarta",
   Asia_Singapore = "Asia/Singapore",
@@ -93,7 +93,7 @@ export enum Timezone {
   America_Chicago = "America/Chicago",
   America_Denver = "America/Denver",
   America_Los_Angeles = "America/Los_Angeles",
-  America_Phoenix = "America/Phoenix",       // No DST
+  America_Phoenix = "America/Phoenix", // No DST
   America_Anchorage = "America/Anchorage",
   America_Vancouver = "America/Vancouver",
   America_Mexico_City = "America/Mexico_City",
@@ -231,7 +231,8 @@ export function getTimezoneOffset(tz: string): string {
     timeZoneName: "shortOffset",
     hour: "2-digit",
   }).formatToParts(now);
-  const offset = parts.find(p => p.type === "timeZoneName")?.value?.replace(/^UTC/, "GMT") ?? "GMT";
+  const offset =
+    parts.find((p) => p.type === "timeZoneName")?.value?.replace(/^UTC/, "GMT") ?? "GMT";
   return offset;
 }
 
@@ -305,5 +306,6 @@ export interface OrganizationSettings {
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   channelAgents?: Record<string, string>; // Channel-specific agent assignments (channel -> agentId)
+  retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
   [key: string]: unknown;
 }
