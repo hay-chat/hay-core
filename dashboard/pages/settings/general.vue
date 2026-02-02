@@ -441,49 +441,6 @@
       </CardContent>
     </Card> -->
 
-    <!-- Data Retention -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Data Retention</CardTitle>
-        <CardDescription>
-          Configure automatic anonymization of closed conversations for GDPR compliance
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <Input
-          v-model="settings.retentionDays"
-          type="select"
-          label="Conversation Retention Period"
-          :options="[
-            { label: 'Disabled (keep forever)', value: null },
-            { label: '30 days', value: 30 },
-            { label: '60 days', value: 60 },
-            { label: '90 days', value: 90 },
-            { label: '180 days', value: 180 },
-            { label: '365 days (1 year)', value: 365 },
-          ]"
-          helper-text="After this period, closed conversations will be anonymized. Messages are deleted but analytics metadata is preserved."
-        />
-
-        <div
-          class="p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg"
-        >
-          <div class="flex items-start space-x-2">
-            <AlertTriangle class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div class="text-sm">
-              <p class="font-medium text-amber-800 dark:text-amber-200">Important</p>
-              <p class="text-amber-700 dark:text-amber-300">
-                When enabled, closed conversations older than the retention period will be
-                automatically anonymized daily. Messages will be permanently deleted, but
-                conversation metadata is preserved for analytics. Conversations marked with "Legal
-                Hold" are exempt from anonymization.
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
     <!-- Danger Zone - Only visible to owners -->
     <Card v-if="isOwner" class="!border-destructive">
       <CardHeader>
@@ -508,7 +465,7 @@
 </template>
 
 <script setup lang="ts">
-import { Save, RotateCcw, Trash2, AlertTriangle } from "lucide-vue-next";
+import { Save, RotateCcw, Trash2 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useFileUpload } from "@/composables/useFileUpload";
