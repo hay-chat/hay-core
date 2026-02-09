@@ -50,7 +50,8 @@ export type AuditAction =
   | "document.create"
   | "document.update"
   | "document.delete"
-  | "permission.denied";
+  | "permission.denied"
+  | "retention.cleanup";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

@@ -1,4 +1,4 @@
-import { Repository, SelectQueryBuilder, In, Not } from "typeorm";
+import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
@@ -56,7 +56,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   /**
    * Find conversation by ID and organizationId - ensures proper organization scoping
    */
-  override async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
+  override async findByIdAndOrganization(
+    id: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
     const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id AND conversation.organization_id = :organizationId", {
@@ -75,14 +78,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { agent_id: agentId, organization_id: organizationId },
+      where: { agent_id: agentId, organization_id: organizationId, deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
 
   override async findByOrganization(organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { organization_id: organizationId },
+      where: { organization_id: organizationId, deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
@@ -107,7 +110,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;
@@ -128,7 +134,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;
@@ -150,16 +159,18 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
       // Only select conversations that are truly available for processing
-      queryBuilder.where(
-        "(conversation.status = :openStatus OR " +
-          "(conversation.status = :processingStatus AND conversation.processing_locked_until < :fiveMinutesAgo)) AND " +
-          "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
-        {
-          openStatus: "open",
-          processingStatus: "processing",
-          fiveMinutesAgo,
-        },
-      );
+      queryBuilder
+        .where("conversation.deleted_at IS NULL")
+        .andWhere(
+          "(conversation.status = :openStatus OR " +
+            "(conversation.status = :processingStatus AND conversation.processing_locked_until < :fiveMinutesAgo)) AND " +
+            "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
+          {
+            openStatus: "open",
+            processingStatus: "processing",
+            fiveMinutesAgo,
+          },
+        );
 
       queryBuilder.leftJoinAndSelect("conversation.messages", "messages");
       queryBuilder.orderBy("conversation.created_at", "ASC");
@@ -199,9 +210,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
     // Use organization_id instead of organizationId for conversations
-    queryBuilder.where("entity.organization_id = :organizationId", {
-      organizationId,
-    });
+    // Exclude soft-deleted (anonymized) conversations by default
+    queryBuilder
+      .where("entity.organization_id = :organizationId", {
+        organizationId,
+      })
+      .andWhere("entity.deleted_at IS NULL");
 
     // Add base where conditions if provided
     if (baseWhere) {
@@ -363,7 +377,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   async findReadyForProcessing(): Promise<Conversation[]> {
     const query = this.getRepository()
       .createQueryBuilder("conversation")
-      .where("conversation.needs_processing = :needsProcessing", {
+      .where("conversation.deleted_at IS NULL")
+      .andWhere("conversation.needs_processing = :needsProcessing", {
         needsProcessing: true,
       })
       .andWhere("conversation.status IN (:...statuses)", {
@@ -380,7 +395,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   async findAllOpenConversations(): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { status: "open" },
+      where: { status: "open", deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
@@ -462,13 +477,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const query = `
-      SELECT 
+      SELECT
         DATE(created_at) as date,
         COUNT(*) as count
-      FROM conversations 
-      WHERE organization_id = $1 
-        AND created_at >= $2 
+      FROM conversations
+      WHERE organization_id = $1
+        AND created_at >= $2
         AND created_at <= $3
+        AND deleted_at IS NULL
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `;
@@ -527,7 +543,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .createQueryBuilder("conversation")
       .where("conversation.organization_id = :organizationId", {
         organizationId: filters.organizationId,
-      });
+      })
+      .andWhere("conversation.deleted_at IS NULL");
 
     if (filters.startDate) {
       queryBuilder.andWhere("conversation.created_at >= :startDate", {
