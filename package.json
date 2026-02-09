@@ -70,5 +70,8 @@
   "dependencies": {
     "@hay/plugin-sdk": "file:packages/plugin-sdk",
     "@types/archiver": "^7.0.0"
+  },
+  "devDependencies": {
+    "ts-jest": "^29.4.6"
   }
 }

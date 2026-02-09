@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { t } from "@server/trpc/init";
 import * as jwt from "jsonwebtoken";
 import type { Context } from "@server/trpc/context";
+import { config } from "@server/config/env";
 
 /**
  * Plugin JWT token payload
@@ -58,7 +59,7 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
 
   try {
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as PluginTokenPayload;
+    const decoded = jwt.verify(token, config.jwt.secret) as PluginTokenPayload;
 
     // Verify scope
     if (decoded.scope !== "plugin-api") {
@@ -122,10 +123,7 @@ export const pluginProcedure = t.procedure.use(verifyPluginAuth);
 /**
  * Helper to check if a capability is present
  */
-export function requireCapability(
-  ctx: PluginAuthContext,
-  capability: string
-): void {
+export function requireCapability(ctx: PluginAuthContext, capability: string): void {
   if (!ctx.pluginAuth.capabilities.includes(capability)) {
     throw new TRPCError({
       code: "FORBIDDEN",
