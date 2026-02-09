@@ -245,7 +245,7 @@ Wizard optimizes for confidence, not completeness
 
 ### Frontend — Step Components
 
-- [ ] **3. Create `WizardStepPurpose.vue` (Step 1)**
+- [x] **3. Create `WizardStepPurpose.vue` (Step 1)**
   - File: `dashboard/components/playbooks/WizardStepPurpose.vue`
   - Single textarea with `v-model`, label "What is this playbook for?"
   - Helper text: "Describe what this playbook should help resolve or automate."
