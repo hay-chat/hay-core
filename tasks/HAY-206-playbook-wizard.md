@@ -6,6 +6,184 @@
 
 ---
 
+User Story
+As a support lead or operations manager
+I want a guided wizard to create a new playbook from a blank state
+So I can quickly define its purpose, attach the right documents, and generate a solid first version without needing to understand AI or system internals.
+
+Scope
+This story covers only the Wizard experience, not the Editor, auto-save, or versioning behavior after creation.
+
+The wizard is responsible for:
+
+Collecting minimal intent
+
+Helping users select relevant documents (with suggestions)
+
+Generating the first playbook draft
+
+Handing off to the Playbook Editor for refinement
+
+Wizard Structure (v1)
+Step 1 — Define Purpose
+Goal: Capture intent with the lowest possible cognitive load.
+
+UI
+
+Single large textarea:
+
+Label: “What is this playbook for?”
+
+Helper text: “Describe what this playbook should help resolve or automate.”
+
+Constraints
+
+No tone selection
+
+No channel selection
+
+No industry selection
+
+No advanced options
+
+Acceptance Criteria
+
+User can proceed with only this field filled
+
+Soft guidance on length (e.g. “1–3 sentences recommended”)
+
+Example text is shown inline (not placeholder-only)
+
+Step 2 — Key Actions (unchanged conceptually)
+Goal: Define what the playbook is allowed to do via integrations or actions.
+
+UI
+
+List of suggested actions based on connected integrations
+
+Ability to select multiple actions
+
+Optional free-text field for custom actions
+
+Acceptance Criteria
+
+Suggested actions appear automatically if integrations exist
+
+User can continue even if no actions are selected
+
+Clear copy explains that “no actions” means “answer-only playbook”
+
+Step 3 — Documents & Knowledge (with Suggestions)
+Goal: Ground the playbook in the right source material.
+
+UI
+
+Document selector (multi-select)
+
+Suggested documents section:
+
+Highlighted list of recommended documents
+
+Based on:
+
+Document usage frequency
+
+Title / tag relevance to Step 1 description
+
+Ability to preview documents
+
+Acceptance Criteria
+
+Suggested documents are visually distinct from the full list
+
+User can accept or ignore suggestions freely
+
+Wizard does not block progression if no documents are selected
+
+Selected documents are clearly listed before moving forward
+
+Exploration / Open Questions
+
+What heuristic defines “suggested” (usage, tags, semantic match)?
+
+Do we show why a document is suggested (v1 optional)?
+
+Step 4 — Boundaries & Escalation
+Goal: Ensure safe defaults before generation.
+
+UI
+
+Simple checklist + text inputs:
+
+“Always escalate when…”
+
+“Never answer questions about…”
+
+Preset examples shown inline
+
+Acceptance Criteria
+
+At least one escalation rule is encouraged but not strictly required
+
+High-risk examples are visually emphasized
+
+User must acknowledge review of escalation rules before proceeding
+
+Step 5 — Generate Instructions
+Goal: Generate the initial playbook and transition to the Editor.
+
+UI
+
+Full-width generated instruction preview (read-only)
+
+Short explanatory copy:
+
+“This is a starting point. You’ll be able to refine everything next.”
+
+Primary CTA: “Create playbook & open editor”
+
+Behavior
+
+On confirmation:
+
+Playbook is created
+
+Initial draft/version is generated
+
+User is redirected into the Playbook Editor
+
+Acceptance Criteria
+
+Wizard does not support deep editing at this step
+
+No publishing happens in the wizard
+
+User lands in the editor with generated content pre-filled
+
+Out of Scope (Explicit)
+Editing instructions inside the wizard
+
+Auto-save behavior
+
+Version history UI
+
+Publishing or activation
+
+Analytics or optimization suggestions
+
+These are handled in the Playbook Editor.
+
+UX & Product Principles
+Wizard should take < 5 minutes for first-time users
+
+Every step must feel reversible
+
+Copy avoids technical or AI-centric language
+
+Wizard optimizes for confidence, not completeness
+
+---
+
 ## Progress Tracker
 
 ### Backend
@@ -16,7 +194,7 @@
   - Variables: `purpose`, `actions` (array), `documents` (array), `escalationRules`, `boundaries`
   - Instructs LLM to produce structured step-by-step playbook instructions
 
-- [ ] **2. Add `generateInstructions` mutation to playbooks router**
+- [x] **2. Add `generateInstructions` mutation to playbooks router**
   - File: `server/routes/v1/playbooks/index.ts`
   - Input schema:
     ```typescript
