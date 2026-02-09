@@ -10,7 +10,7 @@
 
 ### Backend
 
-- [ ] **1. Create prompt template**
+- [x] **1. Create prompt template**
   - File: `server/prompts/en/playbook/generate-instructions.md`
   - Handlebars template with frontmatter (follow pattern from `server/prompts/en/retrieval/playbook-selection.md`)
   - Variables: `purpose`, `actions` (array), `documents` (array), `escalationRules`, `boundaries`
