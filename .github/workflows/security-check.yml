@@ -1,0 +1,51 @@
+name: Security Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  jwt-secret-defaults:
+    name: Check for hardcoded JWT defaults
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for insecure JWT default secrets in source code
+        run: |
+          # Search for known insecure default secret strings in TypeScript source files
+          # Excludes test files, SECURITY.md, env.example files, and this workflow
+          INSECURE_PATTERNS=(
+            "default-secret-change-in-production"
+            "default-refresh-secret-change-in-production"
+            "your-secret-key-change-in-production"
+            "your-refresh-secret-change-in-production"
+          )
+
+          FAILED=0
+          for pattern in "${INSECURE_PATTERNS[@]}"; do
+            # Search server source code (excluding tests, docs, examples, and the validation blocklist itself)
+            MATCHES=$(grep -rn "$pattern" server/ \
+              --include="*.ts" \
+              --exclude-dir=tests \
+              --exclude-dir=dist \
+              --exclude-dir=node_modules \
+              | grep -v "KNOWN_INSECURE_DEFAULTS" \
+              || true)
+
+            if [ -n "$MATCHES" ]; then
+              echo "::error::Found insecure JWT default '$pattern' in source code:"
+              echo "$MATCHES"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "::error::Insecure JWT default values found in source code. Remove all hardcoded fallback secrets."
+            exit 1
+          fi
+
+          echo "No insecure JWT defaults found in source code."
