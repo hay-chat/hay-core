@@ -282,7 +282,7 @@ Wizard optimizes for confidence, not completeness
   - `Checkbox` for acknowledgment: "I have reviewed the escalation rules and boundaries"
   - `v-model:escalation-rules`, `v-model:boundaries`, `v-model:acknowledged`
 
-- [ ] **7. Create `WizardStepGenerate.vue` (Step 5)**
+- [x] **7. Create `WizardStepGenerate.vue` (Step 5)**
   - File: `dashboard/components/playbooks/WizardStepGenerate.vue`
   - Props: `wizardData`, `generatedResult`, `generating` (boolean)
   - Emits: `generate`

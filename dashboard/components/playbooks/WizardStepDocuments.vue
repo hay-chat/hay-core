@@ -148,23 +148,22 @@ onMounted(async () => {
     // Deduplicate search results by documentId
     const seenIds = new Set<string>();
     suggestedDocuments.value = searchResults
-      .filter((r: { documentId?: string }) => {
-        if (!r.documentId || seenIds.has(r.documentId)) return false;
-        seenIds.add(r.documentId);
+      .filter((r) => {
+        const docId = r.documentId as string | undefined;
+        if (!docId || seenIds.has(docId)) return false;
+        seenIds.add(docId);
         return true;
       })
-      .map((r: { documentId?: string; title: string }) => ({
-        id: r.documentId!,
+      .map((r) => ({
+        id: r.documentId as string,
         title: r.title,
       }));
 
-    allDocuments.value = listResults.items.map(
-      (d: { id: string; title: string; description?: string }) => ({
-        id: d.id,
-        title: d.title || "Untitled",
-        description: d.description,
-      }),
-    );
+    allDocuments.value = listResults.items.map((d) => ({
+      id: d.id,
+      title: d.title || "Untitled",
+      description: d.description,
+    }));
   } catch {
     error.value = true;
   } finally {
