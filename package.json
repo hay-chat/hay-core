@@ -69,6 +69,10 @@
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:packages/plugin-sdk",
-    "@types/archiver": "^7.0.0"
+    "@mozilla/readability": "^0.6.0",
+    "@types/archiver": "^7.0.0",
+    "@types/turndown": "^5.0.6",
+    "linkedom": "^0.18.12",
+    "turndown": "^7.2.2"
   }
 }

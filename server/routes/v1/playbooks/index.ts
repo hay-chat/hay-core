@@ -227,19 +227,7 @@ export const playbooksRouter = t.router({
           title: { type: "string" },
           trigger: { type: "string" },
           description: { type: "string" },
-          instructions: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                level: { type: "number" },
-                instructions: { type: "string" },
-              },
-              required: ["id", "level", "instructions"],
-              additionalProperties: false,
-            },
-          },
+          instructions: { type: "string" },
         },
         required: ["title", "trigger", "description", "instructions"],
         additionalProperties: false,

@@ -41,9 +41,7 @@ export class DocumentProcessorService {
   /**
    * Process a web document: convert HTML to Markdown, update content, and create embeddings
    */
-  async processWebDocument(
-    options: ProcessWebDocumentOptions,
-  ): Promise<ProcessWebDocumentResult> {
+  async processWebDocument(options: ProcessWebDocumentOptions): Promise<ProcessWebDocumentResult> {
     const {
       documentId,
       organizationId,
@@ -56,21 +54,25 @@ export class DocumentProcessorService {
     } = options;
 
     try {
-      // Step 1: Convert HTML to Markdown with timeout
+      // Step 1: Convert HTML to Markdown (using Readability + Turndown, synchronous)
       let processed: { content: string; metadata: Record<string, unknown> };
       try {
-        processed = (await Promise.race([
-          this.htmlProcessor.process(Buffer.from(htmlContent), pageTitle),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("HTML processing timeout after 30 seconds")), 30000),
-          ),
-        ])) as { content: string; metadata: Record<string, unknown> };
+        processed = await this.htmlProcessor.process(Buffer.from(htmlContent), pageTitle);
       } catch (htmlError) {
-        const errorMessage = htmlError instanceof Error ? htmlError.message : "HTML processing failed";
+        const errorMessage =
+          htmlError instanceof Error ? htmlError.message : "HTML processing failed";
         console.error(`[DocumentProcessor] HTML processing failed for ${pageUrl}:`, errorMessage);
 
         // Update document with processing error
-        await this.updateDocumentWithError(documentId, organizationId, pageUrl, errorMessage, "html_to_markdown", retryCount, jobId);
+        await this.updateDocumentWithError(
+          documentId,
+          organizationId,
+          pageUrl,
+          errorMessage,
+          "html_to_markdown",
+          retryCount,
+          jobId,
+        );
 
         return {
           success: false,
@@ -102,10 +104,19 @@ export class DocumentProcessorService {
           throw new Error("Failed to update document in database");
         }
       } catch (updateError) {
-        const errorMessage = updateError instanceof Error ? updateError.message : "Database update failed";
+        const errorMessage =
+          updateError instanceof Error ? updateError.message : "Database update failed";
         console.error(`[DocumentProcessor] Failed to update document ${documentId}:`, errorMessage);
 
-        await this.updateDocumentWithError(documentId, organizationId, pageUrl, errorMessage, "html_to_markdown", retryCount, jobId);
+        await this.updateDocumentWithError(
+          documentId,
+          organizationId,
+          pageUrl,
+          errorMessage,
+          "html_to_markdown",
+          retryCount,
+          jobId,
+        );
 
         return {
           success: false,
@@ -139,7 +150,7 @@ export class DocumentProcessorService {
 
         // Success: Update document to final status
         const finalStatus = metadata.status || DocumentationStatus.PUBLISHED;
-        await documentRepository.update(document.id, organizationId, {
+        const updatedDocument = await documentRepository.update(document.id, organizationId, {
           status: finalStatus,
           processingMetadata: {
             retryCount,
@@ -149,15 +160,21 @@ export class DocumentProcessorService {
           },
         });
 
-        console.log(`[DocumentProcessor] Successfully processed document ${documentId} from ${pageUrl}`);
+        console.log(
+          `[DocumentProcessor] Successfully processed document ${documentId} from ${pageUrl}`,
+        );
 
         return {
           success: true,
-          document,
+          document: updatedDocument || document,
         };
       } catch (embeddingError) {
-        const errorMessage = embeddingError instanceof Error ? embeddingError.message : "Embedding generation failed";
-        console.error(`[DocumentProcessor] Failed to create embeddings for ${pageUrl}:`, errorMessage);
+        const errorMessage =
+          embeddingError instanceof Error ? embeddingError.message : "Embedding generation failed";
+        console.error(
+          `[DocumentProcessor] Failed to create embeddings for ${pageUrl}:`,
+          errorMessage,
+        );
 
         // Document is saved but without embeddings
         await documentRepository.update(document.id, organizationId, {
@@ -180,10 +197,21 @@ export class DocumentProcessorService {
         };
       }
     } catch (unexpectedError) {
-      const errorMessage = unexpectedError instanceof Error ? unexpectedError.message : "Unexpected error during processing";
+      const errorMessage =
+        unexpectedError instanceof Error
+          ? unexpectedError.message
+          : "Unexpected error during processing";
       console.error(`[DocumentProcessor] Unexpected error processing ${pageUrl}:`, errorMessage);
 
-      await this.updateDocumentWithError(documentId, organizationId, pageUrl, errorMessage, "html_to_markdown", retryCount, jobId);
+      await this.updateDocumentWithError(
+        documentId,
+        organizationId,
+        pageUrl,
+        errorMessage,
+        "html_to_markdown",
+        retryCount,
+        jobId,
+      );
 
       return {
         success: false,
@@ -205,9 +233,10 @@ export class DocumentProcessorService {
     jobId?: string,
   ): Promise<void> {
     const status = retryCount >= 3 ? DocumentationStatus.ERROR : DocumentationStatus.PROCESSING;
-    const content = retryCount >= 3
-      ? `Failed to import content from ${pageUrl} after ${retryCount} attempts.\n\nError: ${errorMessage}`
-      : `Processing content from ${pageUrl}...\n\nLast error: ${errorMessage}`;
+    const content =
+      retryCount >= 3
+        ? `Failed to import content from ${pageUrl} after ${retryCount} attempts.\n\nError: ${errorMessage}`
+        : `Processing content from ${pageUrl}...\n\nLast error: ${errorMessage}`;
 
     try {
       await documentRepository.update(documentId, organizationId, {

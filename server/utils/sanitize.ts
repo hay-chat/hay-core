@@ -11,8 +11,13 @@ export function sanitizeContent(content: string): string {
   // Remove other control characters except tab, newline, and carriage return
   sanitized = sanitized.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
-  // Normalize whitespace (optional - keeps only standard whitespace)
-  sanitized = sanitized.replace(/\s+/g, " ").trim();
+  // Collapse runs of 3+ blank lines into 2 (preserves markdown structure)
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+
+  // Trim trailing whitespace on each line
+  sanitized = sanitized.replace(/[^\S\n]+$/gm, "");
+
+  sanitized = sanitized.trim();
 
   return sanitized;
 }
