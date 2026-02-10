@@ -34,8 +34,15 @@ export class PlaybookService {
       for (const agentId of agentIds) {
         const agent = await this.agentRepository.findById(agentId);
         if (!agent || agent.organization_id !== organizationId) continue;
-        if (agent) {
-          agents.push(agent);
+        agents.push(agent);
+      }
+    } else {
+      // Auto-assign the organization's default agent when no agents are specified
+      const organization = await this.organizationRepository.findById(organizationId);
+      if (organization?.defaultAgentId) {
+        const defaultAgent = await this.agentRepository.findById(organization.defaultAgentId);
+        if (defaultAgent) {
+          agents.push(defaultAgent);
         }
       }
     }
