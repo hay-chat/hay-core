@@ -252,7 +252,7 @@ Wizard optimizes for confidence, not completeness
   - Inline tips section (not just placeholder)
   - Validation: `purpose.trim().length >= 10`
 
-- [ ] **4. Create `WizardStepActions.vue` (Step 2)**
+- [x] **4. Create `WizardStepActions.vue` (Step 2)**
   - File: `dashboard/components/playbooks/WizardStepActions.vue`
   - On mount: `HayApi.plugins.getMCPTools.query()` to fetch available tools
   - Group tools by `pluginName`
