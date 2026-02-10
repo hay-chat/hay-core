@@ -261,7 +261,7 @@ Wizard optimizes for confidence, not completeness
   - `v-model` binds to array of selected tool objects `{ name, description, pluginName }`
   - Can proceed without selecting any
 
-- [ ] **5. Create `WizardStepDocuments.vue` (Step 3)**
+- [x] **5. Create `WizardStepDocuments.vue` (Step 3)**
   - File: `dashboard/components/playbooks/WizardStepDocuments.vue`
   - Props: `purpose` (string from Step 1)
   - On mount, parallel fetch:
