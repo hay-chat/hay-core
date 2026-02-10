@@ -110,6 +110,9 @@ import { useStepper } from "@vueuse/core";
 import { ArrowLeft, Check } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { useToast } from "~/composables/useToast";
+import { PlaybookStatus } from "~/types/playbook";
+
+type StepId = "purpose" | "actions" | "documents" | "boundaries" | "generate";
 
 const router = useRouter();
 const toast = useToast();
@@ -166,7 +169,7 @@ const canProceed = computed(() => {
 });
 
 // --- Step Indicator Styling ---
-function stepIndicatorClass(stepId: string) {
+function stepIndicatorClass(stepId: StepId) {
   if (stepper.isBefore(stepId)) {
     return "bg-primary text-primary-foreground";
   }
@@ -208,7 +211,7 @@ async function handleCreate() {
       trigger: generatedResult.value.trigger,
       description: generatedResult.value.description,
       instructions: generatedResult.value.instructions,
-      status: "draft",
+      status: PlaybookStatus.DRAFT,
     });
     toast.success("Playbook created successfully");
     router.push(`/playbooks/${response.id}`);

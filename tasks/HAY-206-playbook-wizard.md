@@ -345,13 +345,13 @@ Wizard optimizes for confidence, not completeness
 
 ### Verification
 
-- [ ] **11. Generate tRPC types**
+- [x] **11. Generate tRPC types**
   - Run `npm run generate:trpc`
 
-- [ ] **12. Run typecheck**
+- [x] **12. Run typecheck**
   - Run `npm run typecheck`
 
-- [ ] **13. Run lint**
+- [x] **13. Run lint**
   - Run `npm run lint` (fix any issues)
 
 ---
