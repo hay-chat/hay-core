@@ -352,8 +352,7 @@ const toggleView = () => {
 };
 
 const createPlaybook = () => {
-  // TODO: Navigate to playbook creation
-  router.push("/playbooks/new");
+  router.push("/playbooks/wizard");
 };
 
 const editPlaybook = (id: string) => {
