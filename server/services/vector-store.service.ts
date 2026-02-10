@@ -1,18 +1,18 @@
 /**
  * Vector Store Service
  *
- * This service provides vector embedding storage and similarity search using pgvector and LangChain.
- * It's designed as a plain TypeScript service that uses the shared DataSource.
- * If this codebase uses NestJS, this can be easily converted to an @Injectable() provider.
+ * This service provides vector embedding storage and similarity search using pgvector.
+ * It calls the OpenAI embeddings API directly via the OpenAI SDK.
  *
  * @module services/vector-store
  */
 
-import { TypeORMVectorStore } from "@langchain/community/vectorstores/typeorm";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import OpenAI from "openai";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
-import type { DataSourceOptions, EntityManager } from "typeorm";
+import type { EntityManager } from "typeorm";
+
+const EMBEDDING_BATCH_SIZE = 100;
 
 export interface VectorChunk {
   content: string;
@@ -28,21 +28,15 @@ export interface SearchResult {
 }
 
 export class VectorStoreService {
-  private vectorStore: TypeORMVectorStore | null = null;
-  private embeddings: OpenAIEmbeddings;
-  private readonly embeddingDim: number;
+  private openai: OpenAI;
+  private readonly model: string;
+  private readonly dimensions: number;
   private _initialized: boolean = false;
 
   constructor() {
-    // Initialize OpenAI embeddings
-    this.embeddings = new OpenAIEmbeddings({
-      openAIApiKey: config.openai.apiKey,
-      modelName: config.openai.models.embedding.model || "text-embedding-3-small",
-      dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
-      batchSize: 100,
-    });
-
-    this.embeddingDim = parseInt(process.env.EMBEDDING_DIM || "1536");
+    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    this.model = config.openai.models.embedding.model || "text-embedding-3-small";
+    this.dimensions = parseInt(process.env.EMBEDDING_DIM || "1536");
   }
 
   get initialized(): boolean {
@@ -58,23 +52,43 @@ export class VectorStoreService {
       throw new Error("DataSource must be initialized before VectorStore");
     }
 
-    // Get connection options from the initialized DataSource
-    const postgresConnectionOptions: DataSourceOptions = {
-      type: "postgres",
-      host: config.database.host,
-      port: config.database.port,
-      username: config.database.username,
-      password: config.database.password,
-      database: config.database.database,
-      ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-    };
+    this._initialized = true;
+  }
 
-    this.vectorStore = await TypeORMVectorStore.fromDataSource(this.embeddings, {
-      postgresConnectionOptions,
-      tableName: "embeddings",
+  /**
+   * Embed an array of texts, batching to stay within API limits.
+   * Returns one vector per input text, in the same order.
+   */
+  private async embedTexts(texts: string[]): Promise<number[][]> {
+    const allVectors: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
+      const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE);
+      const response = await this.openai.embeddings.create({
+        model: this.model,
+        input: batch,
+        dimensions: this.dimensions,
+      });
+
+      // OpenAI returns embeddings sorted by index, but sort to be safe
+      const sorted = response.data.sort((a, b) => a.index - b.index);
+      allVectors.push(...sorted.map((item) => item.embedding));
+    }
+
+    return allVectors;
+  }
+
+  /**
+   * Embed a single query string.
+   */
+  private async embedQuery(text: string): Promise<number[]> {
+    const response = await this.openai.embeddings.create({
+      model: this.model,
+      input: text,
+      dimensions: this.dimensions,
     });
 
-    this._initialized = true;
+    return response.data[0].embedding;
   }
 
   /**
@@ -90,21 +104,15 @@ export class VectorStoreService {
     docId: string | null,
     chunks: VectorChunk[],
   ): Promise<string[]> {
-    if (!this.embeddings) {
-      throw new Error("Embeddings not initialized.");
-    }
-
-    // Embed all chunks
     const texts = chunks.map((chunk) => chunk.content);
-    const vectors = await this.embeddings.embedDocuments(texts);
+    const vectors = await this.embedTexts(texts);
 
-    // Insert directly using raw SQL to handle our custom columns properly
     const insertQuery = `
       INSERT INTO embeddings (
-        "organization_id", 
-        "document_id", 
-        "page_content", 
-        metadata, 
+        "organization_id",
+        "document_id",
+        "page_content",
+        metadata,
         embedding
       )
       VALUES ($1, $2, $3, $4, $5::vector)
@@ -137,18 +145,14 @@ export class VectorStoreService {
    * @returns Array of search results with similarity scores
    */
   async search(organizationId: string, query: string, k: number = 10): Promise<SearchResult[]> {
-    if (!this.vectorStore) {
+    if (!this._initialized) {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
 
-    // First, embed the query
-    const queryVector = await this.embeddings.embedQuery(query);
+    const queryVector = await this.embedQuery(query);
 
-    // Use raw SQL for organization-scoped similarity search
-    // This ensures proper multi-tenancy filtering
-    // Cast the embedding column to vector type for the comparison
     const searchQuery = `
-      SELECT 
+      SELECT
         id,
         "page_content" as content,
         metadata,
@@ -164,8 +168,6 @@ export class VectorStoreService {
       organizationId,
       k,
     ]);
-
-    // console.log("🚨 [VectorStoreService] ROW Search results", results);
 
     interface SearchResultRow {
       id: string;
@@ -380,7 +382,7 @@ export class VectorStoreService {
   }> {
     const stats = await AppDataSource.query(
       `
-      SELECT 
+      SELECT
         COUNT(*)::int as "totalEmbeddings",
         COUNT(DISTINCT "document_id")::int as "totalDocuments"
       FROM embeddings
