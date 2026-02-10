@@ -272,7 +272,7 @@ Wizard optimizes for confidence, not completeness
   - `v-model` binds to `selectedDocumentIds: string[]`
   - Can proceed with 0 docs
 
-- [ ] **6. Create `WizardStepBoundaries.vue` (Step 4)**
+- [x] **6. Create `WizardStepBoundaries.vue` (Step 4)**
   - File: `dashboard/components/playbooks/WizardStepBoundaries.vue`
   - Two textareas: "Always escalate when..." and "Never answer questions about..."
   - Preset example rules as clickable `Badge` elements that append to textarea
