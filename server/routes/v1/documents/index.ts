@@ -962,11 +962,18 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     const scraper = new WebScraperService();
     const htmlProcessor = new HtmlProcessor();
 
-    // Scrape the single URL
+    // Scrape only the single document URL (not the entire site)
     if (!document.sourceUrl) {
       throw new Error("Document has no source URL to recrawl");
     }
-    const pages = await scraper.scrapeWebsite(document.sourceUrl);
+    const pages = await scraper.scrapeSelectedPages([
+      {
+        url: document.sourceUrl,
+        title: document.title,
+        selected: true,
+        discoveredAt: new Date(),
+      },
+    ]);
 
     if (pages.length === 0) {
       throw new Error("Failed to recrawl the page");

@@ -16,7 +16,7 @@
             class="flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium transition-colors"
             :class="stepIndicatorClass(step.id)"
           >
-            <Check v-if="stepper.isBefore(step.id)" class="h-4 w-4" />
+            <Check v-if="stepper.isAfter(step.id)" class="h-4 w-4" />
             <span v-else>{{ index + 1 }}</span>
           </div>
           <span
@@ -34,7 +34,7 @@
           v-if="index < stepsMeta.length - 1"
           class="w-8 lg:w-12 h-px mx-2"
           :class="
-            stepper.isBefore(stepsMeta[index + 1].id) || stepper.isCurrent(stepsMeta[index + 1].id)
+            stepper.isAfter(stepsMeta[index + 1].id) || stepper.isCurrent(stepsMeta[index + 1].id)
               ? 'bg-primary'
               : 'bg-border'
           "
@@ -100,6 +100,22 @@
       :destructive="true"
       @confirm="confirmCancel"
     />
+
+    <!-- Success Dialog -->
+    <Dialog :open="showSuccessDialog">
+      <DialogContent :hide-close="true" class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Playbook Created</DialogTitle>
+          <DialogDescription>
+            Your playbook has been created successfully. What would you like to do next?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter class="flex-col sm:flex-row gap-2">
+          <Button variant="outline" @click="goToPlaybooks">View All Playbooks</Button>
+          <Button @click="goToEditor">Continue Editing</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </Page>
 </template>
 
@@ -111,6 +127,7 @@ import { ArrowLeft, Check } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { useToast } from "~/composables/useToast";
 import { PlaybookStatus } from "~/types/playbook";
+import { markdownToTiptapJSON } from "@/utils/markdownToTiptap";
 
 type StepId = "purpose" | "actions" | "documents" | "boundaries" | "generate";
 
@@ -143,12 +160,14 @@ interface GeneratedResult {
   title: string;
   trigger: string;
   description: string;
-  instructions: { id: string; level: number; instructions: string }[];
+  instructions: string;
 }
 
 const generatedResult = ref<GeneratedResult | null>(null);
 const generating = ref(false);
 const creating = ref(false);
+const showSuccessDialog = ref(false);
+const createdPlaybookId = ref<string | null>(null);
 
 // --- Step Validation ---
 const canProceed = computed(() => {
@@ -170,7 +189,7 @@ const canProceed = computed(() => {
 
 // --- Step Indicator Styling ---
 function stepIndicatorClass(stepId: StepId) {
-  if (stepper.isBefore(stepId)) {
+  if (stepper.isAfter(stepId)) {
     return "bg-primary text-primary-foreground";
   }
   if (stepper.isCurrent(stepId)) {
@@ -206,15 +225,16 @@ async function handleCreate() {
 
   creating.value = true;
   try {
+    const instructionsJSON = markdownToTiptapJSON(generatedResult.value.instructions);
     const response = await HayApi.playbooks.create.mutate({
       title: generatedResult.value.title,
       trigger: generatedResult.value.trigger,
       description: generatedResult.value.description,
-      instructions: generatedResult.value.instructions,
+      instructions: instructionsJSON,
       status: PlaybookStatus.DRAFT,
     });
-    toast.success("Playbook created successfully");
-    router.push(`/playbooks/${response.id}`);
+    createdPlaybookId.value = response.id;
+    showSuccessDialog.value = true;
   } catch (error) {
     console.error("Failed to create playbook:", error);
     toast.error("Failed to create playbook. Please try again.");
@@ -223,8 +243,22 @@ async function handleCreate() {
   }
 }
 
+// --- Success Dialog Navigation ---
+function goToEditor() {
+  navigatingAway.value = true;
+  showSuccessDialog.value = false;
+  router.push(`/playbooks/${createdPlaybookId.value}`);
+}
+
+function goToPlaybooks() {
+  navigatingAway.value = true;
+  showSuccessDialog.value = false;
+  router.push("/playbooks");
+}
+
 // --- Cancel / Navigation Guard ---
 const showCancelDialog = ref(false);
+const navigatingAway = ref(false);
 const hasProgress = computed(() => {
   return (
     wizardData.purpose.trim().length > 0 ||
@@ -245,6 +279,7 @@ function handleCancel() {
 
 function confirmCancel() {
   showCancelDialog.value = false;
+  navigatingAway.value = true;
   router.push("/playbooks");
 }
 
@@ -258,7 +293,7 @@ onBeforeUnmount(() => {
 });
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (hasProgress.value) {
+  if (hasProgress.value && !navigatingAway.value) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -266,11 +301,11 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 
 // Vue Router navigation guard
 const unregisterGuard = router.beforeEach((_to, _from, next) => {
-  if (hasProgress.value && !showCancelDialog.value) {
+  if (navigatingAway.value || !hasProgress.value) {
+    next();
+  } else {
     showCancelDialog.value = true;
     next(false);
-  } else {
-    next();
   }
 });
 

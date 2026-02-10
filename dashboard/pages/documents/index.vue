@@ -41,11 +41,12 @@
           @change="applyFilters"
         >
           <option value="">All Types</option>
-          <option value="pdf">PDF</option>
-          <option value="txt">Text</option>
-          <option value="md">Markdown</option>
-          <option value="doc">Word</option>
-          <option value="html">HTML</option>
+          <option value="article">Article</option>
+          <option value="guide">Guide</option>
+          <option value="faq">FAQ</option>
+          <option value="tutorial">Tutorial</option>
+          <option value="reference">Reference</option>
+          <option value="policy">Policy</option>
         </select>
         <select
           v-model="statusFilter"
@@ -53,8 +54,9 @@
           @change="applyFilters"
         >
           <option value="">All Status</option>
-          <option value="active">Active</option>
+          <option value="published">Published</option>
           <option value="processing">Processing</option>
+          <option value="draft">Draft</option>
           <option value="archived">Archived</option>
           <option value="error">Error</option>
         </select>
@@ -71,8 +73,8 @@
           <AlertCircle class="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0" />
           <div>
             <p class="text-sm font-medium text-red-900 dark:text-red-300">
-              {{ errorDocumentsCount }} document{{ errorDocumentsCount === 1 ? "" : "s" }} failed
-              to process
+              {{ errorDocumentsCount }} document{{ errorDocumentsCount === 1 ? "" : "s" }} failed to
+              process
             </p>
             <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">
               These documents encountered errors during import and may need attention.
@@ -80,9 +82,7 @@
           </div>
         </div>
         <div class="flex space-x-2">
-          <Button variant="outline" size="sm" @click="viewFailedDocuments">
-            View Failed
-          </Button>
+          <Button variant="outline" size="sm" @click="viewFailedDocuments"> View Failed </Button>
           <Button size="sm" :disabled="retryingAll" @click="retryAllFailed">
             <RotateCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': retryingAll }" />
             {{ retryingAll ? "Retrying..." : "Retry All" }}
@@ -117,7 +117,7 @@
 
     <!-- Documents Table -->
     <div
-      v-if="!loading && filteredDocuments.length > 0"
+      v-if="!loading && documents.length > 0"
       class="bg-background rounded-lg border overflow-x-auto"
     >
       <Table class="table-fixed w-full">
@@ -135,7 +135,7 @@
         </TableHeader>
         <TableBody>
           <TableRow
-            v-for="document in filteredDocuments"
+            v-for="document in documents"
             :key="document.id"
             :class="selectedDocuments.includes(document.id) ? 'bg-background-secondary' : ''"
           >
@@ -241,7 +241,10 @@
                     <RefreshCw class="mr-2 h-4 w-4" />
                     Update from Source
                   </DropdownMenuItem>
-                  <DropdownMenuItem v-if="document.status === 'error'" @click="retryDocument(document)">
+                  <DropdownMenuItem
+                    v-if="document.status === 'error'"
+                    @click="retryDocument(document)"
+                  >
                     <RotateCw class="mr-2 h-4 w-4" />
                     Retry Processing
                   </DropdownMenuItem>
@@ -267,7 +270,7 @@
 
     <!-- Empty State -->
     <EmptyState
-      v-else-if="!loading && filteredDocuments.length === 0"
+      v-else-if="!loading && documents.length === 0"
       :title="searchQuery || typeFilter || statusFilter ? 'No documents found' : 'No documents yet'"
       :description="
         searchQuery || typeFilter || statusFilter
@@ -276,7 +279,11 @@
       "
       illustration="/bale/document.svg"
       :action="searchQuery || typeFilter || statusFilter ? 'Clear Filters' : 'Import Document'"
-      @click="searchQuery || typeFilter || statusFilter ? clearFilters() : $router.push('/documents/import')"
+      @click="
+        searchQuery || typeFilter || statusFilter
+          ? clearFilters()
+          : $router.push('/documents/import')
+      "
     />
 
     <!-- Pagination -->
@@ -386,10 +393,7 @@
     </Dialog>
 
     <!-- Document Preview Sheet -->
-    <DocumentPreviewSheet
-      v-model:open="showPreview"
-      :document-id="previewDocumentId"
-    />
+    <DocumentPreviewSheet v-model:open="showPreview" :document-id="previewDocumentId" />
   </Page>
 </template>
 
@@ -481,32 +485,11 @@ const uploadForm = ref({
 const toast = useToast();
 
 // Computed
-const filteredDocuments = computed(() => {
-  let filtered = documents.value;
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(
-      (doc) =>
-        doc.name.toLowerCase().includes(query) || doc.description?.toLowerCase().includes(query),
-    );
-  }
-
-  if (typeFilter.value) {
-    filtered = filtered.filter((doc) => doc.type === typeFilter.value);
-  }
-
-  if (statusFilter.value) {
-    filtered = filtered.filter((doc) => doc.status === statusFilter.value);
-  }
-
-  return filtered;
-});
 
 const allSelected = computed(() => {
   return (
-    filteredDocuments.value.length > 0 &&
-    filteredDocuments.value.every((doc) => selectedDocuments.value.includes(doc.id))
+    documents.value.length > 0 &&
+    documents.value.every((doc) => selectedDocuments.value.includes(doc.id))
   );
 });
 
@@ -563,8 +546,13 @@ const formatDate = (date: Date) => {
 const refreshData = async () => {
   loading.value = true;
   try {
+    const filters: Record<string, string> = {};
+    if (typeFilter.value) filters.type = typeFilter.value;
+    if (statusFilter.value) filters.status = statusFilter.value;
+
     const result = await HayApi.documents.list.query({
       pagination: { page: currentPage.value, limit: pageSize.value },
+      ...(Object.keys(filters).length > 0 && { filters }),
     });
 
     // Map the result to the expected document format
@@ -644,11 +632,6 @@ const handleItemsPerPageChange = async (itemsPerPage: number) => {
   await refreshData();
 };
 
-// Load documents on mount
-onMounted(() => {
-  refreshData();
-});
-
 // Helper function to detect file type from MIME type or extension
 const _detectFileType = (mimeType: string, extension: string): string => {
   if (mimeType.includes("pdf") || extension === "pdf") return "pdf";
@@ -679,14 +662,19 @@ const _mapDocumentStatus = (documentStatus: string, processingStatus?: string): 
 };
 
 const applyFilters = () => {
-  // Filters are reactive through computed property
+  currentPage.value = 1;
+  selectedDocuments.value = [];
+  refreshData();
 };
 
 const clearFilters = () => {
   searchQuery.value = "";
   typeFilter.value = "";
   statusFilter.value = "";
+  searchResults.value = [];
   selectedDocuments.value = [];
+  currentPage.value = 1;
+  refreshData();
 };
 
 const toggleDocumentSelection = (documentId: string) => {
@@ -702,7 +690,7 @@ const toggleAllSelection = () => {
   if (allSelected.value) {
     selectedDocuments.value = [];
   } else {
-    selectedDocuments.value = filteredDocuments.value.map((doc) => doc.id);
+    selectedDocuments.value = documents.value.map((doc) => doc.id);
   }
 };
 
@@ -943,24 +931,28 @@ const handleFileUpload = async (event: Event) => {
 const uploadDocument = async () => {};
 
 const retryDocument = async (document: Document) => {
+  const previousStatus = document.status;
   try {
+    // Set processing immediately so the UI updates before the API call
+    document.status = "processing";
+
     await HayApi.documents.retryDocument.mutate({
       documentId: document.id,
     });
 
-    toast.success(`Retry started for "${document.title || document.name}"`);
-
-    // Update document status to processing
-    document.status = "processing";
+    // Toast will be shown by the WebSocket handler when processing
+    // completes with "published" or "error" status
   } catch (error) {
     console.error("Error retrying document:", error);
     toast.error("Failed to retry document processing");
+    document.status = previousStatus;
   }
 };
 
 const viewFailedDocuments = () => {
   statusFilter.value = "error";
-  applyFilters();
+  currentPage.value = 1;
+  refreshData();
 };
 
 const retryAllFailed = async () => {
@@ -982,11 +974,17 @@ const retryAllFailed = async () => {
 
         document.status = "processing";
         successCount++;
-        toast.update(progressToastId, `Retrying documents... ${successCount + failureCount}/${totalCount}`);
+        toast.update(
+          progressToastId,
+          `Retrying documents... ${successCount + failureCount}/${totalCount}`,
+        );
       } catch (error) {
         console.error(`Failed to retry document ${document.id}:`, error);
         failureCount++;
-        toast.update(progressToastId, `Retrying documents... ${successCount + failureCount}/${totalCount}`);
+        toast.update(
+          progressToastId,
+          `Retrying documents... ${successCount + failureCount}/${totalCount}`,
+        );
       }
     }
 
@@ -1033,13 +1031,17 @@ onMounted(async () => {
       const oldStatus = document.status;
       document.status = data.status;
 
-      console.log(`[Documents] Updated document ${data.documentId} status: ${oldStatus} → ${data.status}`);
+      console.log(
+        `[Documents] Updated document ${data.documentId} status: ${oldStatus} → ${data.status}`,
+      );
 
-      // Show toast notification for status changes
-      if (data.status === "published") {
-        toast.success(`Document "${document.title || document.name}" processed successfully`);
-      } else if (data.status === "error") {
-        toast.error(`Document "${document.title || document.name}" failed to process`);
+      // Show toast notification for status changes (skip during batch retry)
+      if (!retryingAll.value) {
+        if (data.status === "published") {
+          toast.success(`Document "${document.title || document.name}" processed successfully`);
+        } else if (data.status === "error") {
+          toast.error(`Document "${document.title || document.name}" failed to process`);
+        }
       }
     }
   });

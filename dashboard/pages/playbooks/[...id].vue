@@ -1,9 +1,9 @@
 <template>
   <Page
-    :title="isEditMode ? 'Edit' : 'Create New'"
+    :title="isEditMode ? `Edit ${playbook?.title}` : 'Create New'"
     :description="
       isEditMode
-        ? ' Update your playbook configuration'
+        ? 'Update your playbook configuration'
         : 'Define automated conversation flows for your agents'
     "
     width="max"

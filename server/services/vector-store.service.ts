@@ -39,6 +39,7 @@ export class VectorStoreService {
       openAIApiKey: config.openai.apiKey,
       modelName: config.openai.models.embedding.model || "text-embedding-3-small",
       dimensions: parseInt(process.env.EMBEDDING_DIM || "1536"),
+      batchSize: 100,
     });
 
     this.embeddingDim = parseInt(process.env.EMBEDDING_DIM || "1536");

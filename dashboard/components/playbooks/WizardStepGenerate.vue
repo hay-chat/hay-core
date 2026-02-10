@@ -77,16 +77,11 @@
 
         <div class="space-y-2">
           <Label>Instructions</Label>
-          <div class="rounded-lg border border-border bg-background-secondary p-4 space-y-2">
-            <div
-              v-for="item in generatedResult.instructions"
-              :key="item.id"
-              class="text-sm text-foreground"
-              :style="{ paddingLeft: `${(item.level - 1) * 1}rem` }"
-            >
-              {{ item.instructions }}
-            </div>
-          </div>
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div
+            class="rounded-lg border border-border bg-background-secondary p-4 prose prose-sm max-w-none instructions-preview"
+            v-html="instructionsHtml"
+          />
         </div>
       </div>
 
@@ -107,6 +102,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Sparkles, Loader2, RefreshCw, Info as InfoIcon } from "lucide-vue-next";
+import { marked } from "marked";
 
 interface WizardData {
   purpose: string;
@@ -121,7 +117,7 @@ interface GeneratedResult {
   title: string;
   trigger: string;
   description: string;
-  instructions: { id: string; level: number; instructions: string }[];
+  instructions: string;
 }
 
 const props = defineProps<{
@@ -140,4 +136,47 @@ const hasBoundaries = computed(() => {
     props.wizardData.boundaries.trim().length > 0
   );
 });
+
+const instructionsHtml = computed(() => {
+  if (!props.generatedResult?.instructions) return "";
+  return marked.parse(props.generatedResult.instructions, { async: false }) as string;
+});
 </script>
+
+<style scoped>
+.instructions-preview :deep(h1) {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.instructions-preview :deep(h2) {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+.instructions-preview :deep(p) {
+  margin-bottom: 0.5rem;
+}
+
+.instructions-preview :deep(ul),
+.instructions-preview :deep(ol) {
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.instructions-preview :deep(ul) {
+  list-style-type: disc;
+}
+
+.instructions-preview :deep(ol) {
+  list-style-type: decimal;
+}
+
+.instructions-preview :deep(li) {
+  margin-bottom: 0.25rem;
+}
+</style>

@@ -3,7 +3,6 @@ import { Document, DocumentationStatus } from "@server/entities/document.entity"
 import { documentRepository } from "@server/repositories/document.repository";
 import { documentProcessorService } from "./document-processor.service";
 import { websocketService } from "./websocket.service";
-import { MoreThan, LessThan, In } from "typeorm";
 
 interface RetryQueueResult {
   processed: number;
@@ -22,6 +21,7 @@ interface RetryQueueResult {
  */
 export class DocumentRetryService {
   private readonly MAX_RETRY_COUNT = 3;
+  private readonly MAX_BATCH_SIZE = 100; // Process at most 10 documents per retry run
 
   /**
    * Calculate the minimum wait time based on retry count (exponential backoff)
@@ -48,10 +48,9 @@ export class DocumentRetryService {
       const query = repository
         .createQueryBuilder("document")
         .where("document.status = :status", { status: DocumentationStatus.PROCESSING })
-        .andWhere(
-          "COALESCE((document.processing_metadata->>'retryCount')::int, 0) < :maxRetries",
-          { maxRetries: this.MAX_RETRY_COUNT },
-        );
+        .andWhere("COALESCE((document.processing_metadata->>'retryCount')::int, 0) < :maxRetries", {
+          maxRetries: this.MAX_RETRY_COUNT,
+        });
 
       // Filter by organization if specified
       if (organizationId) {
@@ -236,10 +235,14 @@ export class DocumentRetryService {
         return result;
       }
 
-      console.log(`[DocumentRetry] Processing ${documents.length} documents...`);
+      // Cap the batch to avoid overwhelming target servers with concurrent retries
+      const batch = documents.slice(0, this.MAX_BATCH_SIZE);
+      console.log(
+        `[DocumentRetry] Processing ${batch.length} of ${documents.length} eligible documents...`,
+      );
 
-      // Process each document
-      for (const document of documents) {
+      // Process each document in the batch
+      for (const document of batch) {
         result.processed++;
 
         const success = await this.retryDocument(document.id, document.organizationId);
@@ -257,8 +260,8 @@ export class DocumentRetryService {
           error: success ? undefined : "Processing failed",
         });
 
-        // Add a small delay between documents to avoid overwhelming the system
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Delay between retries to avoid rate limiting on target servers
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       console.log(

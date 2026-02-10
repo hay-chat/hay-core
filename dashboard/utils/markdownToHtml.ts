@@ -19,21 +19,35 @@ export function markdownToHtml(markdown: string): string {
   html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
   html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
 
-  // Convert bold
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Convert horizontal rules (must come before bold/italic to avoid * * * being eaten)
+  html = html.replace(/^---$/gim, "<hr>");
+  html = html.replace(/^\*\*\*$/gim, "<hr>");
+  html = html.replace(/^\* \* \*$/gim, "<hr>");
+  html = html.replace(/^___$/gim, "<hr>");
 
-  // Convert italic
+  // Convert bold (* and _ variants, double must come before single)
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
+
+  // Convert italic (* and _ variants)
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>");
 
   // Convert strikethrough
   html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
 
-  // Convert links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // Convert images (must come before links since ![alt](url) would match [alt](url))
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
+    // Fix protocol-relative URLs (//example.com → https://example.com)
+    const fixedSrc = src.startsWith("//") ? `https:${src}` : src;
+    return `<img src="${fixedSrc}" alt="${alt}" loading="lazy" style="max-width: 100%; height: auto; border-radius: 0.375rem; margin: 0.5rem 0;" />`;
+  });
 
-  // Convert horizontal rules
-  html = html.replace(/^---$/gim, "<hr>");
-  html = html.replace(/^\*\*\*$/gim, "<hr>");
+  // Convert links
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+  );
 
   // Convert unordered lists (simple version)
   html = html.replace(/^\s*[-*]\s+(.*)$/gim, "<li>$1</li>");
@@ -41,9 +55,9 @@ export function markdownToHtml(markdown: string): string {
   // Convert ordered lists (simple version)
   html = html.replace(/^\s*\d+\.\s+(.*)$/gim, "<li>$1</li>");
 
-  // Wrap consecutive list items
+  // Wrap consecutive list items and strip newlines between tags
   html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-    return "<ul>" + match + "</ul>";
+    return "<ul>" + match.replace(/\n/g, "") + "</ul>";
   });
 
   // Convert blockquotes
