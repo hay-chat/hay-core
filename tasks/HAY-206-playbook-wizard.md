@@ -295,7 +295,7 @@ Wizard optimizes for confidence, not completeness
 
 ### Frontend — Wizard Page
 
-- [ ] **8. Create wizard page**
+- [x] **8. Create wizard page**
   - File: `dashboard/pages/playbooks/wizard.vue`
   - `useStepper(['purpose', 'actions', 'documents', 'boundaries', 'generate'])` from `@vueuse/core`
   - Reactive `wizardData` object:
@@ -333,12 +333,12 @@ Wizard optimizes for confidence, not completeness
 
 ### Route Updates
 
-- [ ] **9. Update list page route**
+- [x] **9. Update list page route**
   - File: `dashboard/pages/playbooks/index.vue`
   - Change "Create Playbook" button from routing to `/playbooks/new` → `/playbooks/wizard`
   - Also update `EmptyState` action link if applicable
 
-- [ ] **10. Add redirect from `/playbooks/new`**
+- [x] **10. Add redirect from `/playbooks/new`**
   - File: `dashboard/pages/playbooks/[...id].vue`
   - Add early check in `onMounted`: if route is `/playbooks/new`, `router.replace('/playbooks/wizard')`
   - Page then exclusively handles editing existing playbooks
