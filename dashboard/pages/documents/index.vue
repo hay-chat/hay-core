@@ -25,7 +25,7 @@
           />
           <Input
             v-model="searchQuery"
-            placeholder="Search documents using natural language..."
+            placeholder="Search documents by keyword or natural language..."
             class="pl-10"
             @keyup.enter="searchDocuments"
           />
@@ -297,30 +297,6 @@
       @items-per-page-change="handleItemsPerPageChange"
     />
 
-    <!-- Search Results -->
-    <div v-if="searchResults.length > 0" class="space-y-4">
-      <h3 class="text-lg font-semibold">Search Results</h3>
-      <div class="grid gap-4">
-        <Card v-for="result in searchResults" :key="result.id">
-          <CardHeader>
-            <CardTitle class="text-base">
-              {{ result.title }}
-            </CardTitle>
-            <CardDescription>
-              Similarity: {{ (result.similarity * 100).toFixed(2) }}%
-
-              {{ result }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p class="text-sm text-neutral-muted">
-              {{ result.content }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-
     <!-- Loading State -->
     <div v-if="loading" class="space-y-4">
       <div v-for="i in 5" :key="i" class="animate-pulse">
@@ -426,16 +402,6 @@ const loading = ref(false);
 const searching = ref(false);
 const searchQuery = ref("");
 const retryingAll = ref(false);
-interface SearchResult {
-  id: string;
-  title: string;
-  content: string;
-  type: string;
-  status: string;
-  similarity: number;
-}
-
-const searchResults = ref<SearchResult[]>([]);
 const typeFilter = ref("");
 const statusFilter = ref("");
 const selectedDocuments = ref<string[]>([]);
@@ -578,7 +544,7 @@ const refreshData = async () => {
   }
 };
 
-// Search documents using vector similarity
+// Search documents using hybrid search (vector + keyword)
 const searchDocuments = async () => {
   if (!searchQuery.value.trim()) return;
 
@@ -589,30 +555,23 @@ const searchDocuments = async () => {
       limit: 20,
     });
 
-    // Map search results to document format
-    searchResults.value = (results || []).map((doc: any) => ({
+    // Update the main documents list with search results
+    documents.value = (results || []).map((doc: any) => ({
       id: doc.id,
-      title: doc.title,
-      content: doc.content,
-      type: doc.type,
-      status: doc.status,
-      similarity: doc.similarity || 0,
-    }));
-
-    // Also update the main documents list with search results
-    documents.value = searchResults.value.map((doc: any) => ({
-      id: doc.id,
-      name: doc.title,
+      name: doc.title || "Untitled",
       title: doc.title,
       description: doc.content,
       type: doc.type,
       status: doc.status,
-      similarity: doc.similarity,
       category: "search-result",
       fileSize: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: doc.createdAt ? new Date(doc.createdAt) : new Date(),
+      updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : new Date(),
+      sourceUrl: doc.sourceUrl,
+      importMethod: doc.importMethod,
+      hasAttachment: doc.hasAttachment,
     }));
+    totalDocuments.value = documents.value.length;
   } catch (error) {
     console.error("Search failed:", error);
   } finally {
@@ -671,7 +630,6 @@ const clearFilters = () => {
   searchQuery.value = "";
   typeFilter.value = "";
   statusFilter.value = "";
-  searchResults.value = [];
   selectedDocuments.value = [];
   currentPage.value = 1;
   refreshData();

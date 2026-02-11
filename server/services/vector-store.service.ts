@@ -13,6 +13,9 @@ import { config } from "../config/env";
 import type { EntityManager } from "typeorm";
 
 const EMBEDDING_BATCH_SIZE = 100;
+// OpenAI allows max 300K tokens per embedding request.
+// Conservative estimate: ~3 chars per token → 900K char budget per batch.
+const MAX_CHARS_PER_BATCH = 900_000;
 
 export interface VectorChunk {
   content: string;
@@ -56,14 +59,46 @@ export class VectorStoreService {
   }
 
   /**
-   * Embed an array of texts, batching to stay within API limits.
+   * Embed an array of texts, batching by both count and total character size
+   * to stay within OpenAI API limits (100 texts AND 300K tokens per request).
    * Returns one vector per input text, in the same order.
    */
   private async embedTexts(texts: string[]): Promise<number[][]> {
+    // Build batches respecting both count and character limits
+    const batches: string[][] = [];
+    let currentBatch: string[] = [];
+    let currentBatchChars = 0;
+
+    for (const text of texts) {
+      const wouldExceedChars = currentBatchChars + text.length > MAX_CHARS_PER_BATCH;
+      const wouldExceedCount = currentBatch.length >= EMBEDDING_BATCH_SIZE;
+
+      if ((wouldExceedChars || wouldExceedCount) && currentBatch.length > 0) {
+        batches.push(currentBatch);
+        currentBatch = [];
+        currentBatchChars = 0;
+      }
+
+      currentBatch.push(text);
+      currentBatchChars += text.length;
+    }
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+
+    const totalChars = texts.reduce((sum, t) => sum + t.length, 0);
+    console.log(
+      `[VectorStore] Embedding ${texts.length} texts (${totalChars} total chars) in ${batches.length} batches`,
+    );
+
     const allVectors: number[][] = [];
 
-    for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
-      const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE);
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchChars = batch.reduce((sum, t) => sum + t.length, 0);
+      console.log(
+        `[VectorStore] Batch ${i + 1}/${batches.length}: ${batch.length} texts, ${batchChars} chars`,
+      );
       const response = await this.openai.embeddings.create({
         model: this.model,
         input: batch,
@@ -182,6 +217,50 @@ export class VectorStoreService {
       content: row.content,
       metadata: row.metadata,
       similarity: row.similarity,
+    }));
+  }
+
+  /**
+   * Search for documents by vector similarity, grouped by document.
+   * Returns the best similarity score per document (deduplicates chunks).
+   *
+   * @param organizationId - Organization ID to filter results
+   * @param query - Search query text
+   * @param k - Number of documents to return (default: 10)
+   * @returns Array of { documentId, similarity } sorted by similarity descending
+   */
+  async searchDocuments(
+    organizationId: string,
+    query: string,
+    k: number = 10,
+  ): Promise<Array<{ documentId: string; similarity: number }>> {
+    if (!this._initialized) {
+      throw new Error("VectorStore not initialized. Call initialize() first.");
+    }
+
+    const queryVector = await this.embedQuery(query);
+
+    const searchQuery = `
+      SELECT
+        "document_id" as "documentId",
+        MAX(1 - (embedding::vector <=> $1::vector)) as similarity
+      FROM embeddings
+      WHERE "organization_id" = $2
+        AND "document_id" IS NOT NULL
+      GROUP BY "document_id"
+      ORDER BY similarity DESC
+      LIMIT $3
+    `;
+
+    const results = await AppDataSource.query(searchQuery, [
+      `[${queryVector.join(",")}]`,
+      organizationId,
+      k,
+    ]);
+
+    return results.map((row: { documentId: string; similarity: number }) => ({
+      documentId: row.documentId,
+      similarity: parseFloat(String(row.similarity)),
     }));
   }
 

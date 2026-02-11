@@ -145,19 +145,11 @@ onMounted(async () => {
       HayApi.documents.list.query({}),
     ]);
 
-    // Deduplicate search results by documentId
-    const seenIds = new Set<string>();
-    suggestedDocuments.value = searchResults
-      .filter((r) => {
-        const docId = r.documentId as string | undefined;
-        if (!docId || seenIds.has(docId)) return false;
-        seenIds.add(docId);
-        return true;
-      })
-      .map((r) => ({
-        id: r.documentId as string,
-        title: r.title,
-      }));
+    // Search results are already document-level (no duplicates)
+    suggestedDocuments.value = searchResults.map((r) => ({
+      id: r.id,
+      title: r.title,
+    }));
 
     allDocuments.value = listResults.items.map((d) => ({
       id: d.id,
