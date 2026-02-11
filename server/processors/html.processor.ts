@@ -17,10 +17,38 @@ export class HtmlProcessor extends BaseProcessor {
       bulletListMarker: "-",
       hr: "---",
     });
+
+    // Only keep images that point to actual URLs (http/https or protocol-relative //)
+    this.turndown.addRule("removeNonUrlImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const src = node.getAttribute("src") || "";
+        return !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("//");
+      },
+      replacement: () => "",
+    });
+  }
+
+  /**
+   * Strip img tags whose src is not an HTTP(S) URL.
+   * Removes inline base64 data URIs, relative paths, and other non-URL sources
+   * that are useless for text embeddings and can be hundreds of KB each.
+   */
+  private stripNonUrlImages(html: string): string {
+    return html.replace(/<img\b[^>]*>/gi, (match) => {
+      const srcMatch = match.match(/\bsrc\s*=\s*["']([^"']*?)["']/i);
+      if (!srcMatch) return "";
+      const src = srcMatch[1];
+      // Keep http://, https://, and protocol-relative // URLs
+      if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("//")) {
+        return match;
+      }
+      return "";
+    });
   }
 
   async process(buffer: Buffer, fileName?: string): Promise<ProcessedDocument> {
-    const htmlContent = buffer.toString("utf-8");
+    const htmlContent = this.stripNonUrlImages(buffer.toString("utf-8"));
 
     try {
       // Use Readability (Firefox Reader Mode algorithm) to extract article content
