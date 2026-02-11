@@ -1,5 +1,6 @@
 import { PlaybookRepository } from "../repositories/playbook.repository";
 import { AgentRepository } from "../repositories/agent.repository";
+import { OrganizationRepository } from "../repositories/organization.repository";
 import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
 import type { InstructionItem } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
@@ -7,10 +8,12 @@ import { Agent } from "../database/entities/agent.entity";
 export class PlaybookService {
   private playbookRepository: PlaybookRepository;
   private agentRepository: AgentRepository;
+  private organizationRepository: OrganizationRepository;
 
   constructor() {
     this.playbookRepository = new PlaybookRepository();
     this.agentRepository = new AgentRepository();
+    this.organizationRepository = new OrganizationRepository();
   }
 
   async createPlaybook(
@@ -31,8 +34,15 @@ export class PlaybookService {
       for (const agentId of agentIds) {
         const agent = await this.agentRepository.findById(agentId);
         if (!agent || agent.organization_id !== organizationId) continue;
-        if (agent) {
-          agents.push(agent);
+        agents.push(agent);
+      }
+    } else {
+      // Auto-assign the organization's default agent when no agents are specified
+      const organization = await this.organizationRepository.findById(organizationId);
+      if (organization?.defaultAgentId) {
+        const defaultAgent = await this.agentRepository.findById(organization.defaultAgentId);
+        if (defaultAgent) {
+          agents.push(defaultAgent);
         }
       }
     }

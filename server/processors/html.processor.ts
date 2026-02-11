@@ -1,28 +1,58 @@
 import { BaseProcessor } from "./base.processor";
 import type { ProcessedDocument } from "./base.processor";
-import OpenAI from "openai";
 import { sanitizeContent } from "../utils/sanitize";
+import { Readability } from "@mozilla/readability";
+import { parseHTML } from "linkedom";
+import TurndownService from "turndown";
 
 export class HtmlProcessor extends BaseProcessor {
   supportedTypes = ["text/html", "application/xhtml+xml"];
-  private openai: OpenAI;
+  private turndown: TurndownService;
 
   constructor() {
     super();
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    this.turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-",
+      hr: "---",
+    });
+
+    // Only keep images that point to actual URLs (http/https or protocol-relative //)
+    this.turndown.addRule("removeNonUrlImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const src = node.getAttribute("src") || "";
+        return !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("//");
+      },
+      replacement: () => "",
+    });
+  }
+
+  /**
+   * Strip img tags whose src is not an HTTP(S) URL.
+   * Removes inline base64 data URIs, relative paths, and other non-URL sources
+   * that are useless for text embeddings and can be hundreds of KB each.
+   */
+  private stripNonUrlImages(html: string): string {
+    return html.replace(/<img\b[^>]*>/gi, (match) => {
+      const srcMatch = match.match(/\bsrc\s*=\s*["']([^"']*?)["']/i);
+      if (!srcMatch) return "";
+      const src = srcMatch[1];
+      // Keep http://, https://, and protocol-relative // URLs
+      if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("//")) {
+        return match;
+      }
+      return "";
     });
   }
 
   async process(buffer: Buffer, fileName?: string): Promise<ProcessedDocument> {
-    const htmlContent = buffer.toString("utf-8");
-
-    // Extract basic text content first (fallback)
-    const textContent = this.extractTextFromHtml(htmlContent);
+    const htmlContent = this.stripNonUrlImages(buffer.toString("utf-8"));
 
     try {
-      // Use LLM to convert HTML to clean markdown
-      const markdownContent = await this.convertToMarkdown(htmlContent);
+      // Use Readability (Firefox Reader Mode algorithm) to extract article content
+      const markdownContent = this.convertToMarkdown(htmlContent);
 
       return {
         content: sanitizeContent(markdownContent),
@@ -31,13 +61,14 @@ export class HtmlProcessor extends BaseProcessor {
           fileType: "text/html",
           originalLength: htmlContent.length,
           processedLength: markdownContent.length,
-          processingMethod: "llm-markdown-conversion",
+          processingMethod: "readability-turndown",
         },
       };
     } catch (error) {
-      console.error("Failed to convert HTML to markdown with LLM:", error);
+      console.error("Failed to convert HTML with Readability + Turndown:", error);
 
       // Fallback to basic text extraction
+      const textContent = this.extractTextFromHtml(htmlContent);
       return {
         content: sanitizeContent(textContent),
         metadata: {
@@ -73,42 +104,28 @@ export class HtmlProcessor extends BaseProcessor {
     return text;
   }
 
-  private async convertToMarkdown(html: string): Promise<string> {
-    // Truncate HTML if too long for LLM context
-    const maxLength = 30000;
-    const truncatedHtml = html.length > maxLength ? html.substring(0, maxLength) + "..." : html;
+  private convertToMarkdown(html: string): string {
+    // Parse HTML into a DOM using linkedom
+    const { document } = parseHTML(html);
 
-    const response = await this.openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a documentation converter. Convert the provided HTML content to clean, well-formatted Markdown. 
-Focus on:
-1. Preserving the main content and structure
-2. Removing navigation, menus, footers, ads, and other non-content elements
-3. Converting HTML formatting to proper Markdown syntax
-4. Maintaining code blocks with proper language hints
-5. Preserving links but simplifying them where appropriate
-6. Creating a clean, readable document suitable for a knowledge base
+    // Use Readability to extract article content (same as Firefox Reader Mode)
+    const reader = new Readability(document);
+    const article = reader.parse();
 
-Output only the Markdown content, no explanations.`,
-        },
-        {
-          role: "user",
-          content: truncatedHtml,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 4000,
-    });
-
-    const markdownContent = response.choices[0]?.message?.content || "";
-
-    if (!markdownContent) {
-      throw new Error("LLM returned empty response");
+    if (!article || !article.content) {
+      throw new Error("Readability could not extract article content");
     }
 
-    return sanitizeContent(markdownContent);
+    // Convert the clean HTML to Markdown using Turndown
+    let markdown = this.turndown.turndown(article.content);
+
+    if (!markdown.trim()) {
+      throw new Error("Turndown produced empty markdown");
+    }
+
+    // Clean up Turndown artifacts: lone asterisks from empty bold/em/decorative elements
+    markdown = markdown.replace(/^\*{1,2}$/gm, "");
+
+    return markdown;
   }
 }

@@ -1,9 +1,9 @@
 <template>
   <Page
-    :title="isEditMode ? 'Edit' : 'Create New'"
+    :title="isEditMode ? `Edit ${playbook?.title}` : 'Create New'"
     :description="
       isEditMode
-        ? ' Update your playbook configuration'
+        ? 'Update your playbook configuration'
         : 'Define automated conversation flows for your agents'
     "
     width="max"
@@ -300,6 +300,12 @@ const formatDate = (date: string | Date) => {
 
 // Load data on mount
 onMounted(async () => {
+  // Redirect /playbooks/new to the wizard
+  if (!isEditMode.value) {
+    router.replace("/playbooks/wizard");
+    return;
+  }
+
   try {
     // Load agents
     loadingAgents.value = true;

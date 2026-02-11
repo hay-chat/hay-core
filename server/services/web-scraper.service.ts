@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError, type AxiosResponse } from "axios";
 import * as cheerio from "cheerio";
 import { URL } from "url";
 import { EventEmitter } from "events";
@@ -104,8 +104,8 @@ export class WebScraperService extends EventEmitter {
           this.scrapedPages.push(scrapedPage);
         }
 
-        // Small delay to be respectful to the server
-        await this.delay(100);
+        // Delay between pages to avoid rate limiting
+        await this.delay(200);
       }
 
       this.emitProgress("completed", this.scrapedPages.length, this.scrapedPages.length);
@@ -205,8 +205,10 @@ export class WebScraperService extends EventEmitter {
     // Check if this is a sitemap index file (contains <sitemap> elements)
     const sitemapElements = $("sitemap > loc");
     if (sitemapElements.length > 0) {
-      console.log(`Found sitemap index with ${sitemapElements.length} sub-sitemaps at ${sitemapUrl}`);
-      
+      console.log(
+        `Found sitemap index with ${sitemapElements.length} sub-sitemaps at ${sitemapUrl}`,
+      );
+
       // This is a sitemap index, recursively fetch and parse sub-sitemaps
       const subSitemapUrls: string[] = [];
       sitemapElements.each((_: number, element: any) => {
@@ -227,7 +229,7 @@ export class WebScraperService extends EventEmitter {
               timeout: 10000,
               maxContentLength: 5 * 1024 * 1024,
             });
-            
+
             if (response.status === 200) {
               // Recursively parse the sub-sitemap
               const subUrls = await this.parseSitemap(response.data, subSitemapUrl);
@@ -250,7 +252,7 @@ export class WebScraperService extends EventEmitter {
           break;
         }
       }
-      
+
       // If this was a sitemap index and we found URLs, return them
       if (urls.length > 0) {
         console.log(`Total URLs from sitemap index: ${urls.length}`);
@@ -320,18 +322,18 @@ export class WebScraperService extends EventEmitter {
         // Continue with other URLs
       }
 
-      // Small delay to be respectful to the server
-      await this.delay(100);
+      // Delay between pages to avoid rate limiting
+      await this.delay(200);
     }
   }
 
+  /**
+   * Fetch a page and return the full HTML for Readability processing.
+   * Handles 429 rate limiting by respecting Retry-After headers.
+   */
   private async scrapePage(url: string): Promise<ScrapedPage | null> {
     try {
-      // First try to get print version
-      const printUrl = await this.findPrintVersion(url);
-      const targetUrl = printUrl || url;
-
-      const response = await axios.get(targetUrl, {
+      const response = await this.fetchWithRetryAfter(url, {
         timeout: 15000,
         maxContentLength: 10 * 1024 * 1024, // 10MB limit
         headers: {
@@ -343,28 +345,21 @@ export class WebScraperService extends EventEmitter {
         return null;
       }
 
-      const $ = cheerio.load(response.data);
+      const fullHtml = response.data;
+      const $ = cheerio.load(fullHtml);
 
-      // Remove unwanted elements
-      $(
-        "script, style, nav, header, footer, aside, .navigation, .menu, .sidebar, .ads, .advertisement",
-      ).remove();
-
-      // Extract title
+      // Extract title from the page
       const title = $("title").text() || $("h1").first().text() || "Untitled";
 
-      // Extract main content
-      const mainContent =
-        $("main, article, .content, .main-content, #content").html() || $("body").html() || "";
-
-      // Get text content
+      // Get plain text for the content field
+      $("script, style").remove();
       const textContent = $.text().replace(/\s+/g, " ").trim();
 
       return {
         url,
         title: title.trim(),
         content: textContent,
-        html: mainContent,
+        html: fullHtml, // Return full HTML — Readability handles content extraction
         crawledAt: new Date(),
       };
     } catch (error) {
@@ -373,56 +368,30 @@ export class WebScraperService extends EventEmitter {
     }
   }
 
-  private async findPrintVersion(url: string): Promise<string | null> {
+  /**
+   * Fetch a URL with automatic retry on 429 (Too Many Requests).
+   * Respects the Retry-After header from the server.
+   */
+  private async fetchWithRetryAfter(
+    url: string,
+    config: Record<string, unknown>,
+  ): Promise<AxiosResponse> {
     try {
-      const response = await axios.get(url, {
-        timeout: 10000,
-        maxContentLength: 1 * 1024 * 1024, // 1MB for initial page
-      });
-
-      const $ = cheerio.load(response.data);
-
-      // Look for print links
-      const printSelectors = [
-        'a[href*="print"]',
-        'a[onclick*="print"]',
-        'link[media="print"]',
-        "a.print-link",
-        "a.print-version",
-      ];
-
-      for (const selector of printSelectors) {
-        const element = $(selector).first();
-        if (element.length > 0) {
-          const href = element.attr("href");
-          if (href && !href.startsWith("javascript:")) {
-            return new URL(href, url).href;
-          }
-        }
-      }
-
-      // Try common print URL patterns
-      const printPatterns = [
-        url + (url.includes("?") ? "&" : "?") + "print=true",
-        url + (url.includes("?") ? "&" : "?") + "view=print",
-        url.replace(/\.html?$/, ".print.html"),
-      ];
-
-      for (const printUrl of printPatterns) {
-        try {
-          const testResponse = await axios.head(printUrl, { timeout: 5000 });
-          if (testResponse.status === 200) {
-            return printUrl;
-          }
-        } catch {
-          // Continue trying other patterns
-        }
-      }
+      return await axios.get(url, config);
     } catch (error) {
-      // Ignore errors and return null
-    }
+      if (error instanceof AxiosError && error.response?.status === 429) {
+        const retryAfter = error.response.headers["retry-after"];
+        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
+        const clampedWaitMs = Math.min(waitMs, 10000); // Cap at 10 seconds
 
-    return null;
+        console.log(`[WebScraper] 429 for ${url}, retrying after ${clampedWaitMs}ms`);
+        await this.delay(clampedWaitMs);
+
+        // Single retry — if it fails again, let the error propagate
+        return await axios.get(url, config);
+      }
+      throw error;
+    }
   }
 
   private extractUrls(html: string, baseUrl: string): string[] {
@@ -516,7 +485,7 @@ export class WebScraperService extends EventEmitter {
 
       try {
         // Fetch page to get title and discover more URLs
-        const response = await axios.get(url, {
+        const response = await this.fetchWithRetryAfter(url, {
           timeout: 10000,
           maxContentLength: 1 * 1024 * 1024, // 1MB for discovery
           headers: {
@@ -569,8 +538,8 @@ export class WebScraperService extends EventEmitter {
         });
       }
 
-      // Small delay to be respectful to the server
-      await this.delay(50);
+      // Delay between pages to avoid rate limiting
+      await this.delay(100);
     }
   }
 

@@ -1,3 +1,6 @@
 [submodule "plugins/attio/mcp"]
 	path = plugins/attio/mcp
 	url = https://github.com/kesslerio/attio-mcp-server
+[submodule "plugins/core/magento/mcp"]
+	path = plugins/core/magento/mcp
+	url = https://github.com/boldcommerce/magento2-mcp.git

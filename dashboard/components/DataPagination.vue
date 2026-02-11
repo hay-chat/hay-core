@@ -19,7 +19,7 @@
 
     <!-- Pagination controls on the right -->
     <div class="flex items-center space-x-6 lg:space-x-8">
-      <div class="flex w-[100px] items-center justify-center text-sm font-medium">
+      <div class="flex items-center justify-center text-sm font-medium whitespace-nowrap">
         Page {{ currentPage }} of {{ totalPages }}
       </div>
       <Pagination>
