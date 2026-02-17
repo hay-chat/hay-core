@@ -300,12 +300,6 @@ const formatDate = (date: string | Date) => {
 
 // Load data on mount
 onMounted(async () => {
-  // Redirect /playbooks/new to the wizard
-  if (!isEditMode.value) {
-    router.replace("/playbooks/wizard");
-    return;
-  }
-
   try {
     // Load agents
     loadingAgents.value = true;

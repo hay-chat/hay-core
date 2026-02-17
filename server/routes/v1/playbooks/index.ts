@@ -187,7 +187,14 @@ export const playbooksRouter = t.router({
       z.object({
         purpose: z.string().min(1),
         actions: z
-          .array(z.object({ name: z.string(), description: z.string(), pluginName: z.string() }))
+          .array(
+            z.object({
+              name: z.string(),
+              description: z.string(),
+              pluginName: z.string(),
+              pluginId: z.string(),
+            }),
+          )
           .optional()
           .default([]),
         documentIds: z.array(z.string().uuid()).optional().default([]),
@@ -200,13 +207,14 @@ export const playbooksRouter = t.router({
       const llmService = new LLMService();
 
       // Fetch document metadata for the provided IDs
-      let documents: { title: string; description: string }[] = [];
+      let documents: { id: string; title: string; description: string }[] = [];
       if (input.documentIds.length > 0) {
         const docs = await documentRepository.findByOrganization(ctx.organizationId!, {
           where: { id: In(input.documentIds) } as any,
           select: ["id", "title", "description"],
         });
         documents = docs.map((doc) => ({
+          id: doc.id,
           title: doc.title || "Untitled",
           description: doc.description || "",
         }));
@@ -241,7 +249,19 @@ export const playbooksRouter = t.router({
       });
 
       try {
-        return JSON.parse(response);
+        const parsed = JSON.parse(response);
+        return {
+          ...parsed,
+          references: {
+            actions: input.actions.map((a) => ({
+              id: `${a.pluginId}:${a.name}`,
+              name: a.name,
+              pluginId: a.pluginId,
+              pluginName: a.pluginName,
+            })),
+            documents: documents.map((d) => ({ id: d.id, title: d.title })),
+          },
+        };
       } catch {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

@@ -102,9 +102,10 @@
     />
 
     <!-- Success Dialog -->
-    <Dialog :open="showSuccessDialog">
-      <DialogContent :hide-close="true" class="sm:max-w-md">
+    <Dialog :open="true" confetti centered>
+      <DialogContent :hide-close="true">
         <DialogHeader>
+          <img src="/bale/rocket.png" alt="Playbook Created" class="w-96 h-96 m-auto" />
           <DialogTitle>Playbook Created</DialogTitle>
           <DialogDescription>
             Your playbook has been created successfully. What would you like to do next?
@@ -148,7 +149,12 @@ const stepper = useStepper(["purpose", "actions", "documents", "boundaries", "ge
 // --- Wizard Data ---
 const wizardData = reactive({
   purpose: "",
-  selectedActions: [] as { name: string; description: string; pluginName: string }[],
+  selectedActions: [] as {
+    name: string;
+    description: string;
+    pluginName: string;
+    pluginId: string;
+  }[],
   selectedDocumentIds: [] as string[],
   escalationRules: "",
   boundaries: "",
@@ -161,6 +167,10 @@ interface GeneratedResult {
   trigger: string;
   description: string;
   instructions: string;
+  references: {
+    actions: Array<{ id: string; name: string; pluginId: string; pluginName: string }>;
+    documents: Array<{ id: string; title: string }>;
+  };
 }
 
 const generatedResult = ref<GeneratedResult | null>(null);
@@ -225,7 +235,10 @@ async function handleCreate() {
 
   creating.value = true;
   try {
-    const instructionsJSON = markdownToTiptapJSON(generatedResult.value.instructions);
+    const instructionsJSON = markdownToTiptapJSON(
+      generatedResult.value.instructions,
+      generatedResult.value.references,
+    );
     const response = await HayApi.playbooks.create.mutate({
       title: generatedResult.value.title,
       trigger: generatedResult.value.trigger,

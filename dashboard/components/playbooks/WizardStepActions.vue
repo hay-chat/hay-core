@@ -62,6 +62,7 @@ interface SelectedAction {
   name: string;
   description: string;
   pluginName: string;
+  pluginId: string;
 }
 
 const props = defineProps<{
@@ -107,7 +108,12 @@ function toggleTool(tool: MCPTool) {
   } else {
     emit("update:modelValue", [
       ...props.modelValue,
-      { name: tool.name, description: tool.description, pluginName: tool.pluginName },
+      {
+        name: tool.name,
+        description: tool.description,
+        pluginName: tool.pluginName,
+        pluginId: tool.pluginId,
+      },
     ]);
   }
 }

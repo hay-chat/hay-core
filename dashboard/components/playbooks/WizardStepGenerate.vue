@@ -103,10 +103,11 @@
 import { computed } from "vue";
 import { Sparkles, Loader2, RefreshCw, Info as InfoIcon } from "lucide-vue-next";
 import { marked } from "marked";
+import { renderTokensForPreview, type MentionReferences } from "@/utils/markdownToTiptap";
 
 interface WizardData {
   purpose: string;
-  selectedActions: { name: string; description: string; pluginName: string }[];
+  selectedActions: { name: string; description: string; pluginName: string; pluginId: string }[];
   selectedDocumentIds: string[];
   escalationRules: string;
   boundaries: string;
@@ -118,6 +119,7 @@ interface GeneratedResult {
   trigger: string;
   description: string;
   instructions: string;
+  references: MentionReferences;
 }
 
 const props = defineProps<{
@@ -139,7 +141,10 @@ const hasBoundaries = computed(() => {
 
 const instructionsHtml = computed(() => {
   if (!props.generatedResult?.instructions) return "";
-  return marked.parse(props.generatedResult.instructions, { async: false }) as string;
+  const preprocessed = props.generatedResult.references
+    ? renderTokensForPreview(props.generatedResult.instructions, props.generatedResult.references)
+    : props.generatedResult.instructions;
+  return marked.parse(preprocessed, { async: false }) as string;
 });
 </script>
 
@@ -178,5 +183,29 @@ const instructionsHtml = computed(() => {
 
 .instructions-preview :deep(li) {
   margin-bottom: 0.25rem;
+}
+
+.instructions-preview :deep(.mention-token) {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.375rem;
+  margin: 0 0.125rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  vertical-align: middle;
+}
+
+.instructions-preview :deep(.mention-action) {
+  background: var(--color-purple-100);
+  border: 1px solid var(--color-purple-300);
+  color: var(--color-purple-600);
+}
+
+.instructions-preview :deep(.mention-document) {
+  background: var(--color-document-100);
+  border: 1px solid var(--color-document-300);
+  color: var(--color-document-600);
 }
 </style>

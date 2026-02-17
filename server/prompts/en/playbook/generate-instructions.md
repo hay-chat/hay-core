@@ -19,8 +19,9 @@ The agent can perform these actions during the conversation:
 {{#each actions}}
 
 - **{{item.name}}** ({{item.pluginName}}): {{item.description}}
-  {{/each}}
-  {{/if}}
+  - Reference token: `<<action:{{item.pluginId}}:{{item.name}}>>`
+    {{/each}}
+    {{/if}}
 
 {{#if documents}}
 
@@ -30,8 +31,9 @@ The agent has access to these documents for reference:
 {{#each documents}}
 
 - **{{item.title}}**: {{item.description|default:"No description"}}
-  {{/each}}
-  {{/if}}
+  - Reference token: `<<document:{{item.id}}>>`
+    {{/each}}
+    {{/if}}
 
 {{#if escalationRules}}
 
@@ -86,11 +88,10 @@ Guidelines for instructions:
 - Start with a brief introductory paragraph providing context.
 - Use `# Step N: Title` headings for each major step.
 - Use bullet lists (`-`) under each step for specific actions and decisions.
-- Reference available actions by name when the agent should use them.
-- Reference knowledge base documents when the agent should look up information.
+- **IMPORTANT**: When referencing an action or document in the instructions, you MUST use its exact reference token as listed above (e.g., `<<action:@hay/email-plugin:send-email>>` or `<<document:9497421b-...>>`). Place the token inline in the sentence where you mention the action or document. Do NOT invent tokens — only use the exact tokens provided above.
 - Include escalation steps that match the escalation rules.
 - End with a resolution/closing step.
 - Use 5-10 steps total. Keep each step focused on one action or decision.
 - Write instructions in second person ("Ask the customer...", "Look up...", "If the customer...").
 - You may optionally include an "Additional Notes" section at the end for edge cases.
-- Use only headings (`#`), bullet lists (`-`), and paragraphs. Do not use bold, italic, code blocks, or other formatting.
+- Use only headings (`#`), bullet lists (`-`), and paragraphs. Do not use bold, italic, code blocks, or other formatting (except for the reference tokens).
