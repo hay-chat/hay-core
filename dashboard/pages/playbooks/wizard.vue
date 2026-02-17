@@ -102,7 +102,7 @@
     />
 
     <!-- Success Dialog -->
-    <Dialog :open="true" confetti centered>
+    <Dialog :open="showSuccessDialog" confetti centered>
       <DialogContent :hide-close="true">
         <DialogHeader>
           <img src="/bale/rocket.png" alt="Playbook Created" class="w-96 h-96 m-auto" />
