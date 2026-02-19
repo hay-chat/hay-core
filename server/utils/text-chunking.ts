@@ -9,7 +9,28 @@ export interface ChunkOptions {
 }
 
 /**
- * Split text into chunks for embedding
+ * Split a single oversized segment at character boundaries.
+ * Guarantees every returned chunk is <= chunkSize.
+ */
+function splitAtCharBoundary(text: string, chunkSize: number, chunkOverlap: number): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push(text.slice(start, end));
+    start = end - chunkOverlap;
+    // Prevent infinite loop if overlap >= chunkSize
+    if (start <= chunks.length * chunkSize - text.length && end === text.length) break;
+    if (end === text.length) break;
+  }
+  return chunks;
+}
+
+/**
+ * Split text into chunks for embedding.
+ * Tries sentence boundaries first, then word boundaries, then raw character slicing.
+ * Guarantees no chunk exceeds chunkSize.
+ *
  * @param text Text to split
  * @param options Chunking options
  * @returns Array of text chunks
@@ -23,30 +44,40 @@ export function splitTextIntoChunks(text: string, options: ChunkOptions = {}): s
   let currentChunk = "";
 
   for (const sentence of sentences) {
-    // If single sentence is too long, split it further
+    // If single sentence is too long, split it further by words
     if (sentence.length > chunkSize) {
-      // Split long sentence by words
+      // Flush current chunk before processing the long sentence
+      if (currentChunk) {
+        chunks.push(currentChunk.trim());
+        currentChunk = "";
+      }
+
       const words = sentence.split(/\s+/);
-      let wordChunk = "";
 
       for (const word of words) {
-        if ((wordChunk + " " + word).length > chunkSize && wordChunk) {
-          chunks.push(wordChunk.trim());
+        // If a single word exceeds chunkSize, force-split at character boundaries
+        if (word.length > chunkSize) {
+          if (currentChunk) {
+            chunks.push(currentChunk.trim());
+            currentChunk = "";
+          }
+          chunks.push(...splitAtCharBoundary(word, chunkSize, chunkOverlap));
+          continue;
+        }
+
+        if ((currentChunk + " " + word).length > chunkSize && currentChunk) {
+          chunks.push(currentChunk.trim());
           // Add overlap from the end of previous chunk
-          wordChunk =
-            wordChunk
+          currentChunk =
+            currentChunk
               .split(/\s+/)
               .slice(-Math.floor(chunkOverlap / 10))
               .join(" ") +
             " " +
             word;
         } else {
-          wordChunk += (wordChunk ? " " : "") + word;
+          currentChunk += (currentChunk ? " " : "") + word;
         }
-      }
-
-      if (wordChunk) {
-        currentChunk = wordChunk.trim();
       }
     } else if ((currentChunk + " " + sentence).length > chunkSize && currentChunk) {
       chunks.push(currentChunk.trim());

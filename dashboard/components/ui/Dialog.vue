@@ -13,6 +13,8 @@
         <div class="fixed inset-0 bg-black/25" />
       </HeadlessTransitionChild>
 
+      <Confetti v-if="confetti" ref="confettiRef" />
+
       <div class="fixed inset-0 overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4 text-center">
           <HeadlessTransitionChild
@@ -23,11 +25,13 @@
             leave="duration-200 ease-in"
             leave-from="opacity-100 scale-100"
             leave-to="opacity-0 scale-95"
+            @after-enter="onDialogEnter"
           >
             <HeadlessDialogPanel
               :class="[
-                'w-full transform overflow-hidden rounded-2xl bg-background p-6 text-left align-middle shadow-xl transition-all',
-                sizeClass
+                'w-full transform overflow-hidden rounded-2xl bg-background p-6 align-middle shadow-xl transition-all',
+                sizeClass,
+                centered ? 'text-center dialog-centered' : 'text-left',
               ]"
             >
               <slot />
@@ -52,20 +56,35 @@ const props = withDefaults(
   defineProps<{
     open: boolean;
     size?: "sm" | "md" | "lg";
+    centered?: boolean;
+    confetti?: boolean;
   }>(),
   {
     size: "md",
-  }
+    centered: false,
+    confetti: false,
+  },
 );
 
 defineEmits<{
   "update:open": [value: boolean];
 }>();
 
+const confettiRef = ref<{
+  fire: (options?: Record<string, unknown>) => void;
+  burst: () => void;
+} | null>(null);
+
+function onDialogEnter() {
+  if (props.confetti) {
+    confettiRef.value?.burst();
+  }
+}
+
 const sizeClass = computed(() => {
   switch (props.size) {
     case "sm":
-      return "max-w-md";  // 28rem (448px)
+      return "max-w-md"; // 28rem (448px)
     case "md":
       return "max-w-2xl"; // 42rem (672px)
     case "lg":
@@ -75,3 +94,17 @@ const sizeClass = computed(() => {
   }
 });
 </script>
+
+<style scoped>
+:deep(.dialog-centered h3) {
+  font-size: 1.5rem;
+}
+
+:deep(.dialog-centered .dialog-footer) {
+  justify-content: center;
+}
+
+:deep(.dialog-centered .dialog-footer > div) {
+  margin-left: 0;
+}
+</style>
