@@ -119,29 +119,33 @@ export const customersRouter = t.router({
       return customer;
     }),
 
-  create: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE).input(createCustomerSchema).mutation(async ({ ctx, input }) => {
-    try {
-      const customer = await customerService.createCustomer(ctx.organizationId!, {
-        external_id: input.external_id || null,
-        email: input.email || null,
-        phone: input.phone || null,
-        name: input.name || null,
-        notes: input.notes || null,
-        external_metadata: input.external_metadata || null,
-      });
-      return customer;
-    } catch (error) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: error instanceof Error ? error.message : "An error occurred",
-      });
-    }
-  }),
+  create: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE)
+    .input(createCustomerSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const customer = await customerService.createCustomer(ctx.organizationId!, {
+          external_id: input.external_id || null,
+          email: input.email || null,
+          phone: input.phone || null,
+          name: input.name || null,
+          notes: input.notes || null,
+          external_metadata: input.external_metadata || null,
+        });
+        return customer;
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "An error occurred",
+        });
+      }
+    }),
 
-  createAnonymous: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE).mutation(async ({ ctx }) => {
-    const customer = await customerService.createAnonymousCustomer(ctx.organizationId!);
-    return customer;
-  }),
+  createAnonymous: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE).mutation(
+    async ({ ctx }) => {
+      const customer = await customerService.createAnonymousCustomer(ctx.organizationId!);
+      return customer;
+    },
+  ),
 
   findOrCreate: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.CREATE)
     .input(createCustomerSchema)
@@ -209,20 +213,43 @@ export const customersRouter = t.router({
       return { success: true };
     }),
 
-  merge: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE).input(mergeCustomersSchema).mutation(async ({ ctx, input }) => {
-    const mergedCustomer = await customerService.mergeCustomers(
-      input.sourceCustomerId,
-      input.targetCustomerId,
-      ctx.organizationId!,
-    );
+  merge: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
+    .input(mergeCustomersSchema)
+    .mutation(async ({ ctx, input }) => {
+      const mergedCustomer = await customerService.mergeCustomers(
+        input.sourceCustomerId,
+        input.targetCustomerId,
+        ctx.organizationId!,
+      );
 
-    if (!mergedCustomer) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "One or both customers not found",
+      if (!mergedCustomer) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "One or both customers not found",
+        });
+      }
+
+      return mergedCustomer;
+    }),
+
+  // Merge persistent public context into a customer by external ID (server-to-server, API key auth)
+  // Context is stored in customer.external_metadata and injected into the LLM prompt on every conversation
+  addContext: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
+    .input(z.object({ externalId: z.string(), context: z.record(z.any()) }))
+    .mutation(async ({ ctx, input }) => {
+      const customer = await customerRepository.findByExternalId(
+        input.externalId,
+        ctx.organizationId!,
+      );
+
+      if (!customer) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
+      }
+
+      const merged = { ...(customer.external_metadata ?? {}), ...input.context };
+      await customerRepository.update(customer.id, ctx.organizationId!, {
+        external_metadata: merged,
       });
-    }
-
-    return mergedCustomer;
-  }),
+      return { success: true };
+    }),
 });

@@ -1,4 +1,4 @@
-import type { HayChatConfig } from '@/types';
+import type { HayChatConfig } from "@/types";
 
 interface ConversationMetadata {
   source: string;
@@ -53,10 +53,12 @@ export function useConversation(config: HayChatConfig) {
    */
   const createConversation = async (
     publicJwk: JsonWebKey,
+    context?: Record<string, unknown>,
+    customerExternalId?: string,
   ): Promise<CreateConversationResponse | null> => {
     try {
       const metadata: ConversationMetadata = {
-        source: 'web-embed',
+        source: "web-embed",
         url: window.location.href,
         referrer: document.referrer,
         userAgent: navigator.userAgent,
@@ -64,26 +66,28 @@ export function useConversation(config: HayChatConfig) {
       };
 
       const response = await fetch(`${baseUrl}/v1/publicConversations.create`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           organizationId: config.organizationId,
           publicJwk,
           metadata,
+          ...(context && Object.keys(context).length > 0 ? { context } : {}),
+          ...(customerExternalId ? { customerExternalId } : {}),
         }),
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || 'Failed to create conversation');
+        throw new Error(error.message || "Failed to create conversation");
       }
 
       const data = await response.json();
       return data.result.data;
     } catch (error) {
-      console.error('[Conversation] Failed to create conversation:', error);
+      console.error("[Conversation] Failed to create conversation:", error);
       return null;
     }
   };
@@ -100,9 +104,9 @@ export function useConversation(config: HayChatConfig) {
   ): Promise<GetMessagesResponse | null> => {
     try {
       const response = await fetch(`${baseUrl}/v1/publicConversations.getMessages`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           conversationId,
@@ -116,21 +120,21 @@ export function useConversation(config: HayChatConfig) {
       const data = await response.json();
 
       // Check if response is OK but contains nonce expiration error
-      if (response.ok && data.result?.data?.error === 'NONCE_EXPIRED') {
+      if (response.ok && data.result?.data?.error === "NONCE_EXPIRED") {
         return {
           messages: [],
           nonce: data.result.data.nonce,
-          error: 'NONCE_EXPIRED',
+          error: "NONCE_EXPIRED",
         };
       }
 
       if (!response.ok) {
-        throw new Error('Failed to load messages');
+        throw new Error("Failed to load messages");
       }
 
       return data.result.data;
     } catch (error) {
-      console.error('[Conversation] Failed to load messages:', error);
+      console.error("[Conversation] Failed to load messages:", error);
       return null;
     }
   };
@@ -144,12 +148,13 @@ export function useConversation(config: HayChatConfig) {
     proof: string,
     method: string,
     url: string,
+    context?: Record<string, unknown>,
   ): Promise<SendMessageResponse | null> => {
     try {
       const response = await fetch(`${baseUrl}/v1/publicConversations.sendMessage`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           conversationId,
@@ -157,29 +162,30 @@ export function useConversation(config: HayChatConfig) {
           proof,
           method,
           url,
+          ...(context && Object.keys(context).length > 0 ? { context } : {}),
         }),
       });
 
       const data = await response.json();
 
       // Check if response is OK but contains nonce expiration error
-      if (response.ok && data.result?.data?.error === 'NONCE_EXPIRED') {
+      if (response.ok && data.result?.data?.error === "NONCE_EXPIRED") {
         return {
           messageId: null,
           nonce: data.result.data.nonce,
           createdAt: null,
-          error: 'NONCE_EXPIRED',
+          error: "NONCE_EXPIRED",
           errorMessage: data.result.data.errorMessage,
         };
       }
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error("Failed to send message");
       }
 
       return data.result.data;
     } catch (error) {
-      console.error('[Conversation] Failed to send message:', error);
+      console.error("[Conversation] Failed to send message:", error);
       return null;
     }
   };

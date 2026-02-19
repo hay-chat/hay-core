@@ -1,5 +1,6 @@
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { playbookRepository } from "@server/repositories/playbook.repository";
+import { conversationSecretService } from "@server/services/conversation-secret.service";
 import { PerceptionLayer } from "./perception.layer";
 import { RetrievalLayer } from "./retrieval.layer";
 import { ExecutionLayer } from "./execution.layer";
@@ -377,6 +378,9 @@ export const runConversation = async (conversationId: string) => {
         },
       });
 
+      // Clean up ephemeral secrets from Redis
+      await conversationSecretService.deleteSecrets(conversation.id);
+
       // Add a closing message
       const closingMessage =
         intent.label === "close_satisfied"
@@ -695,7 +699,11 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     });
 
     // Handle case where LLM returns both a userMessage and a tool call
-    if (executionResult.step === "CALL_TOOL" && executionResult.userMessage && executionResult.tool) {
+    if (
+      executionResult.step === "CALL_TOOL" &&
+      executionResult.userMessage &&
+      executionResult.tool
+    ) {
       // Only send the userMessage if this is the first tool call
       if (!hasToolCallBeenMade) {
         await conversation.addMessage({
@@ -925,6 +933,8 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           type: MessageType.BOT_AGENT,
         });
       }
+      // Clean up ephemeral secrets from Redis
+      await conversationSecretService.deleteSecrets(conversation.id);
       break;
     } else {
       // Regular response (not a tool call) - end the loop
