@@ -2,6 +2,7 @@ import { ref, computed, watch } from "vue";
 import { useWebSocket } from "./useWebSocket";
 import { useConversation } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
+import { initContext, getContext } from "./useWidgetContext";
 import {
   generateKeypair,
   storeKeypair,
@@ -73,10 +74,23 @@ export function useChat(config: HayChatConfig) {
         throw new Error("Failed to generate keypair");
       }
 
-      // Create conversation via HTTP
-      const conversationData = await conversation.createConversation(newKeypair.publicJwk);
+      // Create conversation via HTTP, passing current context and customerExternalId
+      const conversationData = await conversation.createConversation(
+        newKeypair.publicJwk,
+        getContext(),
+        config.customerExternalId,
+      );
       if (!conversationData) {
         throw new Error("Failed to create conversation");
+      }
+
+      // Fire onConversationStarted callback — if it returns a Promise, wait for it
+      // This allows the host to attach server-side secrets before input is enabled
+      if (config.onConversationStarted) {
+        const result = config.onConversationStarted({ id: conversationData.id });
+        if (result instanceof Promise) {
+          await result;
+        }
       }
 
       // Store keypair and conversation data
@@ -238,6 +252,11 @@ export function useChat(config: HayChatConfig) {
       if (!isWebCryptoAvailable()) {
         console.error("[Webchat] WebCrypto API not available");
         throw new Error("WebCrypto not supported");
+      }
+
+      // Initialize context store from config
+      if (config.context && Object.keys(config.context).length > 0) {
+        initContext(config.context);
       }
 
       // Generate or retrieve customer ID
@@ -542,8 +561,15 @@ export function useChat(config: HayChatConfig) {
       throw new Error("Failed to create DPoP proof");
     }
 
-    // Send via HTTP instead of WebSocket
-    const result = await conversation.sendMessage(convId, text.trim(), proof, "POST", httpUrl);
+    // Send via HTTP instead of WebSocket, including current context for the orchestrator
+    const result = await conversation.sendMessage(
+      convId,
+      text.trim(),
+      proof,
+      "POST",
+      httpUrl,
+      getContext(),
+    );
 
     if (!result) {
       throw new Error("Failed to send message");

@@ -1,4 +1,6 @@
-import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, publicProcedure, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageStatus } from "../../../database/entities/message.entity";
@@ -721,5 +723,32 @@ export const conversationsRouter = t.router({
         legalHold: conversation.legal_hold,
         legalHoldSetAt: conversation.legal_hold_set_at,
       };
+    }),
+
+  // Attach server-side secrets to a conversation (server-to-server, API key auth)
+  // Secrets are stored in Redis, never reach the LLM — injected into MCP tool calls only
+  addSecrets: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      await conversationSecretService.setSecrets(input.id, input.secrets);
+      return { success: true };
+    }),
+
+  // Merge public context into a conversation (server-to-server, API key auth)
+  // Context is stored in DB conversation.context JSONB and injected into the LLM prompt
+  addContext: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ id: z.string().uuid(), context: z.record(z.any()) }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      const merged = { ...(conversation.context ?? {}), ...input.context };
+      await conversationRepository.updateById(input.id, { context: merged });
+      return { success: true };
     }),
 });

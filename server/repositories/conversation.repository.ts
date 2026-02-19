@@ -48,6 +48,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
@@ -56,7 +57,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   /**
    * Find conversation by ID and organizationId - ensures proper organization scoping
    */
-  override async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
+  override async findByIdAndOrganization(
+    id: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
     const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id AND conversation.organization_id = :organizationId", {
@@ -68,6 +72,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
@@ -107,7 +112,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;
@@ -128,7 +136,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;

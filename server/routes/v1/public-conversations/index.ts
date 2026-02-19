@@ -5,6 +5,9 @@ import { MessageType, MessageDirection } from "../../../database/entities/messag
 import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
+import { CustomerRepository } from "../../../repositories/customer.repository";
+
+const customerRepository = new CustomerRepository();
 
 const conversationService = new ConversationService();
 
@@ -23,6 +26,8 @@ const createPublicConversationSchema = z.object({
   }),
   metadata: z.record(z.any()).optional(),
   language: z.string().optional(),
+  context: z.record(z.any()).optional(),
+  customerExternalId: z.string().optional(),
 });
 
 // Schema for sending messages
@@ -32,6 +37,7 @@ const sendMessageSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
+  context: z.record(z.any()).optional(),
 });
 
 // Schema for getting messages
@@ -74,7 +80,23 @@ export const publicConversationsRouter = t.router({
         channel: "web",
         publicJwk: input.publicJwk,
         lastMessageAt: new Date(),
+        ...(input.context && Object.keys(input.context).length > 0
+          ? { context: input.context }
+          : {}),
       });
+
+      // Link customer if customerExternalId is provided
+      if (input.customerExternalId) {
+        const customer = await customerRepository.findByExternalId(
+          input.customerExternalId,
+          organizationId,
+        );
+        if (customer) {
+          await conversationRepository.updateById(conversation.id, {
+            customer_id: customer.id,
+          });
+        }
+      }
 
       // Generate initial nonce for this conversation
       const nonce = await dpopCacheService.generateNonce(conversation.id);
@@ -216,6 +238,12 @@ export const publicConversationsRouter = t.router({
           timestamp: new Date().toISOString(),
         },
       });
+
+      // Merge incoming context into conversation context if provided
+      if (input.context && Object.keys(input.context).length > 0) {
+        const merged = { ...(conversation.context ?? {}), ...input.context };
+        await conversationRepository.updateById(conversation.id, { context: merged });
+      }
 
       return {
         messageId: message.id,
