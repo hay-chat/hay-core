@@ -1,4 +1,4 @@
-import axios, { AxiosError, type AxiosResponse } from "axios";
+import axios, { type AxiosResponse } from "axios";
 import * as cheerio from "cheerio";
 import { URL } from "url";
 import { EventEmitter } from "events";
@@ -342,10 +342,24 @@ export class WebScraperService extends EventEmitter {
       });
 
       if (response.status !== 200) {
+        console.log(`[WebScraper] Skipping scrape of ${url}: HTTP ${response.status}`);
+        return null;
+      }
+
+      // Skip HTTP redirects (URL changed materially after following redirects)
+      if (this.wasHttpRedirected(response, url)) {
+        console.log(`[WebScraper] Skipping scrape of ${url}: redirected to different page`);
         return null;
       }
 
       const fullHtml = response.data;
+
+      // Skip client-side redirects (meta refresh, "Redirecting..." pages)
+      if (this.isClientSideRedirect(fullHtml)) {
+        console.log(`[WebScraper] Skipping scrape of ${url}: client-side redirect detected`);
+        return null;
+      }
+
       const $ = cheerio.load(fullHtml);
 
       // Extract title from the page
@@ -376,22 +390,26 @@ export class WebScraperService extends EventEmitter {
     url: string,
     config: Record<string, unknown>,
   ): Promise<AxiosResponse> {
-    try {
-      return await axios.get(url, config);
-    } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 429) {
-        const retryAfter = error.response.headers["retry-after"];
-        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
-        const clampedWaitMs = Math.min(waitMs, 10000); // Cap at 10 seconds
+    const fetchConfig = {
+      ...config,
+      validateStatus: () => true, // Accept all status codes so callers can inspect them
+    };
 
-        console.log(`[WebScraper] 429 for ${url}, retrying after ${clampedWaitMs}ms`);
-        await this.delay(clampedWaitMs);
+    let response = await axios.get(url, fetchConfig);
 
-        // Single retry — if it fails again, let the error propagate
-        return await axios.get(url, config);
-      }
-      throw error;
+    // Handle 429 with single retry respecting Retry-After header
+    if (response.status === 429) {
+      const retryAfter = response.headers["retry-after"];
+      const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
+      const clampedWaitMs = Math.min(waitMs, 10000); // Cap at 10 seconds
+
+      console.log(`[WebScraper] 429 for ${url}, retrying after ${clampedWaitMs}ms`);
+      await this.delay(clampedWaitMs);
+
+      response = await axios.get(url, fetchConfig);
     }
+
+    return response;
   }
 
   private extractUrls(html: string, baseUrl: string): string[] {
@@ -431,6 +449,65 @@ export class WebScraperService extends EventEmitter {
     try {
       const urlObj = new URL(url);
       return urlObj.hostname === this.baseUrl.hostname;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Detect client-side redirects in HTML content.
+   * Catches meta refresh tags and near-empty "Redirecting..." placeholder pages.
+   */
+  private isClientSideRedirect(html: string): boolean {
+    const $ = cheerio.load(html);
+
+    // Meta refresh redirect: <meta http-equiv="refresh" content="0;url=...">
+    const metaRefresh = $('meta[http-equiv="refresh"]').attr("content");
+    if (metaRefresh && /url\s*=/i.test(metaRefresh)) {
+      return true;
+    }
+
+    // Near-empty pages with redirect-like language
+    $("script, style, noscript").remove();
+    const bodyText = $.text().replace(/\s+/g, " ").trim();
+
+    if (bodyText.length < 200) {
+      const redirectPatterns =
+        /\b(redirecting|you are being redirected|moved permanently|page has moved|click here if not redirected)\b/i;
+      if (redirectPatterns.test(bodyText)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if an HTTP response was the result of following a redirect.
+   * Allows benign normalizations (http→https, trailing slash).
+   */
+  private wasHttpRedirected(response: AxiosResponse, originalUrl: string): boolean {
+    const finalUrl: string | undefined = (response.request as any)?.res?.responseUrl;
+    if (!finalUrl) {
+      return false;
+    }
+
+    try {
+      const original = new URL(originalUrl);
+      const final_ = new URL(finalUrl);
+
+      const normalizePath = (p: string) => p.replace(/\/+$/, "");
+
+      // Allow http→https upgrade and trailing slash normalization
+      if (
+        original.hostname === final_.hostname &&
+        normalizePath(original.pathname) === normalizePath(final_.pathname) &&
+        original.search === final_.search
+      ) {
+        return false;
+      }
+
+      return true;
     } catch {
       return false;
     }
@@ -493,8 +570,28 @@ export class WebScraperService extends EventEmitter {
           },
         });
 
+        // Skip error pages (4xx, 5xx)
+        if (response.status >= 400) {
+          console.log(`[WebScraper] Skipping ${url}: HTTP ${response.status}`);
+          continue;
+        }
+
+        // Skip HTTP redirects (URL changed materially after following redirects)
+        if (this.wasHttpRedirected(response, url)) {
+          console.log(`[WebScraper] Skipping ${url}: redirected to different page`);
+          continue;
+        }
+
         if (response.status === 200) {
-          const $ = cheerio.load(response.data);
+          const html = response.data;
+
+          // Skip client-side redirects (meta refresh, "Redirecting..." pages)
+          if (this.isClientSideRedirect(html)) {
+            console.log(`[WebScraper] Skipping ${url}: client-side redirect detected`);
+            continue;
+          }
+
+          const $ = cheerio.load(html);
 
           // Extract page metadata
           const title = $("title").text() || $("h1").first().text() || "Untitled";
@@ -512,7 +609,7 @@ export class WebScraperService extends EventEmitter {
           });
 
           // Extract and queue new URLs from the page
-          const newUrls = this.extractUrls(response.data, url);
+          const newUrls = this.extractUrls(html, url);
           let newUrlsAdded = 0;
           for (const newUrl of newUrls) {
             if (!this.visitedUrls.has(newUrl) && !this.urlQueue.includes(newUrl)) {
@@ -527,15 +624,8 @@ export class WebScraperService extends EventEmitter {
           }
         }
       } catch (error) {
+        // Network errors, timeouts, etc. — skip entirely
         console.error(`Failed to discover ${url}:`, error);
-        // Add URL with minimal info even if fetch failed
-        this.discoveredPages.push({
-          url,
-          title: url.split("/").pop() || "Unknown",
-          description: "",
-          discoveredAt: new Date(),
-          selected: false, // Default to not selected if failed
-        });
       }
 
       // Delay between pages to avoid rate limiting

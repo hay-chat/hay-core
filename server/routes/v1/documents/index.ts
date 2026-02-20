@@ -797,28 +797,48 @@ async function processWebImport(
       status: JobStatus.PROCESSING,
     });
 
-    // Create placeholder documents immediately so users can see them
+    // Create or update placeholder documents — reuse existing documents with the same sourceUrl
     const placeholderDocuments = [];
     for (const page of selectedPages) {
-      const doc = await documentRepository.create({
-        title: page.title || new URL(page.url).pathname,
-        content: `Processing content from ${page.url}...`,
-        type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
-        status: DocumentationStatus.PROCESSING, // Mark as processing
-        visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
-        tags: metadata?.tags as string[] | undefined,
-        categories: metadata?.categories as string[] | undefined,
-        importMethod: ImportMethod.WEB,
-        sourceUrl: page.url,
-        organizationId,
-        processingMetadata: {
-          retryCount: 0,
-          lastAttemptAt: new Date(),
-          jobId,
-          processingStage: "scraping",
-        },
-      });
-      placeholderDocuments.push(doc);
+      const existingDoc = await documentRepository.findBySourceUrl(page.url, organizationId);
+
+      if (existingDoc) {
+        // Update existing document instead of creating a duplicate
+        const updated = await documentRepository.update(existingDoc.id, organizationId, {
+          title: page.title || existingDoc.title,
+          content: `Processing content from ${page.url}...`,
+          status: DocumentationStatus.PROCESSING,
+          processingMetadata: {
+            retryCount: 0,
+            lastAttemptAt: new Date(),
+            jobId,
+            processingStage: "scraping",
+          },
+        });
+        if (updated) {
+          placeholderDocuments.push(updated);
+        }
+      } else {
+        const doc = await documentRepository.create({
+          title: page.title || new URL(page.url).pathname,
+          content: `Processing content from ${page.url}...`,
+          type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
+          status: DocumentationStatus.PROCESSING,
+          visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
+          tags: metadata?.tags as string[] | undefined,
+          categories: metadata?.categories as string[] | undefined,
+          importMethod: ImportMethod.WEB,
+          sourceUrl: page.url,
+          organizationId,
+          processingMetadata: {
+            retryCount: 0,
+            lastAttemptAt: new Date(),
+            jobId,
+            processingStage: "scraping",
+          },
+        });
+        placeholderDocuments.push(doc);
+      }
     }
 
     console.log(`Created ${placeholderDocuments.length} placeholder documents`);

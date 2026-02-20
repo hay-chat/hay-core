@@ -66,6 +66,13 @@ export const analyticsRouter = t.router({
       };
     }),
 
+  documentStatusCounts: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const data = await analyticsService.getDocumentStatusCounts(ctx.organizationId!);
+      return { data };
+    },
+  ),
+
   responseTime: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(analyticsInputSchema)
     .query(async ({ ctx, input }) => {

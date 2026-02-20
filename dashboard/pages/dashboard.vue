@@ -296,6 +296,9 @@
           </div>
         </CardContent>
       </Card>
+
+      <!-- Document Status Overview -->
+      <DocumentStatsWidget ref="documentStatsWidget" />
     </div>
 
     <!-- Quick Actions -->
@@ -353,6 +356,7 @@ import { useAnalyticsStore } from "@/stores/analytics";
 // State
 const loading = ref(false);
 const router = useRouter();
+const documentStatsWidget = ref<{ refresh: () => void } | null>(null);
 const analyticsStore = useAnalyticsStore();
 
 // Cache keys for different widgets
@@ -707,6 +711,7 @@ const refreshData = async () => {
   try {
     // Force refresh to bypass cache
     await fetchDashboardData(true);
+    documentStatsWidget.value?.refresh();
   } catch (error) {
     console.error("Error refreshing data:", error);
   } finally {
