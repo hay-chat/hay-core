@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="hay-chat-window"
-    :class="{ 'hay-chat-window--left': position === 'left' }"
-  >
+  <div class="hay-chat-window" :class="{ 'hay-chat-window--left': position === 'left' }">
     <!-- Header -->
     <div class="hay-chat-header">
       <div class="hay-chat-header__content">
@@ -11,11 +8,7 @@
           {{ widgetSubtitle }}
         </div>
       </div>
-      <button
-        @click="$emit('close')"
-        class="hay-chat-header__close"
-        aria-label="Close chat"
-      >
+      <button @click="$emit('close')" class="hay-chat-header__close" aria-label="Close chat">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
@@ -33,33 +26,28 @@
       </button>
     </div>
 
-    <!-- Connection Status -->
-    <div v-if="!isConnected" class="hay-chat-status">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="hay-chat-status__icon"
-      >
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <span>Connecting...</span>
+    <!-- Skeleton loading while connecting -->
+    <div v-if="!isConnected" class="hay-chat-skeleton">
+      <div class="hay-chat-skeleton__message hay-chat-skeleton__message--agent">
+        <div class="hay-chat-skeleton__line" style="width: 70%"></div>
+        <div class="hay-chat-skeleton__line" style="width: 50%"></div>
+      </div>
+      <div class="hay-chat-skeleton__message hay-chat-skeleton__message--user">
+        <div class="hay-chat-skeleton__line" style="width: 40%"></div>
+      </div>
+      <div class="hay-chat-skeleton__message hay-chat-skeleton__message--agent">
+        <div class="hay-chat-skeleton__line" style="width: 60%"></div>
+        <div class="hay-chat-skeleton__line" style="width: 75%"></div>
+        <div class="hay-chat-skeleton__line" style="width: 35%"></div>
+      </div>
     </div>
 
     <!-- Greeting Message -->
     <div
-      v-if="showGreeting && greetingMessage && messages.length === 0"
-      class="hay-chat-greeting"
+      v-else-if="showGreeting && greetingMessage && messages.length === 0"
+      class="hay-chat-greeting hay-message hay-message--agent"
     >
-      {{ greetingMessage }}
+      <div class="hay-message__content">{{ greetingMessage }}</div>
     </div>
 
     <!-- Messages -->
@@ -85,10 +73,7 @@
         </svg>
         <span class="hay-chat-closed-footer__text">This conversation has ended</span>
       </div>
-      <button
-        @click="$emit('startNewConversation')"
-        class="hay-chat-closed-footer__button"
-      >
+      <button @click="$emit('startNewConversation')" class="hay-chat-closed-footer__button">
         Start New Conversation
       </button>
     </div>
@@ -101,18 +86,58 @@
       @start-typing="$emit('startTyping')"
       @stop-typing="$emit('stopTyping')"
     />
+
+    <!-- Powered by Hay -->
+    <a :href="poweredByUrl" target="_blank" rel="noopener noreferrer" class="hay-powered-by">
+      Powered by
+      <svg
+        width="684"
+        height="238"
+        viewBox="0 0 684 238"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        class="hay-powered-by__logo"
+        alt="Hay"
+      >
+        <path
+          d="M167.884 0C198.661 0 214.049 0.00037514 223.61 9.56152C233.172 19.1227 233.172 34.511 233.172 65.2881V167.884C233.172 198.661 233.172 214.049 223.61 223.61C214.049 233.172 198.661 233.172 167.884 233.172H65.2881C34.511 233.172 19.1227 233.172 9.56152 223.61C0.00037514 214.049 0 198.661 0 167.884V65.2881C0 34.511 0.000305188 19.1227 9.56152 9.56152C19.1227 0.00030087 34.511 0 65.2881 0H167.884ZM143.97 120.49C143.97 18.9343 128.297 37.2143 103.767 123.198C97.6336 3.36215 79.2354 66.3274 51.2979 167.884C85.3681 167.884 174.634 163.821 174.634 163.821C178.722 111.012 192.35 11.4868 143.97 120.49Z"
+          fill="#1D293D"
+        />
+        <path
+          d="M569.916 227.368L581.824 207.591C581.824 207.591 588.629 214.183 595.222 214.183C603.94 214.183 607.555 211.631 612.446 199.297L616.487 188.877L567.364 85.7408H595.647L629.671 159.531L656.253 85.7408H683.685L634.775 209.079C626.056 231.195 611.808 238 596.923 238C581.612 238 569.916 227.368 569.916 227.368Z"
+          fill="#1D293D"
+        />
+        <path
+          d="M537.754 85.7402H561.358V186.538H537.754V173.353C537.754 173.353 529.035 189.09 507.344 189.09C481.188 189.09 458.222 167.186 458.222 136.139C458.222 105.092 481.188 83.1884 507.344 83.1884C528.397 83.1884 537.754 98.9247 537.754 98.9247V85.7402ZM535.84 151.237V121.041C535.84 121.041 528.397 107.005 512.023 107.005C494.798 107.005 484.165 119.552 484.165 136.139C484.165 152.726 494.798 165.272 512.023 165.272C528.397 165.272 535.84 151.237 535.84 151.237Z"
+          fill="#1D293D"
+        />
+        <path
+          d="M419.62 98.2868V37.6807H445.138V186.538H419.62V122.529H356.037V186.538H330.519V37.6807H356.037V98.2868H419.62Z"
+          fill="#1D293D"
+        />
+      </svg>
+    </a>
   </div>
 </template>
 
 <script setup lang="ts">
-import MessageList from './MessageList.vue';
-import MessageInput from './MessageInput.vue';
-import type { Message } from '@/types';
+import { computed } from "vue";
+import MessageList from "./MessageList.vue";
+import MessageInput from "./MessageInput.vue";
+import type { Message } from "@/types";
+
+const poweredByUrl = computed(() => {
+  const url = new URL("https://hay.chat");
+  url.searchParams.set("utm_source", window.location.hostname);
+  url.searchParams.set("utm_medium", "webchat");
+  url.searchParams.set("utm_campaign", "powered_by");
+  return url.toString();
+});
 
 defineProps<{
   widgetTitle: string;
   widgetSubtitle?: string;
-  position: 'left' | 'right';
+  position: "left" | "right";
   showGreeting: boolean;
   greetingMessage?: string;
   messages: Message[];
@@ -130,7 +155,7 @@ defineEmits<{
 }>();
 </script>
 
-<style scoped>
+<style>
 .hay-chat-window {
   position: fixed;
   bottom: 90px;
@@ -231,16 +256,6 @@ defineEmits<{
   }
 }
 
-.hay-chat-greeting {
-  padding: 16px;
-  margin: 16px;
-  background: var(--hay-primary-light);
-  color: white;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
 /* Closed conversation footer (replaces input area) */
 .hay-chat-closed-footer {
   padding: 16px;
@@ -288,6 +303,87 @@ defineEmits<{
 
 .hay-chat-closed-footer__button:active {
   opacity: 0.8;
+}
+
+/* Skeleton loading */
+.hay-chat-skeleton {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hay-chat-skeleton__message {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 70%;
+}
+
+.hay-chat-skeleton__message--agent {
+  align-self: flex-start;
+}
+
+.hay-chat-skeleton__message--user {
+  align-self: flex-end;
+}
+
+.hay-chat-skeleton__line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1s infinite;
+}
+
+.hay-chat-skeleton__message--user .hay-chat-skeleton__line {
+  align-self: flex-end;
+  height: 41px;
+  border-radius: 12px;
+  border-bottom-right-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* Powered by Hay */
+.hay-powered-by {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding-block: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.hay-powered-by:hover {
+  color: #6b7280;
+}
+
+.hay-powered-by strong {
+  font-weight: 600;
+  color: inherit;
+}
+
+.hay-powered-by__logo {
+  flex-shrink: 0;
+  border-radius: 3px;
+  height: 1.2em;
+  width: auto;
+}
+.hay-powered-by__logo path {
+  fill: currentColor;
 }
 
 /* Mobile responsiveness */

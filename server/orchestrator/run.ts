@@ -32,6 +32,7 @@ async function publishStatusChange(
       await redisService.publish("websocket:events", {
         type: "conversation_status_changed",
         organizationId,
+        conversationId,
         payload: {
           conversationId,
           status,
@@ -42,7 +43,7 @@ async function publishStatusChange(
     } else {
       // Fallback to direct WebSocket if Redis not available
       const { websocketService } = await import("@server/services/websocket.service");
-      websocketService.sendToOrganization(organizationId, {
+      const statusPayload = {
         type: "conversation_status_changed",
         payload: {
           conversationId,
@@ -50,7 +51,9 @@ async function publishStatusChange(
           title,
           processingPhase,
         },
-      });
+      };
+      websocketService.sendToConversation(conversationId, statusPayload);
+      websocketService.sendToOrganization(organizationId, statusPayload);
     }
   } catch (error) {
     console.error("[Orchestrator] Failed to publish status change:", error);

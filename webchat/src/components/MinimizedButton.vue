@@ -41,7 +41,7 @@
 <script setup lang="ts">
 defineProps<{
   isOpen: boolean;
-  position: 'left' | 'right';
+  position: "left" | "right";
   unreadCount: number;
 }>();
 
@@ -50,14 +50,15 @@ defineEmits<{
 }>();
 </script>
 
-<style scoped>
+<style>
 .hay-chat-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
   width: 60px;
   height: 60px;
-  border-radius: 50%;
+  border-radius: 24px;
+  corner-shape: squircle;
   background: var(--hay-primary);
   border: none;
   cursor: pointer;

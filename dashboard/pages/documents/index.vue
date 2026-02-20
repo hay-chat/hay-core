@@ -146,7 +146,10 @@
               />
             </TableCell>
             <TableCell class="font-medium max-w-0">
-              <div class="flex items-center gap-2 min-w-0">
+              <NuxtLink
+                :to="`/documents/${document.id}`"
+                class="flex items-center gap-2 min-w-0 hover:text-primary transition-colors"
+              >
                 <component
                   :is="getFileIcon(document.type)"
                   class="h-4 w-4 min-w-4 flex-shrink-0 text-neutral-muted"
@@ -154,7 +157,7 @@
                 <span class="truncate block" :title="document.title || document.name">
                   {{ document.title || document.name }}
                 </span>
-              </div>
+              </NuxtLink>
             </TableCell>
             <TableCell>
               <span
@@ -212,7 +215,7 @@
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="viewDocument(document)">
+                  <DropdownMenuItem @click="$router.push(`/documents/${document.id}`)">
                     <Eye class="mr-2 h-4 w-4" />
                     View
                   </DropdownMenuItem>
@@ -367,9 +370,6 @@
         </div>
       </DialogContent>
     </Dialog>
-
-    <!-- Document Preview Sheet -->
-    <DocumentPreviewSheet v-model:open="showPreview" :document-id="previewDocumentId" />
   </Page>
 </template>
 
@@ -435,10 +435,6 @@ const deleteDialogTitle = ref("");
 const deleteDialogDescription = ref("");
 const documentToDelete = ref<Document | null>(null);
 const isBulkDelete = ref(false);
-
-// Document preview state
-const showPreview = ref(false);
-const previewDocumentId = ref<string | null>(null);
 
 const uploadForm = ref({
   title: "",
@@ -650,11 +646,6 @@ const toggleAllSelection = () => {
   } else {
     selectedDocuments.value = documents.value.map((doc) => doc.id);
   }
-};
-
-const viewDocument = (document: Document) => {
-  previewDocumentId.value = document.id;
-  showPreview.value = true;
 };
 
 const visitSourcePage = (document: Document) => {

@@ -487,6 +487,50 @@ export function useChat(config: HayChatConfig) {
     return created;
   };
 
+  // Merge server messages into existing messages (additive only - never removes messages)
+  const mergeMessages = (serverMessages: any[]) => {
+    const existingIds = new Set(messages.value.map((m) => m.id));
+    let added = 0;
+
+    for (const msg of serverMessages) {
+      // Skip messages we already have (including optimistic temp messages matched by content)
+      if (existingIds.has(msg.id)) continue;
+
+      const sender = msg.type === "Customer" ? "user" : "agent";
+      const newMessage: Message = {
+        id: msg.id,
+        sender,
+        content: msg.content,
+        timestamp: new Date(msg.createdAt).getTime(),
+        metadata: msg.metadata,
+      };
+
+      // Check if this is a server confirmation of an optimistic user message
+      // Don't replace it — changing the key (temp-* → real ID) causes Vue to
+      // destroy and recreate the DOM element, which triggers a visual flash.
+      // Just skip the server duplicate; the temp message already shows correctly.
+      if (sender === "user") {
+        const hasTempMatch = messages.value.some(
+          (m) => m.id.startsWith("temp-") && m.sender === "user" && m.content === msg.content,
+        );
+        if (hasTempMatch) {
+          continue;
+        }
+      }
+
+      messages.value.push(newMessage);
+      existingIds.add(msg.id);
+      added++;
+
+      // Check for closure message
+      if (msg.metadata?.isClosureMessage === true) {
+        isConversationClosed.value = true;
+      }
+    }
+
+    return added;
+  };
+
   // Refresh messages from server to ensure we have the complete conversation
   const refreshMessages = async () => {
     if (!conversationId.value || !keypair.value) {
@@ -522,9 +566,23 @@ export function useChat(config: HayChatConfig) {
       }
 
       if (messagesData?.messages) {
-        // Replace messages with fresh data from server
-        loadMessagesIntoUI(messagesData.messages);
-        console.log("[Webchat] Messages refreshed successfully:", messagesData.messages.length);
+        // If server returned 0 messages but we have messages locally, skip the update
+        // This prevents the conversation from disappearing due to transient server issues
+        if (messagesData.messages.length === 0 && messages.value.length > 0) {
+          console.log(
+            "[Webchat] Server returned 0 messages but we have local messages, skipping refresh",
+          );
+          return;
+        }
+
+        // Merge new messages into existing ones (additive only)
+        const added = mergeMessages(messagesData.messages);
+        console.log(
+          "[Webchat] Messages refreshed: %d on server, %d new added, %d total",
+          messagesData.messages.length,
+          added,
+          messages.value.length,
+        );
       }
 
       // Update conversation closed state
@@ -625,9 +683,8 @@ export function useChat(config: HayChatConfig) {
 
       await sendMessageInternal(text.trim(), conversationId.value!, retryCount);
 
-      // After successfully sending, refresh the conversation to get the complete message list
-      // This ensures we have all messages including bot responses
-      await refreshMessages();
+      // Don't call refreshMessages() here — the bot hasn't responded yet so it's
+      // wasted work. The 10-second polling loop and WebSocket handle new messages.
 
       isSending.value = false;
     } catch (error: any) {
