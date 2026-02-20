@@ -6,13 +6,21 @@ import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { Not, IsNull } from "typeorm";
+import { AuthCode } from "@server/entities/auth-code.entity";
 import {
   hashPassword,
   verifyPassword,
   generateSessionId,
+  hashApiKey,
+  generateSecureToken,
 } from "@server/lib/auth/utils/hashing";
 import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
-import { protectedProcedure, protectedProcedureWithoutOrg, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
+import {
+  protectedProcedure,
+  protectedProcedureWithoutOrg,
+  publicProcedure,
+  adminProcedure,
+} from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService } from "@server/services/email.service";
 import * as crypto from "crypto";
@@ -448,7 +456,7 @@ export const authRouter = t.router({
       z.object({
         token: z.string(),
         newPassword: z.string().min(8),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
@@ -538,91 +546,95 @@ export const authRouter = t.router({
 
   // Protected endpoints
   me: protectedProcedureWithoutOrg
-    .output(z.object({
-      id: z.string(),
-      email: z.string(),
-      pendingEmail: z.string().nullable().optional(),
-      firstName: z.string().nullable().optional(),
-      lastName: z.string().nullable().optional(),
-      avatarUrl: z.string().nullable().optional(),
-      isActive: z.boolean(),
-      lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
-      lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
-      status: z.enum(["available", "away"]).optional(),
-      onlineStatus: z.enum(["online", "away", "offline"]),
-      authMethod: z.string(),
-      organizations: z.array(z.object({
+    .output(
+      z.object({
         id: z.string(),
-        name: z.string(),
-        slug: z.string(),
-        logo: z.string().nullable().optional(),
+        email: z.string(),
+        pendingEmail: z.string().nullable().optional(),
+        firstName: z.string().nullable().optional(),
+        lastName: z.string().nullable().optional(),
+        avatarUrl: z.string().nullable().optional(),
+        isActive: z.boolean(),
+        lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
+        lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
+        status: z.enum(["available", "away"]).optional(),
+        onlineStatus: z.enum(["online", "away", "offline"]),
+        authMethod: z.string(),
+        organizations: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            slug: z.string(),
+            logo: z.string().nullable().optional(),
+            role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
+            permissions: z.array(z.string()).nullable().optional(),
+            joinedAt: z.union([z.date(), z.string()]).optional(),
+            lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
+          }),
+        ),
+        activeOrganizationId: z.string().optional(),
         role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
-        permissions: z.array(z.string()).nullable().optional(),
-        joinedAt: z.union([z.date(), z.string()]).optional(),
-        lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
-      })),
-      activeOrganizationId: z.string().optional(),
-      role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
-    }))
+      }),
+    )
     .query(async ({ ctx }) => {
-    const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
+      const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
 
-    // Fetch user with organization data
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: userEntity.id },
-      relations: ["organization"],
-    });
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
+      // Fetch user with organization data
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: userEntity.id },
+        relations: ["organization"],
       });
-    }
 
-    // Load all user organizations (multi-org support)
-    const organizations = await getUserOrganizations(user.id);
-
-    // Determine active organization
-    // Use the one from context if available, otherwise use most recently accessed or legacy
-    let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
-    if (!activeOrganizationId && organizations.length > 0) {
-      const mostRecent = organizations.reduce((prev, current) => {
-        if (!prev.lastAccessedAt) return current;
-        if (!current.lastAccessedAt) return prev;
-        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
-      });
-      activeOrganizationId = mostRecent.id;
-    }
-
-    // Get role for active organization or fall back to user role
-    let role = user.role;
-    if (activeOrganizationId && organizations.length > 0) {
-      const activeOrg = organizations.find(org => org.id === activeOrganizationId);
-      if (activeOrg) {
-        role = activeOrg.role;
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
       }
-    }
 
-    return {
-      id: user.id,
-      email: user.email,
-      pendingEmail: user.pendingEmail,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatarUrl: user.avatarUrl,
-      isActive: user.isActive,
-      lastLoginAt: user.lastLoginAt,
-      lastSeenAt: user.lastSeenAt,
-      status: user.status,
-      onlineStatus: user.getOnlineStatus(),
-      authMethod: ctx.user!.authMethod,
-      organizations,
-      activeOrganizationId,
-      role,
-    };
-  }),
+      // Load all user organizations (multi-org support)
+      const organizations = await getUserOrganizations(user.id);
+
+      // Determine active organization
+      // Use the one from context if available, otherwise use most recently accessed or legacy
+      let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
+      if (!activeOrganizationId && organizations.length > 0) {
+        const mostRecent = organizations.reduce((prev, current) => {
+          if (!prev.lastAccessedAt) return current;
+          if (!current.lastAccessedAt) return prev;
+          return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+        });
+        activeOrganizationId = mostRecent.id;
+      }
+
+      // Get role for active organization or fall back to user role
+      let role = user.role;
+      if (activeOrganizationId && organizations.length > 0) {
+        const activeOrg = organizations.find((org) => org.id === activeOrganizationId);
+        if (activeOrg) {
+          role = activeOrg.role;
+        }
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        pendingEmail: user.pendingEmail,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive,
+        lastLoginAt: user.lastLoginAt,
+        lastSeenAt: user.lastSeenAt,
+        status: user.status,
+        onlineStatus: user.getOnlineStatus(),
+        authMethod: ctx.user!.authMethod,
+        organizations,
+        activeOrganizationId,
+        role,
+      };
+    }),
 
   logout: protectedProcedure.mutation(async () => {
     // In a stateless JWT system, logout is handled client-side
@@ -1004,7 +1016,10 @@ export const authRouter = t.router({
         console.log("✅ [updateEmail] All emails sent successfully");
       } catch (error) {
         console.error("❌ [updateEmail] Failed to send verification emails:", error);
-        console.error("❌ [updateEmail] Error stack:", error instanceof Error ? error.stack : "No stack");
+        console.error(
+          "❌ [updateEmail] Error stack:",
+          error instanceof Error ? error.stack : "No stack",
+        );
         // Rollback the pending email change
         await userRepository.update(user.id, {
           pendingEmail: null as any,
@@ -1020,7 +1035,8 @@ export const authRouter = t.router({
 
       return {
         success: true,
-        message: "Verification email sent. Please check your new email address to complete the change.",
+        message:
+          "Verification email sent. Please check your new email address to complete the change.",
         pendingEmail: user.pendingEmail,
       };
     }),
@@ -1267,8 +1283,91 @@ export const authRouter = t.router({
     };
   }),
 
-  // API Key management has been moved to /api-tokens router
-  // See server/routes/v1/api-tokens/index.ts for organization-scoped API tokens
+  // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
+  generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const rawCode = generateSecureToken(32);
+    const codeHash = await hashApiKey(rawCode);
+
+    const authCodeRepo = AppDataSource.getRepository(AuthCode);
+    const authCode = authCodeRepo.create({
+      userId: ctx.user!.id,
+      codeHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      used: false,
+    });
+    await authCodeRepo.save(authCode);
+
+    return {
+      code: rawCode,
+      expiresAt: authCode.expiresAt,
+    };
+  }),
+
+  exchangeAuthCode: publicProcedure
+    .input(z.object({ code: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const codeHash = await hashApiKey(input.code);
+
+      const authCodeRepo = AppDataSource.getRepository(AuthCode);
+      const authCode = await authCodeRepo.findOne({
+        where: { codeHash, used: false },
+        relations: ["user"],
+      });
+
+      if (!authCode || !authCode.isValid()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired auth code",
+        });
+      }
+
+      // Mark as used immediately (single-use)
+      authCode.used = true;
+      await authCodeRepo.save(authCode);
+
+      const user = authCode.user!;
+
+      if (!user.isActive) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Account is deactivated",
+        });
+      }
+
+      // Update last login
+      const userRepository = AppDataSource.getRepository(User);
+      user.lastLoginAt = new Date();
+      user.updateLastSeen();
+      await userRepository.save(user);
+
+      // Generate tokens
+      const sessionId = generateSessionId();
+      const tokens = generateTokens(user, sessionId);
+
+      // Load all user organizations
+      const organizations = await getUserOrganizations(user.id);
+
+      // Determine active organization
+      let activeOrganizationId = user.organizationId;
+      if (organizations.length > 0) {
+        const mostRecent = organizations.reduce((prev, current) => {
+          if (!prev.lastAccessedAt) return current;
+          if (!current.lastAccessedAt) return prev;
+          return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+        });
+        activeOrganizationId = mostRecent.id;
+      }
+
+      return {
+        user: {
+          ...user.toJSON(),
+          organizations,
+          activeOrganizationId,
+          onlineStatus: user.getOnlineStatus(),
+        },
+        ...tokens,
+      };
+    }),
 
   // Admin endpoints
   listUsers: adminProcedure.query(async () => {
