@@ -3,9 +3,12 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
-        <Button @click="createPlaybook">
-          <Plus class="h-4 w-4 mr-2" />
-          Create Playbook
+        <Button variant="outline" size="icon" @click="router.push('/playbooks/new')">
+          <Plus class="h-4 w-4" />
+        </Button>
+        <Button @click="router.push('/playbooks/wizard')">
+          <Sparkles class="h-4 w-4 mr-2" />
+          Generate Playbook
         </Button>
       </div>
     </template>
@@ -107,7 +110,7 @@
       "
       illustration="/bale/playbook.svg"
       :action="searchQuery ? undefined : 'Create Your First Playbook'"
-      @click="createPlaybook"
+      @click="router.push('/playbooks/new')"
     />
 
     <!-- Playbooks Grid View -->
@@ -241,16 +244,14 @@ import {
   Plus,
   Book,
   Play,
-  Target,
   Zap,
   Search,
-  Filter,
   LayoutGrid,
   List,
   MoreHorizontal,
   Copy,
   Trash2,
-  FileText,
+  Sparkles,
 } from "lucide-vue-next";
 
 import { useRouter } from "vue-router";
@@ -349,11 +350,6 @@ const formatDate = (date: Date) => {
 
 const toggleView = () => {
   viewMode.value = viewMode.value === "grid" ? "table" : "grid";
-};
-
-const createPlaybook = () => {
-  // TODO: Navigate to playbook creation
-  router.push("/playbooks/new");
 };
 
 const editPlaybook = (id: string) => {

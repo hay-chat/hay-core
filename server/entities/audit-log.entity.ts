@@ -109,7 +109,7 @@ export class AuditLog extends TypeOrmBaseEntity {
 
   // Helper method to create log entry
   static createLog(data: {
-    userId: string;
+    userId?: string;
     organizationId?: string;
     action: AuditAction;
     resource?: string;

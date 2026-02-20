@@ -10,6 +10,7 @@
     "dashboard",
     "server",
     "packages/plugin-sdk",
+    "packages/server-sdk",
     "plugins/core/*"
   ],
   "scripts": {
@@ -35,8 +36,9 @@
     "lint:fix": "eslint \"server/**/*.{js,ts}\" \"dashboard/**/*.{js,ts,vue}\" --cache --fix",
     "lint:dashboard": "eslint \"dashboard/**/*.{js,ts,vue}\" --cache",
     "lint:server": "eslint \"server/**/*.{js,ts}\" --cache",
-    "typecheck": "npm run typecheck:plugin-sdk && npm run typecheck:dashboard && npm run typecheck:server",
+    "typecheck": "npm run typecheck:plugin-sdk && npm run typecheck:server-sdk && npm run typecheck:dashboard && npm run typecheck:server",
     "typecheck:plugin-sdk": "cd packages/plugin-sdk && npm run typecheck",
+    "typecheck:server-sdk": "cd packages/server-sdk && npm run typecheck",
     "typecheck:dashboard": "cd dashboard && npm run typecheck",
     "typecheck:server": "cd server && npm run typecheck",
     "clean": "npm run clean:plugin-sdk && npm run clean:dashboard && npm run clean:server",
@@ -69,6 +71,10 @@
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:packages/plugin-sdk",
-    "@types/archiver": "^7.0.0"
+    "@mozilla/readability": "^0.6.0",
+    "@types/archiver": "^7.0.0",
+    "@types/turndown": "^5.0.6",
+    "linkedom": "^0.18.12",
+    "turndown": "^7.2.2"
   }
 }

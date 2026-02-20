@@ -155,7 +155,6 @@ export class DataRetentionService {
 
         // Write audit log entry
         const auditLog = AuditLog.createLog({
-          userId: "system" as any, // System-initiated action
           organizationId: org.id,
           action: "retention.cleanup",
           metadata: {
@@ -189,7 +188,6 @@ export class DataRetentionService {
         // Log failed retention attempt
         try {
           const auditLog = AuditLog.createLog({
-            userId: "system" as any,
             organizationId: org.id,
             action: "retention.cleanup",
             metadata: {

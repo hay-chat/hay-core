@@ -23,6 +23,7 @@ import { Upload } from "../entities/upload.entity";
 import { ScheduledJob } from "../entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "../entities/scheduled-job-history.entity";
 import { WebchatSettings } from "./entities/webchat-settings.entity";
+import { AuthCode } from "../entities/auth-code.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import "reflect-metadata";
@@ -62,6 +63,7 @@ export const AppDataSource = new DataSource({
     ScheduledJob,
     ScheduledJobHistory,
     WebchatSettings,
+    AuthCode,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

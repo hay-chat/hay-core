@@ -23,9 +23,7 @@
         <AlertCircle class="h-12 w-12 text-red-500 mb-4" />
         <p class="text-lg font-medium text-foreground">Failed to load document</p>
         <p class="text-sm text-neutral-muted mt-1">{{ error }}</p>
-        <Button variant="outline" class="mt-4" @click="fetchDocument">
-          Try Again
-        </Button>
+        <Button variant="outline" class="mt-4" @click="fetchDocument"> Try Again </Button>
       </div>
 
       <!-- Document Content -->
@@ -179,7 +177,7 @@ watch(
       error.value = null;
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 
@@ -290,7 +288,7 @@ watch(
   /* Horizontal rule */
   hr {
     border: none;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--color-neutral-300);
     margin: 1.5rem 0;
   }
 

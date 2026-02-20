@@ -48,6 +48,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
@@ -71,6 +72,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
