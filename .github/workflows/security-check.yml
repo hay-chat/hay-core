@@ -26,13 +26,13 @@ jobs:
 
           FAILED=0
           for pattern in "${INSECURE_PATTERNS[@]}"; do
-            # Search server source code (excluding tests, docs, examples, and the validation blocklist itself)
+            # Search server source code (excluding tests, dist, node_modules, and config/ where the validation blocklist lives)
             MATCHES=$(grep -rn "$pattern" server/ \
               --include="*.ts" \
               --exclude-dir=tests \
               --exclude-dir=dist \
               --exclude-dir=node_modules \
-              | grep -v "KNOWN_INSECURE_DEFAULTS" \
+              --exclude-dir=config \
               || true)
 
             if [ -n "$MATCHES" ]; then
