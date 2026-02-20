@@ -219,14 +219,14 @@ function reloadWidget() {
   }
 
   // Remove existing script
-  const existingScript = document.querySelector('script[src*="/webchat/widget.js"]');
+  const existingScript = document.querySelector('script[src*="/v1/webchat/widget.js"]');
   if (existingScript) {
     existingScript.remove();
   }
 
   // Reload the widget script with new timestamp to force refresh
   const script = document.createElement("script");
-  script.src = `${apiBaseUrl}/webchat/widget.js?v=${Date.now()}`;
+  script.src = `${apiBaseUrl}/v1/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 }
@@ -300,12 +300,12 @@ const implementationExample = `<!-- Hay Webchat Widget -->
   };
 </${"script"}>
 <${"script"}
-  src="https://api.your-domain.com/webchat/widget.js"
+  src="https://api.your-domain.com/v1/webchat/widget.js"
   async>
 </${"script"}>
 <link
   rel="stylesheet"
-  href="https://api.your-domain.com/webchat/widget.css"
+  href="https://api.your-domain.com/v1/webchat/widget.css"
 />`;
 
 // Initialize the widget on this page
@@ -330,14 +330,14 @@ onMounted(() => {
 
   // Load the widget script
   const script = document.createElement("script");
-  script.src = `${apiBaseUrl}/webchat/widget.js?v=${Date.now()}`;
+  script.src = `${apiBaseUrl}/v1/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
 
   // Load the widget styles
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = `${apiBaseUrl}/webchat/widget.css`;
+  link.href = `${apiBaseUrl}/v1/webchat/widget.css`;
   document.head.appendChild(link);
 
   // Start polling for session changes

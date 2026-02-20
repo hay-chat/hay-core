@@ -204,8 +204,8 @@ const installationCode = computed(() => {
     greetingMessage: '${settingsForm.value.greetingMessage}'
   };
 </${"script"}>
-<${"script"} src="${apiBaseUrl}/webchat/widget.js" async></${"script"}>
-<link rel="stylesheet" href="${apiBaseUrl}/webchat/widget.css">`;
+<${"script"} src="${apiBaseUrl}/v1/webchat/widget.js" async></${"script"}>
+<link rel="stylesheet" href="${apiBaseUrl}/v1/webchat/widget.css">`;
 });
 
 // Load settings

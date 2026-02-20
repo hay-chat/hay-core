@@ -127,7 +127,7 @@ async function startServer() {
   const webchatDir = path.join(projectRoot, "webchat", "dist");
   console.log(`📦 Serving webchat files from: ${webchatDir}`);
   server.use(
-    "/webchat",
+    "/v1/webchat",
     express.static(webchatDir, {
       maxAge: "7d",
       etag: true,
