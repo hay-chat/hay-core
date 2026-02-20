@@ -50,7 +50,8 @@ export type AuditAction =
   | "document.create"
   | "document.update"
   | "document.delete"
-  | "permission.denied";
+  | "permission.denied"
+  | "retention.cleanup";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
@@ -108,7 +109,7 @@ export class AuditLog extends TypeOrmBaseEntity {
 
   // Helper method to create log entry
   static createLog(data: {
-    userId: string;
+    userId?: string;
     organizationId?: string;
     action: AuditAction;
     resource?: string;

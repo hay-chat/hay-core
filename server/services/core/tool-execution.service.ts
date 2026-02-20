@@ -6,6 +6,7 @@ import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { conversationSecretService } from "../conversation-secret.service";
 
 interface ToolExecutionResult {
   success: boolean;
@@ -321,12 +322,19 @@ export class ToolExecutionService {
     // Get organization ID from the conversation parameter passed to the parent method
     const organizationId = conversation.organization_id;
 
+    // Inject conversation secrets into tool args before execution
+    const enrichedArgs = await this.injectConversationSecrets(
+      conversation.id,
+      toolArgs,
+      toolSchema as Record<string, unknown> | null,
+    );
+
     // Execute the MCP tool via the running process
     return await this.executeMCPTool(
       organizationId,
       matchingPlugin.pluginId,
       actualToolName,
-      toolArgs,
+      enrichedArgs,
     );
   }
 
@@ -376,6 +384,55 @@ export class ToolExecutionService {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Substitute conversation secrets into tool arguments before MCP execution.
+   *
+   * Two injection modes:
+   *  1. `x-hay-secret` annotation on a schema property → inject secret value by key name directly
+   *  2. `<<secret.keyname>>` placeholder in any string arg value → replace with real value
+   *
+   * Secret values never appear in logs or LLM context — only in the actual MCP call.
+   */
+  private async injectConversationSecrets(
+    conversationId: string,
+    args: Record<string, unknown>,
+    toolSchema: Record<string, unknown> | null,
+  ): Promise<Record<string, unknown>> {
+    const secrets = await conversationSecretService.getSecrets(conversationId);
+    if (Object.keys(secrets).length === 0) {
+      return args;
+    }
+
+    const enriched = { ...args };
+
+    // Mode 1: x-hay-secret annotation on schema properties
+    const inputSchema = toolSchema?.["input_schema"];
+    if (inputSchema && typeof inputSchema === "object" && !Array.isArray(inputSchema)) {
+      const properties = (inputSchema as Record<string, unknown>)["properties"];
+      if (properties && typeof properties === "object" && !Array.isArray(properties)) {
+        for (const [propName, propDef] of Object.entries(properties as Record<string, unknown>)) {
+          if (propDef && typeof propDef === "object" && !Array.isArray(propDef)) {
+            const secretKey = (propDef as Record<string, unknown>)["x-hay-secret"];
+            if (typeof secretKey === "string" && secrets[secretKey] !== undefined) {
+              enriched[propName] = secrets[secretKey];
+            }
+          }
+        }
+      }
+    }
+
+    // Mode 2: <<secret.keyname>> placeholder substitution in string values
+    for (const [argKey, argValue] of Object.entries(enriched)) {
+      if (typeof argValue === "string") {
+        enriched[argKey] = argValue.replace(/<<secret\.([^>]+)>>/g, (_, keyName: string) => {
+          return secrets[keyName] ?? `<<secret.${keyName}>>`;
+        });
+      }
+    }
+
+    return enriched;
   }
 
   /**
