@@ -37,13 +37,17 @@
         <p class="text-sm font-medium text-foreground">Suggested for you</p>
         <p class="text-xs text-neutral-muted">Based on your playbook description</p>
         <div class="grid grid-cols-1 gap-2">
-          <OptionCard
-            v-for="doc in suggestedDocuments"
-            :key="doc.id"
-            :label="doc.title"
-            :checked="isSelected(doc.id)"
-            @click="toggleDocument(doc.id)"
-          />
+          <div v-for="doc in suggestedDocuments" :key="doc.id" class="flex items-center gap-1">
+            <OptionCard
+              class="flex-1"
+              :label="doc.title"
+              :checked="isSelected(doc.id)"
+              @click="toggleDocument(doc.id)"
+            />
+            <Button variant="ghost" size="icon-sm" @click="openPreview(doc.id)">
+              <Eye class="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -61,13 +65,17 @@
           :icon-start="Search"
         />
         <div class="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
-          <OptionCard
-            v-for="doc in filteredDocuments"
-            :key="doc.id"
-            :label="doc.title || 'Untitled'"
-            :checked="isSelected(doc.id)"
-            @click="toggleDocument(doc.id)"
-          />
+          <div v-for="doc in filteredDocuments" :key="doc.id" class="flex items-center gap-1">
+            <OptionCard
+              class="flex-1"
+              :label="doc.title || 'Untitled'"
+              :checked="isSelected(doc.id)"
+              @click="toggleDocument(doc.id)"
+            />
+            <Button variant="ghost" size="icon-sm" @click="openPreview(doc.id)">
+              <Eye class="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -76,13 +84,17 @@
         {{ modelValue.length }} document{{ modelValue.length === 1 ? "" : "s" }} selected
       </p>
     </template>
+
+    <!-- Document Preview Sheet -->
+    <DocumentPreviewSheet v-model:open="showPreview" :document-id="previewDocumentId" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { Info, Search } from "lucide-vue-next";
+import { Info, Search, Eye } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
+import DocumentPreviewSheet from "@/components/documents/DocumentPreviewSheet.vue";
 
 interface DocumentItem {
   id: string;
@@ -102,6 +114,13 @@ const emit = defineEmits<{
 const loading = ref(false);
 const error = ref(false);
 const searchQuery = ref("");
+const showPreview = ref(false);
+const previewDocumentId = ref<string | null>(null);
+
+function openPreview(docId: string) {
+  previewDocumentId.value = docId;
+  showPreview.value = true;
+}
 const suggestedDocuments = ref<DocumentItem[]>([]);
 const allDocuments = ref<DocumentItem[]>([]);
 
