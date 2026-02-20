@@ -1786,11 +1786,17 @@ export class PrivacyService {
               });
             }
           } catch (err) {
-            debugLog("privacy", "Could not download attachment", { url: attachment.url, error: err });
+            debugLog("privacy", "Could not download attachment", {
+              url: attachment.url,
+              error: err,
+            });
           }
         }
       } catch (err) {
-        debugLog("privacy", "Error processing attachment", { attachmentId: attachment.id, error: err });
+        debugLog("privacy", "Error processing attachment", {
+          attachmentId: attachment.id,
+          error: err,
+        });
       }
     }
 
@@ -2079,7 +2085,7 @@ please contact ${supportContact}.
   private signExportData(data: string): string {
     // Use a signing key from environment or generate a deterministic one
     const { config } = require("@server/config/env");
-    const signingKey = config.jwt.secret || "hay-dsar-export-signing-key";
+    const signingKey = config.jwt.secret;
 
     const hmac = crypto.createHmac("sha256", signingKey);
     hmac.update(data);
@@ -2181,7 +2187,10 @@ please contact ${supportContact}.
       for (const attachment of message.attachments as any[]) {
         try {
           // Only delete local files (not external URLs)
-          if (attachment.url && (attachment.url.startsWith("/") || attachment.url.startsWith("./"))) {
+          if (
+            attachment.url &&
+            (attachment.url.startsWith("/") || attachment.url.startsWith("./"))
+          ) {
             // Extract path from URL (e.g., "/uploads/org/folder/file.jpg" -> "org/folder/file.jpg")
             const pathMatch = attachment.url.match(/\/uploads\/(.+)/);
 

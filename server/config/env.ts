@@ -118,9 +118,9 @@ export const config = {
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || "default-secret-change-in-production",
+    secret: process.env.JWT_SECRET || "",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-    refreshSecret: process.env.JWT_REFRESH_SECRET || "default-refresh-secret-change-in-production",
+    refreshSecret: process.env.JWT_REFRESH_SECRET || "",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
@@ -241,12 +241,71 @@ export function getCdnUrl(): string {
   return `${getProtocol()}://${domain}`;
 }
 
+const JWT_MIN_LENGTH = 32;
+
+const KNOWN_INSECURE_DEFAULTS = [
+  "default-secret-change-in-production",
+  "default-refresh-secret-change-in-production",
+  "your-secret-key-change-in-production",
+  "your-refresh-secret-change-in-production",
+  "secret",
+  "changeme",
+];
+
+/**
+ * Validates that JWT secrets meet minimum security requirements.
+ * Enforced in ALL environments (except test) to prevent insecure defaults.
+ * Throws an error at startup if secrets are missing, too short, or use known defaults.
+ *
+ * Generate secure secrets with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+ */
+export function validateJwtSecrets(): void {
+  if (config.isTest) {
+    return;
+  }
+
+  const errors: string[] = [];
+
+  for (const [label, value] of [
+    ["JWT_SECRET", config.jwt.secret],
+    ["JWT_REFRESH_SECRET", config.jwt.refreshSecret],
+  ] as const) {
+    if (!value) {
+      errors.push(`${label} is required but not set.`);
+      continue;
+    }
+
+    if (KNOWN_INSECURE_DEFAULTS.includes(value)) {
+      errors.push(`${label} is using an insecure default value. Generate a secure random string.`);
+      continue;
+    }
+
+    if (value.length < JWT_MIN_LENGTH) {
+      errors.push(
+        `${label} must be at least ${JWT_MIN_LENGTH} characters (current: ${value.length}).`,
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `JWT secret validation failed:\n` +
+        `  ${errors.join("\n  ")}\n\n` +
+        `Generate secure secrets with:\n` +
+        `  node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`,
+    );
+  }
+}
+
 /**
  * Validates that required environment variables are set in production.
  * Throws an error if any required variables are missing.
  * Should be called at application startup.
  */
 export function validateProductionConfig(): void {
+  // JWT secrets are validated in all environments (except test)
+  validateJwtSecrets();
+
   if (config.env === "development" || config.env === "test") {
     return;
   }
@@ -258,15 +317,6 @@ export function validateProductionConfig(): void {
   }
   if (!config.domain.dashboard) {
     missingVars.push("DASHBOARD_DOMAIN");
-  }
-  if (!config.jwt.secret || config.jwt.secret === "default-secret-change-in-production") {
-    missingVars.push("JWT_SECRET");
-  }
-  if (
-    !config.jwt.refreshSecret ||
-    config.jwt.refreshSecret === "default-refresh-secret-change-in-production"
-  ) {
-    missingVars.push("JWT_REFRESH_SECRET");
   }
   if (!config.openai.apiKey) {
     missingVars.push("OPENAI_API_KEY");
