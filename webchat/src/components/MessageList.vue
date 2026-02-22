@@ -176,7 +176,7 @@ watch(
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #9ca3af;
+  color: var(--color-neutral-400);
   gap: 12px;
 }
 
@@ -215,7 +215,7 @@ watch(
 }
 
 .hay-message--agent .hay-message__content {
-  color: #1f2937;
+  color: var(--color-neutral-800);
   border-bottom-left-radius: 4px;
 }
 
@@ -235,7 +235,7 @@ watch(
 }
 
 .hay-message__content--rich :deep(code) {
-  background: #f3f4f6;
+  background: var(--color-neutral-100);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 13px;
@@ -262,7 +262,7 @@ watch(
 
 .hay-message__time {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--color-neutral-400);
   margin-top: 4px;
 }
 
@@ -299,7 +299,7 @@ watch(
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: var(--color-neutral-400);
   animation: typing 1.4s infinite;
 }
 
@@ -327,11 +327,11 @@ watch(
 /* Closure message styling */
 .hay-message__closure-badge {
   font-size: 11px;
-  color: #5f5f5f;
+  color: var(--color-neutral-600);
   font-weight: 600;
   margin-bottom: 4px;
   padding: 4px 8px;
-  background: #ababab;
+  background: var(--color-neutral-400);
   border-radius: 8px;
   display: inline-block;
   align-self: flex-start;

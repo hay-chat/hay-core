@@ -246,8 +246,8 @@ defineEmits<{
 /* Closed conversation footer (replaces input area) */
 .hay-chat-closed-footer {
   padding: 16px;
-  border-top: 1px solid #e3e5e9;
-  background: linear-gradient(to bottom, #f6f7f8, #ffffff);
+  border-top: 1px solid var(--color-neutral-200);
+  background: linear-gradient(to bottom, var(--color-neutral-50), white);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -314,7 +314,12 @@ defineEmits<{
 .hay-chat-skeleton__line {
   height: 12px;
   border-radius: 6px;
-  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-neutral-200) 25%,
+    var(--color-neutral-100) 50%,
+    var(--color-neutral-200) 75%
+  );
   background-size: 400% 100%;
   animation: shimmer 1s infinite;
 }
@@ -343,13 +348,13 @@ defineEmits<{
   gap: 5px;
   padding-block: 6px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--color-neutral-400);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .hay-powered-by:hover {
-  color: #6b7280;
+  color: var(--color-neutral-500);
 }
 
 .hay-powered-by strong {

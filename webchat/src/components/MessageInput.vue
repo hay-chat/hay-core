@@ -140,7 +140,7 @@ const handleSend = () => {
   top: -18px;
   right: 16px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--color-neutral-400);
   line-height: 1;
 }
 
@@ -188,7 +188,7 @@ const handleSend = () => {
 .hay-message-input__wrapper {
   display: flex;
   align-items: center;
-  background: #f1f2f2;
+  background: var(--color-neutral-100);
   border-radius: 8px;
   padding: 4px 4px 4px 16px;
   transition: border-color 0.2s;
@@ -245,7 +245,7 @@ const handleSend = () => {
 
 .hay-message-input__button:disabled {
   background: transparent;
-  color: #95999f;
+  color: var(--color-neutral-400);
   cursor: not-allowed;
 }
 </style>
