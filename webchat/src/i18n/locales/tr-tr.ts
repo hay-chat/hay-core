@@ -4,6 +4,8 @@ export default {
   "widget.defaultGreeting": "Merhaba! Bugün size nasıl yardımcı olabiliriz?",
   "chat.close": "Sohbeti kapat",
   "chat.open": "Sohbeti aç",
+  "chat.expand": "Sohbeti genişlet",
+  "chat.collapse": "Sohbeti daralt",
   "chat.conversationEnded": "Bu görüşme sona erdi",
   "chat.startNew": "Yeni Görüşme Başlat",
   "chat.poweredBy": "Altyapı",

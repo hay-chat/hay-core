@@ -163,6 +163,7 @@ export const publicConversationsRouter = t.router({
           id: msg.id,
           content: msg.content,
           type: msg.type,
+          sender: msg.sender,
           direction:
             msg.direction ||
             (msg.type === MessageType.CUSTOMER ? MessageDirection.IN : MessageDirection.OUT),

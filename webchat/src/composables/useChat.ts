@@ -27,6 +27,8 @@ export function useChat(config: HayChatConfig) {
   const isConversationClosed = ref(false);
   const isSending = ref(false);
   const lastReadMessageId = ref<string | null>(sessionStorage.getItem("hay-last-read-message-id"));
+  const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
+  const currentAgentName = ref<string | null>(null);
 
   // Get existing conversation ID from session storage
   const existingConversationId = ref<string | null>(sessionStorage.getItem("hay-conversation-id"));
@@ -234,7 +236,17 @@ export function useChat(config: HayChatConfig) {
         content: msg.content,
         timestamp: new Date(msg.createdAt).getTime(),
         metadata: msg.metadata,
+        agentType: msg.type,
+        senderName: msg.sender || undefined,
       });
+
+      // Track agent type from messages
+      if (msg.type === "HumanAgent") {
+        currentAgentType.value = "HumanAgent";
+        if (msg.sender) {
+          currentAgentName.value = msg.sender;
+        }
+      }
 
       // Check for closure message
       if (msg.metadata?.isClosureMessage === true) {
@@ -343,6 +355,14 @@ export function useChat(config: HayChatConfig) {
     if (status === "open" && isConversationClosed.value) {
       isConversationClosed.value = false;
       console.log("[Webchat] Conversation has been reopened");
+    }
+
+    // Track human takeover / release
+    if (status === "human-took-over") {
+      currentAgentType.value = "HumanAgent";
+    } else if (status === "open" && currentAgentType.value === "HumanAgent") {
+      currentAgentType.value = "BotAgent";
+      currentAgentName.value = null;
     }
   });
 
@@ -503,7 +523,17 @@ export function useChat(config: HayChatConfig) {
         content: msg.content,
         timestamp: new Date(msg.createdAt).getTime(),
         metadata: msg.metadata,
+        agentType: msg.type,
+        senderName: msg.sender || undefined,
       };
+
+      // Track agent type from new messages
+      if (msg.type === "HumanAgent") {
+        currentAgentType.value = "HumanAgent";
+        if (msg.sender) {
+          currentAgentName.value = msg.sender;
+        }
+      }
 
       // Check if this is a server confirmation of an optimistic user message
       // Don't replace it — changing the key (temp-* → real ID) causes Vue to
@@ -813,6 +843,8 @@ export function useChat(config: HayChatConfig) {
     unreadCount,
     isSending,
     isConversationClosed,
+    currentAgentType,
+    currentAgentName,
 
     // Actions
     initialize,

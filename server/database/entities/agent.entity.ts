@@ -6,9 +6,11 @@ import {
   UpdateDateColumn,
   ManyToOne,
   ManyToMany,
+  OneToOne,
   JoinColumn,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
+import { Upload } from "../../entities/upload.entity";
 import { Playbook } from "./playbook.entity";
 
 @Entity("agents")
@@ -55,6 +57,14 @@ export class Agent {
 
   @ManyToMany(() => Playbook, (playbook) => playbook.agents)
   playbooks!: Playbook[];
+
+  // Avatar upload relationship
+  @OneToOne(() => Upload, { nullable: true, eager: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "avatar_upload_id" })
+  avatarUpload?: Upload;
+
+  @Column({ type: "uuid", nullable: true })
+  avatarUploadId?: string | null;
 
   @Column({ type: "boolean", nullable: true })
   testMode!: boolean | null;

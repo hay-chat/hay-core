@@ -13,11 +13,18 @@
         :is-typing="isTyping"
         :is-connected="isConnected"
         :is-conversation-closed="isConversationClosed"
+        :is-expanded="isExpanded"
+        :agent-name="config.agentName"
+        :agent-avatar-url="resolvedAvatarUrl"
+        :organization-logo-url="resolvedLogoUrl"
+        :current-agent-type="currentAgentType"
+        :current-agent-name="currentAgentName"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
+        @toggle-expand="toggleExpand"
       />
     </Transition>
 
@@ -32,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import MinimizedButton from "./components/MinimizedButton.vue";
 import { useChat } from "./composables/useChat";
@@ -45,6 +52,25 @@ const props = defineProps<{
 
 const t = provideI18n(props.config.locale);
 
+const isExpanded = ref(false);
+
+const toggleExpand = () => {
+  isExpanded.value = !isExpanded.value;
+};
+
+// Resolve relative image URLs to absolute using baseUrl
+const resolvedAvatarUrl = computed(() => {
+  if (!props.config.agentAvatarUrl) return undefined;
+  if (props.config.agentAvatarUrl.startsWith("http")) return props.config.agentAvatarUrl;
+  return `${props.config.baseUrl}${props.config.agentAvatarUrl}`;
+});
+
+const resolvedLogoUrl = computed(() => {
+  if (!props.config.organizationLogoUrl) return undefined;
+  if (props.config.organizationLogoUrl.startsWith("http")) return props.config.organizationLogoUrl;
+  return `${props.config.baseUrl}${props.config.organizationLogoUrl}`;
+});
+
 const {
   isOpen,
   isConnected,
@@ -52,6 +78,8 @@ const {
   isTyping,
   unreadCount,
   isConversationClosed,
+  currentAgentType,
+  currentAgentName,
   initialize,
   toggleChat,
   openChat,

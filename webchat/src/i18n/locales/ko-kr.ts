@@ -4,6 +4,8 @@ export default {
   "widget.defaultGreeting": "안녕하세요! 무엇을 도와드릴까요?",
   "chat.close": "채팅 닫기",
   "chat.open": "채팅 열기",
+  "chat.expand": "채팅 확대",
+  "chat.collapse": "채팅 축소",
   "chat.conversationEnded": "이 대화가 종료되었습니다",
   "chat.startNew": "새 대화 시작",
   "chat.poweredBy": "Powered by",

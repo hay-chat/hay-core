@@ -1,5 +1,11 @@
 import { webchatSettingsRepository } from "@server/repositories/webchat-settings.repository";
-import { WebchatSettings, WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
+import {
+  WebchatSettings,
+  WebchatPosition,
+  WebchatTheme,
+} from "@server/database/entities/webchat-settings.entity";
+import { organizationRepository } from "@server/repositories/organization.repository";
+import { agentRepository } from "@server/repositories/agent.repository";
 
 export interface WebchatSettingsUpdateDTO {
   widgetTitle?: string;
@@ -26,7 +32,7 @@ export class WebchatSettingsService {
    */
   async updateSettings(
     organizationId: string,
-    data: WebchatSettingsUpdateDTO
+    data: WebchatSettingsUpdateDTO,
   ): Promise<WebchatSettings> {
     return await webchatSettingsRepository.update(organizationId, data);
   }
@@ -48,8 +54,36 @@ export class WebchatSettingsService {
     theme: WebchatTheme;
     showGreeting: boolean;
     greetingMessage: string | null;
+    agentName: string | null;
+    agentAvatarUrl: string | null;
+    organizationLogoUrl: string | null;
   }> {
     const settings = await this.getSettings(organizationId);
+
+    // Load organization with logo
+    const organization = await organizationRepository.findById(organizationId);
+
+    // Load default agent with avatar
+    let agentName: string | null = null;
+    let agentAvatarUrl: string | null = null;
+
+    if (organization?.defaultAgentId) {
+      const agent = await agentRepository.findByIdAndOrganization(
+        organization.defaultAgentId,
+        organizationId,
+      );
+      if (agent) {
+        agentName = agent.name;
+        if (agent.avatarUpload?.path) {
+          agentAvatarUrl = `/uploads/${agent.avatarUpload.path}`;
+        }
+      }
+    }
+
+    // Get organization logo URL
+    const organizationLogoUrl = organization?.logoUpload?.path
+      ? `/uploads/${organization.logoUpload.path}`
+      : null;
 
     return {
       widgetTitle: settings.widgetTitle,
@@ -58,6 +92,9 @@ export class WebchatSettingsService {
       theme: settings.theme,
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage,
+      agentName,
+      agentAvatarUrl,
+      organizationLogoUrl,
     };
   }
 

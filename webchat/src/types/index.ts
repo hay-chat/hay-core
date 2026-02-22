@@ -18,6 +18,12 @@ export interface HayChatConfig {
    * If it returns a Promise, the widget input waits until it resolves.
    */
   onConversationStarted?: (conversation: { id: string }) => void | Promise<void>;
+  /** Agent name displayed in the header. Populated from public config. */
+  agentName?: string;
+  /** Agent avatar image URL (relative path). Falls back to organizationLogoUrl. */
+  agentAvatarUrl?: string;
+  /** Organization logo URL (relative path). Used as fallback for agent avatar. */
+  organizationLogoUrl?: string;
 }
 
 export interface Message {
@@ -27,6 +33,10 @@ export interface Message {
   timestamp: number;
   metadata?: Record<string, unknown>;
   isGreeting?: boolean;
+  /** Original message type from server (BotAgent, HumanAgent, Customer, etc.) */
+  agentType?: string;
+  /** Human agent name when message is from a HumanAgent */
+  senderName?: string;
 }
 
 export interface WebSocketMessage {

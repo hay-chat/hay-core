@@ -4,6 +4,8 @@ export default {
   "widget.defaultGreeting": "Hello! How can we help you today?",
   "chat.close": "Close chat",
   "chat.open": "Open chat",
+  "chat.expand": "Expand chat",
+  "chat.collapse": "Collapse chat",
   "chat.conversationEnded": "This conversation has ended",
   "chat.startNew": "Start New Conversation",
   "chat.poweredBy": "Powered by",

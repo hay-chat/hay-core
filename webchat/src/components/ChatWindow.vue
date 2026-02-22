@@ -1,29 +1,110 @@
 <template>
-  <div class="hay-chat-window" :class="{ 'hay-chat-window--left': position === 'left' }">
+  <div
+    class="hay-chat-window"
+    :class="{
+      'hay-chat-window--left': position === 'left',
+      'hay-chat-window--expanded': isExpanded,
+    }"
+  >
     <!-- Header -->
     <div class="hay-chat-header">
-      <div class="hay-chat-header__content">
-        <div class="hay-chat-header__title">{{ widgetTitle }}</div>
-        <div v-if="widgetSubtitle" class="hay-chat-header__subtitle">
-          {{ widgetSubtitle }}
+      <div class="hay-chat-header__left">
+        <div class="hay-chat-header__avatar">
+          <img
+            v-if="agentAvatarUrl || organizationLogoUrl"
+            :src="agentAvatarUrl || organizationLogoUrl"
+            alt=""
+            class="hay-chat-header__avatar-img"
+            @error="($event.target as HTMLImageElement).style.display = 'none'"
+          />
+          <svg
+            v-else
+            class="hay-chat-header__avatar-fallback"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </div>
+        <div class="hay-chat-header__info">
+          <span class="hay-chat-header__name">{{ displayName }}</span>
+          <span v-if="isShowingTitle && widgetSubtitle" class="hay-chat-header__subtitle">
+            {{ widgetSubtitle }}
+          </span>
         </div>
       </div>
-      <button @click="$emit('close')" class="hay-chat-header__close" :aria-label="t('chat.close')">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <div class="hay-chat-header__actions">
+        <button
+          @click="$emit('toggleExpand')"
+          class="hay-chat-header__action-btn"
+          :aria-label="isExpanded ? t('chat.collapse') : t('chat.expand')"
         >
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
+          <!-- Expand icon (arrow-up-right) when collapsed -->
+          <svg
+            v-if="!isExpanded"
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+          <!-- Collapse icon (arrow-down-left) when expanded -->
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="14" y1="10" x2="21" y2="3" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        </button>
+        <button
+          @click="$emit('close')"
+          class="hay-chat-header__action-btn"
+          :aria-label="t('chat.close')"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Skeleton loading while connecting -->
@@ -42,16 +123,12 @@
       </div>
     </div>
 
-    <!-- Greeting Message -->
-    <div
-      v-else-if="showGreeting && greetingMessage && messages.length === 0"
-      class="hay-chat-greeting hay-message hay-message--agent"
-    >
-      <div class="hay-message__content">{{ greetingMessage }}</div>
-    </div>
-
     <!-- Messages -->
-    <MessageList :messages="messages" :is-typing="isTyping" />
+    <MessageList
+      :messages="messages"
+      :is-typing="isTyping"
+      :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
+    />
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
     <div v-if="isConversationClosed" class="hay-chat-closed-footer">
@@ -114,15 +191,7 @@ import type { Message } from "@/types";
 
 const t = useI18n();
 
-const poweredByUrl = computed(() => {
-  const url = new URL("https://hay.chat");
-  url.searchParams.set("utm_source", window.location.hostname);
-  url.searchParams.set("utm_medium", "webchat");
-  url.searchParams.set("utm_campaign", "powered_by");
-  return url.toString();
-});
-
-defineProps<{
+const props = defineProps<{
   widgetTitle: string;
   widgetSubtitle?: string;
   position: "left" | "right";
@@ -132,6 +201,12 @@ defineProps<{
   isTyping: boolean;
   isConnected: boolean;
   isConversationClosed: boolean;
+  isExpanded: boolean;
+  agentName?: string;
+  agentAvatarUrl?: string;
+  organizationLogoUrl?: string;
+  currentAgentType?: string;
+  currentAgentName?: string;
 }>();
 
 defineEmits<{
@@ -140,7 +215,29 @@ defineEmits<{
   startTyping: [];
   stopTyping: [];
   startNewConversation: [];
+  toggleExpand: [];
 }>();
+
+const isShowingTitle = computed(() => {
+  if (props.currentAgentType === "HumanAgent" && props.currentAgentName) return false;
+  if (props.agentName) return false;
+  return true;
+});
+
+const displayName = computed(() => {
+  if (props.currentAgentType === "HumanAgent" && props.currentAgentName) {
+    return props.currentAgentName;
+  }
+  return props.agentName || props.widgetTitle;
+});
+
+const poweredByUrl = computed(() => {
+  const url = new URL("https://hay.chat");
+  url.searchParams.set("utm_source", window.location.hostname);
+  url.searchParams.set("utm_medium", "webchat");
+  url.searchParams.set("utm_campaign", "powered_by");
+  return url.toString();
+});
 </script>
 
 <style>
@@ -158,6 +255,9 @@ defineEmits<{
   flex-direction: column;
   z-index: 999999;
   animation: slideUp 0.3s ease-out;
+  transition:
+    width 0.3s ease,
+    height 0.3s ease;
 }
 
 @keyframes slideUp {
@@ -176,71 +276,101 @@ defineEmits<{
   right: auto;
 }
 
+/* Expanded state - desktop */
+.hay-chat-window--expanded {
+  width: 600px;
+  height: 800px;
+  max-height: calc(100vh - 120px);
+}
+
+/* Header */
 .hay-chat-header {
-  background: var(--hay-primary);
-  color: white;
-  padding: 20px;
+  background: white;
+  color: var(--color-neutral-900);
+  padding: 14px 16px;
   border-radius: 12px 12px 0 0;
+  border-bottom: 1px solid var(--color-neutral-200);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
 }
 
-.hay-chat-header__content {
-  flex: 1;
+.hay-chat-header__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.hay-chat-header__title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.hay-chat-header__subtitle {
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-.hay-chat-header__close {
-  background: transparent;
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 4px;
+.hay-chat-header__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-neutral-100);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background 0.2s;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.hay-chat-header__close:hover {
-  background: rgba(255, 255, 255, 0.1);
+.hay-chat-header__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.hay-chat-status {
+.hay-chat-header__avatar-fallback {
+  color: var(--color-neutral-400);
+}
+
+.hay-chat-header__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hay-chat-header__name {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hay-chat-header__subtitle {
+  font-size: 12px;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hay-chat-header__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 13px;
-  border-bottom: 1px solid #fde68a;
-}
-
-.hay-chat-status__icon {
+  gap: 4px;
   flex-shrink: 0;
-  animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.hay-chat-header__action-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.hay-chat-header__action-btn:hover {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-700);
 }
 
 /* Closed conversation footer (replaces input area) */
@@ -378,6 +508,24 @@ defineEmits<{
     width: calc(100vw - 40px);
     height: calc(100vh - 110px);
     max-height: calc(100vh - 110px);
+  }
+
+  /* Expanded on mobile = fullscreen */
+  .hay-chat-window--expanded {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    bottom: 0;
+    right: 0;
+    border-radius: 0;
+  }
+
+  .hay-chat-window--expanded.hay-chat-window--left {
+    left: 0;
+  }
+
+  .hay-chat-window--expanded .hay-chat-header {
+    border-radius: 0;
   }
 }
 </style>

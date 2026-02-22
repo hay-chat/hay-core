@@ -4,6 +4,8 @@ export default {
   "widget.defaultGreeting": "Hallo! Hoe kunnen we u vandaag helpen?",
   "chat.close": "Chat sluiten",
   "chat.open": "Chat openen",
+  "chat.expand": "Chat vergroten",
+  "chat.collapse": "Chat verkleinen",
   "chat.conversationEnded": "Dit gesprek is beëindigd",
   "chat.startNew": "Nieuw Gesprek Starten",
   "chat.poweredBy": "Mogelijk gemaakt door",

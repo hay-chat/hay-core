@@ -1,5 +1,10 @@
 <template>
   <div class="hay-message-list" ref="messageListRef">
+    <!-- Greeting Message -->
+    <div v-if="greetingMessage && messages.length === 0" class="hay-message hay-message--agent">
+      <div class="hay-message__content hay-message__content--rich">{{ greetingMessage }}</div>
+    </div>
+
     <div
       v-for="message in messages"
       :key="message.id"
@@ -52,6 +57,7 @@ const t = useI18n();
 const props = defineProps<{
   messages: Message[];
   isTyping: boolean;
+  greetingMessage?: string;
 }>();
 
 const messageListRef = ref<HTMLElement | null>(null);
@@ -160,7 +166,7 @@ watch(
 );
 </script>
 
-<style scoped>
+<style>
 .hay-message-list {
   flex: 1;
   overflow-y: auto;
@@ -219,22 +225,22 @@ watch(
   border-bottom-left-radius: 4px;
 }
 
-/* Markdown content styles (using :deep since v-html bypasses scoped styles) */
-.hay-message__content--rich :deep(a) {
+/* Markdown content styles (using since v-html bypasses scoped styles) */
+.hay-message__content--rich a {
   color: var(--hay-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.hay-message__content--rich :deep(a:hover) {
+.hay-message__content--rich a:hover {
   opacity: 0.8;
 }
 
-.hay-message__content--rich :deep(strong) {
+.hay-message__content--rich strong {
   font-weight: 600;
 }
 
-.hay-message__content--rich :deep(code) {
+.hay-message__content--rich code {
   background: var(--color-neutral-100);
   padding: 1px 5px;
   border-radius: 4px;
@@ -242,22 +248,22 @@ watch(
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
-.hay-message__content--rich :deep(ul),
-.hay-message__content--rich :deep(ol) {
+.hay-message__content--rich ul,
+.hay-message__content--rich ol {
   margin: 4px 0;
   padding-left: 20px;
 }
 
-.hay-message__content--rich :deep(li) {
+.hay-message__content--rich li {
   margin: 2px 0;
 }
 
-.hay-message__content--rich :deep(p) {
+.hay-message__content--rich p {
   margin: 0;
 }
 
-.hay-message__content--rich :deep(p + p) {
-  margin-top: 8px;
+.hay-message__content--rich p:not(:last-child):not(:only-child) {
+  margin-bottom: 12px;
 }
 
 .hay-message__time {
@@ -271,7 +277,7 @@ watch(
 }
 
 /* Word-by-word reveal animation */
-:deep(.hay-word) {
+.hay-word {
   opacity: 0;
   animation: wordReveal 1s ease forwards;
 }
@@ -327,11 +333,11 @@ watch(
 /* Closure message styling */
 .hay-message__closure-badge {
   font-size: 11px;
-  color: var(--color-neutral-600);
+  color: var(--color-neutral-500);
   font-weight: 600;
   margin-bottom: 4px;
   padding: 4px 8px;
-  background: var(--color-neutral-400);
+  background: var(--color-neutral-200);
   border-radius: 8px;
   display: inline-block;
   align-self: flex-start;

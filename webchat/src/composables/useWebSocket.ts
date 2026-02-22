@@ -105,6 +105,8 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
             content: data.data.content || data.data.text,
             timestamp: new Date(data.data.timestamp || Date.now()).getTime(),
             metadata: data.data.metadata,
+            agentType: data.data.type,
+            senderName: data.data.sender || undefined,
           });
 
           // Clear typing indicator when agent message is received
