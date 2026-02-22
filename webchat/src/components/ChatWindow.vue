@@ -8,7 +8,7 @@
           {{ widgetSubtitle }}
         </div>
       </div>
-      <button @click="$emit('close')" class="hay-chat-header__close" aria-label="Close chat">
+      <button @click="$emit('close')" class="hay-chat-header__close" :aria-label="t('chat.close')">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
@@ -56,25 +56,10 @@
     <!-- Closed Conversation Footer (replaces input when closed) -->
     <div v-if="isConversationClosed" class="hay-chat-closed-footer">
       <div class="hay-chat-closed-footer__content">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="hay-chat-closed-footer__icon"
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-        <span class="hay-chat-closed-footer__text">This conversation has ended</span>
+        <span class="hay-chat-closed-footer__text">{{ t("chat.conversationEnded") }}</span>
       </div>
       <button @click="$emit('startNewConversation')" class="hay-chat-closed-footer__button">
-        Start New Conversation
+        {{ t("chat.startNew") }}
       </button>
     </div>
 
@@ -89,7 +74,7 @@
 
     <!-- Powered by Hay -->
     <a :href="poweredByUrl" target="_blank" rel="noopener noreferrer" class="hay-powered-by">
-      Powered by
+      {{ t("chat.poweredBy") }}
       <svg
         width="684"
         height="238"
@@ -124,7 +109,10 @@
 import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
+import { useI18n } from "@/i18n";
 import type { Message } from "@/types";
+
+const t = useI18n();
 
 const poweredByUrl = computed(() => {
   const url = new URL("https://hay.chat");
@@ -258,8 +246,8 @@ defineEmits<{
 /* Closed conversation footer (replaces input area) */
 .hay-chat-closed-footer {
   padding: 16px;
-  border-top: 1px solid #ababab;
-  background: linear-gradient(to bottom, #ababab, #ffffff);
+  border-top: 1px solid #e3e5e9;
+  background: linear-gradient(to bottom, #f6f7f8, #ffffff);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -272,14 +260,8 @@ defineEmits<{
   justify-content: center;
 }
 
-.hay-chat-closed-footer__icon {
-  flex-shrink: 0;
-  color: #dc2626;
-}
-
 .hay-chat-closed-footer__text {
   font-size: 14px;
-  color: #991b1b;
   font-weight: 500;
 }
 

@@ -11,6 +11,8 @@ export interface HayChatConfig {
   context?: Record<string, unknown>;
   /** External ID of the logged-in user in your system. Loads their stored customer context. */
   customerExternalId?: string;
+  /** Locale for widget UI strings (e.g. "en-us", "pt-br", "fr-fr"). Auto-detected from browser if omitted. */
+  locale?: string;
   /**
    * Called after a conversation is created. Use this to attach server-side secrets.
    * If it returns a Promise, the widget input waits until it resolves.

@@ -4,11 +4,11 @@
     <Transition name="fade">
       <ChatWindow
         v-if="isOpen"
-        :widget-title="config.widgetTitle || 'Chat with us'"
-        :widget-subtitle="config.widgetSubtitle"
+        :widget-title="config.widgetTitle || t('widget.defaultTitle')"
+        :widget-subtitle="config.widgetSubtitle || t('widget.defaultSubtitle')"
         :position="config.position || 'right'"
         :show-greeting="config.showGreeting ?? true"
-        :greeting-message="config.greetingMessage"
+        :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
         :messages="messages"
         :is-typing="isTyping"
         :is-connected="isConnected"
@@ -32,15 +32,18 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import ChatWindow from './components/ChatWindow.vue';
-import MinimizedButton from './components/MinimizedButton.vue';
-import { useChat } from './composables/useChat';
-import type { HayChatConfig } from './types';
+import { onMounted } from "vue";
+import ChatWindow from "./components/ChatWindow.vue";
+import MinimizedButton from "./components/MinimizedButton.vue";
+import { useChat } from "./composables/useChat";
+import { provideI18n } from "./i18n";
+import type { HayChatConfig } from "./types";
 
 const props = defineProps<{
   config: HayChatConfig;
 }>();
+
+const t = provideI18n(props.config.locale);
 
 const {
   isOpen,
@@ -69,8 +72,8 @@ onMounted(() => {
 <style>
 /* Global styles for the widget */
 .hay-webchat-widget {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

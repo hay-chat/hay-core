@@ -12,7 +12,7 @@
       }"
     >
       <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-        Conversation Closed
+        {{ t("chat.conversationClosed") }}
       </div>
       <div
         class="hay-message__content"
@@ -45,6 +45,9 @@
 import { ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation } from "@/utils/markdown";
+import { useI18n } from "@/i18n";
+
+const t = useI18n();
 
 const props = defineProps<{
   messages: Message[];
@@ -319,5 +322,18 @@ watch(
     transform: translateY(-10px);
     opacity: 1;
   }
+}
+
+/* Closure message styling */
+.hay-message__closure-badge {
+  font-size: 11px;
+  color: #5f5f5f;
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  background: #ababab;
+  border-radius: 8px;
+  display: inline-block;
+  align-self: flex-start;
 }
 </style>

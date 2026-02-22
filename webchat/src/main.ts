@@ -8,12 +8,9 @@ import "./styles/widget.css";
 const defaultConfig: HayChatConfig = {
   organizationId: "",
   baseUrl: "http://localhost:3001",
-  widgetTitle: "Chat with us",
-  widgetSubtitle: "We typically reply within minutes",
   position: "right",
   theme: "blue",
   showGreeting: true,
-  greetingMessage: "Hello! How can we help you today?",
 };
 
 const config = { ...defaultConfig, ...window.HayChat?.config };

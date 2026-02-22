@@ -17,7 +17,7 @@
         v-model="messageText"
         @keydown="handleKeydown"
         @input="handleInput"
-        placeholder="Type a message..."
+        :placeholder="t('input.placeholder')"
         rows="1"
         ref="textareaRef"
         :disabled="!isConnected"
@@ -28,7 +28,7 @@
         @click="handleSend"
         :disabled="!messageText.trim() || !isConnected"
         class="hay-message-input__button"
-        aria-label="Send message"
+        :aria-label="t('input.send')"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -51,6 +51,9 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
+import { useI18n } from "@/i18n";
+
+const t = useI18n();
 
 const props = defineProps<{
   isConnected: boolean;
