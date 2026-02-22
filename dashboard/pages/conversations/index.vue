@@ -15,7 +15,7 @@
     </template>
 
     <!-- Stats Cards -->
-    <div class="grid gap-4 md:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-3">
       <MetricCard
         title="Total Conversations"
         :icon="MessageSquare"
@@ -39,38 +39,28 @@
         subtitle-color="green"
       />
 
-      <MetricCard
+      <!-- <MetricCard
         title="Satisfaction Rate"
         :icon="Heart"
         :metric="`${stats.satisfactionRate}%`"
         :format-metric="false"
         subtitle="+3.2% this week"
         subtitle-color="green"
-      />
+      /> -->
     </div>
 
     <!-- Filters and Search -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
-        <Input
-          v-model="searchQuery"
-          placeholder="Search conversations..."
-          :icon-start="Search"
-          class="w-[300px]"
-        />
+        <div class="min-w-[300px]">
+          <Input v-model="searchQuery" placeholder="Search conversations..." :icon-start="Search" />
+        </div>
 
         <Input
           v-model="selectedStatus"
           type="select"
           :options="statusOptions"
           placeholder="All Status"
-        />
-
-        <Input
-          v-model="selectedAgent"
-          type="select"
-          :options="agentOptions"
-          placeholder="All Agents"
         />
 
         <Input v-model="selectedTimeframe" type="select" :options="timeframeOptions" />

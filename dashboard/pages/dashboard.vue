@@ -194,23 +194,21 @@
             <div
               v-for="conversation in recentConversations"
               :key="conversation.id"
-              class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer gap-2"
               @click="viewConversation(conversation.id)"
             >
-              <div class="flex items-center space-x-3">
-                <div
-                  class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
-                >
-                  <User class="h-4 w-4 text-neutral-muted" />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium text-foreground truncate">
-                    {{ conversation.customerName }}
-                  </p>
-                  <p class="text-sm text-neutral-muted truncate">
-                    {{ conversation.lastMessage }}
-                  </p>
-                </div>
+              <div
+                class="h-8 w-8 rounded-full bg-background-tertiary flex items-center justify-center"
+              >
+                <User class="h-4 w-4 text-neutral-muted" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-foreground truncate">
+                  {{ conversation.customerName }}
+                </p>
+                <p class="text-sm text-neutral-muted truncate">
+                  {{ conversation.lastMessage }}
+                </p>
               </div>
               <div class="text-right flex-shrink-0">
                 <div
@@ -300,34 +298,6 @@
       <!-- Document Status Overview -->
       <DocumentStatsWidget ref="documentStatsWidget" />
     </div>
-
-    <!-- Quick Actions -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
-        <CardDescription> Common tasks to help you manage your AI agents </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button variant="outline" class="h-20 flex-col space-y-2" @click="createAgent">
-            <Bot class="h-6 w-6" />
-            <span>Create Agent</span>
-          </Button>
-          <Button variant="outline" class="h-20 flex-col space-y-2" @click="viewInsights">
-            <Lightbulb class="h-6 w-6" />
-            <span>View Insights</span>
-          </Button>
-          <Button variant="outline" class="h-20 flex-col space-y-2" @click="managePlaybooks">
-            <BookOpen class="h-6 w-6" />
-            <span>Manage Playbooks</span>
-          </Button>
-          <Button variant="outline" class="h-20 flex-col space-y-2" @click="scrollToTop">
-            <BarChart3 class="h-6 w-6" />
-            <span>View Dashboard</span>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   </Page>
 </template>
 
@@ -336,13 +306,9 @@ import {
   Bot,
   MessageSquare,
   CheckCircle,
-  BarChart3,
   User,
-  Plus,
   RefreshCw,
   ChevronRight,
-  Lightbulb,
-  BookOpen,
   AlertCircle,
   Zap,
   MessageCircle,

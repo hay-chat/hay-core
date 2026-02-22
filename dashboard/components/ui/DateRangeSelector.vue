@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center space-x-2">
-    <Calendar class="h-4 w-4 text-muted-foreground" />
+    <Calendar class="h-4 w-4 min-w-4 min-h-4 text-muted-foreground" />
 
     <!-- Preset Options Dropdown -->
     <DropdownMenu>
