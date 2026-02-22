@@ -12,7 +12,7 @@
       }"
     >
       <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-        🔒 Conversation Closed
+        Conversation Closed
       </div>
       <div
         class="hay-message__content"
@@ -319,29 +319,5 @@ watch(
     transform: translateY(-10px);
     opacity: 1;
   }
-}
-
-/* Closure message styling */
-.hay-message--closure {
-  opacity: 0.85;
-}
-
-.hay-message__closure-badge {
-  font-size: 11px;
-  color: #dc2626;
-  font-weight: 600;
-  margin-bottom: 4px;
-  padding: 4px 8px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  display: inline-block;
-  align-self: flex-start;
-}
-
-.hay-message--closure .hay-message__content {
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #7f1d1d;
 }
 </style>

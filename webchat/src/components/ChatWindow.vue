@@ -259,8 +259,8 @@ defineEmits<{
 /* Closed conversation footer (replaces input area) */
 .hay-chat-closed-footer {
   padding: 16px;
-  background: #fef2f2;
-  border-top: 1px solid #fecaca;
+  border-top: 1px solid #ababab;
+  background: linear-gradient(to bottom, #ababab, #ffffff);
   display: flex;
   flex-direction: column;
   gap: 12px;

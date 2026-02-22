@@ -211,6 +211,10 @@ const handleSend = () => {
   background: transparent;
 }
 
+.hay-message-input__textarea:focus {
+  outline: none;
+}
+
 .hay-message-input__textarea:disabled {
   background: transparent;
   cursor: not-allowed;
