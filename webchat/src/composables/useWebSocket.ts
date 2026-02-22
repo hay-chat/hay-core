@@ -1,5 +1,5 @@
-import { ref, onUnmounted } from 'vue';
-import type { Message } from '@/types';
+import { ref, onUnmounted } from "vue";
+import type { Message } from "@/types";
 
 export function useWebSocket(baseUrl: string, organizationId: string) {
   const ws = ref<WebSocket | null>(null);
@@ -20,16 +20,16 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   } | null = null;
 
   const connect = (token?: string) => {
-    const wsUrl = new URL('/ws', baseUrl.replace('http', 'ws'));
-    wsUrl.searchParams.set('org', organizationId);
+    const wsUrl = new URL("/ws", baseUrl.replace("http", "ws"));
+    wsUrl.searchParams.set("org", organizationId);
     if (token) {
-      wsUrl.searchParams.set('token', token);
+      wsUrl.searchParams.set("token", token);
     }
 
     ws.value = new WebSocket(wsUrl.toString());
 
     ws.value.onopen = () => {
-      console.log('[Webchat] WebSocket connected');
+      console.log("[Webchat] WebSocket connected");
       isConnected.value = true;
       reconnectAttempts = 0;
     };
@@ -37,27 +37,27 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     ws.value.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[Webchat] Received WebSocket message:', data.type, data);
+        console.log("[Webchat] Received WebSocket message:", data.type, data);
         handleMessage(data);
       } catch (error) {
-        console.error('[Webchat] Failed to parse WebSocket message:', error);
+        console.error("[Webchat] Failed to parse WebSocket message:", error);
       }
     };
 
     ws.value.onclose = () => {
-      console.log('[Webchat] WebSocket disconnected');
+      console.log("[Webchat] WebSocket disconnected");
       isConnected.value = false;
       attemptReconnect();
     };
 
     ws.value.onerror = (error) => {
-      console.error('[Webchat] WebSocket error:', error);
+      console.error("[Webchat] WebSocket error:", error);
     };
   };
 
   const attemptReconnect = () => {
     if (reconnectAttempts >= maxReconnectAttempts) {
-      console.error('[Webchat] Max reconnection attempts reached');
+      console.error("[Webchat] Max reconnection attempts reached");
       return;
     }
 
@@ -72,36 +72,36 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
   const handleMessage = (data: any) => {
     switch (data.type) {
-      case 'connected':
-        console.log('[Webchat] Connected with client ID:', data.clientId);
+      case "connected":
+        console.log("[Webchat] Connected with client ID:", data.clientId);
         break;
 
-      case 'identified':
+      case "identified":
         conversationId.value = data.conversationId;
-        sessionStorage.setItem('hay-conversation-id', data.conversationId);
-        console.log('[Webchat] Identified with conversation:', data.conversationId);
+        sessionStorage.setItem("hay-conversation-id", data.conversationId);
+        console.log("[Webchat] Identified with conversation:", data.conversationId);
         break;
 
-      case 'message':
+      case "message":
         if (data.data) {
           // Check if message already exists (prevent duplicates)
           // This handles both optimistically added messages and any other duplicates
           const messageExists = messages.value.some((m) => m.id === data.data.id);
           if (messageExists) {
-            console.log('[Webchat] Skipping duplicate message:', data.data.id);
+            console.log("[Webchat] Skipping duplicate message:", data.data.id);
             break;
           }
 
           // Only add messages from agents (BotAgent, HumanAgent, System)
           // Customer messages are already added optimistically when sent
-          if (data.data.type === 'Customer') {
-            console.log('[Webchat] Skipping customer message (already shown optimistically)');
+          if (data.data.type === "Customer") {
+            console.log("[Webchat] Skipping customer message (already shown optimistically)");
             break;
           }
 
           addMessage({
             id: data.data.id || `msg_${Date.now()}`,
-            sender: 'agent',
+            sender: "agent",
             content: data.data.content || data.data.text,
             timestamp: new Date(data.data.timestamp || Date.now()).getTime(),
             metadata: data.data.metadata,
@@ -112,9 +112,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case 'message_sent':
+      case "message_sent":
         // Message was successfully sent, handle nonce update
-        console.log('[Webchat] Message sent successfully');
+        console.log("[Webchat] Message sent successfully");
         if (data.nonce && nonceUpdateCallback) {
           nonceUpdateCallback(data.nonce);
         }
@@ -127,18 +127,20 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case 'typing':
+      case "typing":
         isTyping.value = data.isTyping;
         break;
 
-      case 'conversation_status_changed':
+      case "conversation_status_changed":
         // Handle conversation status changes (closed, resolved, etc.)
-        console.log('[Webchat] Conversation status changed:', data.payload);
+        console.log("[Webchat] Conversation status changed:", data.payload);
 
         // Update typing indicator based on processing phase
         if (data.payload?.processingPhase) {
-          isTyping.value = data.payload.processingPhase !== 'idle';
-          console.log(`[Webchat] Processing phase: ${data.payload.processingPhase}, typing: ${isTyping.value}`);
+          isTyping.value = data.payload.processingPhase !== "idle";
+          console.log(
+            `[Webchat] Processing phase: ${data.payload.processingPhase}, typing: ${isTyping.value}`,
+          );
         }
 
         if (data.payload && statusChangeCallback) {
@@ -146,7 +148,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case 'history':
+      case "history":
         if (Array.isArray(data.messages)) {
           messages.value = data.messages.map((msg: any) => ({
             id: msg.id || `msg_${Date.now()}`,
@@ -158,18 +160,18 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case 'error':
-        console.error('[Webchat] Server error:', data.error);
+      case "error":
+        console.error("[Webchat] Server error:", data.error);
 
         // Reject pending message if any
         if (pendingMessageResolver) {
           clearTimeout(pendingMessageResolver.timeout);
 
           // Handle NONCE_EXPIRED error
-          if (data.error === 'NONCE_EXPIRED' && data.nonce && nonceUpdateCallback) {
+          if (data.error === "NONCE_EXPIRED" && data.nonce && nonceUpdateCallback) {
             nonceUpdateCallback(data.nonce);
             pendingMessageResolver.reject({
-              message: 'NONCE_EXPIRED',
+              message: "NONCE_EXPIRED",
               nonce: data.nonce,
             });
           } else {
@@ -182,30 +184,37 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         break;
 
       default:
-        console.log('[Webchat] Unknown message type:', data.type);
+        console.log("[Webchat] Unknown message type:", data.type);
     }
   };
 
   const addMessage = (message: Message) => {
+    // If there's a greeting placeholder and the incoming message is from the agent,
+    // replace the greeting with the real server-generated message
+    const greetingIndex = messages.value.findIndex((m) => m.isGreeting);
+    if (greetingIndex !== -1 && message.sender === "agent") {
+      messages.value.splice(greetingIndex, 1, message);
+      return;
+    }
     messages.value.push(message);
   };
 
   const identify = (customerId: string, existingConversationId?: string) => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-      console.error('[Webchat] WebSocket not connected');
+      console.error("[Webchat] WebSocket not connected");
       return;
     }
 
     ws.value.send(
       JSON.stringify({
-        type: 'identify',
+        type: "identify",
         customerId,
         conversationId: existingConversationId,
         metadata: {
           userAgent: navigator.userAgent,
           timestamp: Date.now(),
         },
-      })
+      }),
     );
   };
 
@@ -218,22 +227,22 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   ): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-        console.error('[Webchat] WebSocket not connected');
-        reject(new Error('WebSocket not connected'));
+        console.error("[Webchat] WebSocket not connected");
+        reject(new Error("WebSocket not connected"));
         return;
       }
 
       // Clear any existing pending resolver
       if (pendingMessageResolver) {
         clearTimeout(pendingMessageResolver.timeout);
-        pendingMessageResolver.reject(new Error('Message superseded by new message'));
+        pendingMessageResolver.reject(new Error("Message superseded by new message"));
       }
 
       // Create timeout
       const timeout = setTimeout(() => {
         if (pendingMessageResolver) {
           pendingMessageResolver = null;
-          reject(new Error('Message send timeout'));
+          reject(new Error("Message send timeout"));
         }
       }, 10000);
 
@@ -242,7 +251,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
       // Send to server with DPoP proof
       const payload = {
-        type: 'message',
+        type: "message",
         content: text,
         proof,
         method,
@@ -251,7 +260,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         timestamp: Date.now(),
       };
 
-      console.log('[Webchat] Sending message with payload:', {
+      console.log("[Webchat] Sending message with payload:", {
         type: payload.type,
         content: payload.content,
         method: payload.method,
@@ -271,9 +280,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
     ws.value.send(
       JSON.stringify({
-        type: 'typing',
+        type: "typing",
         isTyping: isTypingValue,
-      })
+      }),
     );
   };
 
@@ -284,9 +293,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
     ws.value.send(
       JSON.stringify({
-        type: 'load_history',
+        type: "load_history",
         conversationId: conversationId.value,
-      })
+      }),
     );
   };
 
@@ -306,7 +315,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
     if (pendingMessageResolver) {
       clearTimeout(pendingMessageResolver.timeout);
-      pendingMessageResolver.reject(new Error('WebSocket disconnected'));
+      pendingMessageResolver.reject(new Error("WebSocket disconnected"));
       pendingMessageResolver = null;
     }
 

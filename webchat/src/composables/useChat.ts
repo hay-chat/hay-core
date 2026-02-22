@@ -518,6 +518,16 @@ export function useChat(config: HayChatConfig) {
         }
       }
 
+      // If there's a greeting placeholder and the incoming message is from the agent,
+      // replace the greeting with the real server-generated message
+      const greetingIndex = messages.value.findIndex((m) => m.isGreeting);
+      if (greetingIndex !== -1 && sender === "agent") {
+        messages.value.splice(greetingIndex, 1, newMessage);
+        existingIds.add(msg.id);
+        added++;
+        continue;
+      }
+
       messages.value.push(newMessage);
       existingIds.add(msg.id);
       added++;

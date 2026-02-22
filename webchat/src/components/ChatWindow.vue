@@ -205,7 +205,6 @@ defineEmits<{
 .hay-chat-header__title {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 4px;
 }
 
 .hay-chat-header__subtitle {
