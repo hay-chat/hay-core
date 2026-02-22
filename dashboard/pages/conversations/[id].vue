@@ -95,7 +95,7 @@
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
           <!-- Playground Loading State -->
           <div v-if="isPlaygroundMode && messagesLoading" class="space-y-4">
             <div v-for="i in 3" :key="i" class="animate-pulse">
