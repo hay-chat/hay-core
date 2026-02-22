@@ -12,6 +12,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, ProcessingPhase } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
+import { PromptService } from "@server/services/prompt.service";
 import { debugLog } from "@server/lib/debug-logger";
 import type { ExecutionResult } from "./execution.layer";
 
@@ -384,11 +385,35 @@ export const runConversation = async (conversationId: string) => {
       // Clean up ephemeral secrets from Redis
       await conversationSecretService.deleteSecrets(conversation.id);
 
-      // Add a closing message
-      const closingMessage =
-        intent.label === "close_satisfied"
-          ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
-          : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+      // Add a closing message generated contextually by the LLM
+      let closingMessage: string;
+      try {
+        const llmService = new LLMService();
+        const promptService = PromptService.getInstance();
+        const messages = await conversation.getPublicMessages();
+        const isSatisfied = intent.label === "close_satisfied";
+
+        const prompt = await promptService.getPrompt(
+          "conversation/user-closure-message",
+          {
+            satisfactionStatus: isSatisfied
+              ? "satisfied with the support received"
+              : "not fully satisfied",
+          },
+          { conversationId: conversation.id, organizationId: conversation.organization_id },
+        );
+
+        closingMessage = await llmService.invoke({
+          history: messages,
+          prompt,
+        });
+      } catch (error) {
+        debugLog("orchestrator", "Error generating closing message, using fallback", { error });
+        closingMessage =
+          intent.label === "close_satisfied"
+            ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
+            : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+      }
 
       await conversation.addMessage({
         content: closingMessage,
