@@ -215,7 +215,7 @@ const handleSend = () => {
 }
 
 .hay-message-input__textarea:focus {
-  outline: none;
+  outline: none !important;
 }
 
 .hay-message-input__textarea:disabled {
