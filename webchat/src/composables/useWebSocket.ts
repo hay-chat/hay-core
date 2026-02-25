@@ -29,7 +29,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     ws.value = new WebSocket(wsUrl.toString());
 
     ws.value.onopen = () => {
-      console.log("[Webchat] WebSocket connected");
       isConnected.value = true;
       reconnectAttempts = 0;
     };
@@ -37,7 +36,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     ws.value.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("[Webchat] Received WebSocket message:", data.type, data);
         handleMessage(data);
       } catch (error) {
         console.error("[Webchat] Failed to parse WebSocket message:", error);
@@ -45,7 +43,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     };
 
     ws.value.onclose = () => {
-      console.log("[Webchat] WebSocket disconnected");
       isConnected.value = false;
       attemptReconnect();
     };
@@ -64,7 +61,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
     reconnectAttempts++;
 
-    console.log(`[Webchat] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
     reconnectTimeout = setTimeout(() => {
       connect();
     }, delay);
@@ -73,13 +69,11 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   const handleMessage = (data: any) => {
     switch (data.type) {
       case "connected":
-        console.log("[Webchat] Connected with client ID:", data.clientId);
         break;
 
       case "identified":
         conversationId.value = data.conversationId;
         sessionStorage.setItem("hay-conversation-id", data.conversationId);
-        console.log("[Webchat] Identified with conversation:", data.conversationId);
         break;
 
       case "message":
@@ -88,14 +82,12 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
           // This handles both optimistically added messages and any other duplicates
           const messageExists = messages.value.some((m) => m.id === data.data.id);
           if (messageExists) {
-            console.log("[Webchat] Skipping duplicate message:", data.data.id);
             break;
           }
 
           // Only add messages from agents (BotAgent, HumanAgent, System)
           // Customer messages are already added optimistically when sent
           if (data.data.type === "Customer") {
-            console.log("[Webchat] Skipping customer message (already shown optimistically)");
             break;
           }
 
@@ -116,7 +108,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
       case "message_sent":
         // Message was successfully sent, handle nonce update
-        console.log("[Webchat] Message sent successfully");
         if (data.nonce && nonceUpdateCallback) {
           nonceUpdateCallback(data.nonce);
         }
@@ -135,14 +126,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
       case "conversation_status_changed":
         // Handle conversation status changes (closed, resolved, etc.)
-        console.log("[Webchat] Conversation status changed:", data.payload);
-
         // Update typing indicator based on processing phase
         if (data.payload?.processingPhase) {
           isTyping.value = data.payload.processingPhase !== "idle";
-          console.log(
-            `[Webchat] Processing phase: ${data.payload.processingPhase}, typing: ${isTyping.value}`,
-          );
         }
 
         if (data.payload && statusChangeCallback) {

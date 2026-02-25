@@ -343,18 +343,14 @@ export function useChat(config: HayChatConfig) {
 
   // Set status change callback for conversation status updates
   setStatusChangeCallback((status: string, payload: any) => {
-    console.log("[Webchat] Conversation status changed to:", status, payload);
-
     // Handle conversation closure
     if (status === "closed" || status === "resolved") {
       isConversationClosed.value = true;
-      console.log("[Webchat] Conversation has been closed/resolved");
     }
 
     // Handle conversation reopening
     if (status === "open" && isConversationClosed.value) {
       isConversationClosed.value = false;
-      console.log("[Webchat] Conversation has been reopened");
     }
 
     // Track human takeover / release
@@ -372,15 +368,12 @@ export function useChat(config: HayChatConfig) {
   const startRetryLoop = () => {
     if (retryTimer) return;
 
-    console.log("[MessageQueue] Starting retry loop");
     retryTimer = setInterval(async () => {
       // Skip if not initialized (we don't need WebSocket for HTTP sending)
       if (!isInitialized.value) return;
 
       const nextMessage = messageQueue.getNextRetry();
       if (nextMessage) {
-        console.log("[MessageQueue] Retrying message:", nextMessage.id);
-
         try {
           // Try to send the message again via HTTP
           await sendMessageInternal(
@@ -391,7 +384,6 @@ export function useChat(config: HayChatConfig) {
 
           // Success - remove from queue
           messageQueue.dequeue(nextMessage.id);
-          console.log("[MessageQueue] Message sent successfully:", nextMessage.id);
         } catch (error) {
           console.error("[MessageQueue] Retry failed for:", nextMessage.id, error);
           // Increment retry count
@@ -408,7 +400,6 @@ export function useChat(config: HayChatConfig) {
     if (retryTimer) {
       clearInterval(retryTimer);
       retryTimer = null;
-      console.log("[MessageQueue] Retry loop stopped");
     }
   };
 
@@ -418,7 +409,6 @@ export function useChat(config: HayChatConfig) {
   const startPolling = () => {
     if (pollingTimer) return;
 
-    console.log("[Webchat] Starting message polling every 10 seconds");
     pollingTimer = setInterval(async () => {
       // Skip if not initialized or no conversation
       if (!isInitialized.value || !conversationId.value) return;
@@ -435,7 +425,6 @@ export function useChat(config: HayChatConfig) {
     if (pollingTimer) {
       clearInterval(pollingTimer);
       pollingTimer = null;
-      console.log("[Webchat] Message polling stopped");
     }
   };
 
@@ -502,7 +491,6 @@ export function useChat(config: HayChatConfig) {
     await clearConversation();
     const created = await createNewConversation();
     if (created) {
-      console.log("[Webchat] New conversation started successfully");
     }
     return created;
   };
@@ -579,7 +567,6 @@ export function useChat(config: HayChatConfig) {
     }
 
     try {
-      console.log("[Webchat] Refreshing messages from server...");
       const wsUrl = `${config.baseUrl}/v1/publicConversations.getMessages`;
       const proof = await createDPoPProof(
         "POST",
@@ -616,13 +603,7 @@ export function useChat(config: HayChatConfig) {
         }
 
         // Merge new messages into existing ones (additive only)
-        const added = mergeMessages(messagesData.messages);
-        console.log(
-          "[Webchat] Messages refreshed: %d on server, %d new added, %d total",
-          messagesData.messages.length,
-          added,
-          messages.value.length,
-        );
+        mergeMessages(messagesData.messages);
       }
 
       // Update conversation closed state

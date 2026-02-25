@@ -59,11 +59,10 @@ async function startServer() {
 
   const server = express();
 
-  // Add permissive CORS middleware for publicConversations endpoints
+  // Add permissive CORS middleware for public widget endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
-    // Check if the path starts with /v1/publicConversations
-    if (req.path.startsWith("/v1/publicConversations")) {
+    if (req.path.startsWith("/v1/publicConversations") || req.path.startsWith("/v1/webchat.getPublicConfig")) {
       return cors({
         origin: true, // Allow all origins
         credentials: false,

@@ -6,6 +6,7 @@ import {
 } from "@server/database/entities/webchat-settings.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { agentRepository } from "@server/repositories/agent.repository";
+import { storageService } from "@server/services/storage.service";
 
 export interface WebchatSettingsUpdateDTO {
   widgetTitle?: string;
@@ -74,15 +75,15 @@ export class WebchatSettingsService {
       );
       if (agent) {
         agentName = agent.name;
-        if (agent.avatarUpload?.path) {
-          agentAvatarUrl = `/uploads/${agent.avatarUpload.path}`;
+        if (agent.avatarUpload) {
+          agentAvatarUrl = storageService.getPublicUrl(agent.avatarUpload);
         }
       }
     }
 
     // Get organization logo URL
-    const organizationLogoUrl = organization?.logoUpload?.path
-      ? `/uploads/${organization.logoUpload.path}`
+    const organizationLogoUrl = organization?.logoUpload
+      ? storageService.getPublicUrl(organization.logoUpload)
       : null;
 
     return {

@@ -1519,10 +1519,6 @@ onMounted(async () => {
         } else {
           isTyping.value = isProcessing;
         }
-
-        console.log(
-          `[WebSocket] Processing phase: ${payload.processingPhase}, typing: ${isProcessing}`,
-        );
       }
 
       await debouncedRefreshConversation("status_changed");
