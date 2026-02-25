@@ -518,6 +518,7 @@ const poweredByUrl = computed(() => {
     bottom: 0;
     right: 0;
     border-radius: 0;
+    z-index: 1000000;
   }
 
   .hay-chat-window--expanded.hay-chat-window--left {
