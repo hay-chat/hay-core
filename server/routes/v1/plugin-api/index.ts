@@ -50,7 +50,7 @@ const authenticatePlugin = (
   }
 
   req.pluginAuth = payload;
-  logger.debug({ payload }, "Plugin API auth token validated");
+  logger.debug({ pluginId: payload.pluginId, organizationId: payload.organizationId }, "Plugin API auth token validated");
   next();
 };
 
@@ -376,7 +376,7 @@ router.post(
 
       // Save to database
       await pluginInstanceRepository.updateConfig(instance.id, config);
-      logger.debug({ config }, "Config saved to database");
+      logger.debug({ configKeys: Object.keys(config) }, "Config saved to database");
 
       // Register tools in registry (only if tools provided)
       if (tools && tools.length > 0) {

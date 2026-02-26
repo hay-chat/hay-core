@@ -89,10 +89,13 @@ export const conversationsRouter = t.router({
     }),
 
   get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    // For public access, try to get conversation without org ID restriction for now
-    // In production, you might want to check a public flag or use session tokens
-    const organizationId =
-      ctx.organizationId || process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    const organizationId = ctx.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Organization context required",
+      });
+    }
     const conversation = await conversationService.getConversation(input.id, organizationId);
 
     if (!conversation) {
@@ -106,12 +109,14 @@ export const conversationsRouter = t.router({
   }),
 
   create: publicProcedure.input(createConversationSchema).mutation(async ({ ctx, input }) => {
-    // For public access, use organization ID from input or a default
-    const organizationId =
-      ctx.organizationId ||
-      input.metadata?.organizationId ||
-      process.env.DEFAULT_ORG_ID ||
-      "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    // Organization ID must come from auth context or explicit input field (validated as UUID above)
+    const organizationId = ctx.organizationId || input.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization ID is required",
+      });
+    }
     const conversation = await conversationService.createConversation(organizationId, input);
 
     return conversation;

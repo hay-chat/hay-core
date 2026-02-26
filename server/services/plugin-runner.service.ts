@@ -432,7 +432,28 @@ export class PluginRunnerService {
     }
 
     // Add allowed environment variables from host
+    // Deny-list prevents plugins from requesting access to server secrets
+    const DENIED_ENV_VARS = new Set([
+      "JWT_SECRET",
+      "JWT_REFRESH_SECRET",
+      "PLUGIN_ENCRYPTION_KEY",
+      "DATABASE_URL",
+      "DB_PASSWORD",
+      "DB_USERNAME",
+      "DB_HOST",
+      "REDIS_PASSWORD",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "GITHUB_TOKEN",
+      "NPM_TOKEN",
+      "OPENAI_API_KEY",
+      "SMTP_PASSWORD",
+    ]);
     for (const envVar of allowedEnvVars) {
+      if (DENIED_ENV_VARS.has(envVar)) {
+        logger.warn({ pluginId, envVar }, "Plugin requested denied environment variable");
+        continue;
+      }
       if (process.env[envVar]) {
         env[envVar] = process.env[envVar]!;
       }

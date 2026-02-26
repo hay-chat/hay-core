@@ -234,9 +234,7 @@ export class EnvironmentManagerService {
     ];
 
     for (const varName of dangerousVars) {
-      if (!baseEnv[varName]) {
-        delete sandboxEnv[varName];
-      }
+      delete sandboxEnv[varName];
     }
 
     return sandboxEnv;

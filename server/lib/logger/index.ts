@@ -49,15 +49,13 @@ const rootLogger = pino({
     censor: REDACT_CENSOR,
   },
   timestamp: pino.stdTimeFunctions.isoTime,
-  // Redact PII from string messages
+  // Redact PII from string messages (including printf-style %s arguments)
   hooks: {
     logMethod(this: pino.Logger, inputArgs, method) {
-      // Pino's logMethod receives args in the form:
-      // (obj, msg, ...args) or (msg, ...args)
-      if (typeof inputArgs[0] === "string") {
-        inputArgs[0] = redactString(inputArgs[0]);
-      } else if (inputArgs.length >= 2 && typeof inputArgs[1] === "string") {
-        inputArgs[1] = redactString(inputArgs[1]);
+      for (let i = 0; i < inputArgs.length; i++) {
+        if (typeof inputArgs[i] === "string") {
+          (inputArgs as string[])[i] = redactString(inputArgs[i] as string);
+        }
       }
       return method.apply(this, inputArgs as Parameters<typeof method>);
     },

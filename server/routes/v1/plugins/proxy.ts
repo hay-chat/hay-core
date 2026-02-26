@@ -50,8 +50,17 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
 
     try {
       // Convert Express headers to fetch-compatible headers
+      // Strip sensitive headers to prevent credential leakage to plugin workers
+      const STRIPPED_HEADERS = new Set([
+        "authorization",
+        "cookie",
+        "x-forwarded-for",
+        "x-real-ip",
+        "proxy-authorization",
+      ]);
       const headers: Record<string, string> = {};
       Object.entries(req.headers).forEach(([key, value]) => {
+        if (STRIPPED_HEADERS.has(key.toLowerCase())) return;
         if (typeof value === "string") {
           headers[key] = value;
         } else if (Array.isArray(value)) {
@@ -96,34 +105,35 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
 /**
  * Extract organization ID from request
  * Tries multiple methods:
- * 1. Query parameter (for webhooks without auth)
+ * 1. Query parameter (for webhooks without auth) — validated against DB
  * 2. Subdomain (for custom domains)
  * 3. Auth token (for authenticated requests)
  */
 async function extractorganizationId(req: Request): Promise<string | null> {
   // Method 1: From query parameter (for webhooks)
+  // Validate UUID format and verify org exists to prevent IDOR
   if (req.query.organizationId && typeof req.query.organizationId === "string") {
-    return req.query.organizationId;
+    const orgId = req.query.organizationId;
+    // Basic UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(orgId)) {
+      return null;
+    }
+    // Verify org exists to prevent access to arbitrary org IDs
+    const org = await organizationRepository.findById(orgId);
+    if (!org) {
+      return null;
+    }
+    return orgId;
   }
 
-  // Method 2: From subdomain
-  // TODO: Implement subdomain lookup once OrganizationRepository has findBySubdomain method
-  // const hostname = req.hostname || req.get("host") || "";
-  // const subdomain = hostname.split(".")[0];
-  // if (subdomain && subdomain !== "app" && subdomain !== "localhost" && subdomain !== "api") {
-  //   try {
-  //     const org = await organizationRepository.findBySubdomain(subdomain);
-  //     if (org) {
-  //       return org.id;
-  //     }
-  //   } catch (error) {
-  //     console.warn(`[PluginProxy] Failed to lookup org by subdomain ${subdomain}:`, error);
-  //   }
-  // }
+  // Method 2: From x-organization-id header (set by authenticated middleware)
+  const headerOrgId = req.headers["x-organization-id"];
+  if (headerOrgId && typeof headerOrgId === "string") {
+    return headerOrgId;
+  }
 
-  // Method 3: From auth token (if authenticated request)
-  // This would be extracted from JWT in the Authorization header
-  // TODO: Implement if needed for authenticated webhook endpoints
+  // TODO: Method 3 - From auth token (JWT) if needed for authenticated webhook endpoints
 
   return null;
 }
