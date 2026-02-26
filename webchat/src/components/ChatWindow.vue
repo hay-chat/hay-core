@@ -507,18 +507,27 @@ const poweredByUrl = computed(() => {
   .hay-chat-window {
     width: calc(100vw - 40px);
     height: calc(100vh - 110px);
+    height: calc(100dvh - 110px);
     max-height: calc(100vh - 110px);
+    max-height: calc(100dvh - 110px);
   }
 
   /* Expanded on mobile = fullscreen */
   .hay-chat-window--expanded {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     max-height: 100vh;
+    max-height: 100dvh;
     bottom: 0;
     right: 0;
     border-radius: 0;
     z-index: 1000000;
+    /* Respect safe area insets (notch, dynamic island, home indicator) */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .hay-chat-window--expanded.hay-chat-window--left {
