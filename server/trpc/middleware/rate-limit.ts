@@ -29,6 +29,13 @@ export interface RateLimitOptions {
    * Defaults to true for authenticated endpoints, false for public endpoints
    */
   useUserId?: boolean;
+
+  /**
+   * If true, reject requests when Redis is unavailable instead of allowing them.
+   * Use for sensitive endpoints (login, registration, password reset) where
+   * bypassing rate limits is a security risk.
+   */
+  failClosed?: boolean;
 }
 
 /**
@@ -44,7 +51,7 @@ function getRateLimitKey(identifier: string, keyPrefix: string, endpoint: string
  */
 export const rateLimitMiddleware = (options: RateLimitOptions) => {
   return t.middleware(async ({ ctx, path, next }) => {
-    const { max, windowMs, keyPrefix = "default", useUserId = true } = options;
+    const { max, windowMs, keyPrefix = "default", useUserId = true, failClosed = false } = options;
 
     // Determine identifier (user ID or IP address)
     let identifier: string;
@@ -66,8 +73,15 @@ export const rateLimitMiddleware = (options: RateLimitOptions) => {
       // Get Redis client
       const redis = redisService.getClient();
 
-      // Skip rate limiting if Redis is not available
+      // Handle Redis unavailability
       if (!redis) {
+        if (failClosed) {
+          logger.error("Redis unavailable, rejecting request (failClosed)");
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Service temporarily unavailable. Please try again later.",
+          });
+        }
         logger.warn("Redis client not available, skipping rate limit");
         return next({
           ctx: {
@@ -140,8 +154,14 @@ export const rateLimitMiddleware = (options: RateLimitOptions) => {
         throw error;
       }
 
-      // If Redis is unavailable, log the error and allow the request
-      // This prevents rate limiting from blocking all requests if Redis is down
+      // If Redis errors, decide based on failClosed setting
+      if (failClosed) {
+        logger.error({ err: error }, "Redis error, rejecting request (failClosed)");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Service temporarily unavailable. Please try again later.",
+        });
+      }
       logger.error({ err: error }, "Redis error, allowing request");
       return next({
         ctx: {
@@ -175,6 +195,7 @@ export const RateLimits = {
     max: 10,
     windowMs: 60 * 60 * 1000, // 1 hour
     keyPrefix: "strict",
+    failClosed: true,
   },
 
   /**

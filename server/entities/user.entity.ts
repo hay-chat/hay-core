@@ -82,8 +82,15 @@ export class User extends BaseEntity {
 
   // Helper methods
   toJSON(): any {
-    const { password: _password, ...userWithoutPassword } = this;
-    return userWithoutPassword;
+    const {
+      password: _password,
+      passwordResetTokenHash: _prth,
+      passwordResetExpiresAt: _prea,
+      emailVerificationTokenHash: _evth,
+      emailVerificationExpiresAt: _evea,
+      ...safeUser
+    } = this;
+    return safeUser;
   }
 
   /**

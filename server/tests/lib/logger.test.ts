@@ -152,6 +152,21 @@ describe("PII Redaction", () => {
       expect(REDACT_PATHS).toContain("*.ip");
     });
 
+    it("includes PII fields aligned with privacy.service.ts", () => {
+      expect(REDACT_PATHS).toContain("firstName");
+      expect(REDACT_PATHS).toContain("first_name");
+      expect(REDACT_PATHS).toContain("lastName");
+      expect(REDACT_PATHS).toContain("last_name");
+      expect(REDACT_PATHS).toContain("name");
+      expect(REDACT_PATHS).toContain("address");
+      expect(REDACT_PATHS).toContain("userAgent");
+      expect(REDACT_PATHS).toContain("user_agent");
+      // Nested variants
+      expect(REDACT_PATHS).toContain("*.firstName");
+      expect(REDACT_PATHS).toContain("*.lastName");
+      expect(REDACT_PATHS).toContain("*.userAgent");
+    });
+
     it("includes nested header paths", () => {
       expect(REDACT_PATHS).toContain("*.headers.authorization");
       expect(REDACT_PATHS).toContain("*.headers.cookie");
