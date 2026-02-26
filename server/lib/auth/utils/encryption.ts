@@ -15,11 +15,17 @@ const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
  * Get the encryption key from environment or generate a default one
  */
 function getEncryptionKey(): string {
-  const key = process.env.PLUGIN_ENCRYPTION_KEY || process.env.JWT_SECRET;
-  if (!key) {
-    throw new Error("PLUGIN_ENCRYPTION_KEY or JWT_SECRET must be set for encryption");
+  if (process.env.PLUGIN_ENCRYPTION_KEY) {
+    return process.env.PLUGIN_ENCRYPTION_KEY;
   }
-  return key;
+  if (process.env.JWT_SECRET) {
+    logger.warn(
+      "PLUGIN_ENCRYPTION_KEY not set — falling back to JWT_SECRET for encryption. " +
+        "Set a dedicated PLUGIN_ENCRYPTION_KEY in production to isolate key compromise.",
+    );
+    return process.env.JWT_SECRET;
+  }
+  throw new Error("PLUGIN_ENCRYPTION_KEY must be set for encryption");
 }
 
 /**

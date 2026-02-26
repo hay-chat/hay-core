@@ -164,8 +164,12 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
 export async function optionalAuth(req: Request): Promise<AuthUser | null> {
   try {
     return await authenticate(req);
-  } catch {
-    // Suppress authentication errors for optional auth
+  } catch (error) {
+    // Re-throw authorization errors (e.g., user doesn't belong to organization)
+    // Only suppress authentication failures (missing/invalid credentials)
+    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
+      throw error;
+    }
     return null;
   }
 }

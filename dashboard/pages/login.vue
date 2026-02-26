@@ -111,18 +111,6 @@
           <p class="text-sm text-red-800">
             {{ error }}
           </p>
-          <button
-            v-if="showResendVerification"
-            type="button"
-            class="mt-2 text-sm text-primary hover:text-primary/80 font-medium underline"
-            :disabled="resendLoading"
-            @click="handleResendVerification"
-          >
-            {{ resendLoading ? "Sending..." : "Resend verification email" }}
-          </button>
-          <p v-if="resendSuccess" class="mt-1 text-sm text-green-700">
-            {{ resendSuccess }}
-          </p>
         </div>
       </form>
     </div>
@@ -220,9 +208,6 @@ const errors = reactive({
 });
 
 const error = ref("");
-const showResendVerification = ref(false);
-const resendLoading = ref(false);
-const resendSuccess = ref("");
 
 // Computed
 const loading = computed(() => authStore.isLoading);
@@ -276,12 +261,7 @@ const handleSubmit = async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     // Handle different types of authentication errors
-    showResendVerification.value = false;
-    resendSuccess.value = "";
-    if (err.message.includes("verify your email")) {
-      error.value = "Please verify your email address before signing in. Check your inbox for the verification link.";
-      showResendVerification.value = true;
-    } else if (err.message.includes("Invalid credentials")) {
+    if (err.message.includes("Invalid credentials")) {
       error.value = "Invalid email or password. Please check your credentials and try again.";
     } else if (err.message.includes("locked")) {
       error.value =
@@ -292,24 +272,6 @@ const handleSubmit = async () => {
       error.value = "Unable to sign in. Please check your internet connection and try again.";
     }
     console.error("Login error:", err);
-  }
-};
-
-const handleResendVerification = async () => {
-  if (!form.email) return;
-  resendLoading.value = true;
-  resendSuccess.value = "";
-  try {
-    await Hay.auth.resendSignupVerification.mutate({ email: form.email });
-    resendSuccess.value = "If an unverified account exists with this email, a new verification link has been sent.";
-  } catch (err: any) {
-    if (err.message.includes("Too many")) {
-      resendSuccess.value = "Too many requests. Please try again later.";
-    } else {
-      resendSuccess.value = "If an unverified account exists with this email, a new verification link has been sent.";
-    }
-  } finally {
-    resendLoading.value = false;
   }
 };
 

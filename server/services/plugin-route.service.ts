@@ -199,19 +199,33 @@ export class PluginRouteService {
         .update(`${timestamp}.${payload}`)
         .digest("hex");
 
-      return sig === expectedSig;
+      return this.timingSafeCompare(sig, expectedSig);
     } else if (headerName.toLowerCase().includes("github")) {
       // GitHub format: sha256=signature
       const expectedSig =
         "sha256=" + crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-      return signature === expectedSig;
+      return this.timingSafeCompare(signature, expectedSig);
     } else {
       // Default: plain HMAC
       const expectedSig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-      return signature === expectedSig;
+      return this.timingSafeCompare(signature, expectedSig);
     }
+  }
+
+  /**
+   * Timing-safe string comparison to prevent timing attacks on signature verification
+   */
+  private timingSafeCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // Compare against self to maintain constant time, then return false
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
   }
 
   /**

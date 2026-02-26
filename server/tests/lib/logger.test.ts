@@ -70,6 +70,18 @@ describe("PII Redaction", () => {
       const input = "Callback: https://example.com?email=user@test.com";
       expect(redactString(input)).not.toContain("user@test.com");
     });
+
+    it("redacts JWT tokens", () => {
+      const input = "Token: eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiIxMjMifQ.dummysignature12345";
+      expect(redactString(input)).toContain("[TOKEN_REDACTED]");
+      expect(redactString(input)).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+    });
+
+    it("redacts Bearer tokens", () => {
+      const input = "Authorization: Bearer abc123.def456.ghi789";
+      expect(redactString(input)).toContain("Bearer [TOKEN_REDACTED]");
+      expect(redactString(input)).not.toContain("abc123.def456.ghi789");
+    });
   });
 
   describe("REDACT_PATHS", () => {
@@ -89,15 +101,60 @@ describe("PII Redaction", () => {
       expect(REDACT_PATHS).toContain("creditCard");
     });
 
+    it("includes email variant fields (newEmail, oldEmail, to, from, etc.)", () => {
+      expect(REDACT_PATHS).toContain("newEmail");
+      expect(REDACT_PATHS).toContain("oldEmail");
+      expect(REDACT_PATHS).toContain("userEmail");
+      expect(REDACT_PATHS).toContain("toEmail");
+      expect(REDACT_PATHS).toContain("fromEmail");
+      expect(REDACT_PATHS).toContain("to");
+      expect(REDACT_PATHS).toContain("from");
+      expect(REDACT_PATHS).toContain("fromAddress");
+      expect(REDACT_PATHS).toContain("replyTo");
+      expect(REDACT_PATHS).toContain("cc");
+      expect(REDACT_PATHS).toContain("bcc");
+      // Nested variants
+      expect(REDACT_PATHS).toContain("*.to");
+      expect(REDACT_PATHS).toContain("*.from");
+      expect(REDACT_PATHS).toContain("*.newEmail");
+    });
+
+    it("includes URL/key fields that may embed tokens or PII", () => {
+      expect(REDACT_PATHS).toContain("verificationUrl");
+      expect(REDACT_PATHS).toContain("resetUrl");
+      expect(REDACT_PATHS).toContain("callbackUrl");
+      expect(REDACT_PATHS).toContain("key");
+      // Nested variants
+      expect(REDACT_PATHS).toContain("*.verificationUrl");
+      expect(REDACT_PATHS).toContain("*.key");
+    });
+
     it("includes authorization headers", () => {
       expect(REDACT_PATHS).toContain("headers.authorization");
       expect(REDACT_PATHS).toContain("headers.Authorization");
     });
 
-    it("includes nested wildcard paths", () => {
+    it("includes nested wildcard paths at multiple depths", () => {
       expect(REDACT_PATHS).toContain("*.email");
       expect(REDACT_PATHS).toContain("*.password");
       expect(REDACT_PATHS).toContain("*.token");
+      // Depth 2 paths
+      expect(REDACT_PATHS).toContain("*.*.email");
+      expect(REDACT_PATHS).toContain("*.*.password");
+      expect(REDACT_PATHS).toContain("*.*.token");
+      expect(REDACT_PATHS).toContain("*.*.secret");
+    });
+
+    it("includes IP address fields", () => {
+      expect(REDACT_PATHS).toContain("ipAddress");
+      expect(REDACT_PATHS).toContain("ip_address");
+      expect(REDACT_PATHS).toContain("ip");
+      expect(REDACT_PATHS).toContain("*.ip");
+    });
+
+    it("includes nested header paths", () => {
+      expect(REDACT_PATHS).toContain("*.headers.authorization");
+      expect(REDACT_PATHS).toContain("*.headers.cookie");
     });
   });
 

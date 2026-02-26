@@ -73,7 +73,6 @@ const registerSchema = z
     lastName: z.string().optional(),
     organizationName: z.string().optional(),
     organizationSlug: z.string().optional(),
-    emailVerified: z.boolean().optional().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -86,8 +85,27 @@ const refreshTokenSchema = z.object({
 
 export const authRouter = t.router({
   // Public endpoints
-  login: publicProcedure.input(loginSchema).mutation(async ({ input }) => {
+  login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     const { email, password } = input;
+
+    // Rate limit by IP: 10 attempts per 15 minutes
+    const ipAddress = ctx.ipAddress || "unknown";
+    const ipRateLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 15 * 60, true);
+    if (ipRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
+
+    // Rate limit by email: 5 attempts per 15 minutes
+    const emailRateLimit = await rateLimitService.checkEmailRateLimit(email, 5, 15 * 60, true);
+    if (emailRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
 
     // Find user by email with organization
     const userRepository = AppDataSource.getRepository(User);
@@ -122,15 +140,6 @@ export const authRouter = t.router({
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Account is deactivated",
-      });
-    }
-
-    // Check if email is verified
-    if (!user.emailVerified) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Please verify your email address before signing in.",
-        cause: { type: "EMAIL_NOT_VERIFIED" },
       });
     }
 
@@ -172,7 +181,7 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug, emailVerified } = input;
+    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -240,7 +249,6 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
-        emailVerified: emailVerified ?? true,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -295,14 +303,6 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid refresh token",
-        });
-      }
-
-      if (!user.emailVerified) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Please verify your email address before signing in.",
-          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 
@@ -366,9 +366,11 @@ export const authRouter = t.router({
       }
 
       try {
-        // Generate reset token
+        // Generate reset token (high-entropy: 256 bits)
+        // SHA-256 is sufficient for high-entropy tokens — no brute-force risk.
+        // This enables direct DB lookup instead of O(n) argon2 scans.
         const resetToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = await hashPassword(resetToken, "argon2");
+        const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
 
         // Store token hash and expiration (24 hours)
         user.passwordResetTokenHash = tokenHash;
@@ -429,24 +431,11 @@ export const authRouter = t.router({
     .query(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         return {
@@ -483,24 +472,11 @@ export const authRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -967,9 +943,9 @@ export const authRouter = t.router({
         });
       }
 
-      // Generate verification token
+      // Generate verification token (high-entropy: 256 bits, SHA-256 for direct lookup)
       const verificationToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = await hashPassword(verificationToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
       // Store pending email and token
       const oldEmail = user.email;
@@ -1077,24 +1053,14 @@ export const authRouter = t.router({
     .mutation(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending email changes (shouldn't be many)
-      const usersWithPending = await userRepository.find({
+      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+
+      let user = await userRepository.findOne({
         where: {
-          emailVerificationTokenHash: Not(IsNull()),
+          emailVerificationTokenHash: tokenHash,
         },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithPending) {
-        if (u.emailVerificationTokenHash) {
-          const isValid = await verifyPassword(input.token, u.emailVerificationTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -1241,9 +1207,9 @@ export const authRouter = t.router({
       });
     }
 
-    // Generate new verification token
+    // Generate new verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     // Update token and expiry
     user.emailVerificationTokenHash = tokenHash;
@@ -1299,132 +1265,6 @@ export const authRouter = t.router({
     };
   }),
 
-  // Email verification for onboarding (called by backoffice after account creation)
-  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: ctx.user!.id },
-    });
-
-    if (!user) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-    }
-
-    if (user.emailVerified) {
-      return { success: true, message: "Email is already verified", token: null, expiresAt: null };
-    }
-
-    // Rate limit: max 5 verification requests per email per day
-    const rateLimitResult = await rateLimitService.checkEmailRateLimit(
-      user.email,
-      5,
-      24 * 60 * 60,
-    );
-    if (rateLimitResult.limited) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Too many verification requests. Please try again later.",
-      });
-    }
-
-    // Generate token (SHA-256 hash for storage, allows direct DB lookup)
-    const token = generateSecureToken(32);
-    const tokenHash = await hashApiKey(token);
-
-    // Store on user (reuse existing email verification fields)
-    user.emailVerificationTokenHash = tokenHash;
-    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    await userRepository.save(user);
-
-    return {
-      success: true,
-      token, // Plain token returned to caller (backoffice) for inclusion in email
-      expiresAt: user.emailVerificationExpiresAt,
-    };
-  }),
-
-  verifyEmail: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      const tokenHash = await hashApiKey(input.token);
-
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { emailVerificationTokenHash: tokenHash },
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invalid or expired verification token",
-        });
-      }
-
-      // Check expiry
-      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
-        user.clearEmailVerification();
-        await userRepository.save(user);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Verification link has expired. Please request a new one.",
-        });
-      }
-
-      // Mark as verified, clear token fields
-      user.emailVerified = true;
-      user.clearEmailVerification();
-      await userRepository.save(user);
-
-      return { success: true, message: "Email verified successfully", email: user.email };
-    }),
-
-  resendSignupVerification: publicProcedure
-    .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
-      const { email } = input;
-
-      // Rate limit: 3 requests per hour per email
-      const rateLimitResult = await rateLimitService.checkEmailRateLimit(
-        email,
-        3,
-        60 * 60,
-      );
-      if (rateLimitResult.limited) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many requests. Please try again later.",
-        });
-      }
-
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { email: email.toLowerCase() },
-      });
-
-      // Always return success to prevent user enumeration
-      if (!user || !user.isActive || user.emailVerified) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
-        return {
-          success: true,
-          token: null,
-          message: "If an unverified account exists, a new verification link will be sent.",
-        };
-      }
-
-      // Generate new token
-      const token = generateSecureToken(32);
-      const tokenHash = await hashApiKey(token);
-      user.emailVerificationTokenHash = tokenHash;
-      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await userRepository.save(user);
-
-      return {
-        success: true,
-        token, // Returned to backoffice for email sending
-        message: "If an unverified account exists, a new verification link will be sent.",
-      };
-    }),
-
   // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
   generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
     const rawCode = generateSecureToken(32);
@@ -1473,14 +1313,6 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Account is deactivated",
-        });
-      }
-
-      if (!user.emailVerified) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Please verify your email address before signing in.",
-          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 
