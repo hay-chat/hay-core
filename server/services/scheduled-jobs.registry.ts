@@ -7,6 +7,9 @@ import { pluginRouteService } from "./plugin-route.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import { refreshOAuthTokens } from "./oauth-token-refresh.job";
 import { documentRetryService } from "./document-retry.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("scheduled-jobs");
 
 /**
  * Centralized Scheduled Jobs Registry
@@ -112,7 +115,6 @@ const jobRegistry: CronJobConfig[] = [
 
       const { staleMessageDetectorService } = await import("./stale-message-detector.service");
       const { messageRecoveryService } = await import("./message-recovery.service");
-      const { debugLog } = await import("../lib/debug-logger");
 
       const staleConversations = await staleMessageDetectorService.detectStaleConversations();
 
@@ -120,21 +122,15 @@ const jobRegistry: CronJobConfig[] = [
         return; // Nothing to do
       }
 
-      debugLog("stale-detector", `Found ${staleConversations.length} stale conversations`);
+      logger.debug({ count: staleConversations.length }, "Found stale conversations");
 
       // Recover each conversation
       for (const staleConv of staleConversations) {
         try {
           const result = await messageRecoveryService.recoverStaleConversation(staleConv, false);
-          debugLog("stale-detector", "Recovery result", {
-            conversationId: staleConv.conversationId,
-            result,
-          });
+          logger.debug({ conversationId: staleConv.conversationId, result }, "Recovery result");
         } catch (error) {
-          console.error("[Stale Detector] Recovery failed", {
-            conversationId: staleConv.conversationId,
-            error,
-          });
+          logger.error({ err: error, conversationId: staleConv.conversationId }, "Recovery failed");
         }
       }
     },
@@ -244,7 +240,7 @@ const jobRegistry: CronJobConfig[] = [
  * Call this during application startup
  */
 export function registerAllScheduledJobs(): void {
-  console.log("[Scheduler] Registering scheduled jobs...");
+  logger.info("Registering scheduled jobs...");
 
   let registered = 0;
   let skipped = 0;
@@ -254,17 +250,17 @@ export function registerAllScheduledJobs(): void {
       schedulerService.registerJob(job);
       if (job.enabled !== false) {
         registered++;
-        console.log(`[Scheduler] ✓ Registered: ${job.name}`);
+        logger.info({ jobName: job.name }, "Registered job");
       } else {
         skipped++;
-        console.log(`[Scheduler] ⊘ Skipped (disabled): ${job.name}`);
+        logger.info({ jobName: job.name }, "Skipped disabled job");
       }
     } catch (error) {
-      console.error(`[Scheduler] ✗ Failed to register: ${job.name}`, error);
+      logger.error({ err: error, jobName: job.name }, "Failed to register job");
     }
   }
 
-  console.log(`[Scheduler] Registration complete: ${registered} active, ${skipped} disabled`);
+  logger.info({ registered, skipped }, "Registration complete");
 }
 
 /**

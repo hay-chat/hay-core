@@ -4,6 +4,9 @@ import { promisify } from "util";
 import { BaseProcessor } from "./base.processor";
 import type { ProcessedDocument } from "./base.processor";
 import { sanitizeContent } from "../utils/sanitize";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("pptx-processor");
 
 const parseXml = promisify(parseString);
 
@@ -23,7 +26,7 @@ export class PptxProcessor extends BaseProcessor {
       
       return await this.processPptx(buffer, fileName);
     } catch (error) {
-      console.error("Error processing PowerPoint file:", error);
+      logger.error({ err: error }, "Error processing PowerPoint file");
       return {
         content: "",
         metadata: {
@@ -146,7 +149,7 @@ export class PptxProcessor extends BaseProcessor {
       
       return texts.join(" ").trim();
     } catch (error) {
-      console.error("Error parsing XML:", error);
+      logger.error({ err: error }, "Error parsing XML");
       return "";
     }
   }
@@ -203,7 +206,7 @@ export class PptxProcessor extends BaseProcessor {
         }
       }
     } catch (error) {
-      console.error("Error extracting title:", error);
+      logger.error({ err: error }, "Error extracting title");
     }
     
     return null;
@@ -251,7 +254,7 @@ export class PptxProcessor extends BaseProcessor {
         }
       }
     } catch (error) {
-      console.error("Error extracting metadata:", error);
+      logger.error({ err: error }, "Error extracting metadata");
     }
     
     return metadata;

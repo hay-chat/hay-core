@@ -3,6 +3,9 @@ import { AuthUser } from "@server/lib/auth/AuthUser";
 import { authenticate } from "@server/lib/auth/middleware";
 import type { ListParams } from "./middleware/pagination";
 import type { Request } from "express";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("trpc-context");
 
 export interface Context {
   user: AuthUser | null;
@@ -30,7 +33,7 @@ export const createContext = async ({
   } catch (error) {
     // Log authentication errors but don't fail context creation
     if (error instanceof Error) {
-      console.error("[Context] Authentication error:", error.message);
+      logger.error({ err: error }, "Authentication error");
 
       // Store the error for procedures that require auth
       // This allows us to provide better error messages
@@ -39,7 +42,7 @@ export const createContext = async ({
         (req as RequestWithAuthError).authError = error.message;
       }
     } else {
-      console.error("[Context] Authentication error:", error);
+      logger.error({ err: error }, "Authentication error");
     }
     // Authentication errors will be handled by procedures that require auth
   }

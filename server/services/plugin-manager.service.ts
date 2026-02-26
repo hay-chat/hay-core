@@ -8,6 +8,9 @@ import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.e
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-manager");
 
 export class PluginManagerService {
   private pluginsDir: string;
@@ -28,7 +31,7 @@ export class PluginManagerService {
    * Initialize the plugin manager and discover all plugins
    */
   async initialize(): Promise<void> {
-    console.log("🔍 Discovering plugins...");
+    logger.info("Discovering plugins");
 
     // Clear discovered set for fresh initialization
     this.discoveredPluginIds.clear();
@@ -42,7 +45,7 @@ export class PluginManagerService {
     // Restore plugins from ZIP if directories are missing
     await this.restorePluginsFromZip();
 
-    console.log("📦 Plugin registry loaded:");
+    logger.info("Plugin registry loaded");
 
     // Initialize auto-activated plugins
     await this.initializeAutoActivatedPlugins();
@@ -83,7 +86,7 @@ export class PluginManagerService {
         }
       }
     } catch (error) {
-      console.error("Failed to discover plugins:", error);
+      logger.error({ err: error }, "Failed to discover plugins");
     }
   }
 
@@ -114,7 +117,7 @@ export class PluginManagerService {
         }
       }
     } catch (error) {
-      console.error(`Failed to scan plugin directory ${directory}:`, error);
+      logger.error({ err: error, directory }, "Failed to scan plugin directory");
     }
   }
 
@@ -138,7 +141,7 @@ export class PluginManagerService {
         .catch(() => false);
 
       if (!packageExists) {
-        console.warn(`⚠️  No package.json found for plugin at ${pluginPath}`);
+        logger.warn({ pluginPath }, "No package.json found for plugin");
         return;
       }
 
@@ -157,7 +160,7 @@ export class PluginManagerService {
       const pluginId = packageJson.name;
 
       if (!pluginId) {
-        console.warn(`⚠️  No package name found at ${pluginPath}`);
+        logger.warn({ pluginPath }, "No package name found");
         return;
       }
 
@@ -204,9 +207,9 @@ export class PluginManagerService {
 
       this.registry.set(manifest.id, plugin);
       this.discoveredPluginIds.add(manifest.id); // Track as discovered
-      console.log(`✅ Registered plugin: ${pluginId} from ${relativePath}`);
+      logger.info({ pluginId, path: relativePath }, "Registered plugin");
     } catch (error) {
-      console.error(`Failed to register plugin at ${pluginPath}:`, error);
+      logger.error({ err: error, pluginPath }, "Failed to register plugin");
     }
   }
 
@@ -297,8 +300,9 @@ export class PluginManagerService {
       );
 
       if (missingPlugins.length > 0) {
-        console.log(
-          `⚠️  Found ${missingPlugins.length} plugin(s) in database but not on filesystem`,
+        logger.warn(
+          { count: missingPlugins.length },
+          "Found plugins in database but not on filesystem",
         );
 
         // Mark each missing plugin as not_found
@@ -311,11 +315,11 @@ export class PluginManagerService {
             registryPlugin.status = PluginStatus.NOT_FOUND;
           }
 
-          console.log(`   - ${plugin.pluginId} marked as not_found`);
+          logger.info({ pluginId: plugin.pluginId }, "Plugin marked as not_found");
         }
       }
     } catch (error) {
-      console.error("Failed to validate existing plugins:", error);
+      logger.error({ err: error }, "Failed to validate existing plugins");
     }
   }
 
@@ -336,7 +340,7 @@ export class PluginManagerService {
         return;
       }
 
-      console.log(`🔄 Checking ${customPlugins.length} custom plugins for restoration...`);
+      logger.info({ count: customPlugins.length }, "Checking custom plugins for restoration");
 
       for (const plugin of customPlugins) {
         try {
@@ -348,7 +352,7 @@ export class PluginManagerService {
             .catch(() => false);
 
           if (!dirExists && plugin.zipUploadId) {
-            console.log(`📥 Restoring plugin ${plugin.name} from ZIP...`);
+            logger.info({ pluginName: plugin.name }, "Restoring plugin from ZIP");
 
             // Download ZIP from storage
             const { buffer } = await storageService.download(plugin.zipUploadId);
@@ -370,14 +374,14 @@ export class PluginManagerService {
             // Extract to plugin directory
             zip.extractAllTo(pluginPath, true);
 
-            console.log(`✅ Restored plugin ${plugin.name} to ${plugin.pluginPath}`);
+            logger.info({ pluginName: plugin.name, pluginPath: plugin.pluginPath }, "Restored plugin");
           }
         } catch (error) {
-          console.error(`❌ Failed to restore plugin ${plugin.name}:`, error);
+          logger.error({ err: error, pluginName: plugin.name }, "Failed to restore plugin");
         }
       }
     } catch (error) {
-      console.error("Failed to restore plugins from ZIP:", error);
+      logger.error({ err: error }, "Failed to restore plugins from ZIP");
     }
   }
 
@@ -414,13 +418,13 @@ export class PluginManagerService {
     }
 
     if (!installCommand) {
-      console.log(`ℹ️  No install command for plugin ${plugin.name}`);
+      logger.debug({ pluginName: plugin.name }, "No install command for plugin");
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       return;
     }
 
     try {
-      console.log(`📦 Installing plugin ${plugin.name}...`);
+      logger.info({ pluginName: plugin.name }, "Installing plugin");
 
       // For workspace plugins, run from root directory; otherwise run from plugin directory
       const rootDir = path.join(this.pluginsDir, "..");
@@ -434,12 +438,12 @@ export class PluginManagerService {
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       plugin.installed = true;
-      console.log(`✅ [HAY OK] Plugin ${plugin.name} installed successfully`);
+      logger.info({ pluginName: plugin.name }, "Plugin installed successfully");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await pluginRegistryRepository.updateInstallStatus(plugin.id, false, errorMessage);
       plugin.installed = false;
-      console.error(`❌ [HAY FAILED] Plugin ${plugin.name} installation failed`);
+      logger.error({ pluginName: plugin.name }, "Plugin installation failed");
       throw new Error(`Failed to install plugin ${plugin.name}: ${errorMessage}`);
     }
   }
@@ -476,7 +480,7 @@ export class PluginManagerService {
     }
 
     if (!buildCommand) {
-      console.log(`ℹ️  No build command for plugin ${plugin.name}`);
+      logger.debug({ pluginName: plugin.name }, "No build command for plugin");
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
       return;
     }
@@ -486,9 +490,7 @@ export class PluginManagerService {
       const rootDir = path.join(this.pluginsDir, "..");
       const execDir = isWorkspacePlugin ? rootDir : pluginPath;
 
-      console.log(`🔨 Building plugin ${plugin.name}...`);
-      console.log(`   Command: ${buildCommand}`);
-      console.log(`   Path: ${execDir}`);
+      logger.info({ pluginName: plugin.name, command: buildCommand, path: execDir }, "Building plugin");
 
       execSync(buildCommand, {
         cwd: execDir,
@@ -498,12 +500,12 @@ export class PluginManagerService {
 
       await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
       plugin.built = true;
-      console.log(`✅ [HAY OK] Plugin ${plugin.name} built successfully`);
+      logger.info({ pluginName: plugin.name }, "Plugin built successfully");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await pluginRegistryRepository.updateBuildStatus(plugin.id, false, errorMessage);
       plugin.built = false;
-      console.error(`❌ [HAY FAILED] Plugin ${plugin.name} build failed`);
+      logger.error({ pluginName: plugin.name }, "Plugin build failed");
       throw new Error(`Failed to build plugin ${plugin.name}: ${errorMessage}`);
     }
   }
@@ -568,7 +570,7 @@ export class PluginManagerService {
         try {
           // Dynamically import the plugin's router using the stored plugin path
           const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
-          console.log(`Loading router from: ${routerPath}`);
+          logger.debug({ routerPath }, "Loading router");
           const routerModule = await import(routerPath);
           const pluginRouter = routerModule.default || routerModule.router;
 
@@ -576,12 +578,10 @@ export class PluginManagerService {
             // Register with the manifest ID, not the directory name
             const registerId = manifest.id || plugin.pluginId;
             pluginRouterRegistry.registerRouter(registerId, pluginRouter);
-            console.log(
-              `✅ Auto-activated router for plugin: ${plugin.name} with ID: ${registerId}`,
-            );
+            logger.info({ pluginName: plugin.name, registerId }, "Auto-activated router for plugin");
           }
         } catch (error) {
-          console.warn(`⚠️ Could not load router for plugin ${plugin.name}:`, error);
+          logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
         }
       }
     }
@@ -617,7 +617,7 @@ export class PluginManagerService {
 
       return null;
     } catch (error) {
-      console.error(`Failed to find folder for plugin ${pluginId}:`, error);
+      logger.error({ err: error, pluginId }, "Failed to find folder for plugin");
       return null;
     }
   }
@@ -694,9 +694,9 @@ export class PluginManagerService {
         plugin.metadataState = "fresh";
       }
 
-      console.log(`✅ Fetched and cached metadata for ${pluginId}`);
+      logger.info({ pluginId }, "Fetched and cached metadata");
     } catch (error) {
-      console.error(`Failed to fetch metadata for ${pluginId}:`, error);
+      logger.error({ err: error, pluginId }, "Failed to fetch metadata");
       throw error;
     }
   }
@@ -711,7 +711,7 @@ export class PluginManagerService {
     // Check if worker is already running in the runner service
     const existingWorker = this.runnerService.getWorker(organizationId, pluginId);
     if (existingWorker) {
-      console.log(`[PluginManager] Worker already running for ${key}, reusing existing worker`);
+      logger.debug({ key }, "Worker already running, reusing existing worker");
       existingWorker.lastActivity = new Date();
       await pluginInstanceRepository.updateHealthCheck(existingWorker.instanceId, "healthy");
       return existingWorker;
@@ -723,7 +723,7 @@ export class PluginManagerService {
       throw new Error(`Plugin ${pluginId} not found in registry`);
     }
 
-    console.log(`[PluginManager] Starting worker: ${pluginId}`);
+    logger.info({ pluginId }, "Starting worker");
 
     try {
       // Start worker using SDK runner service (source of truth)
@@ -736,9 +736,9 @@ export class PluginManagerService {
           await this.fetchAndStoreMetadata(pluginId, workerInfo.port);
         } catch (error) {
           await pluginRegistryRepository.updateMetadataState(plugin.id, "error");
-          console.warn(
-            `Metadata fetch failed for ${pluginId}, cached metadata may be stale`,
-            error,
+          logger.warn(
+            { err: error, pluginId },
+            "Metadata fetch failed, cached metadata may be stale",
           );
           // Don't throw - use cached metadata if available
         }
@@ -748,17 +748,15 @@ export class PluginManagerService {
     } catch (error) {
       // If worker is already running (race condition), try to get it
       if (error instanceof Error && error.message.includes("Worker already running")) {
-        console.log(
-          `[PluginManager] Caught "already running" error, attempting to get existing worker for ${key}`,
-        );
+        logger.debug({ key }, "Caught already running error, attempting to get existing worker");
         const existingWorker = this.runnerService.getWorker(organizationId, pluginId);
         if (existingWorker) {
-          console.log(`[PluginManager] Successfully retrieved existing worker for ${key}`);
+          logger.debug({ key }, "Successfully retrieved existing worker");
           return existingWorker;
         }
       }
 
-      console.error(`Failed to start worker for ${key}:`, error);
+      logger.error({ err: error, key }, "Failed to start worker");
       throw error;
     }
   }
@@ -786,7 +784,7 @@ export class PluginManagerService {
    * Delegates to PluginRunnerService (single source of truth)
    */
   async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
-    console.log(`[PluginManager] Stopping worker: ${organizationId}:${pluginId}`);
+    logger.info({ organizationId, pluginId }, "Stopping worker");
     await this.runnerService.stopWorker(organizationId, pluginId);
   }
 
@@ -815,8 +813,9 @@ export class PluginManagerService {
 
       if (inactiveTime > TIMEOUT_MS) {
         const key = `${worker.organizationId}:${worker.pluginId}`;
-        console.log(
-          `[PluginManager] Cleaning up inactive worker: ${key} (inactive for ${Math.round(inactiveTime / 1000)}s)`,
+        logger.info(
+          { key, inactiveSeconds: Math.round(inactiveTime / 1000) },
+          "Cleaning up inactive worker",
         );
         await this.stopPluginWorker(worker.organizationId, worker.pluginId);
       }

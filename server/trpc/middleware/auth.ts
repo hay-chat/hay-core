@@ -4,6 +4,9 @@ import { AuthUser } from "@server/lib/auth/AuthUser";
 import type { Context } from "@server/trpc/context";
 import type { Request } from "express";
 import { auditLogService } from "@server/services/audit-log.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("trpc-auth");
 
 /**
  * Middleware to ensure user is authenticated
@@ -81,7 +84,7 @@ const isAdmin = t.middleware(async ({ ctx, next }) => {
         }
       );
     } catch (error) {
-      console.error("Failed to log permission denial:", error);
+      logger.error({ err: error }, "Failed to log permission denial");
     }
 
     throw new TRPCError({
@@ -125,7 +128,7 @@ const hasScope = (resource: string, action: string) => {
           }
         );
       } catch (error) {
-        console.error("Failed to log permission denial:", error);
+        logger.error({ err: error }, "Failed to log permission denial");
       }
 
       throw new TRPCError({

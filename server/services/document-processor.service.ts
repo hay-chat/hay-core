@@ -4,6 +4,9 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
 import { DocumentationStatus, DocumentationType } from "@server/entities/document.entity";
 import type { Document } from "@server/entities/document.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("document-processor");
 
 export interface ProcessWebDocumentOptions {
   documentId: string;
@@ -61,7 +64,7 @@ export class DocumentProcessorService {
       } catch (htmlError) {
         const errorMessage =
           htmlError instanceof Error ? htmlError.message : "HTML processing failed";
-        console.error(`[DocumentProcessor] HTML processing failed for ${pageUrl}:`, errorMessage);
+        logger.error({ pageUrl, error: errorMessage }, "HTML processing failed");
 
         // Update document with processing error
         await this.updateDocumentWithError(
@@ -106,7 +109,7 @@ export class DocumentProcessorService {
       } catch (updateError) {
         const errorMessage =
           updateError instanceof Error ? updateError.message : "Database update failed";
-        console.error(`[DocumentProcessor] Failed to update document ${documentId}:`, errorMessage);
+        logger.error({ documentId, error: errorMessage }, "Failed to update document");
 
         await this.updateDocumentWithError(
           documentId,
@@ -160,9 +163,7 @@ export class DocumentProcessorService {
           },
         });
 
-        console.log(
-          `[DocumentProcessor] Successfully processed document ${documentId} from ${pageUrl}`,
-        );
+        logger.info({ documentId, pageUrl }, "Successfully processed document");
 
         return {
           success: true,
@@ -171,10 +172,7 @@ export class DocumentProcessorService {
       } catch (embeddingError) {
         const errorMessage =
           embeddingError instanceof Error ? embeddingError.message : "Embedding generation failed";
-        console.error(
-          `[DocumentProcessor] Failed to create embeddings for ${pageUrl}:`,
-          errorMessage,
-        );
+        logger.error({ pageUrl, error: errorMessage }, "Failed to create embeddings");
 
         // Document is saved but without embeddings
         await documentRepository.update(document.id, organizationId, {
@@ -201,7 +199,7 @@ export class DocumentProcessorService {
         unexpectedError instanceof Error
           ? unexpectedError.message
           : "Unexpected error during processing";
-      console.error(`[DocumentProcessor] Unexpected error processing ${pageUrl}:`, errorMessage);
+      logger.error({ pageUrl, error: errorMessage }, "Unexpected error processing document");
 
       await this.updateDocumentWithError(
         documentId,
@@ -251,10 +249,7 @@ export class DocumentProcessorService {
         },
       });
     } catch (updateError) {
-      console.error(
-        `[DocumentProcessor] Failed to update document ${documentId} with error:`,
-        updateError,
-      );
+      logger.error({ err: updateError, documentId }, "Failed to update document with error status");
     }
   }
 }

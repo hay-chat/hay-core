@@ -1,8 +1,10 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { StaleConversation, StaleReason } from "./stale-message-detector.service";
 import { config } from "../config/env";
-import { debugLog } from "../lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { MessageType } from "../database/entities/message.entity";
+
+const logger = createLogger("message-recovery");
 
 export interface RecoveryResult {
   success: boolean;
@@ -32,12 +34,13 @@ export class MessageRecoveryService {
       return { success: false, action: "conversation_not_found" };
     }
 
-    debugLog("message-recovery", `Attempting recovery for conversation ${staleConv.conversationId}`, {
+    logger.info({
+      conversationId: staleConv.conversationId,
       reason: staleConv.stuckReason,
       staleDuration: staleConv.staleDuration,
       attempts: staleConv.processingAttempts,
       errors: staleConv.processingErrorCount,
-    });
+    }, "Attempting recovery for conversation");
 
     if (dryRun) {
       return { success: true, action: "dry_run" };
@@ -77,7 +80,7 @@ export class MessageRecoveryService {
           return { success: false, action: "unknown_stuck_reason" };
       }
     } catch (error) {
-      console.error(`[MessageRecovery] Recovery failed for conversation ${staleConv.conversationId}:`, error);
+      logger.error({ err: error, conversationId: staleConv.conversationId }, "Recovery failed for conversation");
       return {
         success: false,
         action: "recovery_error",
@@ -100,7 +103,7 @@ export class MessageRecoveryService {
       stuck_reason: null,
     });
 
-    debugLog("message-recovery", `Cleared expired lock for conversation ${conversation.id}`);
+    logger.debug({ conversationId: conversation.id }, "Cleared expired lock for conversation");
     return { success: true, action: "cleared_lock_and_requeued" };
   }
 
@@ -116,7 +119,7 @@ export class MessageRecoveryService {
       stuck_reason: null,
     });
 
-    debugLog("message-recovery", `Requeued conversation ${conversation.id} after timeout`);
+    logger.debug({ conversationId: conversation.id }, "Requeued conversation after timeout");
     return { success: true, action: "requeued_for_processing" };
   }
 
@@ -134,10 +137,11 @@ export class MessageRecoveryService {
     // Calculate exponential backoff: 1s, 2s, 4s, 8s, 16s (max 60s)
     const backoffDelay = Math.min(1000 * Math.pow(2, errorCount), 60000);
 
-    debugLog("message-recovery", `Applying backoff for conversation ${conversation.id}`, {
+    logger.debug({
+      conversationId: conversation.id,
       errorCount,
       backoffMs: backoffDelay,
-    });
+    }, "Applying backoff for conversation");
 
     // Wait for backoff period
     await new Promise((resolve) => setTimeout(resolve, backoffDelay));
@@ -174,7 +178,7 @@ export class MessageRecoveryService {
       stuck_reason: null,
     });
 
-    debugLog("message-recovery", `Reset abandoned processing for conversation ${conversation.id}`);
+    logger.debug({ conversationId: conversation.id }, "Reset abandoned processing for conversation");
     return { success: true, action: "reset_and_requeued" };
   }
 
@@ -190,7 +194,7 @@ export class MessageRecoveryService {
       stuck_reason: null,
     });
 
-    debugLog("message-recovery", `Cleared cooldown for conversation ${conversation.id}`);
+    logger.debug({ conversationId: conversation.id }, "Cleared cooldown for conversation");
     return { success: true, action: "cleared_cooldown_and_requeued" };
   }
 
@@ -236,11 +240,12 @@ export class MessageRecoveryService {
     // Broadcast alert to organization
     await this.publishStuckConversationAlert(conversation);
 
-    debugLog("message-recovery", `Escalated conversation ${conversation.id} to human`, {
+    logger.info({
+      conversationId: conversation.id,
       reason,
       errorCount: conversation.processing_error_count,
       lastError: conversation.last_processing_error,
-    });
+    }, "Escalated conversation to human");
 
     return {
       success: true,
@@ -260,11 +265,11 @@ export class MessageRecoveryService {
         ["status"] // This will automatically trigger conversation_status_changed event
       );
 
-      debugLog("message-recovery", `Published stuck conversation alert for ${conversation.id}`);
+      logger.debug({ conversationId: conversation.id }, "Published stuck conversation alert");
     } catch (error) {
-      console.error(
-        `[MessageRecovery] Failed to publish stuck conversation alert:`,
-        error
+      logger.error(
+        { err: error },
+        "Failed to publish stuck conversation alert",
       );
     }
   }
@@ -298,7 +303,7 @@ export class MessageRecoveryService {
       recovery_attempts: 0,
     });
 
-    debugLog("message-recovery", `Manual recovery completed for conversation ${conversationId}`);
+    logger.info({ conversationId }, "Manual recovery completed for conversation");
 
     return {
       success: true,

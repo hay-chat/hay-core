@@ -8,7 +8,9 @@ import {
   closeInactiveConversation,
 } from "./conversation-utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("orchestrator");
 
 export class Orchestrator {
   private conversationRepository: ConversationRepository;
@@ -25,13 +27,13 @@ export class Orchestrator {
         try {
           await this.processConversation(conversation.id);
         } catch (error) {
-          console.error(`Error processing conversation ${conversation.id}:`, error);
+          logger.error({ err: error }, `Error processing conversation ${conversation.id}:`);
         }
       });
 
       await Promise.allSettled(processPromises);
     } catch (error) {
-      console.error("Error in orchestrator loop:", error);
+      logger.error({ err: error }, "Error in orchestrator loop");
     }
   }
 
@@ -39,24 +41,24 @@ export class Orchestrator {
     try {
       await runConversation(conversationId);
     } catch (error) {
-      console.error(`Error processing conversation ${conversationId}:`, error);
+      logger.error({ err: error }, `Error processing conversation ${conversationId}:`);
       throw error;
     }
   }
 
   async checkInactivity(): Promise<void> {
     try {
-      debugLog("orchestrator", "Starting inactivity check across all organizations");
+      logger.debug("Starting inactivity check across all organizations");
 
       // Get all open conversations across all organizations
       const openConversations = await this.conversationRepository.findAllOpenConversations();
 
       if (openConversations.length === 0) {
-        debugLog("orchestrator", "No open conversations found");
+        logger.debug("No open conversations found");
         return;
       }
 
-      debugLog("orchestrator", `Found ${openConversations.length} open conversations to check`);
+      logger.debug(`Found ${openConversations.length} open conversations to check`);
 
       const now = new Date();
       const inactivityThreshold = config.conversation.inactivityInterval;
@@ -69,7 +71,7 @@ export class Orchestrator {
           const messages = await conversation.getMessages();
 
           if (messages.length === 0) {
-            debugLog("orchestrator", `Conversation ${conversation.id} has no messages, skipping`);
+            logger.debug(`Conversation ${conversation.id} has no messages, skipping`);
             continue;
           }
 
@@ -82,23 +84,14 @@ export class Orchestrator {
             // Check if conversation is old enough to delete (created more than 2x timeout ago)
             const conversationAge = now.getTime() - new Date(conversation.created_at).getTime();
             if (conversationAge > silentCloseThreshold) {
-              debugLog(
-                "orchestrator",
-                `Deleting empty conversation ${conversation.id} (age: ${conversationAge}ms > ${silentCloseThreshold}ms)`,
-              );
+              logger.debug({ conversationId: conversation.id, conversationAge, silentCloseThreshold }, "Deleting empty conversation past silent close threshold");
               await this.conversationRepository.delete(
                 conversation.id,
                 conversation.organization_id,
               );
-              debugLog(
-                "orchestrator",
-                `Deleted conversation ${conversation.id} and associated messages`,
-              );
+              logger.debug({ conversationId: conversation.id }, "Deleted conversation and associated messages");
             } else {
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} has no user messages, skipping`,
-              );
+              logger.debug({ conversationId: conversation.id }, "Conversation has no user messages, skipping");
             }
             continue;
           }
@@ -116,10 +109,7 @@ export class Orchestrator {
           // Check for different timeout scenarios
           if (timeSinceLastMessage > silentCloseThreshold) {
             // 2x timeout: Close silently without sending a message
-            debugLog(
-              "orchestrator",
-              `Conversation ${conversation.id} exceeded silent close threshold (${timeSinceLastMessage}ms > ${silentCloseThreshold}ms), closing silently`,
-            );
+            logger.debug({ conversationId: conversation.id, timeSinceLastMessage, silentCloseThreshold }, "Conversation exceeded silent close threshold, closing silently");
             await closeInactiveConversation(
               conversation.id,
               conversation.organization_id,
@@ -132,10 +122,7 @@ export class Orchestrator {
 
             if (hasWarning) {
               // Warning was sent but no response, close the conversation
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} didn't respond to warning, closing`,
-              );
+              logger.debug({ conversationId: conversation.id }, "Conversation didn't respond to warning, closing");
               await closeInactiveConversation(
                 conversation.id,
                 conversation.organization_id,
@@ -144,10 +131,7 @@ export class Orchestrator {
               );
             } else {
               // No warning sent yet but past full timeout, close with message
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} exceeded timeout without warning, closing with message`,
-              );
+              logger.debug({ conversationId: conversation.id }, "Conversation exceeded timeout without warning, closing with message");
               await closeInactiveConversation(
                 conversation.id,
                 conversation.organization_id,
@@ -160,10 +144,7 @@ export class Orchestrator {
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
             if (!hasWarning) {
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} reached warning threshold (${timeSinceLastMessage}ms > ${warningThreshold}ms), sending warning`,
-              );
+              logger.debug({ conversationId: conversation.id, timeSinceLastMessage, warningThreshold }, "Conversation reached warning threshold, sending warning");
               await sendInactivityWarning(conversation.id, conversation.organization_id);
 
               // Mark conversation as needing processing to handle potential response
@@ -192,10 +173,7 @@ export class Orchestrator {
             );
 
             if (closureValidation.shouldClose) {
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} has validated closure intent (${lastUserMessage.intent}), closing. Reason: ${closureValidation.reason}`,
-              );
+              logger.debug({ conversationId: conversation.id, intent: lastUserMessage.intent, reason: closureValidation.reason }, "Conversation has validated closure intent, closing");
               await this.conversationRepository.update(
                 conversation.id,
                 conversation.organization_id,
@@ -223,21 +201,18 @@ export class Orchestrator {
               // Generate title for closed conversation
               await generateConversationTitle(conversation.id, conversation.organization_id);
             } else {
-              debugLog(
-                "orchestrator",
-                `Conversation ${conversation.id} has closure intent but validation failed: ${closureValidation.reason}. Keeping open.`,
-              );
+              logger.debug({ conversationId: conversation.id, reason: closureValidation.reason }, "Conversation has closure intent but validation failed, keeping open");
             }
           }
         } catch (error) {
-          console.error(`[Orchestrator] Error checking conversation ${conversation.id}:`, error);
+          logger.error({ err: error, conversationId: conversation.id }, "Error checking conversation inactivity");
           // Continue with other conversations
         }
       }
 
-      debugLog("orchestrator", "Inactivity check completed");
+      logger.debug("Inactivity check completed");
     } catch (error) {
-      console.error("[Orchestrator] Error in checkInactivity:", error);
+      logger.error({ err: error }, "Error in checkInactivity");
     }
   }
 

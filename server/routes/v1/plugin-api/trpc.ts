@@ -10,6 +10,9 @@ import { OrganizationRepository, organizationRepository } from "@server/reposito
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-api-trpc");
 
 // Initialize repositories
 const customerRepository = new CustomerRepository();
@@ -102,7 +105,7 @@ export const pluginApiTrpcRouter = router({
           processed: true,
         };
       } catch (error) {
-        console.error("[PluginAPI] messages.receive error:", error);
+        logger.error({ err: error }, "messages.receive error");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to process message",
@@ -199,7 +202,7 @@ export const pluginApiTrpcRouter = router({
           timestamp: message.created_at,
         };
       } catch (error) {
-        console.error("[PluginAPI] messages.send error:", error);
+        logger.error({ err: error }, "messages.send error");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to send message",
@@ -346,10 +349,7 @@ export const pluginApiTrpcRouter = router({
 
       const pluginId = ctx.pluginAuth.pluginId;
 
-      console.log(
-        `[PluginAPI] Registering source ${input.id} for plugin ${pluginId}:`,
-        input
-      );
+      logger.debug({ sourceId: input.id, pluginId, input }, "Registering source for plugin");
 
       // TODO: Implement actual source registration
       // This might involve:
@@ -389,10 +389,13 @@ export const pluginApiTrpcRouter = router({
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-${Date.now()}`;
 
-      console.log(`[PluginAPI] Registering local MCP for ${organizationId}:${pluginId}:${serverId}`, {
+      logger.debug({
+        organizationId,
+        pluginId,
+        serverId,
         serverPath: input.serverPath,
         toolCount: input.tools.length,
-      });
+      }, "Registering local MCP server");
 
       // 1. Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -436,7 +439,7 @@ export const pluginApiTrpcRouter = router({
       // 4. Register tools in registry
       await mcpRegistryService.registerTools(organizationId, pluginId, serverId, input.tools);
 
-      console.log(`[PluginAPI] Registered local MCP: ${organizationId}:${pluginId}:${serverId}`);
+      logger.info({ organizationId, pluginId, serverId }, "Registered local MCP server");
 
       return {
         success: true,
@@ -496,11 +499,14 @@ export const pluginApiTrpcRouter = router({
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-remote-${Date.now()}`;
 
-      console.log(`[PluginAPI] Registering remote MCP for ${organizationId}:${pluginId}:${serverId}`, {
+      logger.debug({
+        organizationId,
+        pluginId,
+        serverId,
         url: input.url,
         transport: input.transport,
         toolCount: input.tools.length,
-      });
+      }, "Registering remote MCP server");
 
       // 1. Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -542,7 +548,7 @@ export const pluginApiTrpcRouter = router({
       // 4. Register tools in registry
       await mcpRegistryService.registerTools(organizationId, pluginId, serverId, input.tools);
 
-      console.log(`[PluginAPI] Registered remote MCP: ${organizationId}:${pluginId}:${serverId}`);
+      logger.info({ organizationId, pluginId, serverId }, "Registered remote MCP server");
 
       return {
         success: true,

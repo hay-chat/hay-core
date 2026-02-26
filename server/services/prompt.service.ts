@@ -12,6 +12,9 @@ import type {
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
 import { Organization } from "../entities/organization.entity";
 import { AppDataSource } from "../database/data-source";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("prompt");
 
 export class PromptService {
   private static instance: PromptService;
@@ -92,7 +95,7 @@ export class PromptService {
       await this.scanDirectory(promptsDir, "", prompts);
       return prompts;
     } catch (error) {
-      console.error(`Error listing prompts for language ${lang}:`, error);
+      logger.error({ err: error, language: lang }, "Error listing prompts");
       return [];
     }
   }
@@ -160,7 +163,7 @@ export class PromptService {
           options = { ...options, organizationId: conversation.organization_id };
         }
       } catch (error) {
-        console.error("Error fetching conversation language:", error);
+        logger.error({ err: error }, "Error fetching conversation language");
       }
     }
 
@@ -176,7 +179,7 @@ export class PromptService {
           return org.defaultLanguage;
         }
       } catch (error) {
-        console.error("Error fetching organization language:", error);
+        logger.error({ err: error }, "Error fetching organization language");
       }
     }
 
@@ -195,9 +198,7 @@ export class PromptService {
 
     // Fallback to English if not found and language is not English
     if (!content && language !== DEFAULT_LANGUAGE) {
-      console.warn(
-        `Prompt ${promptId} not found in ${language}, falling back to ${DEFAULT_LANGUAGE}`,
-      );
+      logger.warn({ promptId, language, fallback: DEFAULT_LANGUAGE }, "Prompt not found, falling back to default language");
       content = await this.loadPrompt(promptId, DEFAULT_LANGUAGE);
     }
 
@@ -265,12 +266,12 @@ export class PromptService {
             const content = await PromptParser.parsePromptFile(fullPath);
             prompts.push(content);
           } catch (error) {
-            console.error(`Error parsing prompt ${fullPath}:`, error);
+            logger.error({ err: error, path: fullPath }, "Error parsing prompt");
           }
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${dir}:`, error);
+      logger.error({ err: error, dir }, "Error scanning directory");
     }
   }
 

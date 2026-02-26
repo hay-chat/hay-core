@@ -28,6 +28,9 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("auth");
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -82,8 +85,27 @@ const refreshTokenSchema = z.object({
 
 export const authRouter = t.router({
   // Public endpoints
-  login: publicProcedure.input(loginSchema).mutation(async ({ input }) => {
+  login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     const { email, password } = input;
+
+    // Rate limit by IP: 10 attempts per 15 minutes
+    const ipAddress = ctx.ipAddress || "unknown";
+    const ipRateLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 15 * 60, true);
+    if (ipRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
+
+    // Rate limit by email: 5 attempts per 15 minutes
+    const emailRateLimit = await rateLimitService.checkEmailRateLimit(email, 5, 15 * 60, true);
+    if (emailRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
 
     // Find user by email with organization
     const userRepository = AppDataSource.getRepository(User);
@@ -344,9 +366,11 @@ export const authRouter = t.router({
       }
 
       try {
-        // Generate reset token
+        // Generate reset token (high-entropy: 256 bits)
+        // SHA-256 is sufficient for high-entropy tokens — no brute-force risk.
+        // This enables direct DB lookup instead of O(n) argon2 scans.
         const resetToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = await hashPassword(resetToken, "argon2");
+        const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
 
         // Store token hash and expiration (24 hours)
         user.passwordResetTokenHash = tokenHash;
@@ -385,7 +409,7 @@ export const authRouter = t.router({
         try {
           await auditLogService.logPasswordResetRequest(user.id, ctx.ipAddress, ctx.userAgent);
         } catch (error) {
-          console.error("Failed to log password reset request:", error);
+          logger.error({ err: error }, "Failed to log password reset request");
         }
 
         return {
@@ -393,7 +417,7 @@ export const authRouter = t.router({
           message: "If an account exists with this email, you will receive a password reset link.",
         };
       } catch (error) {
-        console.error("Failed to process password reset request:", error);
+        logger.error({ err: error }, "Failed to process password reset request");
         // Don't expose internal errors
         return {
           success: true,
@@ -407,24 +431,11 @@ export const authRouter = t.router({
     .query(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         return {
@@ -461,24 +472,11 @@ export const authRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -534,7 +532,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password reset or send email:", error);
+        logger.error({ err: error }, "Failed to log password reset or send email");
         // Don't fail the password reset if logging/email fails
       }
 
@@ -705,7 +703,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password change or send email:", error);
+        logger.error({ err: error }, "Failed to log password change or send email");
         // Don't fail the password change if logging/email fails
       }
 
@@ -786,7 +784,7 @@ export const authRouter = t.router({
             userAgent: ctx.userAgent,
           });
         } catch (error) {
-          console.error("Failed to log profile update:", error);
+          logger.error({ err: error }, "Failed to log profile update");
         }
       }
 
@@ -837,7 +835,7 @@ export const authRouter = t.router({
               await storageService.delete(uploadIdMatch[1]);
             }
           } catch (error) {
-            console.error("Failed to delete old avatar:", error);
+            logger.error({ err: error }, "Failed to delete old avatar");
             // Continue even if deletion fails
           }
         }
@@ -851,7 +849,7 @@ export const authRouter = t.router({
           avatarUrl: result.url,
         };
       } catch (error) {
-        console.error("Failed to upload avatar:", error);
+        logger.error({ err: error }, "Failed to upload avatar");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to upload avatar. Please try again.",
@@ -896,7 +894,7 @@ export const authRouter = t.router({
         success: true,
       };
     } catch (error) {
-      console.error("Failed to delete avatar:", error);
+      logger.error({ err: error }, "Failed to delete avatar");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to delete avatar. Please try again.",
@@ -945,9 +943,9 @@ export const authRouter = t.router({
         });
       }
 
-      // Generate verification token
+      // Generate verification token (high-entropy: 256 bits, SHA-256 for direct lookup)
       const verificationToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = await hashPassword(verificationToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
       // Store pending email and token
       const oldEmail = user.email;
@@ -958,16 +956,14 @@ export const authRouter = t.router({
 
       // Send verification emails
       try {
-        console.log("📧 [updateEmail] Initializing email service...");
+        logger.debug("Initializing email service for email update");
         await emailService.initialize();
-        console.log("✅ [updateEmail] Email service initialized");
+        logger.debug("Email service initialized");
 
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-        console.log("🔗 [updateEmail] Verification URL:", verificationUrl);
-        console.log("📬 [updateEmail] Sending to NEW email:", input.newEmail.toLowerCase());
-        console.log("📬 [updateEmail] Sending to OLD email:", oldEmail);
+        logger.debug({ verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail }, "Sending email change verification emails");
 
         const commonVariables = {
           userName: user.getFullName(),
@@ -987,7 +983,7 @@ export const authRouter = t.router({
         };
 
         // Send verification email to NEW email
-        console.log("📤 [updateEmail] Sending verification email to NEW address...");
+        logger.debug("Sending verification email to new address");
         const result1 = await emailService.sendTemplateEmail({
           to: input.newEmail.toLowerCase(),
           subject: "Verify Your New Email Address",
@@ -998,10 +994,10 @@ export const authRouter = t.router({
             recipientEmail: input.newEmail.toLowerCase(),
           },
         });
-        console.log("📨 [updateEmail] Verification email result:", result1);
+        logger.debug({ result: result1 }, "Verification email sent to new address");
 
         // Send notification to OLD email
-        console.log("📤 [updateEmail] Sending notification to OLD address...");
+        logger.debug("Sending notification email to old address");
         const result2 = await emailService.sendTemplateEmail({
           to: oldEmail,
           subject: "Email Change Pending Verification",
@@ -1011,22 +1007,18 @@ export const authRouter = t.router({
             recipientEmail: oldEmail,
           },
         });
-        console.log("📨 [updateEmail] Notification email result:", result2);
+        logger.debug({ result: result2 }, "Notification email sent to old address");
 
-        console.log("✅ [updateEmail] All emails sent successfully");
+        logger.info("All email change verification emails sent successfully");
       } catch (error) {
-        console.error("❌ [updateEmail] Failed to send verification emails:", error);
-        console.error(
-          "❌ [updateEmail] Error stack:",
-          error instanceof Error ? error.stack : "No stack",
-        );
+        logger.error({ err: error }, "Failed to send verification emails");
         // Rollback the pending email change
         await userRepository.update(user.id, {
           pendingEmail: null as any,
           emailVerificationTokenHash: null as any,
           emailVerificationExpiresAt: null as any,
         });
-        console.log("🔄 [updateEmail] Rolled back pending email change");
+        logger.warn("Rolled back pending email change due to email send failure");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to send verification email. Please try again.",
@@ -1061,24 +1053,14 @@ export const authRouter = t.router({
     .mutation(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending email changes (shouldn't be many)
-      const usersWithPending = await userRepository.find({
+      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+
+      let user = await userRepository.findOne({
         where: {
-          emailVerificationTokenHash: Not(IsNull()),
+          emailVerificationTokenHash: tokenHash,
         },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithPending) {
-        if (u.emailVerificationTokenHash) {
-          const isValid = await verifyPassword(input.token, u.emailVerificationTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -1162,7 +1144,7 @@ export const authRouter = t.router({
           variables: emailVariables,
         });
       } catch (error) {
-        console.error("Failed to send confirmation emails:", error);
+        logger.error({ err: error }, "Failed to send confirmation emails");
         // Don't fail the verification if email sending fails
       }
 
@@ -1225,9 +1207,9 @@ export const authRouter = t.router({
       });
     }
 
-    // Generate new verification token
+    // Generate new verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     // Update token and expiry
     user.emailVerificationTokenHash = tokenHash;
@@ -1270,7 +1252,7 @@ export const authRouter = t.router({
         },
       });
     } catch (error) {
-      console.error("Failed to resend verification email:", error);
+      logger.error({ err: error }, "Failed to resend verification email");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to resend verification email. Please try again.",

@@ -2,7 +2,9 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { oauthService } from "./oauth.service";
 import type { OAuthTokenData } from "../types/oauth.types";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("oauth-strategy");
 
 /**
  * OAuth Authentication Strategy
@@ -14,35 +16,21 @@ export class OAuthAuthStrategy {
    * Get authorization headers for OAuth-authenticated requests
    */
   async getHeaders(organizationId: string, pluginId: string): Promise<Record<string, string>> {
-    console.log("\n--- Getting OAuth headers ---");
-    console.log("Plugin ID:", pluginId);
-    console.log("Organization ID:", organizationId);
+    logger.debug({ pluginId, organizationId }, "Getting OAuth headers");
 
     const tokens = await this.getValidTokens(organizationId, pluginId);
     if (!tokens) {
-      console.log("❌ No valid tokens available");
+      logger.warn({ pluginId, organizationId }, "No valid tokens available");
       throw new Error("OAuth tokens not available");
     }
 
-    console.log("✅ Valid tokens found:");
-    console.log("  Token type:", tokens.token_type || "Bearer");
-    console.log(
-      "  Access token:",
-      tokens.access_token ? tokens.access_token.substring(0, 20) + "..." : "NONE",
-    );
-    console.log("  Expires at:", tokens.expires_at);
+    logger.debug({ pluginId, tokenType: tokens.token_type || "Bearer" }, "Valid tokens found");
 
     // Always use "Bearer" with capital B (RFC 6750 standard)
     // Some OAuth providers return lowercase "bearer" but MCP servers expect "Bearer"
     const headers = {
       Authorization: `Bearer ${tokens.access_token}`,
     };
-
-    console.log(
-      "Generated Authorization header:",
-      `Bearer ${tokens.access_token.substring(0, 30)}...`,
-    );
-    console.log("--- OAuth headers ready ---\n");
 
     return headers;
   }
@@ -82,20 +70,21 @@ export class OAuthAuthStrategy {
 
         if (expiresAt - now < bufferSeconds) {
           // Token is expired or expiring soon, try to refresh
-          debugLog("oauth-auth", `Token expiring soon, refreshing for plugin ${pluginId}`, {
+          logger.debug({
+            pluginId,
             organizationId,
             expiresAt,
             now,
-          });
+          }, "Token expiring soon, refreshing");
 
           try {
             const newTokens = await oauthService.refreshToken(organizationId, pluginId);
             return newTokens || tokens; // Fall back to old tokens if refresh fails
           } catch (error) {
-            debugLog("oauth-auth", `Token refresh failed, using existing token`, {
-              level: "warn",
-              data: error instanceof Error ? error.message : String(error),
-            });
+            logger.warn({
+              err: error,
+              pluginId,
+            }, "Token refresh failed, using existing token");
             // If refresh fails but token hasn't expired yet, use it anyway
             if (expiresAt - now > 0) {
               return tokens;
@@ -108,10 +97,10 @@ export class OAuthAuthStrategy {
 
       return tokens;
     } catch (error) {
-      debugLog("oauth-auth", `Failed to get OAuth tokens`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error({
+        err: error,
+        pluginId,
+      }, "Failed to get OAuth tokens");
       return null;
     }
   }

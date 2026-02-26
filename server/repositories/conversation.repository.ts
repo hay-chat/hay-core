@@ -4,6 +4,9 @@ import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType, MessageStatus } from "@server/database/entities/message.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversation-repo");
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   private messageRepository!: Repository<Message>;
@@ -151,7 +154,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   async getAvailableForProcessing(): Promise<Conversation[]> {
     if (!this.getRepository()) {
-      console.error("[ConversationRepository] Repository not initialized");
+      logger.error("Repository not initialized");
       return [];
     }
 
@@ -179,7 +182,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
       return await queryBuilder.getMany();
     } catch (error) {
-      console.error("[ConversationRepository] Error getting available conversations:", error);
+      logger.error({ err: error }, "Error getting available conversations");
       return [];
     }
   }
@@ -370,7 +373,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
-            console.warn(`Invalid relation '${relation}' for Conversation entity`);
+            logger.warn({ relation }, "Invalid relation for Conversation entity");
           }
       }
     });

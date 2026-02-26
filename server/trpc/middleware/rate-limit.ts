@@ -1,6 +1,9 @@
 import { t } from "../init";
 import { TRPCError } from "@trpc/server";
 import { redisService } from "@server/services/redis.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("trpc-rate-limit");
 
 /**
  * Rate limit options
@@ -65,7 +68,7 @@ export const rateLimitMiddleware = (options: RateLimitOptions) => {
 
       // Skip rate limiting if Redis is not available
       if (!redis) {
-        console.warn("[RateLimit] Redis client not available, skipping rate limit");
+        logger.warn("Redis client not available, skipping rate limit");
         return next({
           ctx: {
             ...ctx,
@@ -139,7 +142,7 @@ export const rateLimitMiddleware = (options: RateLimitOptions) => {
 
       // If Redis is unavailable, log the error and allow the request
       // This prevents rate limiting from blocking all requests if Redis is down
-      console.error("[RateLimit] Redis error, allowing request:", error);
+      logger.error({ err: error }, "Redis error, allowing request");
       return next({
         ctx: {
           ...ctx,

@@ -1,5 +1,9 @@
 import crypto from "crypto";
 
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("encryption");
+
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 const SALT_LENGTH = 64;
@@ -11,11 +15,17 @@ const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
  * Get the encryption key from environment or generate a default one
  */
 function getEncryptionKey(): string {
-  const key = process.env.PLUGIN_ENCRYPTION_KEY || process.env.JWT_SECRET;
-  if (!key) {
-    throw new Error("PLUGIN_ENCRYPTION_KEY or JWT_SECRET must be set for encryption");
+  if (process.env.PLUGIN_ENCRYPTION_KEY) {
+    return process.env.PLUGIN_ENCRYPTION_KEY;
   }
-  return key;
+  if (process.env.JWT_SECRET) {
+    logger.warn(
+      "PLUGIN_ENCRYPTION_KEY not set — falling back to JWT_SECRET for encryption. " +
+        "Set a dedicated PLUGIN_ENCRYPTION_KEY in production to isolate key compromise.",
+    );
+    return process.env.JWT_SECRET;
+  }
+  throw new Error("PLUGIN_ENCRYPTION_KEY must be set for encryption");
 }
 
 /**
@@ -131,7 +141,7 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
       try {
         decrypted[key] = decryptValue((value as any).value);
       } catch (error) {
-        console.error(`Failed to decrypt config key ${key}:`, error);
+        logger.error({ err: error, key }, "Failed to decrypt config key");
         decrypted[key] = null;
       }
     } else {
@@ -201,7 +211,7 @@ export class EncryptedTransformer {
         try {
           decrypted[field] = decryptValue(decrypted[field]);
         } catch (error) {
-          console.error(`Failed to decrypt field ${field}:`, error);
+          logger.error({ err: error, field }, "Failed to decrypt field");
           // Keep encrypted value if decryption fails
         }
       }
@@ -281,10 +291,7 @@ export class AuthStateEncryptedTransformer {
           } catch (error) {
             // Decryption failed - this is legacy plaintext data from before encryption
             // Return as-is for backwards compatibility (will be encrypted on next save)
-            console.warn(
-              `[AuthStateTransformer] Failed to decrypt credential '${key}', using as-is (legacy data?):`,
-              error instanceof Error ? error.message : String(error),
-            );
+            logger.warn({ err: error, key }, "Failed to decrypt credential, using as-is (legacy data?)");
             decryptedCredentials[key] = val;
           }
         } else {

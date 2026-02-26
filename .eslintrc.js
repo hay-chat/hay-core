@@ -198,7 +198,19 @@ module.exports = {
       files: ["server/**/*.ts", "server/**/*.js"],
       rules: {
         "@typescript-eslint/no-var-requires": "off",
-        "no-console": "off", // Server can use console for logging
+        "no-console": "error", // Use createLogger() from @server/lib/logger instead
+      },
+    },
+    // Server scripts and migrations (CLI tools, not app code)
+    {
+      files: [
+        "server/scripts/**/*.ts",
+        "server/database/migrations/**/*.ts",
+        "server/run-migration.ts",
+        "server/run-migrations.ts",
+      ],
+      rules: {
+        "no-console": "off", // CLI tools can use console directly
       },
     },
     // Configuration files
@@ -210,7 +222,16 @@ module.exports = {
     },
     // Test files
     {
-      files: ["**/*.test.ts", "**/*.spec.ts", "**/*.test.js", "**/*.spec.js"],
+      files: [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.test.js",
+        "**/*.spec.js",
+        "**/*.test.example.ts",
+        "**/tests/test-*.ts",
+        "**/tests/setup.ts",
+        "**/email-usage-example.ts",
+      ],
       env: {
         jest: true,
       },

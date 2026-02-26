@@ -4,6 +4,9 @@ import { sanitizeContent } from "../utils/sanitize";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("html-processor");
 
 export class HtmlProcessor extends BaseProcessor {
   supportedTypes = ["text/html", "application/xhtml+xml"];
@@ -65,7 +68,7 @@ export class HtmlProcessor extends BaseProcessor {
         },
       };
     } catch (error) {
-      console.error("Failed to convert HTML with Readability + Turndown:", error);
+      logger.error({ err: error }, "Failed to convert HTML with Readability + Turndown");
 
       // Fallback to basic text extraction
       const textContent = this.extractTextFromHtml(htmlContent);

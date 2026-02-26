@@ -4,6 +4,20 @@ import { AppDataSource } from "../database/data-source";
 import type { ListParams } from "../trpc/middleware/pagination";
 import type { PaginatedResponse } from "../types/list-input";
 import { createPaginatedResponse } from "../types/list-input";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("base-repo");
+
+/**
+ * Validate that a string is a safe SQL identifier (column/relation name).
+ * Prevents SQL injection through dynamic column interpolation.
+ */
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+function assertSafeIdentifier(name: string, context: string): void {
+  if (!SAFE_IDENTIFIER.test(name)) {
+    throw new Error(`Invalid ${context}: ${name}`);
+  }
+}
 
 export abstract class BaseRepository<T extends ObjectLiteral> {
   protected repository!: Repository<T>;
@@ -44,6 +58,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     // Add base where conditions if provided
     if (baseWhere) {
       Object.entries(baseWhere).forEach(([key, value], index) => {
+        assertSafeIdentifier(key, "baseWhere column");
         queryBuilder.andWhere(`entity.${key} = :baseWhere${index}`, {
           [`baseWhere${index}`]: value,
         });
@@ -73,7 +88,10 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
-      const selectFields = listParams.select.map((field) => `entity.${field}`);
+      const selectFields = listParams.select.map((field) => {
+        assertSafeIdentifier(field, "select field");
+        return `entity.${field}`;
+      });
       queryBuilder.select(selectFields);
     }
 
@@ -101,6 +119,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
 
     Object.entries(filters).forEach(([key, value], index) => {
       if (value !== undefined && value !== null) {
+        assertSafeIdentifier(key, "filter column");
         if (Array.isArray(value)) {
           queryBuilder.andWhere(`entity.${key} IN (:...filter${index})`, {
             [`filter${index}`]: value,
@@ -126,7 +145,10 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
     }
 
     const searchConditions = search.searchFields
-      .map((field, index) => `entity.${field} ILIKE :searchQuery${index}`)
+      .map((field, index) => {
+        assertSafeIdentifier(field, "search field");
+        return `entity.${field} ILIKE :searchQuery${index}`;
+      })
       .join(" OR ");
 
     if (searchConditions) {
@@ -174,6 +196,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   ): void {
     // Default to created_at if no orderBy specified
     const orderBy = sorting.orderBy || "created_at";
+    assertSafeIdentifier(orderBy, "sort column");
     const direction = sorting.orderDirection.toUpperCase() as "ASC" | "DESC";
 
     queryBuilder.orderBy(`entity.${orderBy}`, direction);
@@ -187,11 +210,12 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
 
     // Base implementation - child classes should override for specific relations
     include.forEach((relation) => {
+      assertSafeIdentifier(relation, "relation name");
       try {
         queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
       } catch (error) {
         // Silently ignore invalid relations
-        console.warn(`Invalid relation '${relation}' for entity ${this.entityClass.name}`);
+        logger.warn({ relation, entity: this.entityClass.name }, "Invalid relation for entity");
       }
     });
   }

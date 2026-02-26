@@ -3,6 +3,7 @@ import { config } from "./env";
 export const authConfig = {
   jwt: {
     secret: config.jwt.secret,
+    refreshSecret: config.jwt.refreshSecret,
     expiresIn: "15m",
     refreshExpiresIn: config.jwt.refreshExpiresIn,
     algorithm: "HS256" as const,

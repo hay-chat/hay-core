@@ -6,6 +6,9 @@ import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
 import { CustomerRepository } from "../../../repositories/customer.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("public-conversations");
 
 const customerRepository = new CustomerRepository();
 
@@ -107,7 +110,7 @@ export const publicConversationsRouter = t.router({
         createdAt: conversation.created_at,
       };
     } catch (error) {
-      console.error("Error creating public conversation:", error);
+      logger.error({ err: error }, "Error creating public conversation");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to create conversation",
@@ -185,7 +188,7 @@ export const publicConversationsRouter = t.router({
       if (error instanceof TRPCError) {
         throw error;
       }
-      console.error("Error getting messages:", error);
+      logger.error({ err: error }, "Error getting messages");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to get messages",
@@ -257,7 +260,7 @@ export const publicConversationsRouter = t.router({
       if (error instanceof TRPCError) {
         throw error;
       }
-      console.error("Error sending message:", error);
+      logger.error({ err: error }, "Error sending message");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to send message",
@@ -322,7 +325,7 @@ export const publicConversationsRouter = t.router({
         if (error instanceof TRPCError) {
           throw error;
         }
-        console.error("Error rotating keys:", error);
+        logger.error({ err: error }, "Error rotating keys");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to rotate keys",
@@ -440,7 +443,7 @@ export async function verifyDPoPForRequest(
 
     return { success: true, newNonce };
   } catch (error) {
-    console.error("DPoP verification error:", error);
+    logger.error({ err: error }, "DPoP verification error");
     return { success: false, error: "Verification failed" };
   }
 } // restart

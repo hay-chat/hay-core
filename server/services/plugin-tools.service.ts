@@ -7,6 +7,9 @@
  */
 
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-tools");
 
 /**
  * MCP Tool definition from worker
@@ -40,9 +43,7 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
   const timeoutMs = 5000;
   let lastError: Error | null = null;
 
-  console.log(`[Tools] ===== fetchToolsFromWorker called =====`);
-  console.log(`[Tools] Plugin: ${pluginId}, Port: ${port}`);
-  console.log(`[Tools] Max retries: ${maxRetries}, Timeout: ${timeoutMs}ms`);
+  logger.debug({ pluginId, port, maxRetries, timeoutMs }, "Fetching tools from worker");
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     // Create AbortController for timeout
@@ -51,7 +52,7 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
 
     try {
       const url = `http://localhost:${port}/mcp/list-tools`;
-      console.log(`[Tools] 📡 Attempt ${attempt}/${maxRetries}: Fetching ${url}`);
+      logger.debug({ pluginId, attempt, maxRetries, url }, "Fetching tools endpoint");
 
       const response = await fetch(url, {
         signal: abortController.signal,
@@ -59,12 +60,11 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
 
       clearTimeout(timeoutId);
 
-      console.log(`[Tools] Response status: ${response.status} ${response.statusText}`);
-      console.log(`[Tools] Response headers:`, Object.fromEntries(response.headers.entries()));
+      logger.debug({ pluginId, status: response.status, statusText: response.statusText }, "Tools response received");
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.log(`[Tools] Error response body:`, errorBody);
+        logger.debug({ pluginId, errorBody }, "Error response body");
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -73,14 +73,11 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
       // Worker returns { tools: [...] }
       const tools = Array.isArray(data.tools) ? data.tools : [];
 
-      console.log(`[Tools] ✅ Successfully fetched ${tools.length} tools for ${pluginId}`);
+      logger.info({ pluginId, toolCount: tools.length }, "Successfully fetched tools");
       if (tools.length > 0) {
-        console.log(
-          `[Tools] Tool names:`,
-          tools.map((t: MCPTool) => t.name),
-        );
+        logger.debug({ pluginId, toolNames: tools.map((t: MCPTool) => t.name) }, "Tool names");
       } else {
-        console.log(`[Tools] ⚠️  No tools in response (empty array)`);
+        logger.debug({ pluginId }, "No tools in response (empty array)");
       }
 
       return tools;
@@ -89,22 +86,20 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
       lastError = error as Error;
 
       if (error instanceof Error && error.name === "AbortError") {
-        console.warn(`[Tools] ⏱️  Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`);
+        logger.warn({ pluginId, attempt, maxRetries }, "Tool fetch timeout");
       } else {
-        console.warn(
-          `[Tools] ❌ Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        if (error instanceof Error && error.stack) {
-          console.warn(`[Tools] Error stack:`, error.stack);
-        }
+        logger.warn({
+          pluginId,
+          attempt,
+          maxRetries,
+          error: error instanceof Error ? error.message : String(error),
+        }, "Tool fetch failed");
       }
 
       // Exponential backoff between retries
       if (attempt < maxRetries) {
         const backoffMs = 1000 * attempt;
-        console.log(`[Tools] ⏳ Waiting ${backoffMs}ms before retry...`);
+        logger.debug({ pluginId, backoffMs }, "Waiting before retry");
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
@@ -114,7 +109,7 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
   const errorMsg = `Failed to fetch tools after ${maxRetries} attempts: ${
     lastError?.message || "Unknown error"
   }`;
-  console.error(`[Tools] ❌❌❌ ${errorMsg}`);
+  logger.error({ pluginId }, errorMsg);
   throw new Error(errorMsg);
 }
 
@@ -177,9 +172,7 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
   // Persist updated config
   await pluginInstanceRepository.updateConfig(instanceId, config);
 
-  console.log(
-    `[Tools] Stored ${tools.length} tools for instance ${instanceId} across ${toolsByServer.size} server(s)`,
-  );
+  logger.info({ instanceId, toolCount: tools.length, serverCount: toolsByServer.size }, "Stored tools for instance");
 }
 
 /**
@@ -198,13 +191,13 @@ export async function fetchAndStoreTools(
   pluginId: string,
 ): Promise<void> {
   try {
-    console.log(`[Tools] Starting tool discovery for ${pluginId}:${orgId}`);
+    logger.info({ pluginId, orgId }, "Starting tool discovery");
 
     // Fetch tools from worker
     const tools = await fetchToolsFromWorker(port, pluginId);
 
     if (tools.length === 0) {
-      console.log(`[Tools] No tools found for ${pluginId}:${orgId}`);
+      logger.debug({ pluginId, orgId }, "No tools found");
       return;
     }
 
@@ -218,12 +211,13 @@ export async function fetchAndStoreTools(
     // Store tools in config
     await storeToolsInConfig(instance.id, tools);
 
-    console.log(`[Tools] Successfully stored ${tools.length} tools for ${pluginId}:${orgId}`);
+    logger.info({ pluginId, orgId, toolCount: tools.length }, "Successfully stored tools");
   } catch (error) {
-    console.error(
-      `[Tools] Failed to fetch and store tools for ${pluginId}:${orgId}:`,
-      error instanceof Error ? error.message : String(error),
-    );
+    logger.error({
+      pluginId,
+      orgId,
+      error: error instanceof Error ? error.message : String(error),
+    }, "Failed to fetch and store tools");
     // Don't throw - this is non-blocking
   }
 }

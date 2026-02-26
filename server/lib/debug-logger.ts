@@ -1,24 +1,25 @@
 import { config } from "@server/config/env";
+import { createLogger } from "@server/lib/logger";
+import type pino from "pino";
 
 /**
- * Debug Logger Utility
+ * Debug Logger Utility (Legacy Bridge)
  *
- * Provides conditional logging based on the DEBUG and DEBUG_MODULES environment variables.
+ * @deprecated Use `createLogger(module)` from `@server/lib/logger` instead.
  *
- * If DEBUG_MODULES is set to anything other than "*", debug logging is automatically enabled
- * (you don't need DEBUG=true). This allows you to see only your app's debug logs without
- * enabling DEBUG for all Node.js modules (like OpenAI SDK).
+ * This module now delegates to the centralized Pino-based logger with PII redaction.
+ * It preserves the DEBUG_MODULES filtering behavior for backwards compatibility.
  *
- * You can filter specific modules using DEBUG_MODULES environment variable:
- * - DEBUG_MODULES="perception,retrieval" - Only show these modules (auto-enables debugging)
- * - DEBUG_MODULES="*" - Show all modules (requires DEBUG=true)
- * - DEBUG_MODULES="!redis,!websocket" - Show all EXCEPT these modules (auto-enables debugging)
- *
- * Usage:
+ * Migration:
  * ```typescript
+ * // Before:
  * import { debugLog } from "@server/lib/debug-logger";
+ * debugLog("perception", "Analyzing intent", { messageId: "123" });
  *
- * debugLog("perception", "Analyzing message intent", { messageId: "123" });
+ * // After:
+ * import { createLogger } from "@server/lib/logger";
+ * const logger = createLogger("perception");
+ * logger.info({ messageId: "123" }, "Analyzing intent");
  * ```
  */
 
@@ -26,7 +27,7 @@ type LogLevel = "info" | "warn" | "error" | "debug";
 
 interface LogOptions {
   level?: LogLevel;
-  data?: any;
+  data?: unknown;
 }
 
 // Parse DEBUG_MODULES environment variable
@@ -38,44 +39,48 @@ function parseDebugModules(input: string): { include: string[]; exclude: string[
   const include: string[] = [];
   const exclude: string[] = [];
 
-  for (const module of modules) {
-    if (module.startsWith("!")) {
-      exclude.push(module.substring(1));
-    } else if (module !== "*" && module !== "") {
-      include.push(module);
+  for (const mod of modules) {
+    if (mod.startsWith("!")) {
+      exclude.push(mod.substring(1));
+    } else if (mod !== "*" && mod !== "") {
+      include.push(mod);
     }
   }
 
   return { include, exclude };
 }
 
-function shouldLogModule(module: string): boolean {
-  const moduleLower = module.toLowerCase();
+function shouldLogModule(moduleName: string): boolean {
+  const moduleLower = moduleName.toLowerCase();
   const { include, exclude } = debugModulesConfig;
 
-  // If module is in exclude list, don't log it
   if (exclude.includes(moduleLower)) {
     return false;
   }
 
-  // If include list is empty (meaning "*" or no filter), log everything not excluded
   if (include.length === 0) {
     return true;
   }
 
-  // If include list has items, only log if module is in the list
   return include.includes(moduleLower);
 }
 
+// Cache child loggers per module to avoid re-creation
+const loggerCache = new Map<string, pino.Logger>();
+
+function getModuleLogger(moduleName: string): pino.Logger {
+  let cached = loggerCache.get(moduleName);
+  if (!cached) {
+    cached = createLogger(moduleName);
+    loggerCache.set(moduleName, cached);
+  }
+  return cached;
+}
+
 /**
- * Main debug logging function
- * @param module - The module/component name (e.g., "perception", "retrieval", "execution")
- * @param message - The log message
- * @param options - Optional configuration including log level and additional data
+ * @deprecated Use `createLogger(module)` from `@server/lib/logger` instead.
  */
-export function debugLog(module: string, message: string, options?: LogOptions | any): void {
-  // If DEBUG_MODULES is set (not default "*"), enable debug logging automatically
-  // This allows selective debugging without enabling DEBUG for all Node.js modules
+export function debugLog(moduleName: string, message: string, options?: LogOptions | unknown): void {
   const debugModulesSet = process.env.DEBUG_MODULES && process.env.DEBUG_MODULES !== "*";
   const debugEnabled = config.logging.debug || debugModulesSet;
 
@@ -83,36 +88,25 @@ export function debugLog(module: string, message: string, options?: LogOptions |
     return;
   }
 
-  // Check if this module should be logged
-  if (!shouldLogModule(module)) {
+  if (!shouldLogModule(moduleName)) {
     return;
   }
 
-  const level = options?.level || "debug";
+  const logger = getModuleLogger(moduleName);
+
+  const opts = options as LogOptions | Record<string, unknown> | undefined;
+  const level: LogLevel =
+    (opts && typeof opts === "object" && "level" in opts ? (opts.level as LogLevel) : "debug") || "debug";
   const data =
-    options?.data ||
-    (options && typeof options === "object" && !options.level ? options : undefined);
+    opts && typeof opts === "object" && "data" in opts
+      ? opts.data
+      : opts && typeof opts === "object" && !("level" in opts)
+        ? opts
+        : undefined;
 
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] [${module.toUpperCase()}]`;
-
-  const logMessage = data
-    ? `${prefix} ${message} | Data: ${JSON.stringify(data, null, 2)}`
-    : `${prefix} ${message}`;
-
-  switch (level) {
-    case "error":
-      console.error(logMessage);
-      break;
-    case "warn":
-      console.warn(logMessage);
-      break;
-    case "info":
-      console.info(logMessage);
-      break;
-    case "debug":
-    default:
-      console.log(logMessage);
-      break;
+  if (data && typeof data === "object") {
+    logger[level](data as object, message);
+  } else {
+    logger[level](message);
   }
 }

@@ -287,6 +287,17 @@ export function validateJwtSecrets(): void {
     }
   }
 
+  // Ensure access and refresh tokens use different signing keys
+  if (
+    config.jwt.secret &&
+    config.jwt.refreshSecret &&
+    config.jwt.secret === config.jwt.refreshSecret
+  ) {
+    errors.push(
+      "JWT_SECRET and JWT_REFRESH_SECRET must be different to ensure token type separation.",
+    );
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `JWT secret validation failed:\n` +

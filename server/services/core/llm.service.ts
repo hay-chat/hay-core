@@ -3,6 +3,9 @@ import { config } from "@server/config/env";
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("llm");
 
 export interface ChatOptions {
   history?: string | Message[];
@@ -242,7 +245,7 @@ export class LLMService {
     try {
       fs.appendFileSync(this.logFilePath, logEntry, "utf8");
     } catch (error) {
-      console.error(`Failed to write to log file: ${error}`);
+      logger.error({ err: error }, "Failed to write to log file");
     }
   }
 

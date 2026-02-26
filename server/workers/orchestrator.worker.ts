@@ -1,6 +1,8 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("orchestrator-worker");
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
@@ -14,16 +16,16 @@ export class OrchestratorWorker {
 
     // Only initialize if database is connected
     if (!AppDataSource.isInitialized) {
-      console.warn("Database not initialized, skipping orchestrator initialization");
+      logger.warn("Database not initialized, skipping orchestrator initialization");
       return;
     }
 
     try {
       this.orchestrator = new Orchestrator();
       this.initialized = true;
-      debugLog("worker", "Orchestrator worker initialized successfully");
+      logger.info("Orchestrator worker initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize orchestrator worker:", error);
+      logger.error({ err: error }, "Failed to initialize orchestrator worker");
       this.initialized = false;
     }
   }
@@ -34,7 +36,7 @@ export class OrchestratorWorker {
    * See: server/services/scheduled-jobs.registry.ts -> 'orchestrator-worker-tick' and 'orchestrator-inactivity-check'
    */
   start(intervalMs: number = 1000): void {
-    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
+    logger.debug("Orchestrator worker processing handled by scheduler service");
     // Run immediately once
     this.tick();
     this.checkInactivity();
@@ -45,7 +47,7 @@ export class OrchestratorWorker {
    * NOTE: Worker processing is now handled by the scheduler service
    */
   stop(): void {
-    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
+    logger.debug("Orchestrator worker processing handled by scheduler service");
   }
 
   /**
@@ -67,7 +69,7 @@ export class OrchestratorWorker {
       // Run the orchestrator loop
       await this.orchestrator.loop();
     } catch (error) {
-      console.error("Orchestrator tick error:", error);
+      logger.error({ err: error }, "Orchestrator tick error");
     } finally {
       this.isProcessing = false;
     }
@@ -90,7 +92,7 @@ export class OrchestratorWorker {
       // Call the orchestrator's inactivity check method
       await this.orchestrator.checkInactivity();
     } catch (error) {
-      console.error("[Worker] Inactivity check error:", error);
+      logger.error({ err: error }, "Inactivity check error");
     }
   }
 }

@@ -10,6 +10,9 @@ import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
 import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-runner");
 
 /**
  * Plugin Runner Service
@@ -85,15 +88,12 @@ export class PluginRunnerService {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
     }
 
-    // Debug: Log authState before any processing
-    console.log(`[PluginRunner] authState for ${pluginId}:`, {
+    logger.debug({
+      pluginId,
       methodId: instance.authState?.methodId,
       hasAccessToken: !!instance.authState?.credentials?.accessToken,
-      accessTokenPreview: instance.authState?.credentials?.accessToken
-        ? String(instance.authState.credentials.accessToken).substring(0, 30) + "..."
-        : "NONE",
       expiresAt: instance.authState?.credentials?.expiresAt,
-    });
+    }, "Auth state before processing");
 
     // Check if OAuth token needs refresh before starting worker
     if (instance.authMethod === "oauth" && instance.authState?.credentials?.expiresAt) {
@@ -102,9 +102,7 @@ export class PluginRunnerService {
       const bufferSeconds = 5 * 60; // 5 minutes buffer
 
       if (expiresAt - now < bufferSeconds) {
-        console.log(
-          `[PluginRunner] OAuth token expired or expiring soon for ${pluginId}, refreshing...`,
-        );
+        logger.info({ pluginId }, "OAuth token expired or expiring soon, refreshing");
         try {
           await oauthService.refreshToken(orgId, pluginId);
           // Reload instance to get fresh authState
@@ -115,21 +113,15 @@ export class PluginRunnerService {
             throw new Error(`Plugin instance not found after token refresh`);
           }
           instance = refreshedInstance;
-          console.log(`[PluginRunner] OAuth token refreshed successfully for ${pluginId}`);
-          // Debug: Log refreshed authState
-          console.log(`[PluginRunner] Refreshed authState for ${pluginId}:`, {
+          logger.info({ pluginId }, "OAuth token refreshed successfully");
+          logger.debug({
+            pluginId,
             methodId: instance.authState?.methodId,
             hasAccessToken: !!instance.authState?.credentials?.accessToken,
-            accessTokenPreview: instance.authState?.credentials?.accessToken
-              ? String(instance.authState.credentials.accessToken).substring(0, 30) + "..."
-              : "NONE",
             expiresAt: instance.authState?.credentials?.expiresAt,
-          });
+          }, "Refreshed auth state");
         } catch (error: any) {
-          console.error(
-            `[PluginRunner] OAuth token refresh failed for ${pluginId}:`,
-            error.message,
-          );
+          logger.error({ err: error, pluginId }, "OAuth token refresh failed");
           // If token is already expired and refresh failed, throw error
           if (expiresAt - now <= 0) {
             throw new Error(
@@ -137,9 +129,7 @@ export class PluginRunnerService {
             );
           }
           // If token hasn't expired yet, continue with existing token
-          console.warn(
-            `[PluginRunner] Continuing with existing token (expires in ${expiresAt - now}s)`,
-          );
+          logger.warn({ pluginId, expiresInSeconds: expiresAt - now }, "Continuing with existing token");
         }
       }
     }
@@ -222,7 +212,7 @@ export class PluginRunnerService {
       // Handle spawn errors (e.g., command not found)
       // This prevents ENOENT errors from crashing the server
       workerProcess.on("error", (error) => {
-        console.error(`[${pluginId}:${orgId}] Spawn error: ${error.message}`);
+        logger.error({ err: error, pluginId, orgId }, "Spawn error");
         spawnError = error;
         this.portAllocator.release(port);
         this.workers.delete(workerKey);
@@ -230,16 +220,16 @@ export class PluginRunnerService {
 
       // Log output for debugging
       workerProcess.stdout?.on("data", (data) => {
-        console.log(`[${pluginId}:${orgId}] ${data.toString().trim()}`);
+        logger.debug({ pluginId, orgId }, data.toString().trim());
       });
 
       workerProcess.stderr?.on("data", (data) => {
-        console.error(`[${pluginId}:${orgId}] ERROR: ${data.toString().trim()}`);
+        logger.error({ pluginId, orgId }, data.toString().trim());
       });
 
       // Handle process exit
       workerProcess.on("exit", async (code, signal) => {
-        console.log(`[${pluginId}:${orgId}] Process exited with code ${code}, signal ${signal}`);
+        logger.info({ pluginId, orgId, code, signal }, "Process exited");
         this.portAllocator.release(port);
         this.workers.delete(workerKey);
 
@@ -287,11 +277,11 @@ export class PluginRunnerService {
 
       this.workers.set(workerKey, workerInfo);
 
-      console.log(`✅ Worker started successfully: ${workerKey} on port ${port}`);
+      logger.info({ workerKey, port }, "Worker started successfully");
 
       // Discover and cache MCP tools (non-blocking)
       fetchAndStoreTools(port, orgId, pluginId).catch((error) => {
-        console.error(`Tool discovery failed for ${pluginId}:${orgId}:`, error);
+        logger.error({ err: error, pluginId, orgId }, "Tool discovery failed");
       });
 
       return workerInfo;
@@ -320,7 +310,7 @@ export class PluginRunnerService {
     const worker = this.workers.get(workerKey);
 
     if (!worker) {
-      console.log(`Worker not found: ${workerKey}`);
+      logger.debug({ workerKey }, "Worker not found");
       return;
     }
 
@@ -331,9 +321,9 @@ export class PluginRunnerService {
           method: "POST",
           signal: AbortSignal.timeout(5000),
         });
-        console.log(`Called /disable for ${workerKey}: ${response.status}`);
+        logger.debug({ workerKey, status: response.status }, "Called /disable endpoint");
       } catch (err) {
-        console.warn(`Failed to call /disable for ${workerKey}:`, err);
+        logger.warn({ err, workerKey }, "Failed to call /disable endpoint");
       }
 
       // Send SIGTERM for graceful shutdown
@@ -367,9 +357,9 @@ export class PluginRunnerService {
         lastStoppedAt: new Date(),
       });
 
-      console.log(`✅ Worker stopped: ${workerKey}`);
+      logger.info({ workerKey }, "Worker stopped");
     } catch (error: any) {
-      console.error(`Failed to stop worker ${workerKey}:`, error);
+      logger.error({ err: error, workerKey }, "Failed to stop worker");
       throw error;
     }
   }
@@ -442,7 +432,28 @@ export class PluginRunnerService {
     }
 
     // Add allowed environment variables from host
+    // Deny-list prevents plugins from requesting access to server secrets
+    const DENIED_ENV_VARS = new Set([
+      "JWT_SECRET",
+      "JWT_REFRESH_SECRET",
+      "PLUGIN_ENCRYPTION_KEY",
+      "DATABASE_URL",
+      "DB_PASSWORD",
+      "DB_USERNAME",
+      "DB_HOST",
+      "REDIS_PASSWORD",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "GITHUB_TOKEN",
+      "NPM_TOKEN",
+      "OPENAI_API_KEY",
+      "SMTP_PASSWORD",
+    ]);
     for (const envVar of allowedEnvVars) {
+      if (DENIED_ENV_VARS.has(envVar)) {
+        logger.warn({ pluginId, envVar }, "Plugin requested denied environment variable");
+        continue;
+      }
       if (process.env[envVar]) {
         env[envVar] = process.env[envVar]!;
       }
@@ -467,7 +478,7 @@ export class PluginRunnerService {
         });
 
         if (response.ok) {
-          console.log(`✅ /metadata endpoint ready on port ${port} (attempt ${attempt})`);
+          logger.debug({ port, attempt }, "Metadata endpoint ready");
           return;
         }
       } catch (err) {

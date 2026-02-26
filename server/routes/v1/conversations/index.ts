@@ -11,6 +11,9 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { DeliveryState } from "@server/types/message-feedback.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversations");
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
@@ -86,10 +89,13 @@ export const conversationsRouter = t.router({
     }),
 
   get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    // For public access, try to get conversation without org ID restriction for now
-    // In production, you might want to check a public flag or use session tokens
-    const organizationId =
-      ctx.organizationId || process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    const organizationId = ctx.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Organization context required",
+      });
+    }
     const conversation = await conversationService.getConversation(input.id, organizationId);
 
     if (!conversation) {
@@ -103,12 +109,14 @@ export const conversationsRouter = t.router({
   }),
 
   create: publicProcedure.input(createConversationSchema).mutation(async ({ ctx, input }) => {
-    // For public access, use organization ID from input or a default
-    const organizationId =
-      ctx.organizationId ||
-      input.metadata?.organizationId ||
-      process.env.DEFAULT_ORG_ID ||
-      "c3578568-c83b-493f-991c-ca2d34a3bd17";
+    // Organization ID must come from auth context or explicit input field (validated as UUID above)
+    const organizationId = ctx.organizationId || input.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization ID is required",
+      });
+    }
     const conversation = await conversationService.createConversation(organizationId, input);
 
     return conversation;
@@ -601,7 +609,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[approveMessage] Failed to publish approval event:", error);
+        logger.error({ err: error }, "Failed to publish approval event");
       }
 
       // TODO: Trigger actual message delivery to customer via WebSocket/plugin
@@ -685,7 +693,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[blockMessage] Failed to publish block event:", error);
+        logger.error({ err: error }, "Failed to publish block event");
       }
 
       return updatedMessage;

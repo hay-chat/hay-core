@@ -1,8 +1,10 @@
 import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { conversationSecretService } from "../services/conversation-secret.service";
+
+const logger = createLogger("execution");
 import {
   ConfidenceGuardrailService,
   type ConfidenceAssessment,
@@ -54,7 +56,7 @@ export class ExecutionLayer {
     this.promptService = PromptService.getInstance();
     this.companyInterestService = new CompanyInterestGuardrailService();
     this.confidenceService = new ConfidenceGuardrailService();
-    debugLog("execution", "ExecutionLayer initialized");
+    logger.debug("ExecutionLayer initialized");
 
     this.plannerSchema = {
       type: "object",
@@ -106,14 +108,14 @@ export class ExecutionLayer {
     customerLanguage?: string,
   ): Promise<ExecutionResult | null> {
     try {
-      debugLog("execution", "Starting execution for conversation", {
+      logger.debug({
         conversationId: conversation.id,
         organizationId: conversation.organization_id,
         agentId: conversation.agent_id,
         playbookId: conversation.playbook_id,
         enabledTools: conversation.enabled_tools,
-        customerLanguage,
-      });
+        customerLanguage
+      }, "Starting execution for conversation");
 
       const messages = await conversation.getMessages();
 
@@ -163,13 +165,13 @@ export class ExecutionLayer {
         finalPrompt = finalPrompt + contextBlock;
       }
 
-      debugLog("execution", "Retrieved execution planner prompt", {
+      logger.debug({
         promptLength: finalPrompt.length,
         hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
-        tools: conversation.enabled_tools,
-      });
+        tools: conversation.enabled_tools
+      }, "Retrieved execution planner prompt");
 
-      debugLog("execution", "Invoking LLM for execution planning");
+      logger.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string
@@ -186,11 +188,9 @@ export class ExecutionLayer {
         try {
           parsedArgs = JSON.parse(result.toolArgs);
         } catch (error) {
-          debugLog("execution", "Failed to parse toolArgs JSON", {
-            level: "error",
-            toolArgs: result.toolArgs,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          logger.error({            toolArgs: result.toolArgs,
+            error: error instanceof Error ? error.message : String(error)
+          }, "Failed to parse toolArgs JSON");
         }
 
         result.tool = {
@@ -211,56 +211,38 @@ export class ExecutionLayer {
 
       // Detect and auto-correct missing step when tool is present
       if (!result.step && result.tool) {
-        debugLog("execution", "Auto-correcting: Missing step with tool present → CALL_TOOL", {
-          level: "warn",
-          toolName: result.tool.name,
-        });
+        logger.warn({ toolName: result.tool.name }, "Auto-correcting: Missing step with tool present -> CALL_TOOL");
         result.step = "CALL_TOOL";
       }
 
       // Detect and auto-correct step/field mismatch
       if (result.step === "RESPOND" && result.tool && !result.userMessage) {
-        debugLog("execution", "Auto-correcting: RESPOND with tool but no userMessage → CALL_TOOL", {
-          level: "warn",
-          toolName: result.tool.name,
-          originalStep: result.step,
-        });
+        logger.warn({ toolName: result.tool.name, originalStep: result.step }, "Auto-correcting: RESPOND with tool but no userMessage -> CALL_TOOL");
         result.step = "CALL_TOOL";
       }
 
       // Validate CALL_TOOL steps have required tool field
       if (result.step === "CALL_TOOL") {
         if (!result.tool || !result.tool.name) {
-          debugLog("execution", "Invalid CALL_TOOL: missing tool or tool.name", {
-            level: "warn",
-            hasTool: !!result.tool,
-            toolName: result.tool?.name,
-          });
+          logger.warn({ hasTool: !!result.tool, toolName: result.tool?.name }, "Invalid CALL_TOOL: missing tool or tool.name");
           return null; // Trigger retry
         }
 
         // Clear userMessage from CALL_TOOL to prevent confusion
         if (result.userMessage) {
-          debugLog("execution", "Removing userMessage from CALL_TOOL step", {
-            level: "warn",
-            toolName: result.tool.name,
-          });
+          logger.warn({ toolName: result.tool.name }, "Removing userMessage from CALL_TOOL step");
           result.userMessage = undefined;
         }
       }
 
       // Validate that ASK and RESPOND steps have userMessage
       if ((result.step === "ASK" || result.step === "RESPOND") && !result.userMessage) {
-        debugLog("execution", "Invalid response: ASK/RESPOND without userMessage", {
-          level: "warn",
-          step: result.step,
-          rationale: result.rationale,
-        });
+        logger.warn({ step: result.step, rationale: result.rationale }, "Invalid response: ASK/RESPOND without userMessage");
         // Return null to trigger retry in orchestrator
         return null;
       }
 
-      debugLog("execution", "Execution planning complete", {
+      logger.debug({
         step: result.step,
         hasUserMessage: !!result.userMessage,
         userMessagePreview: result.userMessage?.substring(0, 100),
@@ -269,8 +251,8 @@ export class ExecutionLayer {
         hasHandoff: !!result.handoff,
         hasClose: !!result.close,
         rationale: result.rationale,
-        fullResult: JSON.stringify(result),
-      });
+        fullResult: JSON.stringify(result)
+      }, "Execution planning complete");
 
       // Apply confidence guardrails to RESPOND steps
       if (result.step === "RESPOND" && result.userMessage) {
@@ -279,12 +261,7 @@ export class ExecutionLayer {
 
       return result;
     } catch (error) {
-      debugLog("execution", "Error in execution layer", {
-        level: "error",
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      console.error("[ExecutionLayer] Error generating response:", error);
+      logger.error({ err: error }, "Error in execution layer");
       return {
         step: "RESPOND",
         userMessage:
@@ -303,7 +280,7 @@ export class ExecutionLayer {
     conversation: Conversation,
     customerLanguage?: string,
   ): Promise<ExecutionResult> {
-    debugLog("execution", "Applying two-stage guardrails to RESPOND step");
+    logger.debug("Applying two-stage guardrails to RESPOND step");
 
     // Check if we should skip guardrail checks based on user intent
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
@@ -318,16 +295,16 @@ export class ExecutionLayer {
       ];
 
       if (exemptIntents.includes(intent)) {
-        debugLog("execution", "Skipping guardrails - conversational intent detected", {
+        logger.debug({
           intent: lastCustomerMessage.intent,
-          messageContent: lastCustomerMessage.content,
-        });
+          messageContent: lastCustomerMessage.content
+        }, "Skipping guardrails - conversational intent detected");
         return result;
       }
     }
 
     // STAGE 1: Company Interest Protection
-    debugLog("execution", "Stage 1: Assessing company interest");
+    logger.debug("Stage 1: Assessing company interest");
     const companyInterestAssessment = await this.assessCompanyInterest(
       conversation,
       result.userMessage!,
@@ -335,20 +312,20 @@ export class ExecutionLayer {
 
     result.companyInterest = companyInterestAssessment;
 
-    debugLog("execution", "Company interest assessment complete", {
+    logger.debug({
       passed: companyInterestAssessment.passed,
       violationType: companyInterestAssessment.violationType,
       severity: companyInterestAssessment.severity,
       shouldBlock: companyInterestAssessment.shouldBlock,
-      requiresFactCheck: companyInterestAssessment.requiresFactCheck,
-    });
+      requiresFactCheck: companyInterestAssessment.requiresFactCheck
+    }, "Company interest assessment complete");
 
     // If Stage 1 blocks response, escalate immediately
     if (companyInterestAssessment.shouldBlock) {
-      debugLog("execution", "Stage 1 BLOCKED: Response violates company interests", {
+      logger.debug({
         violationType: companyInterestAssessment.violationType,
-        reasoning: companyInterestAssessment.reasoning,
-      });
+        reasoning: companyInterestAssessment.reasoning
+      }, "Stage 1 BLOCKED: Response violates company interests");
 
       const config = await this.getConfidenceConfig(conversation);
       const fallbackMessage = await this.getTranslatedFallbackMessage(
@@ -377,7 +354,7 @@ export class ExecutionLayer {
 
     // STAGE 2: Fact Grounding (only if Stage 1 requires it)
     if (companyInterestAssessment.requiresFactCheck) {
-      debugLog("execution", "Stage 2: Assessing fact grounding (company claims detected)");
+      logger.debug("Stage 2: Assessing fact grounding (company claims detected)");
 
       const confidenceAssessment = await this.assessResponseConfidence(
         conversation,
@@ -388,16 +365,16 @@ export class ExecutionLayer {
       result.recheckAttempted = false;
       result.recheckCount = 0;
 
-      debugLog("execution", "Fact grounding assessment complete", {
+      logger.debug({
         score: confidenceAssessment.score,
         tier: confidenceAssessment.tier,
         shouldRecheck: confidenceAssessment.shouldRecheck,
-        shouldEscalate: confidenceAssessment.shouldEscalate,
-      });
+        shouldEscalate: confidenceAssessment.shouldEscalate
+      }, "Fact grounding assessment complete");
 
       // Handle medium confidence - trigger recheck
       if (confidenceAssessment.shouldRecheck) {
-        debugLog("execution", "Medium confidence detected, triggering recheck");
+        logger.debug("Medium confidence detected, triggering recheck");
 
         const recheckResult = await this.performRecheck(result, conversation, customerLanguage);
 
@@ -407,10 +384,10 @@ export class ExecutionLayer {
           result.recheckAttempted = true;
           result.recheckCount = 1;
 
-          debugLog("execution", "Recheck complete", {
+          logger.debug({
             newScore: recheckResult.confidence?.score,
-            newTier: recheckResult.confidence?.tier,
-          });
+            newTier: recheckResult.confidence?.tier
+          }, "Recheck complete");
         }
       }
 
@@ -419,7 +396,7 @@ export class ExecutionLayer {
         result.confidence?.shouldEscalate ||
         (result.recheckAttempted && result.confidence!.tier === "low")
       ) {
-        debugLog("execution", "Stage 2: Low confidence detected, applying fallback/escalation");
+        logger.debug("Stage 2: Low confidence detected, applying fallback/escalation");
 
         const config = await this.getConfidenceConfig(conversation);
         const fallbackMessage = await this.getTranslatedFallbackMessage(
@@ -432,7 +409,7 @@ export class ExecutionLayer {
 
         // If escalation is enabled, convert to HANDOFF
         if (config.enableEscalation) {
-          debugLog("execution", "Escalation enabled, converting to HANDOFF");
+          logger.debug("Escalation enabled, converting to HANDOFF");
           return {
             step: "HANDOFF",
             userMessage: fallbackMessage,
@@ -451,13 +428,13 @@ export class ExecutionLayer {
           };
         } else {
           // Just use fallback message
-          debugLog("execution", "Using fallback message");
+          logger.debug("Using fallback message");
           result.originalMessage = originalMessage || undefined;
           result.userMessage = fallbackMessage;
         }
       }
     } else {
-      debugLog("execution", "Stage 2 SKIPPED: No fact checking required (no company claims)");
+      logger.debug("Stage 2 SKIPPED: No fact checking required (no company claims)");
     }
 
     return result;
@@ -540,20 +517,17 @@ export class ExecutionLayer {
             });
           }
         } catch (error) {
-          debugLog("execution", "Error fetching document for confidence assessment", {
-            level: "error",
-            documentId: docId,
-          });
+          logger.error({ documentId: docId }, "Error fetching document for confidence assessment");
         }
       }
     }
 
     // Add tool results as synthetic documents with high similarity (they're authoritative)
     if (recentToolMessages.length > 0) {
-      debugLog("execution", "Including tool results in confidence assessment", {
+      logger.debug({
         toolMessageCount: recentToolMessages.length,
-        toolNames: recentToolMessages.map((msg) => msg.metadata?.toolName || "Unknown"),
-      });
+        toolNames: recentToolMessages.map((msg) => msg.metadata?.toolName || "Unknown")
+      }, "Including tool results in confidence assessment");
     }
 
     for (const toolMsg of recentToolMessages) {
@@ -621,7 +595,7 @@ export class ExecutionLayer {
     conversation: Conversation,
     customerLanguage?: string,
   ): Promise<{ userMessage: string; confidence?: ConfidenceAssessment } | null> {
-    debugLog("execution", "Performing recheck with alternate strategy");
+    logger.debug("Performing recheck with alternate strategy");
 
     try {
       // Get more documents with relaxed threshold
@@ -638,10 +612,10 @@ export class ExecutionLayer {
       // Add new documents temporarily
       for (const doc of moreDocuments) {
         if (!originalDocIds.includes(doc.id)) {
-          debugLog("execution", "Adding additional document for recheck", {
+          logger.debug({
             documentId: doc.id,
-            similarity: doc.similarity,
-          });
+            similarity: doc.similarity
+          }, "Adding additional document for recheck");
           await conversation.addDocument(doc.id);
         }
       }
@@ -661,29 +635,26 @@ export class ExecutionLayer {
         recheckResult.confidence ||
         (await this.assessResponseConfidence(conversation, recheckResult.userMessage));
 
-      debugLog("execution", "Recheck assessment complete", {
+      logger.debug({
         newScore: recheckAssessment.score,
-        improved: recheckAssessment.score > (originalResult.confidence?.score || 0),
-      });
+        improved: recheckAssessment.score > (originalResult.confidence?.score || 0)
+      }, "Recheck assessment complete");
 
       // If recheck improved confidence, keep the new response and documents
       if (recheckAssessment.score > (originalResult.confidence?.score || 0)) {
-        debugLog("execution", "Recheck improved confidence, keeping new response");
+        logger.debug("Recheck improved confidence, keeping new response");
         return {
           userMessage: recheckResult.userMessage,
           confidence: recheckAssessment,
         };
       } else {
         // Recheck didn't improve, restore original documents
-        debugLog("execution", "Recheck did not improve confidence, reverting");
+        logger.debug("Recheck did not improve confidence, reverting");
         conversation.document_ids = originalDocIds;
         return null;
       }
     } catch (error) {
-      debugLog("execution", "Error during recheck", {
-        level: "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error({ err: error }, "Error during recheck");
       return null;
     }
   }
@@ -722,10 +693,10 @@ export class ExecutionLayer {
         await vectorStoreService.initialize();
       }
 
-      debugLog("execution", "Retrieving documents with relaxed threshold", {
+      logger.debug({
         maxDocuments,
-        similarityThreshold,
-      });
+        similarityThreshold
+      }, "Retrieving documents with relaxed threshold");
 
       const searchResults = await vectorStoreService.search(organizationId, query, maxDocuments);
       if (!searchResults || searchResults.length === 0) {
@@ -741,10 +712,7 @@ export class ExecutionLayer {
         similarity: result.similarity || 0,
       }));
     } catch (error) {
-      debugLog("execution", "Error in relaxed retrieval", {
-        level: "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error({ err: error }, "Error in relaxed retrieval");
       return [];
     }
   }
@@ -799,10 +767,7 @@ export class ExecutionLayer {
         undefined,
       );
     } catch (error) {
-      debugLog("execution", "Error loading company interest config, using defaults", {
-        level: "warn",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.warn({ err: error }, "Error loading company interest config, using defaults");
       return CompanyInterestGuardrailService.getDefaultConfig();
     }
   }
@@ -821,10 +786,7 @@ export class ExecutionLayer {
         undefined,
       );
     } catch (error) {
-      debugLog("execution", "Error loading confidence config, using defaults", {
-        level: "warn",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.warn({ err: error }, "Error loading confidence config, using defaults");
       return ConfidenceGuardrailService.getDefaultConfig();
     }
   }
@@ -858,10 +820,7 @@ Translated message:`;
 
       return translated.trim();
     } catch (error) {
-      debugLog("execution", "Error translating fallback message, using original", {
-        level: "warn",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.warn({ err: error }, "Error translating fallback message, using original");
       return fallbackMessage;
     }
   }

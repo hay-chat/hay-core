@@ -10,6 +10,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   const payload: JWTPayload = {
     userId: user.id,
     email: user.email,
+    type: "access",
   };
 
   const signOptions: jwt.SignOptions = {
@@ -19,7 +20,9 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   const accessToken = jwt.sign(payload, authConfig.jwt.secret, signOptions);
 
   const refreshPayload: RefreshTokenPayload = {
-    ...payload,
+    userId: user.id,
+    email: user.email,
+    type: "refresh",
     sessionId: sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
   };
 
@@ -27,7 +30,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
     expiresIn: authConfig.jwt.refreshExpiresIn as any,
     algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
   };
-  const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.secret, refreshSignOptions);
+  const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.refreshSecret, refreshSignOptions);
 
   // Calculate expiration time in seconds
   const expiresIn =
@@ -43,13 +46,17 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
 }
 
 /**
- * Verify and decode a JWT token
+ * Verify and decode a JWT access token
  */
 export function verifyToken<T = JWTPayload>(token: string): T {
   try {
     const decoded = jwt.verify(token, authConfig.jwt.secret, {
       algorithms: [authConfig.jwt.algorithm as jwt.Algorithm],
     }) as T;
+    // Reject refresh tokens used as access tokens
+    if ((decoded as any).type === "refresh") {
+      throw new Error("Invalid token");
+    }
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -62,10 +69,27 @@ export function verifyToken<T = JWTPayload>(token: string): T {
 }
 
 /**
- * Verify a refresh token and return the payload
+ * Verify a refresh token and return the payload.
+ * Uses a separate signing secret from access tokens.
  */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return verifyToken<RefreshTokenPayload>(token);
+  try {
+    const decoded = jwt.verify(token, authConfig.jwt.refreshSecret, {
+      algorithms: [authConfig.jwt.algorithm as jwt.Algorithm],
+    }) as RefreshTokenPayload;
+    // Ensure this is actually a refresh token
+    if (decoded.type !== "refresh") {
+      throw new Error("Invalid token");
+    }
+    return decoded;
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new Error("Token has expired");
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      throw new Error("Invalid token");
+    }
+    throw error;
+  }
 }
 
 /**
@@ -89,6 +113,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   const newPayload: JWTPayload = {
     userId: payload.userId,
     email: payload.email,
+    type: "access",
   };
 
   const signOptions: jwt.SignOptions = {
