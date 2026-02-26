@@ -2,7 +2,12 @@ import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 import { UserOrganization } from "./user-organization.entity";
-import { getDefaultScopesForRole, hasRequiredScope, type Resource, type Action } from "@server/types/scopes";
+import {
+  getDefaultScopesForRole,
+  hasRequiredScope,
+  type Resource,
+  type Action,
+} from "@server/types/scopes";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -107,10 +112,7 @@ export class User extends BaseEntity {
     const defaultScopes = getDefaultScopesForRole(this.role);
 
     // Combine default role scopes with custom permissions
-    const allScopes = [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    const allScopes = [...defaultScopes, ...(this.permissions || [])];
 
     // Use the scope matching system to check permissions
     return hasRequiredScope(resource as Resource, action as Action, allScopes);
@@ -122,10 +124,7 @@ export class User extends BaseEntity {
    */
   getScopes(): string[] {
     const defaultScopes = getDefaultScopesForRole(this.role);
-    return [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    return [...defaultScopes, ...(this.permissions || [])];
   }
 
   /**
