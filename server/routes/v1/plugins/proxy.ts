@@ -39,7 +39,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
       logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
       return res.status(503).json({
         error: "Plugin unavailable",
-        message: error instanceof Error ? error.message : "Failed to start plugin worker",
+        message: "Failed to start plugin worker",
       });
     }
 
@@ -97,7 +97,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
     logger.error({ err: error }, "Unexpected error in plugin proxy");
     return res.status(500).json({
       error: "Internal server error",
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: "An unexpected error occurred",
     });
   }
 });

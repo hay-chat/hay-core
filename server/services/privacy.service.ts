@@ -13,7 +13,7 @@ import { Job, JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
-import { hashPassword, verifyPassword } from "@server/lib/auth/utils/hashing";
+
 import { emailService } from "./email.service";
 import { auditLogService } from "./audit-log.service";
 import { jobQueueService } from "./job-queue.service";
@@ -80,9 +80,9 @@ export class PrivacyService {
       where: { email, deletedAt: IsNull() },
     });
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -140,25 +140,16 @@ export class PrivacyService {
     return AppDataSource.transaction(async (manager) => {
       const requestRepository = manager.getRepository(PrivacyRequest);
 
-      // Find matching request
-      const requests = await requestRepository.find({
+      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+      const request = await requestRepository.findOne({
         where: {
           type: "export",
           status: "pending_verification",
-          verificationTokenHash: Not(IsNull()),
+          verificationTokenHash: tokenHash,
         },
       });
-
-      let request: PrivacyRequest | null = null;
-      for (const req of requests) {
-        if (req.verificationTokenHash) {
-          const isValid = await verifyPassword(token, req.verificationTokenHash);
-          if (isValid) {
-            request = req;
-            break;
-          }
-        }
-      }
 
       if (!request) {
         throw new Error("Invalid or expired verification token");
@@ -267,9 +258,9 @@ export class PrivacyService {
       throw new Error("No account found with this email address");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -321,25 +312,16 @@ export class PrivacyService {
   async confirmDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "deletion",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");
@@ -461,8 +443,9 @@ export class PrivacyService {
       throw new Error("This request cannot be cancelled (no verification token)");
     }
 
-    const isValid = await verifyPassword(token, request.verificationTokenHash);
-    if (!isValid) {
+    // SHA-256 compare (tokens are high-entropy, no need for argon2)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    if (tokenHash !== request.verificationTokenHash) {
       throw new Error("Invalid verification token");
     }
 
@@ -1046,9 +1029,9 @@ export class PrivacyService {
       logger.debug({ organizationId, identifierType: identifier.type, identifierValue: identifier.value }, "Customer not found for export request");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -1115,26 +1098,17 @@ export class PrivacyService {
   async confirmCustomerExport(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "export",
         subjectType: "customer",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");
@@ -1215,9 +1189,9 @@ export class PrivacyService {
       throw new Error("No customer found with this identifier");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -1279,26 +1253,17 @@ export class PrivacyService {
   async confirmCustomerDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "deletion",
         subjectType: "customer",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");

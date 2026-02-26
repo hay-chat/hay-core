@@ -242,9 +242,14 @@ async function saveConfidenceLog(
 }
 
 export const runConversation = async (conversationId: string) => {
+  // Note: findById is used here because this is called from the internal message queue
+  // with trusted conversation IDs (not user input). We validate org context below.
   const conversation = await conversationRepository.findById(conversationId);
   if (!conversation) {
     throw new Error("Conversation not found");
+  }
+  if (!conversation.organization_id) {
+    throw new Error("Conversation missing organization context");
   }
 
   // Skip processing for conversations taken over by humans
@@ -713,6 +718,22 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       hasClose: !!executionResult.close,
       rationale: executionResult.rationale
     }, "Processing execution result");
+
+    // Enforce enabled_tools: reject tool calls not in the conversation's allowed list
+    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
+      const enabledTools = conversation.enabled_tools;
+      if (enabledTools && enabledTools.length > 0) {
+        if (!enabledTools.includes(executionResult.tool.name)) {
+          logger.warn({
+            toolName: executionResult.tool.name,
+            enabledTools,
+            conversationId: conversation.id,
+          }, "Tool execution blocked — not in enabled_tools");
+          // Skip this tool call and let the LLM continue without it
+          continue;
+        }
+      }
+    }
 
     // Handle case where LLM returns both a userMessage and a tool call
     if (

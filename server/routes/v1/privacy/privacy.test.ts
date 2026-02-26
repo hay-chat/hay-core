@@ -8,6 +8,7 @@ import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
 import { redisService } from "@server/services/redis.service";
 import { hashPassword } from "@server/lib/auth/utils/hashing";
+import * as crypto from "crypto";
 
 describe("Privacy DSAR Integration Tests", () => {
   let testUser: User;
@@ -393,7 +394,7 @@ describe("Privacy DSAR Integration Tests", () => {
       // Note: In real scenario, we'd use the actual token from email
       // For testing, we'll create a new token and hash it
       const testToken = "test-verification-token";
-      const tokenHash = await hashPassword(testToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(testToken).digest("hex");
       request!.verificationTokenHash = tokenHash;
       await privacyRequestRepo.save(request!);
 
@@ -438,7 +439,7 @@ describe("Privacy DSAR Integration Tests", () => {
 
       // Try to confirm with a test token
       const testToken = "test-verification-token";
-      const tokenHash = await hashPassword(testToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(testToken).digest("hex");
       request!.verificationTokenHash = tokenHash;
       await privacyRequestRepo.save(request!);
 
@@ -454,7 +455,7 @@ describe("Privacy DSAR Integration Tests", () => {
       const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
       const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
       const testToken = "test-verification-token";
-      const tokenHash = await hashPassword(testToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(testToken).digest("hex");
       request!.verificationTokenHash = tokenHash;
       await privacyRequestRepo.save(request!);
 
@@ -611,7 +612,7 @@ describe("Privacy DSAR Integration Tests", () => {
       const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
       const request = await privacyRequestRepo.findOne({ where: { id: requestId } });
       const testToken = "test-verification-token";
-      const tokenHash = await hashPassword(testToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(testToken).digest("hex");
       request!.verificationTokenHash = tokenHash;
       await privacyRequestRepo.save(request!);
 
@@ -627,7 +628,7 @@ describe("Privacy DSAR Integration Tests", () => {
       // Create a completed request
       const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
       const testToken = "test-verification-token";
-      const tokenHash = await hashPassword(testToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(testToken).digest("hex");
 
       const request = privacyRequestRepo.create({
         email: testEmail,
