@@ -73,7 +73,6 @@ const registerSchema = z
     lastName: z.string().optional(),
     organizationName: z.string().optional(),
     organizationSlug: z.string().optional(),
-    emailVerified: z.boolean().optional().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -125,15 +124,6 @@ export const authRouter = t.router({
       });
     }
 
-    // Check if email is verified
-    if (!user.emailVerified) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Please verify your email address before signing in.",
-        cause: { type: "EMAIL_NOT_VERIFIED" },
-      });
-    }
-
     // Update last login time and last seen
     user.lastLoginAt = new Date();
     user.updateLastSeen();
@@ -172,7 +162,7 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug, emailVerified } = input;
+    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -240,7 +230,6 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
-        emailVerified: emailVerified ?? true,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -295,14 +284,6 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid refresh token",
-        });
-      }
-
-      if (!user.emailVerified) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Please verify your email address before signing in.",
-          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 
@@ -1299,132 +1280,6 @@ export const authRouter = t.router({
     };
   }),
 
-  // Email verification for onboarding (called by backoffice after account creation)
-  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: ctx.user!.id },
-    });
-
-    if (!user) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-    }
-
-    if (user.emailVerified) {
-      return { success: true, message: "Email is already verified", token: null, expiresAt: null };
-    }
-
-    // Rate limit: max 5 verification requests per email per day
-    const rateLimitResult = await rateLimitService.checkEmailRateLimit(
-      user.email,
-      5,
-      24 * 60 * 60,
-    );
-    if (rateLimitResult.limited) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Too many verification requests. Please try again later.",
-      });
-    }
-
-    // Generate token (SHA-256 hash for storage, allows direct DB lookup)
-    const token = generateSecureToken(32);
-    const tokenHash = await hashApiKey(token);
-
-    // Store on user (reuse existing email verification fields)
-    user.emailVerificationTokenHash = tokenHash;
-    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    await userRepository.save(user);
-
-    return {
-      success: true,
-      token, // Plain token returned to caller (backoffice) for inclusion in email
-      expiresAt: user.emailVerificationExpiresAt,
-    };
-  }),
-
-  verifyEmail: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      const tokenHash = await hashApiKey(input.token);
-
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { emailVerificationTokenHash: tokenHash },
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invalid or expired verification token",
-        });
-      }
-
-      // Check expiry
-      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
-        user.clearEmailVerification();
-        await userRepository.save(user);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Verification link has expired. Please request a new one.",
-        });
-      }
-
-      // Mark as verified, clear token fields
-      user.emailVerified = true;
-      user.clearEmailVerification();
-      await userRepository.save(user);
-
-      return { success: true, message: "Email verified successfully", email: user.email };
-    }),
-
-  resendSignupVerification: publicProcedure
-    .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
-      const { email } = input;
-
-      // Rate limit: 3 requests per hour per email
-      const rateLimitResult = await rateLimitService.checkEmailRateLimit(
-        email,
-        3,
-        60 * 60,
-      );
-      if (rateLimitResult.limited) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many requests. Please try again later.",
-        });
-      }
-
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { email: email.toLowerCase() },
-      });
-
-      // Always return success to prevent user enumeration
-      if (!user || !user.isActive || user.emailVerified) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
-        return {
-          success: true,
-          token: null,
-          message: "If an unverified account exists, a new verification link will be sent.",
-        };
-      }
-
-      // Generate new token
-      const token = generateSecureToken(32);
-      const tokenHash = await hashApiKey(token);
-      user.emailVerificationTokenHash = tokenHash;
-      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await userRepository.save(user);
-
-      return {
-        success: true,
-        token, // Returned to backoffice for email sending
-        message: "If an unverified account exists, a new verification link will be sent.",
-      };
-    }),
-
   // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
   generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
     const rawCode = generateSecureToken(32);
@@ -1473,14 +1328,6 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Account is deactivated",
-        });
-      }
-
-      if (!user.emailVerified) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Please verify your email address before signing in.",
-          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 
