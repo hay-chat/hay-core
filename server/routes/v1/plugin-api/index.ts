@@ -6,8 +6,10 @@ import type {
   SendEmailHttpRequest,
   SendEmailHttpResponse,
 } from "../../../types/plugin-api.types";
-import { debugLog } from "../../../lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { mcpRegistryService } from "../../../services/mcp-registry.service";
+
+const logger = createLogger("plugin-api");
 import { pluginInstanceRepository } from "../../../repositories/plugin-instance.repository";
 
 const router = Router();
@@ -48,7 +50,7 @@ const authenticatePlugin = (
   }
 
   req.pluginAuth = payload;
-  console.log("[Plugin API Auth] Token payload:", JSON.stringify(payload, null, 2));
+  logger.debug({ payload }, "Plugin API auth token validated");
   next();
 };
 
@@ -83,14 +85,14 @@ router.post(
     }
 
     try {
-      debugLog("plugin-api", "Received send-email request", {
+      logger.debug({
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
         subject: emailRequest.subject,
         hasTo: !!emailRequest.to,
         hasText: !!emailRequest.body,
         hasHtml: !!emailRequest.html,
-      });
+      }, "Received send-email request");
 
       // Call service to send email
       const result = await pluginAPIService.sendEmail(pluginAuth, {
@@ -121,12 +123,11 @@ router.post(
         } as SendEmailHttpResponse,
       } as PluginAPIHttpResponse<SendEmailHttpResponse>);
     } catch (error) {
-      debugLog("plugin-api", "Error in send-email endpoint", {
-        level: "error",
+      logger.error({
+        err: error,
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      }, "Error in send-email endpoint");
 
       return res.status(500).json({
         success: false,
@@ -200,13 +201,13 @@ router.post(
       const pluginId = pluginAuth.pluginId;
       const finalServerId = serverId || `mcp-${Date.now()}`;
 
-      debugLog("plugin-api", "Registering local MCP server", {
+      logger.debug({
         organizationId,
         pluginId,
         serverId: finalServerId,
         toolCount: tools?.length || 0,
         toolsProvided: !!tools,
-      });
+      }, "Registering local MCP server");
 
       // Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -253,12 +254,12 @@ router.post(
         await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
       }
 
-      debugLog("plugin-api", "Local MCP server registered successfully", {
+      logger.info({
         organizationId,
         pluginId,
         serverId: finalServerId,
         toolsRegistered: tools.length,
-      });
+      }, "Local MCP server registered successfully");
 
       return res.status(200).json({
         success: true,
@@ -268,12 +269,11 @@ router.post(
         },
       } as PluginAPIHttpResponse);
     } catch (error) {
-      debugLog("plugin-api", "Error registering local MCP server", {
-        level: "error",
+      logger.error({
+        err: error,
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      }, "Error registering local MCP server");
 
       return res.status(500).json({
         success: false,
@@ -328,24 +328,16 @@ router.post(
       const pluginId = pluginAuth.pluginId;
       const finalServerId = serverId || `mcp-remote-${Date.now()}`;
 
-      console.log("========== MCP REGISTER REMOTE ==========");
-      console.log("Organization ID:", organizationId);
-      console.log("Plugin ID:", pluginId);
-      console.log("Server ID:", finalServerId);
-      console.log("URL:", url);
-      console.log("Transport:", transport);
-      console.log("Auth:", JSON.stringify(auth, null, 2));
-      console.log("Tools count:", tools?.length || 0);
-      console.log("Tools provided:", !!tools);
-
-      debugLog("plugin-api", "Registering remote MCP server", {
+      logger.debug({
         organizationId,
         pluginId,
         serverId: finalServerId,
         url,
+        transport,
+        hasAuth: !!auth,
         toolCount: tools?.length || 0,
         toolsProvided: !!tools,
-      });
+      }, "Registering remote MCP server");
 
       // Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -384,23 +376,22 @@ router.post(
 
       // Save to database
       await pluginInstanceRepository.updateConfig(instance.id, config);
-      console.log("✅ Config saved to database successfully");
-      console.log("Final config:", JSON.stringify(config, null, 2));
+      logger.debug({ config }, "Config saved to database");
 
       // Register tools in registry (only if tools provided)
       if (tools && tools.length > 0) {
         await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
-        console.log("✅ Tools registered in registry");
+        logger.info({ toolCount: tools.length }, "Tools registered in registry");
       } else {
-        console.log("ℹ️  No tools provided - will be discovered from MCP server");
+        logger.debug("No tools provided - will be discovered from MCP server");
       }
 
-      debugLog("plugin-api", "Remote MCP server registered successfully", {
+      logger.info({
         organizationId,
         pluginId,
         serverId: finalServerId,
         toolsRegistered: tools?.length || 0,
-      });
+      }, "Remote MCP server registered successfully");
 
       return res.status(200).json({
         success: true,
@@ -410,12 +401,11 @@ router.post(
         },
       } as PluginAPIHttpResponse);
     } catch (error) {
-      debugLog("plugin-api", "Error registering remote MCP server", {
-        level: "error",
+      logger.error({
+        err: error,
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      }, "Error registering remote MCP server");
 
       return res.status(500).json({
         success: false,

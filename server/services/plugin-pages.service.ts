@@ -1,6 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { pluginManagerService } from "./plugin-manager.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-pages");
 
 export class PluginPagesService {
   private dashboardPagesDir: string;
@@ -15,7 +18,7 @@ export class PluginPagesService {
    * Initialize plugin pages management
    */
   async initialize(): Promise<void> {
-    console.log("🔍 Initializing plugin pages...");
+    logger.info("Initializing plugin pages");
 
     // Ensure plugins pages directory exists in dashboard
     await this.ensurePluginsPagesDirectory();
@@ -31,7 +34,7 @@ export class PluginPagesService {
     try {
       await fs.mkdir(this.dashboardPagesDir, { recursive: true });
     } catch (error) {
-      console.error("Failed to create plugins pages directory:", error);
+      logger.error({ err: error }, "Failed to create plugins pages directory");
     }
   }
 
@@ -114,9 +117,9 @@ export class PluginPagesService {
       // Track pages for this plugin
       this.pluginPagesMap.set(pluginId, vuePages);
 
-      console.log(`✅ Synced ${vuePages.length} pages for plugin ${pluginId}`);
+      logger.info({ pluginId, pageCount: vuePages.length }, "Synced plugin pages");
     } catch (error) {
-      console.error(`Failed to sync pages for plugin ${pluginId}:`, error);
+      logger.error({ err: error, pluginId }, "Failed to sync pages for plugin");
     }
   }
 
@@ -133,9 +136,9 @@ export class PluginPagesService {
       // Remove from map
       this.pluginPagesMap.delete(pluginId);
 
-      console.log(`🗑️ Removed pages for plugin ${pluginId}`);
+      logger.info({ pluginId }, "Removed pages for plugin");
     } catch (error) {
-      console.error(`Failed to remove pages for plugin ${pluginId}:`, error);
+      logger.error({ err: error, pluginId }, "Failed to remove pages for plugin");
     }
   }
 

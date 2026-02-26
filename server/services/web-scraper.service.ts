@@ -2,6 +2,9 @@ import axios, { type AxiosResponse } from "axios";
 import * as cheerio from "cheerio";
 import { URL } from "url";
 import { EventEmitter } from "events";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("web-scraper");
 
 export interface ScrapeProgress {
   status: "discovering" | "crawling" | "processing" | "completed" | "error";
@@ -58,7 +61,7 @@ export class WebScraperService extends EventEmitter {
         this.urlQueue = sitemapUrls;
         this.totalUrlsDiscovered = sitemapUrls.length; // Set initial count from sitemap
         this.hasSitemap = true; // Mark that we have a sitemap
-        console.log(`Found ${sitemapUrls.length} total URLs from sitemap(s)`);
+        logger.info({ count: sitemapUrls.length }, "Found URLs from sitemap(s)");
 
         // Immediately emit progress showing all URLs found in sitemap
         this.emit("discovery-progress", {
@@ -73,7 +76,7 @@ export class WebScraperService extends EventEmitter {
         // Step 2: Crawl the website to discover URLs
         this.totalUrlsDiscovered = 1; // Starting with just the base URL
         this.hasSitemap = false;
-        console.log("No sitemap found, crawling from base URL");
+        logger.info("No sitemap found, crawling from base URL");
       }
 
       // Step 3: Discover all URLs with basic metadata
@@ -130,10 +133,10 @@ export class WebScraperService extends EventEmitter {
 
       if (sitemapUrls.length > 0) {
         this.urlQueue = sitemapUrls;
-        console.log(`Found ${sitemapUrls.length} total URLs from sitemap(s)`);
+        logger.info({ count: sitemapUrls.length }, "Found URLs from sitemap(s)");
       } else {
         // Step 2: Crawl the website starting from the base URL
-        console.log("No sitemap found, crawling from base URL");
+        logger.info("No sitemap found, crawling from base URL");
       }
 
       // Step 3: Process all URLs
@@ -205,9 +208,7 @@ export class WebScraperService extends EventEmitter {
     // Check if this is a sitemap index file (contains <sitemap> elements)
     const sitemapElements = $("sitemap > loc");
     if (sitemapElements.length > 0) {
-      console.log(
-        `Found sitemap index with ${sitemapElements.length} sub-sitemaps at ${sitemapUrl}`,
-      );
+      logger.info({ count: sitemapElements.length, sitemapUrl }, "Found sitemap index with sub-sitemaps");
 
       // This is a sitemap index, recursively fetch and parse sub-sitemaps
       const subSitemapUrls: string[] = [];
@@ -224,7 +225,7 @@ export class WebScraperService extends EventEmitter {
         const batch = subSitemapUrls.slice(i, i + concurrencyLimit);
         const batchPromises = batch.map(async (subSitemapUrl) => {
           try {
-            console.log(`Fetching sub-sitemap: ${subSitemapUrl}`);
+            logger.debug({ subSitemapUrl }, "Fetching sub-sitemap");
             const response = await axios.get(subSitemapUrl, {
               timeout: 10000,
               maxContentLength: 5 * 1024 * 1024,
@@ -233,11 +234,11 @@ export class WebScraperService extends EventEmitter {
             if (response.status === 200) {
               // Recursively parse the sub-sitemap
               const subUrls = await this.parseSitemap(response.data, subSitemapUrl);
-              console.log(`Found ${subUrls.length} URLs in sub-sitemap: ${subSitemapUrl}`);
+              logger.debug({ count: subUrls.length, subSitemapUrl }, "Found URLs in sub-sitemap");
               return subUrls;
             }
           } catch (error) {
-            console.error(`Failed to fetch sub-sitemap ${subSitemapUrl}:`, error);
+            logger.error({ err: error, subSitemapUrl }, "Failed to fetch sub-sitemap");
           }
           return [];
         });
@@ -255,7 +256,7 @@ export class WebScraperService extends EventEmitter {
 
       // If this was a sitemap index and we found URLs, return them
       if (urls.length > 0) {
-        console.log(`Total URLs from sitemap index: ${urls.length}`);
+        logger.info({ count: urls.length }, "Total URLs from sitemap index");
         return urls.slice(0, this.maxPages);
       }
     }
@@ -263,7 +264,7 @@ export class WebScraperService extends EventEmitter {
     // Parse regular sitemap (contains <url> elements)
     const urlElements = $("url > loc");
     if (urlElements.length > 0) {
-      console.log(`Found regular sitemap with ${urlElements.length} URLs at ${sitemapUrl}`);
+      logger.info({ count: urlElements.length, sitemapUrl }, "Found regular sitemap");
       urlElements.each((_: number, element: any) => {
         const url = $(element).text().trim();
         // Always check if URL is from same domain
@@ -284,7 +285,7 @@ export class WebScraperService extends EventEmitter {
       }
     }
 
-    console.log(`Returning ${urls.length} URLs from ${sitemapUrl}`);
+    logger.debug({ count: urls.length, sitemapUrl }, "Returning URLs from sitemap");
     return urls.slice(0, this.maxPages);
   }
 
@@ -318,7 +319,7 @@ export class WebScraperService extends EventEmitter {
           }
         }
       } catch (error) {
-        console.error(`Failed to scrape ${url}:`, error);
+        logger.error({ err: error, url }, "Failed to scrape URL");
         // Continue with other URLs
       }
 
@@ -342,13 +343,13 @@ export class WebScraperService extends EventEmitter {
       });
 
       if (response.status !== 200) {
-        console.log(`[WebScraper] Skipping scrape of ${url}: HTTP ${response.status}`);
+        logger.debug({ url, status: response.status }, "Skipping scrape: non-200 status");
         return null;
       }
 
       // Skip HTTP redirects (URL changed materially after following redirects)
       if (this.wasHttpRedirected(response, url)) {
-        console.log(`[WebScraper] Skipping scrape of ${url}: redirected to different page`);
+        logger.debug({ url }, "Skipping scrape: redirected to different page");
         return null;
       }
 
@@ -356,7 +357,7 @@ export class WebScraperService extends EventEmitter {
 
       // Skip client-side redirects (meta refresh, "Redirecting..." pages)
       if (this.isClientSideRedirect(fullHtml)) {
-        console.log(`[WebScraper] Skipping scrape of ${url}: client-side redirect detected`);
+        logger.debug({ url }, "Skipping scrape: client-side redirect detected");
         return null;
       }
 
@@ -377,7 +378,7 @@ export class WebScraperService extends EventEmitter {
         crawledAt: new Date(),
       };
     } catch (error) {
-      console.error(`Error scraping ${url}:`, error);
+      logger.error({ err: error, url }, "Error scraping URL");
       return null;
     }
   }
@@ -403,7 +404,7 @@ export class WebScraperService extends EventEmitter {
       const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000;
       const clampedWaitMs = Math.min(waitMs, 10000); // Cap at 10 seconds
 
-      console.log(`[WebScraper] 429 for ${url}, retrying after ${clampedWaitMs}ms`);
+      logger.debug({ url, waitMs: clampedWaitMs }, "Rate limited (429), retrying");
       await this.delay(clampedWaitMs);
 
       response = await axios.get(url, fetchConfig);
@@ -572,13 +573,13 @@ export class WebScraperService extends EventEmitter {
 
         // Skip error pages (4xx, 5xx)
         if (response.status >= 400) {
-          console.log(`[WebScraper] Skipping ${url}: HTTP ${response.status}`);
+          logger.debug({ url, status: response.status }, "Skipping URL: error status");
           continue;
         }
 
         // Skip HTTP redirects (URL changed materially after following redirects)
         if (this.wasHttpRedirected(response, url)) {
-          console.log(`[WebScraper] Skipping ${url}: redirected to different page`);
+          logger.debug({ url }, "Skipping URL: redirected to different page");
           continue;
         }
 
@@ -587,7 +588,7 @@ export class WebScraperService extends EventEmitter {
 
           // Skip client-side redirects (meta refresh, "Redirecting..." pages)
           if (this.isClientSideRedirect(html)) {
-            console.log(`[WebScraper] Skipping ${url}: client-side redirect detected`);
+            logger.debug({ url }, "Skipping URL: client-side redirect detected");
             continue;
           }
 
@@ -625,7 +626,7 @@ export class WebScraperService extends EventEmitter {
         }
       } catch (error) {
         // Network errors, timeouts, etc. — skip entirely
-        console.error(`Failed to discover ${url}:`, error);
+        logger.error({ err: error, url }, "Failed to discover URL");
       }
 
       // Delay between pages to avoid rate limiting

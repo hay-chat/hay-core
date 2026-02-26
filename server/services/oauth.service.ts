@@ -11,6 +11,9 @@ import type {
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("oauth");
 
 export class OAuthService {
   /**
@@ -97,10 +100,7 @@ export class OAuthService {
     organizationId: string,
     userId: string,
   ): Promise<{ authorizationUrl: string; state: string }> {
-    console.log("\n========== OAUTH INITIATE START ==========");
-    console.log("Plugin ID:", pluginId);
-    console.log("Organization ID:", organizationId);
-    console.log("User ID:", userId);
+    logger.info({ pluginId, organizationId, userId }, "OAuth initiate started");
 
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
@@ -118,7 +118,7 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} does not have metadata (metadata required)`);
     }
 
-    console.log("Checking metadata.authMethods for OAuth2...");
+    logger.debug("Checking metadata.authMethods for OAuth2");
     const oauth2Method = plugin.metadata.authMethods.find(
       (method: AuthMethodDescriptor) => method.type === "oauth2",
     );
@@ -127,7 +127,7 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }
 
-    console.log("OAuth2 method found in metadata:", oauth2Method.id);
+    logger.debug({ methodId: oauth2Method.id }, "OAuth2 method found in metadata");
 
     // Validate required OAuth fields
     if (!oauth2Method.authorizationUrl || !oauth2Method.tokenUrl) {
@@ -172,8 +172,7 @@ export class OAuthService {
       instance.authState?.credentials?.[clientSecretFieldName] ||
       null;
 
-    console.log("Client ID:", clientId ? clientId.substring(0, 20) + "..." : "NOT SET");
-    console.log("Client Secret:", clientSecret ? "SET (hidden)" : "NOT SET");
+    logger.debug({ clientIdSet: !!clientId, clientSecretSet: !!clientSecret }, "OAuth client credentials resolved");
 
     if (!clientId) {
       throw new Error(`OAuth client ID not configured for plugin ${pluginId}`);
@@ -189,7 +188,7 @@ export class OAuthService {
 
     // Generate state nonce
     const nonce = oauthStateService.generateNonce();
-    console.log("Generated nonce:", nonce.substring(0, 20) + "...");
+    logger.debug("Generated OAuth state nonce");
 
     // Generate PKCE if required
     let codeVerifier: string | undefined;
@@ -198,7 +197,7 @@ export class OAuthService {
       const pkce = oauthStateService.generatePKCE();
       codeVerifier = pkce.codeVerifier;
       codeChallenge = pkce.codeChallenge;
-      console.log("PKCE enabled - Code Challenge:", codeChallenge.substring(0, 20) + "...");
+      logger.debug("PKCE enabled, code challenge generated");
     }
 
     // Store state in Redis
@@ -210,7 +209,7 @@ export class OAuthService {
       codeVerifier,
       createdAt: Date.now(),
     });
-    console.log("State stored in Redis");
+    logger.debug("OAuth state stored in Redis");
 
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
@@ -239,9 +238,7 @@ export class OAuthService {
     // Convert to string and replace + with %20 for proper URL encoding (RFC 3986)
     const authorizationUrl = `${oauthConfig.authorizationUrl}?${params.toString().replace(/\+/g, "%20")}`;
 
-    // Log the authorization URL to console
-    console.log(`\n🔐 OAuth Authorization URL for ${pluginId}:\n${authorizationUrl}\n`);
-    console.log("========== OAUTH INITIATE END ==========\n");
+    logger.info({ pluginId }, "OAuth authorization URL generated");
 
     debugLog("oauth", `Initiated OAuth flow for plugin ${pluginId}`, {
       organizationId,
@@ -260,38 +257,36 @@ export class OAuthService {
     state: string,
     error?: string,
   ): Promise<{ success: boolean; pluginId?: string; organizationId?: string; error?: string }> {
-    console.log("\n========== OAUTH CALLBACK START ==========");
-    console.log("Code received:", code ? code.substring(0, 20) + "..." : "NOT PROVIDED");
-    console.log("State received:", state ? state.substring(0, 20) + "..." : "NOT PROVIDED");
-    console.log("Error received:", error || "NONE");
+    logger.info({ codeProvided: !!code, stateProvided: !!state, hasError: !!error }, "OAuth callback received");
 
     if (error) {
-      console.log("OAuth provider returned error:", error);
+      logger.warn({ error }, "OAuth provider returned error");
       debugLog("oauth", `OAuth callback error: ${error}`, { level: "error" });
       return { success: false, error };
     }
 
     // Retrieve state from Redis (one-time use)
-    console.log("Retrieving state from Redis...");
+    logger.debug("Retrieving OAuth state from Redis");
     const oauthState = await oauthStateService.retrieveState(state);
 
     if (!oauthState) {
-      console.log("❌ State not found in Redis or expired");
+      logger.warn("OAuth state not found in Redis or expired");
       debugLog("oauth", `Invalid or expired OAuth state: ${state}`, { level: "error" });
       return { success: false, error: "Invalid or expired state" };
     }
 
-    console.log("✅ State retrieved from Redis:");
-    console.log("  Plugin ID:", oauthState.pluginId);
-    console.log("  Organization ID:", oauthState.organizationId);
-    console.log("  User ID:", oauthState.userId);
-    console.log("  Has code verifier:", !!oauthState.codeVerifier);
+    logger.debug({
+      pluginId: oauthState.pluginId,
+      organizationId: oauthState.organizationId,
+      userId: oauthState.userId,
+      hasCodeVerifier: !!oauthState.codeVerifier,
+    }, "OAuth state retrieved from Redis");
 
     const { pluginId, organizationId, codeVerifier } = oauthState;
 
     try {
       // Get plugin
-      console.log("Loading plugin...");
+      logger.debug({ pluginId }, "Loading plugin for OAuth callback");
       const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
       if (!plugin) {
         throw new Error(`Plugin ${pluginId} not found`);
@@ -308,7 +303,7 @@ export class OAuthService {
         throw new Error(`Plugin ${pluginId} does not have metadata`);
       }
 
-      console.log("Checking metadata.authMethods for OAuth2...");
+      logger.debug("Checking metadata.authMethods for OAuth2");
       const oauth2Method = plugin.metadata.authMethods.find(
         (method: AuthMethodDescriptor) => method.type === "oauth2",
       );
@@ -317,7 +312,7 @@ export class OAuthService {
         throw new Error(`Plugin ${pluginId} does not support OAuth`);
       }
 
-      console.log("OAuth2 method found in metadata:", oauth2Method.id);
+      logger.debug({ methodId: oauth2Method.id }, "OAuth2 method found in metadata");
 
       // Validate required OAuth fields
       if (!oauth2Method.tokenUrl) {
@@ -333,7 +328,7 @@ export class OAuthService {
         pkce: true,
       };
 
-      console.log("Token URL:", oauthConfig.tokenUrl);
+      logger.debug({ tokenUrl: oauthConfig.tokenUrl }, "OAuth token URL resolved");
 
       // Get client credentials from plugin instance using config resolver with env fallback
       const clientIdFieldName = oauth2Method.clientId;
@@ -372,7 +367,7 @@ export class OAuthService {
         clientSecret,
       };
 
-      console.log("Exchanging authorization code for tokens...");
+      logger.info("Exchanging authorization code for tokens");
       // Exchange code for tokens
       const tokens = await this.exchangeCodeForTokens(
         code,
@@ -380,15 +375,13 @@ export class OAuthService {
         validCredentials,
         codeVerifier,
       );
-      console.log("✅ Tokens received from provider:");
-      console.log(
-        "  Access token:",
-        tokens.access_token ? tokens.access_token.substring(0, 20) + "..." : "NOT PROVIDED",
-      );
-      console.log("  Refresh token:", tokens.refresh_token ? "PROVIDED" : "NOT PROVIDED");
-      console.log("  Expires in:", tokens.expires_in);
-      console.log("  Token type:", tokens.token_type);
-      console.log("  Scope:", tokens.scope);
+      logger.info({
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+        tokenType: tokens.token_type,
+        scope: tokens.scope,
+      }, "Tokens received from provider");
 
       // Combine required and optional scopes for storage
       const allScopes: string[] = [];
@@ -400,27 +393,28 @@ export class OAuthService {
       }
 
       // Store tokens in plugin instance config
-      console.log("Storing tokens in database...");
-      console.log("  Combined scopes:", allScopes);
+      logger.debug({ scopes: allScopes }, "Storing tokens in database");
       await this.storeTokens(organizationId, pluginId, tokens, allScopes);
-      console.log("✅ Tokens stored successfully");
+      logger.info("Tokens stored successfully");
 
       debugLog("oauth", `OAuth callback successful for plugin ${pluginId}`, {
         organizationId,
       });
 
-      console.log("========== OAUTH CALLBACK SUCCESS ==========\n");
+      logger.info({ pluginId, organizationId }, "OAuth callback completed successfully");
       return { success: true, pluginId, organizationId };
     } catch (error) {
-      console.log("❌ OAuth callback failed:");
-      console.error(error);
+      logger.error({
+        err: error instanceof Error ? error : new Error(String(error)),
+        pluginId,
+        organizationId,
+      }, "OAuth callback failed");
       debugLog("oauth", `OAuth callback failed`, {
         level: "error",
         data: error instanceof Error ? error.message : String(error),
         pluginId,
         organizationId,
       });
-      console.log("========== OAUTH CALLBACK FAILED ==========\n");
       return {
         success: false,
         error: error instanceof Error ? error.message : "Token exchange failed",
@@ -455,12 +449,13 @@ export class OAuthService {
       body.append("code_verifier", codeVerifier);
     }
 
-    console.log("Token exchange request:");
-    console.log("  URL:", oauthConfig.tokenUrl);
-    console.log("  Grant type:", "authorization_code");
-    console.log("  Redirect URI:", redirectUri);
-    console.log("  Has client secret:", !!credentials.clientSecret);
-    console.log("  Has code verifier:", !!codeVerifier);
+    logger.debug({
+      tokenUrl: oauthConfig.tokenUrl,
+      grantType: "authorization_code",
+      redirectUri,
+      hasClientSecret: !!credentials.clientSecret,
+      hasCodeVerifier: !!codeVerifier,
+    }, "Token exchange request");
 
     const response = await fetch(oauthConfig.tokenUrl, {
       method: "POST",
@@ -470,16 +465,21 @@ export class OAuthService {
       body: body.toString(),
     });
 
-    console.log("Token exchange response status:", response.status, response.statusText);
+    logger.debug({ status: response.status, statusText: response.statusText }, "Token exchange response received");
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log("❌ Token exchange error response:", errorText);
+      logger.error({ status: response.status, errorText }, "Token exchange failed");
       throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Token exchange response data:", JSON.stringify(data, null, 2));
+    logger.debug({
+      hasAccessToken: !!data.access_token,
+      hasRefreshToken: !!data.refresh_token,
+      expiresIn: data.expires_in,
+      tokenType: data.token_type,
+    }, "Token exchange response parsed");
 
     // Calculate expires_at if expires_in is provided
     let expiresAt: number | undefined;
@@ -506,26 +506,24 @@ export class OAuthService {
     tokens: OAuthTokenData,
     scopes?: string[],
   ): Promise<void> {
-    console.log("\n--- Storing OAuth tokens ---");
-    console.log("Plugin ID:", pluginId);
-    console.log("Organization ID:", organizationId);
+    logger.debug({ pluginId, organizationId }, "Storing OAuth tokens");
 
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    console.log("Plugin registry ID:", plugin.id);
+    logger.debug({ pluginRegistryId: plugin.id }, "Plugin registry entry found");
 
     // Get or create instance (pass string pluginId, not UUID)
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    console.log("Existing instance found:", !!instance);
-    if (instance) {
-      console.log("  Instance ID:", instance.id);
-      console.log("  Instance enabled:", instance.enabled);
-      console.log("  Instance authMethod:", instance.authMethod);
-      console.log("  Instance has config:", !!instance.config);
-    }
+    logger.debug({
+      instanceFound: !!instance,
+      instanceId: instance?.id,
+      enabled: instance?.enabled,
+      authMethod: instance?.authMethod,
+      hasConfig: !!instance?.config,
+    }, "Plugin instance lookup result");
 
     // Build authState - the standard way to store OAuth tokens
     // The authState format is what the plugin SDK expects via ctx.auth.get()
@@ -544,7 +542,7 @@ export class OAuthService {
     };
 
     if (instance) {
-      console.log("Updating existing instance...");
+      logger.debug({ instanceId: instance.id }, "Updating existing instance auth state");
 
       // Update authState using updateAuthState which uses .save() to trigger transformer
       await pluginInstanceRepository.updateAuthState(
@@ -552,19 +550,18 @@ export class OAuthService {
         instance.organizationId,
         authState,
       );
-      console.log("  Auth state updated with access token (via updateAuthState)");
-      console.log("  Instance enabled state should remain:", instance.enabled);
+      logger.debug({ enabled: instance.enabled }, "Auth state updated via updateAuthState");
     } else {
-      console.log("Creating new instance with enabled=false...");
+      logger.debug("Creating new instance with enabled=false");
       // Create new instance - upsertInstance uses .save() which triggers transformer
       await pluginInstanceRepository.upsertInstance(organizationId, pluginId, {
         authMethod: "oauth",
         authState,
         enabled: false, // Don't auto-enable
       });
-      console.log("  New instance created");
+      logger.debug("New plugin instance created");
     }
-    console.log("--- OAuth tokens stored ---\n");
+    logger.info({ pluginId, organizationId }, "OAuth tokens stored successfully");
   }
 
   /**

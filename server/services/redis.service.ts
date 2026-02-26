@@ -1,6 +1,8 @@
 import Redis from "ioredis";
 import { config } from "../config/env";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("redis");
 
 /**
  * Redis Service
@@ -18,15 +20,11 @@ export class RedisService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      debugLog("redis", "Already initialized");
+      logger.debug("Already initialized");
       return;
     }
 
-    debugLog("redis", "Initializing Redis service", {
-      host: config.redis.host,
-      port: config.redis.port,
-      db: config.redis.db,
-    });
+    logger.debug({ host: config.redis.host, port: config.redis.port, db: config.redis.db }, "Initializing Redis service");
 
     try {
       // Create publisher connection
@@ -38,11 +36,11 @@ export class RedisService {
         tls: config.redis.tls,
         retryStrategy: (times) => {
           if (times > 10) {
-            console.error("[Redis] Max retry attempts reached, stopping retries");
+            logger.error("Max retry attempts reached, stopping retries");
             return null; // Stop retrying
           }
           const delay = Math.min(times * 1000, 5000);
-          debugLog("redis", `Retrying connection in ${delay}ms (attempt ${times})`);
+          logger.debug({ delay, attempt: times }, "Retrying connection");
           return delay;
         },
         maxRetriesPerRequest: null, // Allow indefinite retries per request
@@ -61,11 +59,11 @@ export class RedisService {
         tls: config.redis.tls,
         retryStrategy: (times) => {
           if (times > 10) {
-            console.error("[Redis] Max retry attempts reached, stopping retries");
+            logger.error("Max retry attempts reached, stopping retries");
             return null; // Stop retrying
           }
           const delay = Math.min(times * 1000, 5000);
-          debugLog("redis", `Retrying connection in ${delay}ms (attempt ${times})`);
+          logger.debug({ delay, attempt: times }, "Retrying connection");
           return delay;
         },
         maxRetriesPerRequest: null, // Allow indefinite retries per request
@@ -77,19 +75,19 @@ export class RedisService {
 
       // Set up event handlers
       this.publisher.on("error", (err) => {
-        console.error("[Redis Publisher] Error:", err);
+        logger.error({ err }, "Publisher error");
       });
 
       this.subscriber.on("error", (err) => {
-        console.error("[Redis Subscriber] Error:", err);
+        logger.error({ err }, "Subscriber error");
       });
 
       this.publisher.on("connect", () => {
-        debugLog("redis", "Publisher connected");
+        logger.debug("Publisher connected");
       });
 
       this.subscriber.on("connect", () => {
-        debugLog("redis", "Subscriber connected");
+        logger.debug("Subscriber connected");
       });
 
       // Handle incoming messages
@@ -98,9 +96,9 @@ export class RedisService {
       });
 
       this.isInitialized = true;
-      debugLog("redis", "Redis service fully initialized and ready");
+      logger.debug("Redis service fully initialized and ready");
     } catch (error) {
-      console.error("[Redis] Failed to initialize:", error);
+      logger.error({ err: error }, "Failed to initialize");
       throw error;
     }
   }
@@ -110,21 +108,17 @@ export class RedisService {
    */
   async publish(channel: string, data: any): Promise<void> {
     if (!this.publisher) {
-      console.error("[Redis] Publisher not initialized");
+      logger.error("Publisher not initialized");
       return;
     }
 
     try {
       const message = JSON.stringify(data);
-      debugLog("redis", `Publishing message to channel: ${channel}`, {
-        channel,
-        dataType: data.type,
-        dataKeys: Object.keys(data),
-      });
+      logger.debug({ channel, dataType: data.type, dataKeys: Object.keys(data) }, "Publishing message to channel");
       await this.publisher.publish(channel, message);
-      debugLog("redis", `Message published successfully to: ${channel}`);
+      logger.debug({ channel }, "Message published successfully");
     } catch (error) {
-      console.error(`[Redis] Failed to publish to ${channel}:`, error);
+      logger.error({ err: error, channel }, "Failed to publish");
       throw error;
     }
   }
@@ -134,7 +128,7 @@ export class RedisService {
    */
   async subscribe(channel: string, handler: (data: any) => void): Promise<void> {
     if (!this.subscriber) {
-      console.error("[Redis] Subscriber not initialized");
+      logger.error("Subscriber not initialized");
       return;
     }
 
@@ -143,19 +137,17 @@ export class RedisService {
       if (!this.eventHandlers.has(channel)) {
         this.eventHandlers.set(channel, new Set());
         // Subscribe to channel if first handler
-        debugLog("redis", `Subscribing to new channel: ${channel}`);
+        logger.debug({ channel }, "Subscribing to new channel");
         await this.subscriber.subscribe(channel);
-        debugLog("redis", `Successfully subscribed to channel: ${channel}`);
+        logger.debug({ channel }, "Successfully subscribed to channel");
       } else {
-        debugLog("redis", `Adding handler to existing subscription: ${channel}`);
+        logger.debug({ channel }, "Adding handler to existing subscription");
       }
 
       this.eventHandlers.get(channel)!.add(handler);
-      debugLog("redis", `Handler added for channel: ${channel}`, {
-        totalHandlers: this.eventHandlers.get(channel)!.size,
-      });
+      logger.debug({ channel, totalHandlers: this.eventHandlers.get(channel)!.size }, "Handler added for channel");
     } catch (error) {
-      console.error(`[Redis] Failed to subscribe to ${channel}:`, error);
+      logger.error({ err: error, channel }, "Failed to subscribe");
       throw error;
     }
   }
@@ -182,16 +174,16 @@ export class RedisService {
         if (handlers.size === 0) {
           this.eventHandlers.delete(channel);
           await this.subscriber.unsubscribe(channel);
-          console.log(`[Redis] Unsubscribed from channel: ${channel}`);
+          logger.info({ channel }, "Unsubscribed from channel");
         }
       } else {
         // Remove all handlers for channel
         this.eventHandlers.delete(channel);
         await this.subscriber.unsubscribe(channel);
-        console.log(`[Redis] Unsubscribed from channel: ${channel}`);
+        logger.info({ channel }, "Unsubscribed from channel");
       }
     } catch (error) {
-      console.error(`[Redis] Failed to unsubscribe from ${channel}:`, error);
+      logger.error({ err: error, channel }, "Failed to unsubscribe");
     }
   }
 
@@ -200,34 +192,28 @@ export class RedisService {
    */
   private handleMessage(channel: string, message: string): void {
     try {
-      debugLog("redis", `Received message on channel: ${channel}`, {
-        messageLength: message.length,
-        messagePreview: message.substring(0, 100),
-      });
+      logger.debug({ channel, messageLength: message.length }, "Received message on channel");
 
       const data = JSON.parse(message);
       const handlers = this.eventHandlers.get(channel);
 
       if (handlers) {
-        debugLog("redis", `Dispatching to ${handlers.size} handler(s) for channel: ${channel}`, {
-          dataType: data.type,
-          dataKeys: Object.keys(data),
-        });
+        logger.debug({ channel, handlerCount: handlers.size, dataType: data.type }, "Dispatching to handlers");
 
         handlers.forEach((handler) => {
           try {
             handler(data);
           } catch (error) {
-            console.error(`[Redis] Error in handler for ${channel}:`, error);
+            logger.error({ err: error, channel }, "Error in handler");
           }
         });
 
-        debugLog("redis", `Message handling complete for channel: ${channel}`);
+        logger.debug({ channel }, "Message handling complete");
       } else {
-        debugLog("redis", `No handlers found for channel: ${channel}`);
+        logger.debug({ channel }, "No handlers found for channel");
       }
     } catch (error) {
-      console.error(`[Redis] Failed to parse message from ${channel}:`, error);
+      logger.error({ err: error, channel }, "Failed to parse message");
     }
   }
 
@@ -249,7 +235,7 @@ export class RedisService {
    * Gracefully shutdown Redis connections
    */
   async shutdown(): Promise<void> {
-    console.log("[Redis] Shutting down...");
+    logger.info("Shutting down...");
 
     try {
       // Unsubscribe from all channels
@@ -264,9 +250,9 @@ export class RedisService {
 
       this.eventHandlers.clear();
       this.isInitialized = false;
-      console.log("[Redis] Shutdown complete");
+      logger.info("Shutdown complete");
     } catch (error) {
-      console.error("[Redis] Error during shutdown:", error);
+      logger.error({ err: error }, "Error during shutdown");
     }
   }
 }

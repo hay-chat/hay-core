@@ -1,8 +1,10 @@
 import { AppDataSource } from "@server/database/data-source";
 import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import * as cron from "node-cron";
+
+const logger = createLogger("scheduler");
 
 export type CronJobConfig = {
   name: string; // Unique job identifier
@@ -67,11 +69,11 @@ export class SchedulerService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.warn("[Scheduler] Already initialized");
+      logger.warn("Already initialized");
       return;
     }
 
-    debugLog("scheduler", "Initializing scheduler service");
+    logger.debug("Initializing scheduler service");
 
     // Load job history from database to restore stats
     try {
@@ -79,15 +81,15 @@ export class SchedulerService {
         const scheduledJobRepo = AppDataSource.getRepository(ScheduledJob);
         const existingJobs = await scheduledJobRepo.find();
 
-        debugLog("scheduler", `Loaded ${existingJobs.length} job records from database`);
+        logger.debug({ count: existingJobs.length }, "Loaded job records from database");
       }
     } catch (error) {
-      console.error("[Scheduler] Failed to load job history:", error);
+      logger.error({ err: error }, "Failed to load job history");
       // Continue initialization even if database load fails
     }
 
     this.isInitialized = true;
-    console.log("[Scheduler] ✓ Scheduler service initialized");
+    logger.info("Scheduler service initialized");
   }
 
   /**
@@ -127,10 +129,7 @@ export class SchedulerService {
       }
     }
 
-    debugLog("scheduler", `Registered job: ${config.name}`, {
-      schedule: config.schedule,
-      enabled: config.enabled !== false,
-    });
+    logger.debug({ jobName: config.name, schedule: config.schedule, enabled: config.enabled !== false }, "Registered job");
   }
 
   /**
@@ -148,7 +147,7 @@ export class SchedulerService {
     // Remove from registry
     this.jobs.delete(name);
 
-    debugLog("scheduler", `Unregistered job: ${name}`);
+    logger.debug({ jobName: name }, "Unregistered job");
   }
 
   /**
@@ -163,7 +162,7 @@ export class SchedulerService {
     job.config.enabled = true;
     this.scheduleJob(name);
 
-    debugLog("scheduler", `Enabled job: ${name}`);
+    logger.debug({ jobName: name }, "Enabled job");
   }
 
   /**
@@ -178,7 +177,7 @@ export class SchedulerService {
     job.config.enabled = false;
     this.stopJob(name);
 
-    debugLog("scheduler", `Disabled job: ${name}`);
+    logger.debug({ jobName: name }, "Disabled job");
   }
 
   /**
@@ -190,7 +189,7 @@ export class SchedulerService {
       throw new Error(`Job '${name}' not found`);
     }
 
-    debugLog("scheduler", `Manually triggered job: ${name}`);
+    logger.debug({ jobName: name }, "Manually triggered job");
     await this.executeJob(name);
   }
 
@@ -234,7 +233,7 @@ export class SchedulerService {
     this.isShuttingDown = true;
     const gracefulTimeout = options?.gracefulTimeout || 30000;
 
-    console.log("[Scheduler] Shutting down scheduler service...");
+    logger.info("Shutting down scheduler service...");
 
     // Stop accepting new job executions
     const runningJobs = Array.from(this.jobs.entries())
@@ -242,14 +241,13 @@ export class SchedulerService {
       .map(([name]) => name);
 
     if (runningJobs.length > 0) {
-      console.log(`[Scheduler] Waiting for ${runningJobs.length} running jobs to complete...`);
-      console.log(`[Scheduler] Running jobs: ${runningJobs.join(", ")}`);
+      logger.info({ count: runningJobs.length, jobs: runningJobs }, "Waiting for running jobs to complete");
 
       // Wait for running jobs with timeout
       const waitStart = Date.now();
       while (runningJobs.some((name) => this.jobs.get(name)?.isRunning)) {
         if (Date.now() - waitStart > gracefulTimeout) {
-          console.warn("[Scheduler] Graceful timeout exceeded, forcing shutdown");
+          logger.warn("Graceful timeout exceeded, forcing shutdown");
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -265,7 +263,7 @@ export class SchedulerService {
     this.jobs.clear();
 
     this.isInitialized = false;
-    console.log("[Scheduler] ✓ Scheduler service shut down");
+    logger.info("Scheduler service shut down");
   }
 
   /**
@@ -286,7 +284,7 @@ export class SchedulerService {
         this.executeJob(name);
       }, schedule);
 
-      debugLog("scheduler", `Scheduled interval job: ${name} (every ${schedule}ms)`);
+      logger.debug({ jobName: name, intervalMs: schedule }, "Scheduled interval job");
     } else {
       // Cron-based scheduling
       try {
@@ -294,9 +292,9 @@ export class SchedulerService {
           this.executeJob(name);
         });
 
-        debugLog("scheduler", `Scheduled cron job: ${name} (${schedule})`);
+        logger.debug({ jobName: name, schedule }, "Scheduled cron job");
       } catch (error) {
-        console.error(`[Scheduler] Failed to schedule cron job '${name}':`, error);
+        logger.error({ err: error, jobName: name }, "Failed to schedule cron job");
         throw error;
       }
     }
@@ -331,13 +329,13 @@ export class SchedulerService {
 
     // Skip if shutting down
     if (this.isShuttingDown) {
-      debugLog("scheduler", `Skipping job '${name}' - scheduler is shutting down`);
+      logger.debug({ jobName: name }, "Skipping job - scheduler is shutting down");
       return;
     }
 
     // Check singleton constraint
     if (job.config.singleton && job.isRunning) {
-      debugLog("scheduler", `Skipping job '${name}' - already running (singleton)`);
+      logger.debug({ jobName: name }, "Skipping job - already running (singleton)");
       return;
     }
 
@@ -345,7 +343,7 @@ export class SchedulerService {
     job.isRunning = true;
     const startTime = Date.now();
 
-    debugLog("scheduler", `Executing job: ${name}`);
+    logger.debug({ jobName: name }, "Executing job");
 
     try {
       // Execute with optional timeout
@@ -364,7 +362,7 @@ export class SchedulerService {
       job.totalRuns++;
       job.totalDuration += duration;
 
-      debugLog("scheduler", `Job completed: ${name} (${duration}ms)`);
+      logger.debug({ jobName: name, durationMs: duration }, "Job completed");
 
       // Save to database (unless skipped)
       if (!job.config.skipDatabaseLogging) {
@@ -383,7 +381,7 @@ export class SchedulerService {
       job.totalFailures++;
       job.totalDuration += duration;
 
-      console.error(`[Scheduler] Job failed: ${name}`, error);
+      logger.error({ err: error, jobName: name }, "Job failed");
 
       // Retry if configured
       if (
@@ -391,7 +389,7 @@ export class SchedulerService {
         job.config.maxRetries &&
         retryCount < job.config.maxRetries
       ) {
-        console.log(`[Scheduler] Retrying job '${name}' (attempt ${retryCount + 1}/${job.config.maxRetries})`);
+        logger.info({ jobName: name, attempt: retryCount + 1, maxRetries: job.config.maxRetries }, "Retrying job");
         await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1s between retries
         return this.executeJob(name, retryCount + 1);
       }
@@ -471,7 +469,7 @@ export class SchedulerService {
 
       await historyRepo.save(history);
     } catch (error) {
-      console.error("[Scheduler] Failed to save job execution to database:", error);
+      logger.error({ err: error }, "Failed to save job execution to database");
       // Don't throw - database errors shouldn't stop job execution
     }
   }

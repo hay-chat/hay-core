@@ -28,6 +28,9 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("auth");
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -70,6 +73,7 @@ const registerSchema = z
     lastName: z.string().optional(),
     organizationName: z.string().optional(),
     organizationSlug: z.string().optional(),
+    emailVerified: z.boolean().optional().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -121,6 +125,15 @@ export const authRouter = t.router({
       });
     }
 
+    // Check if email is verified
+    if (!user.emailVerified) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Please verify your email address before signing in.",
+        cause: { type: "EMAIL_NOT_VERIFIED" },
+      });
+    }
+
     // Update last login time and last seen
     user.lastLoginAt = new Date();
     user.updateLastSeen();
@@ -159,7 +172,7 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
+    const { email, password, firstName, lastName, organizationName, organizationSlug, emailVerified } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -227,6 +240,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
+        emailVerified: emailVerified ?? true,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -281,6 +295,14 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid refresh token",
+        });
+      }
+
+      if (!user.emailVerified) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Please verify your email address before signing in.",
+          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 
@@ -385,7 +407,7 @@ export const authRouter = t.router({
         try {
           await auditLogService.logPasswordResetRequest(user.id, ctx.ipAddress, ctx.userAgent);
         } catch (error) {
-          console.error("Failed to log password reset request:", error);
+          logger.error({ err: error }, "Failed to log password reset request");
         }
 
         return {
@@ -393,7 +415,7 @@ export const authRouter = t.router({
           message: "If an account exists with this email, you will receive a password reset link.",
         };
       } catch (error) {
-        console.error("Failed to process password reset request:", error);
+        logger.error({ err: error }, "Failed to process password reset request");
         // Don't expose internal errors
         return {
           success: true,
@@ -534,7 +556,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password reset or send email:", error);
+        logger.error({ err: error }, "Failed to log password reset or send email");
         // Don't fail the password reset if logging/email fails
       }
 
@@ -705,7 +727,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password change or send email:", error);
+        logger.error({ err: error }, "Failed to log password change or send email");
         // Don't fail the password change if logging/email fails
       }
 
@@ -786,7 +808,7 @@ export const authRouter = t.router({
             userAgent: ctx.userAgent,
           });
         } catch (error) {
-          console.error("Failed to log profile update:", error);
+          logger.error({ err: error }, "Failed to log profile update");
         }
       }
 
@@ -837,7 +859,7 @@ export const authRouter = t.router({
               await storageService.delete(uploadIdMatch[1]);
             }
           } catch (error) {
-            console.error("Failed to delete old avatar:", error);
+            logger.error({ err: error }, "Failed to delete old avatar");
             // Continue even if deletion fails
           }
         }
@@ -851,7 +873,7 @@ export const authRouter = t.router({
           avatarUrl: result.url,
         };
       } catch (error) {
-        console.error("Failed to upload avatar:", error);
+        logger.error({ err: error }, "Failed to upload avatar");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to upload avatar. Please try again.",
@@ -896,7 +918,7 @@ export const authRouter = t.router({
         success: true,
       };
     } catch (error) {
-      console.error("Failed to delete avatar:", error);
+      logger.error({ err: error }, "Failed to delete avatar");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to delete avatar. Please try again.",
@@ -958,16 +980,14 @@ export const authRouter = t.router({
 
       // Send verification emails
       try {
-        console.log("📧 [updateEmail] Initializing email service...");
+        logger.debug("Initializing email service for email update");
         await emailService.initialize();
-        console.log("✅ [updateEmail] Email service initialized");
+        logger.debug("Email service initialized");
 
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-        console.log("🔗 [updateEmail] Verification URL:", verificationUrl);
-        console.log("📬 [updateEmail] Sending to NEW email:", input.newEmail.toLowerCase());
-        console.log("📬 [updateEmail] Sending to OLD email:", oldEmail);
+        logger.debug({ verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail }, "Sending email change verification emails");
 
         const commonVariables = {
           userName: user.getFullName(),
@@ -987,7 +1007,7 @@ export const authRouter = t.router({
         };
 
         // Send verification email to NEW email
-        console.log("📤 [updateEmail] Sending verification email to NEW address...");
+        logger.debug("Sending verification email to new address");
         const result1 = await emailService.sendTemplateEmail({
           to: input.newEmail.toLowerCase(),
           subject: "Verify Your New Email Address",
@@ -998,10 +1018,10 @@ export const authRouter = t.router({
             recipientEmail: input.newEmail.toLowerCase(),
           },
         });
-        console.log("📨 [updateEmail] Verification email result:", result1);
+        logger.debug({ result: result1 }, "Verification email sent to new address");
 
         // Send notification to OLD email
-        console.log("📤 [updateEmail] Sending notification to OLD address...");
+        logger.debug("Sending notification email to old address");
         const result2 = await emailService.sendTemplateEmail({
           to: oldEmail,
           subject: "Email Change Pending Verification",
@@ -1011,22 +1031,18 @@ export const authRouter = t.router({
             recipientEmail: oldEmail,
           },
         });
-        console.log("📨 [updateEmail] Notification email result:", result2);
+        logger.debug({ result: result2 }, "Notification email sent to old address");
 
-        console.log("✅ [updateEmail] All emails sent successfully");
+        logger.info("All email change verification emails sent successfully");
       } catch (error) {
-        console.error("❌ [updateEmail] Failed to send verification emails:", error);
-        console.error(
-          "❌ [updateEmail] Error stack:",
-          error instanceof Error ? error.stack : "No stack",
-        );
+        logger.error({ err: error }, "Failed to send verification emails");
         // Rollback the pending email change
         await userRepository.update(user.id, {
           pendingEmail: null as any,
           emailVerificationTokenHash: null as any,
           emailVerificationExpiresAt: null as any,
         });
-        console.log("🔄 [updateEmail] Rolled back pending email change");
+        logger.warn("Rolled back pending email change due to email send failure");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to send verification email. Please try again.",
@@ -1162,7 +1178,7 @@ export const authRouter = t.router({
           variables: emailVariables,
         });
       } catch (error) {
-        console.error("Failed to send confirmation emails:", error);
+        logger.error({ err: error }, "Failed to send confirmation emails");
         // Don't fail the verification if email sending fails
       }
 
@@ -1270,7 +1286,7 @@ export const authRouter = t.router({
         },
       });
     } catch (error) {
-      console.error("Failed to resend verification email:", error);
+      logger.error({ err: error }, "Failed to resend verification email");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to resend verification email. Please try again.",
@@ -1282,6 +1298,132 @@ export const authRouter = t.router({
       message: "Verification email resent successfully",
     };
   }),
+
+  // Email verification for onboarding (called by backoffice after account creation)
+  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    if (user.emailVerified) {
+      return { success: true, message: "Email is already verified", token: null, expiresAt: null };
+    }
+
+    // Rate limit: max 5 verification requests per email per day
+    const rateLimitResult = await rateLimitService.checkEmailRateLimit(
+      user.email,
+      5,
+      24 * 60 * 60,
+    );
+    if (rateLimitResult.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many verification requests. Please try again later.",
+      });
+    }
+
+    // Generate token (SHA-256 hash for storage, allows direct DB lookup)
+    const token = generateSecureToken(32);
+    const tokenHash = await hashApiKey(token);
+
+    // Store on user (reuse existing email verification fields)
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await userRepository.save(user);
+
+    return {
+      success: true,
+      token, // Plain token returned to caller (backoffice) for inclusion in email
+      expiresAt: user.emailVerificationExpiresAt,
+    };
+  }),
+
+  verifyEmail: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const tokenHash = await hashApiKey(input.token);
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { emailVerificationTokenHash: tokenHash },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired verification token",
+        });
+      }
+
+      // Check expiry
+      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
+        user.clearEmailVerification();
+        await userRepository.save(user);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Verification link has expired. Please request a new one.",
+        });
+      }
+
+      // Mark as verified, clear token fields
+      user.emailVerified = true;
+      user.clearEmailVerification();
+      await userRepository.save(user);
+
+      return { success: true, message: "Email verified successfully", email: user.email };
+    }),
+
+  resendSignupVerification: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const { email } = input;
+
+      // Rate limit: 3 requests per hour per email
+      const rateLimitResult = await rateLimitService.checkEmailRateLimit(
+        email,
+        3,
+        60 * 60,
+      );
+      if (rateLimitResult.limited) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many requests. Please try again later.",
+        });
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { email: email.toLowerCase() },
+      });
+
+      // Always return success to prevent user enumeration
+      if (!user || !user.isActive || user.emailVerified) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
+        return {
+          success: true,
+          token: null,
+          message: "If an unverified account exists, a new verification link will be sent.",
+        };
+      }
+
+      // Generate new token
+      const token = generateSecureToken(32);
+      const tokenHash = await hashApiKey(token);
+      user.emailVerificationTokenHash = tokenHash;
+      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await userRepository.save(user);
+
+      return {
+        success: true,
+        token, // Returned to backoffice for email sending
+        message: "If an unverified account exists, a new verification link will be sent.",
+      };
+    }),
 
   // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
   generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
@@ -1331,6 +1473,14 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Account is deactivated",
+        });
+      }
+
+      if (!user.emailVerified) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Please verify your email address before signing in.",
+          cause: { type: "EMAIL_NOT_VERIFIED" },
         });
       }
 

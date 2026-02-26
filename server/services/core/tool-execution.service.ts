@@ -7,6 +7,9 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { conversationSecretService } from "../conversation-secret.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("tool-execution");
 
 interface ToolExecutionResult {
   success: boolean;
@@ -52,7 +55,7 @@ export class ToolExecutionService {
     messageId?: string,
   ): Promise<ToolExecutionResult> {
     try {
-      console.log(`Executing tool: ${toolCall.name} with args:`, toolCall.args);
+      logger.info({ toolName: toolCall.name, args: toolCall.args }, "Executing tool");
 
       const currentContext = conversation.orchestration_status as ConversationContext | null;
       if (currentContext) {
@@ -82,12 +85,12 @@ export class ToolExecutionService {
         const executedAt = new Date().toISOString();
 
         try {
-          console.log(`[ToolExecutionService] Executing tool call:`, toolCall);
+          logger.debug({ toolCall }, "Executing tool call");
           const result = await this.executeToolCall(conversation, {
             tool_name: toolCall.name,
             arguments: toolCall.args,
           });
-          console.log(`[ToolExecutionService] Tool call result:`, result);
+          logger.debug({ result }, "Tool call result");
 
           toolLogEntry.ok = true;
           toolLogEntry.result = result;
@@ -187,7 +190,7 @@ export class ToolExecutionService {
 
       return { success: false, error: "No conversation context available" };
     } catch (error) {
-      console.error("Error handling tool execution:", error);
+      logger.error({ err: error }, "Error handling tool execution");
       return {
         success: false,
         error: (error as Error).message || "Unknown error",
@@ -201,8 +204,7 @@ export class ToolExecutionService {
   ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
-    console.log(`[ToolExecution] Executing MCP tool: ${fullToolName}`);
-    console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));
+    logger.debug({ fullToolName, toolArgs }, "Executing MCP tool");
 
     // Parse the tool name to extract plugin and tool parts
     // Expected format: "{pluginId}:{toolName}"
@@ -216,22 +218,22 @@ export class ToolExecutionService {
     const pluginId = fullToolName.substring(0, colonIndex);
     const actualToolName = fullToolName.substring(colonIndex + 1);
 
-    console.log(`[ToolExecution] Parsed plugin ID: ${pluginId}, tool name: ${actualToolName}`);
+    logger.debug({ pluginId, actualToolName }, "Parsed tool name");
 
     // Find the plugin that contains this tool
     const allPlugins = pluginManagerService.getAllPlugins();
-    console.log(
-      `[ToolExecution] Available plugins:`,
-      allPlugins.map((p) => ({ id: p.pluginId, name: p.name })),
+    logger.debug(
+      { availablePlugins: allPlugins.map((p) => ({ id: p.pluginId, name: p.name })) },
+      "Available plugins",
     );
 
     let matchingPlugin = null;
     let toolSchema = null;
 
     for (const plugin of allPlugins) {
-      console.log(`[ToolExecution] Checking plugin: ${plugin.pluginId} (${plugin.name})`);
+      logger.debug({ pluginId: plugin.pluginId, pluginName: plugin.name }, "Checking plugin");
       if (plugin.pluginId === pluginId) {
-        console.log(`[ToolExecution] Found matching plugin ID: ${pluginId}`);
+        logger.debug({ pluginId }, "Found matching plugin ID");
         const manifest = plugin.manifest as HayPluginManifest;
 
         // Check if this plugin has dynamic MCP tools (no static tool definitions)
@@ -240,28 +242,28 @@ export class ToolExecutionService {
 
         if (hasMCPCapability && !manifest.capabilities?.mcp?.tools) {
           // Plugin with dynamic tools - fetched from the running MCP server
-          console.log(`[ToolExecution] Plugin has dynamic tools, skipping manifest validation`);
+          logger.debug("Plugin has dynamic tools, skipping manifest validation");
           matchingPlugin = plugin;
           // No toolSchema needed - the MCP client will handle validation
           break;
         } else if (manifest.capabilities?.mcp?.tools) {
           // Legacy plugin with static tool definitions in manifest
           const mcpTools = manifest.capabilities.mcp.tools;
-          console.log(
-            `[ToolExecution] Available tools in plugin:`,
-            mcpTools.map((t) => t.name),
+          logger.debug(
+            { tools: mcpTools.map((t) => t.name) },
+            "Available tools in plugin",
           );
           const tool = mcpTools.find((t) => t.name === actualToolName);
           if (tool) {
             matchingPlugin = plugin;
             toolSchema = tool;
-            console.log(`[ToolExecution] Found matching tool:`, tool.name);
+            logger.debug({ toolName: tool.name }, "Found matching tool");
             break;
           } else {
-            console.log(`[ToolExecution] Tool '${actualToolName}' not found in this plugin`);
+            logger.debug({ actualToolName }, "Tool not found in this plugin");
           }
         } else {
-          console.log(`[ToolExecution] Plugin has no MCP capability or tools defined`);
+          logger.debug("Plugin has no MCP capability or tools defined");
         }
       }
     }
@@ -278,8 +280,9 @@ export class ToolExecutionService {
       );
     }
 
-    console.log(
-      `[ToolExecution] Found tool '${actualToolName}' in plugin '${matchingPlugin.name}'`,
+    logger.info(
+      { toolName: actualToolName, pluginName: matchingPlugin.name },
+      "Found tool in plugin",
     );
 
     // Validate tool arguments against input schema (only for legacy plugins with static schemas)
@@ -295,19 +298,17 @@ export class ToolExecutionService {
         }
       }
     } else if (!toolSchema) {
-      console.log(
-        `[ToolExecution] Skipping argument validation for dynamic plugin (handled by MCP server)`,
-      );
+      logger.debug("Skipping argument validation for dynamic plugin (handled by MCP server)");
     }
 
     // Check if plugin needs installation/building
     if (pluginManagerService.needsInstallation(matchingPlugin.pluginId)) {
-      console.log(`[ToolExecution] Installing plugin '${matchingPlugin.name}'`);
+      logger.info({ pluginName: matchingPlugin.name }, "Installing plugin");
       await pluginManagerService.installPlugin(matchingPlugin.pluginId);
     }
 
     if (pluginManagerService.needsBuilding(matchingPlugin.pluginId)) {
-      console.log(`[ToolExecution] Building plugin '${matchingPlugin.name}'`);
+      logger.info({ pluginName: matchingPlugin.name }, "Building plugin");
       await pluginManagerService.buildPlugin(matchingPlugin.pluginId);
     }
 
@@ -317,7 +318,7 @@ export class ToolExecutionService {
       throw new Error(`Plugin '${matchingPlugin.name}' has no start command defined`);
     }
 
-    console.log(`[ToolExecution] Plugin start command: ${startCommand}`);
+    logger.debug({ startCommand }, "Plugin start command");
 
     // Get organization ID from the conversation parameter passed to the parent method
     const organizationId = conversation.organization_id;
@@ -450,7 +451,7 @@ export class ToolExecutionService {
       // Fetch the full message to get all fields
       const message = await this.messageService.messageRepository.findById(messageId);
       if (!message) {
-        console.warn(`[ToolExecution] Message ${messageId} not found for broadcast`);
+        logger.warn({ messageId }, "Message not found for broadcast");
         return;
       }
 
@@ -473,7 +474,7 @@ export class ToolExecutionService {
       if (redisService.isConnected()) {
         // Publish to Redis for distribution across all server instances
         await redisService.publish("websocket:events", eventPayload);
-        console.log(`[ToolExecution] Tool result broadcast via Redis for message ${messageId}`);
+        logger.debug({ messageId }, "Tool result broadcast via Redis");
       } else {
         // Fallback to direct WebSocket if Redis not available
         const { websocketService } = await import("@server/services/websocket.service");
@@ -493,10 +494,10 @@ export class ToolExecutionService {
         // Broadcast to both organization (dashboard) and conversation (webchat) clients
         websocketService.sendToOrganization(conversation.organization_id, messagePayload);
         websocketService.sendToConversation(conversation.id, messagePayload);
-        console.log(`[ToolExecution] Tool result broadcast via WebSocket for message ${messageId}`);
+        logger.debug({ messageId }, "Tool result broadcast via WebSocket");
       }
     } catch (error) {
-      console.error(`[ToolExecution] Failed to broadcast message update:`, error);
+      logger.error({ err: error }, "Failed to broadcast message update");
       // Don't throw - broadcast failure shouldn't break tool execution
     }
   }
@@ -507,9 +508,7 @@ export class ToolExecutionService {
     toolName: string,
     toolArgs: Record<string, unknown>,
   ): Promise<unknown> {
-    console.log(`[ToolExecution] Executing MCP tool: ${pluginId}:${toolName}`);
-    console.log(`[ToolExecution] Organization ID: ${organizationId}`);
-    console.log(`[ToolExecution] Tool arguments:`, JSON.stringify(toolArgs, null, 2));
+    logger.debug({ pluginId, toolName, organizationId, toolArgs }, "Executing MCP tool via client");
 
     try {
       // Use MCP client factory to get the appropriate client (local or remote)
@@ -519,7 +518,7 @@ export class ToolExecutionService {
       // Call the tool
       const result = await client.callTool(toolName, toolArgs);
 
-      console.log(`[ToolExecution] MCP response received:`, JSON.stringify(result, null, 2));
+      logger.debug({ result }, "MCP response received");
 
       if (result.isError) {
         // Preserve the full error object for better error visibility
@@ -536,7 +535,7 @@ export class ToolExecutionService {
       // Return the result content or the full result object
       return result.content || result;
     } catch (error) {
-      console.error(`[ToolExecution] MCP tool execution failed:`, error);
+      logger.error({ err: error }, "MCP tool execution failed");
       throw error;
     }
   }

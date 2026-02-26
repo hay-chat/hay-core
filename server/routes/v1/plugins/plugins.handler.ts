@@ -19,6 +19,9 @@ import { fetchToolsFromWorker, fetchAndStoreTools } from "@server/services/plugi
 import { readFile } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugins");
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -180,9 +183,9 @@ export const getPlugin = authenticatedProcedure
           }
         }
       } catch (error) {
-        console.warn(
-          `[getPlugin] Failed to fetch metadata from worker for ${input.pluginId}:`,
-          error,
+        logger.warn(
+          { err: error, pluginId: input.pluginId },
+          "Failed to fetch metadata from worker",
         );
       }
     }
@@ -324,37 +327,37 @@ export const enablePlugin = authenticatedProcedure
     try {
       // Check if plugin needs installation
       if (pluginManagerService.needsInstallation(input.pluginId)) {
-        console.log(`🚀 [HAY] Starting installation for ${plugin.name}...`);
+        logger.info({ pluginName: plugin.name }, "Starting installation for plugin");
         await pluginManagerService.installPlugin(input.pluginId);
       }
 
       // Check if plugin needs building
       if (pluginManagerService.needsBuilding(input.pluginId)) {
-        console.log(`🚀 [HAY] Starting build for ${plugin.name}...`);
+        logger.info({ pluginName: plugin.name }, "Starting build for plugin");
         await pluginManagerService.buildPlugin(input.pluginId);
       }
 
       // Only enable plugin if installation and build succeeded
-      console.log(`🚀 [HAY] Enabling ${plugin.name} for organization...`);
+      logger.info({ pluginName: plugin.name }, "Enabling plugin for organization");
       const instance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
         input.configuration || {},
       );
 
-      console.log(`✅ [HAY OK] Plugin ${plugin.name} successfully enabled`);
+      logger.info({ pluginName: plugin.name }, "Plugin successfully enabled");
 
       // For MCP plugins, start the worker immediately so it can register its MCP servers
       const manifest = plugin.manifest as any;
       const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
 
       if (capabilities.includes("mcp")) {
-        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        logger.info({ pluginName: plugin.name }, "Starting worker for MCP plugin");
         try {
           await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
-          console.log(`✅ [HAY OK] Worker started for ${plugin.name}`);
+          logger.info({ pluginName: plugin.name }, "Worker started for plugin");
         } catch (workerError) {
-          console.error(`⚠️ [HAY WARNING] Failed to start worker for ${plugin.name}:`, workerError);
+          logger.error({ err: workerError, pluginName: plugin.name }, "Failed to start worker for plugin");
           // Don't fail the entire enable operation if worker fails to start
           // The worker can be started later on-demand
         }
@@ -365,7 +368,7 @@ export const enablePlugin = authenticatedProcedure
         instance,
       };
     } catch (error) {
-      console.error(`❌ [HAY FAILED] Failed to enable plugin ${plugin.name}:`, error);
+      logger.error({ err: error, pluginName: plugin.name }, "Failed to enable plugin");
 
       // Extract the most relevant error message
       let errorMessage = "Unknown error";
@@ -415,9 +418,9 @@ export const disablePlugin = authenticatedProcedure
         });
 
         clearTimeout(timeoutId);
-        console.log(`✅ Called /disable hook for ${plugin.name}`);
+        logger.info({ pluginName: plugin.name }, "Called /disable hook for plugin");
       } catch (error) {
-        console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+        logger.warn({ err: error, pluginName: plugin.name }, "Plugin disable hook failed");
         // Continue anyway - cleanup failure should not block disable
       }
     }
@@ -472,7 +475,7 @@ export const restartPlugin = authenticatedProcedure
     }
 
     try {
-      console.log(`🔄 [HAY] Restarting worker for ${plugin.name}...`);
+      logger.info({ pluginName: plugin.name }, "Restarting worker for plugin");
 
       // Call plugin's disable hook (if worker running)
       const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
@@ -487,25 +490,25 @@ export const restartPlugin = authenticatedProcedure
           });
 
           clearTimeout(timeoutId);
-          console.log(`✅ Called /disable hook for ${plugin.name} before restart`);
+          logger.info({ pluginName: plugin.name }, "Called /disable hook before restart");
         } catch (error) {
-          console.warn(`⚠️ Plugin disable hook failed for ${plugin.name}:`, error);
+          logger.warn({ err: error, pluginName: plugin.name }, "Plugin disable hook failed before restart");
           // Continue anyway - cleanup failure should not block restart
         }
       }
 
       // Stop the worker
       await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);
-      console.log(`🛑 [HAY] Worker stopped for ${plugin.name}`);
+      logger.info({ pluginName: plugin.name }, "Worker stopped for plugin");
 
       // For MCP plugins, start the worker immediately
       const manifest = plugin.manifest as any;
       const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
 
       if (capabilities.includes("mcp")) {
-        console.log(`🚀 [HAY] Starting worker for MCP plugin ${plugin.name}...`);
+        logger.info({ pluginName: plugin.name }, "Starting worker for MCP plugin");
         await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
-        console.log(`✅ [HAY OK] Worker restarted for ${plugin.name}`);
+        logger.info({ pluginName: plugin.name }, "Worker restarted for plugin");
       }
 
       return {
@@ -513,7 +516,7 @@ export const restartPlugin = authenticatedProcedure
         message: `Worker for ${plugin.name} restarted successfully`,
       };
     } catch (error) {
-      console.error(`❌ [HAY FAILED] Failed to restart plugin ${plugin.name}:`, error);
+      logger.error({ err: error, pluginName: plugin.name }, "Failed to restart plugin");
 
       let errorMessage = "Unknown error";
       if (error instanceof Error) {
@@ -623,7 +626,7 @@ export const configurePlugin = authenticatedProcedure
 
     // Validate auth if auth fields changed
     if (metadata && authState && hasAuthChanges(input.configuration, metadata)) {
-      console.log(`🔐 Auth fields changed for ${plugin.name}, validating credentials...`);
+      logger.info({ pluginName: plugin.name }, "Auth fields changed, validating credentials");
 
       try {
         const worker = pluginManagerService.getWorker(ctx.organizationId!, input.pluginId);
@@ -656,7 +659,7 @@ export const configurePlugin = authenticatedProcedure
               });
             }
 
-            console.log(`✅ Auth validated for ${plugin.name}`);
+            logger.info({ pluginName: plugin.name }, "Auth validated successfully");
           } catch (error: any) {
             clearTimeout(timeoutId);
             if (error.name === "AbortError") {
@@ -668,8 +671,9 @@ export const configurePlugin = authenticatedProcedure
             throw error;
           }
         } else {
-          console.log(
-            `ℹ️ Worker not running or SDK v1, skipping auth validation for ${plugin.name}`,
+          logger.debug(
+            { pluginName: plugin.name },
+            "Worker not running or SDK v1, skipping auth validation",
           );
         }
       } catch (error: any) {
@@ -679,7 +683,7 @@ export const configurePlugin = authenticatedProcedure
         }
 
         // Otherwise wrap it
-        console.error(`❌ Auth validation failed for ${plugin.name}:`, error);
+        logger.error({ err: error, pluginName: plugin.name }, "Auth validation failed");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Auth validation failed: ${error.message}`,
@@ -721,18 +725,19 @@ export const configurePlugin = authenticatedProcedure
     // Restart the plugin if it's currently running to apply new configuration
     const runner = getPluginRunnerService();
     if (runner.isRunning(ctx.organizationId!, input.pluginId)) {
-      console.log(
-        `🔄 Configuration changed for ${plugin.name}, restarting plugin to apply new settings...`,
+      logger.info(
+        { pluginName: plugin.name },
+        "Configuration changed, restarting plugin to apply new settings",
       );
       try {
         // Stop and start worker to apply new configuration
         await runner.stopWorker(ctx.organizationId!, input.pluginId);
         await runner.startWorker(ctx.organizationId!, input.pluginId);
-        console.log(`✅ Plugin ${plugin.name} restarted with new configuration`);
+        logger.info({ pluginName: plugin.name }, "Plugin restarted with new configuration");
       } catch (error) {
-        console.error(
-          `⚠️  Failed to restart ${plugin.name} after config change:`,
-          error instanceof Error ? error.message : String(error),
+        logger.error(
+          { err: error, pluginName: plugin.name },
+          "Failed to restart plugin after config change",
         );
         // Don't throw - config was saved successfully, restart failure is non-critical
       }
@@ -838,20 +843,21 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
           // Background refresh of cache (non-blocking)
           if (tools.length > 0) {
             fetchAndStoreTools(workerInfo.port, ctx.organizationId!, plugin.id).catch((error) => {
-              console.error(`Background tool cache refresh failed for ${plugin.id}:`, error);
+              logger.error({ err: error, pluginId: plugin.id }, "Background tool cache refresh failed");
             });
           }
         } else {
           // Worker fetch failed - log error and return empty (don't mask with cached tools)
           const errorText = await response.text();
-          console.error(
-            `Failed to fetch tools from worker for ${plugin.id}: HTTP ${response.status} - ${errorText}`,
+          logger.error(
+            { pluginId: plugin.id, httpStatus: response.status, errorText },
+            "Failed to fetch tools from worker",
           );
           tools = [];
         }
       } catch (error) {
         // Timeout or network error - log and return empty (don't mask with cached tools)
-        console.error(`Failed to fetch tools from worker for ${plugin.id}:`, error);
+        logger.error({ err: error, pluginId: plugin.id }, "Failed to fetch tools from worker");
         tools = [];
       }
     } else {
@@ -1012,13 +1018,12 @@ export const testConnection = authenticatedProcedure
     }),
   )
   .query(async ({ ctx, input }): Promise<PluginHealthCheckResult> => {
-    console.log(`[testConnection] ===== Starting test for ${input.pluginId} =====`);
-    console.log(`[testConnection] Organization ID: ${ctx.organizationId}`);
+    logger.debug({ pluginId: input.pluginId, organizationId: ctx.organizationId }, "Starting connection test");
 
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
     if (!plugin) {
-      console.log(`[testConnection] ❌ Plugin ${input.pluginId} not found in registry`);
+      logger.debug({ pluginId: input.pluginId }, "Plugin not found in registry");
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
@@ -1026,8 +1031,7 @@ export const testConnection = authenticatedProcedure
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    console.log(`[testConnection] Plugin manifest capabilities:`, manifest.capabilities);
-    console.log(`[testConnection] Plugin type:`, manifest.type);
+    logger.debug({ capabilities: manifest.capabilities, type: manifest.type }, "Plugin manifest details");
 
     // Check if plugin has MCP capabilities (support both TypeScript-first array and legacy object format)
     const hasMcpCapability = Array.isArray(manifest.capabilities)
@@ -1035,7 +1039,7 @@ export const testConnection = authenticatedProcedure
       : !!manifest.capabilities?.mcp;
 
     if (!hasMcpCapability) {
-      console.log(`[testConnection] ❌ Plugin ${input.pluginId} does not have MCP capability`);
+      logger.debug({ pluginId: input.pluginId }, "Plugin does not have MCP capability");
       return {
         success: false,
         status: "unhealthy",
@@ -1044,7 +1048,7 @@ export const testConnection = authenticatedProcedure
       };
     }
 
-    console.log(`[testConnection] ✅ Plugin has MCP capability`);
+    logger.debug("Plugin has MCP capability");
 
     // Check if plugin instance exists and has configuration
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(
@@ -1056,17 +1060,17 @@ export const testConnection = authenticatedProcedure
     // Use in-memory plugin metadata (more up-to-date than database)
     const authMethods = plugin.metadata?.authMethods;
 
-    console.log(`[testConnection] Plugin instance status:`, {
+    logger.debug({
       exists: !!instance,
       enabled: instance?.enabled,
       hasConfig: !!instance?.config,
       hasAuthState: !!instance?.authState,
       configKeys: instance?.config ? Object.keys(instance.config) : [],
       authMethods: authMethods?.map((m: any) => ({ type: m.type, id: m.id })) || [],
-    });
+    }, "Plugin instance status");
 
     if (!instance) {
-      console.log(`[testConnection] ❌ Plugin has no instance`);
+      logger.debug("Plugin has no instance");
       return {
         success: false,
         status: "unconfigured",
@@ -1087,9 +1091,7 @@ export const testConnection = authenticatedProcedure
         });
 
       if (!hasCredentials) {
-        console.log(
-          `[testConnection] ❌ Plugin requires authentication but no credentials configured`,
-        );
+        logger.debug("Plugin requires authentication but no credentials configured");
         return {
           success: false,
           status: "unconfigured",
@@ -1097,23 +1099,20 @@ export const testConnection = authenticatedProcedure
           testedAt: new Date(),
         };
       }
-      console.log(`[testConnection] ✅ Plugin has required credentials configured`);
+      logger.debug("Plugin has required credentials configured");
     }
 
     try {
       let mcpTools: any[] = [];
 
       // Start the worker if not already running
-      console.log(`[testConnection] 🚀 Starting or getting existing worker...`);
+      logger.debug("Starting or getting existing worker");
       let worker;
       try {
         worker = await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
-        console.log(`[testConnection] ✅ Worker is running:`, {
-          port: worker.port,
-          startedAt: worker.startedAt,
-        });
+        logger.debug({ port: worker.port, startedAt: worker.startedAt }, "Worker is running");
       } catch (workerStartError) {
-        console.error(`[testConnection] ❌ Failed to start worker:`, workerStartError);
+        logger.error({ err: workerStartError }, "Failed to start worker for connection test");
         return {
           success: false,
           status: "unhealthy",
@@ -1124,37 +1123,36 @@ export const testConnection = authenticatedProcedure
 
       if (worker && worker.port) {
         // Use shared fetchToolsFromWorker service - throws on error
-        console.log(`[testConnection] 📡 Fetching tools from worker on port ${worker.port}...`);
+        logger.debug({ port: worker.port, pluginId: input.pluginId }, "Fetching tools from worker");
         mcpTools = await fetchToolsFromWorker(worker.port, input.pluginId);
-        console.log(
-          `[testConnection] ✅ Fetched ${mcpTools.length} MCP tools from worker for ${input.pluginId}`,
+        logger.debug(
+          { toolCount: mcpTools.length, pluginId: input.pluginId },
+          "Fetched MCP tools from worker",
         );
         if (mcpTools.length > 0) {
-          console.log(
-            `[testConnection] Tool names:`,
-            mcpTools.map((t: any) => t.name),
+          logger.debug(
+            { toolNames: mcpTools.map((t: any) => t.name) },
+            "Available tool names",
           );
         }
       } else {
-        console.log(`[testConnection] ⚠️  No worker running for ${input.pluginId}`);
+        logger.debug({ pluginId: input.pluginId }, "No worker running for plugin");
 
         // Only use cached tools when there's no worker at all
-        console.log(`[testConnection] 📦 Checking for cached tools in database config...`);
+        logger.debug("Checking for cached tools in database config");
         mcpTools = getToolsFromConfig(instance.config);
-        console.log(`[testConnection] Found ${mcpTools.length} cached tools in database`);
+        logger.debug({ toolCount: mcpTools.length }, "Found cached tools in database");
         if (mcpTools.length > 0) {
-          console.log(
-            `[testConnection] Cached tool names:`,
-            mcpTools.map((t: any) => t.name),
+          logger.debug(
+            { toolNames: mcpTools.map((t: any) => t.name) },
+            "Cached tool names",
           );
         }
       }
 
       // Verify tools are registered
       if (mcpTools.length === 0) {
-        console.log(
-          `[testConnection] ❌ No tools found (neither from worker nor from database cache)`,
-        );
+        logger.debug("No tools found (neither from worker nor from database cache)");
         return {
           success: false,
           status: "unhealthy",
@@ -1207,20 +1205,15 @@ export const testConnection = authenticatedProcedure
 
       const hasRequiredParams =
         testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
-      console.log(`[testConnection] Testing MCP connection by calling tool: ${testTool.name}`);
-      console.log(`[testConnection] Tool has required parameters: ${hasRequiredParams}`);
+      logger.debug({ toolName: testTool.name, hasRequiredParams }, "Testing MCP connection by calling tool");
 
       // Call the tool via worker or legacy MCP client
       if (worker && worker.port) {
         // If the selected tool has required parameters, skip the actual call
         // and just verify the worker is responding
         if (hasRequiredParams) {
-          console.log(
-            `[testConnection] ⚠️  Selected tool has required parameters, skipping actual tool call`,
-          );
-          console.log(
-            `[testConnection] ✅ Worker is running and tools are available - marking as healthy`,
-          );
+          logger.debug("Selected tool has required parameters, skipping actual tool call");
+          logger.debug("Worker is running and tools are available - marking as healthy");
           return {
             success: true,
             status: "healthy",
@@ -1232,7 +1225,7 @@ export const testConnection = authenticatedProcedure
 
         // Call tool via worker HTTP API (only if no required parameters)
         try {
-          console.log(`[testConnection] 🔄 Calling tool with empty arguments for health check...`);
+          logger.debug("Calling tool with empty arguments for health check");
           const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1245,9 +1238,7 @@ export const testConnection = authenticatedProcedure
 
           if (!callResponse.ok) {
             const errorText = await callResponse.text();
-            console.log(
-              `[testConnection] ❌ Tool call failed: HTTP ${callResponse.status} - ${errorText}`,
-            );
+            logger.debug({ httpStatus: callResponse.status, errorText }, "Tool call failed");
             return {
               success: false,
               status: "unhealthy",
@@ -1260,7 +1251,7 @@ export const testConnection = authenticatedProcedure
           await callResponse.json();
 
           // Success - MCP server is responding
-          console.log(`[testConnection] ✅ Tool call succeeded - MCP server is healthy`);
+          logger.debug("Tool call succeeded - MCP server is healthy");
           return {
             success: true,
             status: "healthy",
@@ -1269,7 +1260,7 @@ export const testConnection = authenticatedProcedure
             testedAt: new Date(),
           };
         } catch (testError: any) {
-          console.log(`[testConnection] ❌ Tool call failed with error: ${testError.message}`);
+          logger.debug({ err: testError }, "Tool call failed with error");
           return {
             success: false,
             status: "unhealthy",

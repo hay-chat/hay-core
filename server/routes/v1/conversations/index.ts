@@ -11,6 +11,9 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { DeliveryState } from "@server/types/message-feedback.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversations");
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
@@ -601,7 +604,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[approveMessage] Failed to publish approval event:", error);
+        logger.error({ err: error }, "Failed to publish approval event");
       }
 
       // TODO: Trigger actual message delivery to customer via WebSocket/plugin
@@ -685,7 +688,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[blockMessage] Failed to publish block event:", error);
+        logger.error({ err: error }, "Failed to publish block event");
       }
 
       return updatedMessage;

@@ -1,5 +1,9 @@
 import crypto from "crypto";
 
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("encryption");
+
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 const SALT_LENGTH = 64;
@@ -131,7 +135,7 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
       try {
         decrypted[key] = decryptValue((value as any).value);
       } catch (error) {
-        console.error(`Failed to decrypt config key ${key}:`, error);
+        logger.error({ err: error, key }, "Failed to decrypt config key");
         decrypted[key] = null;
       }
     } else {
@@ -201,7 +205,7 @@ export class EncryptedTransformer {
         try {
           decrypted[field] = decryptValue(decrypted[field]);
         } catch (error) {
-          console.error(`Failed to decrypt field ${field}:`, error);
+          logger.error({ err: error, field }, "Failed to decrypt field");
           // Keep encrypted value if decryption fails
         }
       }
@@ -281,10 +285,7 @@ export class AuthStateEncryptedTransformer {
           } catch (error) {
             // Decryption failed - this is legacy plaintext data from before encryption
             // Return as-is for backwards compatibility (will be encrypted on next save)
-            console.warn(
-              `[AuthStateTransformer] Failed to decrypt credential '${key}', using as-is (legacy data?):`,
-              error instanceof Error ? error.message : String(error),
-            );
+            logger.warn({ err: error, key }, "Failed to decrypt credential, using as-is (legacy data?)");
             decryptedCredentials[key] = val;
           }
         } else {

@@ -7,6 +7,9 @@ import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("auth-middleware");
 
 /**
  * Load UserOrganization relationship for multi-org context
@@ -192,6 +195,5 @@ function logAuthSuccess(_method: string, _userId: string): void {
 }
 
 function logAuthFailure(method: string, error: unknown): void {
-  const message = error instanceof Error ? error.message : "Unknown error";
-  console.error(`[Auth] Failed ${method} authentication: ${message}`);
+  logger.error({ err: error, method }, "Authentication failed");
 }

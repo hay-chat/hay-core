@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { dpopCacheService } from "../../services/dpop-cache.service";
 import { conversationRepository } from "../../repositories/conversation.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("dpop");
 
 export interface DPoPPayload {
   iat?: number;
@@ -152,7 +155,7 @@ export async function verifyDPoPProof(
       throw new DPoPError("invalid_token", "Token verification failed");
     }
 
-    console.error("DPoP verification error:", error);
+    logger.error({ err: error }, "DPoP verification error");
     throw new DPoPError("invalid_token", "Token verification failed");
   }
 }
@@ -240,7 +243,7 @@ export function dpopAuthMiddleware(requireAuth: boolean = true) {
         });
       }
 
-      console.error("DPoP middleware error:", error);
+      logger.error({ err: error }, "DPoP middleware error");
       return res.status(500).json({
         error: "internal_error",
         error_description: "Authentication failed",

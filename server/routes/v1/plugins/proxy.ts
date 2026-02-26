@@ -1,6 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-proxy");
 
 const router = Router();
 
@@ -16,7 +19,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
     const { pluginId } = req.params;
     const path = (req.params as any).path ? `/${(req.params as any).path}` : "";
 
-    console.log(`[PluginProxy] ${req.method} ${req.path} -> /${pluginId}${path}`);
+    logger.debug({ method: req.method, path: req.path, pluginId }, "Proxying request to plugin");
 
     // Extract organization ID (from auth, subdomain, or query param)
     const organizationId = await extractorganizationId(req);
@@ -33,10 +36,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
     try {
       worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
     } catch (error) {
-      console.error(
-        `[PluginProxy] Failed to start worker for ${organizationId}:${pluginId}:`,
-        error,
-      );
+      logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
       return res.status(503).json({
         error: "Plugin unavailable",
         message: error instanceof Error ? error.message : "Failed to start plugin worker",
@@ -46,7 +46,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
     // Proxy request to worker
     const workerUrl = `http://localhost:${worker.port}${path}${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`;
 
-    console.log(`[PluginProxy] Forwarding to ${workerUrl}`);
+    logger.debug({ workerUrl }, "Forwarding request to worker");
 
     try {
       // Convert Express headers to fetch-compatible headers
@@ -78,14 +78,14 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
       const data = await response.text();
       return res.send(data);
     } catch (error) {
-      console.error(`[PluginProxy] Error forwarding to worker:`, error);
+      logger.error({ err: error }, "Error forwarding to worker");
       return res.status(502).json({
         error: "Bad gateway",
         message: "Failed to communicate with plugin worker",
       });
     }
   } catch (error) {
-    console.error("[PluginProxy] Unexpected error:", error);
+    logger.error({ err: error }, "Unexpected error in plugin proxy");
     return res.status(500).json({
       error: "Internal server error",
       message: error instanceof Error ? error.message : "Unknown error",

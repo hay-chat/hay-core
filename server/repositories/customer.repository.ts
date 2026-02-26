@@ -3,6 +3,9 @@ import { Customer } from "../database/entities/customer.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("customer-repo");
 
 export class CustomerRepository extends BaseRepository<Customer> {
   private legacyRepository!: Repository<Customer>;
@@ -246,7 +249,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
-            console.warn(`Invalid relation '${relation}' for Customer entity`);
+            logger.warn({ relation }, "Invalid relation for Customer entity");
           }
       }
     });

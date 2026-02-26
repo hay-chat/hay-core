@@ -5,8 +5,11 @@ import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
+import { createLogger } from "@server/lib/logger";
 import "reflect-metadata";
 import "dotenv/config";
+
+const logger = createLogger("server");
 
 async function startServer() {
   // Validate required environment variables in production
@@ -23,7 +26,7 @@ async function startServer() {
   try {
     await redisService.initialize();
   } catch (error) {
-    console.warn("⚠️  Starting server without Redis connection");
+    logger.warn("Starting server without Redis connection");
   }
 
   // Initialize Job Queue service (depends on Redis)
@@ -31,7 +34,7 @@ async function startServer() {
   try {
     await jobQueueService.initialize();
   } catch (error) {
-    console.warn("⚠️  Starting server without Job Queue service");
+    logger.warn("Starting server without Job Queue service");
   }
 
   // Initialize Scheduler service (depends on Database)
@@ -41,8 +44,7 @@ async function startServer() {
     await schedulerService.initialize();
     registerAllScheduledJobs();
   } catch (error) {
-    console.warn("⚠️  Starting server without Scheduler service");
-    console.error(error);
+    logger.warn({ err: error }, "Starting server without Scheduler service");
   }
 
   // Import services after database initialization to avoid circular dependency issues
@@ -124,7 +126,7 @@ async function startServer() {
     projectRoot = path.resolve(projectRoot, "..");
   }
   const webchatDir = path.join(projectRoot, "webchat", "dist");
-  console.log(`📦 Serving webchat files from: ${webchatDir}`);
+  logger.debug({ webchatDir }, "Serving webchat files");
   server.use(
     "/v1/webchat",
     express.static(webchatDir, {
@@ -148,7 +150,7 @@ async function startServer() {
       pluginName: decodeURIComponent(req.params[0]),
     };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
-      console.error("Thumbnail serving error:", error);
+      logger.error({ err: error }, "Thumbnail serving error");
       res.status(500).json({ error: "Internal server error" });
     });
   });
@@ -161,7 +163,7 @@ async function startServer() {
       filePath: req.params[1],
     };
     pluginAssetService.servePublicFile(req, res).catch((error) => {
-      console.error("Public file serving error:", error);
+      logger.error({ err: error }, "Public file serving error");
       res.status(500).json({ error: "Internal server error" });
     });
   });
@@ -183,7 +185,7 @@ async function startServer() {
       // Serve the file (no authentication required for UI bundles)
       await pluginAssetService.serveUIAsset(req, res);
     } catch (error) {
-      console.error("UI asset serving error:", error);
+      logger.error({ err: error }, "UI asset serving error");
       res.status(500).json({ error: "Failed to load UI asset" });
     }
   });
@@ -196,7 +198,7 @@ async function startServer() {
       webhookPath: req.params[1],
     };
     pluginRouteService.handleWebhook(req, res).catch((error) => {
-      console.error("Webhook handling error:", error);
+      logger.error({ err: error }, "Webhook handling error");
       res.status(500).json({ error: "Internal server error" });
     });
   });
@@ -204,7 +206,7 @@ async function startServer() {
   // Plugin webhook verification route - handle webhook verification challenges
   server.get("/plugins/webhooks/:pluginName", (req, res) => {
     pluginRouteService.handleWebhookVerification(req, res).catch((error) => {
-      console.error("Webhook verification error:", error);
+      logger.error({ err: error }, "Webhook verification error");
       res.status(500).json({ error: "Internal server error" });
     });
   });
@@ -216,9 +218,7 @@ async function startServer() {
 
   // OAuth callback route - handle OAuth redirects from providers
   server.get("/oauth/callback", async (req, res) => {
-    console.log("\n========== OAUTH CALLBACK ENDPOINT HIT ==========");
-    console.log("Full query params:", req.query);
-    console.log("URL:", req.url);
+    logger.debug("OAuth callback endpoint hit");
 
     const { oauthService } = await import("@server/services/oauth.service");
     const { getDashboardUrl } = await import("@server/config/env");
@@ -250,12 +250,10 @@ async function startServer() {
         const dashboardUrl = getDashboardUrl();
         const encodedPluginId = encodeURIComponent(result.pluginId!);
         const redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
-        console.log("✅ OAuth successful, redirecting to:", redirectUrl);
-        console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
+        logger.info({ pluginId: result.pluginId }, "OAuth callback successful");
         return res.redirect(redirectUrl);
       } else {
-        console.log("❌ OAuth failed, showing error page");
-        console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
+        logger.warn({ error: result.error }, "OAuth callback failed");
         // Show error page
         return res.status(400).send(`
           <html>
@@ -269,8 +267,7 @@ async function startServer() {
         `);
       }
     } catch (error) {
-      console.error("❌ OAuth callback exception:", error);
-      console.log("========== OAUTH CALLBACK ENDPOINT END ==========\n");
+      logger.error({ err: error }, "OAuth callback exception");
       return res.status(500).send(`
         <html>
           <head><title>OAuth Error</title></head>
@@ -291,9 +288,9 @@ async function startServer() {
   // Initialize plugin system BEFORE creating the router
   try {
     await pluginManagerService.initialize();
-    console.log("🔌 Plugin manager initialized");
+    logger.info("Plugin manager initialized");
   } catch (error) {
-    console.error("Failed to initialize plugin system:", error);
+    logger.error({ err: error }, "Failed to initialize plugin system");
   }
 
   // Plugin upload endpoints
@@ -375,47 +372,47 @@ async function startServer() {
 
   httpServer.on("error", (error: ServerError) => {
     if (error.code === "EADDRINUSE") {
-      console.error(`❌ Port ${config.server.port} is already in use.`);
+      logger.error({ port: config.server.port }, "Port is already in use");
       process.exit(1);
     }
-    console.error("Server error:", error);
+    logger.error({ err: error }, "Server error");
     process.exit(1);
   });
 
   httpServer.listen(config.server.port, async () => {
-    console.log(`🚀 Server is running on port http://localhost:${config.server.port}`);
-    console.log(`🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`);
+    logger.info({ port: config.server.port }, "Server is running");
+    logger.info({ wsPort: config.server.wsPort }, "WebSocket server is running");
 
     // Start the orchestrator worker
     orchestratorWorker.start(config.orchestrator.interval); // Check every second
-    console.log("🤖 Orchestrator worker started");
+    logger.info("Orchestrator worker started");
 
     // Initialize plugin pages management (plugin system already initialized)
     try {
       // Initialize plugin pages management
       const { pluginPagesService } = await import("./services/plugin-pages.service");
       await pluginPagesService.initialize();
-      console.log("📄 Plugin pages synced with dashboard");
+      logger.info("Plugin pages synced with dashboard");
 
       // Start plugin route service cleanup
       pluginRouteService.startCleanup();
-      console.log("🔌 Plugin route service started");
+      logger.info("Plugin route service started");
 
       // Start plugin instance lifecycle management
       pluginInstanceManagerService.startCleanup();
-      console.log("🔌 Plugin instance lifecycle manager started");
+      logger.info("Plugin instance lifecycle manager started");
 
       // Note: Plugins will now be started on-demand when needed
       // This improves scalability and resource usage
-      console.log(`🔌 Plugin system ready (on-demand instance startup enabled)`);
+      logger.info("Plugin system ready (on-demand instance startup enabled)");
     } catch (error) {
-      console.error("Failed to initialize plugin system:", error);
+      logger.error({ err: error }, "Failed to initialize plugin system");
     }
   });
 
   // Graceful shutdown
   process.on("SIGTERM", async () => {
-    console.log("SIGTERM received, shutting down gracefully");
+    logger.info("SIGTERM received, shutting down gracefully");
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
@@ -424,7 +421,7 @@ async function startServer() {
   });
 
   process.on("SIGINT", async () => {
-    console.log("SIGINT received, shutting down gracefully");
+    logger.info("SIGINT received, shutting down gracefully");
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
@@ -435,6 +432,6 @@ async function startServer() {
 
 // Start the server
 startServer().catch((error) => {
-  console.error("Failed to start server:", error);
+  logger.error({ err: error }, "Failed to start server");
   process.exit(1);
 });

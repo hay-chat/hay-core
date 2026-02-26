@@ -6,6 +6,9 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { environmentManagerService } from "./environment-manager.service";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-route");
 
 interface RateLimitEntry {
   count: number;
@@ -90,7 +93,7 @@ export class PluginRouteService {
 
         const webhookSecret = env.WEBHOOK_SECRET || instance.config?.webhookSecret;
         if (!webhookSecret) {
-          console.error(`Webhook secret not configured for ${pluginName}`);
+          logger.error({ pluginName }, "Webhook secret not configured");
           res.status(500).json({ error: "Webhook secret not configured" });
           return;
         }
@@ -166,7 +169,7 @@ export class PluginRouteService {
 
       res.status(proxyResponse.status).json(responseBody);
     } catch (error) {
-      console.error(`Webhook error for ${pluginName}/${fullPath}:`, error);
+      logger.error({ err: error, pluginName, path: fullPath }, "Webhook error");
       res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -285,7 +288,7 @@ export class PluginRouteService {
     }
 
     if (cleared > 0) {
-      console.log(`[PluginRoute] Cleared ${cleared} expired rate limit entries`);
+      logger.debug({ cleared }, "Cleared expired rate limit entries");
     }
   }
 
@@ -296,7 +299,7 @@ export class PluginRouteService {
    */
   startCleanup(): void {
     // No-op: Cleanup is now handled by scheduler
-    console.log("[PluginRoute] Rate limit cleanup handled by scheduler service");
+    logger.debug("Rate limit cleanup handled by scheduler service");
   }
 }
 

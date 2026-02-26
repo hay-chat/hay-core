@@ -4,6 +4,9 @@ import { AppDataSource } from "../database/data-source";
 import type { ListParams } from "../trpc/middleware/pagination";
 import type { PaginatedResponse } from "../types/list-input";
 import { createPaginatedResponse } from "../types/list-input";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("base-repo");
 
 export abstract class BaseRepository<T extends ObjectLiteral> {
   protected repository!: Repository<T>;
@@ -191,7 +194,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
         queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
       } catch (error) {
         // Silently ignore invalid relations
-        console.warn(`Invalid relation '${relation}' for entity ${this.entityClass.name}`);
+        logger.warn({ relation, entity: this.entityClass.name }, "Invalid relation for entity");
       }
     });
   }

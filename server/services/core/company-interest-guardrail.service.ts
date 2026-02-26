@@ -1,6 +1,9 @@
 import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
 import { Message } from "@server/database/entities/message.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("company-guardrail");
 
 /**
  * Types of violations that harm company interests
@@ -156,7 +159,7 @@ export class CompanyInterestGuardrailService {
         requiresFactCheck: parsed.requiresFactCheck && !shouldBlock,
       };
     } catch (error) {
-      console.error("Error in company interest assessment:", error);
+      logger.error({ err: error }, "Error in company interest assessment");
       // On error, be conservative and allow response but require fact check
       return {
         passed: true,

@@ -5,6 +5,9 @@ import { Conversation } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversation");
 
 export class ConversationService {
   private conversationRepository: ConversationRepository;
@@ -136,7 +139,7 @@ export class ConversationService {
     if (data.status === "pending-human") {
       import("../orchestrator/conversation-utils").then(({ generateConversationTitle }) => {
         generateConversationTitle(conversationId, organizationId, false).catch((error) => {
-          console.error("Error generating title for pending-human conversation:", error);
+          logger.error({ err: error }, "Error generating title for pending-human conversation");
         });
       });
     }
@@ -168,9 +171,9 @@ export class ConversationService {
           await vectorStoreService.deleteByMessageIds(organizationId, messageIds);
         }
       } catch (error) {
-        console.error(
-          `[ConversationService] Failed to delete embeddings for conversation ${conversationId}:`,
-          error,
+        logger.error(
+          { err: error, conversationId },
+          "Failed to delete embeddings for conversation",
         );
         throw error; // Re-throw to abort conversation deletion for GDPR compliance
       }

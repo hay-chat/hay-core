@@ -1,4 +1,7 @@
 import { router } from "@server/trpc";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-router-registry");
 
 /**
  * Generic plugin router registry - plugins register their routers here
@@ -22,7 +25,7 @@ export class PluginRouterRegistry {
    * Called by plugins during initialization
    */
   registerRouter(pluginId: string, pluginRouter: any): void {
-    console.log(`📦 Registering router for plugin: ${pluginId}`);
+    logger.info({ pluginId }, "Registering router for plugin");
     this.pluginRouters.set(pluginId, pluginRouter);
     this.mergedRouter = null; // Invalidate cache
   }
@@ -31,7 +34,7 @@ export class PluginRouterRegistry {
    * Unregister a plugin router
    */
   unregisterRouter(pluginId: string): void {
-    console.log(`📦 Unregistering router for plugin: ${pluginId}`);
+    logger.info({ pluginId }, "Unregistering router for plugin");
     this.pluginRouters.delete(pluginId);
     this.mergedRouter = null; // Invalidate cache
   }

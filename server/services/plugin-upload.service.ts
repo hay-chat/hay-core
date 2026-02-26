@@ -9,6 +9,9 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { storageService } from "./storage.service";
 import { pluginManagerService } from "./plugin-manager.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-upload");
 
 export class PluginUploadService {
   private pluginsDir: string;
@@ -91,7 +94,7 @@ export class PluginUploadService {
         message: `Plugin ${manifest.name} uploaded successfully`,
       });
     } catch (error) {
-      console.error("Plugin upload failed:", error);
+      logger.error({ err: error }, "Plugin upload failed");
       const message = error instanceof Error ? error.message : "Upload failed";
       res.status(400).json({ error: message });
     }
@@ -183,7 +186,7 @@ export class PluginUploadService {
         message: `Plugin ${manifest.name} updated successfully`,
       });
     } catch (error) {
-      console.error("Plugin update failed:", error);
+      logger.error({ err: error }, "Plugin update failed");
       const message = error instanceof Error ? error.message : "Update failed";
       res.status(400).json({ error: message });
     }
@@ -253,7 +256,7 @@ export class PluginUploadService {
         message: `Plugin ${pluginId} deleted successfully`,
       });
     } catch (error) {
-      console.error("Plugin deletion failed:", error);
+      logger.error({ err: error }, "Plugin deletion failed");
       const message = error instanceof Error ? error.message : "Deletion failed";
       res.status(400).json({ error: message });
     }

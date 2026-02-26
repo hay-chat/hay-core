@@ -2,6 +2,9 @@ import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
 import { Document } from "@server/entities/document.entity";
 import { Message } from "@server/database/entities/message.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("confidence-guardrail");
 
 /**
  * Confidence score breakdown showing individual components
@@ -181,7 +184,7 @@ export class ConfidenceGuardrailService {
       const parsed = JSON.parse(result);
       return Math.max(0, Math.min(1, parsed.score)); // Ensure 0-1 range
     } catch (error) {
-      console.error("Error calculating grounding score:", error);
+      logger.error({ err: error }, "Error calculating grounding score");
       // On error, return a conservative low score
       return 0.3;
     }
@@ -241,7 +244,7 @@ export class ConfidenceGuardrailService {
 
       return score;
     } catch (error) {
-      console.error("Error calculating certainty score:", error);
+      logger.error({ err: error }, "Error calculating certainty score");
       // On error, return moderate certainty
       return 0.5;
     }

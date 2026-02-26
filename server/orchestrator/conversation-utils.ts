@@ -5,7 +5,9 @@ import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { PromptService } from "@server/services/prompt.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversation-utils");
 
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
@@ -62,12 +64,9 @@ export async function generateConversationTitle(
       title: title.substring(0, 255), // Ensure it fits in the column
     });
 
-    debugLog(
-      "conversation-utils",
-      `Generated title for conversation ${conversationId}: "${title}"`,
-    );
+    logger.debug({ conversationId, title }, "Generated conversation title");
   } catch (error) {
-    console.error("Error generating conversation title:", error);
+    logger.error({ err: error }, "Error generating conversation title");
     // Don't throw - title generation is not critical
   }
 }
@@ -120,12 +119,9 @@ export async function sendInactivityWarning(
       },
     });
 
-    debugLog(
-      "conversation-utils",
-      `Sent inactivity warning for conversation ${conversationId}`,
-    );
+    logger.debug({ conversationId }, "Sent inactivity warning");
   } catch (error) {
-    console.error("Error sending inactivity warning:", error);
+    logger.error({ err: error }, "Error sending inactivity warning");
     throw error;
   }
 }
@@ -216,12 +212,9 @@ export async function closeInactiveConversation(
       },
     });
 
-    debugLog(
-      "conversation-utils",
-      `Closed inactive conversation ${conversationId} (silent: ${!sendMessage})`,
-    );
+    logger.debug({ conversationId, silent: !sendMessage }, "Closed inactive conversation");
   } catch (error) {
-    console.error("Error closing inactive conversation:", error);
+    logger.error({ err: error }, "Error closing inactive conversation");
     throw error;
   }
 }
@@ -241,16 +234,13 @@ export async function checkForClosureIntent(
 
     // Check if message has closure intent
     if (message.intent === "close_satisfied" || message.intent === "close_unsatisfied") {
-      debugLog(
-        "conversation-utils",
-        `Detected closure intent (${message.intent}) in message ${messageId}`,
-      );
+      logger.debug({ conversationId, messageId, intent: message.intent }, "Detected closure intent");
       return true;
     }
 
     return false;
   } catch (error) {
-    console.error("Error checking closure intent:", error);
+    logger.error({ err: error }, "Error checking closure intent");
     return false;
   }
 }
@@ -299,7 +289,7 @@ export async function validateConversationClosure(
 
     return JSON.parse(response);
   } catch (error) {
-    console.error("Error validating conversation closure:", error);
+    logger.error({ err: error }, "Error validating conversation closure");
     // Default to not closing on error
     return {
       shouldClose: false,

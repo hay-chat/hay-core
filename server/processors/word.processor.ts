@@ -2,6 +2,9 @@ import { BaseProcessor, type ProcessedDocument } from "./base.processor";
 import * as mammoth from "mammoth";
 import { sanitizeContent } from "../utils/sanitize";
 const WordExtractor = require("word-extractor");
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("word-processor");
 
 export class WordProcessor extends BaseProcessor {
   supportedTypes = [
@@ -25,7 +28,7 @@ export class WordProcessor extends BaseProcessor {
         return await this.processDoc(buffer, fileName);
       }
     } catch (error) {
-      console.error(`Error processing Word document ${fileName}:`, error);
+      logger.error({ err: error, fileName }, "Error processing Word document");
       throw new Error(`Failed to process Word document: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -47,7 +50,7 @@ export class WordProcessor extends BaseProcessor {
         },
       };
     } catch (error) {
-      console.error("Error processing DOCX with mammoth:", error);
+      logger.error({ err: error }, "Error processing DOCX with mammoth");
       // Fallback to word-extractor if mammoth fails
       return await this.processWithWordExtractor(buffer, fileName);
     }
@@ -82,7 +85,7 @@ export class WordProcessor extends BaseProcessor {
         },
       };
     } catch (error) {
-      console.error("Error processing with word-extractor:", error);
+      logger.error({ err: error }, "Error processing with word-extractor");
       throw error;
     }
   }

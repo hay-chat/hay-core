@@ -1,4 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("dpop-cache");
 
 export class DPoPCacheService {
   private readonly NONCE_PREFIX = "nonce:";
@@ -118,7 +121,7 @@ export class DPoPCacheService {
     }
 
     if (noncesDeleted > 0 || jtisDeleted > 0) {
-      console.log(`[DPoP] Cleanup: ${noncesDeleted} nonces, ${jtisDeleted} JTIs deleted`);
+      logger.debug({ noncesDeleted, jtisDeleted }, "Cleanup completed");
     }
   }
 }

@@ -2,6 +2,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import mjml2html from "mjml";
 import type { EmailTemplate, TemplateRenderOptions } from "../types/email.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("template");
 
 export class TemplateService {
   private templateCache: Map<string, EmailTemplate> = new Map();
@@ -22,7 +25,7 @@ export class TemplateService {
     try {
       await this.loadTemplates();
     } catch (error) {
-      console.error("Failed to initialize template service:", error);
+      logger.error({ err: error }, "Failed to initialize template service");
     }
   }
 
@@ -33,7 +36,7 @@ export class TemplateService {
     try {
       const contentDirExists = await this.fileExists(this.contentDir);
       if (!contentDirExists) {
-        console.warn("[TemplateService] Content directory not found");
+        logger.warn("Content directory not found");
         return;
       }
 
@@ -41,22 +44,22 @@ export class TemplateService {
       const files = await fs.readdir(this.contentDir);
       const mjmlFiles = files.filter((file) => file.endsWith(".mjml"));
 
-      console.log(`[TemplateService] Loading ${mjmlFiles.length} MJML templates...`);
+      logger.info({ count: mjmlFiles.length }, "Loading MJML templates");
 
       for (const file of mjmlFiles) {
         const templateId = file.replace(".mjml", "");
         const template = await this.loadMjmlTemplate(templateId);
         if (template) {
           this.templateCache.set(templateId, template);
-          console.log(`[TemplateService] ✓ Loaded template: ${templateId}`);
+          logger.info({ templateId }, "Loaded template");
         } else {
-          console.warn(`[TemplateService] ✗ Failed to load template: ${templateId}`);
+          logger.warn({ templateId }, "Failed to load template");
         }
       }
 
-      console.log(`[TemplateService] Total templates cached: ${this.templateCache.size}`);
+      logger.info({ count: this.templateCache.size }, "Total templates cached");
     } catch (error) {
-      console.error("Error loading templates:", error);
+      logger.error({ err: error }, "Error loading templates");
     }
   }
 
@@ -82,7 +85,7 @@ export class TemplateService {
         isMjml: true,
       };
     } catch (error) {
-      console.error(`Error loading MJML template ${templateId}:`, error);
+      logger.error({ err: error, templateId }, "Error loading MJML template");
       return null;
     }
   }
@@ -135,14 +138,14 @@ export class TemplateService {
 
     // If template is not in cache, try to load it
     if (!template) {
-      console.log(`[TemplateService] Template "${templateId}" not in cache, attempting to load...`);
+      logger.debug({ templateId }, "Template not in cache, attempting to load");
       const loadedTemplate = await this.loadMjmlTemplate(templateId);
       if (loadedTemplate) {
         this.templateCache.set(templateId, loadedTemplate);
         template = loadedTemplate;
-        console.log(`[TemplateService] ✓ Successfully loaded template: ${templateId}`);
+        logger.info({ templateId }, "Successfully loaded template");
       } else {
-        console.error(`[TemplateService] ✗ Failed to load template: ${templateId}`);
+        logger.error({ templateId }, "Failed to load template");
       }
     }
 
@@ -178,7 +181,7 @@ export class TemplateService {
     });
 
     if (result.errors.length > 0) {
-      console.warn("MJML compilation warnings:", result.errors);
+      logger.warn({ errors: result.errors }, "MJML compilation warnings");
     }
 
     let html = result.html;
@@ -204,20 +207,18 @@ export class TemplateService {
 
     // Handle conditional blocks
     result = this.processConditionals(result, variables);
-    console.log(
-      `[TemplateService] After conditionals: ${originalLength} -> ${result.length} bytes`,
-    );
+    logger.debug({ originalLength, resultLength: result.length }, "After conditionals");
 
     // Handle loops
     result = this.processLoops(result, variables);
-    console.log(`[TemplateService] After loops: ${result.length} bytes`);
+    logger.debug({ resultLength: result.length }, "After loops");
 
     // Replace simple variables
     for (const [key, value] of Object.entries(variables)) {
       const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
       const matches = result.match(pattern);
       if (matches) {
-        console.log(`[TemplateService] Replacing ${matches.length} instances of {{${key}}}`);
+        logger.debug({ key, count: matches.length }, "Replacing variable instances");
       }
       result = result.replace(pattern, this.formatValue(value));
     }
@@ -225,10 +226,7 @@ export class TemplateService {
     // Count remaining unmatched variables before removal
     const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
     if (unmatchedVars) {
-      console.log(
-        `[TemplateService] Removing ${unmatchedVars.length} unmatched variables:`,
-        unmatchedVars.slice(0, 5),
-      );
+      logger.debug({ count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) }, "Removing unmatched variables");
     }
 
     // Remove any remaining unmatched variables
@@ -249,9 +247,7 @@ export class TemplateService {
       const variable = condition.trim();
       const value = this.getNestedValue(variables, variable);
 
-      console.log(
-        `[TemplateService] Conditional #${matchCount}: {{#if ${variable}}} = ${!!value} (value: ${JSON.stringify(value)?.substring(0, 50)})`,
-      );
+      logger.debug({ conditionNumber: matchCount, variable, result: !!value }, "Processing conditional");
 
       if (value) {
         return block; // Don't recursively replace here - will be done in main replaceVariables

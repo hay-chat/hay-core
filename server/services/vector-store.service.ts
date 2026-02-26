@@ -11,6 +11,9 @@ import OpenAI from "openai";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
 import type { EntityManager } from "typeorm";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("vector-store");
 
 const EMBEDDING_BATCH_SIZE = 100;
 // OpenAI allows max 300K tokens per embedding request.
@@ -87,18 +90,14 @@ export class VectorStoreService {
     }
 
     const totalChars = texts.reduce((sum, t) => sum + t.length, 0);
-    console.log(
-      `[VectorStore] Embedding ${texts.length} texts (${totalChars} total chars) in ${batches.length} batches`,
-    );
+    logger.debug({ textCount: texts.length, totalChars, batchCount: batches.length }, "Embedding texts");
 
     const allVectors: number[][] = [];
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       const batchChars = batch.reduce((sum, t) => sum + t.length, 0);
-      console.log(
-        `[VectorStore] Batch ${i + 1}/${batches.length}: ${batch.length} texts, ${batchChars} chars`,
-      );
+      logger.debug({ batch: i + 1, totalBatches: batches.length, textCount: batch.length, batchChars }, "Processing batch");
       const response = await this.openai.embeddings.create({
         model: this.model,
         input: batch,

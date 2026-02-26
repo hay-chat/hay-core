@@ -2,6 +2,9 @@ import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-ui");
 
 interface UITemplate {
   name: string;
@@ -76,7 +79,7 @@ export class PluginUIService {
         this.templateCache.set(cacheKey, template);
         return content;
       } catch (error) {
-        console.error(`Failed to load configuration template for ${plugin.name}:`, error);
+        logger.error({ err: error, pluginName: plugin.name }, "Failed to load configuration template");
       }
     }
 
@@ -370,7 +373,7 @@ const saveConfiguration = async () => {
             type: this.detectTemplateType(filePath as string),
           };
         } catch (error) {
-          console.error(`Failed to load template ${name} for ${plugin.name}:`, error);
+          logger.error({ err: error, templateName: name, pluginName: plugin.name }, "Failed to load template");
         }
       }
     }
@@ -451,10 +454,7 @@ const saveConfiguration = async () => {
         const content = await fs.readFile(fullPath, "utf-8");
         return content;
       } catch (fallbackError) {
-        console.error(
-          `Failed to load component ${componentPath} for ${plugin.name}:`,
-          fallbackError,
-        );
+        logger.error({ err: fallbackError, componentPath, pluginName: plugin.name }, "Failed to load component");
         return null;
       }
     }

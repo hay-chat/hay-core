@@ -25,6 +25,9 @@ import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
 import { AppDataSource } from "@server/database/data-source";
 import { websocketService } from "@server/services/websocket.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("documents");
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -223,7 +226,7 @@ export const documentsRouter = t.router({
             },
           ];
         } catch (uploadError) {
-          console.error("Failed to save document file to storage:", uploadError);
+          logger.error({ err: uploadError }, "Failed to save document file to storage");
           // Continue without attachment - document content will still be processed
         }
       }
@@ -790,7 +793,7 @@ async function processWebImport(
 ) {
   try {
     // Log received metadata for debugging
-    console.log("[Web Import] Received metadata:", metadata);
+    logger.debug({ metadata }, "Web import received metadata");
 
     // Update job status to processing
     await jobQueueService.updateJobStatus(jobId, organizationId, {
@@ -841,7 +844,7 @@ async function processWebImport(
       }
     }
 
-    console.log(`Created ${placeholderDocuments.length} placeholder documents`);
+    logger.info({ count: placeholderDocuments.length }, "Created placeholder documents");
 
     // Initialize scraper
     const scraper = new WebScraperService();
@@ -871,7 +874,7 @@ async function processWebImport(
       // Check if job was cancelled
       const currentJob = await jobRepository.findById(jobId);
       if (currentJob?.status === JobStatus.CANCELLED) {
-        console.log(`[Web Import] Job ${jobId} was cancelled, stopping processing`);
+        logger.info({ jobId }, "Web import job was cancelled, stopping processing");
         break;
       }
 
@@ -881,7 +884,7 @@ async function processWebImport(
         // Find the corresponding placeholder document
         const placeholderDoc = placeholderDocuments.find((d) => d.sourceUrl === page.url);
         if (!placeholderDoc) {
-          console.error(`No placeholder document found for ${page.url}`);
+          logger.error({ url: page.url }, "No placeholder document found for URL");
           failedPages.push({ url: page.url, error: "Placeholder document not found" });
           continue;
         }
@@ -933,7 +936,7 @@ async function processWebImport(
         });
       } catch (pageError) {
         const errorMessage = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Failed to process page ${page.url}:`, errorMessage);
+        logger.error({ url: page.url, error: errorMessage }, "Failed to process page");
         failedPages.push({ url: page.url, error: errorMessage });
 
         // Error is already tracked in document metadata by the processor service
@@ -955,7 +958,7 @@ async function processWebImport(
 
     await jobQueueService.completeJob(jobId, organizationId, jobResult);
   } catch (error) {
-    console.error("Web import error:", error);
+    logger.error({ err: error }, "Web import error");
 
     // Update job as failed
     await jobQueueService.failJob(
@@ -1029,7 +1032,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
       totalFound: pages.length,
     });
   } catch (error) {
-    console.error("Error in page discovery:", error);
+    logger.error({ err: error }, "Error in page discovery");
 
     // Update job as failed
     await jobQueueService.failJob(
@@ -1127,7 +1130,7 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
       },
     });
   } catch (error) {
-    console.error("Recrawl error:", error);
+    logger.error({ err: error }, "Recrawl error");
 
     // Update document status to error
     await documentRepository.update(document.id, organizationId, {

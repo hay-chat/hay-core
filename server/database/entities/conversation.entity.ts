@@ -17,8 +17,10 @@ import { MessageType, MessageStatus } from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
 import { documentRepository } from "../../repositories/document.repository";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { SupportedLanguage } from "../../types/language.types";
+
+const logger = createLogger("conversation-entity");
 
 @Entity("conversations")
 export class Conversation {
@@ -247,32 +249,32 @@ export class Conversation {
 
     // Log playbook addition with embedded references (only logs once per conversation per playbook)
     if (this.playbook_id !== playbookId) {
-      debugLog("conversation", "Playbook added to conversation", {
+      logger.debug({
         conversationId: this.id,
         playbookName: playbook.title,
         referencedActions: referencedActions,
-        referencedDocuments: referencedDocuments,
-      });
+        referencedDocuments: referencedDocuments
+      }, "Playbook added to conversation");
     }
 
     // Get tool schemas from MCP Registry Service
     // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
-      debugLog("conversation", "Fetching tools from MCP registry for playbook update", {
+      logger.debug({
         conversationId: this.id,
         organizationId: this.organization_id,
-        playbookId: playbookId,
-      });
+        playbookId: playbookId
+      }, "Fetching tools from MCP registry for playbook update");
 
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
-      debugLog("conversation", "MCP registry returned tools", {
+      logger.debug({
         conversationId: this.id,
         toolCount: tools.length,
-        toolNames: tools.map((t) => `${t.pluginId}:${t.name}`),
-      });
+        toolNames: tools.map((t) => `${t.pluginId}:${t.name}`)
+      }, "MCP registry returned tools");
 
       // Convert MCP tools to schema format expected by playbook system
       for (const tool of tools) {
@@ -283,19 +285,13 @@ export class Conversation {
         });
       }
 
-      debugLog("conversation", "Fetched tool schemas from MCP registry", {
+      logger.debug({
         conversationId: this.id,
         toolCount: tools.length,
-        tools: tools.map((t) => `${t.pluginId}:${t.name}`),
-      });
+        tools: tools.map((t) => `${t.pluginId}:${t.name}`)
+      }, "Fetched tool schemas from MCP registry");
     } catch (error) {
-      debugLog("conversation", "ERROR fetching tools from MCP registry", {
-        level: "error",
-        conversationId: this.id,
-        organizationId: this.organization_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      console.warn("Could not fetch tool schemas from MCP registry:", error);
+      logger.error({ err: error, conversationId: this.id, organizationId: this.organization_id }, "Failed to fetch tools from MCP registry");
     }
 
     let content = "";
@@ -313,13 +309,13 @@ export class Conversation {
         **Trigger:** ${playbook.trigger}`;
 
     // Add referenced actions with tool schemas if available
-    debugLog("conversation", "Processing playbook actions", {
+    logger.debug({
       conversationId: this.id,
       referencedActionsCount: referencedActions.length,
       referencedActions,
       availableToolSchemasCount: toolSchemas.length,
-      availableToolNames: toolSchemas.map((s) => s.name),
-    });
+      availableToolNames: toolSchemas.map((s) => s.name)
+    }, "Processing playbook actions");
 
     if (referencedActions.length > 0 && toolSchemas && toolSchemas.length > 0) {
       content += `\n\n**Referenced Actions:**
@@ -328,11 +324,11 @@ The following tools are available for you to use. You MUST return only valid JSO
       const actionDetails = referencedActions.map((actionName) => {
         let toolSchema = toolSchemas.find((schema) => schema.name === actionName);
 
-        debugLog("conversation", "Looking for tool schema", {
+        logger.debug({
           conversationId: this.id,
           actionName,
-          directMatch: !!toolSchema,
-        });
+          directMatch: !!toolSchema
+        }, "Looking for tool schema");
 
         if (!toolSchema && actionName.includes(":")) {
           const parts = actionName.split(":");
@@ -356,13 +352,13 @@ The following tools are available for you to use. You MUST return only valid JSO
               toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
             }
 
-            debugLog("conversation", "Tool schema fuzzy match result", {
+            logger.debug({
               conversationId: this.id,
               actionName,
               toolName,
               found: !!toolSchema,
-              matchedName: toolSchema ? toolSchema.name : undefined,
-            });
+              matchedName: toolSchema ? toolSchema.name : undefined
+            }, "Tool schema fuzzy match result");
           }
         }
 
@@ -372,12 +368,12 @@ The following tools are available for you to use. You MUST return only valid JSO
           const toolNameToAdd = toolSchema.name as string;
           if (!enabledToolIds.includes(toolNameToAdd)) {
             enabledToolIds.push(toolNameToAdd);
-            debugLog("conversation", "Added tool to enabled list", {
+            logger.debug({
               conversationId: this.id,
               actionName,
               toolNameAdded: toolNameToAdd,
-              enabledToolsCount: enabledToolIds.length,
-            });
+              enabledToolsCount: enabledToolIds.length
+            }, "Added tool to enabled list");
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
@@ -412,10 +408,10 @@ The following tools are available for you to use. You MUST return only valid JSO
     );
 
     if (!existingPlaybookMessage) {
-      debugLog("conversation", "Adding playbook message to conversation", {
+      logger.debug({
         conversationId: this.id,
-        playbookId,
-      });
+        playbookId
+      }, "Adding playbook message to conversation");
 
       await this.addMessage({
         content,
@@ -426,21 +422,21 @@ The following tools are available for you to use. You MUST return only valid JSO
         },
       });
     } else {
-      debugLog("conversation", "Playbook message already exists, skipping", {
+      logger.debug({
         conversationId: this.id,
         playbookId,
-        existingMessageId: existingPlaybookMessage.id,
-      });
+        existingMessageId: existingPlaybookMessage.id
+      }, "Playbook message already exists, skipping");
     }
 
     // Update conversation with playbook_id and enabled_tools
-    debugLog("conversation", "Updating conversation with playbook and tools", {
+    logger.debug({
       conversationId: this.id,
       playbookId,
       enabledToolIds,
       enabledToolsCount: enabledToolIds.length,
-      willSetEnabledTools: enabledToolIds.length > 0,
-    });
+      willSetEnabledTools: enabledToolIds.length > 0
+    }, "Updating conversation with playbook and tools");
 
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
@@ -450,18 +446,15 @@ The following tools are available for you to use. You MUST return only valid JSO
     this.playbook_id = playbookId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
 
-    debugLog("conversation", "Playbook update complete", {
+    logger.debug({
       conversationId: this.id,
       playbookId: this.playbook_id,
-      enabledTools: this.enabled_tools,
-    });
+      enabledTools: this.enabled_tools
+    }, "Playbook update complete");
 
     // Attach documents referenced in the playbook
     if (referencedDocuments.length > 0) {
-      debugLog(
-        "conversation",
-        `Playbook references ${referencedDocuments.length} documents, attempting to attach them`,
-      );
+      logger.debug({ conversationId: this.id, documentCount: referencedDocuments.length }, "Playbook references documents, attempting to attach them");
 
       for (const documentId of referencedDocuments) {
         try {
@@ -469,26 +462,17 @@ The following tools are available for you to use. You MUST return only valid JSO
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            debugLog(
-              "conversation",
-              `Attaching document "${document.title}" (${documentId}) from playbook`,
-            );
+            logger.debug({ conversationId: this.id, documentId, documentTitle: document.title }, "Attaching document from playbook");
 
             // addDocument already handles deduplication
             await this.addDocument(documentId);
           } else if (document) {
-            debugLog(
-              "conversation",
-              `Document ${documentId} belongs to different organization, skipping`,
-              { level: "warn" },
-            );
+            logger.warn({ conversationId: this.id, documentId }, "Document belongs to different organization, skipping");
           } else {
-            debugLog("conversation", `Document ${documentId} referenced in playbook not found`, {
-              level: "warn",
-            });
+            logger.warn({ conversationId: this.id, documentId }, "Document referenced in playbook not found");
           }
         } catch (error) {
-          console.error(`[Conversation] Error attaching document "${documentId}":`, error);
+          logger.error({ err: error, documentId }, "Error attaching document from playbook");
         }
       }
     }
@@ -515,12 +499,12 @@ The following tools are available for you to use. You MUST return only valid JSO
       referencedDocuments = analysis.documents;
     }
 
-    debugLog("conversation", "Adding handoff instructions", {
+    logger.debug({
       conversationId: this.id,
       handoffType,
       referencedActions,
-      referencedDocuments,
-    });
+      referencedDocuments
+    }, "Adding handoff instructions");
 
     // Get tool schemas from MCP Registry Service
     // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
@@ -538,13 +522,13 @@ The following tools are available for you to use. You MUST return only valid JSO
         });
       }
 
-      debugLog("conversation", "Fetched tool schemas from MCP registry for handoff", {
+      logger.debug({
         conversationId: this.id,
         toolCount: tools.length,
-        tools: tools.map((t) => `${t.pluginId}:${t.name}`),
-      });
+        tools: tools.map((t) => `${t.pluginId}:${t.name}`)
+      }, "Fetched tool schemas from MCP registry for handoff");
     } catch (error) {
-      console.warn("Could not fetch tool schemas from MCP registry:", error);
+      logger.warn({ err: error, conversationId: this.id }, "Could not fetch tool schemas from MCP registry");
     }
 
     let content = `From this message forward you should follow these handoff instructions:
@@ -636,34 +620,22 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // Attach documents referenced in the handoff instructions
     if (referencedDocuments.length > 0) {
-      debugLog(
-        "conversation",
-        `Handoff references ${referencedDocuments.length} documents, attempting to attach them`,
-      );
+      logger.debug({ conversationId: this.id, documentCount: referencedDocuments.length }, "Handoff references documents, attempting to attach them");
 
       for (const documentId of referencedDocuments) {
         try {
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            debugLog(
-              "conversation",
-              `Attaching document "${document.title}" (${documentId}) from handoff instructions`,
-            );
+            logger.debug({ conversationId: this.id, documentId, documentTitle: document.title }, "Attaching document from handoff instructions");
             await this.addDocument(documentId);
           } else if (document) {
-            debugLog(
-              "conversation",
-              `Document ${documentId} belongs to different organization, skipping`,
-              { level: "warn" },
-            );
+            logger.warn({ conversationId: this.id, documentId }, "Document belongs to different organization, skipping");
           } else {
-            debugLog("conversation", `Document ${documentId} referenced in handoff not found`, {
-              level: "warn",
-            });
+            logger.warn({ conversationId: this.id, documentId }, "Document referenced in handoff not found");
           }
         } catch (error) {
-          console.error(`[Conversation] Error attaching document "${documentId}":`, error);
+          logger.error({ err: error, documentId }, "Error attaching document from handoff");
         }
       }
     }
@@ -673,10 +645,10 @@ The following tools are available for you to use. You MUST return only valid JSO
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     if (!this.document_ids?.includes(documentId)) {
-      debugLog("conversation", "Adding document to conversation", { documentId });
-      debugLog("conversation", "Current document ids", { documentIds: this.document_ids });
+      logger.debug({ documentId }, "Adding document to conversation");
+      logger.debug({ documentIds: this.document_ids }, "Current document ids");
       const updatedDocIds = [...(this.document_ids || []), documentId];
-      debugLog("conversation", "Updated document ids", { documentIds: updatedDocIds });
+      logger.debug({ documentIds: updatedDocIds }, "Updated document ids");
       await conversationRepository.update(this.id, this.organization_id, {
         document_ids: updatedDocIds,
       });
@@ -719,11 +691,11 @@ The following tools are available for you to use. You MUST return only valid JSO
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.content === messageData.content && lastMessage.type === messageData.type) {
-        debugLog("conversation", "Duplicate message detected, skipping", {
+        logger.debug({
           conversationId: this.id,
           content: messageData.content.substring(0, 100),
-          type: messageData.type,
-        });
+          type: messageData.type
+        }, "Duplicate message detected, skipping");
         return lastMessage;
       }
     }
@@ -819,7 +791,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // IMPORTANT: Message is now saved to database and committed
     // Now it's safe to broadcast to WebSocket clients
-    debugLog("conversation", `Message ${message.id} saved to database, preparing to broadcast`);
+    logger.debug(`Message ${message.id} saved to database, preparing to broadcast`);
 
     // Broadcast messages via WebSocket:
     // - Dashboard (organization clients): receives ALL message types
@@ -855,7 +827,7 @@ The following tools are available for you to use. You MUST return only valid JSO
           // Publish to Redis for distribution across all server instances
           await redisService.publish("websocket:events", eventPayload);
 
-          debugLog("conversation", `Message ${message.id} published to Redis for broadcast`);
+          logger.debug(`Message ${message.id} published to Redis for broadcast`);
         } else {
           // Fallback to direct WebSocket if Redis not available
           const { websocketService } = await import("../../services/websocket.service");
@@ -875,21 +847,15 @@ The following tools are available for you to use. You MUST return only valid JSO
           // Send full message data to all clients in this conversation
           const sent = websocketService.sendToConversation(this.id, messagePayload);
 
-          debugLog(
-            "conversation",
-            `Sent message to ${sent} clients in conversation ${this.id} (Redis not available, after DB commit)`,
-          );
+          logger.debug({ messageId: message.id, conversationId: this.id, clientCount: sent }, "Sent message to clients (Redis not available, after DB commit)");
         }
       } catch (error) {
         // IMPORTANT: If broadcasting fails, the message is still saved in the database
 
-        debugLog(
-          "conversation",
-          `Message ${message.id} saved but broadcast failed - clients will see it on refresh`,
-        );
+        logger.warn({ messageId: message.id, conversationId: this.id }, "Message saved but broadcast failed - clients will see it on refresh");
       }
     } else {
-      debugLog("conversation", `Message NOT broadcast (not a public message)`);
+      logger.debug(`Message NOT broadcast (not a public message)`);
     }
 
     return message;
@@ -955,7 +921,7 @@ Translated message:`;
       });
       return translated.trim();
     } catch (error) {
-      console.error("Error translating greeting:", error);
+      logger.error({ err: error }, "Error translating greeting");
       // Fallback to original greeting if translation fails
       return greeting;
     }
@@ -997,7 +963,7 @@ Translated message:`;
   async addInitialAgentInstructions(): Promise<Message | null> {
     // Return early if no agent assigned
     if (!this.agent_id) {
-      debugLog("conversation", "No agent assigned, skipping agent instructions");
+      logger.debug("No agent assigned, skipping agent instructions");
       return null;
     }
 
@@ -1006,9 +972,7 @@ Translated message:`;
     const agent = await agentRepository.findById(this.agent_id);
 
     if (!agent) {
-      debugLog("conversation", `Agent ${this.agent_id} not found, skipping instructions`, {
-        level: "warn",
-      });
+      logger.warn({ agentId: this.agent_id }, "Agent not found, skipping instructions");
       return null;
     }
 
@@ -1041,7 +1005,7 @@ Translated message:`;
 
     // Skip if no content
     if (!content) {
-      debugLog("conversation", "Agent has no instructions to add");
+      logger.debug("Agent has no instructions to add");
       return null;
     }
 

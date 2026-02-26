@@ -1,6 +1,9 @@
 import { AppDataSource } from "../database/data-source";
 import { AuditLog, type AuditAction } from "../entities/audit-log.entity";
 import { User } from "../entities/user.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("audit-log");
 
 export interface AuditLogOptions {
   userId: string;
@@ -40,7 +43,7 @@ export class AuditLogService {
 
       return await this.auditLogRepository.save(auditLog);
     } catch (error) {
-      console.error("Failed to create audit log:", error);
+      logger.error({ err: error }, "Failed to create audit log");
       throw error;
     }
   }
@@ -179,7 +182,7 @@ export class AuditLogService {
 
       if (!user) {
         // Can't log without a user ID - could create a separate failed_login_attempts table
-        console.warn("Cannot log failed login for non-existent user:", email);
+        logger.warn({ email }, "Cannot log failed login for non-existent user");
         return null;
       }
 
@@ -193,7 +196,7 @@ export class AuditLogService {
         errorMessage: errorMessage || "Invalid credentials",
       });
     } catch (error) {
-      console.error("Failed to log failed login attempt:", error);
+      logger.error({ err: error }, "Failed to log failed login attempt");
       return null;
     }
   }
