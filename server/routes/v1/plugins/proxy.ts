@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { isValidUuid } from "@server/lib/validation/uuid";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-proxy");
@@ -114,12 +115,9 @@ async function extractorganizationId(req: Request): Promise<string | null> {
   // Validate UUID format and verify org exists to prevent IDOR
   if (req.query.organizationId && typeof req.query.organizationId === "string") {
     const orgId = req.query.organizationId;
-    // Basic UUID format validation
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(orgId)) {
+    if (!isValidUuid(orgId)) {
       return null;
     }
-    // Verify org exists to prevent access to arbitrary org IDs
     const org = await organizationRepository.findById(orgId);
     if (!org) {
       return null;
@@ -127,9 +125,18 @@ async function extractorganizationId(req: Request): Promise<string | null> {
     return orgId;
   }
 
-  // Method 2: From x-organization-id header (set by authenticated middleware)
+  // Method 2: From x-organization-id header
+  // This route has no auth middleware, so the header is user-controllable.
+  // Apply the same UUID + DB existence validation as query params.
   const headerOrgId = req.headers["x-organization-id"];
   if (headerOrgId && typeof headerOrgId === "string") {
+    if (!isValidUuid(headerOrgId)) {
+      return null;
+    }
+    const org = await organizationRepository.findById(headerOrgId);
+    if (!org) {
+      return null;
+    }
     return headerOrgId;
   }
 

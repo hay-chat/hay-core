@@ -101,6 +101,34 @@ describe("PII Redaction", () => {
       expect(REDACT_PATHS).toContain("creditCard");
     });
 
+    it("includes email variant fields (newEmail, oldEmail, to, from, etc.)", () => {
+      expect(REDACT_PATHS).toContain("newEmail");
+      expect(REDACT_PATHS).toContain("oldEmail");
+      expect(REDACT_PATHS).toContain("userEmail");
+      expect(REDACT_PATHS).toContain("toEmail");
+      expect(REDACT_PATHS).toContain("fromEmail");
+      expect(REDACT_PATHS).toContain("to");
+      expect(REDACT_PATHS).toContain("from");
+      expect(REDACT_PATHS).toContain("fromAddress");
+      expect(REDACT_PATHS).toContain("replyTo");
+      expect(REDACT_PATHS).toContain("cc");
+      expect(REDACT_PATHS).toContain("bcc");
+      // Nested variants
+      expect(REDACT_PATHS).toContain("*.to");
+      expect(REDACT_PATHS).toContain("*.from");
+      expect(REDACT_PATHS).toContain("*.newEmail");
+    });
+
+    it("includes URL/key fields that may embed tokens or PII", () => {
+      expect(REDACT_PATHS).toContain("verificationUrl");
+      expect(REDACT_PATHS).toContain("resetUrl");
+      expect(REDACT_PATHS).toContain("callbackUrl");
+      expect(REDACT_PATHS).toContain("key");
+      // Nested variants
+      expect(REDACT_PATHS).toContain("*.verificationUrl");
+      expect(REDACT_PATHS).toContain("*.key");
+    });
+
     it("includes authorization headers", () => {
       expect(REDACT_PATHS).toContain("headers.authorization");
       expect(REDACT_PATHS).toContain("headers.Authorization");

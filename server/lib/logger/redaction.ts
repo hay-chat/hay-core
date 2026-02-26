@@ -33,6 +33,11 @@ const SENSITIVE_FIELDS = [
 
   // Personal data
   "email",
+  "newEmail",
+  "oldEmail",
+  "userEmail",
+  "toEmail",
+  "fromEmail",
   "phone",
   "phoneNumber",
   "phone_number",
@@ -44,6 +49,20 @@ const SENSITIVE_FIELDS = [
   "credit_card",
   "bankAccount",
   "bank_account",
+
+  // Email message fields (recipient/sender addresses)
+  "to",
+  "from",
+  "fromAddress",
+  "replyTo",
+  "cc",
+  "bcc",
+
+  // URLs/keys that may embed tokens or PII
+  "verificationUrl",
+  "resetUrl",
+  "callbackUrl",
+  "key",
 ];
 
 function buildRedactPaths(): string[] {
