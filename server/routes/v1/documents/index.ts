@@ -504,6 +504,7 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         url: z.string().url(),
+        autoImport: z.boolean().optional().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -520,6 +521,7 @@ export const documentsRouter = t.router({
         data: {
           type: "page_discovery",
           url: input.url,
+          autoImport: input.autoImport,
           progress: {
             status: "starting",
             pagesFound: 0,
@@ -533,7 +535,7 @@ export const documentsRouter = t.router({
       });
 
       // Start the discovery process asynchronously
-      processPageDiscovery(ctx.organizationId, job.id, input.url);
+      processPageDiscovery(ctx.organizationId, job.id, input.url, input.autoImport);
 
       return {
         jobId: job.id,
@@ -970,7 +972,7 @@ async function processWebImport(
 }
 
 // Async function to process page discovery
-async function processPageDiscovery(organizationId: string, jobId: string, url: string) {
+async function processPageDiscovery(organizationId: string, jobId: string, url: string, autoImport = false) {
   try {
     // Update job status to processing
     await jobQueueService.updateJobStatus(jobId, organizationId, {
@@ -978,6 +980,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
       data: {
         type: "page_discovery",
         url,
+        autoImport,
         progress: {
           status: "discovering",
           pagesFound: 0,
@@ -1031,6 +1034,28 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
       pages,
       totalFound: pages.length,
     });
+
+    // Auto-import all discovered pages if requested
+    if (autoImport && pages.length > 0) {
+      logger.info({ organizationId, url, pageCount: pages.length }, "Auto-importing discovered pages");
+
+      const selectedPages = pages.map((p) => ({ ...p, selected: true }));
+
+      const importJob = await jobRepository.create({
+        title: `Import from ${new URL(url).hostname}`,
+        description: `Auto-importing ${selectedPages.length} pages from ${url}`,
+        status: JobStatus.QUEUED,
+        priority: JobPriority.NORMAL,
+        data: {
+          type: "web_import",
+          url,
+          pages: selectedPages,
+        },
+        organizationId,
+      });
+
+      processWebImport(organizationId, importJob.id, url, selectedPages);
+    }
   } catch (error) {
     logger.error({ err: error }, "Error in page discovery");
 
