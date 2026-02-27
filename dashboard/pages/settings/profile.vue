@@ -582,7 +582,7 @@ const cancelEmailChange = async () => {
 const resendVerificationEmail = async () => {
   resendingEmail.value = true;
   try {
-    const response = await Hay.auth.resendEmailVerification.mutate();
+    const response = await Hay.auth.resendEmailChangeVerification.mutate();
 
     if (response.success) {
       toast.success("Verification email resent successfully. Please check your inbox.");

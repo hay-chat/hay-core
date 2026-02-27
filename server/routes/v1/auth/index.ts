@@ -73,6 +73,7 @@ const registerSchema = z
     lastName: z.string().optional(),
     organizationName: z.string().optional(),
     organizationSlug: z.string().optional(),
+    emailVerified: z.boolean().optional().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -143,6 +144,15 @@ export const authRouter = t.router({
       });
     }
 
+    // Check if email is verified
+    if (!user.emailVerified) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Email not verified. Please check your inbox for the verification link.",
+        cause: { type: "EMAIL_NOT_VERIFIED", email: user.email },
+      });
+    }
+
     // Update last login time and last seen
     user.lastLoginAt = new Date();
     user.updateLastSeen();
@@ -181,7 +191,7 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
+    const { email, password, firstName, lastName, organizationName, organizationSlug, emailVerified } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -249,6 +259,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
+        emailVerified,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -1187,7 +1198,134 @@ export const authRouter = t.router({
     };
   }),
 
-  resendEmailVerification: protectedProcedure.mutation(async ({ ctx }) => {
+  // ─── Signup Email Verification ──────────────────────────────
+
+  /**
+   * Request a signup verification token for the authenticated user.
+   * Called right after registration when emailVerified is false.
+   * Returns the plain token so the caller (backoffice) can include it in the verification email.
+   */
+  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    if (user.emailVerified) {
+      return { success: true, token: null, expiresAt: null, message: "Email already verified" };
+    }
+
+    // Generate verification token (SHA-256 for O(1) DB lookup)
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await userRepository.save(user);
+
+    return {
+      success: true,
+      token: verificationToken,
+      expiresAt: user.emailVerificationExpiresAt.toISOString(),
+      message: "Verification token generated",
+    };
+  }),
+
+  /**
+   * Verify a user's email using a signup verification token.
+   * Public endpoint — no auth required.
+   */
+  verifyEmail: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { emailVerificationTokenHash: tokenHash },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired verification token",
+        });
+      }
+
+      // Check expiry
+      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
+        user.clearEmailVerification();
+        await userRepository.save(user);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Verification link has expired. Please request a new one.",
+        });
+      }
+
+      // Mark as verified, clear token fields
+      user.emailVerified = true;
+      user.clearEmailVerification();
+      await userRepository.save(user);
+
+      return { success: true, message: "Email verified successfully", email: user.email };
+    }),
+
+  /**
+   * Resend signup verification email for an unverified user.
+   * Public endpoint (accepts email) — returns token so the backoffice can send the email.
+   * Always returns success to prevent user enumeration.
+   */
+  resendSignupVerification: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const { email } = input;
+
+      // Rate limit: 3 requests per hour per email
+      const rateLimitResult = await rateLimitService.checkEmailRateLimit(email, 3, 60 * 60);
+      if (rateLimitResult.limited) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many requests. Please try again later.",
+        });
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { email: email.toLowerCase() },
+      });
+
+      // Always return success to prevent user enumeration
+      if (!user || !user.isActive || user.emailVerified) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
+        return {
+          success: true,
+          token: null,
+          message: "If an unverified account exists, a new verification link will be sent.",
+        };
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+
+      user.emailVerificationTokenHash = tokenHash;
+      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await userRepository.save(user);
+
+      return {
+        success: true,
+        token: verificationToken,
+        message: "If an unverified account exists, a new verification link will be sent.",
+      };
+    }),
+
+  // ─── Email Change Verification (resend) ─────────────────────
+
+  resendEmailChangeVerification: protectedProcedure.mutation(async ({ ctx }) => {
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: ctx.user!.id },
@@ -1313,6 +1451,15 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Account is deactivated",
+        });
+      }
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Email not verified. Please check your inbox for the verification link.",
+          cause: { type: "EMAIL_NOT_VERIFIED", email: user.email },
         });
       }
 
