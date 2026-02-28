@@ -131,15 +131,32 @@ const verifyEmail = async () => {
   verificationStatus.value = "pending";
 
   try {
-    const response = await Hay.auth.verifyEmailChange.mutate({
-      token: token.value,
-    });
+    // Determine verification type from URL query param
+    const verificationType = route.query.type as string | undefined;
+
+    let response: { success: boolean; message?: string; email?: string };
+
+    if (verificationType === "signup") {
+      // Signup verification (from onboarding)
+      response = await Hay.auth.verifyEmail.mutate({ token: token.value });
+    } else {
+      // Try email change first (profile settings flow), fall back to signup verification
+      try {
+        response = await Hay.auth.verifyEmailChange.mutate({ token: token.value });
+      } catch (changeError: any) {
+        if (changeError.message?.includes("pending email change")) {
+          response = await Hay.auth.verifyEmail.mutate({ token: token.value });
+        } else {
+          throw changeError;
+        }
+      }
+    }
 
     if (response.success) {
       verificationStatus.value = "success";
       toast.success(response.message || "Email verified successfully!");
 
-      // Refresh user data to clear pendingEmail from the store
+      // Refresh user data
       try {
         const userData = await Hay.auth.me.query();
         const userDataWithDates = {
@@ -165,7 +182,7 @@ const verifyEmail = async () => {
     // Provide helpful hints based on error
     if (error.message?.includes("expired")) {
       errorHint.value =
-        "The verification link has expired. Please request a new email change from your profile settings.";
+        "The verification link has expired. Please request a new verification email.";
     } else if (error.message?.includes("Invalid")) {
       errorHint.value =
         "The verification link is invalid. Please check your email or request a new verification link.";
