@@ -283,7 +283,7 @@ const deletePlugin = async (pluginId: string) => {
 
   deletingPlugin.value = pluginId;
   try {
-    const response = await fetch(getApiUrl(`/v1/plugins/${pluginId}`), {
+    const response = await fetch(getApiUrl(`/v1/plugins/${encodeURIComponent(pluginId)}`), {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${authStore.tokens?.accessToken}`,

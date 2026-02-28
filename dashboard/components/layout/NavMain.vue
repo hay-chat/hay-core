@@ -1,8 +1,18 @@
 <template>
   <div class="space-y-1">
     <template v-for="item in items" :key="item.title">
+      <a
+        v-if="!item.items && item.url && item.external"
+        href="#"
+        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        @click.prevent="handleExternalClick(item.url!)"
+      >
+        <component :is="item.icon" class="h-4 w-4" />
+        <span>{{ item.title }}</span>
+        <ExternalLink class="ml-auto h-4 w-4 text-muted-foreground" />
+      </a>
       <NuxtLink
-        v-if="!item.items && item.url"
+        v-else-if="!item.items && item.url"
         :to="item.url"
         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
         :class="{
@@ -48,7 +58,8 @@
 
 <script setup lang="ts">
 import { reactive, watchEffect, type Component } from "vue";
-import { ChevronRight } from "lucide-vue-next";
+import { ChevronRight, ExternalLink } from "lucide-vue-next";
+import { Hay } from "@/utils/api";
 
 interface NavItem {
   title: string;
@@ -56,6 +67,7 @@ interface NavItem {
   icon?: Component;
   badge?: string;
   isActive?: boolean;
+  external?: boolean;
   items?: {
     title: string;
     url: string;
@@ -86,4 +98,15 @@ watchEffect(() => {
 const toggleExpanded = (title: string) => {
   expanded[title] = !expanded[title];
 };
+
+async function handleExternalClick(url: string) {
+  try {
+    const result = await Hay.auth.generateAuthCode.mutate();
+    const separator = url.includes("?") ? "&" : "?";
+    window.open(`${url}${separator}code=${result.code}`, "_blank");
+  } catch (error) {
+    console.error("Failed to generate auth code:", error);
+    window.open(url, "_blank");
+  }
+}
 </script>

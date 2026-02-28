@@ -38,7 +38,13 @@ export class MCPRegistryService {
     tools: MCPToolDefinition[],
   ): Promise<void> {
     logger.debug(
-      { organizationId, pluginId, serverId, toolCount: tools.length, toolNames: tools.map((t) => t.name) },
+      {
+        organizationId,
+        pluginId,
+        serverId,
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name),
+      },
       "Registering tools",
     );
   }
@@ -56,7 +62,7 @@ export class MCPRegistryService {
         continue;
       }
 
-      // Get the semantic plugin ID (e.g., @hay/email-plugin) from the plugin registry
+      // Get the semantic plugin ID (e.g., hay-plugin-email) from the plugin registry
       // instance.pluginId is the UUID, instance.plugin.pluginId is the semantic ID
       const semanticPluginId = instance.plugin?.pluginId || instance.pluginId;
 
@@ -105,10 +111,7 @@ export class MCPRegistryService {
       }
     }
 
-    logger.debug(
-      { organizationId, toolCount: tools.length },
-      "Found total tools for organization",
-    );
+    logger.debug({ organizationId, toolCount: tools.length }, "Found total tools for organization");
     return tools;
   }
 

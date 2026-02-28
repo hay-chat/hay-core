@@ -1,5 +1,5 @@
 {
-  "name": "@hay/plugin-zendesk",
+  "name": "hay-plugin-zendesk",
   "version": "2.0.0",
   "description": "Connect your Zendesk account to manage tickets, customers, and support workflows",
   "author": "Hay",

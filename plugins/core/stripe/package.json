@@ -1,5 +1,5 @@
 {
-  "name": "@hay/plugin-stripe",
+  "name": "hay-plugin-stripe",
   "version": "1.0.0",
   "type": "module",
   "description": "Connect your Stripe account to manage payments, customers, subscriptions, and more",
@@ -9,7 +9,10 @@
     "entry": "./dist/index.js",
     "displayName": "Stripe",
     "category": "integration",
-    "capabilities": ["mcp", "auth"]
+    "capabilities": [
+      "mcp",
+      "auth"
+    ]
   },
   "scripts": {
     "build": "tsc",

@@ -176,7 +176,9 @@ export class PluginManagerService {
         author: packageJson.author,
         category: hayPlugin.category,
         icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
-        type: this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+        type: hayPlugin.category
+          ? [hayPlugin.category]
+          : this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
         entry: hayPlugin.entry,
         capabilities: hayPlugin.capabilities || [],
         configSchema: hayPlugin.config || {},
@@ -185,6 +187,7 @@ export class PluginManagerService {
           api: hayPlugin.capabilities || [],
         },
         auth: hayPlugin.auth || undefined, // Include auth config if present
+        channel: hayPlugin.channel || undefined, // For channel-type plugins
       };
 
       // Calculate checksum of plugin files
@@ -215,15 +218,12 @@ export class PluginManagerService {
 
   /**
    * Parse display name from package name
-   * @example "@hay/plugin-hubspot" => "HubSpot"
+   * @example "hay-plugin-hubspot" => "HubSpot"
    * @example "my-plugin" => "My Plugin"
    */
   private parseDisplayName(packageName: string): string {
-    // Remove scope (@hay/)
-    let name = packageName.replace(/^@[^/]+\//, "");
-
-    // Remove plugin- prefix
-    name = name.replace(/^plugin-/, "");
+    // Remove hay-plugin- prefix
+    let name = packageName.replace(/^hay-plugin-/, "");
 
     // Convert kebab-case to Title Case
     return name
@@ -374,7 +374,10 @@ export class PluginManagerService {
             // Extract to plugin directory
             zip.extractAllTo(pluginPath, true);
 
-            logger.info({ pluginName: plugin.name, pluginPath: plugin.pluginPath }, "Restored plugin");
+            logger.info(
+              { pluginName: plugin.name, pluginPath: plugin.pluginPath },
+              "Restored plugin",
+            );
           }
         } catch (error) {
           logger.error({ err: error, pluginName: plugin.name }, "Failed to restore plugin");
@@ -490,7 +493,10 @@ export class PluginManagerService {
       const rootDir = path.join(this.pluginsDir, "..");
       const execDir = isWorkspacePlugin ? rootDir : pluginPath;
 
-      logger.info({ pluginName: plugin.name, command: buildCommand, path: execDir }, "Building plugin");
+      logger.info(
+        { pluginName: plugin.name, command: buildCommand, path: execDir },
+        "Building plugin",
+      );
 
       execSync(buildCommand, {
         cwd: execDir,
@@ -578,7 +584,10 @@ export class PluginManagerService {
             // Register with the manifest ID, not the directory name
             const registerId = manifest.id || plugin.pluginId;
             pluginRouterRegistry.registerRouter(registerId, pluginRouter);
-            logger.info({ pluginName: plugin.name, registerId }, "Auto-activated router for plugin");
+            logger.info(
+              { pluginName: plugin.name, registerId },
+              "Auto-activated router for plugin",
+            );
           }
         } catch (error) {
           logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
@@ -777,6 +786,20 @@ export class PluginManagerService {
 
     // No worker running - start one
     return await this.startPluginWorker(organizationId, pluginId);
+  }
+
+  /**
+   * Find the plugin ID that handles a given conversation channel.
+   * Looks up the in-memory registry for a plugin with matching `channel` field.
+   */
+  findPluginIdByChannel(channel: string): string | null {
+    for (const [pluginId, plugin] of this.registry) {
+      const manifest = plugin.manifest as any;
+      if (manifest?.channel === channel) {
+        return pluginId;
+      }
+    }
+    return null;
   }
 
   /**

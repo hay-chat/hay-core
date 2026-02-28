@@ -76,7 +76,10 @@
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
                   @error="handleThumbnailError($event)"
-                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                  onerror="
+                    this.style.display = 'none';
+                    this.nextElementSibling.style.display = 'flex';
+                  "
                 />
                 <div
                   :class="[
@@ -94,8 +97,8 @@
                 }}</CardDescription>
               </div>
             </div>
-            <!-- Connection Status Badge (when enabled) -->
-            <div v-if="enabled" class="flex items-center space-x-2">
+            <!-- Connection Status Badge (only for MCP plugins when enabled) -->
+            <div v-if="enabled && isMcpPlugin" class="flex items-center space-x-2">
               <!-- Testing Badge -->
               <div
                 v-if="testing && !testResult"
@@ -161,9 +164,9 @@
         </Card>
       </template>
 
-      <!-- Connection Status Alert (when enabled) -->
+      <!-- Connection Status Alert (only for MCP plugins when enabled) -->
       <Alert
-        v-if="enabled && testResult && !testResult.success"
+        v-if="isMcpPlugin && enabled && testResult && !testResult.success"
         :variant="testResult.status === 'unconfigured' ? 'default' : 'danger'"
         :icon="testResult.status === 'unconfigured' ? Info : AlertTriangle"
       >
@@ -616,6 +619,13 @@ const oauthAvailable = ref(false); // Plugin has OAuth2 registered
 const oauthConfigured = ref(false); // OAuth credentials configured
 const oauthConnected = ref(false); // OAuth flow completed and access token exists
 
+// Whether this plugin has MCP capabilities (connection testing only applies to MCP plugins)
+const isMcpPlugin = computed(() => {
+  if (!plugin.value?.manifest?.capabilities) return false;
+  const caps = plugin.value.manifest.capabilities;
+  return Array.isArray(caps) ? caps.includes("mcp") : !!caps.mcp;
+});
+
 // Configuration
 const hasConfiguration = ref(false);
 const hasCustomTemplate = ref(false);
@@ -866,10 +876,10 @@ const fetchPlugin = async () => {
   } finally {
     loading.value = false;
 
-    // Auto-test connection asynchronously (don't block page load)
+    // Auto-test connection asynchronously (only for MCP plugins, don't block page load)
     // Wait 3 seconds to ensure metadata has been updated in the database
-    if (enabled.value) {
-      console.log("[Plugin] Enabled, checking auth methods:", plugin.value);
+    if (enabled.value && isMcpPlugin.value) {
+      console.log("[Plugin] MCP plugin enabled, checking auth methods:", plugin.value);
       scheduleAutoTest();
     }
   }

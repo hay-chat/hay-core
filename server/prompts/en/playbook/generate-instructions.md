@@ -88,7 +88,7 @@ Guidelines for instructions:
 - Start with a brief introductory paragraph providing context.
 - Use `# Step N: Title` headings for each major step.
 - Use bullet lists (`-`) under each step for specific actions and decisions.
-- **IMPORTANT**: When referencing an action or document in the instructions, you MUST use its exact reference token as listed above (e.g., `<<action:@hay/email-plugin:send-email>>` or `<<document:9497421b-...>>`). Place the token inline in the sentence where you mention the action or document. Do NOT invent tokens — only use the exact tokens provided above.
+- **IMPORTANT**: When referencing an action or document in the instructions, you MUST use its exact reference token as listed above (e.g., `<<action:hay-plugin-email:send-email>>` or `<<document:9497421b-...>>`). Place the token inline in the sentence where you mention the action or document. Do NOT invent tokens — only use the exact tokens provided above.
 - Include escalation steps that match the escalation rules.
 - End with a resolution/closing step.
 - Use 5-10 steps total. Keep each step focused on one action or decision.

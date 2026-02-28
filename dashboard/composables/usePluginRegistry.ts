@@ -7,7 +7,7 @@
  * @example
  * ```typescript
  * const { loadPluginComponent } = usePluginRegistry();
- * const AfterSettings = loadPluginComponent('@hay/plugin-zendesk', 'AfterSettings');
+ * const AfterSettings = loadPluginComponent('hay-plugin-zendesk', 'AfterSettings');
  * ```
  */
 
@@ -26,8 +26,8 @@ interface WindowWithVue {
 /**
  * Convert plugin ID to global variable name.
  * Examples:
- * - @hay/plugin-zendesk -> ZendeskPlugin
- * - @hay/plugin-oauth2 -> Oauth2Plugin
+ * - hay-plugin-zendesk -> ZendeskPlugin
+ * - hay-plugin-oauth2 -> Oauth2Plugin
  *
  * @param pluginId - Plugin ID
  * @returns Global variable name
@@ -35,7 +35,7 @@ interface WindowWithVue {
 function convertPluginIdToGlobalVar(pluginId: string): string {
   return (
     pluginId
-      .replace(/@hay\/plugin-/, "")
+      .replace(/^hay-(?:plugin|channel)-/, "")
       // Handle numbers and uppercase letters: oauth2 -> Oauth2, shopify-v2 -> ShopifyV2
       .replace(/-([a-z0-9])/g, (_, letter) => letter.toUpperCase())
       .replace(/^[a-z]/, (letter) => letter.toUpperCase()) + "Plugin"
@@ -50,7 +50,7 @@ export const usePluginRegistry = () => {
   /**
    * Load a plugin component dynamically from its UI bundle.
    *
-   * @param pluginId - Plugin identifier (e.g., '@hay/plugin-zendesk')
+   * @param pluginId - Plugin identifier (e.g., 'hay-plugin-zendesk')
    * @param componentName - Component name as exported from the bundle (e.g., 'AfterSettings')
    * @param _pluginPath - Plugin source path (unused, kept for compatibility)
    * @returns Vue component or null if loading fails
@@ -82,7 +82,7 @@ export const usePluginRegistry = () => {
           }
 
           // Build authenticated URL to plugin UI bundle (UMD format)
-          // URL format: http://localhost:3001/plugins/ui/@hay/plugin-zendesk/ui.js
+          // URL format: http://localhost:3001/plugins/ui/hay-plugin-zendesk/ui.js
           const apiBaseUrl = getApiUrl();
           const bundleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/ui.js`;
           const styleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/style.css`;

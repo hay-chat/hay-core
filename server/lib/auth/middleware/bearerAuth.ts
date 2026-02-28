@@ -34,6 +34,11 @@ export async function authenticateBearerAuth(authHeader?: string): Promise<AuthU
     throw new Error("Invalid token");
   }
 
+  // Skip plugin API tokens — they use a different auth flow (verifyPluginAuth middleware)
+  if ((payload as any).scope === "plugin-api") {
+    return null;
+  }
+
   // Find the user from the payload
   const userRepository = AppDataSource.getRepository(User);
   const user = await userRepository.findOne({

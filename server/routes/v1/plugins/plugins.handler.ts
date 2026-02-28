@@ -357,7 +357,10 @@ export const enablePlugin = authenticatedProcedure
           await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
           logger.info({ pluginName: plugin.name }, "Worker started for plugin");
         } catch (workerError) {
-          logger.error({ err: workerError, pluginName: plugin.name }, "Failed to start worker for plugin");
+          logger.error(
+            { err: workerError, pluginName: plugin.name },
+            "Failed to start worker for plugin",
+          );
           // Don't fail the entire enable operation if worker fails to start
           // The worker can be started later on-demand
         }
@@ -492,7 +495,10 @@ export const restartPlugin = authenticatedProcedure
           clearTimeout(timeoutId);
           logger.info({ pluginName: plugin.name }, "Called /disable hook before restart");
         } catch (error) {
-          logger.warn({ err: error, pluginName: plugin.name }, "Plugin disable hook failed before restart");
+          logger.warn(
+            { err: error, pluginName: plugin.name },
+            "Plugin disable hook failed before restart",
+          );
           // Continue anyway - cleanup failure should not block restart
         }
       }
@@ -843,7 +849,10 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
           // Background refresh of cache (non-blocking)
           if (tools.length > 0) {
             fetchAndStoreTools(workerInfo.port, ctx.organizationId!, plugin.id).catch((error) => {
-              logger.error({ err: error, pluginId: plugin.id }, "Background tool cache refresh failed");
+              logger.error(
+                { err: error, pluginId: plugin.id },
+                "Background tool cache refresh failed",
+              );
             });
           }
         } else {
@@ -872,7 +881,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
         name: tool.name,
         label: tool.name,
         description: tool.description || "",
-        pluginId: plugin.pluginId, // Plugin package ID (e.g., "@hay/email-plugin")
+        pluginId: plugin.pluginId, // Plugin package ID (e.g., "hay-plugin-email")
         pluginName: plugin.name,
       });
     }
@@ -972,6 +981,7 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
     parent?: "settings" | "integrations" | "root";
     position?: number;
     pluginId: string;
+    external?: boolean;
   }> = [];
 
   // Get enabled instances for organization-specific plugins
@@ -1000,6 +1010,23 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
     }
   }
 
+  // Append custom menu items from CUSTOM_MENU env var
+  const { config } = await import("@server/config/env");
+  for (const item of config.customMenu.items) {
+    if (item.title && item.url) {
+      menuItems.push({
+        id: `custom-${item.title.toLowerCase().replace(/\s+/g, "-")}`,
+        title: item.title,
+        url: item.url,
+        icon: item.icon,
+        parent: (item.parent as "settings" | "integrations" | "root") || "root",
+        position: item.position,
+        pluginId: "__custom__",
+        external: item.external || false,
+      });
+    }
+  }
+
   // Sort by position if provided
   menuItems.sort((a, b) => (a.position || 999) - (b.position || 999));
 
@@ -1018,7 +1045,10 @@ export const testConnection = authenticatedProcedure
     }),
   )
   .query(async ({ ctx, input }): Promise<PluginHealthCheckResult> => {
-    logger.debug({ pluginId: input.pluginId, organizationId: ctx.organizationId }, "Starting connection test");
+    logger.debug(
+      { pluginId: input.pluginId, organizationId: ctx.organizationId },
+      "Starting connection test",
+    );
 
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
@@ -1031,7 +1061,10 @@ export const testConnection = authenticatedProcedure
     }
 
     const manifest = plugin.manifest as HayPluginManifest;
-    logger.debug({ capabilities: manifest.capabilities, type: manifest.type }, "Plugin manifest details");
+    logger.debug(
+      { capabilities: manifest.capabilities, type: manifest.type },
+      "Plugin manifest details",
+    );
 
     // Check if plugin has MCP capabilities (support both TypeScript-first array and legacy object format)
     const hasMcpCapability = Array.isArray(manifest.capabilities)
@@ -1060,14 +1093,17 @@ export const testConnection = authenticatedProcedure
     // Use in-memory plugin metadata (more up-to-date than database)
     const authMethods = plugin.metadata?.authMethods;
 
-    logger.debug({
-      exists: !!instance,
-      enabled: instance?.enabled,
-      hasConfig: !!instance?.config,
-      hasAuthState: !!instance?.authState,
-      configKeys: instance?.config ? Object.keys(instance.config) : [],
-      authMethods: authMethods?.map((m: any) => ({ type: m.type, id: m.id })) || [],
-    }, "Plugin instance status");
+    logger.debug(
+      {
+        exists: !!instance,
+        enabled: instance?.enabled,
+        hasConfig: !!instance?.config,
+        hasAuthState: !!instance?.authState,
+        configKeys: instance?.config ? Object.keys(instance.config) : [],
+        authMethods: authMethods?.map((m: any) => ({ type: m.type, id: m.id })) || [],
+      },
+      "Plugin instance status",
+    );
 
     if (!instance) {
       logger.debug("Plugin has no instance");
@@ -1130,10 +1166,7 @@ export const testConnection = authenticatedProcedure
           "Fetched MCP tools from worker",
         );
         if (mcpTools.length > 0) {
-          logger.debug(
-            { toolNames: mcpTools.map((t: any) => t.name) },
-            "Available tool names",
-          );
+          logger.debug({ toolNames: mcpTools.map((t: any) => t.name) }, "Available tool names");
         }
       } else {
         logger.debug({ pluginId: input.pluginId }, "No worker running for plugin");
@@ -1143,10 +1176,7 @@ export const testConnection = authenticatedProcedure
         mcpTools = getToolsFromConfig(instance.config);
         logger.debug({ toolCount: mcpTools.length }, "Found cached tools in database");
         if (mcpTools.length > 0) {
-          logger.debug(
-            { toolNames: mcpTools.map((t: any) => t.name) },
-            "Cached tool names",
-          );
+          logger.debug({ toolNames: mcpTools.map((t: any) => t.name) }, "Cached tool names");
         }
       }
 
@@ -1205,7 +1235,10 @@ export const testConnection = authenticatedProcedure
 
       const hasRequiredParams =
         testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
-      logger.debug({ toolName: testTool.name, hasRequiredParams }, "Testing MCP connection by calling tool");
+      logger.debug(
+        { toolName: testTool.name, hasRequiredParams },
+        "Testing MCP connection by calling tool",
+      );
 
       // Call the tool via worker or legacy MCP client
       if (worker && worker.port) {

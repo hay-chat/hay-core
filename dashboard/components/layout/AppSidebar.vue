@@ -27,7 +27,12 @@ import {
   Settings,
   BookOpen,
   Puzzle,
+  CreditCard,
+  Zap,
+  Globe,
+  ExternalLink,
 } from "lucide-vue-next";
+import type { Component } from "vue";
 
 import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
@@ -47,6 +52,20 @@ const route = useRoute();
 
 // Plugin menu items
 const pluginMenuItems = ref<any[]>([]);
+
+// Map icon name strings from CUSTOM_MENU to Lucide components
+const ICON_MAP: Record<string, Component> = {
+  CreditCard,
+  Zap,
+  Globe,
+  ExternalLink,
+  Settings,
+  Puzzle,
+};
+
+function resolveIcon(iconName?: string): Component {
+  return (iconName && ICON_MAP[iconName]) || ExternalLink;
+}
 
 // Get user data from store with validation
 const user = computed(() => {
@@ -171,6 +190,18 @@ const navMain = computed(() => {
       ],
     });
   }
+
+  // Add external/custom menu items at root level
+  const externalItems = pluginMenuItems.value
+    .filter((item) => (item.parent === "root" || !item.parent) && item.external)
+    .map((item) => ({
+      title: item.title,
+      url: item.url,
+      icon: resolveIcon(item.icon),
+      isActive: false,
+      external: true,
+    }));
+  items.push(...externalItems);
 
   // Build Settings submenu based on role
   const settingsItems = [];
