@@ -1,5 +1,5 @@
 {
-  "name": "@hay/plugin-hubspot",
+  "name": "hay-plugin-hubspot",
   "version": "2.0.0",
   "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
   "author": "Hay",
@@ -10,8 +10,14 @@
     "entry": "./dist/index.js",
     "displayName": "HubSpot",
     "category": "integration",
-    "capabilities": ["mcp", "auth"],
-    "env": ["HUBSPOT_CLIENT_ID", "HUBSPOT_CLIENT_SECRET"]
+    "capabilities": [
+      "mcp",
+      "auth"
+    ],
+    "env": [
+      "HUBSPOT_CLIENT_ID",
+      "HUBSPOT_CLIENT_SECRET"
+    ]
   },
   "scripts": {
     "build": "tsc",

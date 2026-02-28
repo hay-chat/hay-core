@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import path from "path";
+import * as jwt from "jsonwebtoken";
 import { getPortAllocator } from "./port-allocator.service";
 import type { WorkerInfo, AuthState, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { AppDataSource } from "../database/data-source";
@@ -8,7 +9,7 @@ import { PluginInstance } from "../entities/plugin-instance.entity";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
-import { getApiUrl } from "../config/env";
+import { getApiUrl, config as envConfig } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
 
@@ -88,12 +89,15 @@ export class PluginRunnerService {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
     }
 
-    logger.debug({
-      pluginId,
-      methodId: instance.authState?.methodId,
-      hasAccessToken: !!instance.authState?.credentials?.accessToken,
-      expiresAt: instance.authState?.credentials?.expiresAt,
-    }, "Auth state before processing");
+    logger.debug(
+      {
+        pluginId,
+        methodId: instance.authState?.methodId,
+        hasAccessToken: !!instance.authState?.credentials?.accessToken,
+        expiresAt: instance.authState?.credentials?.expiresAt,
+      },
+      "Auth state before processing",
+    );
 
     // Check if OAuth token needs refresh before starting worker
     if (instance.authMethod === "oauth" && instance.authState?.credentials?.expiresAt) {
@@ -114,12 +118,15 @@ export class PluginRunnerService {
           }
           instance = refreshedInstance;
           logger.info({ pluginId }, "OAuth token refreshed successfully");
-          logger.debug({
-            pluginId,
-            methodId: instance.authState?.methodId,
-            hasAccessToken: !!instance.authState?.credentials?.accessToken,
-            expiresAt: instance.authState?.credentials?.expiresAt,
-          }, "Refreshed auth state");
+          logger.debug(
+            {
+              pluginId,
+              methodId: instance.authState?.methodId,
+              hasAccessToken: !!instance.authState?.credentials?.accessToken,
+              expiresAt: instance.authState?.credentials?.expiresAt,
+            },
+            "Refreshed auth state",
+          );
         } catch (error: any) {
           logger.error({ err: error, pluginId }, "OAuth token refresh failed");
           // If token is already expired and refresh failed, throw error
@@ -129,7 +136,10 @@ export class PluginRunnerService {
             );
           }
           // If token hasn't expired yet, continue with existing token
-          logger.warn({ pluginId, expiresInSeconds: expiresAt - now }, "Continuing with existing token");
+          logger.warn(
+            { pluginId, expiresInSeconds: expiresAt - now },
+            "Continuing with existing token",
+          );
         }
       }
     }
@@ -218,9 +228,9 @@ export class PluginRunnerService {
         this.workers.delete(workerKey);
       });
 
-      // Log output for debugging
+      // Log worker output
       workerProcess.stdout?.on("data", (data) => {
-        logger.debug({ pluginId, orgId }, data.toString().trim());
+        logger.info({ pluginId, orgId }, data.toString().trim());
       });
 
       workerProcess.stderr?.on("data", (data) => {
@@ -424,12 +434,9 @@ export class PluginRunnerService {
       HAY_ORG_AUTH: JSON.stringify(orgAuth || {}),
     };
 
-    // Add API access if needed
-    if (capabilities.includes("routes") || capabilities.includes("mcp")) {
-      env.HAY_API_URL = process.env.HAY_API_URL || getApiUrl();
-      // TODO: Generate plugin JWT token
-      // env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
-    }
+    // Add API access so the plugin worker can call the main server's plugin-api
+    env.HAY_API_URL = process.env.HAY_API_URL || getApiUrl();
+    env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
 
     // Add allowed environment variables from host
     // Deny-list prevents plugins from requesting access to server secrets
@@ -460,6 +467,23 @@ export class PluginRunnerService {
     }
 
     return env;
+  }
+
+  /**
+   * Generate a JWT token for plugin workers to call the main server's plugin-api.
+   * Token is scoped to a specific org + plugin and includes granted capabilities.
+   */
+  private generatePluginJWT(orgId: string, pluginId: string, capabilities: string[]): string {
+    return jwt.sign(
+      {
+        organizationId: orgId,
+        pluginId,
+        scope: "plugin-api",
+        capabilities,
+      },
+      envConfig.jwt.secret,
+      { expiresIn: "24h" },
+    );
   }
 
   /**

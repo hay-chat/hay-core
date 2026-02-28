@@ -1,12 +1,19 @@
 import { router } from "@server/trpc";
-import { pluginProcedure, requireCapability, type PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
+import {
+  pluginProcedure,
+  requireCapability,
+  type PluginAuthContext,
+} from "@server/trpc/middleware/plugin-auth";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
-import { OrganizationRepository, organizationRepository } from "@server/repositories/organization.repository";
+import {
+  OrganizationRepository,
+  organizationRepository,
+} from "@server/repositories/organization.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
@@ -46,7 +53,7 @@ export const pluginApiTrpcRouter = router({
         content: z.string(),
         channel: z.enum(["web", "whatsapp", "instagram", "telegram", "sms", "email"]),
         metadata: z.record(z.any()).optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "messages");
@@ -66,6 +73,19 @@ export const pluginApiTrpcRouter = router({
               [channel]: {
                 id: from,
                 firstSeenAt: new Date(),
+                ...metadata,
+              },
+            },
+          });
+        } else if (metadata) {
+          // Update customer metadata with latest info from the channel
+          await customerRepository.update(customer.id, organizationId, {
+            external_metadata: {
+              ...customer.external_metadata,
+              [channel]: {
+                ...((customer.external_metadata?.[channel] as Record<string, unknown>) ?? {}),
+                id: from,
+                ...metadata,
               },
             },
           });
@@ -81,15 +101,25 @@ export const pluginApiTrpcRouter = router({
           });
         }
 
-        // TODO: Find or create conversation by customer and channel
-        // For now, create a new conversation
-        const conversation = await conversationRepository.create({
-          organization_id: organizationId,
-          customer_id: customer.id,
-          agent_id: agentId,
+        // Find active conversation or create a new one
+        let conversation = await conversationRepository.findActiveByCustomerAndChannel(
+          customer.id,
           channel,
-          status: "open",
-        });
+          organizationId,
+        );
+
+        if (!conversation) {
+          // Generate a title from the channel and customer identifier
+          const title = `${channel.charAt(0).toUpperCase() + channel.slice(1)} conversation`;
+          conversation = await conversationRepository.create({
+            organization_id: organizationId,
+            customer_id: customer.id,
+            agent_id: agentId,
+            channel,
+            status: "open",
+            title,
+          });
+        }
 
         // Add customer message
         const message = await messageRepository.create({
@@ -129,7 +159,7 @@ export const pluginApiTrpcRouter = router({
         channel: z.enum(["web", "whatsapp", "instagram", "telegram", "sms", "email"]),
         conversationId: z.string().uuid().optional(),
         metadata: z.record(z.any()).optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "messages");
@@ -142,7 +172,10 @@ export const pluginApiTrpcRouter = router({
 
         if (conversationId) {
           // Use existing conversation
-          conversation = await conversationRepository.findByIdAndOrganization(conversationId, organizationId);
+          conversation = await conversationRepository.findByIdAndOrganization(
+            conversationId,
+            organizationId,
+          );
 
           if (!conversation) {
             throw new TRPCError({
@@ -177,15 +210,24 @@ export const pluginApiTrpcRouter = router({
             });
           }
 
-          // TODO: Find existing conversation by customer and channel
-          // For now, create a new conversation
-          conversation = await conversationRepository.create({
-            organization_id: organizationId,
-            customer_id: customer.id,
-            agent_id: agentId,
+          // Find active conversation or create a new one
+          conversation = await conversationRepository.findActiveByCustomerAndChannel(
+            customer.id,
             channel,
-            status: "open",
-          });
+            organizationId,
+          );
+
+          if (!conversation) {
+            const title = `${channel.charAt(0).toUpperCase() + channel.slice(1)} conversation`;
+            conversation = await conversationRepository.create({
+              organization_id: organizationId,
+              customer_id: customer.id,
+              agent_id: agentId,
+              channel,
+              status: "open",
+              title,
+            });
+          }
         }
 
         // Add agent message
@@ -220,7 +262,10 @@ export const pluginApiTrpcRouter = router({
 
       const organizationId = ctx.pluginAuth.organizationId;
 
-      const conversation = await conversationRepository.findByIdAndOrganization(input.conversationId, organizationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        organizationId,
+      );
 
       if (!conversation) {
         throw new TRPCError({
@@ -242,7 +287,10 @@ export const pluginApiTrpcRouter = router({
 
       const organizationId = ctx.pluginAuth.organizationId;
 
-      const customer = await customerRepository.findByIdAndOrganization(input.customerId, organizationId);
+      const customer = await customerRepository.findByIdAndOrganization(
+        input.customerId,
+        organizationId,
+      );
 
       return customer || null;
     }),
@@ -254,17 +302,14 @@ export const pluginApiTrpcRouter = router({
     .input(
       z.object({
         externalId: z.string(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "customers");
 
       const organizationId = ctx.pluginAuth.organizationId;
 
-      const customer = await customerRepository.findByExternalId(
-        input.externalId,
-        organizationId
-      );
+      const customer = await customerRepository.findByExternalId(input.externalId, organizationId);
 
       return customer || null;
     }),
@@ -281,7 +326,7 @@ export const pluginApiTrpcRouter = router({
         phone: z.string().optional(),
         name: z.string().optional(),
         metadata: z.record(z.any()).optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "customers");
@@ -342,7 +387,7 @@ export const pluginApiTrpcRouter = router({
         category: z.enum(["messaging", "social", "email", "helpdesk"]),
         icon: z.string().optional(),
         metadata: z.record(z.any()).optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "sources");
@@ -378,10 +423,10 @@ export const pluginApiTrpcRouter = router({
             name: z.string(),
             description: z.string(),
             input_schema: z.record(z.any()),
-          })
+          }),
         ),
         env: z.record(z.string()).optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "mcp");
@@ -389,13 +434,16 @@ export const pluginApiTrpcRouter = router({
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-${Date.now()}`;
 
-      logger.debug({
-        organizationId,
-        pluginId,
-        serverId,
-        serverPath: input.serverPath,
-        toolCount: input.tools.length,
-      }, "Registering local MCP server");
+      logger.debug(
+        {
+          organizationId,
+          pluginId,
+          serverId,
+          serverPath: input.serverPath,
+          toolCount: input.tools.length,
+        },
+        "Registering local MCP server",
+      );
 
       // 1. Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -489,9 +537,9 @@ export const pluginApiTrpcRouter = router({
             name: z.string(),
             description: z.string(),
             input_schema: z.record(z.any()),
-          })
+          }),
         ),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "mcp");
@@ -499,14 +547,17 @@ export const pluginApiTrpcRouter = router({
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-remote-${Date.now()}`;
 
-      logger.debug({
-        organizationId,
-        pluginId,
-        serverId,
-        url: input.url,
-        transport: input.transport,
-        toolCount: input.tools.length,
-      }, "Registering remote MCP server");
+      logger.debug(
+        {
+          organizationId,
+          pluginId,
+          serverId,
+          url: input.url,
+          transport: input.transport,
+          toolCount: input.tools.length,
+        },
+        "Registering remote MCP server",
+      );
 
       // 1. Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);

@@ -206,6 +206,21 @@ export const config = {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
   },
+
+  customMenu: {
+    items: (() => {
+      const raw = process.env.CUSTOM_MENU;
+      if (!raw) return [] as Array<{ title: string; url: string; icon?: string; parent?: string; position?: number; external?: boolean }>;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed as Array<{ title: string; url: string; icon?: string; parent?: string; position?: number; external?: boolean }>;
+      } catch {
+        console.warn("CUSTOM_MENU env var contains invalid JSON, ignoring");
+        return [];
+      }
+    })(),
+  },
 } as const;
 
 export type Config = typeof config;

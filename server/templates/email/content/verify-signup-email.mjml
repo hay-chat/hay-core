@@ -1,0 +1,35 @@
+<!-- Signup Email Verification Content -->
+<mj-section mj-class="section-white">
+  <mj-column>
+    <mj-text mj-class="h2" padding="0 0 20px 0">
+      Verify Your Email Address
+    </mj-text>
+
+    <mj-text mj-class="text-body">
+      Hi {{userName}},
+    </mj-text>
+
+    <mj-text mj-class="text-body" padding="10px 0">
+      Thank you for signing up for Hay! To complete your registration, please verify your email address by clicking the button below:
+    </mj-text>
+
+    <mj-button mj-class="btn-primary" href="{{verificationUrl}}">
+      Verify Email Address
+    </mj-button>
+
+    <mj-text mj-class="text-small" padding="10px 0">
+      Or copy and paste this link into your browser:<br/>
+      <a href="{{verificationUrl}}" class="link-primary word-break">{{verificationUrl}}</a>
+    </mj-text>
+
+    <mj-divider padding="20px 0" />
+
+    <mj-text mj-class="text-danger" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>Important:</strong> This verification link will expire in 24 hours.
+    </mj-text>
+
+    <mj-text mj-class="text-small">
+      If you didn't create an account, please ignore this email.
+    </mj-text>
+  </mj-column>
+</mj-section>

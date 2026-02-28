@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
+import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { isValidUuid } from "@server/lib/validation/uuid";
 import { createLogger } from "@server/lib/logger";
@@ -12,13 +13,13 @@ const router = Router();
  * Proxy all requests to plugin workers
  * URL pattern: /v1/plugins/:pluginId/*
  *
- * This route forwards external requests (webhooks, callbacks) to the appropriate
- * plugin worker process. The worker is automatically started if not running.
+ * Plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
+ * Match groups: [1] = pluginId, [2] = remaining path
  */
-router.all("/:pluginId/*path", async (req: Request, res: Response) => {
+router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
   try {
-    const { pluginId } = req.params;
-    const path = (req.params as any).path ? `/${(req.params as any).path}` : "";
+    const pluginId = req.params[0];
+    const path = req.params[1] ? `/${req.params[1]}` : "";
 
     logger.debug({ method: req.method, path: req.path, pluginId }, "Proxying request to plugin");
 
@@ -36,6 +37,10 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
     let worker;
     try {
       worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
+      // Update activity timestamp so the instance cleanup job doesn't kill the worker
+      pluginInstanceManagerService
+        .updateActivityTimestamp(organizationId, pluginId)
+        .catch(() => {});
     } catch (error) {
       logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
       return res.status(503).json({
@@ -58,6 +63,7 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
         "x-forwarded-for",
         "x-real-ip",
         "proxy-authorization",
+        "content-length", // Removed: proxy re-encodes body as JSON, so original content-length is wrong
       ]);
       const headers: Record<string, string> = {};
       Object.entries(req.headers).forEach(([key, value]) => {
@@ -69,6 +75,18 @@ router.all("/:pluginId/*path", async (req: Request, res: Response) => {
         }
       });
       headers.host = `localhost:${worker.port}`; // Override host header
+
+      // When forwarding, we JSON.stringify the body (Express already parsed it).
+      // Set Content-Type to match and pass original request info for signature validation.
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        const originalContentType = headers["content-type"];
+        headers["content-type"] = "application/json";
+        if (originalContentType) {
+          headers["x-original-content-type"] = originalContentType;
+        }
+        // Pass the original URL so plugins can reconstruct it for webhook signature validation
+        headers["x-original-url"] = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+      }
 
       const response = await fetch(workerUrl, {
         method: req.method,

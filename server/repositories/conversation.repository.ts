@@ -379,6 +379,29 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     });
   }
 
+  /**
+   * Find the most recent active conversation for a customer on a given channel.
+   * Used by channel plugins (WhatsApp, etc.) to reuse existing conversations
+   * instead of creating duplicates.
+   */
+  async findActiveByCustomerAndChannel(
+    customerId: string,
+    channel: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.customer_id = :customerId", { customerId })
+      .andWhere("conversation.channel = :channel", { channel })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.status IN (:...statuses)", {
+        statuses: ["open", "processing", "pending-human", "human-took-over"],
+      })
+      .andWhere("conversation.deleted_at IS NULL")
+      .orderBy("conversation.created_at", "DESC")
+      .getOne();
+  }
+
   async findReadyForProcessing(): Promise<Conversation[]> {
     const query = this.getRepository()
       .createQueryBuilder("conversation")

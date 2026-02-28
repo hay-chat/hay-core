@@ -7,6 +7,7 @@ export interface HayPluginManifest {
     "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel" | "system"
   >;
   entry: string;
+  channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")
   autoActivate?: boolean;
   invisible?: boolean;
   menuItems?: Array<{
@@ -122,7 +123,7 @@ export interface HayPluginManifest {
     templates?: Record<string, string>;
   };
   auth?: {
-    type: 'oauth2' | 'apiKey' | 'basic' | 'none';
+    type: "oauth2" | "apiKey" | "basic" | "none";
     authorizationUrl?: string;
     tokenUrl?: string;
     scopes?: string[];
@@ -132,7 +133,7 @@ export interface HayPluginManifest {
     clientSecretEnvVar?: string;
   };
   settingsExtensions?: Array<{
-    slot: 'before-settings' | 'after-settings' | 'tab';
+    slot: "before-settings" | "after-settings" | "tab";
     component: string;
     tabName?: string;
     tabOrder?: number;

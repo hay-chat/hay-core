@@ -249,32 +249,41 @@ export class Conversation {
 
     // Log playbook addition with embedded references (only logs once per conversation per playbook)
     if (this.playbook_id !== playbookId) {
-      logger.debug({
-        conversationId: this.id,
-        playbookName: playbook.title,
-        referencedActions: referencedActions,
-        referencedDocuments: referencedDocuments
-      }, "Playbook added to conversation");
+      logger.debug(
+        {
+          conversationId: this.id,
+          playbookName: playbook.title,
+          referencedActions: referencedActions,
+          referencedDocuments: referencedDocuments,
+        },
+        "Playbook added to conversation",
+      );
     }
 
     // Get tool schemas from MCP Registry Service
     // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
-      logger.debug({
-        conversationId: this.id,
-        organizationId: this.organization_id,
-        playbookId: playbookId
-      }, "Fetching tools from MCP registry for playbook update");
+      logger.debug(
+        {
+          conversationId: this.id,
+          organizationId: this.organization_id,
+          playbookId: playbookId,
+        },
+        "Fetching tools from MCP registry for playbook update",
+      );
 
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
-      logger.debug({
-        conversationId: this.id,
-        toolCount: tools.length,
-        toolNames: tools.map((t) => `${t.pluginId}:${t.name}`)
-      }, "MCP registry returned tools");
+      logger.debug(
+        {
+          conversationId: this.id,
+          toolCount: tools.length,
+          toolNames: tools.map((t) => `${t.pluginId}:${t.name}`),
+        },
+        "MCP registry returned tools",
+      );
 
       // Convert MCP tools to schema format expected by playbook system
       for (const tool of tools) {
@@ -285,13 +294,19 @@ export class Conversation {
         });
       }
 
-      logger.debug({
-        conversationId: this.id,
-        toolCount: tools.length,
-        tools: tools.map((t) => `${t.pluginId}:${t.name}`)
-      }, "Fetched tool schemas from MCP registry");
+      logger.debug(
+        {
+          conversationId: this.id,
+          toolCount: tools.length,
+          tools: tools.map((t) => `${t.pluginId}:${t.name}`),
+        },
+        "Fetched tool schemas from MCP registry",
+      );
     } catch (error) {
-      logger.error({ err: error, conversationId: this.id, organizationId: this.organization_id }, "Failed to fetch tools from MCP registry");
+      logger.error(
+        { err: error, conversationId: this.id, organizationId: this.organization_id },
+        "Failed to fetch tools from MCP registry",
+      );
     }
 
     let content = "";
@@ -309,13 +324,16 @@ export class Conversation {
         **Trigger:** ${playbook.trigger}`;
 
     // Add referenced actions with tool schemas if available
-    logger.debug({
-      conversationId: this.id,
-      referencedActionsCount: referencedActions.length,
-      referencedActions,
-      availableToolSchemasCount: toolSchemas.length,
-      availableToolNames: toolSchemas.map((s) => s.name)
-    }, "Processing playbook actions");
+    logger.debug(
+      {
+        conversationId: this.id,
+        referencedActionsCount: referencedActions.length,
+        referencedActions,
+        availableToolSchemasCount: toolSchemas.length,
+        availableToolNames: toolSchemas.map((s) => s.name),
+      },
+      "Processing playbook actions",
+    );
 
     if (referencedActions.length > 0 && toolSchemas && toolSchemas.length > 0) {
       content += `\n\n**Referenced Actions:**
@@ -324,11 +342,14 @@ The following tools are available for you to use. You MUST return only valid JSO
       const actionDetails = referencedActions.map((actionName) => {
         let toolSchema = toolSchemas.find((schema) => schema.name === actionName);
 
-        logger.debug({
-          conversationId: this.id,
-          actionName,
-          directMatch: !!toolSchema
-        }, "Looking for tool schema");
+        logger.debug(
+          {
+            conversationId: this.id,
+            actionName,
+            directMatch: !!toolSchema,
+          },
+          "Looking for tool schema",
+        );
 
         if (!toolSchema && actionName.includes(":")) {
           const parts = actionName.split(":");
@@ -339,7 +360,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "@hay/email-plugin:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);
@@ -352,28 +373,34 @@ The following tools are available for you to use. You MUST return only valid JSO
               toolSchema = toolSchemas.find((schema) => schema.name === toolNameSuffix);
             }
 
-            logger.debug({
-              conversationId: this.id,
-              actionName,
-              toolName,
-              found: !!toolSchema,
-              matchedName: toolSchema ? toolSchema.name : undefined
-            }, "Tool schema fuzzy match result");
+            logger.debug(
+              {
+                conversationId: this.id,
+                actionName,
+                toolName,
+                found: !!toolSchema,
+                matchedName: toolSchema ? toolSchema.name : undefined,
+              },
+              "Tool schema fuzzy match result",
+            );
           }
         }
 
         if (toolSchema) {
           // Add tool ID to enabled_tools list using the actual tool name from the schema
-          // This ensures we use the correct namespaced name (e.g., "@hay/email-plugin:send-email")
+          // This ensures we use the correct namespaced name (e.g., "hay-plugin-email:send-email")
           const toolNameToAdd = toolSchema.name as string;
           if (!enabledToolIds.includes(toolNameToAdd)) {
             enabledToolIds.push(toolNameToAdd);
-            logger.debug({
-              conversationId: this.id,
-              actionName,
-              toolNameAdded: toolNameToAdd,
-              enabledToolsCount: enabledToolIds.length
-            }, "Added tool to enabled list");
+            logger.debug(
+              {
+                conversationId: this.id,
+                actionName,
+                toolNameAdded: toolNameToAdd,
+                enabledToolsCount: enabledToolIds.length,
+              },
+              "Added tool to enabled list",
+            );
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
@@ -408,10 +435,13 @@ The following tools are available for you to use. You MUST return only valid JSO
     );
 
     if (!existingPlaybookMessage) {
-      logger.debug({
-        conversationId: this.id,
-        playbookId
-      }, "Adding playbook message to conversation");
+      logger.debug(
+        {
+          conversationId: this.id,
+          playbookId,
+        },
+        "Adding playbook message to conversation",
+      );
 
       await this.addMessage({
         content,
@@ -422,21 +452,27 @@ The following tools are available for you to use. You MUST return only valid JSO
         },
       });
     } else {
-      logger.debug({
-        conversationId: this.id,
-        playbookId,
-        existingMessageId: existingPlaybookMessage.id
-      }, "Playbook message already exists, skipping");
+      logger.debug(
+        {
+          conversationId: this.id,
+          playbookId,
+          existingMessageId: existingPlaybookMessage.id,
+        },
+        "Playbook message already exists, skipping",
+      );
     }
 
     // Update conversation with playbook_id and enabled_tools
-    logger.debug({
-      conversationId: this.id,
-      playbookId,
-      enabledToolIds,
-      enabledToolsCount: enabledToolIds.length,
-      willSetEnabledTools: enabledToolIds.length > 0
-    }, "Updating conversation with playbook and tools");
+    logger.debug(
+      {
+        conversationId: this.id,
+        playbookId,
+        enabledToolIds,
+        enabledToolsCount: enabledToolIds.length,
+        willSetEnabledTools: enabledToolIds.length > 0,
+      },
+      "Updating conversation with playbook and tools",
+    );
 
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
@@ -446,15 +482,21 @@ The following tools are available for you to use. You MUST return only valid JSO
     this.playbook_id = playbookId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
 
-    logger.debug({
-      conversationId: this.id,
-      playbookId: this.playbook_id,
-      enabledTools: this.enabled_tools
-    }, "Playbook update complete");
+    logger.debug(
+      {
+        conversationId: this.id,
+        playbookId: this.playbook_id,
+        enabledTools: this.enabled_tools,
+      },
+      "Playbook update complete",
+    );
 
     // Attach documents referenced in the playbook
     if (referencedDocuments.length > 0) {
-      logger.debug({ conversationId: this.id, documentCount: referencedDocuments.length }, "Playbook references documents, attempting to attach them");
+      logger.debug(
+        { conversationId: this.id, documentCount: referencedDocuments.length },
+        "Playbook references documents, attempting to attach them",
+      );
 
       for (const documentId of referencedDocuments) {
         try {
@@ -462,14 +504,23 @@ The following tools are available for you to use. You MUST return only valid JSO
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            logger.debug({ conversationId: this.id, documentId, documentTitle: document.title }, "Attaching document from playbook");
+            logger.debug(
+              { conversationId: this.id, documentId, documentTitle: document.title },
+              "Attaching document from playbook",
+            );
 
             // addDocument already handles deduplication
             await this.addDocument(documentId);
           } else if (document) {
-            logger.warn({ conversationId: this.id, documentId }, "Document belongs to different organization, skipping");
+            logger.warn(
+              { conversationId: this.id, documentId },
+              "Document belongs to different organization, skipping",
+            );
           } else {
-            logger.warn({ conversationId: this.id, documentId }, "Document referenced in playbook not found");
+            logger.warn(
+              { conversationId: this.id, documentId },
+              "Document referenced in playbook not found",
+            );
           }
         } catch (error) {
           logger.error({ err: error, documentId }, "Error attaching document from playbook");
@@ -499,12 +550,15 @@ The following tools are available for you to use. You MUST return only valid JSO
       referencedDocuments = analysis.documents;
     }
 
-    logger.debug({
-      conversationId: this.id,
-      handoffType,
-      referencedActions,
-      referencedDocuments
-    }, "Adding handoff instructions");
+    logger.debug(
+      {
+        conversationId: this.id,
+        handoffType,
+        referencedActions,
+        referencedDocuments,
+      },
+      "Adding handoff instructions",
+    );
 
     // Get tool schemas from MCP Registry Service
     // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
@@ -522,13 +576,19 @@ The following tools are available for you to use. You MUST return only valid JSO
         });
       }
 
-      logger.debug({
-        conversationId: this.id,
-        toolCount: tools.length,
-        tools: tools.map((t) => `${t.pluginId}:${t.name}`)
-      }, "Fetched tool schemas from MCP registry for handoff");
+      logger.debug(
+        {
+          conversationId: this.id,
+          toolCount: tools.length,
+          tools: tools.map((t) => `${t.pluginId}:${t.name}`),
+        },
+        "Fetched tool schemas from MCP registry for handoff",
+      );
     } catch (error) {
-      logger.warn({ err: error, conversationId: this.id }, "Could not fetch tool schemas from MCP registry");
+      logger.warn(
+        { err: error, conversationId: this.id },
+        "Could not fetch tool schemas from MCP registry",
+      );
     }
 
     let content = `From this message forward you should follow these handoff instructions:
@@ -555,7 +615,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "@hay/email-plugin:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);
@@ -620,19 +680,31 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // Attach documents referenced in the handoff instructions
     if (referencedDocuments.length > 0) {
-      logger.debug({ conversationId: this.id, documentCount: referencedDocuments.length }, "Handoff references documents, attempting to attach them");
+      logger.debug(
+        { conversationId: this.id, documentCount: referencedDocuments.length },
+        "Handoff references documents, attempting to attach them",
+      );
 
       for (const documentId of referencedDocuments) {
         try {
           const document = await documentRepository.findById(documentId);
 
           if (document && document.organizationId === this.organization_id) {
-            logger.debug({ conversationId: this.id, documentId, documentTitle: document.title }, "Attaching document from handoff instructions");
+            logger.debug(
+              { conversationId: this.id, documentId, documentTitle: document.title },
+              "Attaching document from handoff instructions",
+            );
             await this.addDocument(documentId);
           } else if (document) {
-            logger.warn({ conversationId: this.id, documentId }, "Document belongs to different organization, skipping");
+            logger.warn(
+              { conversationId: this.id, documentId },
+              "Document belongs to different organization, skipping",
+            );
           } else {
-            logger.warn({ conversationId: this.id, documentId }, "Document referenced in handoff not found");
+            logger.warn(
+              { conversationId: this.id, documentId },
+              "Document referenced in handoff not found",
+            );
           }
         } catch (error) {
           logger.error({ err: error, documentId }, "Error attaching document from handoff");
@@ -691,11 +763,14 @@ The following tools are available for you to use. You MUST return only valid JSO
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.content === messageData.content && lastMessage.type === messageData.type) {
-        logger.debug({
-          conversationId: this.id,
-          content: messageData.content.substring(0, 100),
-          type: messageData.type
-        }, "Duplicate message detected, skipping");
+        logger.debug(
+          {
+            conversationId: this.id,
+            content: messageData.content.substring(0, 100),
+            type: messageData.type,
+          },
+          "Duplicate message detected, skipping",
+        );
         return lastMessage;
       }
     }
@@ -847,12 +922,18 @@ The following tools are available for you to use. You MUST return only valid JSO
           // Send full message data to all clients in this conversation
           const sent = websocketService.sendToConversation(this.id, messagePayload);
 
-          logger.debug({ messageId: message.id, conversationId: this.id, clientCount: sent }, "Sent message to clients (Redis not available, after DB commit)");
+          logger.debug(
+            { messageId: message.id, conversationId: this.id, clientCount: sent },
+            "Sent message to clients (Redis not available, after DB commit)",
+          );
         }
       } catch (error) {
         // IMPORTANT: If broadcasting fails, the message is still saved in the database
 
-        logger.warn({ messageId: message.id, conversationId: this.id }, "Message saved but broadcast failed - clients will see it on refresh");
+        logger.warn(
+          { messageId: message.id, conversationId: this.id },
+          "Message saved but broadcast failed - clients will see it on refresh",
+        );
       }
     } else {
       logger.debug(`Message NOT broadcast (not a public message)`);

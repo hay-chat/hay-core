@@ -78,6 +78,10 @@ export class MessageRepository {
     return await this.findById(id);
   }
 
+  async updateProviderMessageId(id: string, providerMessageId: string): Promise<void> {
+    await this.getRepository().update(id, { providerMessageId } as any);
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await this.getRepository().delete(id);
     return result.affected !== 0;
@@ -93,7 +97,7 @@ export class MessageRepository {
   async getSentimentDistribution(
     organizationId: string,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<Array<{ sentiment: MessageSentiment; count: number }>> {
     const queryBuilder = this.getRepository()
       .createQueryBuilder("message")
@@ -116,16 +120,16 @@ export class MessageRepository {
 
     const results = await queryBuilder.getRawMany();
 
-    return results.map(row => ({
+    return results.map((row) => ({
       sentiment: row.sentiment as MessageSentiment,
-      count: parseInt(row.count, 10)
+      count: parseInt(row.count, 10),
     }));
   }
 
   async getAverageMessagesPerConversation(
     organizationId: string,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<number> {
     // Build the query with proper parameterization
     let query = `

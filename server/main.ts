@@ -29,6 +29,15 @@ async function startServer() {
     logger.warn("Starting server without Redis connection");
   }
 
+  // Initialize Channel Delivery service (depends on Redis)
+  // Listens for outbound bot/agent messages and delivers them to external channels (WhatsApp, etc.)
+  const { channelDeliveryService } = await import("@server/services/channel-delivery.service");
+  try {
+    await channelDeliveryService.initialize();
+  } catch (error) {
+    logger.warn("Starting server without channel delivery service");
+  }
+
   // Initialize Job Queue service (depends on Redis)
   const { jobQueueService } = await import("@server/services/job-queue.service");
   try {
@@ -64,7 +73,10 @@ async function startServer() {
   // Add permissive CORS middleware for public widget endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
-    if (req.path.startsWith("/v1/publicConversations") || req.path.startsWith("/v1/webchat.getPublicConfig")) {
+    if (
+      req.path.startsWith("/v1/publicConversations") ||
+      req.path.startsWith("/v1/webchat.getPublicConfig")
+    ) {
       return cors({
         origin: true, // Allow all origins
         credentials: false,
@@ -142,13 +154,11 @@ async function startServer() {
     }),
   );
 
+  // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
+
   // Plugin thumbnail route - serve thumbnail.jpg files
-  // Use catch-all pattern to handle plugin IDs with slashes (e.g., @hay/plugin-name)
-  server.get(/^\/plugins\/thumbnails\/(.+)$/, (req, res) => {
-    // Set params manually for regex routes
-    req.params = {
-      pluginName: decodeURIComponent(req.params[0]),
-    };
+  server.get(/^\/plugins\/thumbnails\/([^/]+)$/, (req, res) => {
+    req.params = { pluginName: req.params[0] };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
       logger.error({ err: error }, "Thumbnail serving error");
       res.status(500).json({ error: "Internal server error" });
@@ -157,11 +167,7 @@ async function startServer() {
 
   // Plugin public directory route - serve any file from plugin's public folder
   server.get(/^\/plugins\/public\/([^/]+)\/(.*)$/, (req, res) => {
-    // Set params manually for regex routes
-    req.params = {
-      pluginName: req.params[0],
-      filePath: req.params[1],
-    };
+    req.params = { pluginName: req.params[0], filePath: req.params[1] };
     pluginAssetService.servePublicFile(req, res).catch((error) => {
       logger.error({ err: error }, "Public file serving error");
       res.status(500).json({ error: "Internal server error" });
@@ -169,20 +175,10 @@ async function startServer() {
   });
 
   // Plugin UI assets route - serve dist/ files (ui.js, etc.)
-  // Pattern: /plugins/ui/:pluginName/:assetPath
-  // Example: /plugins/ui/@hay/plugin-zendesk/ui.js
-  // Note: Public endpoint - UI bundles are just JavaScript code with no secrets
-  server.get(/^\/plugins\/ui\/([^/]+(?:\/[^/]+)?)\/(.+)$/, async (req, res) => {
-    // Set params manually for regex routes
-    // params[0] = pluginName (may contain slash for scoped packages like @hay/plugin-zendesk)
-    // params[1] = assetPath (e.g., ui.js or images/screenshot.png)
-    req.params = {
-      pluginName: decodeURIComponent(req.params[0]),
-      assetPath: req.params[1],
-    };
+  server.get(/^\/plugins\/ui\/([^/]+)\/(.+)$/, async (req, res) => {
+    req.params = { pluginName: req.params[0], assetPath: req.params[1] };
 
     try {
-      // Serve the file (no authentication required for UI bundles)
       await pluginAssetService.serveUIAsset(req, res);
     } catch (error) {
       logger.error({ err: error }, "UI asset serving error");
@@ -192,11 +188,7 @@ async function startServer() {
 
   // Plugin webhook routes - handle incoming webhooks from external services
   server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
-    // Set params manually for regex routes
-    req.params = {
-      pluginName: req.params[0],
-      webhookPath: req.params[1],
-    };
+    req.params = { pluginName: req.params[0], webhookPath: req.params[1] };
     pluginRouteService.handleWebhook(req, res).catch((error) => {
       logger.error({ err: error }, "Webhook handling error");
       res.status(500).json({ error: "Internal server error" });
@@ -204,7 +196,8 @@ async function startServer() {
   });
 
   // Plugin webhook verification route - handle webhook verification challenges
-  server.get("/plugins/webhooks/:pluginName", (req, res) => {
+  server.get(/^\/plugins\/webhooks\/([^/]+)$/, (req, res) => {
+    req.params = { pluginName: req.params[0] };
     pluginRouteService.handleWebhookVerification(req, res).catch((error) => {
       logger.error({ err: error }, "Webhook verification error");
       res.status(500).json({ error: "Internal server error" });
