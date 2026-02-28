@@ -4,7 +4,7 @@
   "private": true,
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "node-version": "22.10.0",
   "workspaces": [
     "dashboard",
