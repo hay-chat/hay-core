@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import { PluginApiClient } from "./plugin-api.js";
+import { validateTwilioSignature } from "./signature.js";
 
 export interface WebhookContext {
   getAuthToken: () => string | null;
@@ -31,12 +32,24 @@ export async function webhookHandler(
       return;
     }
 
-    // NOTE: Twilio signature validation cannot be done here because the proxy
-    // converts the original form-encoded body to JSON, invalidating the HMAC signature.
-    // TODO: Implement signature validation at the proxy level (server/routes/v1/plugins/proxy.ts)
-    // before the body transformation, where the raw form-encoded body is still available.
+    // Validate Twilio signature to ensure the request is authentic.
+    // The proxy passes x-twilio-signature and x-original-url headers,
+    // and re-encodes the form body as JSON (same key-value pairs).
+    const signature = req.headers["x-twilio-signature"] as string | undefined;
+    const originalUrl = req.headers["x-original-url"] as string | undefined;
 
-    // Extract message data from Twilio's form-encoded body (now JSON after proxy conversion)
+    if (!signature || !originalUrl) {
+      logger.warn("Webhook missing Twilio signature or original URL headers");
+      res.status(403).json({ error: "Missing signature" });
+      return;
+    }
+
+    if (!validateTwilioSignature(token, signature, originalUrl, req.body)) {
+      logger.warn("Invalid Twilio webhook signature", { originalUrl });
+      res.status(403).json({ error: "Invalid signature" });
+      return;
+    }
+
     const { From, Body, ProfileName, WaId, MessageSid } = req.body;
 
     if (!From || !Body) {
