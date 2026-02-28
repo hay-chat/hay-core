@@ -531,31 +531,6 @@
               </CardContent>
             </Card>
 
-            <!-- Available Actions -->
-            <Card>
-              <CardHeader>
-                <CardTitle class="text-base"> Quick Actions </CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-2">
-                <Button variant="outline" size="sm" class="w-full justify-start">
-                  <Ticket class="h-4 w-4 mr-2" />
-                  Create Support Ticket
-                </Button>
-                <Button variant="outline" size="sm" class="w-full justify-start">
-                  <Mail class="h-4 w-4 mr-2" />
-                  Send Email
-                </Button>
-                <Button variant="outline" size="sm" class="w-full justify-start">
-                  <Phone class="h-4 w-4 mr-2" />
-                  Schedule Call
-                </Button>
-                <Button variant="outline" size="sm" class="w-full justify-start">
-                  <Star class="h-4 w-4 mr-2" />
-                  Request Feedback
-                </Button>
-              </CardContent>
-            </Card>
-
             <!-- Knowledge Base Articles -->
             <Card>
               <CardHeader>
