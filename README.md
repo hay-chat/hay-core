@@ -14,7 +14,7 @@
 
 AI-powered customer support platform. Automate conversations with configurable AI agents, train them on your knowledge base, and integrate with your existing tools — all from a single dashboard.
 
-[Website](https://hay.chat) · [Documentation](docs/)
+[Website](https://hay.chat) · [Documentation](https://hay.chat/docs/technical/)
 
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/hay-chat/hay-core)
 ![GitHub last commit](https://img.shields.io/github/last-commit/hay-chat/hay-core)
@@ -172,7 +172,7 @@ Plugins extend Hay via the Model Context Protocol (MCP). Each plugin is loaded d
 | WooCommerce | E-commerce | Products, orders, customers         |
 | Zendesk     | Help desk  | Tickets, customers, workflows       |
 
-See [docs/PLUGIN_API.md](docs/PLUGIN_API.md) for the plugin development guide.
+See the [Plugin API docs](https://hay.chat/docs/technical/plugins/api-reference/) for the plugin development guide.
 
 ### Webchat Widget
 
@@ -197,12 +197,15 @@ Features: real-time messaging, typing indicators, agent avatars, unread badge, i
 
 ## Documentation
 
-- [Plugin API Reference](docs/PLUGIN_API.md)
-- [Plugin Quick Reference](docs/PLUGIN_QUICK_REFERENCE.md)
-- [Channel Registration Guide](docs/PLUGIN_CHANNEL_REGISTRATION.md)
-- [Orchestrator Architecture](server/orchestrator/ARCHITECTURE.md)
-- [Database Conventions](server/database/DATABASE_CONVENTIONS.md)
+- [Overview](https://hay.chat/docs/technical/)
+- [Architecture](https://hay.chat/docs/technical/architecture/)
+- [Context API](https://hay.chat/docs/technical/context-api/)
+- [Guardrails](https://hay.chat/docs/technical/guardrails/)
+- [Plugin Getting Started](https://hay.chat/docs/technical/plugins/getting-started/)
+- [Plugin API Reference](https://hay.chat/docs/technical/plugins/api-reference/)
+- [Channel Architecture](https://hay.chat/docs/technical/plugins/channel-architecture/)
+- [Contributing](https://hay.chat/docs/technical/contributing/orchestrator/)
 
 ## License
 
-MIT
+[Hay Community License v1.0](LICENSE) — free to use, modify, and deploy, but you may not sell the software itself or remove the "Powered by Hay" attribution from the chat widget. See the full [LICENSE](LICENSE) for details.
