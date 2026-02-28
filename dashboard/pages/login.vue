@@ -107,10 +107,37 @@
         </Button>
 
         <!-- Error Message -->
-        <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+        <div
+          v-if="error && !emailNotVerified"
+          class="p-3 rounded-md bg-red-50 border border-red-200"
+        >
           <p class="text-sm text-red-800">
             {{ error }}
           </p>
+        </div>
+
+        <!-- Email Not Verified -->
+        <div
+          v-if="emailNotVerified"
+          class="p-4 rounded-md bg-amber-50 border border-amber-200 space-y-3"
+        >
+          <p class="text-sm text-amber-800 font-medium">
+            Your email address hasn't been verified yet.
+          </p>
+          <p class="text-sm text-amber-700">
+            Please check your inbox for the verification link. If you can't find it, you can request
+            a new one.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            class="w-full"
+            :loading="resendingVerification"
+            :disabled="verificationResent"
+            @click="handleResendVerification"
+          >
+            {{ verificationResent ? "Verification email sent!" : "Resend verification email" }}
+          </Button>
         </div>
       </form>
     </div>
@@ -208,6 +235,9 @@ const errors = reactive({
 });
 
 const error = ref("");
+const emailNotVerified = ref(false);
+const resendingVerification = ref(false);
+const verificationResent = ref(false);
 
 // Computed
 const loading = computed(() => authStore.isLoading);
@@ -252,6 +282,8 @@ const handleSubmit = async () => {
   }
 
   error.value = "";
+  emailNotVerified.value = false;
+  verificationResent.value = false;
 
   try {
     await authStore.login(form.email, form.password);
@@ -261,7 +293,9 @@ const handleSubmit = async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     // Handle different types of authentication errors
-    if (err.message.includes("Invalid credentials")) {
+    if (err.message.includes("not verified")) {
+      emailNotVerified.value = true;
+    } else if (err.message.includes("Invalid credentials")) {
       error.value = "Invalid email or password. Please check your credentials and try again.";
     } else if (err.message.includes("locked")) {
       error.value =
@@ -272,6 +306,22 @@ const handleSubmit = async () => {
       error.value = "Unable to sign in. Please check your internet connection and try again.";
     }
     console.error("Login error:", err);
+  }
+};
+
+const handleResendVerification = async () => {
+  resendingVerification.value = true;
+  try {
+    await Hay.auth.resendSignupVerification.mutate({ email: form.email });
+    verificationResent.value = true;
+  } catch (err: any) {
+    if (err.message.includes("Too many requests")) {
+      error.value = "Too many requests. Please try again later.";
+    } else {
+      error.value = "Failed to resend verification email. Please try again.";
+    }
+  } finally {
+    resendingVerification.value = false;
   }
 };
 

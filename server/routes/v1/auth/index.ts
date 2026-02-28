@@ -191,7 +191,15 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug, emailVerified } = input;
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      organizationName,
+      organizationSlug,
+      emailVerified,
+    } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -974,7 +982,10 @@ export const authRouter = t.router({
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-        logger.debug({ verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail }, "Sending email change verification emails");
+        logger.debug(
+          { verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail },
+          "Sending email change verification emails",
+        );
 
         const commonVariables = {
           userName: user.getFullName(),
@@ -1276,7 +1287,7 @@ export const authRouter = t.router({
 
   /**
    * Resend signup verification email for an unverified user.
-   * Public endpoint (accepts email) — returns token so the backoffice can send the email.
+   * Public endpoint (accepts email) — sends verification email directly.
    * Always returns success to prevent user enumeration.
    */
   resendSignupVerification: publicProcedure
@@ -1303,7 +1314,6 @@ export const authRouter = t.router({
         await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
         return {
           success: true,
-          token: null,
           message: "If an unverified account exists, a new verification link will be sent.",
         };
       }
@@ -1316,9 +1326,33 @@ export const authRouter = t.router({
       user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await userRepository.save(user);
 
+      // Send verification email
+      try {
+        await emailService.initialize();
+
+        const baseUrl = getDashboardUrl();
+        const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}&type=signup`;
+
+        await emailService.sendTemplateEmail({
+          to: user.email,
+          subject: "Verify Your Email Address",
+          template: "verify-signup-email",
+          variables: {
+            userName: user.getFullName(),
+            verificationUrl,
+            companyName: "Hay",
+            currentYear: new Date().getFullYear().toString(),
+            companyAddress: "Hay Platform",
+            websiteUrl: "https://hay.chat",
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, "Failed to send signup verification email");
+        // Don't throw - token was saved, user can retry
+      }
+
       return {
         success: true,
-        token: verificationToken,
         message: "If an unverified account exists, a new verification link will be sent.",
       };
     }),
