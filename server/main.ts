@@ -361,6 +361,9 @@ async function startServer() {
     // metadata populated by the manager above).
     const { pluginCronService } = await import("@server/services/plugin-cron.service");
     await pluginCronService.initialize();
+
+    // Boot keepAlive plugins (e.g., IMAP email polling) for all enabled orgs
+    await pluginManagerService.bootKeepAlivePlugins();
   } catch (error) {
     logger.error({ err: error }, "Failed to initialize plugin system");
   }

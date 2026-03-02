@@ -3,6 +3,7 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { createLogger } from "@server/lib/logger";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 const logger = createLogger("plugin-manager");
 
@@ -144,6 +145,12 @@ export class PluginInstanceManagerService {
     const runner = getPluginRunnerService();
 
     for (const instance of runningInstances) {
+      // Skip keepAlive plugins — they should never be cleaned up for inactivity
+      const manifest = instance.plugin?.manifest as HayPluginManifest;
+      if (manifest?.keepAlive) {
+        continue;
+      }
+
       const instanceKey = this.getInstanceKey(instance.organizationId, instance.plugin.pluginId);
 
       // Check in-memory activity first (more recent)

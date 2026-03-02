@@ -115,15 +115,21 @@ export const pluginApiTrpcRouter = router({
         // Find or create customer
         let customer = await customerRepository.findByExternalId(from, organizationId);
 
+        // Determine contact fields based on channel type
+        const isEmailChannel = channel === "email";
+        const customerName = (metadata?.senderName || metadata?.profileName) as string | undefined;
+
         if (!customer) {
           customer = await customerRepository.create({
             organization_id: organizationId,
             external_id: from,
-            name: metadata?.profileName as string | undefined,
+            name: customerName,
             // Only store a real phone number if the channel provides one.
             // `from` is a channel-scoped identity (e.g. "instagram:<psid>") and
-            // belongs in external_id, never the phone field.
+            // belongs in external_id, never the phone field. For email channels,
+            // `from` IS the customer's email address.
             phone: (metadata?.phone as string | undefined) ?? undefined,
+            ...(isEmailChannel ? { email: from } : {}),
             external_metadata: {
               [channel]: {
                 id: from,
@@ -134,11 +140,14 @@ export const pluginApiTrpcRouter = router({
           });
         } else {
           // Update customer metadata with latest info from the channel
-          // Also backfill name/phone if they weren't set before
+          // Also backfill name/phone/email if they weren't set before
           const updates: Record<string, unknown> = {};
 
-          if (!customer.name && metadata?.profileName) {
-            updates.name = metadata.profileName;
+          if (!customer.name && customerName) {
+            updates.name = customerName;
+          }
+          if (isEmailChannel && !customer.email) {
+            updates.email = from;
           }
           if (!customer.phone && metadata?.phone) {
             updates.phone = metadata.phone as string;
