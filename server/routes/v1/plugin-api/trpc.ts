@@ -121,9 +121,8 @@ export const pluginApiTrpcRouter = router({
           });
         }
 
-        // Add customer message
-        const message = await messageRepository.create({
-          conversation_id: conversation.id,
+        // Add customer message using entity method which handles cooldown and needs_processing
+        const message = await conversation.addMessage({
           content,
           type: MessageType.CUSTOMER,
           metadata,
