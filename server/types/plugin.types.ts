@@ -14,6 +14,7 @@ export interface HayPluginManifest {
   >;
   entry: string;
   channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")
+  keepAlive?: boolean; // If true, worker won't be cleaned up for inactivity and will be auto-started on server boot
   autoActivate?: boolean;
   invisible?: boolean;
   menuItems?: Array<{
