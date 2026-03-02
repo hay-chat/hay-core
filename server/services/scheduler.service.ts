@@ -349,7 +349,7 @@ export class SchedulerService {
     job.isRunning = true;
     const startTime = Date.now();
 
-    logger.debug({ jobName: name }, "Executing job");
+    // logger.debug({ jobName: name }, "Executing job");
 
     try {
       // Execute with optional timeout
