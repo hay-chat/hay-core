@@ -35,8 +35,7 @@ export class OrchestratorWorker {
    * NOTE: Worker processing is now handled by the scheduler service
    * See: server/services/scheduled-jobs.registry.ts -> 'orchestrator-worker-tick' and 'orchestrator-inactivity-check'
    */
-  start(intervalMs: number = 1000): void {
-    logger.debug("Orchestrator worker processing handled by scheduler service");
+  start(): void {
     // Run immediately once
     this.tick();
     this.checkInactivity();

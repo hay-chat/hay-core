@@ -129,7 +129,10 @@ export class SchedulerService {
       }
     }
 
-    logger.debug({ jobName: config.name, schedule: config.schedule, enabled: config.enabled !== false }, "Registered job");
+    logger.debug(
+      { jobName: config.name, schedule: config.schedule, enabled: config.enabled !== false },
+      "Registered job",
+    );
   }
 
   /**
@@ -241,7 +244,10 @@ export class SchedulerService {
       .map(([name]) => name);
 
     if (runningJobs.length > 0) {
-      logger.info({ count: runningJobs.length, jobs: runningJobs }, "Waiting for running jobs to complete");
+      logger.info(
+        { count: runningJobs.length, jobs: runningJobs },
+        "Waiting for running jobs to complete",
+      );
 
       // Wait for running jobs with timeout
       const waitStart = Date.now();
@@ -362,7 +368,7 @@ export class SchedulerService {
       job.totalRuns++;
       job.totalDuration += duration;
 
-      logger.debug({ jobName: name, durationMs: duration }, "Job completed");
+      // logger.debug({ jobName: name, durationMs: duration }, "Job completed");
 
       // Save to database (unless skipped)
       if (!job.config.skipDatabaseLogging) {
@@ -374,7 +380,8 @@ export class SchedulerService {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       job.lastRun = new Date();
-      job.lastStatus = error instanceof Error && error.message.includes("timeout") ? "timeout" : "failed";
+      job.lastStatus =
+        error instanceof Error && error.message.includes("timeout") ? "timeout" : "failed";
       job.lastError = errorMessage;
       job.lastDuration = duration;
       job.totalRuns++;
@@ -389,7 +396,10 @@ export class SchedulerService {
         job.config.maxRetries &&
         retryCount < job.config.maxRetries
       ) {
-        logger.info({ jobName: name, attempt: retryCount + 1, maxRetries: job.config.maxRetries }, "Retrying job");
+        logger.info(
+          { jobName: name, attempt: retryCount + 1, maxRetries: job.config.maxRetries },
+          "Retrying job",
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1s between retries
         return this.executeJob(name, retryCount + 1);
       }
@@ -406,10 +416,7 @@ export class SchedulerService {
   /**
    * Execute a function with timeout
    */
-  private async executeWithTimeout(
-    fn: () => Promise<void>,
-    timeout: number,
-  ): Promise<void> {
+  private async executeWithTimeout(fn: () => Promise<void>, timeout: number): Promise<void> {
     return Promise.race([
       fn(),
       new Promise<void>((_, reject) =>
@@ -453,7 +460,8 @@ export class SchedulerService {
       scheduledJob.lastError = error;
       scheduledJob.totalRuns = job.totalRuns;
       scheduledJob.totalFailures = job.totalFailures;
-      scheduledJob.averageDuration = job.totalRuns > 0 ? Math.round(job.totalDuration / job.totalRuns) : 0;
+      scheduledJob.averageDuration =
+        job.totalRuns > 0 ? Math.round(job.totalDuration / job.totalRuns) : 0;
 
       await scheduledJobRepo.save(scheduledJob);
 

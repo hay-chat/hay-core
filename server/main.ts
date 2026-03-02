@@ -377,7 +377,7 @@ async function startServer() {
     logger.info({ wsPort: config.server.wsPort }, "WebSocket server is running");
 
     // Start the orchestrator worker
-    orchestratorWorker.start(config.orchestrator.interval); // Check every second
+    orchestratorWorker.start();
     logger.info("Orchestrator worker started");
 
     // Initialize plugin pages management (plugin system already initialized)
