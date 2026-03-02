@@ -44,8 +44,21 @@ export async function webhookHandler(
       return;
     }
 
+    logger.debug("Twilio signature validation inputs", {
+      originalUrl,
+      originalContentType: req.headers["x-original-content-type"],
+      bodyType: typeof req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      hasSignature: !!signature,
+    });
+
     if (!validateTwilioSignature(token, signature, originalUrl, req.body)) {
-      logger.warn("Invalid Twilio webhook signature", { originalUrl });
+      logger.warn("Invalid Twilio webhook signature", {
+        originalUrl,
+        originalContentType: req.headers["x-original-content-type"],
+        bodyKeys: req.body ? Object.keys(req.body).sort() : [],
+        bodyParamCount: req.body ? Object.keys(req.body).length : 0,
+      });
       res.status(403).json({ error: "Invalid signature" });
       return;
     }

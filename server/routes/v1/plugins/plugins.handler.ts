@@ -973,6 +973,7 @@ export const refreshMCPTools = authenticatedProcedure
  */
 export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
   const allPlugins = pluginManagerService.getAllPlugins();
+  const userRole = ctx.user!.getRole();
   const menuItems: Array<{
     id: string;
     title: string;
@@ -982,6 +983,7 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
     position?: number;
     pluginId: string;
     external?: boolean;
+    roles?: string[];
   }> = [];
 
   // Get enabled instances for organization-specific plugins
@@ -1013,18 +1015,24 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
   // Append custom menu items from CUSTOM_MENU env var
   const { config } = await import("@server/config/env");
   for (const item of config.customMenu.items) {
-    if (item.title && item.url) {
-      menuItems.push({
-        id: `custom-${item.title.toLowerCase().replace(/\s+/g, "-")}`,
-        title: item.title,
-        url: item.url,
-        icon: item.icon,
-        parent: (item.parent as "settings" | "integrations" | "root") || "root",
-        position: item.position,
-        pluginId: "__custom__",
-        external: item.external || false,
-      });
+    if (!item.title || !item.url) continue;
+
+    // Skip items restricted to specific roles that don't include the current user's role
+    if (item.roles && item.roles.length > 0 && (!userRole || !item.roles.includes(userRole))) {
+      continue;
     }
+
+    menuItems.push({
+      id: `custom-${item.title.toLowerCase().replace(/\s+/g, "-")}`,
+      title: item.title,
+      url: item.url,
+      icon: item.icon,
+      parent: (item.parent as "settings" | "integrations" | "root") || "root",
+      position: item.position,
+      pluginId: "__custom__",
+      external: item.external || false,
+      roles: item.roles,
+    });
   }
 
   // Sort by position if provided

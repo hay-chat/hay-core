@@ -42,6 +42,7 @@ import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 import { Hay } from "@/utils/api";
+import { roleProtectedRoutes } from "@/middleware/auth.global";
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
@@ -285,6 +286,14 @@ onMounted(async () => {
   try {
     const response = await Hay.plugins.getMenuItems.query();
     pluginMenuItems.value = response.items || [];
+
+    // Register role restrictions for internal custom menu items
+    // so direct URL navigation is also guarded by the auth middleware
+    for (const item of pluginMenuItems.value) {
+      if (item.roles?.length && !item.external && item.url) {
+        roleProtectedRoutes[item.url] = item.roles;
+      }
+    }
   } catch (error) {
     console.error("Failed to fetch plugin menu items:", error);
   }

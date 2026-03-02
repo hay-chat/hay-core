@@ -210,11 +210,28 @@ export const config = {
   customMenu: {
     items: (() => {
       const raw = process.env.CUSTOM_MENU;
-      if (!raw) return [] as Array<{ title: string; url: string; icon?: string; parent?: string; position?: number; external?: boolean }>;
+      if (!raw)
+        return [] as Array<{
+          title: string;
+          url: string;
+          icon?: string;
+          parent?: string;
+          position?: number;
+          external?: boolean;
+          roles?: string[];
+        }>;
       try {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        return parsed as Array<{ title: string; url: string; icon?: string; parent?: string; position?: number; external?: boolean }>;
+        return parsed as Array<{
+          title: string;
+          url: string;
+          icon?: string;
+          parent?: string;
+          position?: number;
+          external?: boolean;
+          roles?: string[];
+        }>;
       } catch {
         console.warn("CUSTOM_MENU env var contains invalid JSON, ignoring");
         return [];

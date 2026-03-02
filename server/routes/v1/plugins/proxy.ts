@@ -86,6 +86,18 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
         }
         // Pass the original URL so plugins can reconstruct it for webhook signature validation
         headers["x-original-url"] = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
+        logger.debug(
+          {
+            protocol: req.protocol,
+            forwardedProto: req.get("x-forwarded-proto"),
+            host: req.get("host"),
+            originalUrl: req.originalUrl,
+            constructedUrl: headers["x-original-url"],
+            originalContentType: originalContentType,
+          },
+          "Webhook proxy URL construction",
+        );
       }
 
       const response = await fetch(workerUrl, {
