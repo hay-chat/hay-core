@@ -216,6 +216,15 @@ async function startServer() {
     const { oauthService } = await import("@server/services/oauth.service");
     const { getDashboardUrl } = await import("@server/config/env");
 
+    // HTML-encode a string to prevent XSS in rendered HTML
+    const escapeHtml = (str: string) =>
+      str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     const { code, state, error } = req.query;
 
     if (!code && !error) {
@@ -253,7 +262,7 @@ async function startServer() {
             <head><title>OAuth Error</title></head>
             <body>
               <h1>OAuth Authorization Failed</h1>
-              <p>${result.error || "Unknown error occurred"}</p>
+              <p>${escapeHtml(result.error || "Unknown error occurred")}</p>
               <a href="${getDashboardUrl()}">Return to Dashboard</a>
             </body>
           </html>

@@ -67,6 +67,10 @@ export class User extends BaseEntity {
   @Column({ type: "timestamptz", nullable: true })
   emailVerificationExpiresAt?: Date;
 
+  // Token revocation: increment on password change/reset to invalidate all refresh tokens
+  @Column({ type: "int", default: 0 })
+  tokenVersion!: number;
+
   // Password reset fields
   @Column({ type: "varchar", length: 255, nullable: true })
   passwordResetTokenHash?: string;

@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure, publicProcedure, scopedProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
@@ -88,39 +88,43 @@ export const conversationsRouter = t.router({
       return conversations;
     }),
 
-  get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    const organizationId = ctx.organizationId;
-    if (!organizationId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Organization context required",
-      });
-    }
-    const conversation = await conversationService.getConversation(input.id, organizationId);
+  get: authenticatedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Organization context required",
+        });
+      }
+      const conversation = await conversationService.getConversation(input.id, organizationId);
 
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
 
-    return conversation;
-  }),
+      return conversation;
+    }),
 
-  create: publicProcedure.input(createConversationSchema).mutation(async ({ ctx, input }) => {
-    // Organization ID must come from auth context or explicit input field (validated as UUID above)
-    const organizationId = ctx.organizationId || input.organizationId;
-    if (!organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Organization ID is required",
-      });
-    }
-    const conversation = await conversationService.createConversation(organizationId, input);
+  create: authenticatedProcedure
+    .input(createConversationSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Organization ID must come from auth context or explicit input field (validated as UUID above)
+      const organizationId = ctx.organizationId || input.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID is required",
+        });
+      }
+      const conversation = await conversationService.createConversation(organizationId, input);
 
-    return conversation;
-  }),
+      return conversation;
+    }),
 
   update: authenticatedProcedure
     .input(

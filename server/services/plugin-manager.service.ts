@@ -411,9 +411,9 @@ export class PluginManagerService {
         if (isWorkspacePlugin) {
           // For workspace plugins, run npm install from root to properly resolve workspace links
           // The plugin is part of plugins/core/* workspace, so we need workspace-aware install
-          installCommand = `npm install --workspace=plugins/${plugin.pluginPath}`;
+          installCommand = `npm install --ignore-scripts --workspace=plugins/${plugin.pluginPath}`;
         } else {
-          installCommand = "npm install";
+          installCommand = "npm install --ignore-scripts";
         }
       }
     } catch (error) {

@@ -170,6 +170,10 @@ export default defineNuxtConfig({
         { name: "description", content: "Hay platform dashboard application" },
         { name: "robots", content: "noindex, nofollow" },
       ],
+      script: [
+        // TEMPORARY: Figma capture script - remove after capture
+        { src: "https://mcp.figma.com/mcp/html-to-design/capture.js", async: true },
+      ],
       link: [
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },

@@ -73,7 +73,6 @@ const registerSchema = z
     lastName: z.string().optional(),
     organizationName: z.string().optional(),
     organizationSlug: z.string().optional(),
-    emailVerified: z.boolean().optional().default(true),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -191,15 +190,7 @@ export const authRouter = t.router({
   }),
 
   register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      organizationName,
-      organizationSlug,
-      emailVerified,
-    } = input;
+    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
     // Use a transaction for atomicity
     return await AppDataSource.transaction(async (manager) => {
@@ -267,7 +258,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
-        emailVerified,
+        emailVerified: false,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -322,6 +313,14 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid refresh token",
+        });
+      }
+
+      // Check token version — rejects tokens issued before password change/reset
+      if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Token has been revoked",
         });
       }
 
@@ -519,6 +518,9 @@ export const authRouter = t.router({
       // Hash new password
       user.password = await hashPassword(input.newPassword, "argon2");
 
+      // Invalidate all existing tokens by incrementing tokenVersion
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+
       // Clear password reset fields
       user.clearPasswordReset();
 
@@ -688,8 +690,9 @@ export const authRouter = t.router({
         });
       }
 
-      // Hash new password
+      // Hash new password and invalidate all existing tokens
       user.password = await hashPassword(input.newPassword, "argon2");
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
 
       // Log password change

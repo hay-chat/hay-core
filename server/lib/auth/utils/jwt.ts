@@ -11,6 +11,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
     userId: user.id,
     email: user.email,
     type: "access",
+    tokenVersion: user.tokenVersion ?? 0,
   };
 
   const signOptions: jwt.SignOptions = {
@@ -23,6 +24,7 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
     userId: user.id,
     email: user.email,
     type: "refresh",
+    tokenVersion: user.tokenVersion ?? 0,
     sessionId: sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
   };
 

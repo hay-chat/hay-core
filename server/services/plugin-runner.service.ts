@@ -439,25 +439,29 @@ export class PluginRunnerService {
     env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
 
     // Add allowed environment variables from host
-    // Deny-list prevents plugins from requesting access to server secrets
-    const DENIED_ENV_VARS = new Set([
-      "JWT_SECRET",
-      "JWT_REFRESH_SECRET",
-      "PLUGIN_ENCRYPTION_KEY",
-      "DATABASE_URL",
-      "DB_PASSWORD",
-      "DB_USERNAME",
-      "DB_HOST",
-      "REDIS_PASSWORD",
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
-      "GITHUB_TOKEN",
-      "NPM_TOKEN",
-      "OPENAI_API_KEY",
-      "SMTP_PASSWORD",
-    ]);
+    // Pattern-based deny list blocks any env var containing sensitive keywords.
+    // This is more robust than an explicit list — new secrets are blocked by default.
+    const DENIED_ENV_PATTERNS = [
+      /SECRET/i,
+      /PASSWORD/i,
+      /TOKEN/i,
+      /PRIVATE.?KEY/i,
+      /CREDENTIAL/i,
+      /^DB_/i,
+      /^DATABASE/i,
+      /^REDIS/i,
+      /^AWS_/i,
+      /^OPENAI/i,
+      /^ANTHROPIC/i,
+      /^JWT/i,
+      /^SMTP/i,
+      /^GITHUB/i,
+      /^NPM/i,
+      /^PLUGIN_ENCRYPTION/i,
+      /^HAY_/i, // Prevent plugins from overriding SDK internals
+    ];
     for (const envVar of allowedEnvVars) {
-      if (DENIED_ENV_VARS.has(envVar)) {
+      if (DENIED_ENV_PATTERNS.some((pattern) => pattern.test(envVar))) {
         logger.warn({ pluginId, envVar }, "Plugin requested denied environment variable");
         continue;
       }
