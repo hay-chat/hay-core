@@ -19,21 +19,5 @@ export function validateTwilioSignature(
   url: string,
   params: Record<string, string>,
 ): boolean {
-  // TODO: Remove after diagnosing signature validation failures in production
-  console.debug("[twilio-signature] Validation inputs:", {
-    url,
-    paramKeys: Object.keys(params).sort(),
-    paramCount: Object.keys(params).length,
-    hasSignature: !!signature,
-    hasAuthToken: !!authToken,
-    urlProtocol: url.startsWith("https") ? "https" : "http",
-  });
-
-  const result = validateRequest(authToken, signature, url, params);
-
-  if (!result) {
-    console.debug("[twilio-signature] Validation FAILED — check URL protocol and body params");
-  }
-
-  return result;
+  return validateRequest(authToken, signature, url, params);
 }

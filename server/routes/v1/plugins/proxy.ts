@@ -84,20 +84,11 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
         if (originalContentType) {
           headers["x-original-content-type"] = originalContentType;
         }
-        // Pass the original URL so plugins can reconstruct it for webhook signature validation
-        headers["x-original-url"] = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
-
-        logger.debug(
-          {
-            protocol: req.protocol,
-            forwardedProto: req.get("x-forwarded-proto"),
-            host: req.get("host"),
-            originalUrl: req.originalUrl,
-            constructedUrl: headers["x-original-url"],
-            originalContentType: originalContentType,
-          },
-          "Webhook proxy URL construction",
-        );
+        // Pass the original URL so plugins can reconstruct it for webhook signature validation.
+        // Behind a load balancer / reverse proxy, req.protocol is "http" (internal hop),
+        // but the external-facing protocol is in X-Forwarded-Proto.
+        const externalProto = req.get("x-forwarded-proto") || req.protocol;
+        headers["x-original-url"] = `${externalProto}://${req.get("host")}${req.originalUrl}`;
       }
 
       const response = await fetch(workerUrl, {
