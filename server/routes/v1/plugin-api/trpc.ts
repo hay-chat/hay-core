@@ -69,6 +69,8 @@ export const pluginApiTrpcRouter = router({
           customer = await customerRepository.create({
             organization_id: organizationId,
             external_id: from,
+            name: metadata?.profileName as string | undefined,
+            phone: from,
             external_metadata: {
               [channel]: {
                 id: from,
@@ -77,18 +79,31 @@ export const pluginApiTrpcRouter = router({
               },
             },
           });
-        } else if (metadata) {
+        } else {
           // Update customer metadata with latest info from the channel
-          await customerRepository.update(customer.id, organizationId, {
-            external_metadata: {
+          // Also backfill name/phone if they weren't set before
+          const updates: Record<string, unknown> = {};
+
+          if (!customer.name && metadata?.profileName) {
+            updates.name = metadata.profileName;
+          }
+          if (!customer.phone) {
+            updates.phone = from;
+          }
+          if (metadata) {
+            updates.external_metadata = {
               ...customer.external_metadata,
               [channel]: {
                 ...((customer.external_metadata?.[channel] as Record<string, unknown>) ?? {}),
                 id: from,
                 ...metadata,
               },
-            },
-          });
+            };
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await customerRepository.update(customer.id, organizationId, updates);
+          }
         }
 
         // Get agent for this channel
