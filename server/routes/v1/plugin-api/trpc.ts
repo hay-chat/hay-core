@@ -109,15 +109,13 @@ export const pluginApiTrpcRouter = router({
         );
 
         if (!conversation) {
-          // Generate a title from the channel and customer identifier
-          const title = `${channel.charAt(0).toUpperCase() + channel.slice(1)} conversation`;
           conversation = await conversationRepository.create({
             organization_id: organizationId,
             customer_id: customer.id,
             agent_id: agentId,
             channel,
             status: "open",
-            title,
+            title: "",
           });
         }
 
@@ -217,14 +215,13 @@ export const pluginApiTrpcRouter = router({
           );
 
           if (!conversation) {
-            const title = `${channel.charAt(0).toUpperCase() + channel.slice(1)} conversation`;
             conversation = await conversationRepository.create({
               organization_id: organizationId,
               customer_id: customer.id,
               agent_id: agentId,
               channel,
               status: "open",
-              title,
+              title: "",
             });
           }
         }
