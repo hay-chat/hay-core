@@ -230,12 +230,15 @@ async function saveConfidenceLog(
       orchestration_status: orchestrationStatus,
     });
 
-    logger.debug({
-      conversationId: conversation.id,
-      hasCompanyInterest: !!executionResult.companyInterest,
-      hasFactGrounding: !!executionResult.confidence,
-      logEntries: orchestrationStatus.guardrailLog.length
-    }, "Guardrail log saved");
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        hasCompanyInterest: !!executionResult.companyInterest,
+        hasFactGrounding: !!executionResult.confidence,
+        logEntries: orchestrationStatus.guardrailLog.length,
+      },
+      "Guardrail log saved",
+    );
   } catch (error) {
     logger.error({ err: error }, "Error saving guardrail log");
   }
@@ -255,11 +258,14 @@ export const runConversation = async (conversationId: string) => {
   // Skip processing for conversations taken over by humans
   // Check both status and assigned_user_id to handle race conditions
   if (conversation.status === "human-took-over" || conversation.assigned_user_id) {
-    logger.debug({
-      conversationId,
-      status: conversation.status,
-      assignedUserId: conversation.assigned_user_id
-    }, "Skipping - conversation taken over by human");
+    logger.debug(
+      {
+        conversationId,
+        status: conversation.status,
+        assignedUserId: conversation.assigned_user_id,
+      },
+      "Skipping - conversation taken over by human",
+    );
     return;
   }
 
@@ -278,9 +284,12 @@ export const runConversation = async (conversationId: string) => {
         last_processing_error: "Failed to acquire lock",
         last_processing_error_at: new Date(),
       });
-      logger.debug({
-        conversationId
-      }, "Could not acquire lock, conversation already being processed");
+      logger.debug(
+        {
+          conversationId,
+        },
+        "Could not acquire lock, conversation already being processed",
+      );
       return;
     }
 
@@ -356,14 +365,20 @@ export const runConversation = async (conversationId: string) => {
       shouldClose = closureValidation.shouldClose;
 
       if (!shouldClose) {
-        logger.debug({ isGratitudeMessage, reason: closureValidation.reason }, isGratitudeMessage
-          ? "Gratitude message detected but validation determined it's not a closure"
-          : "Closure intent detected but validation failed");
+        logger.debug(
+          { isGratitudeMessage, reason: closureValidation.reason },
+          isGratitudeMessage
+            ? "Gratitude message detected but validation determined it's not a closure"
+            : "Closure intent detected but validation failed",
+        );
       }
     }
 
     if (shouldClose) {
-      logger.debug({ intentLabel: intent.label, intentScore: intent.score }, "User indicated closure intent, marking conversation as resolved");
+      logger.debug(
+        { intentLabel: intent.label, intentScore: intent.score },
+        "User indicated closure intent, marking conversation as resolved",
+      );
 
       // Generate a title for the conversation before closing
       const { generateConversationTitle } = await import("./conversation-utils");
@@ -434,16 +449,22 @@ export const runConversation = async (conversationId: string) => {
     // Automatic agent selection during orchestration is no longer used.
     const currentAgent = conversation.agent_id;
     if (!currentAgent) {
-      logger.debug({
-        conversationId: conversation.id,
-        organizationId: conversation.organization_id
-      }, "WARNING: No agent assigned to conversation");
+      logger.debug(
+        {
+          conversationId: conversation.id,
+          organizationId: conversation.organization_id,
+        },
+        "WARNING: No agent assigned to conversation",
+      );
       // This shouldn't happen if conversation creation is working correctly
       // Agent should be set at creation time or fall back to organization default
     } else {
-      logger.debug({
-        agentId: currentAgent
-      }, "Agent assigned");
+      logger.debug(
+        {
+          agentId: currentAgent,
+        },
+        "Agent assigned",
+      );
     }
 
     // Update processing state to retrieving
@@ -457,25 +478,31 @@ export const runConversation = async (conversationId: string) => {
 
     const currentPlaybook = conversation.playbook_id;
 
-    logger.debug({
-      conversationId: conversation.id,
-      currentPlaybookId: currentPlaybook,
-      publicMessagesCount: publicMessages.length
-    }, "Starting playbook retrieval");
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        currentPlaybookId: currentPlaybook,
+        publicMessagesCount: publicMessages.length,
+      },
+      "Starting playbook retrieval",
+    );
 
     const activePlaybooks = await playbookRepository.findByStatus(
       conversation.organization_id,
       PlaybookStatus.ACTIVE,
     );
 
-    logger.debug({
-      activePlaybooksCount: activePlaybooks.length,
-      playbooks: activePlaybooks.map((p) => ({
-        id: p.id,
-        title: p.title,
-        trigger: p.trigger?.substring(0, 50)
-      }))
-    }, "Retrieved active playbooks");
+    logger.debug(
+      {
+        activePlaybooksCount: activePlaybooks.length,
+        playbooks: activePlaybooks.map((p) => ({
+          id: p.id,
+          title: p.title,
+          trigger: p.trigger?.substring(0, 50),
+        })),
+      },
+      "Retrieved active playbooks",
+    );
 
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
@@ -484,60 +511,84 @@ export const runConversation = async (conversationId: string) => {
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
-      logger.debug({
-        oldPlaybookId: currentPlaybook,
-        newPlaybookId: playbookCandidate.id,
-        newPlaybookTitle: playbookCandidate.title
-      }, "Playbook candidate differs from current, updating conversation");
+      logger.debug(
+        {
+          oldPlaybookId: currentPlaybook,
+          newPlaybookId: playbookCandidate.id,
+          newPlaybookTitle: playbookCandidate.title,
+        },
+        "Playbook candidate differs from current, updating conversation",
+      );
       await conversation.updatePlaybook(playbookCandidate.id);
     } else if (playbookCandidate) {
       // Check if enabled_tools is null despite having a playbook - this means tools were never fetched
       if (!conversation.enabled_tools || conversation.enabled_tools.length === 0) {
-        logger.debug({
-          playbookId: currentPlaybook,
-          enabledTools: conversation.enabled_tools
-        }, "Playbook is set but enabled_tools is null, refreshing tools");
+        logger.debug(
+          {
+            playbookId: currentPlaybook,
+            enabledTools: conversation.enabled_tools,
+          },
+          "Playbook is set but enabled_tools is null, refreshing tools",
+        );
         await conversation.updatePlaybook(playbookCandidate.id);
       } else {
-        logger.debug({
-          playbookId: currentPlaybook,
-          enabledToolsCount: conversation.enabled_tools.length
-        }, "Playbook candidate matches current playbook, no update needed");
+        logger.debug(
+          {
+            playbookId: currentPlaybook,
+            enabledToolsCount: conversation.enabled_tools.length,
+          },
+          "Playbook candidate matches current playbook, no update needed",
+        );
       }
     } else {
-      logger.debug({
-        currentPlaybookId: currentPlaybook
-      }, "No playbook candidate selected");
+      logger.debug(
+        {
+          currentPlaybookId: currentPlaybook,
+        },
+        "No playbook candidate selected",
+      );
     }
 
     // 02.2. Get Document Candidates
-    logger.debug({
-      conversationId: conversation.id,
-      currentDocumentIds: conversation.document_ids
-    }, "Starting document retrieval");
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        currentDocumentIds: conversation.document_ids,
+      },
+      "Starting document retrieval",
+    );
 
     const retrievedDocuments = await retrievalLayer.getRelevantDocuments(
       publicMessages,
       conversation.organization_id,
     );
 
-    logger.debug({
-      retrievedDocumentsCount: retrievedDocuments.length,
-      documents: retrievedDocuments
-    }, "Document retrieval complete");
+    logger.debug(
+      {
+        retrievedDocumentsCount: retrievedDocuments.length,
+        documents: retrievedDocuments,
+      },
+      "Document retrieval complete",
+    );
 
     if (retrievedDocuments.length > 0) {
       for (const document of retrievedDocuments) {
         if (!conversation.document_ids?.includes(document.id)) {
-          logger.debug({
-            documentId: document.id,
-            similarity: document.similarity
-          }, "Adding new document to conversation");
+          logger.debug(
+            {
+              documentId: document.id,
+              similarity: document.similarity,
+            },
+            "Adding new document to conversation",
+          );
           await conversation.addDocument(document.id);
         } else {
-          logger.debug({
-            documentId: document.id
-          }, "Document already attached to conversation");
+          logger.debug(
+            {
+              documentId: document.id,
+            },
+            "Document already attached to conversation",
+          );
         }
       }
     } else {
@@ -561,13 +612,16 @@ export const runConversation = async (conversationId: string) => {
     await updateProcessingState(conversation, "executing", "Generating response");
 
     // Log current conversation state before execution
-    logger.debug({
-      conversationId: conversation.id,
-      playbookId: conversation.playbook_id,
-      enabledTools: conversation.enabled_tools,
-      enabledToolsCount: conversation.enabled_tools?.length || 0,
-      agentId: conversation.agent_id
-    }, "Conversation state before execution");
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        playbookId: conversation.playbook_id,
+        enabledTools: conversation.enabled_tools,
+        enabledToolsCount: conversation.enabled_tools?.length || 0,
+        agentId: conversation.agent_id,
+      },
+      "Conversation state before execution",
+    );
 
     // 04. Execution - Handle iterative execution with tool calls
     await handleExecutionLoop(conversation, language);
@@ -592,10 +646,13 @@ export const runConversation = async (conversationId: string) => {
 
       // Generate title after at least 2 customer messages
       if (customerMessages.length >= 2) {
-        logger.debug({
-          conversationId: conversation.id,
-          customerMessagesCount: customerMessages.length
-        }, "Generating conversation title");
+        logger.debug(
+          {
+            conversationId: conversation.id,
+            customerMessagesCount: customerMessages.length,
+          },
+          "Generating conversation title",
+        );
 
         // Generate title asynchronously (don't block processing)
         const { generateConversationTitle } = await import("./conversation-utils");
@@ -640,10 +697,13 @@ export const runConversation = async (conversationId: string) => {
     try {
       await conversation.unlock();
     } catch (unlockError) {
-      logger.error({
-        conversationId,
-        err: unlockError,
-      }, "CRITICAL: Failed to unlock conversation");
+      logger.error(
+        {
+          conversationId,
+          err: unlockError,
+        },
+        "CRITICAL: Failed to unlock conversation",
+      );
       // Emergency fallback: Force clear lock via direct DB update
       try {
         await conversationRepository.updateById(conversation.id, {
@@ -684,10 +744,13 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
     if (!executionResult) {
       emptyRetries++;
-      logger.debug({
-        emptyRetries,
-        maxEmptyRetries: MAX_EMPTY_RETRIES
-      }, "No execution result");
+      logger.debug(
+        {
+          emptyRetries,
+          maxEmptyRetries: MAX_EMPTY_RETRIES,
+        },
+        "No execution result",
+      );
 
       // If we've retried too many times, use a fallback response
       if (emptyRetries >= MAX_EMPTY_RETRIES) {
@@ -708,28 +771,47 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     // Reset empty retry counter on successful response
     emptyRetries = 0;
 
-    logger.debug({
-      step: executionResult.step,
-      hasUserMessage: !!executionResult.userMessage,
-      userMessagePreview: executionResult.userMessage?.substring(0, 100),
-      hasTool: !!executionResult.tool,
-      toolName: executionResult.tool?.name,
-      hasHandoff: !!executionResult.handoff,
-      hasClose: !!executionResult.close,
-      rationale: executionResult.rationale
-    }, "Processing execution result");
+    logger.debug(
+      {
+        step: executionResult.step,
+        hasUserMessage: !!executionResult.userMessage,
+        userMessagePreview: executionResult.userMessage?.substring(0, 100),
+        hasTool: !!executionResult.tool,
+        toolName: executionResult.tool?.name,
+        hasHandoff: !!executionResult.handoff,
+        hasClose: !!executionResult.close,
+        rationale: executionResult.rationale,
+      },
+      "Processing execution result",
+    );
 
-    // Enforce enabled_tools: reject tool calls not in the conversation's allowed list
+    // Enforce enabled_tools: reject tool calls not in the conversation's allowed list.
+    // Policy: when enabled_tools is null/empty (no playbook), all tools are allowed.
+    // When a playbook defines enabled_tools, only those tools may be called.
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       const enabledTools = conversation.enabled_tools;
       if (enabledTools && enabledTools.length > 0) {
         if (!enabledTools.includes(executionResult.tool.name)) {
-          logger.warn({
-            toolName: executionResult.tool.name,
-            enabledTools,
-            conversationId: conversation.id,
-          }, "Tool execution blocked — not in enabled_tools");
-          // Skip this tool call and let the LLM continue without it
+          logger.warn(
+            {
+              toolName: executionResult.tool.name,
+              enabledTools,
+              conversationId: conversation.id,
+            },
+            "Tool execution blocked — not in enabled_tools",
+          );
+          // Don't count blocked tool calls toward the iteration limit —
+          // feed an error back to the LLM so it can adjust instead of silently looping.
+          iterations--;
+          await conversation.addMessage({
+            content: `Tool "${executionResult.tool.name}" is not available in this conversation. Available tools: ${enabledTools.join(", ")}`,
+            type: MessageType.TOOL,
+            metadata: {
+              toolName: executionResult.tool.name,
+              status: "blocked",
+              reason: "not_in_enabled_tools",
+            },
+          });
           continue;
         }
       }
@@ -793,10 +875,13 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Continue the loop to let LLM analyze the result
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
-      logger.debug({
-        confidenceRelated: !!executionResult.confidence,
-        confidenceScore: executionResult.confidence?.score
-      }, "HANDOFF step detected");
+      logger.debug(
+        {
+          confidenceRelated: !!executionResult.confidence,
+          confidenceScore: executionResult.confidence?.score,
+        },
+        "HANDOFF step detected",
+      );
 
       // Check if we've already processed handoff to avoid duplicates
       if (handoffProcessed) {
@@ -981,10 +1066,13 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
         // Detect if message claims action without executing tool
         if (executionResult.tool && executionResult.tool.name) {
-          logger.error({
-            toolName: executionResult.tool.name,
-            messagePreview: executionResult.userMessage.substring(0, 100),
-          }, "HALLUCINATION DETECTED: Saved user message with unpopulated tool field");
+          logger.error(
+            {
+              toolName: executionResult.tool.name,
+              messagePreview: executionResult.userMessage.substring(0, 100),
+            },
+            "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
+          );
         }
 
         await conversation.addMessage({
@@ -997,27 +1085,34 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
               : {}),
           },
         });
-        logger.debug({
-          messagePreview: executionResult.userMessage.substring(0, 100),
-          confidenceScore: executionResult.confidence?.score,
-          confidenceTier: executionResult.confidence?.tier,
-        }, "Added bot response, ending execution loop");
+        logger.debug(
+          {
+            messagePreview: executionResult.userMessage.substring(0, 100),
+            confidenceScore: executionResult.confidence?.score,
+            confidenceTier: executionResult.confidence?.tier,
+          },
+          "Added bot response, ending execution loop",
+        );
 
         break;
       } else {
         // Missing userMessage for non-tool/non-handoff/non-close steps
         emptyRetries++;
-        logger.error({          step: executionResult.step,
-          emptyRetries,
-          maxEmptyRetries: MAX_EMPTY_RETRIES,
-          hasTool: !!executionResult.tool,
-          toolName: executionResult.tool?.name,
-          hasHandoff: !!executionResult.handoff,
-          hasClose: !!executionResult.close,
-          rationale: executionResult.rationale,
-          fullResult: JSON.stringify(executionResult),
-          possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool
-        }, "No user message in response, retrying");
+        logger.error(
+          {
+            step: executionResult.step,
+            emptyRetries,
+            maxEmptyRetries: MAX_EMPTY_RETRIES,
+            hasTool: !!executionResult.tool,
+            toolName: executionResult.tool?.name,
+            hasHandoff: !!executionResult.handoff,
+            hasClose: !!executionResult.close,
+            rationale: executionResult.rationale,
+            fullResult: JSON.stringify(executionResult),
+            possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool,
+          },
+          "No user message in response, retrying",
+        );
 
         // If we've retried too many times, use a fallback response
         if (emptyRetries >= MAX_EMPTY_RETRIES) {

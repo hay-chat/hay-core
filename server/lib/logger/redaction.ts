@@ -84,7 +84,18 @@ function buildRedactPaths(): string[] {
   }
 
   // Headers at top level and one level deep
-  const headerFields = ["authorization", "Authorization", "cookie", "Cookie"];
+  const headerFields = [
+    "authorization",
+    "Authorization",
+    "cookie",
+    "Cookie",
+    "set-cookie",
+    "Set-Cookie",
+    "x-api-key",
+    "X-Api-Key",
+    "proxy-authorization",
+    "Proxy-Authorization",
+  ];
   for (const h of headerFields) {
     paths.push(`headers.${h}`);
     paths.push(`*.headers.${h}`);
@@ -104,16 +115,28 @@ const US_PHONE_REGEX = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
 const INTL_PHONE_REGEX = /\+\d{1,3}[-.\s]?(?:\d[-.\s]?){4,14}\d/g;
 const JWT_REGEX = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
 const BEARER_REGEX = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const BASIC_AUTH_REGEX = /Basic\s+[A-Za-z0-9+/=]+/gi;
+const IPV4_REGEX = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+const CREDIT_CARD_REGEX = /\b(?:\d[ -]*?){13,19}\b/g;
+const SSN_REGEX = /\b\d{3}-\d{2}-\d{4}\b/g;
+const API_KEY_PREFIX_REGEX =
+  /\b(?:sk-|pk_live_|sk_live_|sk_test_|pk_test_|rk_live_|rk_test_)[A-Za-z0-9_-]+/g;
 
 /**
  * Redact PII and secret patterns from a string message.
- * Catches email addresses, phone numbers, JWTs, and Bearer tokens in freeform text.
+ * Catches email addresses, phone numbers, JWTs, Bearer/Basic tokens,
+ * IPv4 addresses, credit card numbers, SSNs, and common API key prefixes.
  */
 export function redactString(input: string): string {
   return input
     .replace(JWT_REGEX, "[TOKEN_REDACTED]")
     .replace(BEARER_REGEX, "Bearer [TOKEN_REDACTED]")
+    .replace(BASIC_AUTH_REGEX, "Basic [TOKEN_REDACTED]")
+    .replace(API_KEY_PREFIX_REGEX, "[API_KEY_REDACTED]")
     .replace(EMAIL_REGEX, "[EMAIL_REDACTED]")
+    .replace(CREDIT_CARD_REGEX, "[CREDIT_CARD_REDACTED]")
+    .replace(SSN_REGEX, "[SSN_REDACTED]")
     .replace(INTL_PHONE_REGEX, "[PHONE_REDACTED]")
-    .replace(US_PHONE_REGEX, "[PHONE_REDACTED]");
+    .replace(US_PHONE_REGEX, "[PHONE_REDACTED]")
+    .replace(IPV4_REGEX, "[IP_REDACTED]");
 }
