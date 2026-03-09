@@ -1,5 +1,6 @@
 {
-  "page": {
+  "documents": {
+    "page": {
     "title": "Documentos",
     "description": "Gerencie os documentos da sua base de conhecimento para agentes de IA.",
     "seoTitle": "Documentos - Hay Dashboard",
@@ -284,5 +285,6 @@
       "cancelFailed": "Falha ao cancelar importação",
       "cancelFailedMessage": "Por favor, tente novamente."
     }
+  }
   }
 }

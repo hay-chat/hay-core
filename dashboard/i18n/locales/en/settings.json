@@ -299,7 +299,7 @@
     "reset": "Reset",
     "saveChanges": "Save Changes",
     "installationCode": "Installation Code",
-    "installationCodeDescription": "Add this code to your website before the closing </body> tag",
+    "installationCodeDescription": "Add this code to your website before the closing body tag",
     "loadFailed": "Failed to load webchat settings",
     "saveSuccess": "Webchat settings saved successfully",
     "saveFailed": "Failed to save webchat settings"

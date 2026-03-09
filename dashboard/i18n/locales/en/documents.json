@@ -1,5 +1,6 @@
 {
-  "page": {
+  "documents": {
+    "page": {
     "title": "Documents",
     "description": "Manage your knowledge base documents for AI agents.",
     "seoTitle": "Documents - Hay Dashboard",
@@ -284,5 +285,6 @@
       "cancelFailed": "Failed to cancel import",
       "cancelFailedMessage": "Please try again."
     }
+  }
   }
 }

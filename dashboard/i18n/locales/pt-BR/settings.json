@@ -299,7 +299,7 @@
     "reset": "Redefinir",
     "saveChanges": "Salvar Alterações",
     "installationCode": "Código de Instalação",
-    "installationCodeDescription": "Adicione este código ao seu site antes da tag de fechamento </body>",
+    "installationCodeDescription": "Adicione este código ao seu site antes da tag de fechamento body",
     "loadFailed": "Falha ao carregar configurações do webchat",
     "saveSuccess": "Configurações do webchat salvas com sucesso",
     "saveFailed": "Falha ao salvar configurações do webchat"

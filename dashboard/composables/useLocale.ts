@@ -14,7 +14,7 @@ const I18N_TO_BACKEND: Record<string, string> = {
 };
 
 export function useLocale() {
-  const { locale, setLocale } = useI18n();
+  const { setLocale, locale } = useNuxtApp().$i18n;
 
   /**
    * Set the i18n locale from a backend SupportedLanguage value.

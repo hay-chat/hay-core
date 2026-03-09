@@ -1,5 +1,6 @@
 {
-  "page": {
+  "dashboard": {
+    "page": {
     "title": "Dashboard",
     "description": "Welcome back! Here's what's happening with your AI agents.",
     "seoTitle": "Dashboard - Hay",
@@ -110,5 +111,6 @@
       "viewConversations": "View Conversations",
       "locked": "Finish the previous steps before doing this. Hay will work better this way."
     }
+  }
   }
 }

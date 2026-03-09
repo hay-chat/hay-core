@@ -1,5 +1,6 @@
 {
-  "page": {
+  "dashboard": {
+    "page": {
     "title": "Painel",
     "description": "Bem-vindo de volta! Veja o que está acontecendo com seus agentes de IA.",
     "seoTitle": "Painel - Hay",
@@ -110,5 +111,6 @@
       "viewConversations": "Ver Conversas",
       "locked": "Termine as etapas anteriores antes de fazer isso. O Hay vai funcionar melhor assim."
     }
+  }
   }
 }
