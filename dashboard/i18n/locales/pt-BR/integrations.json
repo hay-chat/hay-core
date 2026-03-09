@@ -1,0 +1,239 @@
+{
+  "marketplace": {
+    "title": "Marketplace de Plugins",
+    "description": "Descubra e instale plugins para ampliar as capacidades da sua plataforma",
+    "headTitle": "Marketplace de Plugins - Hay Dashboard",
+    "uploadPlugin": "Enviar Plugin",
+    "manageCustom": "Gerenciar Personalizados ({count})",
+    "refresh": "Atualizar",
+    "stats": {
+      "totalPlugins": "Total de Plugins",
+      "availablePlugins": "Plugins disponíveis",
+      "installed": "Instalados",
+      "activePlugins": "Plugins ativos",
+      "channels": "Canais",
+      "communicationChannels": "Canais de comunicação",
+      "mcpConnectors": "Conectores MCP",
+      "modelContextProtocol": "Model Context Protocol"
+    },
+    "categories": {
+      "label": "Categorias:",
+      "all": "Todos os Plugins",
+      "channels": "Canais",
+      "mcpConnectors": "Conectores MCP",
+      "documentImporters": "Importadores de Documentos",
+      "retrievers": "Recuperadores",
+      "playbooks": "Playbooks"
+    },
+    "search": "Buscar plugins...",
+    "empty": {
+      "title": "Nenhum plugin encontrado",
+      "searchHint": "Tente ajustar os termos da sua busca.",
+      "categoryHint": "Nenhum plugin corresponde à categoria selecionada."
+    },
+    "pluginTypes": {
+      "channel": "Canal",
+      "mcpConnector": "Conector MCP",
+      "documentImporter": "Importador de Documentos",
+      "retriever": "Recuperador",
+      "playbook": "Playbook"
+    },
+    "actions": {
+      "install": "Instalar",
+      "installing": "Instalando...",
+      "configure": "Configurar",
+      "remove": "Remover",
+      "removing": "Removendo...",
+      "delete": "Excluir",
+      "deleting": "Excluindo..."
+    },
+    "custom": "Personalizado",
+    "confirmDelete": "Tem certeza de que deseja excluir este plugin? Esta ação não pode ser desfeita.",
+    "toast": {
+      "enabledSuccess": "Plugin {name} ativado com sucesso",
+      "disabledSuccess": "Plugin {name} desativado com sucesso",
+      "deletedSuccess": "Plugin excluído com sucesso",
+      "enableFailed": "Falha ao ativar plugin",
+      "disableFailed": "Falha ao desativar plugin",
+      "deleteFailed": "Falha ao excluir plugin"
+    }
+  },
+  "manage": {
+    "title": "Gerenciar Plugins Personalizados",
+    "description": "Visualize e gerencie os plugins personalizados da sua organização",
+    "headTitle": "Gerenciar Plugins Personalizados - Hay Dashboard",
+    "uploadPlugin": "Enviar Plugin",
+    "refresh": "Atualizar",
+    "stats": {
+      "customPlugins": "Plugins Personalizados",
+      "uploadedByOrg": "Enviados pela sua organização",
+      "enabled": "Ativados",
+      "currentlyActive": "Atualmente ativos",
+      "totalSize": "Tamanho Total",
+      "storageUsed": "Armazenamento utilizado"
+    },
+    "loading": "Carregando plugins...",
+    "empty": {
+      "title": "Nenhum plugin personalizado",
+      "description": "Envie seu primeiro plugin personalizado para começar"
+    },
+    "table": {
+      "title": "Plugins Personalizados",
+      "version": "Versão: {version}",
+      "id": "ID: {id}",
+      "uploaded": "Enviado: {date}"
+    },
+    "actions": {
+      "enable": "Ativar",
+      "enabling": "Ativando...",
+      "disable": "Desativar",
+      "disabling": "Desativando...",
+      "settings": "Configurações",
+      "update": "Atualizar",
+      "delete": "Excluir",
+      "deleting": "Excluindo..."
+    },
+    "confirmDelete": "Tem certeza de que deseja excluir este plugin? Esta ação não pode ser desfeita.",
+    "updateComingSoon": "Funcionalidade de atualização em breve",
+    "toast": {
+      "enabledSuccess": "Plugin ativado com sucesso",
+      "disabledSuccess": "Plugin desativado com sucesso",
+      "deletedSuccess": "Plugin excluído com sucesso",
+      "enableFailed": "Falha ao ativar plugin",
+      "disableFailed": "Falha ao desativar plugin",
+      "deleteFailed": "Falha ao excluir plugin"
+    }
+  },
+  "upload": {
+    "title": "Enviar Plugin Personalizado",
+    "description": "Envie um plugin personalizado para ampliar sua plataforma",
+    "headTitle": "Enviar Plugin - Hay Dashboard",
+    "backToMarketplace": "Voltar ao Marketplace",
+    "card": {
+      "title": "Enviar ZIP do Plugin",
+      "description": "Envie um arquivo ZIP contendo seu plugin personalizado. O ZIP deve incluir um arquivo manifest.json na raiz."
+    },
+    "file": {
+      "label": "Arquivo do Plugin",
+      "dropHint": "Arraste o ZIP do plugin aqui ou clique para procurar",
+      "maxSize": "Tamanho máximo do arquivo: 50MB",
+      "selectFile": "Selecionar Arquivo",
+      "remove": "Remover"
+    },
+    "success": {
+      "message": "Plugin enviado com sucesso!",
+      "uploadAnother": "Enviar Outro",
+      "viewMarketplace": "Ver Marketplace"
+    },
+    "progress": {
+      "uploading": "Enviando...",
+      "uploadPlugin": "Enviar Plugin"
+    },
+    "errors": {
+      "title": "Envio Falhou",
+      "zipOnly": "Apenas arquivos ZIP são permitidos",
+      "tooLarge": "O tamanho do arquivo excede o limite de 50MB",
+      "uploadFailed": "Falha ao enviar plugin"
+    },
+    "requirements": {
+      "title": "Requisitos do Plugin",
+      "manifest": {
+        "title": "manifest.json válido",
+        "description": "Deve incluir um arquivo manifest.json na raiz com os campos id, name e version"
+      },
+      "pluginId": {
+        "title": "ID de plugin válido",
+        "description": "O ID do plugin deve conter apenas letras minúsculas, números e hífens"
+      },
+      "zipFormat": {
+        "title": "Formato ZIP",
+        "description": "O arquivo deve estar no formato ZIP com tamanho máximo de 50MB"
+      },
+      "noPathTraversal": {
+        "title": "Sem travessia de caminho",
+        "description": "O ZIP não deve conter arquivos com caminhos absolutos ou .."
+      }
+    },
+    "toast": {
+      "uploadedSuccess": "Plugin {name} enviado com sucesso!"
+    }
+  },
+  "pluginSettings": {
+    "backToMarketplace": "Voltar ao Marketplace",
+    "headTitle": "Configurações do Plugin - Hay Dashboard",
+    "headTitleWithName": "Configurações de {name} - Hay Dashboard",
+    "restartWorker": "Reiniciar Worker",
+    "restarting": "Reiniciando...",
+    "disablePlugin": "Desativar Plugin",
+    "disabling": "Desativando...",
+    "enablePlugin": "Ativar Plugin",
+    "disableConfirm": {
+      "title": "Desativar Plugin?",
+      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso do plugin na sua organização.",
+      "confirm": "Desativar"
+    },
+    "error": {
+      "loadFailed": "Falha ao carregar plugin",
+      "returnToMarketplace": "Voltar ao Marketplace"
+    },
+    "connection": {
+      "testing": "Testando Conexão",
+      "connected": "Conectado",
+      "failed": "Conexão Falhou",
+      "needsAuth": "Necessita Autenticação",
+      "configureCredentials": "Por favor, configure suas credenciais",
+      "connectionFailed": "Conexão falhou",
+      "tryAgain": "Tentar Novamente"
+    },
+    "about": "Sobre",
+    "capabilities": {
+      "title": "Capacidades",
+      "description": "O que este plugin pode fazer",
+      "chatConnector": "Conector de Chat",
+      "sendMessages": "Enviar mensagens",
+      "receiveMessages": "Receber mensagens",
+      "listConversations": "Listar conversas",
+      "mcpConnector": "Conector MCP",
+      "mcpDescription": "Fornece ferramentas e recursos de IA através do Model Context Protocol",
+      "documentImporter": "Importador de Documentos",
+      "documentImporterDescription": "Importar e processar documentos de fontes externas"
+    },
+    "availableActions": {
+      "title": "Ações Disponíveis",
+      "toolsAvailable": "{count} ferramentas disponíveis"
+    },
+    "configuration": {
+      "title": "Configuração",
+      "description": "Configure as definições de {name}"
+    },
+    "connectionTest": {
+      "title": "Teste de Conexão",
+      "description": "Teste a conexão de {name}",
+      "testConnection": "Testar Conexão",
+      "testing": "Testando...",
+      "success": "Conexão bem-sucedida!",
+      "configRequired": "Configuração necessária",
+      "failed": "Conexão falhou",
+      "checkConfig": "Por favor, verifique sua configuração e tente novamente."
+    },
+    "tabs": {
+      "settings": "Configurações"
+    },
+    "toast": {
+      "configSaved": "Configuração salva com sucesso",
+      "configSaveFailed": "Falha ao salvar configuração",
+      "enabledSuccess": "Plugin ativado com sucesso",
+      "enableFailed": "Falha ao ativar plugin",
+      "disabledSuccess": "Plugin desativado com sucesso",
+      "disableFailed": "Falha ao desativar plugin",
+      "restartedSuccess": "Worker do plugin reiniciado com sucesso",
+      "restartFailed": "Falha ao reiniciar plugin",
+      "resetToEnv": "Redefinido para variável de ambiente",
+      "resetToEnvFailed": "Falha ao redefinir para variável de ambiente",
+      "oauthSuccess": "Conexão OAuth estabelecida com sucesso",
+      "oauthFailed": "Conexão OAuth falhou. Por favor, tente novamente.",
+      "connectionEstablished": "Conexão estabelecida com sucesso",
+      "connectionCheckFailed": "Falha ao estabelecer conexão. Por favor, verifique sua configuração."
+    }
+  }
+}

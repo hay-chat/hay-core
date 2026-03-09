@@ -1,0 +1,175 @@
+{
+  "page": {
+    "title": "Conversations",
+    "description": "Monitor and manage all customer conversations",
+    "headTitle": "Conversations - Hay Dashboard",
+    "headDescription": "Monitor and manage all customer conversations"
+  },
+  "actions": {
+    "playground": "Conversation Playground",
+    "refresh": "Refresh",
+    "select": "Select",
+    "exit": "Exit",
+    "archive": "Archive ({count})",
+    "tryAgain": "Try Again",
+    "startPlayground": "Start Playground"
+  },
+  "stats": {
+    "totalConversations": "Total Conversations",
+    "todayIncrease": "+{count} today",
+    "activeNow": "Active Now",
+    "realTimeConversations": "Real-time conversations",
+    "avgResponseTime": "Avg Response Time",
+    "yesterdayChange": "-12% from yesterday"
+  },
+  "filters": {
+    "searchPlaceholder": "Search conversations...",
+    "allStatus": "All Status",
+    "active": "Active",
+    "resolved": "Resolved",
+    "escalated": "Escalated",
+    "closed": "Closed",
+    "today": "Today",
+    "thisWeek": "This Week",
+    "thisMonth": "This Month",
+    "allTime": "All Time",
+    "allAgents": "All Agents"
+  },
+  "table": {
+    "conversation": "Conversation",
+    "status": "Status",
+    "assignedTo": "Assigned To",
+    "duration": "Duration",
+    "satisfaction": "Satisfaction",
+    "updated": "Updated",
+    "newConversation": "New Conversation",
+    "waiting": "Waiting {time}",
+    "notRated": "Not rated"
+  },
+  "status": {
+    "open": "Open",
+    "processing": "Processing",
+    "pendingHuman": "Needs Attention",
+    "humanTookOver": "Manual Control",
+    "resolved": "Resolved",
+    "closed": "Closed",
+    "unknown": "Unknown"
+  },
+  "error": {
+    "loadingConversations": "Error Loading Conversations",
+    "failedToLoad": "Failed to load conversations"
+  },
+  "empty": {
+    "noConversationsFound": "No conversations found",
+    "noConversationsYet": "No conversations yet",
+    "adjustSearch": "Try adjusting your search terms or filters.",
+    "startFirst": "Click 'New Conversation' to start your first conversation."
+  },
+  "detail": {
+    "exitPlayground": "Exit Playground",
+    "playgroundTitle": "Conversation Playground",
+    "autoSends": "Auto-sends",
+    "playgroundDescription": "Test conversations with AI \u2022 Messages auto-send \u2022 Use",
+    "rateQuality": "to rate quality",
+    "newTest": "New Test",
+    "backToConversations": "Back to Conversations",
+    "conversationNumber": "Conversation #{id}",
+    "loading": "Loading...",
+    "testMode": "Test Mode: {state}",
+    "testModeOn": "ON",
+    "testModeOff": "OFF",
+    "export": "Export",
+    "exitSupervision": "Exit Supervision",
+    "supervise": "Supervise",
+    "takeOver": "Take Over",
+    "sendTestMessage": "Type your test message...",
+    "sendMessage": "Type your message...",
+    "sendMessageToStart": "Send a message to start testing",
+    "noMessages": "No messages in this conversation yet",
+    "conversationStarted": "Conversation started {date}",
+    "youAreHandling": "You are handling this conversation",
+    "releaseConversation": "Release Conversation",
+    "closeConversation": "Close Conversation"
+  },
+  "pendingHuman": {
+    "notConfident": "Hay wasn't confident about answering this question",
+    "handedOff": "Hay decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay can handle similar conversations next time.",
+    "startNew": "Start New Conversation",
+    "editPlaybook": "Edit Playbook",
+    "editPlaybooks": "Edit Playbooks"
+  },
+  "orchestrator": {
+    "title": "Orchestrator Status",
+    "status": "Status:",
+    "lastCheck": "Last Check:",
+    "never": "Never",
+    "messages": "Messages:",
+    "needsProcessing": "Needs Processing:"
+  },
+  "testScenarios": {
+    "title": "Test Scenarios",
+    "askAboutHours": "Ask About Hours",
+    "requestSupport": "Request Support",
+    "cancelSubscription": "Cancel Subscription",
+    "requestHuman": "Request Human"
+  },
+  "testingTips": {
+    "title": "Testing Tips",
+    "tip1": "Test different message types to see AI responses",
+    "tip2": "Try switching playbooks to test different scenarios",
+    "tip3": "Use \"New Test\" to start fresh with a new conversation"
+  },
+  "customerInfo": {
+    "title": "Customer Information",
+    "customer": "Customer",
+    "conversationId": "Conversation ID:",
+    "status": "Status:",
+    "created": "Created:"
+  },
+  "conversationDetails": {
+    "title": "Conversation Details",
+    "agent": "Agent:",
+    "defaultAgent": "AI Assistant",
+    "status": "Status:",
+    "messages": "Messages:",
+    "created": "Created:",
+    "updated": "Updated:",
+    "legalHold": "Legal Hold:",
+    "legalHoldNotice": "This conversation is exempt from automatic data retention anonymization."
+  },
+  "previousConversations": {
+    "title": "Previous Conversations",
+    "none": "No previous conversations"
+  },
+  "relatedArticles": {
+    "title": "Related Articles",
+    "defaultCategory": "General"
+  },
+  "releaseDialog": {
+    "title": "Release Conversation",
+    "description": "How would you like to handle this conversation after releasing it?",
+    "returnToAi": "Return to AI",
+    "returnToAiDescription": "The AI will continue processing this conversation automatically",
+    "returnToQueue": "Return to Queue",
+    "returnToQueueDescription": "Another agent can take over this conversation",
+    "release": "Release"
+  },
+  "closeDialog": {
+    "title": "Close Conversation",
+    "description": "Are you sure you want to close this conversation? This will mark it as resolved and closed.",
+    "confirm": "Close Conversation"
+  },
+  "toast": {
+    "takenOver": "Conversation taken over",
+    "takenOverMessage": "You are now handling this conversation",
+    "takeoverFailed": "Takeover failed",
+    "released": "Conversation released",
+    "releasedToAi": "Conversation returned to AI",
+    "releasedToQueue": "Conversation returned to queue",
+    "releaseFailed": "Release failed",
+    "closed": "Conversation closed",
+    "closedMessage": "This conversation has been marked as closed",
+    "closeFailed": "Close failed",
+    "legalHoldFailed": "Failed to update legal hold"
+  }
+}

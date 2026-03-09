@@ -1,25 +1,24 @@
 <template>
-  <Page title="Upload Custom Plugin" description="Upload a custom plugin to extend your platform">
+  <Page :title="$t('upload.title')" :description="$t('upload.description')">
     <template #header>
       <Button variant="outline" size="sm" @click="navigateToMarketplace">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        Back to Marketplace
+        {{ $t("upload.backToMarketplace") }}
       </Button>
     </template>
 
     <!-- Upload Card -->
     <Card>
       <CardHeader>
-        <CardTitle>Upload Plugin ZIP</CardTitle>
+        <CardTitle>{{ $t("upload.card.title") }}</CardTitle>
         <CardDescription>
-          Upload a ZIP file containing your custom plugin. The ZIP must include a
-          <code>manifest.json</code> file in the root.
+          {{ $t("upload.card.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- File Upload -->
         <div class="space-y-2">
-          <Label for="plugin-file">Plugin File</Label>
+          <Label for="plugin-file">{{ $t("upload.file.label") }}</Label>
           <div
             class="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors"
             :class="{
@@ -41,11 +40,11 @@
 
             <div v-if="!selectedFile && !uploadSuccess">
               <Upload class="h-12 w-12 mx-auto text-neutral-muted mb-4" />
-              <p class="text-sm font-medium mb-2">Drop your plugin ZIP here or click to browse</p>
-              <p class="text-xs text-neutral-muted mb-4">Maximum file size: 50MB</p>
+              <p class="text-sm font-medium mb-2">{{ $t("upload.file.dropHint") }}</p>
+              <p class="text-xs text-neutral-muted mb-4">{{ $t("upload.file.maxSize") }}</p>
               <Button variant="outline" @click="triggerFileInput">
                 <Upload class="h-4 w-4 mr-2" />
-                Select File
+                {{ $t("upload.file.selectFile") }}
               </Button>
             </div>
 
@@ -55,22 +54,24 @@
               <p class="text-xs text-neutral-muted mb-4">{{ formatFileSize(selectedFile.size) }}</p>
               <Button variant="outline" size="sm" @click="clearFile">
                 <X class="h-4 w-4 mr-2" />
-                Remove
+                {{ $t("upload.file.remove") }}
               </Button>
             </div>
 
             <div v-else-if="uploadSuccess">
               <CheckCircle class="h-12 w-12 mx-auto text-green-600 mb-4" />
-              <p class="text-sm font-medium text-green-600 mb-2">Plugin uploaded successfully!</p>
+              <p class="text-sm font-medium text-green-600 mb-2">
+                {{ $t("upload.success.message") }}
+              </p>
               <p class="text-xs text-neutral-muted mb-4">{{ uploadedPluginName }}</p>
               <div class="flex justify-center space-x-2">
                 <Button variant="outline" size="sm" @click="resetUpload">
                   <Upload class="h-4 w-4 mr-2" />
-                  Upload Another
+                  {{ $t("upload.success.uploadAnother") }}
                 </Button>
                 <Button size="sm" @click="navigateToMarketplace">
                   <ArrowLeft class="h-4 w-4 mr-2" />
-                  View Marketplace
+                  {{ $t("upload.success.viewMarketplace") }}
                 </Button>
               </div>
             </div>
@@ -79,7 +80,7 @@
           <!-- Upload Progress -->
           <div v-if="uploading" class="space-y-2">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">Uploading...</span>
+              <span class="text-neutral-muted">{{ $t("upload.progress.uploading") }}</span>
               <span class="font-medium">{{ uploadProgress }}%</span>
             </div>
             <div class="w-full bg-neutral-muted rounded-full h-2">
@@ -92,7 +93,7 @@
 
           <!-- Error Message -->
           <Alert v-if="uploadError" variant="destructive">
-            <AlertTitle>Upload Failed</AlertTitle>
+            <AlertTitle>{{ $t("upload.errors.title") }}</AlertTitle>
             <AlertDescription>{{ uploadError }}</AlertDescription>
           </Alert>
         </div>
@@ -101,7 +102,7 @@
         <div class="flex justify-end">
           <Button :disabled="!selectedFile || uploading" :loading="uploading" @click="uploadPlugin">
             <Upload class="h-4 w-4 mr-2" />
-            {{ uploading ? "Uploading..." : "Upload Plugin" }}
+            {{ uploading ? $t("upload.progress.uploading") : $t("upload.progress.uploadPlugin") }}
           </Button>
         </div>
       </CardContent>
@@ -110,42 +111,44 @@
     <!-- Requirements Card -->
     <Card>
       <CardHeader>
-        <CardTitle>Plugin Requirements</CardTitle>
+        <CardTitle>{{ $t("upload.requirements.title") }}</CardTitle>
       </CardHeader>
       <CardContent>
         <div class="space-y-4 text-sm">
           <div class="flex items-start space-x-3">
             <CheckCircle class="h-5 w-5 text-green-600 mt-0.5" />
             <div>
-              <p class="font-medium">Valid manifest.json</p>
+              <p class="font-medium">{{ $t("upload.requirements.manifest.title") }}</p>
               <p class="text-neutral-muted">
-                Must include a manifest.json file in the root with id, name, and version fields
+                {{ $t("upload.requirements.manifest.description") }}
               </p>
             </div>
           </div>
           <div class="flex items-start space-x-3">
             <CheckCircle class="h-5 w-5 text-green-600 mt-0.5" />
             <div>
-              <p class="font-medium">Valid plugin ID</p>
+              <p class="font-medium">{{ $t("upload.requirements.pluginId.title") }}</p>
               <p class="text-neutral-muted">
-                Plugin ID must contain only lowercase letters, numbers, and hyphens
+                {{ $t("upload.requirements.pluginId.description") }}
               </p>
             </div>
           </div>
           <div class="flex items-start space-x-3">
             <CheckCircle class="h-5 w-5 text-green-600 mt-0.5" />
             <div>
-              <p class="font-medium">ZIP format</p>
+              <p class="font-medium">{{ $t("upload.requirements.zipFormat.title") }}</p>
               <p class="text-neutral-muted">
-                File must be in ZIP format with a maximum size of 50MB
+                {{ $t("upload.requirements.zipFormat.description") }}
               </p>
             </div>
           </div>
           <div class="flex items-start space-x-3">
             <CheckCircle class="h-5 w-5 text-green-600 mt-0.5" />
             <div>
-              <p class="font-medium">No path traversal</p>
-              <p class="text-neutral-muted">ZIP must not contain files with absolute paths or ..</p>
+              <p class="font-medium">{{ $t("upload.requirements.noPathTraversal.title") }}</p>
+              <p class="text-neutral-muted">
+                {{ $t("upload.requirements.noPathTraversal.description") }}
+              </p>
             </div>
           </div>
         </div>
@@ -161,6 +164,7 @@ import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
 
+const { t } = useI18n();
 const router = useRouter();
 const authStore = useAuthStore();
 const userStore = useUserStore();
@@ -201,14 +205,14 @@ const validateAndSetFile = (file: File) => {
 
   // Validate file type
   if (!file.name.endsWith(".zip")) {
-    uploadError.value = "Only ZIP files are allowed";
+    uploadError.value = t("upload.errors.zipOnly");
     return;
   }
 
   // Validate file size (50MB)
   const maxSize = 50 * 1024 * 1024;
   if (file.size > maxSize) {
-    uploadError.value = "File size exceeds 50MB limit";
+    uploadError.value = t("upload.errors.tooLarge");
     return;
   }
 
@@ -270,14 +274,14 @@ const uploadPlugin = async () => {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Upload failed");
+      throw new Error(error.error || t("upload.errors.uploadFailed"));
     }
 
     const result = await response.json();
     uploadSuccess.value = true;
     uploadedPluginName.value = result.name;
 
-    toast.success(`Plugin ${result.name} uploaded successfully!`);
+    toast.success(t("upload.toast.uploadedSuccess", { name: result.name }));
 
     // Refresh plugins in store after a short delay
     setTimeout(async () => {
@@ -287,7 +291,7 @@ const uploadPlugin = async () => {
     }, 1000);
   } catch (error: any) {
     console.error("Upload failed:", error);
-    const errorMessage = error.message || "Failed to upload plugin";
+    const errorMessage = error.message || t("upload.errors.uploadFailed");
     uploadError.value = errorMessage;
     toast.error(errorMessage);
   } finally {
@@ -304,11 +308,11 @@ definePageMeta({
 });
 
 useHead({
-  title: "Upload Plugin - Hay Dashboard",
+  title: t("upload.headTitle"),
   meta: [
     {
       name: "description",
-      content: "Upload a custom plugin to extend your platform",
+      content: t("upload.description"),
     },
   ],
 });

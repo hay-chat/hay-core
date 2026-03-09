@@ -1,0 +1,133 @@
+{
+  "page": {
+    "title": "Playbooks",
+    "description": "Fluxos de conversação automatizados e respostas para seus agentes",
+    "headTitle": "Playbooks - Painel Hay"
+  },
+  "actions": {
+    "generatePlaybook": "Gerar Playbook",
+    "createPlaybook": "Criar Playbook",
+    "createFirstPlaybook": "Crie Seu Primeiro Playbook",
+    "createPlaybookOpenEditor": "Criar Playbook e Abrir Editor",
+    "deletePlaybook": "Excluir Playbook",
+    "saveChanges": "Salvar Alterações",
+    "viewAllPlaybooks": "Ver Todos os Playbooks",
+    "continueEditing": "Continuar Editando",
+    "backToList": "Voltar para lista",
+    "previous": "Anterior",
+    "continue": "Continuar",
+    "confirmLeave": "Sair da Página",
+    "leave": "Sair"
+  },
+  "stats": {
+    "totalPlaybooks": "Total de Playbooks",
+    "active": "Ativos",
+    "totalTriggers": "Total de Acionamentos",
+    "newThisMonth": "+{count} este mês",
+    "percentOfTotal": "{percent}% do total",
+    "last30Days": "Últimos 30 dias"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar playbooks...",
+    "allCategories": "Todas as Categorias",
+    "customerSupport": "Suporte ao Cliente",
+    "sales": "Vendas",
+    "technical": "Técnico",
+    "custom": "Personalizado",
+    "allStatus": "Todos os Status",
+    "statusActive": "Ativo",
+    "statusArchived": "Arquivado",
+    "statusDraft": "Rascunho"
+  },
+  "table": {
+    "playbooks": "Playbooks",
+    "name": "Nome",
+    "agents": "Agentes",
+    "agentsCount": "{count} agentes",
+    "status": "Status",
+    "created": "Criado",
+    "actions": "Ações"
+  },
+  "empty": {
+    "noPlaybooksFound": "Nenhum playbook encontrado",
+    "noPlaybooksCreated": "Nenhum playbook criado ainda",
+    "adjustSearch": "Tente ajustar seus termos de busca.",
+    "createFirst": "Crie seu primeiro playbook para automatizar conversas."
+  },
+  "form": {
+    "titleLabel": "Título",
+    "titlePlaceholder": "ex.: Automação de Suporte ao Cliente",
+    "triggerLabel": "Gatilho",
+    "triggerPlaceholder": "Este playbook será ativado quando o cliente disser:\n - Preciso de ajuda com minha conta...",
+    "triggerHint": "Defina quando este playbook deve ser ativado",
+    "descriptionLabel": "Descrição",
+    "descriptionPlaceholder": "Descreva o que este playbook faz...",
+    "instructionsLabel": "Instruções",
+    "instructionsHint": "Crie instruções passo a passo numeradas que os agentes seguirão ao executar este playbook",
+    "statusLabel": "Status",
+    "assignAgents": "Atribuir Agentes",
+    "assignedAgents": "Agentes Atribuídos",
+    "loadingAgents": "Carregando agentes...",
+    "noAgentsAvailable": "Nenhum agente disponível. Crie agentes primeiro.",
+    "createdDate": "Criado: {date}",
+    "lastUpdated": "Última atualização: {date}"
+  },
+  "edit": {
+    "title": "Editar {name}",
+    "description": "Atualize a configuração do seu playbook",
+    "headTitle": "Editar Playbook - Painel Hay"
+  },
+  "create": {
+    "title": "Criar Novo",
+    "description": "Defina fluxos de conversação automatizados para seus agentes",
+    "headTitle": "Criar Playbook - Painel Hay",
+    "headDescription": "Crie um novo playbook de conversação automatizada",
+    "editHeadDescription": "Edite seu playbook de conversação automatizada"
+  },
+  "validation": {
+    "titleRequired": "O título do playbook é obrigatório",
+    "titleMaxLength": "O título do playbook deve ter menos de 255 caracteres",
+    "triggerRequired": "O gatilho é obrigatório",
+    "triggerMaxLength": "O gatilho deve ter menos de 255 caracteres"
+  },
+  "toast": {
+    "deleteSuccess": "Playbook excluído com sucesso",
+    "deleteFailed": "Falha ao excluir playbook",
+    "updateSuccess": "Playbook atualizado com sucesso",
+    "createSuccess": "Playbook criado com sucesso",
+    "saveFailed": "Falha ao {action} playbook. Tente novamente.",
+    "loadFailed": "Falha ao carregar playbooks",
+    "loadAgentsFailed": "Falha ao carregar agentes",
+    "playbookNotFound": "Playbook não encontrado",
+    "generateFailed": "Falha ao gerar instruções. Tente novamente.",
+    "createFailed": "Falha ao criar playbook. Tente novamente."
+  },
+  "delete": {
+    "title": "Excluir Playbook",
+    "confirmMessage": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita."
+  },
+  "loading": {
+    "loadingPlaybook": "Carregando playbook...",
+    "playbookNotFound": "Playbook não encontrado"
+  },
+  "wizard": {
+    "title": "Criar Playbook",
+    "description": "Siga os passos para criar um novo playbook",
+    "headTitle": "Criar Playbook - Painel Hay",
+    "steps": {
+      "purpose": "Propósito",
+      "actions": "Ações",
+      "documents": "Documentos",
+      "boundaries": "Limites",
+      "generate": "Gerar"
+    },
+    "cancelDialog": {
+      "title": "Sair do assistente?",
+      "description": "Seu progresso será perdido. Tem certeza que deseja sair?"
+    },
+    "successDialog": {
+      "title": "Playbook Criado",
+      "description": "Seu playbook foi criado com sucesso. O que você gostaria de fazer agora?"
+    }
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "marketplace": {
+    "title": "Plugin Marketplace",
+    "description": "Discover and install plugins to extend your platform capabilities",
+    "headTitle": "Plugin Marketplace - Hay Dashboard",
+    "uploadPlugin": "Upload Plugin",
+    "manageCustom": "Manage Custom ({count})",
+    "refresh": "Refresh",
+    "stats": {
+      "totalPlugins": "Total Plugins",
+      "availablePlugins": "Available plugins",
+      "installed": "Installed",
+      "activePlugins": "Active plugins",
+      "channels": "Channels",
+      "communicationChannels": "Communication channels",
+      "mcpConnectors": "MCP Connectors",
+      "modelContextProtocol": "Model Context Protocol"
+    },
+    "categories": {
+      "label": "Categories:",
+      "all": "All Plugins",
+      "channels": "Channels",
+      "mcpConnectors": "MCP Connectors",
+      "documentImporters": "Document Importers",
+      "retrievers": "Retrievers",
+      "playbooks": "Playbooks"
+    },
+    "search": "Search plugins...",
+    "empty": {
+      "title": "No plugins found",
+      "searchHint": "Try adjusting your search terms.",
+      "categoryHint": "No plugins match your selected category."
+    },
+    "pluginTypes": {
+      "channel": "Channel",
+      "mcpConnector": "MCP Connector",
+      "documentImporter": "Document Importer",
+      "retriever": "Retriever",
+      "playbook": "Playbook"
+    },
+    "actions": {
+      "install": "Install",
+      "installing": "Installing...",
+      "configure": "Configure",
+      "remove": "Remove",
+      "removing": "Removing...",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "custom": "Custom",
+    "confirmDelete": "Are you sure you want to delete this plugin? This action cannot be undone.",
+    "toast": {
+      "enabledSuccess": "Plugin {name} enabled successfully",
+      "disabledSuccess": "Plugin {name} disabled successfully",
+      "deletedSuccess": "Plugin deleted successfully",
+      "enableFailed": "Failed to enable plugin",
+      "disableFailed": "Failed to disable plugin",
+      "deleteFailed": "Failed to delete plugin"
+    }
+  },
+  "manage": {
+    "title": "Manage Custom Plugins",
+    "description": "View and manage your organization's custom plugins",
+    "headTitle": "Manage Custom Plugins - Hay Dashboard",
+    "uploadPlugin": "Upload Plugin",
+    "refresh": "Refresh",
+    "stats": {
+      "customPlugins": "Custom Plugins",
+      "uploadedByOrg": "Uploaded by your organization",
+      "enabled": "Enabled",
+      "currentlyActive": "Currently active",
+      "totalSize": "Total Size",
+      "storageUsed": "Storage used"
+    },
+    "loading": "Loading plugins...",
+    "empty": {
+      "title": "No custom plugins",
+      "description": "Upload your first custom plugin to get started"
+    },
+    "table": {
+      "title": "Custom Plugins",
+      "version": "Version: {version}",
+      "id": "ID: {id}",
+      "uploaded": "Uploaded: {date}"
+    },
+    "actions": {
+      "enable": "Enable",
+      "enabling": "Enabling...",
+      "disable": "Disable",
+      "disabling": "Disabling...",
+      "settings": "Settings",
+      "update": "Update",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "confirmDelete": "Are you sure you want to delete this plugin? This action cannot be undone.",
+    "updateComingSoon": "Update functionality coming soon",
+    "toast": {
+      "enabledSuccess": "Plugin enabled successfully",
+      "disabledSuccess": "Plugin disabled successfully",
+      "deletedSuccess": "Plugin deleted successfully",
+      "enableFailed": "Failed to enable plugin",
+      "disableFailed": "Failed to disable plugin",
+      "deleteFailed": "Failed to delete plugin"
+    }
+  },
+  "upload": {
+    "title": "Upload Custom Plugin",
+    "description": "Upload a custom plugin to extend your platform",
+    "headTitle": "Upload Plugin - Hay Dashboard",
+    "backToMarketplace": "Back to Marketplace",
+    "card": {
+      "title": "Upload Plugin ZIP",
+      "description": "Upload a ZIP file containing your custom plugin. The ZIP must include a manifest.json file in the root."
+    },
+    "file": {
+      "label": "Plugin File",
+      "dropHint": "Drop your plugin ZIP here or click to browse",
+      "maxSize": "Maximum file size: 50MB",
+      "selectFile": "Select File",
+      "remove": "Remove"
+    },
+    "success": {
+      "message": "Plugin uploaded successfully!",
+      "uploadAnother": "Upload Another",
+      "viewMarketplace": "View Marketplace"
+    },
+    "progress": {
+      "uploading": "Uploading...",
+      "uploadPlugin": "Upload Plugin"
+    },
+    "errors": {
+      "title": "Upload Failed",
+      "zipOnly": "Only ZIP files are allowed",
+      "tooLarge": "File size exceeds 50MB limit",
+      "uploadFailed": "Failed to upload plugin"
+    },
+    "requirements": {
+      "title": "Plugin Requirements",
+      "manifest": {
+        "title": "Valid manifest.json",
+        "description": "Must include a manifest.json file in the root with id, name, and version fields"
+      },
+      "pluginId": {
+        "title": "Valid plugin ID",
+        "description": "Plugin ID must contain only lowercase letters, numbers, and hyphens"
+      },
+      "zipFormat": {
+        "title": "ZIP format",
+        "description": "File must be in ZIP format with a maximum size of 50MB"
+      },
+      "noPathTraversal": {
+        "title": "No path traversal",
+        "description": "ZIP must not contain files with absolute paths or .."
+      }
+    },
+    "toast": {
+      "uploadedSuccess": "Plugin {name} uploaded successfully!"
+    }
+  },
+  "pluginSettings": {
+    "backToMarketplace": "Back to Marketplace",
+    "headTitle": "Plugin Settings - Hay Dashboard",
+    "headTitleWithName": "{name} Settings - Hay Dashboard",
+    "restartWorker": "Restart Worker",
+    "restarting": "Restarting...",
+    "disablePlugin": "Disable Plugin",
+    "disabling": "Disabling...",
+    "enablePlugin": "Enable Plugin",
+    "disableConfirm": {
+      "title": "Disable Plugin?",
+      "description": "Are you sure you want to disable {name}? This will stop the plugin from being used in your organization.",
+      "confirm": "Disable"
+    },
+    "error": {
+      "loadFailed": "Failed to load plugin",
+      "returnToMarketplace": "Return to Marketplace"
+    },
+    "connection": {
+      "testing": "Testing Connection",
+      "connected": "Connected",
+      "failed": "Connection Failed",
+      "needsAuth": "Needs Authentication",
+      "configureCredentials": "Please configure your credentials",
+      "connectionFailed": "Connection failed",
+      "tryAgain": "Try Again"
+    },
+    "about": "About",
+    "capabilities": {
+      "title": "Capabilities",
+      "description": "What this plugin can do",
+      "chatConnector": "Chat Connector",
+      "sendMessages": "Send messages",
+      "receiveMessages": "Receive messages",
+      "listConversations": "List conversations",
+      "mcpConnector": "MCP Connector",
+      "mcpDescription": "Provides AI tools and resources through Model Context Protocol",
+      "documentImporter": "Document Importer",
+      "documentImporterDescription": "Import and process documents from external sources"
+    },
+    "availableActions": {
+      "title": "Available Actions",
+      "toolsAvailable": "{count} tools available"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "description": "Configure your {name} settings"
+    },
+    "connectionTest": {
+      "title": "Connection Test",
+      "description": "Test your {name} connection",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "success": "Connection successful!",
+      "configRequired": "Configuration required",
+      "failed": "Connection failed",
+      "checkConfig": "Please check your configuration and try again."
+    },
+    "tabs": {
+      "settings": "Settings"
+    },
+    "toast": {
+      "configSaved": "Configuration saved successfully",
+      "configSaveFailed": "Failed to save configuration",
+      "enabledSuccess": "Plugin enabled successfully",
+      "enableFailed": "Failed to enable plugin",
+      "disabledSuccess": "Plugin disabled successfully",
+      "disableFailed": "Failed to disable plugin",
+      "restartedSuccess": "Plugin worker restarted successfully",
+      "restartFailed": "Failed to restart plugin",
+      "resetToEnv": "Reset to environment variable",
+      "resetToEnvFailed": "Failed to reset to environment variable",
+      "oauthSuccess": "OAuth connection established successfully",
+      "oauthFailed": "OAuth connection failed. Please try again.",
+      "connectionEstablished": "Connection established successfully",
+      "connectionCheckFailed": "Failed to establish connection. Please check your configuration."
+    }
+  }
+}

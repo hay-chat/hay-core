@@ -1,0 +1,133 @@
+{
+  "page": {
+    "title": "Playbooks",
+    "description": "Automated conversation flows and responses for your agents",
+    "headTitle": "Playbooks - Hay Dashboard"
+  },
+  "actions": {
+    "generatePlaybook": "Generate Playbook",
+    "createPlaybook": "Create Playbook",
+    "createFirstPlaybook": "Create Your First Playbook",
+    "createPlaybookOpenEditor": "Create Playbook & Open Editor",
+    "deletePlaybook": "Delete Playbook",
+    "saveChanges": "Save Changes",
+    "viewAllPlaybooks": "View All Playbooks",
+    "continueEditing": "Continue Editing",
+    "backToList": "Back to list",
+    "previous": "Previous",
+    "continue": "Continue",
+    "confirmLeave": "Leave Page",
+    "leave": "Leave"
+  },
+  "stats": {
+    "totalPlaybooks": "Total Playbooks",
+    "active": "Active",
+    "totalTriggers": "Total Triggers",
+    "newThisMonth": "+{count} this month",
+    "percentOfTotal": "{percent}% of total",
+    "last30Days": "Last 30 days"
+  },
+  "filters": {
+    "searchPlaceholder": "Search playbooks...",
+    "allCategories": "All Categories",
+    "customerSupport": "Customer Support",
+    "sales": "Sales",
+    "technical": "Technical",
+    "custom": "Custom",
+    "allStatus": "All Status",
+    "statusActive": "Active",
+    "statusArchived": "Archived",
+    "statusDraft": "Draft"
+  },
+  "table": {
+    "playbooks": "Playbooks",
+    "name": "Name",
+    "agents": "Agents",
+    "agentsCount": "{count} agents",
+    "status": "Status",
+    "created": "Created",
+    "actions": "Actions"
+  },
+  "empty": {
+    "noPlaybooksFound": "No playbooks found",
+    "noPlaybooksCreated": "No playbooks created yet",
+    "adjustSearch": "Try adjusting your search terms.",
+    "createFirst": "Create your first playbook to automate conversations."
+  },
+  "form": {
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g., Customer Support Automation",
+    "triggerLabel": "Trigger",
+    "triggerPlaceholder": "This playbook will be activated when customer says:\n - I need help with my account...",
+    "triggerHint": "Define when this playbook should be activated",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe what this playbook does...",
+    "instructionsLabel": "Instructions",
+    "instructionsHint": "Create numbered step-by-step instructions that agents will follow when executing this playbook",
+    "statusLabel": "Status",
+    "assignAgents": "Assign Agents",
+    "assignedAgents": "Assigned Agents",
+    "loadingAgents": "Loading agents...",
+    "noAgentsAvailable": "No agents available. Create agents first.",
+    "createdDate": "Created: {date}",
+    "lastUpdated": "Last updated: {date}"
+  },
+  "edit": {
+    "title": "Edit {name}",
+    "description": "Update your playbook configuration",
+    "headTitle": "Edit Playbook - Hay Dashboard"
+  },
+  "create": {
+    "title": "Create New",
+    "description": "Define automated conversation flows for your agents",
+    "headTitle": "Create Playbook - Hay Dashboard",
+    "headDescription": "Create a new automated conversation playbook",
+    "editHeadDescription": "Edit your automated conversation playbook"
+  },
+  "validation": {
+    "titleRequired": "Playbook title is required",
+    "titleMaxLength": "Playbook title must be less than 255 characters",
+    "triggerRequired": "Trigger is required",
+    "triggerMaxLength": "Trigger must be less than 255 characters"
+  },
+  "toast": {
+    "deleteSuccess": "Playbook deleted successfully",
+    "deleteFailed": "Failed to delete playbook",
+    "updateSuccess": "Playbook updated successfully",
+    "createSuccess": "Playbook created successfully",
+    "saveFailed": "Failed to {action} playbook. Please try again.",
+    "loadFailed": "Failed to load playbooks",
+    "loadAgentsFailed": "Failed to load agents",
+    "playbookNotFound": "Playbook not found",
+    "generateFailed": "Failed to generate instructions. Please try again.",
+    "createFailed": "Failed to create playbook. Please try again."
+  },
+  "delete": {
+    "title": "Delete Playbook",
+    "confirmMessage": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
+  },
+  "loading": {
+    "loadingPlaybook": "Loading playbook...",
+    "playbookNotFound": "Playbook not found"
+  },
+  "wizard": {
+    "title": "Create Playbook",
+    "description": "Follow the steps to create a new playbook",
+    "headTitle": "Create Playbook - Hay Dashboard",
+    "steps": {
+      "purpose": "Purpose",
+      "actions": "Actions",
+      "documents": "Documents",
+      "boundaries": "Boundaries",
+      "generate": "Generate"
+    },
+    "cancelDialog": {
+      "title": "Leave wizard?",
+      "description": "Your progress will be lost. Are you sure you want to leave?"
+    },
+    "successDialog": {
+      "title": "Playbook Created",
+      "description": "Your playbook has been created successfully. What would you like to do next?"
+    }
+  }
+}

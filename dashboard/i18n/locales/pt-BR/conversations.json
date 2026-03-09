@@ -1,0 +1,175 @@
+{
+  "page": {
+    "title": "Conversas",
+    "description": "Monitore e gerencie todas as conversas com clientes",
+    "headTitle": "Conversas - Hay Dashboard",
+    "headDescription": "Monitore e gerencie todas as conversas com clientes"
+  },
+  "actions": {
+    "playground": "Playground de Conversas",
+    "refresh": "Atualizar",
+    "select": "Selecionar",
+    "exit": "Sair",
+    "archive": "Arquivar ({count})",
+    "tryAgain": "Tentar Novamente",
+    "startPlayground": "Iniciar Playground"
+  },
+  "stats": {
+    "totalConversations": "Total de Conversas",
+    "todayIncrease": "+{count} hoje",
+    "activeNow": "Ativas Agora",
+    "realTimeConversations": "Conversas em tempo real",
+    "avgResponseTime": "Tempo Médio de Resposta",
+    "yesterdayChange": "-12% em relação a ontem"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar conversas...",
+    "allStatus": "Todos os Status",
+    "active": "Ativa",
+    "resolved": "Resolvida",
+    "escalated": "Escalada",
+    "closed": "Encerrada",
+    "today": "Hoje",
+    "thisWeek": "Esta Semana",
+    "thisMonth": "Este Mês",
+    "allTime": "Todo o Período",
+    "allAgents": "Todos os Agentes"
+  },
+  "table": {
+    "conversation": "Conversa",
+    "status": "Status",
+    "assignedTo": "Atribuído a",
+    "duration": "Duração",
+    "satisfaction": "Satisfação",
+    "updated": "Atualizado",
+    "newConversation": "Nova Conversa",
+    "waiting": "Aguardando {time}",
+    "notRated": "Não avaliado"
+  },
+  "status": {
+    "open": "Aberta",
+    "processing": "Processando",
+    "pendingHuman": "Precisa de Atenção",
+    "humanTookOver": "Controle Manual",
+    "resolved": "Resolvida",
+    "closed": "Encerrada",
+    "unknown": "Desconhecido"
+  },
+  "error": {
+    "loadingConversations": "Erro ao Carregar Conversas",
+    "failedToLoad": "Falha ao carregar conversas"
+  },
+  "empty": {
+    "noConversationsFound": "Nenhuma conversa encontrada",
+    "noConversationsYet": "Nenhuma conversa ainda",
+    "adjustSearch": "Tente ajustar os termos de busca ou filtros.",
+    "startFirst": "Clique em 'Nova Conversa' para iniciar sua primeira conversa."
+  },
+  "detail": {
+    "exitPlayground": "Sair do Playground",
+    "playgroundTitle": "Playground de Conversas",
+    "autoSends": "Envio automático",
+    "playgroundDescription": "Teste conversas com IA \u2022 Mensagens enviadas automaticamente \u2022 Use",
+    "rateQuality": "para avaliar a qualidade",
+    "newTest": "Novo Teste",
+    "backToConversations": "Voltar para Conversas",
+    "conversationNumber": "Conversa #{id}",
+    "loading": "Carregando...",
+    "testMode": "Modo de Teste: {state}",
+    "testModeOn": "LIGADO",
+    "testModeOff": "DESLIGADO",
+    "export": "Exportar",
+    "exitSupervision": "Sair da Supervisão",
+    "supervise": "Supervisionar",
+    "takeOver": "Assumir",
+    "sendTestMessage": "Digite sua mensagem de teste...",
+    "sendMessage": "Digite sua mensagem...",
+    "sendMessageToStart": "Envie uma mensagem para começar a testar",
+    "noMessages": "Nenhuma mensagem nesta conversa ainda",
+    "conversationStarted": "Conversa iniciada em {date}",
+    "youAreHandling": "Você está gerenciando esta conversa",
+    "releaseConversation": "Liberar Conversa",
+    "closeConversation": "Encerrar Conversa"
+  },
+  "pendingHuman": {
+    "notConfident": "Hay não teve confiança para responder esta pergunta",
+    "handedOff": "Hay decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que Hay consiga lidar com conversas semelhantes no futuro.",
+    "startNew": "Iniciar Nova Conversa",
+    "editPlaybook": "Editar Playbook",
+    "editPlaybooks": "Editar Playbooks"
+  },
+  "orchestrator": {
+    "title": "Status do Orquestrador",
+    "status": "Status:",
+    "lastCheck": "Última Verificação:",
+    "never": "Nunca",
+    "messages": "Mensagens:",
+    "needsProcessing": "Precisa Processamento:"
+  },
+  "testScenarios": {
+    "title": "Cenários de Teste",
+    "askAboutHours": "Perguntar sobre Horários",
+    "requestSupport": "Solicitar Suporte",
+    "cancelSubscription": "Cancelar Assinatura",
+    "requestHuman": "Solicitar Humano"
+  },
+  "testingTips": {
+    "title": "Dicas de Teste",
+    "tip1": "Teste diferentes tipos de mensagem para ver as respostas da IA",
+    "tip2": "Tente trocar de playbooks para testar diferentes cenários",
+    "tip3": "Use \"Novo Teste\" para começar do zero com uma nova conversa"
+  },
+  "customerInfo": {
+    "title": "Informações do Cliente",
+    "customer": "Cliente",
+    "conversationId": "ID da Conversa:",
+    "status": "Status:",
+    "created": "Criada em:"
+  },
+  "conversationDetails": {
+    "title": "Detalhes da Conversa",
+    "agent": "Agente:",
+    "defaultAgent": "Assistente IA",
+    "status": "Status:",
+    "messages": "Mensagens:",
+    "created": "Criada em:",
+    "updated": "Atualizada em:",
+    "legalHold": "Retenção Legal:",
+    "legalHoldNotice": "Esta conversa está isenta da anonimização automática de retenção de dados."
+  },
+  "previousConversations": {
+    "title": "Conversas Anteriores",
+    "none": "Nenhuma conversa anterior"
+  },
+  "relatedArticles": {
+    "title": "Artigos Relacionados",
+    "defaultCategory": "Geral"
+  },
+  "releaseDialog": {
+    "title": "Liberar Conversa",
+    "description": "Como você gostaria de lidar com esta conversa após liberá-la?",
+    "returnToAi": "Devolver para a IA",
+    "returnToAiDescription": "A IA continuará processando esta conversa automaticamente",
+    "returnToQueue": "Devolver para a Fila",
+    "returnToQueueDescription": "Outro agente pode assumir esta conversa",
+    "release": "Liberar"
+  },
+  "closeDialog": {
+    "title": "Encerrar Conversa",
+    "description": "Tem certeza de que deseja encerrar esta conversa? Ela será marcada como resolvida e encerrada.",
+    "confirm": "Encerrar Conversa"
+  },
+  "toast": {
+    "takenOver": "Conversa assumida",
+    "takenOverMessage": "Você agora está gerenciando esta conversa",
+    "takeoverFailed": "Falha ao assumir",
+    "released": "Conversa liberada",
+    "releasedToAi": "Conversa devolvida para a IA",
+    "releasedToQueue": "Conversa devolvida para a fila",
+    "releaseFailed": "Falha ao liberar",
+    "closed": "Conversa encerrada",
+    "closedMessage": "Esta conversa foi marcada como encerrada",
+    "closeFailed": "Falha ao encerrar",
+    "legalHoldFailed": "Falha ao atualizar retenção legal"
+  }
+}

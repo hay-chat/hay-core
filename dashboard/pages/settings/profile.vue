@@ -1,14 +1,14 @@
 <template>
   <Page
-    title="Profile Settings"
-    description="Manage your personal information and account security"
+    :title="$t('profile.title')"
+    :description="$t('profile.description')"
     width="max"
   >
     <!-- Profile Picture -->
     <Card>
       <CardHeader>
-        <CardTitle>Profile Picture</CardTitle>
-        <CardDescription>Upload a photo to personalize your profile</CardDescription>
+        <CardTitle>{{ $t('profile.profilePicture') }}</CardTitle>
+        <CardDescription>{{ $t('profile.profilePictureDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <!-- Avatar Preview -->
@@ -26,7 +26,7 @@
               @click="triggerFileInput"
             >
               <Save class="h-4 w-4 mr-2" />
-              Change Photo
+              {{ $t('profile.changePhoto') }}
             </Button>
             <Button
               v-if="avatarUpload.preview.value || currentUser?.avatarUrl"
@@ -36,7 +36,7 @@
               @click="removeAvatar"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              Remove Photo
+              {{ $t('profile.removePhoto') }}
             </Button>
           </div>
         </div>
@@ -51,13 +51,13 @@
         />
 
         <p class="text-sm text-muted-foreground">
-          Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)
+          {{ $t('profile.photoRecommended') }}
         </p>
         <p v-if="avatarUpload.error.value" class="text-sm text-destructive">
           {{ avatarUpload.error.value }}
         </p>
         <p v-if="avatarUpload.isUploading.value" class="text-sm text-blue-600">
-          Uploading avatar...
+          {{ $t('profile.uploadingAvatar') }}
         </p>
       </CardContent>
     </Card>
@@ -65,28 +65,28 @@
     <!-- Profile Information -->
     <Card>
       <CardHeader>
-        <CardTitle>Profile Information</CardTitle>
-        <CardDescription>Update your name and personal details</CardDescription>
+        <CardTitle>{{ $t('profile.profileInformation') }}</CardTitle>
+        <CardDescription>{{ $t('profile.profileInformationDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
           <Input
             id="firstName"
             v-model="profileForm.firstName"
-            label="First Name"
-            placeholder="Enter your first name"
+            :label="$t('profile.firstName')"
+            :placeholder="$t('profile.firstNamePlaceholder')"
           />
 
           <Input
             id="lastName"
             v-model="profileForm.lastName"
-            label="Last Name"
-            placeholder="Enter your last name"
+            :label="$t('profile.lastName')"
+            :placeholder="$t('profile.lastNamePlaceholder')"
           />
         </div>
         <Button :loading="isSavingProfile" :disabled="!hasProfileChanges" @click="saveProfile">
           <Save class="h-4 w-4 mr-2" />
-          Save Changes
+          {{ $t('profile.saveChanges') }}
         </Button>
       </CardContent>
     </Card>
@@ -94,9 +94,9 @@
     <!-- Email Management -->
     <Card>
       <CardHeader>
-        <CardTitle>Email Address</CardTitle>
+        <CardTitle>{{ $t('profile.emailAddress') }}</CardTitle>
         <CardDescription>
-          Manage your email address used for login and notifications
+          {{ $t('profile.emailDescription') }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -104,11 +104,11 @@
           <Input
             id="currentEmail"
             :value="currentUser?.email"
-            label="Current Email"
+            :label="$t('profile.currentEmail')"
             disabled
             class="flex-1"
           />
-          <Badge variant="secondary" class="mt-6">Verified</Badge>
+          <Badge variant="secondary" class="mt-6">{{ $t('profile.verified') }}</Badge>
         </div>
 
         <!-- Pending Email -->
@@ -117,11 +117,11 @@
             <Input
               id="pendingEmail"
               :value="currentUser?.pendingEmail"
-              label="Pending Email (Awaiting Verification)"
+              :label="$t('profile.pendingEmailLabel')"
               disabled
               class="flex-1"
             />
-            <Badge variant="destructive" class="mt-6">Pending</Badge>
+            <Badge variant="destructive" class="mt-6">{{ $t('profile.pending') }}</Badge>
           </div>
           <div class="flex items-center space-x-2">
             <Button
@@ -131,13 +131,12 @@
               @click="resendVerificationEmail"
             >
               <Mail class="h-4 w-4 mr-2" />
-              Resend Verification
+              {{ $t('profile.resendVerification') }}
             </Button>
-            <Button variant="outline" size="sm" @click="cancelEmailChange"> Cancel Change </Button>
+            <Button variant="outline" size="sm" @click="cancelEmailChange">{{ $t('profile.cancelChange') }}</Button>
           </div>
           <p class="text-sm text-muted-foreground">
-            Please check your new email inbox and click the verification link to complete the
-            change. The link will expire in 24 hours.
+            {{ $t('profile.pendingEmailHelp') }}
           </p>
         </div>
 
@@ -146,8 +145,8 @@
             id="newEmail"
             v-model="emailForm.newEmail"
             type="email"
-            label="New Email Address"
-            placeholder="Enter new email address"
+            :label="$t('profile.newEmailAddress')"
+            :placeholder="$t('profile.newEmailPlaceholder')"
             :error="emailError"
             @input="validateEmail"
           />
@@ -157,10 +156,9 @@
           v-if="emailForm.newEmail && !emailError && !currentUser?.pendingEmail"
           variant="default"
         >
-          <AlertTitle>Verification Required</AlertTitle>
+          <AlertTitle>{{ $t('profile.verificationRequired') }}</AlertTitle>
           <AlertDescription>
-            You will need to verify the new email address before the change takes effect. A
-            verification link will be sent to your new email address.
+            {{ $t('profile.verificationRequiredDescription') }}
           </AlertDescription>
         </Alert>
 
@@ -173,7 +171,7 @@
           @click="initiateEmailChange"
         >
           <Mail class="h-4 w-4 mr-2" />
-          Change Email
+          {{ $t('profile.changeEmail') }}
         </Button>
       </CardContent>
     </Card>
@@ -181,16 +179,16 @@
     <!-- Password Management -->
     <Card>
       <CardHeader>
-        <CardTitle>Change Password</CardTitle>
-        <CardDescription> Update your password to keep your account secure </CardDescription>
+        <CardTitle>{{ $t('profile.changePassword') }}</CardTitle>
+        <CardDescription>{{ $t('profile.changePasswordDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <Input
           id="currentPassword"
           v-model="passwordForm.currentPassword"
           type="password"
-          label="Current Password"
-          placeholder="Enter current password"
+          :label="$t('profile.currentPassword')"
+          :placeholder="$t('profile.currentPasswordPlaceholder')"
           autocomplete="current-password"
         />
 
@@ -198,8 +196,8 @@
           id="newPassword"
           v-model="passwordForm.newPassword"
           type="password"
-          label="New Password"
-          placeholder="Enter new password"
+          :label="$t('profile.newPassword')"
+          :placeholder="$t('profile.newPasswordPlaceholder')"
           autocomplete="new-password"
         />
 
@@ -209,22 +207,21 @@
           id="confirmPassword"
           v-model="passwordForm.confirmPassword"
           type="password"
-          label="Confirm New Password"
-          placeholder="Confirm new password"
+          :label="$t('profile.confirmNewPassword')"
+          :placeholder="$t('profile.confirmNewPasswordPlaceholder')"
           autocomplete="new-password"
           :error="
             passwordForm.confirmPassword &&
             passwordForm.newPassword !== passwordForm.confirmPassword
-              ? 'Passwords do not match'
+              ? $t('profile.passwordsDoNotMatch')
               : undefined
           "
         />
 
         <Alert variant="info" :icon="Shield">
-          <AlertTitle>Password Requirements</AlertTitle>
+          <AlertTitle>{{ $t('profile.passwordRequirementsTitle') }}</AlertTitle>
           <AlertDescription>
-            Your password must be at least 8 characters and include uppercase, lowercase, number,
-            and special character.
+            {{ $t('profile.passwordRequirementsDescription') }}
           </AlertDescription>
         </Alert>
 
@@ -234,7 +231,7 @@
           @click="changePassword"
         >
           <Lock class="h-4 w-4 mr-2" />
-          Update Password
+          {{ $t('profile.updatePassword') }}
         </Button>
       </CardContent>
     </Card>
@@ -242,15 +239,15 @@
     <!-- Recent Security Activity -->
     <Card>
       <CardHeader>
-        <CardTitle>Recent Security Activity</CardTitle>
-        <CardDescription>Monitor recent changes to your account</CardDescription>
+        <CardTitle>{{ $t('profile.recentSecurityActivity') }}</CardTitle>
+        <CardDescription>{{ $t('profile.recentSecurityActivityDescription') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div v-if="loadingEvents" class="text-center py-8 text-neutral-muted">
-          Loading security events...
+          {{ $t('profile.loadingSecurityEvents') }}
         </div>
         <div v-else-if="securityEvents.length === 0" class="text-center py-8 text-neutral-muted">
-          No recent security events
+          {{ $t('profile.noSecurityEvents') }}
         </div>
         <div v-else class="space-y-3">
           <div
@@ -295,6 +292,7 @@ import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 import ReauthModal from "@/components/auth/ReauthModal.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 
+const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
 const currentUser = computed(() => userStore.user);
@@ -340,7 +338,7 @@ const validateEmail = () => {
   }
 
   if (!validateEmailUtil(emailForm.newEmail)) {
-    emailError.value = "Please enter a valid email address";
+    emailError.value = t('profile.invalidEmail');
     return;
   }
 
@@ -441,14 +439,14 @@ const handleAvatarSelect = async (event: Event) => {
     // Reload user data to get the new avatar URL
     await refreshUserData();
 
-    toast.success("Profile picture uploaded successfully");
+    toast.success(t('profile.profileUploaded'));
 
     // Clear the file input so the same file can be selected again if needed
     target.value = "";
   } catch (error) {
     console.error("Failed to upload avatar:", error);
-    toast.error("Failed to upload profile picture. Please try again.");
-    avatarUpload.error.value = "Failed to upload profile picture";
+    toast.error(t('profile.profileUploadFailed'));
+    avatarUpload.error.value = t('profile.profileUploadFailed');
   } finally {
     avatarUpload.isUploading.value = false;
   }
@@ -457,14 +455,14 @@ const handleAvatarSelect = async (event: Event) => {
 const removeAvatar = async () => {
   try {
     await Hay.auth.deleteAvatar.mutate();
-    toast.success("Profile picture removed successfully");
+    toast.success(t('profile.profileRemoved'));
     avatarUpload.reset();
 
     // Reload user data to clear the avatar URL
     await refreshUserData();
   } catch (error) {
     console.error("Failed to remove avatar:", error);
-    toast.error("Failed to remove profile picture. Please try again.");
+    toast.error(t('profile.profileRemoveFailed'));
   }
 };
 
@@ -498,11 +496,11 @@ const saveProfile = async () => {
       originalProfile.firstName = profileForm.firstName;
       originalProfile.lastName = profileForm.lastName;
 
-      toast.success("Profile updated successfully");
+      toast.success(t('profile.profileUpdated'));
     }
   } catch (error: any) {
     console.error("Failed to update profile:", error);
-    toast.error(error.message || "Failed to update profile");
+    toast.error(error.message || t('profile.profileUpdateFailed'));
   } finally {
     isSavingProfile.value = false;
   }
@@ -529,10 +527,10 @@ const executeEmailChange = async (password: string) => {
       currentPassword: password,
     });
 
-    console.log("📧 Email change response:", response);
+    console.log("Email change response:", response);
 
     if (response.success) {
-      console.log("✅ Email change successful, pending email:", response.pendingEmail);
+      console.log("Email change successful, pending email:", response.pendingEmail);
 
       // Update user in store with pending email
       if (currentUser.value) {
@@ -540,17 +538,17 @@ const executeEmailChange = async (password: string) => {
           ...currentUser.value,
           pendingEmail: response.pendingEmail,
         };
-        console.log("🔄 Updating user in store:", updatedUser);
+        console.log("Updating user in store:", updatedUser);
         userStore.setUser(updatedUser);
-        console.log("✅ User store updated, currentUser now:", currentUser.value);
+        console.log("User store updated, currentUser now:", currentUser.value);
       }
       emailForm.newEmail = "";
 
-      toast.success(response.message || "Verification email sent. Please check your inbox.");
+      toast.success(response.message || t('profile.verificationEmailSent'));
     }
   } catch (error: any) {
     console.error("Failed to update email:", error);
-    toast.error(error.message || "Failed to send verification email");
+    toast.error(error.message || t('profile.verificationEmailFailed'));
   } finally {
     isChangingEmail.value = false;
   }
@@ -570,11 +568,11 @@ const cancelEmailChange = async () => {
         });
       }
 
-      toast.success("Email change cancelled successfully");
+      toast.success(t('profile.emailChangeCancelled'));
     }
   } catch (error: any) {
     console.error("Failed to cancel email change:", error);
-    toast.error(error.message || "Failed to cancel email change");
+    toast.error(error.message || t('profile.emailChangeCancelFailed'));
   }
 };
 
@@ -585,11 +583,11 @@ const resendVerificationEmail = async () => {
     const response = await Hay.auth.resendEmailChangeVerification.mutate();
 
     if (response.success) {
-      toast.success("Verification email resent successfully. Please check your inbox.");
+      toast.success(t('profile.verificationResent'));
     }
   } catch (error: any) {
     console.error("Failed to resend verification email:", error);
-    toast.error(error.message || "Failed to resend verification email");
+    toast.error(error.message || t('profile.verificationResendFailed'));
   } finally {
     resendingEmail.value = false;
   }
@@ -611,13 +609,13 @@ const changePassword = async () => {
     passwordForm.newPassword = "";
     passwordForm.confirmPassword = "";
 
-    toast.success("Password changed successfully. A confirmation email has been sent.");
+    toast.success(t('profile.passwordChanged'));
 
     // Reload security events
     await loadSecurityEvents();
   } catch (error: any) {
     console.error("Failed to change password:", error);
-    toast.error(error.message || "Failed to change password");
+    toast.error(error.message || t('profile.passwordChangeFailed'));
   } finally {
     isChangingPassword.value = false;
   }
@@ -660,12 +658,12 @@ const getEventColor = (action: string) => {
 
 const formatEventAction = (action: string) => {
   const labels: Record<string, string> = {
-    "profile.update": "Profile Updated",
-    "email.change": "Email Changed",
-    "password.change": "Password Changed",
-    "user.login": "User Login",
-    "apikey.create": "API Key Created",
-    "apikey.revoke": "API Key Revoked",
+    "profile.update": t('profile.eventProfileUpdate'),
+    "email.change": t('profile.eventEmailChange'),
+    "password.change": t('profile.eventPasswordChange'),
+    "user.login": t('profile.eventUserLogin'),
+    "apikey.create": t('profile.eventApiKeyCreate'),
+    "apikey.revoke": t('profile.eventApiKeyRevoke'),
   };
   return labels[action] || action;
 };
@@ -700,11 +698,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Profile Settings - Hay Dashboard",
+  title: t('profile.headTitle'),
   meta: [
     {
       name: "description",
-      content: "Manage your profile information and account security",
+      content: t('profile.headDescription'),
     },
   ],
 });

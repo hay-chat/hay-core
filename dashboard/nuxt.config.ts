@@ -83,12 +83,12 @@ export default defineNuxtConfig({
       {
         code: "en",
         name: "English",
-        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json"],
+        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json", "en/dashboard.json", "en/playbooks.json", "en/conversations.json", "en/integrations.json", "en/documents.json"],
       },
       {
         code: "pt-BR",
         name: "Português (Brasil)",
-        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json"],
+        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json", "pt-BR/dashboard.json", "pt-BR/playbooks.json", "pt-BR/conversations.json", "pt-BR/integrations.json", "pt-BR/documents.json"],
       },
     ],
     langDir: "locales",
