@@ -63,7 +63,7 @@ export class ConversationService {
       metadata: data.metadata || {},
       needs_processing: data.status === "open" || data.status === "processing",
       customer_id: customerId,
-      language: data.language as any || null,
+      language: (data.language as any) || null,
     });
 
     // Trigger hook for conversation created
@@ -77,6 +77,12 @@ export class ConversationService {
         language: data.language,
       },
     });
+
+    // Enqueue for RabbitMQ processing if conversation needs it
+    if (conversation.needs_processing) {
+      const { orchestratorQueueService } = await import("./orchestrator-queue.service");
+      await orchestratorQueueService.enqueue(conversation.id, organizationId, "creation");
+    }
 
     return conversation;
   }
@@ -130,7 +136,11 @@ export class ConversationService {
       updateData.closed_at = getUTCNow();
     }
 
-    const result = await this.conversationRepository.update(conversationId, organizationId, updateData);
+    const result = await this.conversationRepository.update(
+      conversationId,
+      organizationId,
+      updateData,
+    );
 
     // Generate conversation title when status changes to pending-human
     if (data.status === "pending-human") {

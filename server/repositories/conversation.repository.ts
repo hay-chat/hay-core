@@ -56,7 +56,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   /**
    * Find conversation by ID and organizationId - ensures proper organization scoping
    */
-  override async findByIdAndOrganization(id: string, organizationId: string): Promise<Conversation | null> {
+  override async findByIdAndOrganization(
+    id: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
     const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
     queryBuilder.where("conversation.id = :id AND conversation.organization_id = :organizationId", {
@@ -107,7 +110,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;
@@ -128,7 +134,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     if (updatedConversation) {
       const { conversationEventsService } = await import("../services/conversation-events.service");
       const changedFields = Object.keys(data);
-      await conversationEventsService.broadcastConversationUpdated(updatedConversation, changedFields);
+      await conversationEventsService.broadcastConversationUpdated(
+        updatedConversation,
+        changedFields,
+      );
     }
 
     return updatedConversation;
@@ -167,6 +176,33 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return await queryBuilder.getMany();
     } catch (error) {
       console.error("[ConversationRepository] Error getting available conversations:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Find conversations where needs_processing=true but haven't been updated recently.
+   * Used by the sweep safety net to re-enqueue conversations that may have been missed.
+   */
+  async getStaleUnprocessed(thresholdMs: number): Promise<Conversation[]> {
+    if (!this.getRepository()) {
+      return [];
+    }
+
+    try {
+      const threshold = new Date(Date.now() - thresholdMs);
+
+      return await this.getRepository()
+        .createQueryBuilder("conversation")
+        .where("conversation.needs_processing = :needsProcessing", { needsProcessing: true })
+        .andWhere("conversation.updated_at < :threshold", { threshold })
+        .andWhere("conversation.status IN (:...statuses)", {
+          statuses: ["open", "processing"],
+        })
+        .select(["conversation.id", "conversation.organization_id"])
+        .getMany();
+    } catch (error) {
+      console.error("[ConversationRepository] Error getting stale unprocessed:", error);
       return [];
     }
   }

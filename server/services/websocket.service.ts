@@ -483,13 +483,12 @@ export class WebSocketService {
         newNonce = dpopVerification.newNonce;
       }
 
-      const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
-
       console.log(
         `[WebSocket.handleChatMessage] Saving customer message to conversation ${conversation.id}`,
       );
 
       // Save customer message using conversation.addMessage() to ensure broadcasting
+      // addMessage() also enqueues the conversation for RabbitMQ processing
       const savedMessage = await conversation.addMessage({
         content: message.content,
         type: MessageType.CUSTOMER,
@@ -509,15 +508,6 @@ export class WebSocketService {
         confirmationPayload,
       );
       client.ws.send(JSON.stringify(confirmationPayload));
-
-      // Note: Message broadcasting is handled automatically by conversation.addMessage()
-      // via Redis pub/sub or direct WebSocket
-
-      // Trigger orchestrator to process the message and generate response
-      console.log(
-        `[WebSocket.handleChatMessage] Triggering orchestrator for conversation ${conversation.id}`,
-      );
-      await orchestratorWorker.tick();
 
       debugLog("websocket", `Webchat message processed for conversation ${conversation.id}`);
     } catch (error) {

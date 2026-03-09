@@ -1,11 +1,17 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { debugLog } from "@server/lib/debug-logger";
+import { rabbitmqService } from "@server/services/rabbitmq.service";
+import {
+  orchestratorQueueService,
+  ORCHESTRATOR_QUEUES,
+  type OrchestratorMessage,
+} from "@server/services/orchestrator-queue.service";
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
-  private isProcessing = false;
   private initialized = false;
+  private consuming = false;
 
   private async initialize(): Promise<void> {
     if (this.initialized) {
@@ -29,65 +35,99 @@ export class OrchestratorWorker {
   }
 
   /**
-   * Start the orchestrator worker
-   * NOTE: Worker processing is now handled by the scheduler service
-   * See: server/services/scheduled-jobs.registry.ts -> 'orchestrator-worker-tick' and 'orchestrator-inactivity-check'
+   * Start the orchestrator worker.
+   * Subscribes to the RabbitMQ queue for event-driven processing.
+   * Falls back to the sweep job if RabbitMQ is unavailable.
    */
-  start(intervalMs: number = 1000): void {
-    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
-    // Run immediately once
-    this.tick();
+  async start(): Promise<void> {
+    await this.initialize();
+
+    if (!this.initialized || !this.orchestrator) {
+      console.warn("[Worker] Orchestrator not initialized, skipping RabbitMQ consumer setup");
+      return;
+    }
+
+    if (rabbitmqService.isConnected()) {
+      await this.startConsuming();
+    }
+
+    // Re-attach consumer on reconnect
+    rabbitmqService.on("connected", async () => {
+      debugLog("worker", "RabbitMQ reconnected, re-attaching consumer");
+      await orchestratorQueueService.declareQueues();
+      await this.startConsuming();
+    });
+
+    // Run inactivity check once at startup
     this.checkInactivity();
   }
 
-  /**
-   * Stop the orchestrator worker
-   * NOTE: Worker processing is now handled by the scheduler service
-   */
-  stop(): void {
-    debugLog("worker", "Orchestrator worker processing handled by scheduler service");
+  private async startConsuming(): Promise<void> {
+    if (this.consuming) return;
+    this.consuming = true;
+
+    await rabbitmqService.consume(
+      ORCHESTRATOR_QUEUES.PROCESS,
+      async (msg) => {
+        const data = rabbitmqService.parseMessage<OrchestratorMessage>(msg);
+
+        debugLog("worker", `Processing conversation from queue`, {
+          conversationId: data.conversationId,
+          trigger: data.trigger,
+          attempt: data.attempt,
+        });
+
+        try {
+          await this.orchestrator!.processConversation(data.conversationId);
+          rabbitmqService.ack(msg);
+          debugLog("worker", `Successfully processed conversation ${data.conversationId}`);
+        } catch (error) {
+          console.error(`[Worker] Failed to process conversation ${data.conversationId}:`, error);
+          // Nack without requeue — message goes to retry queue via dead-letter
+          rabbitmqService.nack(msg, false);
+        }
+      },
+      { prefetch: 2 },
+    );
+
+    console.log("[Worker] RabbitMQ consumer started for orchestrator.process");
   }
 
   /**
-   * Process one tick of the orchestrator
-   * Called by scheduled job: 'orchestrator-worker-tick'
+   * Legacy polling tick — kept as documented fallback.
+   * Re-enable the 'orchestrator-worker-tick' scheduled job to use this.
    */
   async tick(): Promise<void> {
-    this.isProcessing = true;
-
     try {
-      // Initialize if not already done
       await this.initialize();
-
-      if (!this.initialized || !this.orchestrator) {
-        // Skip if not initialized
-        return;
-      }
-
-      // Run the orchestrator loop
+      if (!this.initialized || !this.orchestrator) return;
       await this.orchestrator.loop();
     } catch (error) {
       console.error("Orchestrator tick error:", error);
-    } finally {
-      this.isProcessing = false;
     }
   }
 
   /**
-   * Check for inactive conversations
+   * Stop the orchestrator worker.
+   * Consumer cancellation is handled by rabbitmqService.shutdown().
+   */
+  stop(): void {
+    this.consuming = false;
+    debugLog("worker", "Orchestrator worker stopped");
+  }
+
+  /**
+   * Check for inactive conversations.
    * Called by scheduled job: 'orchestrator-inactivity-check'
    */
   async checkInactivity(): Promise<void> {
     try {
-      // Initialize if not already done
       await this.initialize();
 
       if (!this.initialized || !this.orchestrator) {
-        // Skip if not initialized
         return;
       }
 
-      // Call the orchestrator's inactivity check method
       await this.orchestrator.checkInactivity();
     } catch (error) {
       console.error("[Worker] Inactivity check error:", error);

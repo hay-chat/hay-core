@@ -26,6 +26,17 @@ async function startServer() {
     console.warn("⚠️  Starting server without Redis connection");
   }
 
+  // Initialize RabbitMQ service and declare orchestrator queues
+  const { rabbitmqService } = await import("@server/services/rabbitmq.service");
+  try {
+    await rabbitmqService.initialize();
+    const { orchestratorQueueService } =
+      await import("@server/services/orchestrator-queue.service");
+    await orchestratorQueueService.declareQueues();
+  } catch (error) {
+    console.warn("⚠️  Starting server without RabbitMQ connection");
+  }
+
   // Initialize Job Queue service (depends on Redis)
   const { jobQueueService } = await import("@server/services/job-queue.service");
   try {
@@ -96,6 +107,15 @@ async function startServer() {
 
   server.get("/", (req, res) => {
     res.send("Welcome to Hay");
+  });
+
+  // Health check endpoint
+  server.get("/health", (req, res) => {
+    res.json({
+      status: "ok",
+      redis: redisService.isConnected(),
+      rabbitmq: rabbitmqService.isConnected(),
+    });
   });
 
   // Serve uploaded files from local storage
@@ -387,8 +407,8 @@ async function startServer() {
     console.log(`🚀 Server is running on port http://localhost:${config.server.port}`);
     console.log(`🔌 WebSocket server is running on ws://localhost:${config.server.wsPort}/ws`);
 
-    // Start the orchestrator worker
-    orchestratorWorker.start(config.orchestrator.interval); // Check every second
+    // Start the orchestrator worker (subscribes to RabbitMQ queue)
+    await orchestratorWorker.start();
     console.log("🤖 Orchestrator worker started");
 
     // Initialize plugin pages management (plugin system already initialized)
@@ -420,6 +440,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
+    await rabbitmqService.shutdown();
     await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });
@@ -429,6 +450,7 @@ async function startServer() {
     orchestratorWorker.stop();
     pluginInstanceManagerService.stopCleanup();
     websocketService.shutdown();
+    await rabbitmqService.shutdown();
     await getPluginRunnerService().stopAllWorkers();
     process.exit(0);
   });

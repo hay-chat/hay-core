@@ -82,12 +82,47 @@ const jobRegistry: CronJobConfig[] = [
 
   {
     name: "orchestrator-worker-tick",
-    description: "Process orchestrator tick for active conversations",
-    schedule: 1000, // Every 1 second
+    description:
+      "Process orchestrator tick for active conversations (replaced by RabbitMQ consumer)",
+    schedule: 1000,
     handler: async () => orchestratorWorker.tick(),
-    singleton: true, // Prevent concurrent ticks
+    singleton: true,
+    enabled: false, // Disabled: RabbitMQ consumer handles processing now
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "orchestrator-sweep",
+    description: "Safety net: re-enqueue conversations stuck with needs_processing=true",
+    schedule: 30000, // Every 30 seconds
+    handler: async () => {
+      const { ConversationRepository } = await import("../repositories/conversation.repository");
+      const { orchestratorQueueService } = await import("./orchestrator-queue.service");
+      const { rabbitmqService } = await import("./rabbitmq.service");
+      const { debugLog } = await import("../lib/debug-logger");
+
+      if (!rabbitmqService.isConnected()) {
+        debugLog("orchestrator-sweep", "RabbitMQ not connected, skipping sweep");
+        return;
+      }
+
+      const repo = new ConversationRepository();
+      const staleConversations = await repo.getStaleUnprocessed(30000); // 30s threshold
+
+      if (staleConversations.length === 0) return;
+
+      debugLog(
+        "orchestrator-sweep",
+        `Found ${staleConversations.length} stale conversations, re-enqueuing`,
+      );
+
+      for (const conv of staleConversations) {
+        await orchestratorQueueService.enqueue(conv.id, conv.organization_id, "sweep");
+      }
+    },
+    singleton: true,
     enabled: true,
-    skipDatabaseLogging: true, // Don't log every tick to database
+    skipDatabaseLogging: true,
   },
 
   {
