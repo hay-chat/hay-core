@@ -139,31 +139,52 @@ export class PromptService {
    * Determine the language to use
    */
   private async determineLanguage(options?: Partial<PromptOptions>): Promise<SupportedLanguage> {
-    // Priority: explicit language > conversation language > organization language > default
+    // Priority: explicit language > conversation language > agent language > organization language > default
     if (options?.language && this.isValidLanguage(options.language)) {
       return options.language as SupportedLanguage;
     }
 
-    // Check conversation language first
+    // Check conversation language first, and extract agent_id for agent language fallback
+    let agentId: string | null = null;
     if (options?.conversationId) {
       try {
         const { Conversation } = await import("../database/entities/conversation.entity");
         const conversationRepo = AppDataSource.getRepository(Conversation);
         const conversation = await conversationRepo.findOne({
           where: { id: options.conversationId },
-          select: ["language", "organization_id"],
+          select: ["language", "organization_id", "agent_id"],
         });
 
         if (conversation?.language) {
           return conversation.language as SupportedLanguage;
         }
 
-        // If conversation has no language, fall back to organization
+        agentId = conversation?.agent_id ?? null;
+
+        // If conversation has no language, fall back to agent then organization
         if (conversation?.organization_id) {
           options = { ...options, organizationId: conversation.organization_id };
         }
       } catch (error) {
         logger.error({ err: error }, "Error fetching conversation language");
+      }
+    }
+
+    // Check agent language
+    if (agentId) {
+      try {
+        const { Agent } = await import("../database/entities/agent.entity");
+        const agentRepo = AppDataSource.getRepository(Agent);
+        const agent = await agentRepo.findOne({
+          where: { id: agentId },
+          select: ["language"],
+        });
+
+        if (agent?.language && this.isValidLanguage(agent.language)) {
+          return agent.language as SupportedLanguage;
+        }
+      } catch (error) {
+        logger.error({ err: error }, "Error fetching agent language");
       }
     }
 
@@ -198,7 +219,10 @@ export class PromptService {
 
     // Fallback to English if not found and language is not English
     if (!content && language !== DEFAULT_LANGUAGE) {
-      logger.warn({ promptId, language, fallback: DEFAULT_LANGUAGE }, "Prompt not found, falling back to default language");
+      logger.warn(
+        { promptId, language, fallback: DEFAULT_LANGUAGE },
+        "Prompt not found, falling back to default language",
+      );
       content = await this.loadPrompt(promptId, DEFAULT_LANGUAGE);
     }
 

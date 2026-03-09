@@ -182,6 +182,14 @@ module.exports = {
         useError: "readonly",
         useSeoMeta: "readonly",
         defineNuxtLink: "readonly",
+        // i18n auto-imports
+        useI18n: "readonly",
+        useLocale: "readonly",
+        useLocalePath: "readonly",
+        useLocaleRoute: "readonly",
+        useSwitchLocalePath: "readonly",
+        defineI18nConfig: "readonly",
+        defineI18nRoute: "readonly",
         // Global utilities
         $fetch: "readonly",
       },
@@ -189,6 +197,10 @@ module.exports = {
     // TypeScript files in dashboard
     {
       files: ["dashboard/**/*.ts", "dashboard/**/*.js"],
+      globals: {
+        useI18n: "readonly",
+        defineI18nConfig: "readonly",
+      },
       rules: {
         "@typescript-eslint/no-var-requires": "off",
       },

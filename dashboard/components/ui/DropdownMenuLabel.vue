@@ -15,7 +15,7 @@
 import { cn } from "@/lib/utils";
 
 export interface DropdownMenuLabelProps {
-  label: string;
+  label?: string;
   class?: string;
 }
 

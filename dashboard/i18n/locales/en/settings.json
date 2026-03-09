@@ -1,0 +1,89 @@
+{
+  "general": {
+    "title": "General Settings",
+    "description": "Manage your platform preferences and configuration",
+    "resetToDefaults": "Reset to Defaults",
+    "saveChanges": "Save Changes",
+    "resetConfirm": "Are you sure you want to reset all settings to their default values?",
+    "saveSuccess": "Settings saved successfully",
+    "saveFailed": "Failed to save settings. Please try again.",
+    "loadFailed": "Failed to load settings"
+  },
+  "organization": {
+    "title": "Organization",
+    "description": "Manage your organization details",
+    "name": "Organization Name",
+    "namePlaceholder": "Acme Corporation",
+    "nameHelper": "The name of your organization",
+    "about": "About Organization",
+    "aboutPlaceholder": "Describe what your organization does, what products or services you offer, your mission, values, etc. This information helps the AI assistant provide more contextually relevant responses.",
+    "aboutHelper": "This information helps AI understand your business context. Max 10,000 characters.",
+    "logo": "Logo",
+    "logoAlt": "Organization logo",
+    "removeLogo": "Remove Logo",
+    "logoRecommended": "Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)",
+    "logoTooLarge": "File too large (max 2MB)",
+    "logoUploadFailed": "Failed to upload logo",
+    "logoUploading": "Uploading logo...",
+    "logoUploadSuccess": "Logo uploaded successfully",
+    "logoUploadError": "Failed to upload logo. Please try again.",
+    "logoRemoveSuccess": "Logo removed successfully",
+    "logoRemoveFailed": "Failed to remove logo. Please try again."
+  },
+  "platform": {
+    "title": "Platform Settings",
+    "description": "Configure basic platform preferences",
+    "defaultLanguage": "Default Language",
+    "defaultLanguageHelper": "Default language for new conversations and system messages",
+    "timezone": "Timezone",
+    "timezoneHelper": "Used for displaying timestamps and scheduling reports",
+    "dateFormat": "Date Format",
+    "dateFormatHelper": "Preview: {preview}",
+    "timeFormat": "Time Format",
+    "timeFormatHelper": "Preview: {preview}",
+    "defaultAgent": "Default Agent",
+    "defaultAgentPlaceholder": "No default agent",
+    "defaultAgentHelper": "Agent to handle conversations when no specific agent is assigned",
+    "testMode": "Test Mode Default",
+    "testModeDescription": "When enabled, AI messages require approval before sending to customers. Individual agents can override this setting.",
+    "testModeCheckbox": "Require approval for AI messages by default",
+    "testModeNote": "Note: Playground conversations always auto-send regardless of this setting.",
+    "languages": {
+      "en": "English",
+      "pt": "Portuguese"
+    },
+    "timeFormats": {
+      "12h": "12-hour (AM/PM)",
+      "24h": "24-hour"
+    }
+  },
+  "confidence": {
+    "title": "AI Confidence Guardrails",
+    "description": "Configure how AI responses are evaluated for confidence and accuracy",
+    "thresholds": "Confidence Thresholds",
+    "thresholdsDescription": "Set the minimum confidence scores required for different quality tiers",
+    "highThreshold": "High Confidence Threshold",
+    "highThresholdHelper": "Minimum score for high confidence (0.0 - 1.0)",
+    "mediumThreshold": "Medium Confidence Threshold",
+    "mediumThresholdHelper": "Minimum score for medium confidence (0.0 - 1.0)",
+    "enableRecheck": "Enable Automatic Recheck",
+    "recheckHint": "When confidence is medium, automatically retrieve more documents and regenerate the response",
+    "enableEscalation": "Enable Human Escalation",
+    "escalationHint": "When confidence is low, escalate to a human agent instead of sending the AI response",
+    "recheckConfig": "Recheck Configuration",
+    "recheckConfigDescription": "Parameters used when rechecking medium-confidence responses",
+    "maxDocuments": "Max Documents",
+    "maxDocumentsHelper": "Number of documents to retrieve (default: 10)",
+    "similarityThreshold": "Similarity Threshold",
+    "similarityThresholdHelper": "Lower threshold for broader search (default: 0.3)",
+    "fallbackMessage": "Fallback Message",
+    "fallbackMessagePlaceholder": "Enter fallback message...",
+    "fallbackMessageHelper": "Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language."
+  },
+  "danger": {
+    "title": "Danger Zone",
+    "description": "Irreversible and destructive actions",
+    "deleteOrg": "Delete organization",
+    "deleteOrgWarning": "Once you delete an organization, there is no going back. Please be certain."
+  }
+}

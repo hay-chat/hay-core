@@ -44,7 +44,7 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent class="w-[280px]" align="start" side="bottom">
-      <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+      <DropdownMenuLabel>{{ $t("org.organizations") }}</DropdownMenuLabel>
       <DropdownMenuItem
         v-for="organization in userStore.organizations"
         :key="organization.id"
@@ -90,7 +90,7 @@
         >
           <Plus class="size-4" />
         </div>
-        <div class="font-medium">Create organization</div>
+        <div class="font-medium">{{ $t("org.createOrganization") }}</div>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -107,6 +107,7 @@ import { useToast } from "@/composables/useToast";
 import { ref } from "vue";
 import CreateOrganizationDialog from "./CreateOrganizationDialog.vue";
 
+const { t } = useI18n();
 const userStore = useUserStore();
 const { toast } = useToast();
 const isSwitching = ref(false);
@@ -143,9 +144,9 @@ const switchOrganization = async (organizationId: string) => {
       sessionStorage.setItem(
         "org-switch-success",
         JSON.stringify({
-          title: "Organization switched",
-          message: `Now viewing ${org.name}`,
-        })
+          title: t("org.switched"),
+          message: t("org.switchedMessage", { name: org.name }),
+        }),
       );
 
       // Force a full page reload to refresh all data with the new organization context
@@ -153,7 +154,7 @@ const switchOrganization = async (organizationId: string) => {
     }
   } catch (error) {
     console.error("Failed to switch organization:", error);
-    toast.error("Failed to switch organization", "Please try again");
+    toast.error(t("org.switchFailed"), t("org.tryAgain"));
 
     // Revert the organization change in the store
     // This is needed because we optimistically updated it above

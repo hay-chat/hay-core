@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "gettingStarted": "Getting Started",
+    "dashboard": "Dashboard",
+    "conversations": "Conversations",
+    "documents": "Documents",
+    "playbooks": "Playbooks",
+    "integrations": "Integrations",
+    "marketplace": "Marketplace",
+    "settings": "Settings",
+    "general": "General",
+    "agents": "Agents",
+    "users": "Users",
+    "privacyData": "Privacy & Data",
+    "apiTokens": "API Tokens",
+    "webchat": "Webchat",
+    "customerPrivacy": "Customer Privacy",
+    "myProfile": "My Profile"
+  },
+  "user": {
+    "status": "Status",
+    "available": "Available",
+    "away": "Away",
+    "profile": "Profile",
+    "logOut": "Log out",
+    "defaultName": "User",
+    "defaultEmail": "user{'@'}example.com"
+  },
+  "org": {
+    "organizations": "Organizations",
+    "createOrganization": "Create organization",
+    "switched": "Organization switched",
+    "switchedMessage": "Now viewing {name}",
+    "switchFailed": "Failed to switch organization",
+    "tryAgain": "Please try again"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "create": "Create",
+    "back": "Back",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "noResults": "No results",
+    "search": "Search",
+    "confirm": "Confirm",
+    "close": "Close",
+    "edit": "Edit",
+    "add": "Add",
+    "remove": "Remove",
+    "yes": "Yes",
+    "no": "No",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "takingLonger": "This is taking longer than expected.",
+    "refreshPage": "Refresh the page"
+  }
+}

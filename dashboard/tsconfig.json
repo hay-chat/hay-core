@@ -17,11 +17,14 @@
   "include": [
     "./**/*.ts",
     "./**/*.vue",
-    "./types/**/*.d.ts"
+    "./types/**/*.d.ts",
+    ".nuxt/nuxt.d.ts",
+    ".nuxt/imports.d.ts",
+    ".nuxt/types/**/*.d.ts",
+    ".nuxt/components.d.ts"
   ],
   "exclude": [
     "node_modules",
-    ".nuxt",
     ".output",
     "dist",
     "../server",

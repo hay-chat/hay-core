@@ -10,10 +10,12 @@
 </template>
 
 <script setup lang="ts">
+const { locale } = useI18n();
+
 // Global app configuration
 useHead({
   htmlAttrs: {
-    lang: "en",
+    lang: locale,
   },
   link: [
     {

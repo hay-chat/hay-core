@@ -1,0 +1,89 @@
+{
+  "general": {
+    "title": "Configurações Gerais",
+    "description": "Gerencie as preferências e configuração da plataforma",
+    "resetToDefaults": "Restaurar Padrões",
+    "saveChanges": "Salvar Alterações",
+    "resetConfirm": "Tem certeza de que deseja restaurar todas as configurações para os valores padrão?",
+    "saveSuccess": "Configurações salvas com sucesso",
+    "saveFailed": "Falha ao salvar configurações. Tente novamente.",
+    "loadFailed": "Falha ao carregar configurações"
+  },
+  "organization": {
+    "title": "Organização",
+    "description": "Gerencie os detalhes da sua organização",
+    "name": "Nome da Organização",
+    "namePlaceholder": "Acme Corporation",
+    "nameHelper": "O nome da sua organização",
+    "about": "Sobre a Organização",
+    "aboutPlaceholder": "Descreva o que sua organização faz, quais produtos ou serviços oferece, sua missão, valores, etc. Essas informações ajudam o assistente de IA a fornecer respostas mais contextualmente relevantes.",
+    "aboutHelper": "Essas informações ajudam a IA a entender o contexto do seu negócio. Máximo de 10.000 caracteres.",
+    "logo": "Logo",
+    "logoAlt": "Logo da organização",
+    "removeLogo": "Remover Logo",
+    "logoRecommended": "Recomendado: Imagem quadrada, máximo 2MB (JPG, PNG, WebP ou GIF)",
+    "logoTooLarge": "Arquivo muito grande (máx. 2MB)",
+    "logoUploadFailed": "Falha ao enviar logo",
+    "logoUploading": "Enviando logo...",
+    "logoUploadSuccess": "Logo enviado com sucesso",
+    "logoUploadError": "Falha ao enviar logo. Tente novamente.",
+    "logoRemoveSuccess": "Logo removido com sucesso",
+    "logoRemoveFailed": "Falha ao remover logo. Tente novamente."
+  },
+  "platform": {
+    "title": "Configurações da Plataforma",
+    "description": "Configure as preferências básicas da plataforma",
+    "defaultLanguage": "Idioma Padrão",
+    "defaultLanguageHelper": "Idioma padrão para novas conversas e mensagens do sistema",
+    "timezone": "Fuso Horário",
+    "timezoneHelper": "Usado para exibir horários e agendar relatórios",
+    "dateFormat": "Formato de Data",
+    "dateFormatHelper": "Prévia: {preview}",
+    "timeFormat": "Formato de Hora",
+    "timeFormatHelper": "Prévia: {preview}",
+    "defaultAgent": "Agente Padrão",
+    "defaultAgentPlaceholder": "Nenhum agente padrão",
+    "defaultAgentHelper": "Agente para atender conversas quando nenhum agente específico está atribuído",
+    "testMode": "Modo de Teste Padrão",
+    "testModeDescription": "Quando ativado, as mensagens de IA precisam de aprovação antes de serem enviadas aos clientes. Agentes individuais podem sobrescrever esta configuração.",
+    "testModeCheckbox": "Exigir aprovação para mensagens de IA por padrão",
+    "testModeNote": "Nota: Conversas no Playground sempre enviam automaticamente, independente desta configuração.",
+    "languages": {
+      "en": "Inglês",
+      "pt": "Português"
+    },
+    "timeFormats": {
+      "12h": "12 horas (AM/PM)",
+      "24h": "24 horas"
+    }
+  },
+  "confidence": {
+    "title": "Proteções de Confiança da IA",
+    "description": "Configure como as respostas da IA são avaliadas quanto à confiança e precisão",
+    "thresholds": "Limites de Confiança",
+    "thresholdsDescription": "Defina as pontuações mínimas de confiança necessárias para diferentes níveis de qualidade",
+    "highThreshold": "Limite de Alta Confiança",
+    "highThresholdHelper": "Pontuação mínima para alta confiança (0.0 - 1.0)",
+    "mediumThreshold": "Limite de Média Confiança",
+    "mediumThresholdHelper": "Pontuação mínima para média confiança (0.0 - 1.0)",
+    "enableRecheck": "Ativar Reverificação Automática",
+    "recheckHint": "Quando a confiança é média, buscar automaticamente mais documentos e regenerar a resposta",
+    "enableEscalation": "Ativar Escalonamento Humano",
+    "escalationHint": "Quando a confiança é baixa, escalonar para um agente humano ao invés de enviar a resposta da IA",
+    "recheckConfig": "Configuração de Reverificação",
+    "recheckConfigDescription": "Parâmetros usados ao reverificar respostas de confiança média",
+    "maxDocuments": "Máximo de Documentos",
+    "maxDocumentsHelper": "Número de documentos a buscar (padrão: 10)",
+    "similarityThreshold": "Limite de Similaridade",
+    "similarityThresholdHelper": "Limite mais baixo para busca mais ampla (padrão: 0.3)",
+    "fallbackMessage": "Mensagem de Fallback",
+    "fallbackMessagePlaceholder": "Digite a mensagem de fallback...",
+    "fallbackMessageHelper": "Mensagem exibida quando a confiança é baixa e o escalonamento está desativado. Será automaticamente traduzida para corresponder ao idioma da conversa."
+  },
+  "danger": {
+    "title": "Zona de Perigo",
+    "description": "Ações irreversíveis e destrutivas",
+    "deleteOrg": "Excluir organização",
+    "deleteOrgWarning": "Uma vez que você exclui uma organização, não há como voltar atrás. Tenha certeza."
+  }
+}

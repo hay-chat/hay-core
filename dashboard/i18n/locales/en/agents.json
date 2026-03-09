@@ -1,0 +1,7 @@
+{
+  "language": {
+    "label": "Response Language",
+    "placeholder": "Inherit from Organization",
+    "helperText": "The language the agent will use to respond. If not set, it inherits from the organization's default language."
+  }
+}

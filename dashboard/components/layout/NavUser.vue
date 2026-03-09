@@ -23,22 +23,22 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width]" align="start" side="top">
-      <DropdownMenuLabel>Status</DropdownMenuLabel>
+      <DropdownMenuLabel>{{ $t("user.status") }}</DropdownMenuLabel>
       <DropdownMenuItem :disabled="currentStatus === 'available'" @click="setStatus('available')">
         <div class="mr-2 h-2 w-2 rounded-full bg-green-500"></div>
-        Available
+        {{ $t("user.available") }}
         <Check v-if="currentStatus === 'available'" class="ml-auto h-4 w-4" />
       </DropdownMenuItem>
       <DropdownMenuItem :disabled="currentStatus === 'away'" @click="setStatus('away')">
         <div class="mr-2 h-2 w-2 rounded-full bg-yellow-500"></div>
-        Away
+        {{ $t("user.away") }}
         <Check v-if="currentStatus === 'away'" class="ml-auto h-4 w-4" />
       </DropdownMenuItem>
 
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="router.push('/settings/profile')">
         <User2 class="mr-2 h-4 w-4" />
-        Profile
+        {{ $t("user.profile") }}
       </DropdownMenuItem>
       <!-- <DropdownMenuItem>
         <Settings class="mr-2 h-4 w-4" />
@@ -51,7 +51,7 @@
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="authStore.logout()">
         <LogOut class="mr-2 h-4 w-4" />
-        Log out
+        {{ $t("user.logOut") }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

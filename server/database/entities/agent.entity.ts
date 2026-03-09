@@ -69,6 +69,9 @@ export class Agent {
   @Column({ type: "boolean", nullable: true })
   testMode!: boolean | null;
 
+  @Column({ type: "varchar", length: 10, nullable: true })
+  language!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

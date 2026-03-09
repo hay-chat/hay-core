@@ -21,8 +21,8 @@
 
       <!-- Header -->
       <div class="text-center">
-        <CardTitle class="text-2xl"> Welcome back </CardTitle>
-        <CardDescription class="mt-2"> Sign in to your account to continue </CardDescription>
+        <CardTitle class="text-2xl"> {{ $t("login.title") }} </CardTitle>
+        <CardDescription class="mt-2"> {{ $t("login.description") }} </CardDescription>
       </div>
 
       <!-- Social Login -->
@@ -63,9 +63,9 @@
           <Input
             id="email"
             v-model="form.email"
-            label="Email address"
+            :label="$t('login.emailLabel')"
             type="email"
-            placeholder="Enter your email"
+            :placeholder="$t('login.emailPlaceholder')"
             required
             :class="errors.email ? 'border-red-500' : ''"
             @blur="validateField('email')"
@@ -79,9 +79,9 @@
           <Input
             id="password"
             v-model="form.password"
-            label="Password"
+            :label="$t('login.passwordLabel')"
             type="password"
-            placeholder="Enter your password"
+            :placeholder="$t('login.passwordPlaceholder')"
             required
             :class="errors.password ? 'border-red-500' : ''"
             @blur="validateField('password')"
@@ -97,13 +97,13 @@
             to="/forgot-password"
             class="text-sm text-primary hover:text-primary/80 font-medium"
           >
-            Forgot password?
+            {{ $t("login.forgotPassword") }}
           </NuxtLink>
         </div>
 
         <!-- Submit Button -->
         <Button type="submit" size="lg" class="w-full" :loading="loading" :disabled="!isFormValid">
-          Sign in
+          {{ $t("login.submit") }}
         </Button>
 
         <!-- Error Message -->
@@ -122,11 +122,10 @@
           class="p-4 rounded-md bg-amber-50 border border-amber-200 space-y-3"
         >
           <p class="text-sm text-amber-800 font-medium">
-            Your email address hasn't been verified yet.
+            {{ $t("login.emailNotVerified") }}
           </p>
           <p class="text-sm text-amber-700">
-            Please check your inbox for the verification link. If you can't find it, you can request
-            a new one.
+            {{ $t("login.emailNotVerifiedDescription") }}
           </p>
           <Button
             variant="outline"
@@ -136,7 +135,7 @@
             :disabled="verificationResent"
             @click="handleResendVerification"
           >
-            {{ verificationResent ? "Verification email sent!" : "Resend verification email" }}
+            {{ verificationResent ? $t("login.verificationSent") : $t("login.resendVerification") }}
           </Button>
         </div>
       </form>
@@ -148,6 +147,8 @@
 import { validateEmail } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { Hay } from "@/utils/api";
+
+const { t } = useI18n();
 
 definePageMeta({
   layout: false,
@@ -253,18 +254,18 @@ const validateField = (field: keyof typeof errors) => {
   switch (field) {
     case "email":
       if (!form.email) {
-        errors.email = "Email is required";
+        errors.email = t("login.errors.emailRequired");
       } else if (!validateEmail(form.email)) {
-        errors.email = "Please enter a valid email address";
+        errors.email = t("login.errors.emailInvalid");
       } else {
         errors.email = "";
       }
       break;
     case "password":
       if (!form.password) {
-        errors.password = "Password is required";
+        errors.password = t("login.errors.passwordRequired");
       } else if (form.password.length < 8) {
-        errors.password = "Password must be at least 8 characters";
+        errors.password = t("login.errors.passwordMinLength");
       } else {
         errors.password = "";
       }
@@ -296,14 +297,13 @@ const handleSubmit = async () => {
     if (err.message.includes("not verified")) {
       emailNotVerified.value = true;
     } else if (err.message.includes("Invalid credentials")) {
-      error.value = "Invalid email or password. Please check your credentials and try again.";
+      error.value = t("login.errors.invalidCredentials");
     } else if (err.message.includes("locked")) {
-      error.value =
-        "Your account has been temporarily locked due to multiple failed login attempts. Please try again later.";
+      error.value = t("login.errors.accountLocked");
     } else if (err.message.includes("suspended")) {
-      error.value = "Your account has been suspended. Please contact support for assistance.";
+      error.value = t("login.errors.accountSuspended");
     } else {
-      error.value = "Unable to sign in. Please check your internet connection and try again.";
+      error.value = t("login.errors.networkError");
     }
     console.error("Login error:", err);
   }
@@ -316,9 +316,9 @@ const handleResendVerification = async () => {
     verificationResent.value = true;
   } catch (err: any) {
     if (err.message.includes("Too many requests")) {
-      error.value = "Too many requests. Please try again later.";
+      error.value = t("login.errors.tooManyRequests");
     } else {
-      error.value = "Failed to resend verification email. Please try again.";
+      error.value = t("login.errors.resendFailed");
     }
   } finally {
     resendingVerification.value = false;
@@ -327,7 +327,7 @@ const handleResendVerification = async () => {
 
 // SEO
 useHead({
-  title: "Sign In - Hay Dashboard",
-  meta: [{ name: "description", content: "Sign in to your Hay dashboard account" }],
+  title: t("login.pageTitle"),
+  meta: [{ name: "description", content: t("login.pageDescription") }],
 });
 </script>

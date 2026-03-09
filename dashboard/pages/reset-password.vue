@@ -7,9 +7,9 @@
           <KeyRound class="w-6 h-6 text-blue-600 animate-pulse" />
         </div>
         <div>
-          <CardTitle class="text-2xl">Verifying Reset Link</CardTitle>
+          <CardTitle class="text-2xl">{{ $t("resetPassword.verifyingTitle") }}</CardTitle>
           <CardDescription class="mt-2">
-            Please wait while we verify your password reset link...
+            {{ $t("resetPassword.verifyingDescription") }}
           </CardDescription>
         </div>
       </div>
@@ -21,19 +21,15 @@
         </div>
 
         <div>
-          <CardTitle class="text-2xl">Password Reset Successful!</CardTitle>
+          <CardTitle class="text-2xl">{{ $t("resetPassword.successTitle") }}</CardTitle>
           <CardDescription class="mt-2">
-            Your password has been successfully reset. You can now log in with your new password.
+            {{ $t("resetPassword.successDescription") }}
           </CardDescription>
         </div>
 
         <div class="space-y-3">
-          <Button
-            size="lg"
-            class="w-full"
-            @click="goToLogin"
-          >
-            Go to Login
+          <Button size="lg" class="w-full" @click="goToLogin">
+            {{ $t("resetPassword.goToLogin") }}
           </Button>
         </div>
       </div>
@@ -45,29 +41,19 @@
         </div>
 
         <div>
-          <CardTitle class="text-2xl">Invalid or Expired Link</CardTitle>
+          <CardTitle class="text-2xl">{{ $t("resetPassword.errorTitle") }}</CardTitle>
           <CardDescription class="mt-2">
             {{ tokenError }}
           </CardDescription>
         </div>
 
         <div class="space-y-3">
-          <Button
-            variant="outline"
-            size="lg"
-            class="w-full"
-            @click="goToForgotPassword"
-          >
-            Request New Reset Link
+          <Button variant="outline" size="lg" class="w-full" @click="goToForgotPassword">
+            {{ $t("resetPassword.requestNewLink") }}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="lg"
-            class="w-full"
-            @click="goToLogin"
-          >
-            Back to Login
+          <Button variant="ghost" size="lg" class="w-full" @click="goToLogin">
+            {{ $t("resetPassword.backToLogin") }}
           </Button>
         </div>
       </div>
@@ -76,9 +62,9 @@
       <div v-else class="space-y-6">
         <!-- Header -->
         <div class="text-center">
-          <CardTitle class="text-2xl">Reset Your Password</CardTitle>
+          <CardTitle class="text-2xl">{{ $t("resetPassword.formTitle") }}</CardTitle>
           <CardDescription class="mt-2">
-            Enter your new password below
+            {{ $t("resetPassword.formDescription") }}
           </CardDescription>
         </div>
 
@@ -88,9 +74,9 @@
             <Input
               id="password"
               v-model="form.password"
-              label="New Password"
+              :label="$t('resetPassword.newPasswordLabel')"
               type="password"
-              placeholder="Enter new password"
+              :placeholder="$t('resetPassword.newPasswordPlaceholder')"
               required
               :class="errors.password ? 'border-red-500' : ''"
               @blur="validateField('password')"
@@ -98,18 +84,16 @@
             <p v-if="errors.password" class="text-sm text-red-600">
               {{ errors.password }}
             </p>
-            <p v-else class="text-sm text-gray-500">
-              Must be at least 8 characters long
-            </p>
+            <p v-else class="text-sm text-gray-500">{{ $t("resetPassword.newPasswordHelper") }}</p>
           </div>
 
           <div class="space-y-2">
             <Input
               id="confirmPassword"
               v-model="form.confirmPassword"
-              label="Confirm New Password"
+              :label="$t('resetPassword.confirmLabel')"
               type="password"
-              placeholder="Confirm new password"
+              :placeholder="$t('resetPassword.confirmPlaceholder')"
               required
               :class="errors.confirmPassword ? 'border-red-500' : ''"
               @blur="validateField('confirmPassword')"
@@ -130,7 +114,7 @@
             :loading="loading"
             :disabled="!isFormValid"
           >
-            Reset Password
+            {{ $t("resetPassword.submit") }}
           </Button>
 
           <!-- Error Message -->
@@ -148,7 +132,7 @@
             class="text-sm text-primary hover:text-primary/80 font-medium flex items-center justify-center space-x-1"
           >
             <ArrowLeft class="w-4 h-4" />
-            <span>Back to Login</span>
+            <span>{{ $t("resetPassword.backToLogin") }}</span>
           </NuxtLink>
         </div>
       </div>
@@ -163,6 +147,7 @@ import { useToast } from "@/composables/useToast";
 import { validatePassword } from "@/lib/utils";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -213,18 +198,18 @@ const validateField = (field: keyof typeof errors) => {
   switch (field) {
     case "password":
       if (!form.password) {
-        errors.password = "Password is required";
+        errors.password = t("resetPassword.errors.passwordRequired");
       } else if (!passwordValidation.value.isValid) {
-        errors.password = "Password does not meet requirements";
+        errors.password = t("resetPassword.errors.passwordRequirements");
       } else {
         errors.password = "";
       }
       break;
     case "confirmPassword":
       if (!form.confirmPassword) {
-        errors.confirmPassword = "Please confirm your password";
+        errors.confirmPassword = t("resetPassword.errors.confirmRequired");
       } else if (form.password !== form.confirmPassword) {
-        errors.confirmPassword = "Passwords do not match";
+        errors.confirmPassword = t("resetPassword.errors.passwordMismatch");
       } else {
         errors.confirmPassword = "";
       }
@@ -234,7 +219,7 @@ const validateField = (field: keyof typeof errors) => {
 
 const verifyToken = async () => {
   if (!token.value) {
-    tokenError.value = "No reset token provided. Please check your email for the reset link.";
+    tokenError.value = t("resetPassword.errors.noToken");
     isVerifyingToken.value = false;
     return;
   }
@@ -246,12 +231,13 @@ const verifyToken = async () => {
       userEmail.value = ("email" in response ? response.email : "") || "";
       isVerifyingToken.value = false;
     } else {
-      tokenError.value = ("message" in response ? response.message : "") || "Invalid or expired reset token.";
+      tokenError.value =
+        ("message" in response ? response.message : "") || t("resetPassword.errors.invalidToken");
       isVerifyingToken.value = false;
     }
   } catch (err: any) {
     console.error("Token verification error:", err);
-    tokenError.value = err.message || "Failed to verify reset token. Please try again.";
+    tokenError.value = err.message || t("resetPassword.errors.verifyFailed");
     isVerifyingToken.value = false;
   }
 };
@@ -275,7 +261,7 @@ const handleSubmit = async () => {
 
     if (response.success) {
       resetSuccess.value = true;
-      toast.success("Password reset successful! You can now log in with your new password.");
+      toast.success(t("resetPassword.toast.success"));
 
       // Redirect to login after 3 seconds
       setTimeout(() => {
@@ -284,7 +270,7 @@ const handleSubmit = async () => {
     }
   } catch (err: any) {
     console.error("Password reset error:", err);
-    error.value = err.message || "Failed to reset password. Please try again.";
+    error.value = err.message || t("resetPassword.errors.resetFailed");
   } finally {
     loading.value = false;
   }
@@ -305,11 +291,11 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: "Reset Password - Hay Dashboard",
+  title: t("resetPassword.pageTitle"),
   meta: [
     {
       name: "description",
-      content: "Reset your Hay dashboard account password",
+      content: t("resetPassword.pageDescription"),
     },
   ],
 });

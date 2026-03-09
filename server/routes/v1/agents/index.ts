@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AgentService } from "../../../services/agent.service";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { SupportedLanguage } from "@server/types/language.types";
 
 const agentService = new AgentService();
 
@@ -18,6 +19,7 @@ const createAgentSchema = z.object({
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
   testMode: z.boolean().nullable().optional(),
+  language: z.nativeEnum(SupportedLanguage).nullable().optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -32,6 +34,7 @@ const updateAgentSchema = z.object({
   humanHandoffAvailableInstructions: z.any().optional(),
   humanHandoffUnavailableInstructions: z.any().optional(),
   testMode: z.boolean().nullable().optional(),
+  language: z.nativeEnum(SupportedLanguage).nullable().optional(),
 });
 
 export const agentsRouter = t.router({
@@ -60,21 +63,24 @@ export const agentsRouter = t.router({
       return agent;
     }),
 
-  create: scopedProcedure(RESOURCES.AGENTS, ACTIONS.CREATE).input(createAgentSchema).mutation(async ({ ctx, input }) => {
-    const agent = await agentService.createAgent(ctx.organizationId!, input as any);
+  create: scopedProcedure(RESOURCES.AGENTS, ACTIONS.CREATE)
+    .input(createAgentSchema)
+    .mutation(async ({ ctx, input }) => {
+      const agent = await agentService.createAgent(ctx.organizationId!, input as any);
 
-    // Auto-set as default agent if this is the first agent for the organization
-    const { organizationRepository } = await import("../../../repositories/organization.repository");
-    const organization = await organizationRepository.findById(ctx.organizationId!);
+      // Auto-set as default agent if this is the first agent for the organization
+      const { organizationRepository } =
+        await import("../../../repositories/organization.repository");
+      const organization = await organizationRepository.findById(ctx.organizationId!);
 
-    if (organization && !organization.defaultAgentId) {
-      await organizationRepository.update(ctx.organizationId!, {
-        defaultAgentId: agent.id,
-      } as any);
-    }
+      if (organization && !organization.defaultAgentId) {
+        await organizationRepository.update(ctx.organizationId!, {
+          defaultAgentId: agent.id,
+        } as any);
+      }
 
-    return agent;
-  }),
+      return agent;
+    }),
 
   update: scopedProcedure(RESOURCES.AGENTS, ACTIONS.UPDATE)
     .input(
@@ -135,7 +141,8 @@ export const agentsRouter = t.router({
       }
 
       // Update organization's default agent
-      const { organizationRepository } = await import("../../../repositories/organization.repository");
+      const { organizationRepository } =
+        await import("../../../repositories/organization.repository");
       const organization = await organizationRepository.findById(ctx.organizationId!);
 
       if (!organization) {

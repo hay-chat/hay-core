@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "gettingStarted": "Primeiros Passos",
+    "dashboard": "Painel",
+    "conversations": "Conversas",
+    "documents": "Documentos",
+    "playbooks": "Playbooks",
+    "integrations": "Integrações",
+    "marketplace": "Marketplace",
+    "settings": "Configurações",
+    "general": "Geral",
+    "agents": "Agentes",
+    "users": "Usuários",
+    "privacyData": "Privacidade e Dados",
+    "apiTokens": "Tokens de API",
+    "webchat": "Webchat",
+    "customerPrivacy": "Privacidade do Cliente",
+    "myProfile": "Meu Perfil"
+  },
+  "user": {
+    "status": "Status",
+    "available": "Disponível",
+    "away": "Ausente",
+    "profile": "Perfil",
+    "logOut": "Sair",
+    "defaultName": "Usuário",
+    "defaultEmail": "usuario{'@'}exemplo.com"
+  },
+  "org": {
+    "organizations": "Organizações",
+    "createOrganization": "Criar organização",
+    "switched": "Organização alterada",
+    "switchedMessage": "Visualizando {name}",
+    "switchFailed": "Falha ao trocar de organização",
+    "tryAgain": "Tente novamente"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "create": "Criar",
+    "back": "Voltar",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "noResults": "Nenhum resultado",
+    "search": "Pesquisar",
+    "confirm": "Confirmar",
+    "close": "Fechar",
+    "edit": "Editar",
+    "add": "Adicionar",
+    "remove": "Remover",
+    "yes": "Sim",
+    "no": "Não",
+    "enabled": "Ativado",
+    "disabled": "Desativado",
+    "takingLonger": "Isso está demorando mais do que o esperado.",
+    "refreshPage": "Atualizar a página"
+  }
+}

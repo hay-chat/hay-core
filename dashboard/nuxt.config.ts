@@ -49,7 +49,6 @@ export default defineNuxtConfig({
         module: "esnext",
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
-        types: ["vite/client"],
         paths: {
           "@server/*": ["../server/*"],
           "@/*": ["./*"],
@@ -76,7 +75,28 @@ export default defineNuxtConfig({
   css: ["@/assets/css/main.css"],
 
   // Modules
-  modules: ["@nuxtjs/tailwindcss", "@pinia/nuxt", "@vueuse/nuxt"],
+  modules: ["@nuxtjs/tailwindcss", "@pinia/nuxt", "@vueuse/nuxt", "@nuxtjs/i18n"],
+
+  // Internationalization
+  i18n: {
+    locales: [
+      {
+        code: "en",
+        name: "English",
+        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json"],
+      },
+      {
+        code: "pt-BR",
+        name: "Português (Brasil)",
+        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json"],
+      },
+    ],
+    langDir: "locales",
+    defaultLocale: "en",
+    strategy: "no_prefix",
+    detectBrowserLanguage: false,
+    vueI18n: "./i18n.config.ts",
+  },
 
   // Auto-import configuration
   imports: {
