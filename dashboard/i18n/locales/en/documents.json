@@ -153,7 +153,7 @@
       "importFromWebsiteDesc": "Crawl and import documentation from any website",
       "autoCrawl": "Auto-crawl",
       "sitemap": "Sitemap",
-      "plugin": "Plugin",
+      "plugin": "Integration",
       "next": "Next"
     },
     "fileSelection": {

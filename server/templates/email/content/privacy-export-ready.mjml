@@ -1,8 +1,7 @@
-<!-- subject: Your Data Export is Ready -->
 <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="20px">
   <mj-column width="100%">
     <mj-text align="center" color="#333333" font-size="24px" font-weight="bold" padding-bottom="10px">
-      Your Data Export is Ready
+      {{ t.privacy-export-ready.title }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -10,15 +9,15 @@
 <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
   <mj-column width="100%">
     <mj-text color="#555555" font-size="16px" line-height="24px">
-      Good news! Your personal data export from {{companyName}} has been successfully generated and is ready for download.
+      {{ t.privacy-export-ready.body }}
     </mj-text>
 
     <mj-button background-color="#0066ff" color="#ffffff" href="{{downloadUrl}}" padding-top="20px" padding-bottom="20px">
-      Download Your Data
+      {{ t.privacy-export-ready.downloadButton }}
     </mj-button>
 
     <mj-text color="#555555" font-size="14px" line-height="20px" padding-top="10px">
-      Or copy and paste this link into your browser:
+      {{ t.common.copyPasteLink }}
     </mj-text>
 
     <mj-text color="#0066ff" font-size="12px" line-height="18px" padding-bottom="20px">
@@ -28,27 +27,27 @@
     <mj-divider border-color="#e0e0e0" border-width="1px" />
 
     <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
-      <strong>Important Information:</strong>
+      <strong>{{ t.common.importantInformation }}</strong>
     </mj-text>
 
     <mj-text color="#555555" font-size="14px" line-height="20px">
-      • This download link will expire in {{expiresIn}}<br/>
-      • Your export includes all personal data we have on file<br/>
-      • The data is provided in JSON format<br/>
-      • Please store this file securely as it contains your personal information
+      • {{ t.privacy-export-ready.info1 }}<br/>
+      • {{ t.privacy-export-ready.info2 }}<br/>
+      • {{ t.privacy-export-ready.info3 }}<br/>
+      • {{ t.privacy-export-ready.info4 }}
     </mj-text>
 
     <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
-      <strong>What's included in your export:</strong><br/>
-      • Profile information<br/>
-      • Account activity logs<br/>
-      • API keys metadata<br/>
-      • Documents and content<br/>
-      • Organization membership data
+      <strong>{{ t.privacy-export-ready.whatsIncluded }}</strong><br/>
+      • {{ t.privacy-export-ready.included1 }}<br/>
+      • {{ t.privacy-export-ready.included2 }}<br/>
+      • {{ t.privacy-export-ready.included3 }}<br/>
+      • {{ t.privacy-export-ready.included4 }}<br/>
+      • {{ t.privacy-export-ready.included5 }}
     </mj-text>
 
     <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px" padding-bottom="20px">
-      Need help? Contact us at <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
+      {{ t.common.needHelp }} <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
     </mj-text>
   </mj-column>
 </mj-section>

@@ -1,16 +1,16 @@
 {
   "marketplace": {
-    "title": "Marketplace de Plugins",
-    "description": "Descubra e instale plugins para ampliar as capacidades da sua plataforma",
-    "headTitle": "Marketplace de Plugins - Hay Dashboard",
-    "uploadPlugin": "Enviar Plugin",
+    "title": "Marketplace de Integrações",
+    "description": "Descubra e instale integrações para ampliar as capacidades da sua plataforma",
+    "headTitle": "Marketplace de Integrações - Hay Dashboard",
+    "uploadPlugin": "Enviar Integração",
     "manageCustom": "Gerenciar Personalizados ({count})",
     "refresh": "Atualizar",
     "stats": {
-      "totalPlugins": "Total de Plugins",
-      "availablePlugins": "Plugins disponíveis",
+      "totalPlugins": "Total de Integrações",
+      "availablePlugins": "Integrações disponíveis",
       "installed": "Instalados",
-      "activePlugins": "Plugins ativos",
+      "activePlugins": "Integrações ativas",
       "channels": "Canais",
       "communicationChannels": "Canais de comunicação",
       "mcpConnectors": "Conectores MCP",
@@ -18,18 +18,18 @@
     },
     "categories": {
       "label": "Categorias:",
-      "all": "Todos os Plugins",
+      "all": "Todas as Integrações",
       "channels": "Canais",
       "mcpConnectors": "Conectores MCP",
       "documentImporters": "Importadores de Documentos",
       "retrievers": "Recuperadores",
       "playbooks": "Playbooks"
     },
-    "search": "Buscar plugins...",
+    "search": "Buscar integrações...",
     "empty": {
-      "title": "Nenhum plugin encontrado",
+      "title": "Nenhuma integração encontrada",
       "searchHint": "Tente ajustar os termos da sua busca.",
-      "categoryHint": "Nenhum plugin corresponde à categoria selecionada."
+      "categoryHint": "Nenhuma integração corresponde à categoria selecionada."
     },
     "pluginTypes": {
       "channel": "Canal",
@@ -48,37 +48,37 @@
       "deleting": "Excluindo..."
     },
     "custom": "Personalizado",
-    "confirmDelete": "Tem certeza de que deseja excluir este plugin? Esta ação não pode ser desfeita.",
+    "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
     "toast": {
-      "enabledSuccess": "Plugin {name} ativado com sucesso",
-      "disabledSuccess": "Plugin {name} desativado com sucesso",
-      "deletedSuccess": "Plugin excluído com sucesso",
-      "enableFailed": "Falha ao ativar plugin",
-      "disableFailed": "Falha ao desativar plugin",
-      "deleteFailed": "Falha ao excluir plugin"
+      "enabledSuccess": "Integração {name} ativada com sucesso",
+      "disabledSuccess": "Integração {name} desativada com sucesso",
+      "deletedSuccess": "Integração excluída com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disableFailed": "Falha ao desativar integração",
+      "deleteFailed": "Falha ao excluir integração"
     }
   },
   "manage": {
-    "title": "Gerenciar Plugins Personalizados",
-    "description": "Visualize e gerencie os plugins personalizados da sua organização",
-    "headTitle": "Gerenciar Plugins Personalizados - Hay Dashboard",
-    "uploadPlugin": "Enviar Plugin",
+    "title": "Gerenciar Integrações Personalizadas",
+    "description": "Visualize e gerencie as integrações personalizadas da sua organização",
+    "headTitle": "Gerenciar Integrações Personalizadas - Hay Dashboard",
+    "uploadPlugin": "Enviar Integração",
     "refresh": "Atualizar",
     "stats": {
-      "customPlugins": "Plugins Personalizados",
-      "uploadedByOrg": "Enviados pela sua organização",
-      "enabled": "Ativados",
-      "currentlyActive": "Atualmente ativos",
+      "customPlugins": "Integrações Personalizadas",
+      "uploadedByOrg": "Enviadas pela sua organização",
+      "enabled": "Ativadas",
+      "currentlyActive": "Atualmente ativas",
       "totalSize": "Tamanho Total",
       "storageUsed": "Armazenamento utilizado"
     },
-    "loading": "Carregando plugins...",
+    "loading": "Carregando integrações...",
     "empty": {
-      "title": "Nenhum plugin personalizado",
-      "description": "Envie seu primeiro plugin personalizado para começar"
+      "title": "Nenhuma integração personalizada",
+      "description": "Envie sua primeira integração personalizada para começar"
     },
     "table": {
-      "title": "Plugins Personalizados",
+      "title": "Integrações Personalizadas",
       "version": "Versão: {version}",
       "id": "ID: {id}",
       "uploaded": "Enviado: {date}"
@@ -93,57 +93,57 @@
       "delete": "Excluir",
       "deleting": "Excluindo..."
     },
-    "confirmDelete": "Tem certeza de que deseja excluir este plugin? Esta ação não pode ser desfeita.",
+    "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
     "updateComingSoon": "Funcionalidade de atualização em breve",
     "toast": {
-      "enabledSuccess": "Plugin ativado com sucesso",
-      "disabledSuccess": "Plugin desativado com sucesso",
-      "deletedSuccess": "Plugin excluído com sucesso",
-      "enableFailed": "Falha ao ativar plugin",
-      "disableFailed": "Falha ao desativar plugin",
-      "deleteFailed": "Falha ao excluir plugin"
+      "enabledSuccess": "Integração ativada com sucesso",
+      "disabledSuccess": "Integração desativada com sucesso",
+      "deletedSuccess": "Integração excluída com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disableFailed": "Falha ao desativar integração",
+      "deleteFailed": "Falha ao excluir integração"
     }
   },
   "upload": {
-    "title": "Enviar Plugin Personalizado",
-    "description": "Envie um plugin personalizado para ampliar sua plataforma",
-    "headTitle": "Enviar Plugin - Hay Dashboard",
+    "title": "Enviar Integração Personalizada",
+    "description": "Envie uma integração personalizada para ampliar sua plataforma",
+    "headTitle": "Enviar Integração - Hay Dashboard",
     "backToMarketplace": "Voltar ao Marketplace",
     "card": {
-      "title": "Enviar ZIP do Plugin",
-      "description": "Envie um arquivo ZIP contendo seu plugin personalizado. O ZIP deve incluir um arquivo manifest.json na raiz."
+      "title": "Enviar ZIP da Integração",
+      "description": "Envie um arquivo ZIP contendo sua integração personalizada. O ZIP deve incluir um arquivo manifest.json na raiz."
     },
     "file": {
-      "label": "Arquivo do Plugin",
-      "dropHint": "Arraste o ZIP do plugin aqui ou clique para procurar",
+      "label": "Arquivo da Integração",
+      "dropHint": "Arraste o ZIP da integração aqui ou clique para procurar",
       "maxSize": "Tamanho máximo do arquivo: 50MB",
       "selectFile": "Selecionar Arquivo",
       "remove": "Remover"
     },
     "success": {
-      "message": "Plugin enviado com sucesso!",
-      "uploadAnother": "Enviar Outro",
+      "message": "Integração enviada com sucesso!",
+      "uploadAnother": "Enviar Outra",
       "viewMarketplace": "Ver Marketplace"
     },
     "progress": {
       "uploading": "Enviando...",
-      "uploadPlugin": "Enviar Plugin"
+      "uploadPlugin": "Enviar Integração"
     },
     "errors": {
       "title": "Envio Falhou",
       "zipOnly": "Apenas arquivos ZIP são permitidos",
       "tooLarge": "O tamanho do arquivo excede o limite de 50MB",
-      "uploadFailed": "Falha ao enviar plugin"
+      "uploadFailed": "Falha ao enviar integração"
     },
     "requirements": {
-      "title": "Requisitos do Plugin",
+      "title": "Requisitos da Integração",
       "manifest": {
         "title": "manifest.json válido",
         "description": "Deve incluir um arquivo manifest.json na raiz com os campos id, name e version"
       },
       "pluginId": {
-        "title": "ID de plugin válido",
-        "description": "O ID do plugin deve conter apenas letras minúsculas, números e hífens"
+        "title": "ID de integração válido",
+        "description": "O ID da integração deve conter apenas letras minúsculas, números e hífens"
       },
       "zipFormat": {
         "title": "Formato ZIP",
@@ -155,25 +155,25 @@
       }
     },
     "toast": {
-      "uploadedSuccess": "Plugin {name} enviado com sucesso!"
+      "uploadedSuccess": "Integração {name} enviada com sucesso!"
     }
   },
   "pluginSettings": {
     "backToMarketplace": "Voltar ao Marketplace",
-    "headTitle": "Configurações do Plugin - Hay Dashboard",
+    "headTitle": "Configurações da Integração - Hay Dashboard",
     "headTitleWithName": "Configurações de {name} - Hay Dashboard",
     "restartWorker": "Reiniciar Worker",
     "restarting": "Reiniciando...",
-    "disablePlugin": "Desativar Plugin",
+    "disablePlugin": "Desativar Integração",
     "disabling": "Desativando...",
-    "enablePlugin": "Ativar Plugin",
+    "enablePlugin": "Ativar Integração",
     "disableConfirm": {
-      "title": "Desativar Plugin?",
-      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso do plugin na sua organização.",
+      "title": "Desativar Integração?",
+      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso da integração na sua organização.",
       "confirm": "Desativar"
     },
     "error": {
-      "loadFailed": "Falha ao carregar plugin",
+      "loadFailed": "Falha ao carregar integração",
       "returnToMarketplace": "Voltar ao Marketplace"
     },
     "connection": {
@@ -188,7 +188,7 @@
     "about": "Sobre",
     "capabilities": {
       "title": "Capacidades",
-      "description": "O que este plugin pode fazer",
+      "description": "O que esta integração pode fazer",
       "chatConnector": "Conector de Chat",
       "sendMessages": "Enviar mensagens",
       "receiveMessages": "Receber mensagens",
@@ -222,12 +222,12 @@
     "toast": {
       "configSaved": "Configuração salva com sucesso",
       "configSaveFailed": "Falha ao salvar configuração",
-      "enabledSuccess": "Plugin ativado com sucesso",
-      "enableFailed": "Falha ao ativar plugin",
-      "disabledSuccess": "Plugin desativado com sucesso",
-      "disableFailed": "Falha ao desativar plugin",
-      "restartedSuccess": "Worker do plugin reiniciado com sucesso",
-      "restartFailed": "Falha ao reiniciar plugin",
+      "enabledSuccess": "Integração ativada com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disabledSuccess": "Integração desativada com sucesso",
+      "disableFailed": "Falha ao desativar integração",
+      "restartedSuccess": "Worker da integração reiniciado com sucesso",
+      "restartFailed": "Falha ao reiniciar integração",
       "resetToEnv": "Redefinido para variável de ambiente",
       "resetToEnvFailed": "Falha ao redefinir para variável de ambiente",
       "oauthSuccess": "Conexão OAuth estabelecida com sucesso",

@@ -86,6 +86,24 @@
     "deleteOrg": "Delete organization",
     "deleteOrgWarning": "Once you delete an organization, there is no going back. Please be certain."
   },
+  "deleteOrganization": {
+    "title": "Delete Organization",
+    "description": "This action cannot be undone. This will permanently delete the organization and all associated data.",
+    "warningTitle": "Warning: This will immediately:",
+    "impact1": "Stop all active conversations",
+    "impact2": "Delete all agents, playbooks, and documents",
+    "impact3": "Remove all team members from the organization",
+    "impact4": "Delete all customer data and conversation history",
+    "impact5": "Invalidate all API keys",
+    "irreversibleWarning": "This action is irreversible.",
+    "confirmLabel": "Type {keyword} to confirm",
+    "cancelButton": "Never mind",
+    "deleteButton": "Delete Organization",
+    "confirmError": "Please type DELETE to confirm",
+    "successTitle": "Organization deleted",
+    "successMessage": "{organizationName} has been permanently deleted.",
+    "deleteFailed": "Failed to delete organization"
+  },
   "users": {
     "title": "Team Members",
     "description": "Manage who has access to your organization",

@@ -22,7 +22,8 @@ import {
   adminProcedure,
 } from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
-import { emailService } from "@server/services/email.service";
+import { emailService, getOrganizationLocale } from "@server/services/email.service";
+import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
@@ -400,9 +401,15 @@ export const authRouter = t.router({
         const baseUrl = getDashboardUrl();
         const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Reset Your Password",
+          locale,
           template: "reset-password",
           variables: {
             userName: user.getFullName(),
@@ -532,9 +539,15 @@ export const authRouter = t.router({
 
         // Send confirmation email
         await emailService.initialize();
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Your Password Has Been Changed",
+          locale,
           template: "password-changed",
           variables: {
             userName: user.getFullName(),
@@ -704,9 +717,10 @@ export const authRouter = t.router({
 
         // Send email notification
         await emailService.initialize();
+        const locale = await getOrganizationLocale(ctx.organizationId);
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Your Password Has Been Changed",
+          locale,
           template: "password-changed",
           variables: {
             userName: user.getFullName(),
@@ -1008,10 +1022,11 @@ export const authRouter = t.router({
         };
 
         // Send verification email to NEW email
+        const locale = await getOrganizationLocale(ctx.organizationId);
         logger.debug("Sending verification email to new address");
         const result1 = await emailService.sendTemplateEmail({
           to: input.newEmail.toLowerCase(),
-          subject: "Verify Your New Email Address",
+          locale,
           template: "verify-email-change",
           variables: {
             ...commonVariables,
@@ -1025,7 +1040,7 @@ export const authRouter = t.router({
         logger.debug("Sending notification email to old address");
         const result2 = await emailService.sendTemplateEmail({
           to: oldEmail,
-          subject: "Email Change Pending Verification",
+          locale,
           template: "email-change-pending",
           variables: {
             ...commonVariables,
@@ -1137,6 +1152,12 @@ export const authRouter = t.router({
         // Send confirmation emails
         await emailService.initialize();
 
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         const emailVariables = {
           userName: user.getFullName(),
           userEmail: newEmail,
@@ -1157,14 +1178,14 @@ export const authRouter = t.router({
         // Notify both old and new email
         await emailService.sendTemplateEmail({
           to: oldEmail,
-          subject: "Your Email Address Has Been Changed",
+          locale,
           template: "email-changed",
           variables: { ...emailVariables, recipientEmail: oldEmail },
         });
 
         await emailService.sendTemplateEmail({
           to: newEmail,
-          subject: "Your Email Address Has Been Changed",
+          locale,
           template: "email-changed",
           variables: emailVariables,
         });
@@ -1336,9 +1357,15 @@ export const authRouter = t.router({
         const baseUrl = getDashboardUrl();
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}&type=signup`;
 
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Verify Your Email Address",
+          locale,
           template: "verify-signup-email",
           variables: {
             userName: user.getFullName(),
@@ -1416,9 +1443,10 @@ export const authRouter = t.router({
       };
 
       // Send verification email to new email address
+      const locale = await getOrganizationLocale(ctx.organizationId);
       await emailService.sendTemplateEmail({
         to: user.pendingEmail,
-        subject: "Verify Your New Email Address",
+        locale,
         template: "verify-email-change",
         variables: {
           ...commonVariables,

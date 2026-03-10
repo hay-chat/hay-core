@@ -2,20 +2,20 @@
   <Dialog :open="open" @update:open="(val: boolean) => $emit('update:open', val)">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Confirm Your Identity</DialogTitle>
+        <DialogTitle>{{ $t("reauth.title") }}</DialogTitle>
         <DialogDescription>
-          Please enter your current password to continue with this security-sensitive action.
+          {{ $t("reauth.description") }}
         </DialogDescription>
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-2">
-          <Label for="password">Current Password</Label>
+          <Label for="password">{{ $t("reauth.passwordLabel") }}</Label>
           <Input
             id="password"
             v-model="password"
             type="password"
-            placeholder="Enter your current password"
+            :placeholder="$t('reauth.passwordPlaceholder')"
             :disabled="loading"
             autocomplete="current-password"
           />
@@ -31,11 +31,11 @@
             @click="handleCancel"
             :disabled="loading"
           >
-            Cancel
+            {{ $t("common.cancel") }}
           </Button>
           <Button type="submit" :disabled="loading || !password">
-            <span v-if="loading">Verifying...</span>
-            <span v-else>Confirm</span>
+            <span v-if="loading">{{ $t("reauth.verifying") }}</span>
+            <span v-else>{{ $t("common.confirm") }}</span>
           </Button>
         </DialogFooter>
       </form>
@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
@@ -59,6 +60,7 @@ interface ReauthModalEmits {
 const props = defineProps<ReauthModalProps>();
 const emit = defineEmits<ReauthModalEmits>();
 
+const { t } = useI18n();
 const toast = useToast();
 
 const password = ref("");
@@ -75,7 +77,7 @@ watch(() => props.open, (newVal) => {
 
 const handleSubmit = async () => {
   if (!password.value) {
-    error.value = "Password is required";
+    error.value = t("reauth.passwordRequired");
     return;
   }
 
@@ -96,7 +98,7 @@ const handleSubmit = async () => {
     password.value = "";
   } catch (err: any) {
     console.error("Password verification failed:", err);
-    error.value = err.message || "Password verification failed. Please try again.";
+    error.value = err.message || t("reauth.verifyFailed");
   } finally {
     loading.value = false;
   }

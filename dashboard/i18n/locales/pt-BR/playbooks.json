@@ -128,6 +128,78 @@
     "successDialog": {
       "title": "Playbook Criado",
       "description": "Seu playbook foi criado com sucesso. O que você gostaria de fazer agora?"
+    },
+    "purpose": {
+      "label": "Para que é este playbook?",
+      "placeholder": "ex.: Lidar com solicitações de reembolso para pedidos feitos nos últimos 30 dias",
+      "helperText": "Descreva o que este playbook deve ajudar a resolver ou automatizar. 1–3 frases recomendadas.",
+      "tipsTitle": "Dicas para uma boa descrição",
+      "tipsFocus": "Foque no problema ou tarefa específica que este playbook deve lidar",
+      "tipsMention": "Mencione quem normalmente precisa de ajuda com isso (ex.: clientes, equipe interna)",
+      "tipsOutcomes": "Inclua quaisquer resultados esperados (ex.: emitir um reembolso, escalar para gerente)"
+    },
+    "actions": {
+      "label": "Quais ações este playbook pode executar?",
+      "helperText": "Selecione as ferramentas que este playbook pode usar. Se nenhuma for selecionada, o playbook será apenas de resposta.",
+      "errorLoadTools": "Falha ao carregar ferramentas disponíveis. Tente novamente mais tarde.",
+      "noTools": "Nenhuma integração conectada ainda. Este playbook será apenas de resposta, a menos que você conecte integrações nas Configurações."
+    },
+    "documents": {
+      "label": "Quais documentos este playbook deve usar?",
+      "helperText": "Selecione documentos para fundamentar o playbook na sua base de conhecimento. Você pode pular esta etapa se nenhum documento for necessário.",
+      "errorLoad": "Falha ao carregar documentos. Tente novamente mais tarde.",
+      "noDocuments": "Nenhum documento encontrado. Você pode continuar sem documentos — o playbook dependerá apenas das instruções que você fornecer.",
+      "suggestedTitle": "Sugeridos para você",
+      "suggestedHint": "Com base na descrição do seu playbook",
+      "allDocumentsTitle": "Todos os documentos",
+      "filterPlaceholder": "Filtrar documentos...",
+      "documentsSelected": "{count} documento selecionado | {count} documentos selecionados"
+    },
+    "boundaries": {
+      "label": "Defina limites e regras de escalonamento",
+      "helperText": "Defina quando o playbook deve escalonar para um humano e quais tópicos deve evitar.",
+      "whyMatters": "Por que isso importa",
+      "warningText": "Regras claras de escalonamento evitam que seu playbook lide com situações sensíveis indevidas. Os limites mantêm as respostas focadas e seguras.",
+      "escalationLabel": "Sempre escalonar quando...",
+      "escalationPlaceholder": "ex.: Cliente menciona ação legal, solicita reembolso acima de R$500...",
+      "boundariesLabel": "Nunca responder perguntas sobre...",
+      "boundariesPlaceholder": "ex.: Políticas internas da empresa, preços de concorrentes...",
+      "acknowledgment": "Eu revisei as regras de escalonamento e limites",
+      "escalationExamples": {
+        "legal": "Ameaças legais",
+        "refund": "Solicitações de reembolso acima de R$500",
+        "safety": "Preocupações com segurança",
+        "manager": "Cliente pede para falar com gerente"
+      },
+      "boundaryExamples": {
+        "policies": "Políticas internas",
+        "competitor": "Comparações com concorrentes",
+        "medical": "Aconselhamento médico/jurídico",
+        "employee": "Informações de funcionários"
+      }
+    },
+    "generate": {
+      "summaryTitle": "Resumo",
+      "purposeLabel": "Propósito",
+      "actionsLabel": "Ações",
+      "actionsNone": "Nenhuma (apenas resposta)",
+      "actionsSelected": "{count} selecionadas",
+      "documentsLabel": "Documentos",
+      "documentsNone": "Nenhum",
+      "documentsSelected": "{count} selecionados",
+      "boundariesLabel": "Limites",
+      "boundariesConfigured": "Configurados",
+      "boundariesNone": "Nenhum definido",
+      "readyText": "Pronto para gerar as instruções do playbook com base nas informações fornecidas.",
+      "generateButton": "Gerar Instruções",
+      "generatingText": "Gerando instruções...",
+      "generatingHint": "Isso pode levar alguns segundos.",
+      "titleLabel": "Título",
+      "triggerLabel": "Gatilho",
+      "descriptionLabel": "Descrição",
+      "instructionsLabel": "Instruções",
+      "startingPointText": "Este é um ponto de partida. Você poderá refinar tudo no editor.",
+      "regenerateButton": "Regenerar"
     }
   }
 }

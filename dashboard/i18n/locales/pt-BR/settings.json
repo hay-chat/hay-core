@@ -86,6 +86,24 @@
     "deleteOrg": "Excluir organização",
     "deleteOrgWarning": "Uma vez que você exclui uma organização, não há como voltar atrás. Tenha certeza."
   },
+  "deleteOrganization": {
+    "title": "Excluir Organização",
+    "description": "Esta ação não pode ser desfeita. Isso excluirá permanentemente a organização e todos os dados associados.",
+    "warningTitle": "Aviso: Isso irá imediatamente:",
+    "impact1": "Parar todas as conversas ativas",
+    "impact2": "Excluir todos os agentes, playbooks e documentos",
+    "impact3": "Remover todos os membros da equipe da organização",
+    "impact4": "Excluir todos os dados de clientes e histórico de conversas",
+    "impact5": "Invalidar todas as chaves de API",
+    "irreversibleWarning": "Esta ação é irreversível.",
+    "confirmLabel": "Digite {keyword} para confirmar",
+    "cancelButton": "Cancelar",
+    "deleteButton": "Excluir Organização",
+    "confirmError": "Por favor, digite DELETE para confirmar",
+    "successTitle": "Organização excluída",
+    "successMessage": "{organizationName} foi permanentemente excluída.",
+    "deleteFailed": "Falha ao excluir organização"
+  },
   "users": {
     "title": "Membros da Equipe",
     "description": "Gerencie quem tem acesso à sua organização",

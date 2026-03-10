@@ -3,20 +3,22 @@
     <div class="space-y-6">
       <!-- Loading State -->
       <div v-if="loading">
-        <Loading label="Processing..." />
+        <Loading :label="$t('common.processing')" />
       </div>
 
       <!-- Success State -->
       <div v-else-if="success" class="space-y-4">
         <div class="text-center">
-          <CardTitle class="text-2xl text-green-600">Invitation Declined</CardTitle>
+          <CardTitle class="text-2xl text-green-600">{{
+            $t("declineInvitation.title")
+          }}</CardTitle>
           <CardDescription class="mt-2">
-            You have successfully declined the invitation.
+            {{ $t("declineInvitation.description") }}
           </CardDescription>
         </div>
         <div class="flex justify-center">
           <Button @click="router.push(authStore.isAuthenticated ? '/' : '/login')">
-            {{ authStore.isAuthenticated ? "Go to Dashboard" : "Go to Login" }}
+            {{ authStore.isAuthenticated ? $t("common.goToDashboard") : $t("common.goToLogin") }}
           </Button>
         </div>
       </div>
@@ -24,12 +26,18 @@
       <!-- Error State -->
       <div v-else-if="error" class="space-y-4">
         <div class="text-center">
-          <CardTitle class="text-2xl text-red-600">Error</CardTitle>
+          <CardTitle class="text-2xl text-red-600">{{
+            $t("declineInvitation.errorTitle")
+          }}</CardTitle>
           <CardDescription class="mt-2">{{ error }}</CardDescription>
         </div>
         <div class="flex justify-center gap-3">
-          <Button variant="outline" @click="router.push('/login')"> Go to Login </Button>
-          <Button @click="handleDecline"> Try Again </Button>
+          <Button variant="outline" @click="router.push('/login')">
+            {{ $t("common.goToLogin") }}
+          </Button>
+          <Button @click="handleDecline">
+            {{ $t("common.tryAgain") }}
+          </Button>
         </div>
       </div>
     </div>
@@ -37,6 +45,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
 
@@ -45,6 +54,7 @@ definePageMeta({
   public: true,
 });
 
+const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
@@ -57,7 +67,7 @@ const error = ref("");
 // Decline invitation
 const handleDecline = async () => {
   if (!token.value) {
-    error.value = "No invitation token provided";
+    error.value = t("declineInvitation.noToken");
     loading.value = false;
     return;
   }
@@ -82,9 +92,7 @@ const handleDecline = async () => {
   } catch (err) {
     console.error("Failed to decline invitation:", err);
     error.value =
-      err instanceof Error
-        ? err.message
-        : "Failed to decline invitation. The link may be invalid or expired.";
+      err instanceof Error ? err.message : t("declineInvitation.declineFailed");
   } finally {
     loading.value = false;
   }
@@ -97,7 +105,7 @@ onMounted(() => {
 
 // SEO
 useHead({
-  title: "Decline Invitation - Hay Dashboard",
-  meta: [{ name: "description", content: "Decline organization invitation" }],
+  title: t("declineInvitation.pageTitle"),
+  meta: [{ name: "description", content: t("declineInvitation.pageDescription") }],
 });
 </script>

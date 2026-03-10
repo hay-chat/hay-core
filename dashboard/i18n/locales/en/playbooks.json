@@ -128,6 +128,78 @@
     "successDialog": {
       "title": "Playbook Created",
       "description": "Your playbook has been created successfully. What would you like to do next?"
+    },
+    "purpose": {
+      "label": "What is this playbook for?",
+      "placeholder": "e.g. Handle refund requests for orders placed in the last 30 days",
+      "helperText": "Describe what this playbook should help resolve or automate. 1–3 sentences recommended.",
+      "tipsTitle": "Tips for a good description",
+      "tipsFocus": "Focus on the specific problem or task this playbook should handle",
+      "tipsMention": "Mention who typically needs help with this (e.g. customers, internal team)",
+      "tipsOutcomes": "Include any key outcomes you expect (e.g. issue a refund, escalate to manager)"
+    },
+    "actions": {
+      "label": "What actions can this playbook take?",
+      "helperText": "Select the tools this playbook is allowed to use. If none are selected, the playbook will be answer-only.",
+      "errorLoadTools": "Failed to load available tools. Please try again later.",
+      "noTools": "No integrations are connected yet. This playbook will be answer-only unless you connect integrations in Settings."
+    },
+    "documents": {
+      "label": "Which documents should this playbook use?",
+      "helperText": "Select documents to ground the playbook in your knowledge base. You can skip this step if no documents are needed.",
+      "errorLoad": "Failed to load documents. Please try again later.",
+      "noDocuments": "No documents found. You can continue without documents — the playbook will rely only on the instructions you provide.",
+      "suggestedTitle": "Suggested for you",
+      "suggestedHint": "Based on your playbook description",
+      "allDocumentsTitle": "All documents",
+      "filterPlaceholder": "Filter documents...",
+      "documentsSelected": "{count} document selected | {count} documents selected"
+    },
+    "boundaries": {
+      "label": "Set boundaries and escalation rules",
+      "helperText": "Define when the playbook should escalate to a human and what topics it should avoid.",
+      "whyMatters": "Why this matters",
+      "warningText": "Clear escalation rules prevent your playbook from handling sensitive situations it shouldn't. Boundaries keep responses focused and safe.",
+      "escalationLabel": "Always escalate when...",
+      "escalationPlaceholder": "e.g. Customer mentions legal action, requests a refund over $500...",
+      "boundariesLabel": "Never answer questions about...",
+      "boundariesPlaceholder": "e.g. Internal company policies, competitor pricing...",
+      "acknowledgment": "I have reviewed the escalation rules and boundaries",
+      "escalationExamples": {
+        "legal": "Legal threats",
+        "refund": "Refund requests over $500",
+        "safety": "Safety concerns",
+        "manager": "Customer asks for manager"
+      },
+      "boundaryExamples": {
+        "policies": "Internal policies",
+        "competitor": "Competitor comparisons",
+        "medical": "Medical/legal advice",
+        "employee": "Employee information"
+      }
+    },
+    "generate": {
+      "summaryTitle": "Summary",
+      "purposeLabel": "Purpose",
+      "actionsLabel": "Actions",
+      "actionsNone": "None (answer-only)",
+      "actionsSelected": "{count} selected",
+      "documentsLabel": "Documents",
+      "documentsNone": "None",
+      "documentsSelected": "{count} selected",
+      "boundariesLabel": "Boundaries",
+      "boundariesConfigured": "Configured",
+      "boundariesNone": "None set",
+      "readyText": "Ready to generate your playbook instructions based on the information you provided.",
+      "generateButton": "Generate Instructions",
+      "generatingText": "Generating instructions...",
+      "generatingHint": "This may take a few seconds.",
+      "titleLabel": "Title",
+      "triggerLabel": "Trigger",
+      "descriptionLabel": "Description",
+      "instructionsLabel": "Instructions",
+      "startingPointText": "This is a starting point. You'll be able to refine everything in the editor.",
+      "regenerateButton": "Regenerate"
     }
   }
 }

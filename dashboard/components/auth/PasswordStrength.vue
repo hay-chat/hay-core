@@ -3,7 +3,7 @@
     <!-- Strength bar -->
     <div class="space-y-2">
       <div class="flex justify-between items-center">
-        <span class="text-sm text-gray-600">Password strength</span>
+        <span class="text-sm text-gray-600">{{ $t("passwordStrength.label") }}</span>
         <span :class="['text-sm font-medium', strengthColor]">
           {{ strengthText }}
         </span>
@@ -13,32 +13,32 @@
 
     <!-- Requirements checklist -->
     <div class="space-y-1">
-      <p class="text-sm text-gray-600">Password must contain:</p>
+      <p class="text-sm text-gray-600">{{ $t("passwordStrength.mustContain") }}</p>
       <ul class="space-y-1">
         <li :class="requirementClass(validation.hasMinLength)">
           <Check v-if="validation.hasMinLength" class="h-3 w-3" />
           <X v-else class="h-3 w-3" />
-          At least 8 characters
+          {{ $t("passwordStrength.minLength") }}
         </li>
         <li :class="requirementClass(validation.hasUpperCase)">
           <Check v-if="validation.hasUpperCase" class="h-3 w-3" />
           <X v-else class="h-3 w-3" />
-          One uppercase letter
+          {{ $t("passwordStrength.uppercase") }}
         </li>
         <li :class="requirementClass(validation.hasLowerCase)">
           <Check v-if="validation.hasLowerCase" class="h-3 w-3" />
           <X v-else class="h-3 w-3" />
-          One lowercase letter
+          {{ $t("passwordStrength.lowercase") }}
         </li>
         <li :class="requirementClass(validation.hasNumber)">
           <Check v-if="validation.hasNumber" class="h-3 w-3" />
           <X v-else class="h-3 w-3" />
-          One number
+          {{ $t("passwordStrength.number") }}
         </li>
         <li :class="requirementClass(validation.hasSpecialChar)">
           <Check v-if="validation.hasSpecialChar" class="h-3 w-3" />
           <X v-else class="h-3 w-3" />
-          One special character
+          {{ $t("passwordStrength.specialChar") }}
         </li>
       </ul>
     </div>
@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Check, X } from "lucide-vue-next";
 import { validatePassword } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export interface PasswordStrengthProps {
 }
 
 const props = defineProps<PasswordStrengthProps>();
+const { t } = useI18n();
 
 const validation = computed(() => {
   const result = validatePassword(props.password);
@@ -82,13 +84,13 @@ const validation = computed(() => {
 const strengthText = computed(() => {
   switch (validation.value.strength) {
     case "weak":
-      return "Weak";
+      return t("passwordStrength.weak");
     case "medium":
-      return "Medium";
+      return t("passwordStrength.medium");
     case "strong":
-      return "Strong";
+      return t("passwordStrength.strong");
     default:
-      return "Weak";
+      return t("passwordStrength.weak");
   }
 });
 

@@ -1,0 +1,69 @@
+{
+  "queue": {
+    "title": "Job Queue",
+    "description": "Monitor and manage background jobs and processing tasks.",
+    "stats": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "filters": {
+      "searchPlaceholder": "Search jobs by type or ID...",
+      "allStatus": "All Status",
+      "statusPending": "Pending",
+      "statusQueued": "Queued",
+      "statusProcessing": "Processing",
+      "statusCompleted": "Completed",
+      "statusFailed": "Failed",
+      "statusCancelled": "Cancelled",
+      "statusRetrying": "Retrying",
+      "allTypes": "All Types",
+      "typeDocumentUpload": "Document Upload",
+      "typeDocumentProcessing": "Document Processing",
+      "typeEmail": "Email",
+      "typeExport": "Export",
+      "typeImport": "Import"
+    },
+    "table": {
+      "loadingJobs": "Loading jobs...",
+      "noJobsFound": "No jobs found",
+      "noJobsMatchingFilters": "There are no jobs matching your filters.",
+      "jobId": "Job ID",
+      "type": "Type",
+      "status": "Status",
+      "priority": "Priority",
+      "progress": "Progress",
+      "created": "Created",
+      "duration": "Duration",
+      "actions": "Actions",
+      "retryJob": "Retry Job",
+      "cancelJob": "Cancel Job"
+    },
+    "pagination": {
+      "showingJobs": "Showing {from} to {to} of {total} jobs"
+    },
+    "details": {
+      "title": "Job Details",
+      "id": "ID",
+      "type": "Type",
+      "status": "Status",
+      "priority": "Priority",
+      "attempts": "Attempts",
+      "created": "Created",
+      "started": "Started",
+      "completed": "Completed",
+      "payload": "Payload",
+      "result": "Result",
+      "error": "Error",
+      "logs": "Logs"
+    },
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "critical": "Critical",
+      "unknown": "Unknown"
+    }
+  }
+}

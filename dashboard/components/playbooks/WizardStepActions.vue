@@ -1,10 +1,9 @@
 <template>
   <div class="space-y-4">
     <div class="space-y-1">
-      <Label>What actions can this playbook take?</Label>
+      <Label>{{ $t("wizard.actions.label") }}</Label>
       <p class="text-sm text-neutral-muted">
-        Select the tools this playbook is allowed to use. If none are selected, the playbook will be
-        answer-only.
+        {{ $t("wizard.actions.helperText") }}
       </p>
     </div>
 
@@ -15,14 +14,13 @@
 
     <!-- Error state -->
     <Alert v-else-if="error" variant="destructive">
-      <AlertDescription> Failed to load available tools. Please try again later. </AlertDescription>
+      <AlertDescription> {{ $t("wizard.actions.errorLoadTools") }} </AlertDescription>
     </Alert>
 
     <!-- No tools available -->
     <Alert v-else-if="tools.length === 0" variant="info" :icon="Info">
       <AlertDescription>
-        No integrations are connected yet. This playbook will be answer-only unless you connect
-        integrations in Settings.
+        {{ $t("wizard.actions.noTools") }}
       </AlertDescription>
     </Alert>
 

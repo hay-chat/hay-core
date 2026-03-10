@@ -1,9 +1,9 @@
 <template>
   <div class="space-y-6">
     <div class="space-y-1">
-      <Label>Set boundaries and escalation rules</Label>
+      <Label>{{ $t("wizard.boundaries.label") }}</Label>
       <p class="text-sm text-neutral-muted">
-        Define when the playbook should escalate to a human and what topics it should avoid.
+        {{ $t("wizard.boundaries.helperText") }}
       </p>
     </div>
 
@@ -11,27 +11,28 @@
     <div
       class="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20 p-4 space-y-1"
     >
-      <p class="text-sm font-medium text-yellow-900 dark:text-yellow-100">Why this matters</p>
+      <p class="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+        {{ $t("wizard.boundaries.whyMatters") }}
+      </p>
       <p class="text-sm text-yellow-800 dark:text-yellow-200">
-        Clear escalation rules prevent your playbook from handling sensitive situations it
-        shouldn't. Boundaries keep responses focused and safe.
+        {{ $t("wizard.boundaries.warningText") }}
       </p>
     </div>
 
     <!-- Escalation rules -->
     <div class="space-y-2">
-      <Label for="escalation-rules">Always escalate when...</Label>
+      <Label for="escalation-rules">{{ $t("wizard.boundaries.escalationLabel") }}</Label>
       <Textarea
         id="escalation-rules"
         :model-value="escalationRules"
-        placeholder="e.g. Customer mentions legal action, requests a refund over $500..."
+        :placeholder="$t('wizard.boundaries.escalationPlaceholder')"
         :rows="4"
         @update:model-value="$emit('update:escalationRules', $event)"
       />
       <div class="flex flex-wrap gap-1.5">
         <Badge
-          v-for="example in escalationExamples"
-          :key="example"
+          v-for="(example, key) in escalationExamples"
+          :key="key"
           variant="outline"
           :on-click="() => appendToEscalation(example)"
         >
@@ -42,18 +43,18 @@
 
     <!-- Boundary rules -->
     <div class="space-y-2">
-      <Label for="boundaries">Never answer questions about...</Label>
+      <Label for="boundaries">{{ $t("wizard.boundaries.boundariesLabel") }}</Label>
       <Textarea
         id="boundaries"
         :model-value="boundaries"
-        placeholder="e.g. Internal company policies, competitor pricing..."
+        :placeholder="$t('wizard.boundaries.boundariesPlaceholder')"
         :rows="4"
         @update:model-value="$emit('update:boundaries', $event)"
       />
       <div class="flex flex-wrap gap-1.5">
         <Badge
-          v-for="example in boundaryExamples"
-          :key="example"
+          v-for="(example, key) in boundaryExamples"
+          :key="key"
           variant="outline"
           :on-click="() => appendToBoundaries(example)"
         >
@@ -70,26 +71,30 @@
         @update:model-value="$emit('update:acknowledged', $event)"
       />
       <span class="text-sm text-foreground">
-        I have reviewed the escalation rules and boundaries
+        {{ $t("wizard.boundaries.acknowledgment") }}
       </span>
     </label>
   </div>
 </template>
 
 <script setup lang="ts">
-const escalationExamples = [
-  "Legal threats",
-  "Refund requests over $500",
-  "Safety concerns",
-  "Customer asks for manager",
-];
+import { useI18n } from "vue-i18n";
 
-const boundaryExamples = [
-  "Internal policies",
-  "Competitor comparisons",
-  "Medical/legal advice",
-  "Employee information",
-];
+const { t } = useI18n();
+
+const escalationExamples = {
+  legal: t("wizard.boundaries.escalationExamples.legal"),
+  refund: t("wizard.boundaries.escalationExamples.refund"),
+  safety: t("wizard.boundaries.escalationExamples.safety"),
+  manager: t("wizard.boundaries.escalationExamples.manager"),
+};
+
+const boundaryExamples = {
+  policies: t("wizard.boundaries.boundaryExamples.policies"),
+  competitor: t("wizard.boundaries.boundaryExamples.competitor"),
+  medical: t("wizard.boundaries.boundaryExamples.medical"),
+  employee: t("wizard.boundaries.boundaryExamples.employee"),
+};
 
 const props = defineProps<{
   escalationRules: string;

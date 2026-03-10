@@ -1,16 +1,16 @@
 {
   "marketplace": {
-    "title": "Plugin Marketplace",
-    "description": "Discover and install plugins to extend your platform capabilities",
-    "headTitle": "Plugin Marketplace - Hay Dashboard",
-    "uploadPlugin": "Upload Plugin",
+    "title": "Integration Marketplace",
+    "description": "Discover and install integrations to extend your platform capabilities",
+    "headTitle": "Integration Marketplace - Hay Dashboard",
+    "uploadPlugin": "Upload Integration",
     "manageCustom": "Manage Custom ({count})",
     "refresh": "Refresh",
     "stats": {
-      "totalPlugins": "Total Plugins",
-      "availablePlugins": "Available plugins",
+      "totalPlugins": "Total Integrations",
+      "availablePlugins": "Available integrations",
       "installed": "Installed",
-      "activePlugins": "Active plugins",
+      "activePlugins": "Active integrations",
       "channels": "Channels",
       "communicationChannels": "Communication channels",
       "mcpConnectors": "MCP Connectors",
@@ -18,18 +18,18 @@
     },
     "categories": {
       "label": "Categories:",
-      "all": "All Plugins",
+      "all": "All Integrations",
       "channels": "Channels",
       "mcpConnectors": "MCP Connectors",
       "documentImporters": "Document Importers",
       "retrievers": "Retrievers",
       "playbooks": "Playbooks"
     },
-    "search": "Search plugins...",
+    "search": "Search integrations...",
     "empty": {
-      "title": "No plugins found",
+      "title": "No integrations found",
       "searchHint": "Try adjusting your search terms.",
-      "categoryHint": "No plugins match your selected category."
+      "categoryHint": "No integrations match your selected category."
     },
     "pluginTypes": {
       "channel": "Channel",
@@ -48,37 +48,37 @@
       "deleting": "Deleting..."
     },
     "custom": "Custom",
-    "confirmDelete": "Are you sure you want to delete this plugin? This action cannot be undone.",
+    "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
     "toast": {
-      "enabledSuccess": "Plugin {name} enabled successfully",
-      "disabledSuccess": "Plugin {name} disabled successfully",
-      "deletedSuccess": "Plugin deleted successfully",
-      "enableFailed": "Failed to enable plugin",
-      "disableFailed": "Failed to disable plugin",
-      "deleteFailed": "Failed to delete plugin"
+      "enabledSuccess": "Integration {name} enabled successfully",
+      "disabledSuccess": "Integration {name} disabled successfully",
+      "deletedSuccess": "Integration deleted successfully",
+      "enableFailed": "Failed to enable integration",
+      "disableFailed": "Failed to disable integration",
+      "deleteFailed": "Failed to delete integration"
     }
   },
   "manage": {
-    "title": "Manage Custom Plugins",
-    "description": "View and manage your organization's custom plugins",
-    "headTitle": "Manage Custom Plugins - Hay Dashboard",
-    "uploadPlugin": "Upload Plugin",
+    "title": "Manage Custom Integrations",
+    "description": "View and manage your organization's custom integrations",
+    "headTitle": "Manage Custom Integrations - Hay Dashboard",
+    "uploadPlugin": "Upload Integration",
     "refresh": "Refresh",
     "stats": {
-      "customPlugins": "Custom Plugins",
+      "customPlugins": "Custom Integrations",
       "uploadedByOrg": "Uploaded by your organization",
       "enabled": "Enabled",
       "currentlyActive": "Currently active",
       "totalSize": "Total Size",
       "storageUsed": "Storage used"
     },
-    "loading": "Loading plugins...",
+    "loading": "Loading integrations...",
     "empty": {
-      "title": "No custom plugins",
-      "description": "Upload your first custom plugin to get started"
+      "title": "No custom integrations",
+      "description": "Upload your first custom integration to get started"
     },
     "table": {
-      "title": "Custom Plugins",
+      "title": "Custom Integrations",
       "version": "Version: {version}",
       "id": "ID: {id}",
       "uploaded": "Uploaded: {date}"
@@ -93,57 +93,57 @@
       "delete": "Delete",
       "deleting": "Deleting..."
     },
-    "confirmDelete": "Are you sure you want to delete this plugin? This action cannot be undone.",
+    "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
     "updateComingSoon": "Update functionality coming soon",
     "toast": {
-      "enabledSuccess": "Plugin enabled successfully",
-      "disabledSuccess": "Plugin disabled successfully",
-      "deletedSuccess": "Plugin deleted successfully",
-      "enableFailed": "Failed to enable plugin",
-      "disableFailed": "Failed to disable plugin",
-      "deleteFailed": "Failed to delete plugin"
+      "enabledSuccess": "Integration enabled successfully",
+      "disabledSuccess": "Integration disabled successfully",
+      "deletedSuccess": "Integration deleted successfully",
+      "enableFailed": "Failed to enable integration",
+      "disableFailed": "Failed to disable integration",
+      "deleteFailed": "Failed to delete integration"
     }
   },
   "upload": {
-    "title": "Upload Custom Plugin",
-    "description": "Upload a custom plugin to extend your platform",
-    "headTitle": "Upload Plugin - Hay Dashboard",
+    "title": "Upload Custom Integration",
+    "description": "Upload a custom integration to extend your platform",
+    "headTitle": "Upload Integration - Hay Dashboard",
     "backToMarketplace": "Back to Marketplace",
     "card": {
-      "title": "Upload Plugin ZIP",
-      "description": "Upload a ZIP file containing your custom plugin. The ZIP must include a manifest.json file in the root."
+      "title": "Upload Integration ZIP",
+      "description": "Upload a ZIP file containing your custom integration. The ZIP must include a manifest.json file in the root."
     },
     "file": {
-      "label": "Plugin File",
-      "dropHint": "Drop your plugin ZIP here or click to browse",
+      "label": "Integration File",
+      "dropHint": "Drop your integration ZIP here or click to browse",
       "maxSize": "Maximum file size: 50MB",
       "selectFile": "Select File",
       "remove": "Remove"
     },
     "success": {
-      "message": "Plugin uploaded successfully!",
+      "message": "Integration uploaded successfully!",
       "uploadAnother": "Upload Another",
       "viewMarketplace": "View Marketplace"
     },
     "progress": {
       "uploading": "Uploading...",
-      "uploadPlugin": "Upload Plugin"
+      "uploadPlugin": "Upload Integration"
     },
     "errors": {
       "title": "Upload Failed",
       "zipOnly": "Only ZIP files are allowed",
       "tooLarge": "File size exceeds 50MB limit",
-      "uploadFailed": "Failed to upload plugin"
+      "uploadFailed": "Failed to upload integration"
     },
     "requirements": {
-      "title": "Plugin Requirements",
+      "title": "Integration Requirements",
       "manifest": {
         "title": "Valid manifest.json",
         "description": "Must include a manifest.json file in the root with id, name, and version fields"
       },
       "pluginId": {
-        "title": "Valid plugin ID",
-        "description": "Plugin ID must contain only lowercase letters, numbers, and hyphens"
+        "title": "Valid integration ID",
+        "description": "Integration ID must contain only lowercase letters, numbers, and hyphens"
       },
       "zipFormat": {
         "title": "ZIP format",
@@ -155,25 +155,25 @@
       }
     },
     "toast": {
-      "uploadedSuccess": "Plugin {name} uploaded successfully!"
+      "uploadedSuccess": "Integration {name} uploaded successfully!"
     }
   },
   "pluginSettings": {
     "backToMarketplace": "Back to Marketplace",
-    "headTitle": "Plugin Settings - Hay Dashboard",
+    "headTitle": "Integration Settings - Hay Dashboard",
     "headTitleWithName": "{name} Settings - Hay Dashboard",
     "restartWorker": "Restart Worker",
     "restarting": "Restarting...",
-    "disablePlugin": "Disable Plugin",
+    "disablePlugin": "Disable Integration",
     "disabling": "Disabling...",
-    "enablePlugin": "Enable Plugin",
+    "enablePlugin": "Enable Integration",
     "disableConfirm": {
-      "title": "Disable Plugin?",
-      "description": "Are you sure you want to disable {name}? This will stop the plugin from being used in your organization.",
+      "title": "Disable Integration?",
+      "description": "Are you sure you want to disable {name}? This will stop the integration from being used in your organization.",
       "confirm": "Disable"
     },
     "error": {
-      "loadFailed": "Failed to load plugin",
+      "loadFailed": "Failed to load integration",
       "returnToMarketplace": "Return to Marketplace"
     },
     "connection": {
@@ -188,7 +188,7 @@
     "about": "About",
     "capabilities": {
       "title": "Capabilities",
-      "description": "What this plugin can do",
+      "description": "What this integration can do",
       "chatConnector": "Chat Connector",
       "sendMessages": "Send messages",
       "receiveMessages": "Receive messages",
@@ -222,12 +222,12 @@
     "toast": {
       "configSaved": "Configuration saved successfully",
       "configSaveFailed": "Failed to save configuration",
-      "enabledSuccess": "Plugin enabled successfully",
-      "enableFailed": "Failed to enable plugin",
-      "disabledSuccess": "Plugin disabled successfully",
-      "disableFailed": "Failed to disable plugin",
-      "restartedSuccess": "Plugin worker restarted successfully",
-      "restartFailed": "Failed to restart plugin",
+      "enabledSuccess": "Integration enabled successfully",
+      "enableFailed": "Failed to enable integration",
+      "disabledSuccess": "Integration disabled successfully",
+      "disableFailed": "Failed to disable integration",
+      "restartedSuccess": "Integration worker restarted successfully",
+      "restartFailed": "Failed to restart integration",
       "resetToEnv": "Reset to environment variable",
       "resetToEnvFailed": "Failed to reset to environment variable",
       "oauthSuccess": "OAuth connection established successfully",

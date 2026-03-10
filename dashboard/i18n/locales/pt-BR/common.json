@@ -55,6 +55,45 @@
     "enabled": "Ativado",
     "disabled": "Desativado",
     "takingLonger": "Isso está demorando mais do que o esperado.",
-    "refreshPage": "Atualizar a página"
+    "refreshPage": "Atualizar a página",
+    "goToDashboard": "Ir para o Painel",
+    "goBack": "Voltar",
+    "goToLogin": "Ir para o Login",
+    "previous": "Anterior",
+    "next": "Próximo",
+    "refresh": "Atualizar",
+    "processing": "Processando...",
+    "tryAgain": "Tentar Novamente",
+    "showing": "Mostrando {from} a {to} de {total}",
+    "viewDetails": "Ver Detalhes"
+  },
+  "unauthorized": {
+    "pageTitle": "Acesso Negado",
+    "pageDescription": "Você não tem permissão para acessar esta página",
+    "title": "Permissão Negada",
+    "description": "Você não tem as permissões necessárias para acessar esta página",
+    "requiresRole": "Esta página requer permissões de {role}. Seu cargo atual em {organization} é {currentRole}.",
+    "thisOrganization": "esta organização",
+    "whatYouCanDo": "O que você pode fazer:",
+    "contactAdmin": "Entre em contato com o administrador da sua organização para solicitar permissões elevadas",
+    "switchOrg": "Troque para uma organização diferente onde você tenha o acesso necessário",
+    "returnDashboard": "Volte ao painel para acessar funcionalidades disponíveis para seu cargo",
+    "roles": {
+      "adminOrOwner": "administrador ou proprietário",
+      "contributorAdminOrOwner": "colaborador, administrador ou proprietário",
+      "higher": "superior"
+    }
+  },
+  "createOrganization": {
+    "title": "Criar Organização",
+    "description": "Crie uma nova organização para gerenciar sua equipe e recursos.",
+    "nameLabel": "Nome da Organização",
+    "namePlaceholder": "Acme Corporation",
+    "createButton": "Criar Organização",
+    "nameRequired": "O nome da organização é obrigatório",
+    "nameLengthError": "O nome da organização deve ter entre 1 e 100 caracteres",
+    "successTitle": "Organização criada",
+    "successMessage": "{name} foi criada com sucesso",
+    "createFailed": "Falha ao criar organização"
   }
 }
