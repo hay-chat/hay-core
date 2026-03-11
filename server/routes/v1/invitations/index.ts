@@ -7,7 +7,7 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { emailService } from "@server/services/email.service";
+import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { getDashboardUrl } from "@server/config/env";
 import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { auditLogService } from "@server/services/audit-log.service";
@@ -40,6 +40,7 @@ async function sendInvitationEmail(
   token: string,
   expiresAt: Date,
   isNewUser: boolean,
+  organizationId: string,
   message?: string,
 ): Promise<void> {
   const dashboardUrl = getDashboardUrl();
@@ -55,10 +56,12 @@ async function sendInvitationEmail(
   // Ensure email service is initialized
   await emailService.initialize();
 
+  const locale = await getOrganizationLocale(organizationId);
+
   await emailService.sendTemplateEmail({
     template: "organization-invitation",
     to: email,
-    subject: `You've been invited to join ${organizationName}`,
+    locale,
     variables: {
       organizationName,
       inviterName,
@@ -192,6 +195,7 @@ export const invitationsRouter = t.router({
         token,
         invitation.expiresAt,
         !existingUser, // isNewUser: true if user doesn't exist yet
+        ctx.organizationId!,
         input.message,
       );
 
@@ -659,6 +663,7 @@ export const invitationsRouter = t.router({
         token,
         invitation.expiresAt,
         !invitation.invitedUserId, // isNewUser: true if invitedUserId is null
+        ctx.organizationId!,
         invitation.message,
       );
 

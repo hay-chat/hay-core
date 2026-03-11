@@ -1,7 +1,7 @@
 <template>
   <Page
-    title="Getting Started"
-    description="You’re just a few steps away from having Hay handle your repetitive support tasks so your team can focus on what truly matters — helping customers and growing your business."
+    :title="$t('dashboard.gettingStarted.title')"
+    :description="$t('dashboard.gettingStarted.description')"
     width="max"
   >
     <Loading v-if="loading" />
@@ -9,15 +9,15 @@
       <!-- Progress Overview -->
       <Card>
         <CardHeader>
-          <CardTitle>Onboarding Progress</CardTitle>
+          <CardTitle>{{ $t('dashboard.gettingStarted.progress.title') }}</CardTitle>
           <CardDescription>
-            {{ progress.completedSteps }} of {{ progress.totalSteps }} steps completed
+            {{ $t('dashboard.gettingStarted.progress.stepsCompleted', { completed: progress.completedSteps, total: progress.totalSteps }) }}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div class="space-y-2">
             <div class="flex items-center justify-between text-sm">
-              <span>{{ progress.progressPercentage }}% Complete</span>
+              <span>{{ $t('dashboard.gettingStarted.progress.percentComplete', { percent: progress.progressPercentage }) }}</span>
             </div>
             <div class="w-full bg-muted rounded-full h-2.5">
               <div
@@ -34,7 +34,7 @@
             <div class="flex items-center gap-2 text-green-700 dark:text-green-300">
               <CheckCircle2 class="w-5 h-5" />
               <span class="font-medium">
-                Congratulations! You've completed all onboarding steps.
+                {{ $t('dashboard.gettingStarted.progress.allCompleted') }}
               </span>
             </div>
           </div>
@@ -52,10 +52,10 @@
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg" :class="{ 'line-through': integrations?.completed }">
-                  Choose integrations
+                  {{ $t('dashboard.gettingStarted.integrations.title') }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  Connect your favorite tools and platforms to Hay
+                  {{ $t('dashboard.gettingStarted.integrations.subtitle') }}
                 </p>
               </div>
             </div>
@@ -63,14 +63,15 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                Hay works where your team already does — plug in apps like <strong>Zendesk</strong>,
-                <strong>Shopify</strong>, or <strong>WhatsApp</strong> in just a few clicks to start
-                syncing conversations automatically.
+                <i18n-t keypath="dashboard.gettingStarted.integrations.description" tag="span">
+                  <template #zendesk><strong>Zendesk</strong></template>
+                  <template #shopify><strong>Shopify</strong></template>
+                  <template #whatsapp><strong>WhatsApp</strong></template>
+                </i18n-t>
               </p>
 
               <div v-if="integrations && integrations.count > 0" class="text-sm">
-                <span class="font-medium">{{ integrations.count }}</span>
-                integrations connected
+                {{ $t('dashboard.gettingStarted.integrations.count', { count: integrations.count }) }}
               </div>
 
               <!-- Integration List -->
@@ -108,12 +109,12 @@
                   :variant="!integrations?.completed ? 'default' : 'outline'"
                   @click="navigateTo('/integrations/marketplace')"
                 >
-                  Browse All Integrations
+                  {{ $t('dashboard.gettingStarted.integrations.browseAll') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <Button href="https://hay.canny.io/" target="_blank" variant="outline">
                   <Lightbulb class="w-3 h-3 mr-2" />
-                  Suggest an Integration
+                  {{ $t('dashboard.gettingStarted.integrations.suggest') }}
                 </Button>
               </div>
             </div>
@@ -129,33 +130,31 @@
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg" :class="{ 'line-through': agent?.completed }">
-                  Create an agent
+                  {{ $t('dashboard.gettingStarted.agent.title') }}
                 </CardTitle>
-                <p class="text-sm text-neutral-muted">Your AI teammate starts here.</p>
+                <p class="text-sm text-neutral-muted">{{ $t('dashboard.gettingStarted.agent.subtitle') }}</p>
               </div>
             </div>
           </CardHeader>
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                Define your first Hay agent — give it a name, choose its tone, and decide which
-                channels it should handle.
+                {{ $t('dashboard.gettingStarted.agent.description') }}
               </p>
 
               <div v-if="agent && agent.count > 0" class="text-sm">
-                <span class="font-medium">{{ agent.count }}</span>
-                {{ agent.count === 1 ? "agent" : "agents" }} created
+                {{ agent.count === 1 ? $t('dashboard.gettingStarted.agent.countOne', { count: agent.count }) : $t('dashboard.gettingStarted.agent.countOther', { count: agent.count }) }}
               </div>
 
               <div v-if="!agent?.completed">
                 <Button @click="navigateTo('/agents/new?redirect=/getting-started')">
-                  Create Agent
+                  {{ $t('dashboard.gettingStarted.agent.createAgent') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/agents')">
-                  View Agents
+                  {{ $t('dashboard.gettingStarted.agent.viewAgents') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -181,10 +180,10 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('documents') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': documents?.completed }">
-                  Upload training documents
+                  {{ $t('dashboard.gettingStarted.documents.title') }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  Teach Hay just like you'd train a new team member.
+                  {{ $t('dashboard.gettingStarted.documents.subtitle') }}
                 </p>
               </div>
             </div>
@@ -192,13 +191,11 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                Upload your existing playbooks, FAQs, or process docs — Hay learns instantly and
-                never forgets.
+                {{ $t('dashboard.gettingStarted.documents.description') }}
               </p>
 
               <div v-if="documents && documents.count > 0" class="text-sm">
-                <span class="font-medium">{{ documents.count }}</span>
-                {{ documents.count === 1 ? "document" : "documents" }} uploaded
+                {{ documents.count === 1 ? $t('dashboard.gettingStarted.documents.countOne', { count: documents.count }) : $t('dashboard.gettingStarted.documents.countOther', { count: documents.count }) }}
               </div>
 
               <div v-if="!documents?.completed">
@@ -206,16 +203,16 @@
                   :disabled="isStepLocked('documents')"
                   @click="navigateTo('/documents/import?redirect=/getting-started')"
                 >
-                  Upload Documents
+                  {{ $t('dashboard.gettingStarted.documents.uploadDocuments') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('documents')" class="text-sm text-neutral-muted mt-2">
-                  Finish the previous steps before doing this. Hay will work better this way.
+                  {{ $t('dashboard.gettingStarted.documents.locked') }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/documents')">
-                  View Documents
+                  {{ $t('dashboard.gettingStarted.documents.viewDocuments') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -241,22 +238,20 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('playbook') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': playbook?.completed }">
-                  Create a playbook
+                  {{ $t('dashboard.gettingStarted.playbook.title') }}
                 </CardTitle>
-                <p class="text-sm text-neutral-muted">Automate common workflows and actions.</p>
+                <p class="text-sm text-neutral-muted">{{ $t('dashboard.gettingStarted.playbook.subtitle') }}</p>
               </div>
             </div>
           </CardHeader>
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                Playbooks let you design how Hay should respond, escalate, or perform tasks (like
-                refunds or order lookups) — all without code.
+                {{ $t('dashboard.gettingStarted.playbook.description') }}
               </p>
 
               <div v-if="playbook && playbook.count > 0" class="text-sm">
-                <span class="font-medium">{{ playbook.count }}</span>
-                {{ playbook.count === 1 ? "playbook" : "playbooks" }} created
+                {{ playbook.count === 1 ? $t('dashboard.gettingStarted.playbook.countOne', { count: playbook.count }) : $t('dashboard.gettingStarted.playbook.countOther', { count: playbook.count }) }}
               </div>
 
               <div v-if="!playbook?.completed">
@@ -264,16 +259,16 @@
                   :disabled="isStepLocked('playbook')"
                   @click="navigateTo('/playbooks/new?redirect=/getting-started')"
                 >
-                  Create Playbook
+                  {{ $t('dashboard.gettingStarted.playbook.createPlaybook') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('playbook')" class="text-sm text-neutral-muted mt-2">
-                  Finish the previous steps before doing this. Hay will work better this way.
+                  {{ $t('dashboard.gettingStarted.playbook.locked') }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/playbooks')">
-                  View Playbooks
+                  {{ $t('dashboard.gettingStarted.playbook.viewPlaybooks') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -299,10 +294,10 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('playground') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': playground?.completed }">
-                  Test the agent in a playground chat
+                  {{ $t('dashboard.gettingStarted.playground.title') }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  See your agent in action before going live.
+                  {{ $t('dashboard.gettingStarted.playground.subtitle') }}
                 </p>
               </div>
             </div>
@@ -310,13 +305,11 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                Use the built-in playground to test how Hay responds, tweak instructions, and
-                perfect the experience before connecting to real customers.
+                {{ $t('dashboard.gettingStarted.playground.description') }}
               </p>
 
               <div v-if="playground && playground.count > 0" class="text-sm">
-                <span class="font-medium">{{ playground.count }}</span>
-                {{ playground.count === 1 ? "conversation" : "conversations" }} started
+                {{ playground.count === 1 ? $t('dashboard.gettingStarted.playground.countOne', { count: playground.count }) : $t('dashboard.gettingStarted.playground.countOther', { count: playground.count }) }}
               </div>
 
               <div v-if="!playground?.completed">
@@ -324,16 +317,16 @@
                   :disabled="isStepLocked('playground')"
                   @click="navigateTo('/conversations')"
                 >
-                  Start Playground Chat
+                  {{ $t('dashboard.gettingStarted.playground.startChat') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('playground')" class="text-sm text-neutral-muted mt-2">
-                  Finish the previous steps before doing this. Hay will work better this way.
+                  {{ $t('dashboard.gettingStarted.playground.locked') }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/conversations')">
-                  View Conversations
+                  {{ $t('dashboard.gettingStarted.playground.viewConversations') }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>

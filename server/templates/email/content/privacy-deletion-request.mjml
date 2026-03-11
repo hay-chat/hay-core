@@ -1,8 +1,7 @@
-<!-- subject: Verify Your Data Deletion Request -->
 <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="20px">
   <mj-column width="100%">
     <mj-text align="center" color="#d32f2f" font-size="24px" font-weight="bold" padding-bottom="10px">
-      ⚠️ Verify Data Deletion Request
+      {{ t.privacy-deletion-request.title }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -10,23 +9,23 @@
 <mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
   <mj-column width="100%">
     <mj-text color="#555555" font-size="16px" line-height="24px">
-      Hi {{userName}},
+      {{ t.common.hi }}
     </mj-text>
 
     <mj-text color="#555555" font-size="16px" line-height="24px">
-      We received a request to permanently delete your account and personal data from {{companyName}}. This is a serious action that cannot be undone.
+      {{ t.privacy-deletion-request.body }}
     </mj-text>
 
     <mj-text color="#d32f2f" font-size="16px" font-weight="bold" line-height="24px" padding-top="10px">
-      ⚠️ WARNING: This action is permanent and irreversible
+      {{ t.privacy-deletion-request.warning }}
     </mj-text>
 
     <mj-button background-color="#d32f2f" color="#ffffff" href="{{verificationUrl}}" padding-top="20px" padding-bottom="20px">
-      Confirm Data Deletion
+      {{ t.privacy-deletion-request.confirmButton }}
     </mj-button>
 
     <mj-text color="#555555" font-size="14px" line-height="20px" padding-top="10px">
-      Or copy and paste this link into your browser:
+      {{ t.common.copyPasteLink }}
     </mj-text>
 
     <mj-text color="#0066ff" font-size="12px" line-height="18px" padding-bottom="20px">
@@ -36,23 +35,23 @@
     <mj-divider border-color="#e0e0e0" border-width="1px" />
 
     <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px">
-      <strong>What will be deleted:</strong>
+      <strong>{{ t.privacy-deletion-request.whatWillBeDeleted }}</strong>
     </mj-text>
 
     <mj-text color="#555555" font-size="14px" line-height="20px">
-      • Your account will be permanently deactivated<br/>
-      • All API keys will be revoked<br/>
-      • Personal information will be anonymized<br/>
-      • Account audit logs will be retained (anonymized) for compliance<br/>
-      • This verification link will expire in {{expiresIn}}
+      • {{ t.privacy-deletion-request.deleted1 }}<br/>
+      • {{ t.privacy-deletion-request.deleted2 }}<br/>
+      • {{ t.privacy-deletion-request.deleted3 }}<br/>
+      • {{ t.privacy-deletion-request.deleted4 }}<br/>
+      • {{ t.privacy-deletion-request.deleted5 }}
     </mj-text>
 
     <mj-text color="#d32f2f" font-size="14px" font-weight="bold" line-height="20px" padding-top="20px">
-      Important: If you didn't request this deletion, please ignore this email and contact support immediately.
+      {{ t.privacy-deletion-request.didntRequest }}
     </mj-text>
 
     <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px" padding-bottom="20px">
-      Need help or have questions? Contact us at <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
+      {{ t.common.needHelp }} <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
     </mj-text>
   </mj-column>
 </mj-section>

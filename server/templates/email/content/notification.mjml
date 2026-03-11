@@ -43,7 +43,7 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     {{#if userName}}
-    <mj-text color="#555555" line-height="24px"> Hi {{ userName }}, </mj-text>
+    <mj-text color="#555555" line-height="24px"> {{ t.common.hi }} </mj-text>
     {{/if}}
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
@@ -59,7 +59,7 @@
       font-size="14px"
       line-height="20px"
     >
-      <strong>Action Required:</strong> {{ actionMessage }}
+      <strong>{{ t.common.actionRequired }}</strong> {{ actionMessage }}
     </mj-text>
     {{/if}}
   </mj-column>
@@ -69,7 +69,7 @@
 <mj-section background-color="#f8f9fa" padding="20px 25px">
   <mj-column>
     <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 15px 0">
-      Details
+      {{ t.notification.details }}
     </mj-text>
     {{#each details}}
     <mj-text color="#555555" font-size="14px" line-height="20px" padding="5px 0">
@@ -112,7 +112,7 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 10px 0">
-      Related Items
+      {{ t.notification.relatedItems }}
     </mj-text>
     {{#each relatedItems}}
     <mj-text color="#555555" line-height="32px" padding="5px 0 5px 20px">
@@ -130,9 +130,9 @@
   <mj-column>
     <mj-divider border-color="#e9ecef" border-width="1px" padding="0 0 20px 0" />
     <mj-text font-size="14px" color="#666666" line-height="20px">
-      You're receiving this notification because {{ notificationReason }}.
+      {{ t.notification.receivingBecause }}
       <a href="{{notificationSettings.url}}" style="color: #001af4; text-decoration: none"
-        >Manage notification preferences</a
+        >{{ t.notification.managePreferences }}</a
       >
     </mj-text>
   </mj-column>
@@ -143,14 +143,14 @@
   <mj-column>
     <mj-text color="#555555" line-height="24px">
       {{#if supportContact}}
-      If you have any questions, please contact us at
+      {{ t.notification.questionsContact }}
       <a href="mailto:{{supportEmail}}" style="color: #001af4; text-decoration: none">{{
         supportEmail
       }}</a
       ><br /><br />
       {{/if}}
-      Best regards,<br />
-      The {{ companyName }} Team
+      {{ t.common.bestRegards }}<br />
+      {{ t.common.theTeam }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -158,7 +158,7 @@
 {{#if timestamp}}
 <mj-section background-color="#f8f9fa" padding="15px 25px">
   <mj-column>
-    <mj-text align="center" color="#666666" font-size="12px"> Sent on {{ timestamp }} </mj-text>
+    <mj-text align="center" color="#666666" font-size="12px"> {{ t.notification.sentOn }} </mj-text>
   </mj-column>
 </mj-section>
 {{/if}}

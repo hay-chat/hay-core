@@ -1,9 +1,9 @@
 <template>
-  <Page title="Create Playbook" description="Follow the steps to create a new playbook">
+  <Page :title="t('wizard.title')" :description="t('wizard.description')">
     <template #header>
       <Button variant="ghost" @click="handleCancel">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        Back to list
+        {{ t('actions.backToList') }}
       </Button>
     </template>
 
@@ -78,25 +78,25 @@
     <!-- Navigation Bar -->
     <div class="flex items-center justify-between">
       <Button v-if="!stepper.isFirst.value" variant="outline" @click="stepper.goToPrevious()">
-        Previous
+        {{ t('actions.previous') }}
       </Button>
       <div v-else />
 
       <Button v-if="!stepper.isLast.value" :disabled="!canProceed" @click="stepper.goToNext()">
-        Continue
+        {{ t('actions.continue') }}
       </Button>
 
       <Button v-else :disabled="!canProceed" :loading="creating" @click="handleCreate">
-        Create Playbook & Open Editor
+        {{ t('actions.createPlaybookOpenEditor') }}
       </Button>
     </div>
 
     <!-- Cancel Confirmation Dialog -->
     <ConfirmDialog
       v-model:open="showCancelDialog"
-      title="Leave wizard?"
-      description="Your progress will be lost. Are you sure you want to leave?"
-      confirm-text="Leave"
+      :title="t('wizard.cancelDialog.title')"
+      :description="t('wizard.cancelDialog.description')"
+      :confirm-text="t('actions.leave')"
       :destructive="true"
       @confirm="confirmCancel"
     />
@@ -106,14 +106,14 @@
       <DialogContent :hide-close="true">
         <DialogHeader>
           <img src="/bale/rocket.png" alt="Playbook Created" class="w-96 h-96 m-auto" />
-          <DialogTitle>Playbook Created</DialogTitle>
+          <DialogTitle>{{ t('wizard.successDialog.title') }}</DialogTitle>
           <DialogDescription>
-            Your playbook has been created successfully. What would you like to do next?
+            {{ t('wizard.successDialog.description') }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="goToPlaybooks">View All Playbooks</Button>
-          <Button @click="goToEditor">Continue Editing</Button>
+          <Button variant="outline" @click="goToPlaybooks">{{ t('actions.viewAllPlaybooks') }}</Button>
+          <Button @click="goToEditor">{{ t('actions.continueEditing') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -132,17 +132,18 @@ import { markdownToTiptapJSON } from "@/utils/markdownToTiptap";
 
 type StepId = "purpose" | "actions" | "documents" | "boundaries" | "generate";
 
+const { t } = useI18n();
 const router = useRouter();
 const toast = useToast();
 
 // --- Stepper ---
-const stepsMeta = [
-  { id: "purpose" as const, label: "Purpose" },
-  { id: "actions" as const, label: "Actions" },
-  { id: "documents" as const, label: "Documents" },
-  { id: "boundaries" as const, label: "Boundaries" },
-  { id: "generate" as const, label: "Generate" },
-];
+const stepsMeta = computed(() => [
+  { id: "purpose" as const, label: t('wizard.steps.purpose') },
+  { id: "actions" as const, label: t('wizard.steps.actions') },
+  { id: "documents" as const, label: t('wizard.steps.documents') },
+  { id: "boundaries" as const, label: t('wizard.steps.boundaries') },
+  { id: "generate" as const, label: t('wizard.steps.generate') },
+]);
 
 const stepper = useStepper(["purpose", "actions", "documents", "boundaries", "generate"]);
 
@@ -223,7 +224,7 @@ async function handleGenerate() {
     generatedResult.value = result as GeneratedResult;
   } catch (error) {
     console.error("Failed to generate instructions:", error);
-    toast.error("Failed to generate instructions. Please try again.");
+    toast.error(t('toast.generateFailed'));
   } finally {
     generating.value = false;
   }
@@ -250,7 +251,7 @@ async function handleCreate() {
     showSuccessDialog.value = true;
   } catch (error) {
     console.error("Failed to create playbook:", error);
-    toast.error("Failed to create playbook. Please try again.");
+    toast.error(t('toast.createFailed'));
   } finally {
     creating.value = false;
   }
@@ -332,6 +333,6 @@ definePageMeta({
 });
 
 useHead({
-  title: "Create Playbook - Hay Dashboard",
+  title: t('wizard.headTitle'),
 });
 </script>

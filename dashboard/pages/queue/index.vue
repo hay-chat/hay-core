@@ -3,15 +3,15 @@
     <!-- Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-foreground">Job Queue</h1>
+        <h1 class="text-2xl font-bold text-foreground">{{ $t("queue.title") }}</h1>
         <p class="mt-1 text-sm text-neutral-muted">
-          Monitor and manage background jobs and processing tasks.
+          {{ $t("queue.description") }}
         </p>
       </div>
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
-          Refresh
+          {{ $t("common.refresh") }}
         </Button>
       </div>
     </div>
@@ -22,7 +22,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Pending</p>
+              <p class="text-sm text-neutral-muted">{{ $t("queue.stats.pending") }}</p>
               <p class="text-2xl font-bold text-yellow-600">
                 {{ stats.pending || 0 }}
               </p>
@@ -36,7 +36,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Processing</p>
+              <p class="text-sm text-neutral-muted">{{ $t("queue.stats.processing") }}</p>
               <p class="text-2xl font-bold text-blue-600">
                 {{ stats.processing || 0 }}
               </p>
@@ -50,7 +50,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Completed</p>
+              <p class="text-sm text-neutral-muted">{{ $t("queue.stats.completed") }}</p>
               <p class="text-2xl font-bold text-green-600">
                 {{ stats.completed || 0 }}
               </p>
@@ -64,7 +64,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Failed</p>
+              <p class="text-sm text-neutral-muted">{{ $t("queue.stats.failed") }}</p>
               <p class="text-2xl font-bold text-red-600">
                 {{ stats.failed || 0 }}
               </p>
@@ -84,7 +84,7 @@
           />
           <Input
             v-model="searchQuery"
-            placeholder="Search jobs by type or ID..."
+            :placeholder="$t('queue.filters.searchPlaceholder')"
             class="pl-10"
             @input="handleSearch"
           />
@@ -96,26 +96,26 @@
           class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           @change="applyFilters"
         >
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="queued">Queued</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="retrying">Retrying</option>
+          <option value="">{{ $t("queue.filters.allStatus") }}</option>
+          <option value="pending">{{ $t("queue.filters.statusPending") }}</option>
+          <option value="queued">{{ $t("queue.filters.statusQueued") }}</option>
+          <option value="processing">{{ $t("queue.filters.statusProcessing") }}</option>
+          <option value="completed">{{ $t("queue.filters.statusCompleted") }}</option>
+          <option value="failed">{{ $t("queue.filters.statusFailed") }}</option>
+          <option value="cancelled">{{ $t("queue.filters.statusCancelled") }}</option>
+          <option value="retrying">{{ $t("queue.filters.statusRetrying") }}</option>
         </select>
         <select
           v-model="typeFilter"
           class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           @change="applyFilters"
         >
-          <option value="">All Types</option>
-          <option value="document_upload">Document Upload</option>
-          <option value="document_processing">Document Processing</option>
-          <option value="email">Email</option>
-          <option value="export">Export</option>
-          <option value="import">Import</option>
+          <option value="">{{ $t("queue.filters.allTypes") }}</option>
+          <option value="document_upload">{{ $t("queue.filters.typeDocumentUpload") }}</option>
+          <option value="document_processing">{{ $t("queue.filters.typeDocumentProcessing") }}</option>
+          <option value="email">{{ $t("queue.filters.typeEmail") }}</option>
+          <option value="export">{{ $t("queue.filters.typeExport") }}</option>
+          <option value="import">{{ $t("queue.filters.typeImport") }}</option>
         </select>
       </div>
     </div>
@@ -125,13 +125,13 @@
       <CardContent class="p-0">
         <div v-if="loading && !jobs.length" class="p-8 text-center">
           <Loader2 class="mx-auto h-8 w-8 animate-spin text-neutral-muted" />
-          <p class="mt-2 text-sm text-neutral-muted">Loading jobs...</p>
+          <p class="mt-2 text-sm text-neutral-muted">{{ $t("queue.table.loadingJobs") }}</p>
         </div>
 
         <div v-else-if="!jobs.length" class="p-8 text-center">
           <Inbox class="mx-auto h-12 w-12 text-neutral-muted" />
-          <h3 class="mt-2 text-sm text-foreground">No jobs found</h3>
-          <p class="mt-1 text-sm text-neutral-muted">There are no jobs matching your filters.</p>
+          <h3 class="mt-2 text-sm text-foreground">{{ $t("queue.table.noJobsFound") }}</h3>
+          <p class="mt-1 text-sm text-neutral-muted">{{ $t("queue.table.noJobsMatchingFilters") }}</p>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -141,42 +141,42 @@
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Job ID
+                  {{ $t("queue.table.jobId") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Type
+                  {{ $t("queue.table.type") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Status
+                  {{ $t("queue.table.status") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Priority
+                  {{ $t("queue.table.priority") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Progress
+                  {{ $t("queue.table.progress") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Created
+                  {{ $t("queue.table.created") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Duration
+                  {{ $t("queue.table.duration") }}
                 </th>
                 <th
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-muted uppercase tracking-wider"
                 >
-                  Actions
+                  {{ $t("queue.table.actions") }}
                 </th>
               </tr>
             </thead>
@@ -231,7 +231,7 @@
                     <Button
                       variant="ghost"
                       size="sm"
-                      title="View Details"
+                      :title="$t('common.viewDetails')"
                       @click="viewJobDetails(job)"
                     >
                       <Eye class="h-4 w-4" />
@@ -245,7 +245,7 @@
                       "
                       variant="ghost"
                       size="sm"
-                      title="Retry Job"
+                      :title="$t('queue.table.retryJob')"
                       @click="retryJob(job)"
                     >
                       <RotateCw class="h-4 w-4" />
@@ -254,7 +254,7 @@
                       v-if="['pending', 'queued', 'processing'].includes(job.status)"
                       variant="ghost"
                       size="sm"
-                      title="Cancel Job"
+                      :title="$t('queue.table.cancelJob')"
                       @click="cancelJob(job)"
                     >
                       <X class="h-4 w-4" />
@@ -270,8 +270,7 @@
         <div v-if="totalPages > 1" class="px-6 py-4 border-t">
           <div class="flex items-center justify-between">
             <p class="text-sm text-neutral-muted">
-              Showing {{ (currentPage - 1) * pageSize + 1 }} to
-              {{ Math.min(currentPage * pageSize, totalJobs) }} of {{ totalJobs }} jobs
+              {{ $t("queue.pagination.showingJobs", { from: (currentPage - 1) * pageSize + 1, to: Math.min(currentPage * pageSize, totalJobs), total: totalJobs }) }}
             </p>
             <div class="flex space-x-2">
               <Button
@@ -280,7 +279,7 @@
                 :disabled="currentPage === 1"
                 @click="goToPage(currentPage - 1)"
               >
-                Previous
+                {{ $t("common.previous") }}
               </Button>
               <Button
                 variant="outline"
@@ -288,7 +287,7 @@
                 :disabled="currentPage === totalPages"
                 @click="goToPage(currentPage + 1)"
               >
-                Next
+                {{ $t("common.next") }}
               </Button>
             </div>
           </div>
@@ -300,52 +299,52 @@
     <Dialog v-model:open="showDetailsModal">
       <DialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Job Details</DialogTitle>
+          <DialogTitle>{{ $t("queue.details.title") }}</DialogTitle>
         </DialogHeader>
         <div v-if="selectedJob" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <p class="text-sm font-medium text-neutral-muted">ID</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.id") }}</p>
               <code class="text-xs bg-background-tertiary px-2 py-1 rounded">{{
                 selectedJob.id
               }}</code>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">Type</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.type") }}</p>
               <p class="text-sm">
                 {{ formatJobType(selectedJob.type) }}
               </p>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">Status</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.status") }}</p>
               <Badge :variant="getStatusVariant(selectedJob.status)">
                 {{ selectedJob.status }}
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">Priority</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.priority") }}</p>
               <Badge :variant="getPriorityVariant(selectedJob.priority)">
                 {{ getPriorityLabel(selectedJob.priority) }}
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">Attempts</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.attempts") }}</p>
               <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.max_attempts }}</p>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">Created</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.created") }}</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.created_at, true) }}
               </p>
             </div>
             <div v-if="selectedJob.started_at">
-              <p class="text-sm font-medium text-neutral-muted">Started</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.started") }}</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.started_at, true) }}
               </p>
             </div>
             <div v-if="selectedJob.completed_at">
-              <p class="text-sm font-medium text-neutral-muted">Completed</p>
+              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.completed") }}</p>
               <p class="text-sm">
                 {{ formatDate(selectedJob.completed_at, true) }}
               </p>
@@ -353,21 +352,21 @@
           </div>
 
           <div v-if="selectedJob.payload" class="space-y-2">
-            <p class="text-sm font-medium text-neutral-muted">Payload</p>
+            <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.payload") }}</p>
             <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
               JSON.stringify(selectedJob.payload, null, 2)
             }}</pre>
           </div>
 
           <div v-if="selectedJob.result" class="space-y-2">
-            <p class="text-sm font-medium text-neutral-muted">Result</p>
+            <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.result") }}</p>
             <pre class="bg-background-tertiary p-3 rounded text-xs overflow-x-auto">{{
               JSON.stringify(selectedJob.result, null, 2)
             }}</pre>
           </div>
 
           <div v-if="selectedJob.error" class="space-y-2">
-            <p class="text-sm font-medium text-neutral-muted">Error</p>
+            <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.error") }}</p>
             <div class="bg-destructive/10 border border-destructive/20 p-3 rounded">
               <p class="text-sm text-destructive">
                 {{ selectedJob.error }}
@@ -376,7 +375,7 @@
           </div>
 
           <div v-if="(selectedJob as any).metadata?.logs" class="space-y-2">
-            <p class="text-sm font-medium text-neutral-muted">Logs</p>
+            <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.logs") }}</p>
             <div class="bg-background-tertiary p-3 rounded max-h-48 overflow-y-auto">
               <p
                 v-for="(log, index) in (selectedJob as any).metadata.logs"
@@ -394,6 +393,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import {
   Activity,
   CheckCircle,
@@ -409,6 +409,8 @@ import {
 } from "lucide-vue-next";
 import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/websocket";
 import type { Job } from "~/types/job";
+
+const { t } = useI18n();
 
 // State
 const loading = ref(false);
@@ -477,17 +479,22 @@ const getStatusVariant = (status: string): "default" | "secondary" | "destructiv
     pending: "secondary",
     queued: "secondary",
     processing: "default",
-    completed: "default", // Changed from 'success' to 'default' since Badge doesn't have success variant
+    completed: "default",
     failed: "destructive",
     cancelled: "outline",
-    retrying: "secondary", // Changed from 'warning' to 'secondary' since Badge doesn't have warning variant
+    retrying: "secondary",
   };
   return variants[status] || "default";
 };
 
 const getPriorityLabel = (priority: number) => {
-  const labels = ["Low", "Normal", "High", "Critical"];
-  return labels[priority] || "Unknown";
+  const labels = [
+    t("queue.priority.low"),
+    t("queue.priority.normal"),
+    t("queue.priority.high"),
+    t("queue.priority.critical"),
+  ];
+  return labels[priority] || t("queue.priority.unknown");
 };
 
 const getPriorityVariant = (

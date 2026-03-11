@@ -55,6 +55,45 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "takingLonger": "This is taking longer than expected.",
-    "refreshPage": "Refresh the page"
+    "refreshPage": "Refresh the page",
+    "goToDashboard": "Go to Dashboard",
+    "goBack": "Go Back",
+    "goToLogin": "Go to Login",
+    "previous": "Previous",
+    "next": "Next",
+    "refresh": "Refresh",
+    "processing": "Processing...",
+    "tryAgain": "Try Again",
+    "showing": "Showing {from} to {to} of {total}",
+    "viewDetails": "View Details"
+  },
+  "unauthorized": {
+    "pageTitle": "Access Denied",
+    "pageDescription": "You don't have permission to access this page",
+    "title": "Permission Denied",
+    "description": "You don't have the necessary permissions to access this page",
+    "requiresRole": "This page requires {role} permissions. Your current role in {organization} is {currentRole}.",
+    "thisOrganization": "this organization",
+    "whatYouCanDo": "What you can do:",
+    "contactAdmin": "Contact your organization admin to request elevated permissions",
+    "switchOrg": "Switch to a different organization where you have the required access",
+    "returnDashboard": "Return to the dashboard to access features available to your role",
+    "roles": {
+      "adminOrOwner": "admin or owner",
+      "contributorAdminOrOwner": "contributor, admin, or owner",
+      "higher": "higher"
+    }
+  },
+  "createOrganization": {
+    "title": "Create Organization",
+    "description": "Create a new organization to manage your team and resources.",
+    "nameLabel": "Organization Name",
+    "namePlaceholder": "Acme Corporation",
+    "createButton": "Create Organization",
+    "nameRequired": "Organization name is required",
+    "nameLengthError": "Organization name must be between 1 and 100 characters",
+    "successTitle": "Organization created",
+    "successMessage": "{name} has been created successfully",
+    "createFailed": "Failed to create organization"
   }
 }

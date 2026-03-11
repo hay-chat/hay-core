@@ -1,10 +1,10 @@
 <template>
-  <Page :title="document?.title || 'Document Preview'" :description="document?.description || ''">
+  <Page :title="document?.title || $t('documents.detail.documentPreview')" :description="document?.description || ''">
     <template #header>
       <div class="flex items-center gap-3">
         <Button variant="ghost" @click="router.push('/documents')">
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Back to Documents
+          {{ $t('documents.detail.backToDocuments') }}
         </Button>
 
         <template v-if="document">
@@ -15,7 +15,7 @@
             @click="visitSource"
           >
             <ExternalLink class="h-4 w-4 mr-2" />
-            Visit Source
+            {{ $t('documents.detail.visitSource') }}
           </Button>
         </template>
       </div>
@@ -23,17 +23,17 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-12">
-      <Loading label="Loading document..." />
+      <Loading :label="$t('documents.detail.loadingDocument')" />
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="flex flex-col items-center justify-center py-24 text-center">
       <AlertCircle class="h-12 w-12 text-red-500 mb-4" />
-      <p class="text-lg font-medium text-foreground">Failed to load document</p>
+      <p class="text-lg font-medium text-foreground">{{ $t('documents.detail.failedToLoad') }}</p>
       <p class="text-sm text-neutral-muted mt-1">{{ error }}</p>
       <div class="flex gap-3 mt-6">
-        <Button variant="outline" @click="router.push('/documents')">Back to Documents</Button>
-        <Button @click="fetchDocument">Try Again</Button>
+        <Button variant="outline" @click="router.push('/documents')">{{ $t('documents.detail.backButton') }}</Button>
+        <Button @click="fetchDocument">{{ $t('documents.detail.tryAgain') }}</Button>
       </div>
     </div>
 
@@ -63,17 +63,17 @@
         </Badge>
         <Badge v-if="document.sourceUrl" variant="outline" class="gap-1">
           <Globe class="h-3 w-3" />
-          Web Import
+          {{ $t('documents.detail.webImport') }}
         </Badge>
 
         <span v-if="document.updatedAt" class="text-xs text-neutral-muted ml-auto">
-          Last updated {{ formatDate(document.updatedAt) }}
+          {{ $t('documents.detail.lastUpdated', { date: formatDate(document.updatedAt) }) }}
         </span>
       </div>
 
       <!-- Source URL -->
       <div v-if="document.sourceUrl" class="text-sm">
-        <span class="text-neutral-muted">Source:</span>
+        <span class="text-neutral-muted">{{ $t('documents.detail.source') }}</span>
         <a
           :href="document.sourceUrl"
           target="_blank"
@@ -97,7 +97,7 @@
           <div class="document-page-content">
             <div v-if="document.content" v-html="renderedContent" />
             <div v-else class="text-neutral-muted italic py-8 text-center">
-              No content available for this document.
+              {{ $t('documents.detail.noContent') }}
             </div>
           </div>
         </CardContent>
@@ -121,6 +121,8 @@ import {
   Globe,
   ExternalLink,
 } from "lucide-vue-next";
+
+const { t } = useI18n();
 
 interface DocumentDetail {
   id: string;
@@ -200,7 +202,7 @@ const fetchDocument = async () => {
     document.value = result as DocumentDetail;
   } catch (err) {
     console.error("Failed to fetch document:", err);
-    error.value = err instanceof Error ? err.message : "Failed to load document";
+    error.value = err instanceof Error ? err.message : t("documents.detail.failedToLoad");
   } finally {
     loading.value = false;
   }
@@ -214,13 +216,13 @@ onMounted(() => {
 useHead({
   title: computed(() =>
     document.value?.title
-      ? `${document.value.title} - Documents - Hay Dashboard`
-      : "Document - Hay Dashboard",
+      ? t("documents.detail.seoTitle", { title: document.value.title })
+      : t("documents.detail.seoTitleDefault"),
   ),
   meta: [
     {
       name: "description",
-      content: computed(() => document.value?.description || "View document details"),
+      content: computed(() => document.value?.description || t("documents.detail.seoDescription")),
     },
   ],
 });

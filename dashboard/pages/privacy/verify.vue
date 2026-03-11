@@ -25,7 +25,7 @@
       <CardContent class="space-y-4">
         <!-- Loading State -->
         <div v-if="loading" class="text-center space-y-2">
-          <p class="text-neutral-muted">Processing your request...</p>
+          <p class="text-neutral-muted">{{ $t("privacyVerify.processingRequest") }}</p>
           <div class="flex justify-center">
             <div class="w-48 h-2 bg-neutral-200 rounded-full overflow-hidden">
               <div class="h-full bg-blue-600 animate-pulse"></div>
@@ -36,26 +36,25 @@
         <!-- Success State -->
         <div v-else-if="success" class="space-y-4">
           <Alert :icon="Mail">
-            <AlertTitle>Request Confirmed</AlertTitle>
+            <AlertTitle>{{ $t("privacyVerify.requestConfirmed") }}</AlertTitle>
             <AlertDescription>{{ successMessage }}</AlertDescription>
           </Alert>
 
           <div v-if="requestType === 'export'" class="space-y-2">
-            <h4 class="font-medium">What happens next?</h4>
+            <h4 class="font-medium">{{ $t("privacyVerify.whatHappensNext") }}</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>We're generating your data export (typically takes less than 5 minutes)</li>
-              <li>You'll receive an email with a download link when it's ready</li>
-              <li>The download link will be valid for 7 days</li>
+              <li>{{ $t("privacyVerify.exportStep1") }}</li>
+              <li>{{ $t("privacyVerify.exportStep2") }}</li>
+              <li>{{ $t("privacyVerify.exportStep3") }}</li>
             </ul>
           </div>
 
           <div v-else-if="requestType === 'deletion'" class="space-y-2">
             <Alert variant="destructive">
               <AlertTriangle class="h-4 w-4" />
-              <AlertTitle>Account Deletion in Progress</AlertTitle>
+              <AlertTitle>{{ $t("privacyVerify.deletionInProgress") }}</AlertTitle>
               <AlertDescription>
-                Your account and data are being permanently deleted. You'll receive a confirmation
-                email when the process is complete.
+                {{ $t("privacyVerify.deletionDescription") }}
               </AlertDescription>
             </Alert>
           </div>
@@ -63,7 +62,7 @@
           <div class="flex justify-center pt-4">
             <Button @click="goToDashboard">
               <Home class="h-4 w-4 mr-2" />
-              Go to Dashboard
+              {{ $t("common.goToDashboard") }}
             </Button>
           </div>
         </div>
@@ -72,27 +71,27 @@
         <div v-else-if="error" class="space-y-4">
           <Alert variant="destructive">
             <AlertTriangle class="h-4 w-4" />
-            <AlertTitle>Verification Failed</AlertTitle>
+            <AlertTitle>{{ $t("privacyVerify.verificationFailed") }}</AlertTitle>
             <AlertDescription>{{ errorMessage }}</AlertDescription>
           </Alert>
 
           <div class="space-y-2">
-            <h4 class="font-medium">Common issues:</h4>
+            <h4 class="font-medium">{{ $t("privacyVerify.commonIssues") }}</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>The verification link may have expired (valid for 24 hours)</li>
-              <li>The link may have already been used</li>
-              <li>The link may be invalid or corrupted</li>
+              <li>{{ $t("privacyVerify.linkExpired") }}</li>
+              <li>{{ $t("privacyVerify.linkUsed") }}</li>
+              <li>{{ $t("privacyVerify.linkInvalid") }}</li>
             </ul>
           </div>
 
           <div class="flex justify-center space-x-2 pt-4">
             <Button variant="outline" @click="goToDashboard">
               <Home class="h-4 w-4 mr-2" />
-              Go to Dashboard
+              {{ $t("common.goToDashboard") }}
             </Button>
             <Button @click="requestNewLink">
               <RefreshCw class="h-4 w-4 mr-2" />
-              Request New Link
+              {{ $t("privacyVerify.requestNewLink") }}
             </Button>
           </div>
         </div>
@@ -104,6 +103,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import {
   Shield,
@@ -121,6 +121,7 @@ definePageMeta({
   public: true,
 });
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
@@ -135,23 +136,23 @@ const token = computed(() => route.query.token as string);
 const type = computed(() => route.query.type as string);
 
 const title = computed(() => {
-  if (loading.value) return "Verifying Request...";
-  if (success.value) return "Request Confirmed!";
-  if (error.value) return "Verification Failed";
-  return "Privacy Request Verification";
+  if (loading.value) return t("privacyVerify.loadingTitle");
+  if (success.value) return t("privacyVerify.successTitle");
+  if (error.value) return t("privacyVerify.errorTitle");
+  return t("privacyVerify.defaultTitle");
 });
 
 const description = computed(() => {
-  if (loading.value) return "Please wait while we verify your privacy request";
+  if (loading.value) return t("privacyVerify.loadingDescription");
   if (success.value) {
     if (requestType.value === "export") {
-      return "Your data export request has been confirmed and is being processed";
+      return t("privacyVerify.successDescriptionExport");
     } else {
-      return "Your account deletion request has been confirmed";
+      return t("privacyVerify.successDescriptionDeletion");
     }
   }
-  if (error.value) return "We couldn't verify your privacy request";
-  return "Confirm your privacy request";
+  if (error.value) return t("privacyVerify.errorDescription");
+  return t("privacyVerify.defaultDescription");
 });
 
 const verifyRequest = async () => {

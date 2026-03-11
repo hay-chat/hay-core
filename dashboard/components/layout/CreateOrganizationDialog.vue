@@ -2,23 +2,25 @@
   <Dialog v-model:open="isOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Create Organization</DialogTitle>
+        <DialogTitle>{{ $t("createOrganization.title") }}</DialogTitle>
         <DialogDescription>
-          Create a new organization to manage your team and resources.
+          {{ $t("createOrganization.description") }}
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-4">
         <Input
           v-model="organizationName"
-          label="Organization Name"
-          placeholder="Acme Corporation"
+          :label="$t('createOrganization.nameLabel')"
+          :placeholder="$t('createOrganization.namePlaceholder')"
           :error="error"
           @keydown.enter.prevent="handleCreate"
         />
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="handleClose">Cancel</Button>
-        <Button :loading="isCreating" @click="handleCreate">Create Organization</Button>
+        <Button variant="outline" @click="handleClose">{{ $t("common.cancel") }}</Button>
+        <Button :loading="isCreating" @click="handleCreate">{{
+          $t("createOrganization.createButton")
+        }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -26,6 +28,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
@@ -38,6 +41,7 @@ const emit = defineEmits<{
   (e: "created", organization: { id: string; name: string; slug: string; role: string }): void;
 }>();
 
+const { t } = useI18n();
 const { toast } = useToast();
 
 const isOpen = ref(props.open);
@@ -77,12 +81,12 @@ const handleCreate = async () => {
 
   // Validate
   if (!organizationName.value.trim()) {
-    error.value = "Organization name is required";
+    error.value = t("createOrganization.nameRequired");
     return;
   }
 
   if (organizationName.value.trim().length < 1 || organizationName.value.trim().length > 100) {
-    error.value = "Organization name must be between 1 and 100 characters";
+    error.value = t("createOrganization.nameLengthError");
     return;
   }
 
@@ -96,7 +100,10 @@ const handleCreate = async () => {
 
     if (result.success && result.data) {
       // Show success message
-      toast.success("Organization created", `${result.data.name} has been created successfully`);
+      toast.success(
+        t("createOrganization.successTitle"),
+        t("createOrganization.successMessage", { name: result.data.name }),
+      );
 
       // Emit the created organization data
       emit("created", result.data);
@@ -106,8 +113,8 @@ const handleCreate = async () => {
     }
   } catch (err: any) {
     console.error("Failed to create organization:", err);
-    error.value = err.message || "Failed to create organization";
-    toast.error("Failed to create organization", error.value);
+    error.value = err.message || t("createOrganization.createFailed");
+    toast.error(t("createOrganization.createFailed"), error.value);
   } finally {
     isCreating.value = false;
   }

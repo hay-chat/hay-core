@@ -2,14 +2,13 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text font-size="20px" font-weight="600" color="#333333" padding="0 0 20px 0">
-      You've Been Invited!
+      {{ t.organization-invitation.title }}
     </mj-text>
 
-    <mj-text color="#555555" line-height="24px"> Hi there, </mj-text>
+    <mj-text color="#555555" line-height="24px"> {{ t.common.hiThere }} </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
-      <strong>{{ inviterName }}</strong> ({{ inviterEmail }}) has invited you to join
-      <strong>{{ organizationName }}</strong> on Hay Platform.
+      {{ t.organization-invitation.body }}
     </mj-text>
 
     {{#if message}}
@@ -27,14 +26,13 @@
     {{/if}}
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
-      You've been invited as a <strong>{{ role }}</strong
-      >.
+      {{ t.organization-invitation.invitedAsRole }}
     </mj-text>
 
     <mj-divider border-color="#e0e0e0" border-width="1px" padding="20px 0" />
 
     <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 15px 0">
-      Accept Your Invitation
+      {{ t.organization-invitation.acceptTitle }}
     </mj-text>
 
     <mj-button
@@ -46,24 +44,23 @@
       padding="10px 0 20px 0"
       href="{{acceptInvitationUrl}}"
     >
-      Accept Invitation
+      {{ t.organization-invitation.acceptButton }}
     </mj-button>
 
     {{#if isNewUser}}
     <mj-text color="#666666" font-size="12px" line-height="20px" padding="0 0 10px 0">
-      You'll need to create an account to accept this invitation.
+      {{ t.organization-invitation.needAccount }}
     </mj-text>
     {{/if}}
 
     <mj-text color="#888888" font-size="12px" line-height="20px" padding="10px 0">
-      This invitation will expire on <strong>{{ expiresAt }}</strong
-      >.
+      {{ t.organization-invitation.expiresAt }}
     </mj-text>
 
     <mj-text color="#888888" font-size="12px" line-height="20px">
-      Not interested? You can
+      {{ t.organization-invitation.notInterested }}
       <a href="{{declineInvitationUrl}}" style="color: #001bf4; text-decoration: none"
-        >decline this invitation</a
+        >{{ t.organization-invitation.declineLink }}</a
       >.
     </mj-text>
   </mj-column>
@@ -73,41 +70,36 @@
 <mj-section background-color="#f9f9f9" padding="20px 25px">
   <mj-column>
     <mj-text font-size="14px" font-weight="600" color="#333333" padding="0 0 10px 0">
-      About Your Role
+      {{ t.organization-invitation.aboutRole }}
     </mj-text>
 
     {{#if isOwner}}
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      As an <strong>Owner</strong>, you'll have full administrative access to
-      {{ organizationName }}, including the ability to manage members, settings, and billing.
+      {{ t.organization-invitation.ownerDescription }}
     </mj-text>
     {{/if}}
 
     {{#if isAdmin}}
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      As an <strong>Admin</strong>, you'll have administrative access to {{ organizationName }},
-      including the ability to manage members and most organization settings.
+      {{ t.organization-invitation.adminDescription }}
     </mj-text>
     {{/if}}
 
     {{#if isContributor}}
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      As a <strong>Contributor</strong>, you'll be able to create and edit content within
-      {{ organizationName }}.
+      {{ t.organization-invitation.contributorDescription }}
     </mj-text>
     {{/if}}
 
     {{#if isMember}}
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      As a <strong>Member</strong>, you'll have standard access to {{ organizationName }}'s
-      resources and features.
+      {{ t.organization-invitation.memberDescription }}
     </mj-text>
     {{/if}}
 
     {{#if isViewer}}
     <mj-text color="#666666" font-size="12px" line-height="18px">
-      As a <strong>Viewer</strong>, you'll have read-only access to {{ organizationName }}'s
-      resources.
+      {{ t.organization-invitation.viewerDescription }}
     </mj-text>
     {{/if}}
   </mj-column>

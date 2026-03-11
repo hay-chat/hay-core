@@ -1,0 +1,239 @@
+{
+  "marketplace": {
+    "title": "Marketplace de Integrações",
+    "description": "Descubra e instale integrações para ampliar as capacidades da sua plataforma",
+    "headTitle": "Marketplace de Integrações - Hay Dashboard",
+    "uploadPlugin": "Enviar Integração",
+    "manageCustom": "Gerenciar Personalizados ({count})",
+    "refresh": "Atualizar",
+    "stats": {
+      "totalPlugins": "Total de Integrações",
+      "availablePlugins": "Integrações disponíveis",
+      "installed": "Instalados",
+      "activePlugins": "Integrações ativas",
+      "channels": "Canais",
+      "communicationChannels": "Canais de comunicação",
+      "mcpConnectors": "Conectores MCP",
+      "modelContextProtocol": "Model Context Protocol"
+    },
+    "categories": {
+      "label": "Categorias:",
+      "all": "Todas as Integrações",
+      "channels": "Canais",
+      "mcpConnectors": "Conectores MCP",
+      "documentImporters": "Importadores de Documentos",
+      "retrievers": "Recuperadores",
+      "playbooks": "Playbooks"
+    },
+    "search": "Buscar integrações...",
+    "empty": {
+      "title": "Nenhuma integração encontrada",
+      "searchHint": "Tente ajustar os termos da sua busca.",
+      "categoryHint": "Nenhuma integração corresponde à categoria selecionada."
+    },
+    "pluginTypes": {
+      "channel": "Canal",
+      "mcpConnector": "Conector MCP",
+      "documentImporter": "Importador de Documentos",
+      "retriever": "Recuperador",
+      "playbook": "Playbook"
+    },
+    "actions": {
+      "install": "Instalar",
+      "installing": "Instalando...",
+      "configure": "Configurar",
+      "remove": "Remover",
+      "removing": "Removendo...",
+      "delete": "Excluir",
+      "deleting": "Excluindo..."
+    },
+    "custom": "Personalizado",
+    "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
+    "toast": {
+      "enabledSuccess": "Integração {name} ativada com sucesso",
+      "disabledSuccess": "Integração {name} desativada com sucesso",
+      "deletedSuccess": "Integração excluída com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disableFailed": "Falha ao desativar integração",
+      "deleteFailed": "Falha ao excluir integração"
+    }
+  },
+  "manage": {
+    "title": "Gerenciar Integrações Personalizadas",
+    "description": "Visualize e gerencie as integrações personalizadas da sua organização",
+    "headTitle": "Gerenciar Integrações Personalizadas - Hay Dashboard",
+    "uploadPlugin": "Enviar Integração",
+    "refresh": "Atualizar",
+    "stats": {
+      "customPlugins": "Integrações Personalizadas",
+      "uploadedByOrg": "Enviadas pela sua organização",
+      "enabled": "Ativadas",
+      "currentlyActive": "Atualmente ativas",
+      "totalSize": "Tamanho Total",
+      "storageUsed": "Armazenamento utilizado"
+    },
+    "loading": "Carregando integrações...",
+    "empty": {
+      "title": "Nenhuma integração personalizada",
+      "description": "Envie sua primeira integração personalizada para começar"
+    },
+    "table": {
+      "title": "Integrações Personalizadas",
+      "version": "Versão: {version}",
+      "id": "ID: {id}",
+      "uploaded": "Enviado: {date}"
+    },
+    "actions": {
+      "enable": "Ativar",
+      "enabling": "Ativando...",
+      "disable": "Desativar",
+      "disabling": "Desativando...",
+      "settings": "Configurações",
+      "update": "Atualizar",
+      "delete": "Excluir",
+      "deleting": "Excluindo..."
+    },
+    "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
+    "updateComingSoon": "Funcionalidade de atualização em breve",
+    "toast": {
+      "enabledSuccess": "Integração ativada com sucesso",
+      "disabledSuccess": "Integração desativada com sucesso",
+      "deletedSuccess": "Integração excluída com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disableFailed": "Falha ao desativar integração",
+      "deleteFailed": "Falha ao excluir integração"
+    }
+  },
+  "upload": {
+    "title": "Enviar Integração Personalizada",
+    "description": "Envie uma integração personalizada para ampliar sua plataforma",
+    "headTitle": "Enviar Integração - Hay Dashboard",
+    "backToMarketplace": "Voltar ao Marketplace",
+    "card": {
+      "title": "Enviar ZIP da Integração",
+      "description": "Envie um arquivo ZIP contendo sua integração personalizada. O ZIP deve incluir um arquivo manifest.json na raiz."
+    },
+    "file": {
+      "label": "Arquivo da Integração",
+      "dropHint": "Arraste o ZIP da integração aqui ou clique para procurar",
+      "maxSize": "Tamanho máximo do arquivo: 50MB",
+      "selectFile": "Selecionar Arquivo",
+      "remove": "Remover"
+    },
+    "success": {
+      "message": "Integração enviada com sucesso!",
+      "uploadAnother": "Enviar Outra",
+      "viewMarketplace": "Ver Marketplace"
+    },
+    "progress": {
+      "uploading": "Enviando...",
+      "uploadPlugin": "Enviar Integração"
+    },
+    "errors": {
+      "title": "Envio Falhou",
+      "zipOnly": "Apenas arquivos ZIP são permitidos",
+      "tooLarge": "O tamanho do arquivo excede o limite de 50MB",
+      "uploadFailed": "Falha ao enviar integração"
+    },
+    "requirements": {
+      "title": "Requisitos da Integração",
+      "manifest": {
+        "title": "manifest.json válido",
+        "description": "Deve incluir um arquivo manifest.json na raiz com os campos id, name e version"
+      },
+      "pluginId": {
+        "title": "ID de integração válido",
+        "description": "O ID da integração deve conter apenas letras minúsculas, números e hífens"
+      },
+      "zipFormat": {
+        "title": "Formato ZIP",
+        "description": "O arquivo deve estar no formato ZIP com tamanho máximo de 50MB"
+      },
+      "noPathTraversal": {
+        "title": "Sem travessia de caminho",
+        "description": "O ZIP não deve conter arquivos com caminhos absolutos ou .."
+      }
+    },
+    "toast": {
+      "uploadedSuccess": "Integração {name} enviada com sucesso!"
+    }
+  },
+  "pluginSettings": {
+    "backToMarketplace": "Voltar ao Marketplace",
+    "headTitle": "Configurações da Integração - Hay Dashboard",
+    "headTitleWithName": "Configurações de {name} - Hay Dashboard",
+    "restartWorker": "Reiniciar Worker",
+    "restarting": "Reiniciando...",
+    "disablePlugin": "Desativar Integração",
+    "disabling": "Desativando...",
+    "enablePlugin": "Ativar Integração",
+    "disableConfirm": {
+      "title": "Desativar Integração?",
+      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso da integração na sua organização.",
+      "confirm": "Desativar"
+    },
+    "error": {
+      "loadFailed": "Falha ao carregar integração",
+      "returnToMarketplace": "Voltar ao Marketplace"
+    },
+    "connection": {
+      "testing": "Testando Conexão",
+      "connected": "Conectado",
+      "failed": "Conexão Falhou",
+      "needsAuth": "Necessita Autenticação",
+      "configureCredentials": "Por favor, configure suas credenciais",
+      "connectionFailed": "Conexão falhou",
+      "tryAgain": "Tentar Novamente"
+    },
+    "about": "Sobre",
+    "capabilities": {
+      "title": "Capacidades",
+      "description": "O que esta integração pode fazer",
+      "chatConnector": "Conector de Chat",
+      "sendMessages": "Enviar mensagens",
+      "receiveMessages": "Receber mensagens",
+      "listConversations": "Listar conversas",
+      "mcpConnector": "Conector MCP",
+      "mcpDescription": "Fornece ferramentas e recursos de IA através do Model Context Protocol",
+      "documentImporter": "Importador de Documentos",
+      "documentImporterDescription": "Importar e processar documentos de fontes externas"
+    },
+    "availableActions": {
+      "title": "Ações Disponíveis",
+      "toolsAvailable": "{count} ferramentas disponíveis"
+    },
+    "configuration": {
+      "title": "Configuração",
+      "description": "Configure as definições de {name}"
+    },
+    "connectionTest": {
+      "title": "Teste de Conexão",
+      "description": "Teste a conexão de {name}",
+      "testConnection": "Testar Conexão",
+      "testing": "Testando...",
+      "success": "Conexão bem-sucedida!",
+      "configRequired": "Configuração necessária",
+      "failed": "Conexão falhou",
+      "checkConfig": "Por favor, verifique sua configuração e tente novamente."
+    },
+    "tabs": {
+      "settings": "Configurações"
+    },
+    "toast": {
+      "configSaved": "Configuração salva com sucesso",
+      "configSaveFailed": "Falha ao salvar configuração",
+      "enabledSuccess": "Integração ativada com sucesso",
+      "enableFailed": "Falha ao ativar integração",
+      "disabledSuccess": "Integração desativada com sucesso",
+      "disableFailed": "Falha ao desativar integração",
+      "restartedSuccess": "Worker da integração reiniciado com sucesso",
+      "restartFailed": "Falha ao reiniciar integração",
+      "resetToEnv": "Redefinido para variável de ambiente",
+      "resetToEnvFailed": "Falha ao redefinir para variável de ambiente",
+      "oauthSuccess": "Conexão OAuth estabelecida com sucesso",
+      "oauthFailed": "Conexão OAuth falhou. Por favor, tente novamente.",
+      "connectionEstablished": "Conexão estabelecida com sucesso",
+      "connectionCheckFailed": "Falha ao estabelecer conexão. Por favor, verifique sua configuração."
+    }
+  }
+}

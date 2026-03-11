@@ -1,10 +1,9 @@
 <template>
   <div class="space-y-4">
     <div class="space-y-1">
-      <Label>Which documents should this playbook use?</Label>
+      <Label>{{ $t("wizard.documents.label") }}</Label>
       <p class="text-sm text-neutral-muted">
-        Select documents to ground the playbook in your knowledge base. You can skip this step if no
-        documents are needed.
+        {{ $t("wizard.documents.helperText") }}
       </p>
     </div>
 
@@ -15,7 +14,7 @@
 
     <!-- Error state -->
     <Alert v-else-if="error" variant="destructive">
-      <AlertDescription> Failed to load documents. Please try again later. </AlertDescription>
+      <AlertDescription> {{ $t("wizard.documents.errorLoad") }} </AlertDescription>
     </Alert>
 
     <!-- No documents available -->
@@ -25,8 +24,7 @@
       :icon="Info"
     >
       <AlertDescription>
-        No documents found. You can continue without documents — the playbook will rely only on the
-        instructions you provide.
+        {{ $t("wizard.documents.noDocuments") }}
       </AlertDescription>
     </Alert>
 
@@ -34,8 +32,8 @@
     <template v-else>
       <!-- Suggested documents -->
       <div v-if="suggestedDocuments.length > 0" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">Suggested for you</p>
-        <p class="text-xs text-neutral-muted">Based on your playbook description</p>
+        <p class="text-sm font-medium text-foreground">{{ $t("wizard.documents.suggestedTitle") }}</p>
+        <p class="text-xs text-neutral-muted">{{ $t("wizard.documents.suggestedHint") }}</p>
         <div class="grid grid-cols-1 gap-2">
           <div v-for="doc in suggestedDocuments" :key="doc.id" class="flex items-center gap-1">
             <OptionCard
@@ -56,12 +54,12 @@
 
       <!-- All documents -->
       <div v-if="remainingDocuments.length > 0" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">All documents</p>
+        <p class="text-sm font-medium text-foreground">{{ $t("wizard.documents.allDocumentsTitle") }}</p>
         <Input
           v-if="remainingDocuments.length > 5"
           v-model="searchQuery"
           type="search"
-          placeholder="Filter documents..."
+          :placeholder="$t('wizard.documents.filterPlaceholder')"
           :icon-start="Search"
         />
         <div class="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">

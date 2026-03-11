@@ -11,6 +11,9 @@ import type {
 } from "../types/email.types";
 import { v4 as uuidv4 } from "uuid";
 import { createLogger } from "@server/lib/logger";
+import { AppDataSource } from "@server/database/data-source";
+import { Organization } from "@server/entities/organization.entity";
+import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 
 const logger = createLogger("email");
 
@@ -208,23 +211,26 @@ export class EmailService {
       const { html, text } = await this.templateService.render({
         template: options.template,
         variables: mergedVariables,
+        locale: options.locale,
         useCache: true,
         stripComments: true,
         minify: true,
       });
       logger.debug("Template rendered successfully");
 
-      // Get template to extract subject
-      const template = this.templateService.getTemplate(options.template);
+      // Resolve subject: explicit > translated > template comment fallback
       let subject = options.subject;
 
-      if (!subject && template) {
-        logger.debug({ subject: template.subject }, "Using template subject");
-        // Replace variables in subject
-        subject = template.subject;
-        if (options.variables) {
-          for (const [key, value] of Object.entries(options.variables)) {
-            subject = subject.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), String(value));
+      if (!subject) {
+        // Try translated subject first, then fall back to template comment
+        subject = this.templateService.getTranslatedSubject(options.template, options.locale) ?? undefined;
+        if (subject) {
+          logger.debug({ subject, locale: options.locale }, "Using translated subject");
+          // Replace variables in translated subject
+          if (options.variables) {
+            for (const [key, value] of Object.entries(options.variables)) {
+              subject = subject!.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), String(value));
+            }
           }
         }
       }
@@ -411,3 +417,21 @@ export class EmailService {
 
 // Export singleton instance
 export const emailService = new EmailService();
+
+/**
+ * Resolve the organization's default language for email localization.
+ * Falls back to English if the organization is not found or has no language set.
+ */
+export async function getOrganizationLocale(organizationId?: string | null): Promise<string> {
+  if (!organizationId) return DEFAULT_LANGUAGE;
+  try {
+    const orgRepo = AppDataSource.getRepository(Organization);
+    const org = await orgRepo.findOne({
+      where: { id: organizationId },
+      select: ["id", "defaultLanguage"],
+    });
+    return org?.defaultLanguage || DEFAULT_LANGUAGE;
+  } catch {
+    return DEFAULT_LANGUAGE;
+  }
+}

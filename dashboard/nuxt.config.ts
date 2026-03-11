@@ -83,18 +83,23 @@ export default defineNuxtConfig({
       {
         code: "en",
         name: "English",
-        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json"],
+        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json", "en/dashboard.json", "en/playbooks.json", "en/conversations.json", "en/integrations.json", "en/documents.json", "en/queue.json", "en/privacy-pages.json", "en/organizations.json"],
       },
       {
         code: "pt-BR",
         name: "Português (Brasil)",
-        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json"],
+        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json", "pt-BR/dashboard.json", "pt-BR/playbooks.json", "pt-BR/conversations.json", "pt-BR/integrations.json", "pt-BR/documents.json", "pt-BR/queue.json", "pt-BR/privacy-pages.json", "pt-BR/organizations.json"],
       },
     ],
     langDir: "locales",
     defaultLocale: "en",
     strategy: "no_prefix",
-    detectBrowserLanguage: false,
+    detectBrowserLanguage: {
+      useCookie: true,
+      cookieKey: "hay_locale",
+      alwaysRedirect: false,
+      fallbackLocale: "en",
+    },
     vueI18n: "./i18n.config.ts",
   },
 

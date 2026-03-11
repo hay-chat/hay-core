@@ -10,26 +10,26 @@
           <div class="flex items-center space-x-4">
             <Button variant="ghost" @click="exitPlayground">
               <X class="h-4 w-4 mr-2" />
-              Exit Playground
+              {{ $t('conversations.detail.exitPlayground') }}
             </Button>
             <div>
               <div class="flex items-center gap-2">
-                <h1 class="text-xl font-semibold">Conversation Playground</h1>
+                <h1 class="text-xl font-semibold">{{ $t('conversations.detail.playgroundTitle') }}</h1>
                 <Badge variant="outline" class="text-xs">
                   <Info class="h-3 w-3 mr-1" />
-                  Auto-sends
+                  {{ $t('conversations.detail.autoSends') }}
                 </Badge>
               </div>
               <p class="text-sm text-neutral-muted">
-                Test conversations with AI • Messages auto-send • Use
-                <ThumbsUp class="icon" />/<ThumbsDown class="icon" /> to rate quality
+                {{ $t('conversations.detail.playgroundDescription') }}
+                <ThumbsUp class="icon" />/<ThumbsDown class="icon" /> {{ $t('conversations.detail.rateQuality') }}
               </p>
             </div>
           </div>
           <div class="flex items-center space-x-2">
             <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
               <RefreshCw class="h-4 w-4 mr-2" />
-              New Test
+              {{ $t('conversations.detail.newTest') }}
             </Button>
           </div>
         </template>
@@ -39,14 +39,14 @@
           <div class="flex items-center space-x-4">
             <Button variant="ghost" @click="goBack">
               <ArrowLeft class="h-4 w-4 mr-2" />
-              Back to Conversations
+              {{ $t('conversations.detail.backToConversations') }}
             </Button>
             <div>
               <h1 class="text-xl font-semibold">
-                {{ conversation?.title || "Loading..." }}
+                {{ conversation?.title || $t('conversations.detail.loading') }}
               </h1>
               <p class="text-sm text-neutral-muted">
-                Conversation #{{ conversation?.id?.slice(0, 8) }}
+                {{ $t('conversations.detail.conversationNumber', { id: conversation?.id?.slice(0, 8) }) }}
               </p>
             </div>
           </div>
@@ -61,11 +61,11 @@
               class="bg-orange-100 text-orange-700 hover:bg-orange-200"
             >
               <ShieldAlert class="h-3 w-3 mr-1" />
-              Test Mode: {{ isTestMode ? "ON" : "OFF" }}
+              {{ $t('conversations.detail.testMode', { state: isTestMode ? $t('conversations.detail.testModeOn') : $t('conversations.detail.testModeOff') }) }}
             </Badge>
             <Button variant="outline" size="sm" @click="exportConversation">
               <Download class="h-4 w-4 mr-2" />
-              Export
+              {{ $t('conversations.detail.export') }}
             </Button>
             <Button
               v-if="conversation?.status === 'open'"
@@ -75,7 +75,7 @@
               @click="toggleSupervisionMode"
             >
               <Eye class="h-4 w-4 mr-2" />
-              {{ supervisionMode ? "Exit Supervision" : "Supervise" }}
+              {{ supervisionMode ? $t('conversations.detail.exitSupervision') : $t('conversations.detail.supervise') }}
             </Button>
             <Button
               v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
@@ -83,7 +83,7 @@
               @click="takeOverConversation"
             >
               <UserCheck class="h-4 w-4 mr-2" />
-              Take Over
+              {{ $t('conversations.detail.takeOver') }}
             </Button>
           </div>
         </template>
@@ -112,7 +112,7 @@
           <!-- Playground Empty State -->
           <div v-else-if="isPlaygroundMode && messages.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-            <p class="text-neutral-muted">Send a message to start testing</p>
+            <p class="text-neutral-muted">{{ $t('conversations.detail.sendMessageToStart') }}</p>
           </div>
 
           <!-- Playground Messages -->
@@ -173,7 +173,7 @@
           <!-- Regular Conversation Empty State -->
           <div v-else-if="conversation?.messages?.length === 0" class="text-center py-12">
             <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-            <p class="text-neutral-muted">No messages in this conversation yet</p>
+            <p class="text-neutral-muted">{{ $t('conversations.detail.noMessages') }}</p>
           </div>
 
           <!-- Regular Conversation Messages -->
@@ -184,7 +184,7 @@
                 class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-neutral-muted"
               >
                 <Clock class="h-3 w-3 mr-1" />
-                Conversation started {{ formatDate(conversation?.created_at) }}
+                {{ $t('conversations.detail.conversationStarted', { date: formatDate(conversation?.created_at) }) }}
               </div>
             </div>
 
@@ -239,16 +239,14 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <UserCheck class="h-4 w-4 text-blue-600" />
-              <span class="text-sm font-medium text-blue-800"
-                >You are handling this conversation</span
-              >
+              <span class="text-sm font-medium text-blue-800">{{ $t('conversations.detail.youAreHandling') }}</span>
             </div>
             <div class="flex items-center space-x-2">
               <Button variant="outline" size="sm" @click="endTakeover">
-                Release Conversation
+                {{ $t('conversations.detail.releaseConversation') }}
               </Button>
               <Button variant="outline" size="sm" @click="showCloseDialog = true">
-                Close Conversation
+                {{ $t('conversations.detail.closeConversation') }}
               </Button>
             </div>
           </div>
@@ -261,19 +259,17 @@
               <AlertCircle class="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div class="flex-1">
                 <p class="text-sm font-medium text-amber-900">
-                  Hay wasn't confident about answering this question
+                  {{ $t('conversations.pendingHuman.notConfident') }}
                 </p>
                 <p class="text-sm text-amber-700 mt-1">
-                  Hay decided to hand this conversation to a human agent. Providing more context in
-                  the playbooks can be a good place to start to provide more information so Hay can
-                  handle similar conversations next time.
+                  {{ $t('conversations.pendingHuman.handedOff') }}
                 </p>
               </div>
             </div>
             <div class="flex items-center space-x-2">
               <Button variant="outline" size="sm" @click="resetConversation">
                 <RefreshCw class="h-4 w-4 mr-2" />
-                Start New Conversation
+                {{ $t('conversations.pendingHuman.startNew') }}
               </Button>
               <Button
                 v-if="conversation?.playbook_id"
@@ -282,11 +278,11 @@
                 @click="navigateToPlaybook"
               >
                 <BookOpen class="h-4 w-4 mr-2" />
-                Edit Playbook
+                {{ $t('conversations.pendingHuman.editPlaybook') }}
               </Button>
               <Button v-else variant="outline" size="sm" @click="navigateToPlaybook">
                 <BookOpen class="h-4 w-4 mr-2" />
-                Edit Playbooks
+                {{ $t('conversations.pendingHuman.editPlaybooks') }}
               </Button>
             </div>
           </div>
@@ -300,7 +296,7 @@
           <form @submit.prevent="sendMessage" class="flex space-x-3">
             <Input
               v-model="newMessage"
-              :placeholder="isPlaygroundMode ? 'Type your test message...' : 'Type your message...'"
+              :placeholder="isPlaygroundMode ? $t('conversations.detail.sendTestMessage') : $t('conversations.detail.sendMessage')"
               class="flex-1"
               :disabled="isPlaygroundMode && !conversation"
               @keyup.enter="sendMessage"
@@ -327,26 +323,26 @@
               <CardHeader>
                 <CardTitle class="text-base flex items-center">
                   <Activity class="h-4 w-4 mr-2" />
-                  Orchestrator Status
+                  {{ $t('conversations.orchestrator.title') }}
                 </CardTitle>
               </CardHeader>
               <CardContent class="space-y-3 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Status:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.orchestrator.status') }}</span>
                   <Badge :variant="orchestratorStatus === 'processing' ? 'default' : 'secondary'">
                     {{ orchestratorStatus }}
                   </Badge>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Last Check:</span>
-                  <span>{{ lastOrchestratorCheck || "Never" }}</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.orchestrator.lastCheck') }}</span>
+                  <span>{{ lastOrchestratorCheck || $t('conversations.orchestrator.never') }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Messages:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.orchestrator.messages') }}</span>
                   <span>{{ messages.length }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Needs Processing:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.orchestrator.needsProcessing') }}</span>
                   <span>{{ conversation?.needs_processing }}</span>
                 </div>
               </CardContent>
@@ -355,7 +351,7 @@
             <!-- Test Scenarios -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Test Scenarios </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.testScenarios.title') }} </CardTitle>
               </CardHeader>
               <CardContent class="space-y-2">
                 <Button
@@ -365,7 +361,7 @@
                   @click="sendQuickMessage('What are your business hours?')"
                 >
                   <Clock class="h-4 w-4 mr-2" />
-                  Ask About Hours
+                  {{ $t('conversations.testScenarios.askAboutHours') }}
                 </Button>
                 <Button
                   variant="outline"
@@ -374,7 +370,7 @@
                   @click="sendQuickMessage('I need help with my account')"
                 >
                   <HelpCircle class="h-4 w-4 mr-2" />
-                  Request Support
+                  {{ $t('conversations.testScenarios.requestSupport') }}
                 </Button>
                 <Button
                   variant="outline"
@@ -383,7 +379,7 @@
                   @click="sendQuickMessage('I want to cancel my subscription')"
                 >
                   <DollarSign class="h-4 w-4 mr-2" />
-                  Cancel Subscription
+                  {{ $t('conversations.testScenarios.cancelSubscription') }}
                 </Button>
                 <Button
                   variant="outline"
@@ -392,7 +388,7 @@
                   @click="sendQuickMessage('I want to speak to a human')"
                 >
                   <UserCheck class="h-4 w-4 mr-2" />
-                  Request Human
+                  {{ $t('conversations.testScenarios.requestHuman') }}
                 </Button>
               </CardContent>
             </Card>
@@ -400,21 +396,21 @@
             <!-- Testing Tips -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Testing Tips </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.testingTips.title') }} </CardTitle>
               </CardHeader>
               <CardContent>
                 <ul class="text-sm space-y-2 text-neutral-muted">
                   <li class="flex items-start">
                     <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>Test different message types to see AI responses</span>
+                    <span>{{ $t('conversations.testingTips.tip1') }}</span>
                   </li>
                   <li class="flex items-start">
                     <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>Try switching playbooks to test different scenarios</span>
+                    <span>{{ $t('conversations.testingTips.tip2') }}</span>
                   </li>
                   <li class="flex items-start">
                     <Info class="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>Use "New Test" to start fresh with a new conversation</span>
+                    <span>{{ $t('conversations.testingTips.tip3') }}</span>
                   </li>
                 </ul>
               </CardContent>
@@ -426,7 +422,7 @@
             <!-- Customer Information -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Customer Information </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.customerInfo.title') }} </CardTitle>
               </CardHeader>
               <CardContent class="space-y-3">
                 <div class="flex items-center space-x-3">
@@ -436,7 +432,7 @@
                     <User class="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <div class="font-medium">Customer</div>
+                    <div class="font-medium">{{ $t('conversations.customerInfo.customer') }}</div>
                     <div class="text-sm text-neutral-muted">
                       {{ conversation?.id?.slice(0, 8) }}
                     </div>
@@ -444,15 +440,15 @@
                 </div>
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between">
-                    <span class="text-neutral-muted">Conversation ID:</span>
+                    <span class="text-neutral-muted">{{ $t('conversations.customerInfo.conversationId') }}</span>
                     <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-neutral-muted">Status:</span>
+                    <span class="text-neutral-muted">{{ $t('conversations.customerInfo.status') }}</span>
                     <span>{{ conversation?.status }}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-neutral-muted">Created:</span>
+                    <span class="text-neutral-muted">{{ $t('conversations.customerInfo.created') }}</span>
                     <span>{{ formatDate(conversation?.created_at) }}</span>
                   </div>
                 </div>
@@ -462,34 +458,34 @@
             <!-- Conversation Details -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Conversation Details </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.conversationDetails.title') }} </CardTitle>
               </CardHeader>
               <CardContent class="space-y-3 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Agent:</span>
-                  <span>{{ conversation?.agent?.name || "AI Assistant" }}</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.agent') }}</span>
+                  <span>{{ conversation?.agent?.name || $t('conversations.conversationDetails.defaultAgent') }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Status:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.status') }}</span>
                   <span>{{ formatStatus(conversation?.status) }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Messages:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.messages') }}</span>
                   <span>{{ conversation?.messages?.length }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Created:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.created') }}</span>
                   <span>{{ formatDate(conversation?.created_at) }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-muted">Updated:</span>
+                  <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.updated') }}</span>
                   <span>{{ formatDate(conversation?.updated_at) }}</span>
                 </div>
                 <!-- Legal Hold Toggle -->
                 <div class="flex items-center justify-between pt-2 border-t mt-2">
                   <div class="flex items-center gap-2">
                     <Lock v-if="conversation?.legal_hold" class="h-4 w-4 text-amber-500" />
-                    <span class="text-neutral-muted">Legal Hold:</span>
+                    <span class="text-neutral-muted">{{ $t('conversations.conversationDetails.legalHold') }}</span>
                   </div>
                   <Switch
                     :model-value="conversation?.legal_hold ?? false"
@@ -498,7 +494,7 @@
                   />
                 </div>
                 <p v-if="conversation?.legal_hold" class="text-xs text-amber-600">
-                  This conversation is exempt from automatic data retention anonymization.
+                  {{ $t('conversations.conversationDetails.legalHoldNotice') }}
                 </p>
               </CardContent>
             </Card>
@@ -506,11 +502,11 @@
             <!-- Previous Conversations -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Previous Conversations </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.previousConversations.title') }} </CardTitle>
               </CardHeader>
               <CardContent>
                 <div v-if="previousConversations.length === 0" class="text-sm text-neutral-muted">
-                  No previous conversations
+                  {{ $t('conversations.previousConversations.none') }}
                 </div>
                 <div v-else class="space-y-3">
                   <div
@@ -524,7 +520,7 @@
                     </div>
                     <div class="text-xs text-neutral-muted">
                       {{ formatDate(prevConv.createdAt || prevConv.date) }} •
-                      {{ prevConv.status || "Unknown" }}
+                      {{ prevConv.status || $t('conversations.status.unknown') }}
                     </div>
                   </div>
                 </div>
@@ -534,7 +530,7 @@
             <!-- Knowledge Base Articles -->
             <Card>
               <CardHeader>
-                <CardTitle class="text-base"> Related Articles </CardTitle>
+                <CardTitle class="text-base"> {{ $t('conversations.relatedArticles.title') }} </CardTitle>
               </CardHeader>
               <CardContent>
                 <div class="space-y-2">
@@ -547,7 +543,7 @@
                       {{ article.title }}
                     </div>
                     <div class="text-xs text-neutral-muted">
-                      {{ article.category || "General" }}
+                      {{ article.category || $t('conversations.relatedArticles.defaultCategory') }}
                     </div>
                   </div>
                 </div>
@@ -562,18 +558,18 @@
     <Dialog v-model:open="showReleaseDialog">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Release Conversation</DialogTitle>
+          <DialogTitle>{{ $t('conversations.releaseDialog.title') }}</DialogTitle>
           <DialogDescription>
-            How would you like to handle this conversation after releasing it?
+            {{ $t('conversations.releaseDialog.description') }}
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
           <div class="flex items-start space-x-3">
             <input id="release-ai" v-model="releaseMode" type="radio" value="ai" class="mt-1" />
             <label for="release-ai" class="flex-1 cursor-pointer">
-              <div class="font-medium">Return to AI</div>
+              <div class="font-medium">{{ $t('conversations.releaseDialog.returnToAi') }}</div>
               <div class="text-sm text-neutral-muted">
-                The AI will continue processing this conversation automatically
+                {{ $t('conversations.releaseDialog.returnToAiDescription') }}
               </div>
             </label>
           </div>
@@ -586,16 +582,16 @@
               class="mt-1"
             />
             <label for="release-queue" class="flex-1 cursor-pointer">
-              <div class="font-medium">Return to Queue</div>
+              <div class="font-medium">{{ $t('conversations.releaseDialog.returnToQueue') }}</div>
               <div class="text-sm text-neutral-muted">
-                Another agent can take over this conversation
+                {{ $t('conversations.releaseDialog.returnToQueueDescription') }}
               </div>
             </label>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="showReleaseDialog = false"> Cancel </Button>
-          <Button @click="confirmRelease"> Release </Button>
+          <Button variant="outline" @click="showReleaseDialog = false"> {{ $t('common.cancel') }} </Button>
+          <Button @click="confirmRelease"> {{ $t('conversations.releaseDialog.release') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -604,15 +600,14 @@
     <Dialog v-model:open="showCloseDialog">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Close Conversation</DialogTitle>
+          <DialogTitle>{{ $t('conversations.closeDialog.title') }}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to close this conversation? This will mark it as resolved and
-            closed.
+            {{ $t('conversations.closeDialog.description') }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" @click="showCloseDialog = false"> Cancel </Button>
-          <Button @click="confirmClose"> Close Conversation </Button>
+          <Button variant="outline" @click="showCloseDialog = false"> {{ $t('common.cancel') }} </Button>
+          <Button @click="confirmClose"> {{ $t('conversations.closeDialog.confirm') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -652,8 +647,10 @@ import {
   Lock,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
-
 import { MessageType } from "~/types/message";
+
+// i18n
+const { t } = useI18n();
 
 interface Message {
   id: string;
@@ -788,7 +785,7 @@ const toggleLegalHold = async (newValue: boolean) => {
     console.error("Failed to update legal hold:", error);
     const { useToast } = await import("@/composables/useToast");
     const toast = useToast();
-    toast.error("Error", "Failed to update legal hold");
+    toast.error(t("common.error"), t("conversations.toast.legalHoldFailed"));
   } finally {
     isUpdatingLegalHold.value = false;
   }
@@ -906,16 +903,16 @@ const getStatusIcon = (status: string | undefined) => {
 };
 
 const formatStatus = (status: string | undefined) => {
-  if (!status) return "Unknown";
-  const labels = {
-    open: "Open",
-    processing: "Processing",
-    "pending-human": "Needs Attention",
-    "human-took-over": "Manual Control",
-    resolved: "Resolved",
-    closed: "Closed",
+  if (!status) return t("conversations.status.unknown");
+  const keys: Record<string, string> = {
+    open: "conversations.status.open",
+    processing: "conversations.status.processing",
+    "pending-human": "conversations.status.pendingHuman",
+    "human-took-over": "conversations.status.humanTookOver",
+    resolved: "conversations.status.resolved",
+    closed: "conversations.status.closed",
   };
-  return labels[status as keyof typeof labels] || status;
+  return keys[status] ? t(keys[status]) : status;
 };
 
 const formatCountdown = (cooldownUntil: Date | string) => {
@@ -960,7 +957,7 @@ const takeOverConversation = async () => {
     });
     humanTakeover.value = true;
     supervisionMode.value = false;
-    toast.success("Conversation taken over", "You are now handling this conversation");
+    toast.success(t("conversations.toast.takenOver"), t("conversations.toast.takenOverMessage"));
     // Refresh conversation and assigned user
     await fetchConversation();
     assignedUser.value = await HayApi.conversations.getAssignedUser.query({
@@ -970,7 +967,7 @@ const takeOverConversation = async () => {
     console.error("Failed to take over conversation:", error);
     const errorMessage =
       error?.message || error?.data?.message || "Failed to take over conversation";
-    toast.error("Takeover failed", errorMessage);
+    toast.error(t("conversations.toast.takeoverFailed"), errorMessage);
   }
 };
 
@@ -992,14 +989,14 @@ const confirmRelease = async () => {
     assignedUser.value = null;
     showReleaseDialog.value = false;
     const message =
-      releaseMode.value === "ai" ? "Conversation returned to AI" : "Conversation returned to queue";
-    toast.success("Conversation released", message);
+      releaseMode.value === "ai" ? t("conversations.toast.releasedToAi") : t("conversations.toast.releasedToQueue");
+    toast.success(t("conversations.toast.released"), message);
     // Refresh conversation to get updated status
     await fetchConversation();
   } catch (error: any) {
     console.error("Failed to release conversation:", error);
     const errorMessage = error?.message || error?.data?.message || "Failed to release conversation";
-    toast.error("Release failed", errorMessage);
+    toast.error(t("conversations.toast.releaseFailed"), errorMessage);
   }
 };
 
@@ -1012,13 +1009,13 @@ const confirmClose = async () => {
       conversationId: conversationId.value,
     });
     showCloseDialog.value = false;
-    toast.success("Conversation closed", "This conversation has been marked as closed");
+    toast.success(t("conversations.toast.closed"), t("conversations.toast.closedMessage"));
     // Refresh conversation to get updated status
     await fetchConversation();
   } catch (error: any) {
     console.error("Failed to close conversation:", error);
     const errorMessage = error?.message || error?.data?.message || "Failed to close conversation";
-    toast.error("Close failed", errorMessage);
+    toast.error(t("conversations.toast.closeFailed"), errorMessage);
   }
 };
 

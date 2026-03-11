@@ -25,7 +25,7 @@
       <CardContent class="space-y-4">
         <!-- Loading State -->
         <div v-if="loading" class="text-center space-y-2">
-          <p class="text-neutral-muted">Preparing your data export...</p>
+          <p class="text-neutral-muted">{{ $t("privacyDownload.preparingExport") }}</p>
           <div class="flex justify-center">
             <div class="w-48 h-2 bg-neutral-200 rounded-full overflow-hidden">
               <div class="h-full bg-blue-600 animate-pulse"></div>
@@ -36,61 +36,61 @@
         <!-- Ready to Download -->
         <div v-else-if="!downloaded && !error" class="space-y-4">
           <Alert>
-            <AlertTitle>Your Export is Ready</AlertTitle>
+            <AlertTitle>{{ $t("privacyDownload.exportReady") }}</AlertTitle>
             <AlertDescription>
-              Click the button below to download your personal data export.
+              {{ $t("privacyDownload.exportReadyDescription") }}
             </AlertDescription>
           </Alert>
 
           <div class="space-y-2">
-            <h4 class="font-medium">What's included:</h4>
+            <h4 class="font-medium">{{ $t("privacyDownload.whatsIncluded") }}</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>Profile information and account settings</li>
-              <li>Conversation history and messages</li>
-              <li>Embeddings (vectorized data)</li>
-              <li>Cryptographic signature for verification</li>
-              <li>README with data structure documentation</li>
+              <li>{{ $t("privacyDownload.includeProfile") }}</li>
+              <li>{{ $t("privacyDownload.includeConversations") }}</li>
+              <li>{{ $t("privacyDownload.includeEmbeddings") }}</li>
+              <li>{{ $t("privacyDownload.includeSignature") }}</li>
+              <li>{{ $t("privacyDownload.includeReadme") }}</li>
             </ul>
           </div>
 
           <div class="flex justify-center pt-4">
             <Button :loading="downloading" @click="startDownload" size="lg">
               <Download class="h-4 w-4 mr-2" />
-              Download My Data
+              {{ $t("privacyDownload.downloadMyData") }}
             </Button>
           </div>
 
           <p class="text-xs text-neutral-muted text-center">
-            File size: {{ fileSize }} • Format: {{ exportFormat }}
+            {{ $t("privacyDownload.fileSize", { size: fileSize }) }} • {{ $t("privacyDownload.format", { format: exportFormat }) }}
           </p>
         </div>
 
         <!-- Downloaded State -->
         <div v-else-if="downloaded" class="space-y-4">
           <Alert :icon="CheckCircle">
-            <AlertTitle>Download Complete</AlertTitle>
+            <AlertTitle>{{ $t("privacyDownload.downloadComplete") }}</AlertTitle>
             <AlertDescription>
-              Your data export has been downloaded successfully.
+              {{ $t("privacyDownload.downloadCompleteDescription") }}
             </AlertDescription>
           </Alert>
 
           <div class="space-y-2">
-            <h4 class="font-medium">Next Steps:</h4>
+            <h4 class="font-medium">{{ $t("privacyDownload.nextSteps") }}</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>Extract and review your data in the downloaded ZIP file</li>
-              <li>Store the file securely as it contains personal information</li>
-              <li>This download link will expire in 7 days</li>
+              <li>{{ $t("privacyDownload.nextStep1") }}</li>
+              <li>{{ $t("privacyDownload.nextStep2") }}</li>
+              <li>{{ $t("privacyDownload.nextStep3") }}</li>
             </ul>
           </div>
 
           <div class="flex justify-center space-x-2 pt-4">
             <Button variant="outline" @click="startDownload">
               <Download class="h-4 w-4 mr-2" />
-              Download Again
+              {{ $t("privacyDownload.downloadAgain") }}
             </Button>
             <Button @click="goToDashboard">
               <Home class="h-4 w-4 mr-2" />
-              Go to Dashboard
+              {{ $t("common.goToDashboard") }}
             </Button>
           </div>
         </div>
@@ -98,27 +98,27 @@
         <!-- Error State -->
         <div v-else-if="error" class="space-y-4">
           <Alert variant="destructive" :icon="AlertTriangle">
-            <AlertTitle>Download Failed</AlertTitle>
+            <AlertTitle>{{ $t("privacyDownload.downloadFailed") }}</AlertTitle>
             <AlertDescription>{{ errorMessage }}</AlertDescription>
           </Alert>
 
           <div class="space-y-2">
-            <h4 class="font-medium">Common issues:</h4>
+            <h4 class="font-medium">{{ $t("privacyDownload.commonIssues") }}</h4>
             <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-              <li>The download link may have expired (valid for 7 days)</li>
-              <li>The download token may be invalid</li>
-              <li>The export may have been deleted</li>
+              <li>{{ $t("privacyDownload.linkExpired") }}</li>
+              <li>{{ $t("privacyDownload.tokenInvalid") }}</li>
+              <li>{{ $t("privacyDownload.exportDeleted") }}</li>
             </ul>
           </div>
 
           <div class="flex justify-center space-x-2 pt-4">
             <Button variant="outline" @click="goToDashboard">
               <Home class="h-4 w-4 mr-2" />
-              Go to Dashboard
+              {{ $t("common.goToDashboard") }}
             </Button>
             <Button @click="requestNewExport">
               <RefreshCw class="h-4 w-4 mr-2" />
-              Request New Export
+              {{ $t("privacyDownload.requestNewExport") }}
             </Button>
           </div>
         </div>
@@ -130,6 +130,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import {
   Download,
@@ -141,6 +142,7 @@ import {
   RefreshCw,
 } from "lucide-vue-next";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
@@ -159,17 +161,17 @@ const requestId = computed(() => route.query.requestId as string);
 const downloadToken = computed(() => route.query.token as string);
 
 const title = computed(() => {
-  if (loading.value) return "Preparing Download...";
-  if (downloaded.value) return "Download Complete!";
-  if (error.value) return "Download Failed";
-  return "Data Export Ready";
+  if (loading.value) return t("privacyDownload.loadingTitle");
+  if (downloaded.value) return t("privacyDownload.downloadedTitle");
+  if (error.value) return t("privacyDownload.errorTitle");
+  return t("privacyDownload.readyTitle");
 });
 
 const description = computed(() => {
-  if (loading.value) return "Please wait while we prepare your data export";
-  if (downloaded.value) return "Your personal data has been downloaded successfully";
-  if (error.value) return "We couldn't download your data export";
-  return "Your personal data export is ready to download";
+  if (loading.value) return t("privacyDownload.loadingDescription");
+  if (downloaded.value) return t("privacyDownload.downloadedDescription");
+  if (error.value) return t("privacyDownload.errorDescription");
+  return t("privacyDownload.readyDescription");
 });
 
 const checkExportAvailability = async () => {

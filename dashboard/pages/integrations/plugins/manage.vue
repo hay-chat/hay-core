@@ -1,17 +1,14 @@
 <template>
-  <Page
-    title="Manage Custom Plugins"
-    description="View and manage your organization's custom plugins"
-  >
+  <Page :title="$t('manage.title')" :description="$t('manage.description')">
     <template #header>
       <div class="flex space-x-2">
         <Button size="sm" @click="navigateToUpload">
           <Upload class="h-4 w-4 mr-2" />
-          Upload Plugin
+          {{ $t("manage.uploadPlugin") }}
         </Button>
         <Button variant="outline" size="sm" @click="refreshPlugins">
           <RefreshCcw class="h-4 w-4 mr-2" />
-          Refresh
+          {{ $t("manage.refresh") }}
         </Button>
       </div>
     </template>
@@ -19,22 +16,22 @@
     <!-- Stats -->
     <div class="grid gap-4 md:grid-cols-3">
       <MetricCard
-        title="Custom Plugins"
+        :title="$t('manage.stats.customPlugins')"
         :metric="customPlugins.length"
-        subtitle="Uploaded by your organization"
+        :subtitle="$t('manage.stats.uploadedByOrg')"
         :icon="Package"
       />
       <MetricCard
-        title="Enabled"
+        :title="$t('manage.stats.enabled')"
         :metric="enabledCustomPlugins.length"
-        subtitle="Currently active"
+        :subtitle="$t('manage.stats.currentlyActive')"
         :icon="CheckCircle"
         subtitle-color="green"
       />
       <MetricCard
-        title="Total Size"
+        :title="$t('manage.stats.totalSize')"
         :metric="formatTotalSize(totalSize)"
-        subtitle="Storage used"
+        :subtitle="$t('manage.stats.storageUsed')"
         :icon="HardDrive"
       />
     </div>
@@ -44,7 +41,7 @@
       <CardContent class="py-8">
         <div class="flex items-center justify-center">
           <RefreshCcw class="h-6 w-6 animate-spin text-neutral-muted" />
-          <span class="ml-2 text-neutral-muted">Loading plugins...</span>
+          <span class="ml-2 text-neutral-muted">{{ $t("manage.loading") }}</span>
         </div>
       </CardContent>
     </Card>
@@ -53,13 +50,13 @@
     <Card v-else-if="customPlugins.length === 0">
       <CardContent class="py-12 text-center">
         <Package class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-        <h3 class="text-lg font-medium mb-2">No custom plugins</h3>
+        <h3 class="text-lg font-medium mb-2">{{ $t("manage.empty.title") }}</h3>
         <p class="text-neutral-muted mb-4">
-          Upload your first custom plugin to get started
+          {{ $t("manage.empty.description") }}
         </p>
         <Button @click="navigateToUpload">
           <Upload class="h-4 w-4 mr-2" />
-          Upload Plugin
+          {{ $t("manage.uploadPlugin") }}
         </Button>
       </CardContent>
     </Card>
@@ -67,7 +64,7 @@
     <!-- Plugins Table -->
     <Card v-else>
       <CardHeader>
-        <CardTitle>Custom Plugins</CardTitle>
+        <CardTitle>{{ $t("manage.table.title") }}</CardTitle>
       </CardHeader>
       <CardContent>
         <div class="space-y-4">
@@ -78,7 +75,9 @@
           >
             <div class="flex items-center space-x-4">
               <!-- Thumbnail -->
-              <div class="w-12 h-12 rounded-lg overflow-hidden bg-neutral-muted flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded-lg overflow-hidden bg-neutral-muted flex items-center justify-center"
+              >
                 <img
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
@@ -93,17 +92,17 @@
                 <div class="flex items-center space-x-2">
                   <h4 class="font-medium">{{ plugin.name }}</h4>
                   <Badge v-if="plugin.enabled" variant="default" class="text-xs">
-                    Enabled
+                    {{ $t("common.enabled") }}
                   </Badge>
                   <Badge v-else variant="secondary" class="text-xs">
-                    Disabled
+                    {{ $t("common.disabled") }}
                   </Badge>
                 </div>
                 <div class="flex items-center space-x-4 text-sm text-neutral-muted mt-1">
-                  <span>Version: {{ plugin.version }}</span>
-                  <span>ID: {{ plugin.id }}</span>
+                  <span>{{ $t("manage.table.version", { version: plugin.version }) }}</span>
+                  <span>{{ $t("manage.table.id", { id: plugin.id }) }}</span>
                   <span v-if="plugin.uploadedAt">
-                    Uploaded: {{ formatDate(plugin.uploadedAt) }}
+                    {{ $t("manage.table.uploaded", { date: formatDate(plugin.uploadedAt) }) }}
                   </span>
                 </div>
               </div>
@@ -119,7 +118,11 @@
                 @click="enablePlugin(plugin.id)"
               >
                 <Plug class="h-3 w-3 mr-1" />
-                {{ enablingPlugin === plugin.id ? "Enabling..." : "Enable" }}
+                {{
+                  enablingPlugin === plugin.id
+                    ? $t("manage.actions.enabling")
+                    : $t("manage.actions.enable")
+                }}
               </Button>
               <Button
                 v-else
@@ -129,25 +132,21 @@
                 @click="disablePlugin(plugin.id)"
               >
                 <Power class="h-3 w-3 mr-1" />
-                {{ disablingPlugin === plugin.id ? "Disabling..." : "Disable" }}
+                {{
+                  disablingPlugin === plugin.id
+                    ? $t("manage.actions.disabling")
+                    : $t("manage.actions.disable")
+                }}
               </Button>
 
-              <Button
-                size="sm"
-                variant="outline"
-                @click="navigateToSettings(plugin.id)"
-              >
+              <Button size="sm" variant="outline" @click="navigateToSettings(plugin.id)">
                 <Settings class="h-3 w-3 mr-1" />
-                Settings
+                {{ $t("manage.actions.settings") }}
               </Button>
 
-              <Button
-                size="sm"
-                variant="outline"
-                @click="updatePlugin(plugin.id)"
-              >
+              <Button size="sm" variant="outline" @click="updatePlugin(plugin.id)">
                 <Upload class="h-3 w-3 mr-1" />
-                Update
+                {{ $t("manage.actions.update") }}
               </Button>
 
               <Button
@@ -157,7 +156,11 @@
                 @click="deletePlugin(plugin.id)"
               >
                 <Trash2 class="h-3 w-3 mr-1" />
-                {{ deletingPlugin === plugin.id ? "Deleting..." : "Delete" }}
+                {{
+                  deletingPlugin === plugin.id
+                    ? $t("manage.actions.deleting")
+                    : $t("manage.actions.delete")
+                }}
               </Button>
             </div>
           </div>
@@ -185,6 +188,7 @@ import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
 
+const { t } = useI18n();
 const router = useRouter();
 const appStore = useAppStore();
 const authStore = useAuthStore();
@@ -254,10 +258,10 @@ const enablePlugin = async (pluginId: string) => {
   enablingPlugin.value = pluginId;
   try {
     await appStore.enablePlugin(pluginId);
-    toast.success("Plugin enabled successfully");
+    toast.success(t("manage.toast.enabledSuccess"));
   } catch (error: any) {
     console.error("Failed to enable plugin:", error);
-    toast.error(error.message || "Failed to enable plugin");
+    toast.error(error.message || t("manage.toast.enableFailed"));
   } finally {
     enablingPlugin.value = null;
   }
@@ -267,17 +271,17 @@ const disablePlugin = async (pluginId: string) => {
   disablingPlugin.value = pluginId;
   try {
     await appStore.disablePlugin(pluginId);
-    toast.success("Plugin disabled successfully");
+    toast.success(t("manage.toast.disabledSuccess"));
   } catch (error: any) {
     console.error("Failed to disable plugin:", error);
-    toast.error(error.message || "Failed to disable plugin");
+    toast.error(error.message || t("manage.toast.disableFailed"));
   } finally {
     disablingPlugin.value = null;
   }
 };
 
 const deletePlugin = async (pluginId: string) => {
-  if (!confirm("Are you sure you want to delete this plugin? This action cannot be undone.")) {
+  if (!confirm(t("manage.confirmDelete"))) {
     return;
   }
 
@@ -293,14 +297,14 @@ const deletePlugin = async (pluginId: string) => {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Failed to delete plugin");
+      throw new Error(error.error || t("manage.toast.deleteFailed"));
     }
 
-    toast.success("Plugin deleted successfully");
+    toast.success(t("manage.toast.deletedSuccess"));
     await appStore.fetchPlugins();
   } catch (error: any) {
     console.error("Failed to delete plugin:", error);
-    toast.error(error.message || "Failed to delete plugin");
+    toast.error(error.message || t("manage.toast.deleteFailed"));
   } finally {
     deletingPlugin.value = null;
   }
@@ -308,7 +312,7 @@ const deletePlugin = async (pluginId: string) => {
 
 const updatePlugin = (pluginId: string) => {
   // TODO: Implement update flow
-  toast.info("Update functionality coming soon");
+  toast.info(t("manage.updateComingSoon"));
 };
 
 const navigateToSettings = (pluginId: string) => {
@@ -335,11 +339,11 @@ definePageMeta({
 });
 
 useHead({
-  title: "Manage Custom Plugins - Hay Dashboard",
+  title: t("manage.headTitle"),
   meta: [
     {
       name: "description",
-      content: "View and manage your organization's custom plugins",
+      content: t("manage.description"),
     },
   ],
 });
