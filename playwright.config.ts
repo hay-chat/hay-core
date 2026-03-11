@@ -89,11 +89,13 @@ export default defineConfig({
       command: "cd server && npm run dev",
       url: "http://localhost:3001",
       reuseExistingServer: !process.env.CI,
+      timeout: 120000,
     },
     {
       command: "cd dashboard && PORT=3000 npm run dev",
       url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,
+      timeout: 120000,
     },
   ],
 });

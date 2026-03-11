@@ -8,6 +8,32 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: hay
+          POSTGRES_PASSWORD: hay_password
+          POSTGRES_DB: hay_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hay -d hay_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,11 +43,36 @@ jobs:
         run: npm ci
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
+      - name: Run database migrations
+        run: cd server && npm run migration:run
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: hay
+          DB_PASSWORD: hay_password
+          DB_NAME: hay_db
+          DB_SSL: false
+          JWT_SECRET: ci-test-secret-not-for-production-use-00000
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-not-for-production-00
       - name: Run Playwright tests
         run: npx playwright test
         env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: hay
+          DB_PASSWORD: hay_password
+          DB_NAME: hay_db
+          DB_SSL: false
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
           JWT_SECRET: ci-test-secret-not-for-production-use-00000
           JWT_REFRESH_SECRET: ci-test-refresh-secret-not-for-production-00
+          OPENAI_API_KEY: sk-fake-key-for-ci-tests
+          BASE_DOMAIN: localhost
+          APP_PROTOCOL: http
+          API_DOMAIN: localhost:3001
+          DASHBOARD_DOMAIN: localhost:3000
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
