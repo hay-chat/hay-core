@@ -1,0 +1,69 @@
+{
+  "organizations": {
+    "header": {
+      "created": "Criado em {date}",
+      "members": "{count} membros",
+      "agents": "{count} agentes",
+      "edit": "Editar",
+      "switchTo": "Trocar Para"
+    },
+    "tabs": {
+      "overview": "Visão Geral",
+      "members": "Membros",
+      "settings": "Configurações"
+    },
+    "overview": {
+      "totalMembers": "Total de Membros",
+      "activeAgents": "Agentes Ativos",
+      "conversations": "Conversas",
+      "storageUsed": "Armazenamento Usado",
+      "thisMonth": "+{count} este mês",
+      "thisWeek": "+{count} esta semana",
+      "fromLastMonth": "+{percent}% em relação ao mês passado",
+      "ofLimit": "de {limit}GB de limite",
+      "recentActivity": "Atividade Recente",
+      "latestUpdates": "Últimas atualizações nesta organização",
+      "resourceUsage": "Uso de Recursos",
+      "currentMonthUsage": "Visão geral do uso do mês atual",
+      "apiCalls": "Chamadas de API",
+      "storage": "Armazenamento",
+      "activeAgentsUsage": "Agentes Ativos"
+    },
+    "members": {
+      "title": "Membros da Organização",
+      "description": "Gerencie quem tem acesso a esta organização",
+      "inviteMember": "Convidar Membro",
+      "roles": {
+        "admin": "Administrador",
+        "member": "Membro",
+        "viewer": "Visualizador"
+      }
+    },
+    "settings": {
+      "generalTitle": "Configurações Gerais",
+      "generalDescription": "Informações básicas e preferências da organização",
+      "orgName": "Nome da Organização",
+      "orgNamePlaceholder": "Digite o nome da organização",
+      "descriptionLabel": "Descrição",
+      "descriptionPlaceholder": "Digite a descrição",
+      "timezone": "Fuso Horário",
+      "saveChanges": "Salvar Alterações",
+      "securityTitle": "Configurações de Segurança",
+      "securityDescription": "Configure políticas de segurança para esta organização",
+      "twoFactor": "Autenticação de Dois Fatores",
+      "twoFactorDescription": "Exigir 2FA para todos os membros",
+      "sso": "Integração SSO",
+      "ssoDescription": "Ativar login único",
+      "saveSecuritySettings": "Salvar Configurações de Segurança",
+      "apiKeys": "Chaves de API",
+      "apiKeysDescription": "Gerencie chaves de API para esta organização",
+      "primaryApiKey": "Chave de API Principal",
+      "usedForApiAccess": "Usada para acesso à API",
+      "regenerate": "Regenerar",
+      "copy": "Copiar"
+    },
+    "notFound": "Organização não encontrada",
+    "notFoundDescription": "A organização que você procura não existe ou você não tem permissão para visualizá-la.",
+    "backToOrganizations": "Voltar para Organizações"
+  }
+}

@@ -2,38 +2,38 @@
 <mj-section mj-class="section-white">
   <mj-column>
     <mj-text mj-class="h2" padding="0 0 20px 0">
-      Verify Your New Email Address
+      {{ t.verify-email-change.title }}
     </mj-text>
 
     <mj-text mj-class="text-body">
-      Hi {{userName}},
+      {{ t.common.hi }}
     </mj-text>
 
     <mj-text mj-class="text-body" padding="10px 0">
-      We received a request to change the email address for your account from <strong>{{oldEmail}}</strong> to <strong>{{newEmail}}</strong>.
+      {{ t.verify-email-change.body }}
     </mj-text>
 
     <mj-text mj-class="text-body">
-      To complete this change, please verify your new email address by clicking the button below:
+      {{ t.verify-email-change.completeChange }}
     </mj-text>
 
     <mj-button mj-class="btn-primary" href="{{verificationUrl}}">
-      Verify Email Address
+      {{ t.verify-email-change.verifyButton }}
     </mj-button>
 
     <mj-text mj-class="text-small" padding="10px 0">
-      Or copy and paste this link into your browser:<br/>
+      {{ t.common.copyPasteLink }}<br/>
       <a href="{{verificationUrl}}" class="link-primary word-break">{{verificationUrl}}</a>
     </mj-text>
 
     <mj-divider padding="20px 0" />
 
     <mj-text mj-class="text-danger" font-size="13px" line-height="20px" padding="0 0 10px 0">
-      ⚠️ <strong>Important:</strong> This verification link will expire in 24 hours.
+      ⚠️ <strong>{{ t.verify-email-change.expirationWarning }}</strong>
     </mj-text>
 
     <mj-text mj-class="text-small">
-      If you didn't request this change, please ignore this email or contact our support team immediately.
+      {{ t.verify-email-change.ignoreEmail }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -42,13 +42,13 @@
 <mj-section mj-class="section-gray">
   <mj-column>
     <mj-text mj-class="h3" padding="0 0 10px 0">
-      Security Details
+      {{ t.common.securityDetails }}
     </mj-text>
     <mj-text mj-class="text-small">
-      <strong>Time:</strong> {{requestTime}}<br/>
-      <strong>IP Address:</strong> {{ipAddress}}<br/>
-      <strong>Browser:</strong> {{browser}}<br/>
-      <strong>Location:</strong> {{location}}
+      <strong>{{ t.common.time }}:</strong> {{requestTime}}<br/>
+      <strong>{{ t.common.ipAddress }}:</strong> {{ipAddress}}<br/>
+      <strong>{{ t.common.browser }}:</strong> {{browser}}<br/>
+      <strong>{{ t.common.location }}:</strong> {{location}}
     </mj-text>
   </mj-column>
 </mj-section>

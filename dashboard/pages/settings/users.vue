@@ -1,7 +1,7 @@
 <template>
   <Page
-    title="Team Members"
-    description="Manage who has access to your organization"
+    :title="$t('users.title')"
+    :description="$t('users.description')"
     width="max"
   >
     <!-- Organization Members -->
@@ -9,15 +9,14 @@
       <CardHeader>
         <div class="flex items-center justify-between">
           <div>
-            <CardTitle>Team Members</CardTitle>
-            <CardDescription
-              >Manage who has access to
-              {{ userStore.activeOrganization?.name }}</CardDescription
-            >
+            <CardTitle>{{ $t('users.teamMembers') }}</CardTitle>
+            <CardDescription>{{
+              $t('users.manageAccess', { name: userStore.activeOrganization?.name })
+            }}</CardDescription>
           </div>
           <Button v-if="userStore.isAdmin" @click="inviteDialogOpen = true">
             <UserPlus class="h-4 w-4 mr-2" />
-            Invite Member
+            {{ $t('users.inviteMember') }}
           </Button>
         </div>
       </CardHeader>
@@ -28,7 +27,7 @@
                 v-model="searchQuery"
                 type="text"
                 :icon-start="Search"
-                placeholder="Search members by name or email..."
+                :placeholder="$t('users.searchPlaceholder')"
                 class="flex-1"
                 @input="debouncedSearch"
               />
@@ -37,14 +36,14 @@
                 v-model="roleFilter"
                 type="select"
                 class="w-[180px]"
-                placeholder="All Roles"
+                :placeholder="$t('users.allRoles')"
                 :options="[
-                  { label: 'All Roles', value: '' },
-                  { label: 'Owner', value: 'owner' },
-                  { label: 'Admin', value: 'admin' },
-                  { label: 'Contributor', value: 'contributor' },
-                  { label: 'Member', value: 'member' },
-                  { label: 'Viewer', value: 'viewer' },
+                  { label: $t('users.allRoles'), value: '' },
+                  { label: $t('users.roles.owner'), value: 'owner' },
+                  { label: $t('users.roles.admin'), value: 'admin' },
+                  { label: $t('users.roles.contributor'), value: 'contributor' },
+                  { label: $t('users.roles.member'), value: 'member' },
+                  { label: $t('users.roles.viewer'), value: 'viewer' },
                 ]"
                 @update:model-value="loadMembers(true)"
               />
@@ -57,8 +56,8 @@
             <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
               {{
                 searchQuery || roleFilter
-                  ? "No members found matching your filters"
-                  : "No members found"
+                  ? $t('users.noMembersFiltered')
+                  : $t('users.noMembers')
               }}
             </div>
 
@@ -100,7 +99,7 @@
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem @click="openRoleDialog(member)">
                         <Shield class="h-4 w-4 mr-2" />
-                        Change Role
+                        {{ $t('users.changeRole') }}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -108,7 +107,7 @@
                         @click="openRemoveMemberDialog(member)"
                       >
                         <Trash2 class="h-4 w-4 mr-2" />
-                        Remove Member
+                        {{ $t('users.removeMember') }}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -122,13 +121,16 @@
               class="flex items-center justify-between mt-4 pt-4 border-t"
             >
               <div class="text-sm text-muted-foreground">
-                Showing {{ (currentPage - 1) * pageSize + 1 }} to
-                {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} members
+                {{ $t('users.showingPagination', {
+                  from: (currentPage - 1) * pageSize + 1,
+                  to: Math.min(currentPage * pageSize, totalItems),
+                  total: totalItems
+                }) }}
               </div>
               <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
                   <ChevronLeft class="h-4 w-4 mr-1" />
-                  Previous
+                  {{ $t('users.previous') }}
                 </Button>
 
                 <div class="flex items-center gap-1">
@@ -150,7 +152,7 @@
                   :disabled="currentPage === totalPages"
                   @click="nextPage"
                 >
-                  Next
+                  {{ $t('users.next') }}
                   <ChevronRight class="h-4 w-4 ml-1" />
                 </Button>
               </div>
@@ -161,8 +163,8 @@
     <!-- Pending Invitations -->
     <Card v-if="userStore.isAdmin">
       <CardHeader>
-        <CardTitle>Pending Invitations</CardTitle>
-        <CardDescription>Invitations sent to join your organization</CardDescription>
+        <CardTitle>{{ $t('users.pendingInvitations') }}</CardTitle>
+        <CardDescription>{{ $t('users.pendingInvitationsDescription') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div v-if="loadingInvitations" class="py-8">
@@ -173,7 +175,7 @@
           v-else-if="invitations.filter((inv) => inv.status === 'pending').length === 0"
           class="text-center py-8 text-muted-foreground"
         >
-          No pending invitations
+          {{ $t('users.noPendingInvitations') }}
         </div>
 
         <div v-else class="space-y-2">
@@ -185,8 +187,8 @@
             <div>
               <p class="font-medium">{{ invitation.email }}</p>
               <p class="text-sm text-muted-foreground">
-                Invited {{ formatDate(invitation.createdAt) }}
-                <span v-if="invitation.invitedBy">by {{ invitation.invitedBy.name }}</span>
+                {{ $t('users.invited', { date: formatDate(invitation.createdAt) }) }}
+                <span v-if="invitation.invitedBy">{{ $t('users.invitedBy', { name: invitation.invitedBy.name }) }}</span>
               </p>
             </div>
             <div class="flex items-center gap-2">
@@ -195,19 +197,19 @@
                 variant="outline"
                 size="xs"
                 :disabled="resendingInvitation === invitation.id"
-                title="Resend invitation"
+                :title="$t('users.resendInvitation')"
                 @click="resendInvitation(invitation.id)"
               >
-                Resend invitation
+                {{ $t('users.resendInvitation') }}
               </Button>
               <Button
                 v-if="invitation.status === 'pending'"
                 variant="outline"
                 size="xs"
-                title="Cancel invitation"
+                :title="$t('users.cancelInvitation')"
                 @click="cancelInvitation(invitation.id)"
               >
-                Cancel invitation
+                {{ $t('users.cancelInvitation') }}
               </Button>
             </div>
           </div>
@@ -219,44 +221,44 @@
     <Dialog v-model:open="inviteDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Invite Team Member</DialogTitle>
+          <DialogTitle>{{ $t('users.inviteDialogTitle') }}</DialogTitle>
           <DialogDescription>
-            Send an invitation to join {{ userStore.activeOrganization?.name }}
+            {{ $t('users.inviteDialogDescription', { name: userStore.activeOrganization?.name }) }}
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
           <Input
             v-model="inviteForm.email"
             type="email"
-            label="Email Address"
-            placeholder="colleague@example.com"
+            :label="$t('users.emailAddress')"
+            :placeholder="$t('users.emailPlaceholder')"
           />
           <div>
-            <label class="text-sm font-medium mb-2 block">Role</label>
+            <label class="text-sm font-medium mb-2 block">{{ $t('users.role') }}</label>
             <Select v-model="inviteForm.role">
               <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
+                <SelectValue :placeholder="$t('users.selectRole')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">Owner</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="contributor">Contributor</SelectItem>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="agent">Agent</SelectItem>
+                <SelectItem value="owner">{{ $t('users.roles.owner') }}</SelectItem>
+                <SelectItem value="admin">{{ $t('users.roles.admin') }}</SelectItem>
+                <SelectItem value="contributor">{{ $t('users.roles.contributor') }}</SelectItem>
+                <SelectItem value="member">{{ $t('users.roles.member') }}</SelectItem>
+                <SelectItem value="viewer">{{ $t('users.roles.viewer') }}</SelectItem>
+                <SelectItem value="agent">{{ $t('users.roles.agent') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <Input
             v-model="inviteForm.message"
             type="textarea"
-            label="Message (Optional)"
-            placeholder="Add a personal message to the invitation"
+            :label="$t('users.messageOptional')"
+            :placeholder="$t('users.messagePlaceholder')"
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="inviteDialogOpen = false">Cancel</Button>
-          <Button :loading="sendingInvite" @click="sendInvitation">Send Invitation</Button>
+          <Button variant="outline" @click="inviteDialogOpen = false">{{ $t('users.cancel') }}</Button>
+          <Button :loading="sendingInvite" @click="sendInvitation">{{ $t('users.sendInvitation') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -265,30 +267,30 @@
     <Dialog v-model:open="roleDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change Member Role</DialogTitle>
-          <DialogDescription> Update the role for {{ selectedMember?.email }} </DialogDescription>
+          <DialogTitle>{{ $t('users.changeRoleDialogTitle') }}</DialogTitle>
+          <DialogDescription>{{ $t('users.changeRoleDialogDescription', { email: selectedMember?.email }) }}</DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
           <div>
-            <label class="text-sm font-medium mb-2 block">Role</label>
+            <label class="text-sm font-medium mb-2 block">{{ $t('users.role') }}</label>
             <Select v-model="roleForm.role">
               <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
+                <SelectValue :placeholder="$t('users.selectRole')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">Owner</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="contributor">Contributor</SelectItem>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="agent">Agent</SelectItem>
+                <SelectItem value="owner">{{ $t('users.roles.owner') }}</SelectItem>
+                <SelectItem value="admin">{{ $t('users.roles.admin') }}</SelectItem>
+                <SelectItem value="contributor">{{ $t('users.roles.contributor') }}</SelectItem>
+                <SelectItem value="member">{{ $t('users.roles.member') }}</SelectItem>
+                <SelectItem value="viewer">{{ $t('users.roles.viewer') }}</SelectItem>
+                <SelectItem value="agent">{{ $t('users.roles.agent') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="roleDialogOpen = false">Cancel</Button>
-          <Button :loading="updatingRole" @click="updateMemberRole">Update Role</Button>
+          <Button variant="outline" @click="roleDialogOpen = false">{{ $t('users.cancel') }}</Button>
+          <Button :loading="updatingRole" @click="updateMemberRole">{{ $t('users.updateRole') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -296,9 +298,9 @@
     <!-- Remove Member Confirmation Dialog -->
     <ConfirmDialog
       v-model:open="removeMemberDialogOpen"
-      title="Remove Member"
-      :description="`Are you sure you want to remove ${memberToRemove?.email} from the organization? This action cannot be undone.`"
-      confirm-text="Remove"
+      :title="$t('users.removeDialogTitle')"
+      :description="$t('users.removeDialogDescription', { email: memberToRemove?.email })"
+      :confirm-text="$t('users.removeConfirmText')"
       :destructive="true"
       @confirm="confirmRemoveMember"
     />
@@ -322,6 +324,7 @@ import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import Avatar from "@/components/ui/Avatar.vue";
 
+const { t } = useI18n();
 const userStore = useUserStore();
 const toastService = useToast();
 
@@ -380,8 +383,8 @@ const loadMembers = async (resetPage = false) => {
     totalPages.value = response.pagination.totalPages;
   } catch (error: any) {
     toastService.error(
-      "Failed to load members",
-      error.message || "Could not retrieve team members",
+      t('users.loadMembersFailed'),
+      error.message || t('users.loadMembersFailedDescription'),
     );
   } finally {
     loading.value = false;
@@ -463,8 +466,8 @@ const loadInvitations = async () => {
     invitations.value = response;
   } catch (error: any) {
     toastService.error(
-      "Failed to load invitations",
-      error.message || "Could not retrieve pending invitations",
+      t('users.loadInvitationsFailed'),
+      error.message || t('users.loadInvitationsFailedDescription'),
     );
   } finally {
     loadingInvitations.value = false;
@@ -473,7 +476,7 @@ const loadInvitations = async () => {
 
 const sendInvitation = async () => {
   if (!inviteForm.value.email) {
-    toastService.error("Email required", "Please enter an email address");
+    toastService.error(t('users.emailRequired'), t('users.emailRequiredDescription'));
     return;
   }
 
@@ -485,13 +488,19 @@ const sendInvitation = async () => {
       message: inviteForm.value.message || undefined,
     });
 
-    toastService.success("Invitation sent", `Invitation sent to ${inviteForm.value.email}`);
+    toastService.success(
+      t('users.invitationSent'),
+      t('users.invitationSentDescription', { email: inviteForm.value.email }),
+    );
 
     inviteDialogOpen.value = false;
     inviteForm.value = { email: "", role: "member", message: "" };
     await loadInvitations();
   } catch (error: any) {
-    toastService.error("Failed to send invitation", error.message || "Could not send invitation");
+    toastService.error(
+      t('users.sendInvitationFailed'),
+      error.message || t('users.sendInvitationFailedDescription'),
+    );
   } finally {
     sendingInvite.value = false;
   }
@@ -500,12 +509,15 @@ const sendInvitation = async () => {
 const cancelInvitation = async (invitationId: string) => {
   try {
     await Hay.invitations.cancelInvitation.mutate({ invitationId });
-    toastService.success("Invitation cancelled", "The invitation has been cancelled");
+    toastService.success(
+      t('users.invitationCancelled'),
+      t('users.invitationCancelledDescription'),
+    );
     await loadInvitations();
   } catch (error: any) {
     toastService.error(
-      "Failed to cancel invitation",
-      error.message || "Could not cancel invitation",
+      t('users.cancelInvitationFailed'),
+      error.message || t('users.cancelInvitationFailedDescription'),
     );
   }
 };
@@ -514,12 +526,15 @@ const resendInvitation = async (invitationId: string) => {
   resendingInvitation.value = invitationId;
   try {
     await Hay.invitations.resendInvitation.mutate({ invitationId });
-    toastService.success("Invitation resent", "The invitation email has been sent again");
+    toastService.success(
+      t('users.invitationResent'),
+      t('users.invitationResentDescription'),
+    );
     await loadInvitations();
   } catch (error: any) {
     toastService.error(
-      "Failed to resend invitation",
-      error.message || "Could not resend invitation",
+      t('users.resendInvitationFailed'),
+      error.message || t('users.resendInvitationFailedDescription'),
     );
   } finally {
     resendingInvitation.value = null;
@@ -543,14 +558,17 @@ const updateMemberRole = async () => {
     });
 
     toastService.success(
-      "Role updated",
-      `${selectedMember.value.email}'s role has been updated to ${roleForm.value.role}`,
+      t('users.roleUpdated'),
+      t('users.roleUpdatedDescription', { email: selectedMember.value.email, role: roleForm.value.role }),
     );
 
     roleDialogOpen.value = false;
     await loadMembers();
   } catch (error: any) {
-    toastService.error("Failed to update role", error.message || "Could not update member role");
+    toastService.error(
+      t('users.updateRoleFailed'),
+      error.message || t('users.updateRoleFailedDescription'),
+    );
   } finally {
     updatingRole.value = false;
   }
@@ -567,12 +585,15 @@ const confirmRemoveMember = async () => {
   try {
     await Hay.organizations.removeMember.mutate({ userId: memberToRemove.value.userId });
     toastService.success(
-      "Member removed",
-      `${memberToRemove.value.email} has been removed from the organization`,
+      t('users.memberRemoved'),
+      t('users.memberRemovedDescription', { email: memberToRemove.value.email }),
     );
     await loadMembers();
   } catch (error: any) {
-    toastService.error("Failed to remove member", error.message || "Could not remove member");
+    toastService.error(
+      t('users.removeMemberFailed'),
+      error.message || t('users.removeMemberFailedDescription'),
+    );
   } finally {
     memberToRemove.value = null;
   }

@@ -1,0 +1,69 @@
+{
+  "queue": {
+    "title": "Fila de Tarefas",
+    "description": "Monitore e gerencie tarefas em segundo plano e processamento.",
+    "stats": {
+      "pending": "Pendentes",
+      "processing": "Processando",
+      "completed": "Concluídas",
+      "failed": "Falharam"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar tarefas por tipo ou ID...",
+      "allStatus": "Todos os Status",
+      "statusPending": "Pendente",
+      "statusQueued": "Na Fila",
+      "statusProcessing": "Processando",
+      "statusCompleted": "Concluído",
+      "statusFailed": "Falhou",
+      "statusCancelled": "Cancelado",
+      "statusRetrying": "Tentando Novamente",
+      "allTypes": "Todos os Tipos",
+      "typeDocumentUpload": "Upload de Documento",
+      "typeDocumentProcessing": "Processamento de Documento",
+      "typeEmail": "E-mail",
+      "typeExport": "Exportação",
+      "typeImport": "Importação"
+    },
+    "table": {
+      "loadingJobs": "Carregando tarefas...",
+      "noJobsFound": "Nenhuma tarefa encontrada",
+      "noJobsMatchingFilters": "Não há tarefas correspondentes aos seus filtros.",
+      "jobId": "ID da Tarefa",
+      "type": "Tipo",
+      "status": "Status",
+      "priority": "Prioridade",
+      "progress": "Progresso",
+      "created": "Criado",
+      "duration": "Duração",
+      "actions": "Ações",
+      "retryJob": "Tentar Novamente",
+      "cancelJob": "Cancelar Tarefa"
+    },
+    "pagination": {
+      "showingJobs": "Mostrando {from} a {to} de {total} tarefas"
+    },
+    "details": {
+      "title": "Detalhes da Tarefa",
+      "id": "ID",
+      "type": "Tipo",
+      "status": "Status",
+      "priority": "Prioridade",
+      "attempts": "Tentativas",
+      "created": "Criado",
+      "started": "Iniciado",
+      "completed": "Concluído",
+      "payload": "Payload",
+      "result": "Resultado",
+      "error": "Erro",
+      "logs": "Logs"
+    },
+    "priority": {
+      "low": "Baixa",
+      "normal": "Normal",
+      "high": "Alta",
+      "critical": "Crítica",
+      "unknown": "Desconhecida"
+    }
+  }
+}

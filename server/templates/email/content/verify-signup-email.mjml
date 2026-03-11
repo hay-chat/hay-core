@@ -2,34 +2,34 @@
 <mj-section mj-class="section-white">
   <mj-column>
     <mj-text mj-class="h2" padding="0 0 20px 0">
-      Verify Your Email Address
+      {{ t.verify-signup-email.title }}
     </mj-text>
 
     <mj-text mj-class="text-body">
-      Hi {{userName}},
+      {{ t.common.hi }}
     </mj-text>
 
     <mj-text mj-class="text-body" padding="10px 0">
-      Thank you for signing up for Hay! To complete your registration, please verify your email address by clicking the button below:
+      {{ t.verify-signup-email.body }}
     </mj-text>
 
     <mj-button mj-class="btn-primary" href="{{verificationUrl}}">
-      Verify Email Address
+      {{ t.verify-signup-email.verifyButton }}
     </mj-button>
 
     <mj-text mj-class="text-small" padding="10px 0">
-      Or copy and paste this link into your browser:<br/>
+      {{ t.common.copyPasteLink }}<br/>
       <a href="{{verificationUrl}}" class="link-primary word-break">{{verificationUrl}}</a>
     </mj-text>
 
     <mj-divider padding="20px 0" />
 
     <mj-text mj-class="text-danger" font-size="13px" line-height="20px" padding="0 0 10px 0">
-      ⚠️ <strong>Important:</strong> This verification link will expire in 24 hours.
+      ⚠️ <strong>{{ t.verify-signup-email.expirationWarning }}</strong>
     </mj-text>
 
     <mj-text mj-class="text-small">
-      If you didn't create an account, please ignore this email.
+      {{ t.verify-signup-email.ignoreEmail }}
     </mj-text>
   </mj-column>
 </mj-section>

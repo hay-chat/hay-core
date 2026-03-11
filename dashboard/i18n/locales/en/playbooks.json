@@ -1,0 +1,205 @@
+{
+  "page": {
+    "title": "Playbooks",
+    "description": "Automated conversation flows and responses for your agents",
+    "headTitle": "Playbooks - Hay Dashboard"
+  },
+  "actions": {
+    "generatePlaybook": "Generate Playbook",
+    "createPlaybook": "Create Playbook",
+    "createFirstPlaybook": "Create Your First Playbook",
+    "createPlaybookOpenEditor": "Create Playbook & Open Editor",
+    "deletePlaybook": "Delete Playbook",
+    "saveChanges": "Save Changes",
+    "viewAllPlaybooks": "View All Playbooks",
+    "continueEditing": "Continue Editing",
+    "backToList": "Back to list",
+    "previous": "Previous",
+    "continue": "Continue",
+    "confirmLeave": "Leave Page",
+    "leave": "Leave"
+  },
+  "stats": {
+    "totalPlaybooks": "Total Playbooks",
+    "active": "Active",
+    "totalTriggers": "Total Triggers",
+    "newThisMonth": "+{count} this month",
+    "percentOfTotal": "{percent}% of total",
+    "last30Days": "Last 30 days"
+  },
+  "filters": {
+    "searchPlaceholder": "Search playbooks...",
+    "allCategories": "All Categories",
+    "customerSupport": "Customer Support",
+    "sales": "Sales",
+    "technical": "Technical",
+    "custom": "Custom",
+    "allStatus": "All Status",
+    "statusActive": "Active",
+    "statusArchived": "Archived",
+    "statusDraft": "Draft"
+  },
+  "table": {
+    "playbooks": "Playbooks",
+    "name": "Name",
+    "agents": "Agents",
+    "agentsCount": "{count} agents",
+    "status": "Status",
+    "created": "Created",
+    "actions": "Actions"
+  },
+  "empty": {
+    "noPlaybooksFound": "No playbooks found",
+    "noPlaybooksCreated": "No playbooks created yet",
+    "adjustSearch": "Try adjusting your search terms.",
+    "createFirst": "Create your first playbook to automate conversations."
+  },
+  "form": {
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g., Customer Support Automation",
+    "triggerLabel": "Trigger",
+    "triggerPlaceholder": "This playbook will be activated when customer says:\n - I need help with my account...",
+    "triggerHint": "Define when this playbook should be activated",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe what this playbook does...",
+    "instructionsLabel": "Instructions",
+    "instructionsHint": "Create numbered step-by-step instructions that agents will follow when executing this playbook",
+    "statusLabel": "Status",
+    "assignAgents": "Assign Agents",
+    "assignedAgents": "Assigned Agents",
+    "loadingAgents": "Loading agents...",
+    "noAgentsAvailable": "No agents available. Create agents first.",
+    "createdDate": "Created: {date}",
+    "lastUpdated": "Last updated: {date}"
+  },
+  "edit": {
+    "title": "Edit {name}",
+    "description": "Update your playbook configuration",
+    "headTitle": "Edit Playbook - Hay Dashboard"
+  },
+  "create": {
+    "title": "Create New",
+    "description": "Define automated conversation flows for your agents",
+    "headTitle": "Create Playbook - Hay Dashboard",
+    "headDescription": "Create a new automated conversation playbook",
+    "editHeadDescription": "Edit your automated conversation playbook"
+  },
+  "validation": {
+    "titleRequired": "Playbook title is required",
+    "titleMaxLength": "Playbook title must be less than 255 characters",
+    "triggerRequired": "Trigger is required",
+    "triggerMaxLength": "Trigger must be less than 255 characters"
+  },
+  "toast": {
+    "deleteSuccess": "Playbook deleted successfully",
+    "deleteFailed": "Failed to delete playbook",
+    "updateSuccess": "Playbook updated successfully",
+    "createSuccess": "Playbook created successfully",
+    "saveFailed": "Failed to {action} playbook. Please try again.",
+    "loadFailed": "Failed to load playbooks",
+    "loadAgentsFailed": "Failed to load agents",
+    "playbookNotFound": "Playbook not found",
+    "generateFailed": "Failed to generate instructions. Please try again.",
+    "createFailed": "Failed to create playbook. Please try again."
+  },
+  "delete": {
+    "title": "Delete Playbook",
+    "confirmMessage": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
+  },
+  "loading": {
+    "loadingPlaybook": "Loading playbook...",
+    "playbookNotFound": "Playbook not found"
+  },
+  "wizard": {
+    "title": "Create Playbook",
+    "description": "Follow the steps to create a new playbook",
+    "headTitle": "Create Playbook - Hay Dashboard",
+    "steps": {
+      "purpose": "Purpose",
+      "actions": "Actions",
+      "documents": "Documents",
+      "boundaries": "Boundaries",
+      "generate": "Generate"
+    },
+    "cancelDialog": {
+      "title": "Leave wizard?",
+      "description": "Your progress will be lost. Are you sure you want to leave?"
+    },
+    "successDialog": {
+      "title": "Playbook Created",
+      "description": "Your playbook has been created successfully. What would you like to do next?"
+    },
+    "purpose": {
+      "label": "What is this playbook for?",
+      "placeholder": "e.g. Handle refund requests for orders placed in the last 30 days",
+      "helperText": "Describe what this playbook should help resolve or automate. 1–3 sentences recommended.",
+      "tipsTitle": "Tips for a good description",
+      "tipsFocus": "Focus on the specific problem or task this playbook should handle",
+      "tipsMention": "Mention who typically needs help with this (e.g. customers, internal team)",
+      "tipsOutcomes": "Include any key outcomes you expect (e.g. issue a refund, escalate to manager)"
+    },
+    "actions": {
+      "label": "What actions can this playbook take?",
+      "helperText": "Select the tools this playbook is allowed to use. If none are selected, the playbook will be answer-only.",
+      "errorLoadTools": "Failed to load available tools. Please try again later.",
+      "noTools": "No integrations are connected yet. This playbook will be answer-only unless you connect integrations in Settings."
+    },
+    "documents": {
+      "label": "Which documents should this playbook use?",
+      "helperText": "Select documents to ground the playbook in your knowledge base. You can skip this step if no documents are needed.",
+      "errorLoad": "Failed to load documents. Please try again later.",
+      "noDocuments": "No documents found. You can continue without documents — the playbook will rely only on the instructions you provide.",
+      "suggestedTitle": "Suggested for you",
+      "suggestedHint": "Based on your playbook description",
+      "allDocumentsTitle": "All documents",
+      "filterPlaceholder": "Filter documents...",
+      "documentsSelected": "{count} document selected | {count} documents selected"
+    },
+    "boundaries": {
+      "label": "Set boundaries and escalation rules",
+      "helperText": "Define when the playbook should escalate to a human and what topics it should avoid.",
+      "whyMatters": "Why this matters",
+      "warningText": "Clear escalation rules prevent your playbook from handling sensitive situations it shouldn't. Boundaries keep responses focused and safe.",
+      "escalationLabel": "Always escalate when...",
+      "escalationPlaceholder": "e.g. Customer mentions legal action, requests a refund over $500...",
+      "boundariesLabel": "Never answer questions about...",
+      "boundariesPlaceholder": "e.g. Internal company policies, competitor pricing...",
+      "acknowledgment": "I have reviewed the escalation rules and boundaries",
+      "escalationExamples": {
+        "legal": "Legal threats",
+        "refund": "Refund requests over $500",
+        "safety": "Safety concerns",
+        "manager": "Customer asks for manager"
+      },
+      "boundaryExamples": {
+        "policies": "Internal policies",
+        "competitor": "Competitor comparisons",
+        "medical": "Medical/legal advice",
+        "employee": "Employee information"
+      }
+    },
+    "generate": {
+      "summaryTitle": "Summary",
+      "purposeLabel": "Purpose",
+      "actionsLabel": "Actions",
+      "actionsNone": "None (answer-only)",
+      "actionsSelected": "{count} selected",
+      "documentsLabel": "Documents",
+      "documentsNone": "None",
+      "documentsSelected": "{count} selected",
+      "boundariesLabel": "Boundaries",
+      "boundariesConfigured": "Configured",
+      "boundariesNone": "None set",
+      "readyText": "Ready to generate your playbook instructions based on the information you provided.",
+      "generateButton": "Generate Instructions",
+      "generatingText": "Generating instructions...",
+      "generatingHint": "This may take a few seconds.",
+      "titleLabel": "Title",
+      "triggerLabel": "Trigger",
+      "descriptionLabel": "Description",
+      "instructionsLabel": "Instructions",
+      "startingPointText": "This is a starting point. You'll be able to refine everything in the editor.",
+      "regenerateButton": "Regenerate"
+    }
+  }
+}

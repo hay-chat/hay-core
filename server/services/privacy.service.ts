@@ -14,7 +14,7 @@ import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
 
-import { emailService } from "./email.service";
+import { emailService, getOrganizationLocale } from "./email.service";
 import { auditLogService } from "./audit-log.service";
 import { jobQueueService } from "./job-queue.service";
 import { vectorStoreService } from "./vector-store.service";
@@ -900,6 +900,7 @@ export class PrivacyService {
     token: string,
     type: "export" | "deletion",
     firstName?: string,
+    organizationId?: string,
   ): Promise<void> {
     await emailService.initialize();
 
@@ -907,13 +908,12 @@ export class PrivacyService {
     const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const subject =
-      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject,
       template,
+      locale,
       variables: {
         userName: firstName || email,
         verificationUrl,
@@ -935,16 +935,18 @@ export class PrivacyService {
     email: string,
     requestId: string,
     downloadToken: string,
+    organizationId?: string,
   ): Promise<void> {
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
     const downloadUrl = `${baseUrl}/privacy/download?requestId=${requestId}&token=${downloadToken}`;
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Export is Ready",
       template: "privacy-export-ready",
+      locale,
       variables: {
         downloadUrl,
         expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
@@ -961,15 +963,16 @@ export class PrivacyService {
   /**
    * Send deletion complete notification
    */
-  private async sendDeletionCompleteEmail(email: string): Promise<void> {
+  private async sendDeletionCompleteEmail(email: string, organizationId?: string): Promise<void> {
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Has Been Deleted",
       template: "privacy-deletion-complete",
+      locale,
       variables: {
         companyName: "Hay",
         supportUrl: `${baseUrl}/support`,
@@ -2256,13 +2259,12 @@ please contact ${supportContact}.
     const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const subject =
-      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject,
       template,
+      locale,
       variables: {
         userName: customerName || email,
         verificationUrl,
@@ -2290,11 +2292,12 @@ please contact ${supportContact}.
 
     const baseUrl = getDashboardUrl();
     const downloadUrl = `${baseUrl}/privacy/download?requestId=${requestId}&token=${downloadToken}`;
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Export is Ready",
       template: "privacy-export-ready",
+      locale,
       variables: {
         downloadUrl,
         expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
@@ -2318,11 +2321,12 @@ please contact ${supportContact}.
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Has Been Deleted",
       template: "privacy-deletion-complete",
+      locale,
       variables: {
         companyName: "Hay",
         supportUrl: `${baseUrl}/support`,

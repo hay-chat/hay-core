@@ -1,22 +1,22 @@
 <template>
   <Page
-    :title="isEditMode ? `Edit ${playbook?.title}` : 'Create New'"
+    :title="isEditMode ? t('edit.title', { name: playbook?.title }) : t('create.title')"
     :description="
       isEditMode
-        ? 'Update your playbook configuration'
-        : 'Define automated conversation flows for your agents'
+        ? t('edit.description')
+        : t('create.description')
     "
     width="max"
   >
     <template #header>
       <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        Back to list
+        {{ t('actions.backToList') }}
       </Button>
     </template>
 
     <div v-if="loading" class="text-center py-12">
-      <Loading label="Loading playbook..." />
+      <Loading :label="t('loading.loadingPlaybook')" />
     </div>
 
     <Card v-else-if="!isEditMode || playbook">
@@ -27,8 +27,8 @@
             <Input
               id="title"
               v-model="form.title"
-              label="Title"
-              placeholder="e.g., Customer Support Automation"
+              :label="t('form.titleLabel')"
+              :placeholder="t('form.titlePlaceholder')"
               :class="errors.title ? 'border-red-500' : ''"
               required
             />
@@ -42,13 +42,13 @@
             <Input
               id="trigger"
               v-model="form.trigger"
-              label="Trigger"
+              :label="t('form.triggerLabel')"
               type="textarea"
               :rows="3"
-              :placeholder="`This playbook will be activated when customer says:\n - I need help with my account...`"
+              :placeholder="t('form.triggerPlaceholder')"
               :class="errors.trigger ? 'border-red-500' : ''"
               :character-limit="250"
-              hint="Define when this playbook should be activated"
+              :hint="t('form.triggerHint')"
               required
             />
             <p v-if="errors.trigger" class="text-sm text-red-500">
@@ -60,9 +60,9 @@
           <div class="space-y-2">
             <Input
               v-model="form.description"
-              label="Description"
+              :label="t('form.descriptionLabel')"
               type="textarea"
-              placeholder="Describe what this playbook does..."
+              :placeholder="t('form.descriptionPlaceholder')"
               :rows="3"
             />
           </div>
@@ -71,8 +71,8 @@
           <InstructionsTiptap
             ref="instructionsEditorRef"
             :initial-data="form.instructions"
-            label="Instructions"
-            hint="Create numbered step-by-step instructions that agents will follow when executing this playbook"
+            :label="t('form.instructionsLabel')"
+            :hint="t('form.instructionsHint')"
             :error="errors.instructions"
           />
 
@@ -82,11 +82,11 @@
               id="status"
               v-model="form.status"
               type="select"
-              label="Status"
+              :label="t('form.statusLabel')"
               :options="[
-                { label: 'Draft', value: 'draft' },
-                { label: 'Active', value: 'active' },
-                { label: 'Archived', value: 'archived' },
+                { label: t('filters.statusDraft'), value: 'draft' },
+                { label: t('filters.statusActive'), value: 'active' },
+                { label: t('filters.statusArchived'), value: 'archived' },
               ]"
               class="w-full"
             />
@@ -95,13 +95,13 @@
           <!-- Agent Selection -->
           <div class="space-y-2">
             <label class="text-sm font-medium"
-              >{{ isEditMode ? "Assigned" : "Assign" }} Agents</label
+              >{{ isEditMode ? t('form.assignedAgents') : t('form.assignAgents') }}</label
             >
             <div v-if="loadingAgents" class="p-4 text-center text-neutral-muted">
-              Loading agents...
+              {{ t('form.loadingAgents') }}
             </div>
             <div v-else-if="agents.length === 0" class="p-4 text-center text-neutral-muted">
-              No agents available. Create agents first.
+              {{ t('form.noAgentsAvailable') }}
             </div>
             <div v-else class="space-y-2 border rounded-md p-4">
               <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
@@ -124,9 +124,9 @@
 
           <!-- Metadata (only in edit mode) -->
           <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-neutral-muted">
-            <div v-if="playbook.created_at">Created: {{ formatDate(playbook.created_at) }}</div>
+            <div v-if="playbook.created_at">{{ t('form.createdDate', { date: formatDate(playbook.created_at) }) }}</div>
             <div v-if="playbook.updated_at">
-              Last updated: {{ formatDate(playbook.updated_at) }}
+              {{ t('form.lastUpdated', { date: formatDate(playbook.updated_at) }) }}
             </div>
           </div>
 
@@ -140,7 +140,7 @@
               @click="handleDelete"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              Delete Playbook
+              {{ t('actions.deletePlaybook') }}
             </Button>
 
             <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
@@ -150,14 +150,14 @@
                 :disabled="isSubmitting"
                 @click="handleCancel"
               >
-                Cancel
+                {{ $t('common.cancel') }}
               </Button>
               <Button
                 type="submit"
                 :loading="isSubmitting"
                 :disabled="!form.title || !form.trigger"
               >
-                {{ isEditMode ? "Save Changes" : "Create Playbook" }}
+                {{ isEditMode ? t('actions.saveChanges') : t('actions.createPlaybook') }}
               </Button>
             </div>
           </div>
@@ -166,7 +166,7 @@
     </Card>
 
     <div v-else-if="isEditMode && !loading" class="text-center py-12">
-      <Error label="Playbook not found" />
+      <Error :label="t('loading.playbookNotFound')" />
     </div>
 
     <!-- Delete Confirmation Dialog -->
@@ -175,7 +175,7 @@
       v-model:open="showDeleteDialog"
       :title="deleteDialogTitle"
       :description="deleteDialogDescription"
-      confirm-text="Delete"
+      :confirm-text="$t('common.delete')"
       :destructive="true"
       @confirm="confirmDelete"
     />
@@ -185,7 +185,7 @@
       v-model:open="showConfirmDialog"
       :title="confirmDialogConfig.title"
       :description="confirmDialogConfig.description"
-      confirm-text="Leave Page"
+      :confirm-text="t('actions.confirmLeave')"
       :destructive="true"
       @confirm="confirmDialogConfig.onConfirm"
       @cancel="handleDialogCancel"
@@ -208,6 +208,7 @@ import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { HayApi } from "@/utils/api";
 
+const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
@@ -315,7 +316,7 @@ onMounted(async () => {
       });
 
       if (!playbookResponse) {
-        toast.error("Playbook not found");
+        toast.error(t('toast.playbookNotFound'));
         await router.push("/playbooks");
         return;
       }
@@ -341,10 +342,10 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load data:", error);
     if (isEditMode.value) {
-      toast.error("Failed to load playbook");
+      toast.error(t('toast.playbookNotFound'));
       await router.push("/playbooks");
     } else {
-      toast.error("Failed to load agents");
+      toast.error(t('toast.loadAgentsFailed'));
     }
   } finally {
     loading.value = false;
@@ -357,22 +358,22 @@ const validateForm = () => {
   errors.value = {};
 
   if (!form.value.title || form.value.title.trim().length === 0) {
-    errors.value.title = "Playbook title is required";
+    errors.value.title = t('validation.titleRequired');
     return false;
   }
 
   if (form.value.title.length > 255) {
-    errors.value.title = "Playbook title must be less than 255 characters";
+    errors.value.title = t('validation.titleMaxLength');
     return false;
   }
 
   if (!form.value.trigger || form.value.trigger.trim().length === 0) {
-    errors.value.trigger = "Trigger is required";
+    errors.value.trigger = t('validation.triggerRequired');
     return false;
   }
 
   if (form.value.trigger.length > 255) {
-    errors.value.trigger = "Trigger must be less than 255 characters";
+    errors.value.trigger = t('validation.triggerMaxLength');
     return false;
   }
 
@@ -406,12 +407,12 @@ const handleSubmit = async () => {
         id: playbookId.value,
         data: payload,
       });
-      toast.success("Playbook updated successfully");
+      toast.success(t('toast.updateSuccess'));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
     } else {
       // Create new playbook
       const response = await HayApi.playbooks.create.mutate(payload);
-      toast.success("Playbook created successfully");
+      toast.success(t('toast.createSuccess'));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
       // Check if there's a redirect parameter
@@ -429,7 +430,8 @@ const handleSubmit = async () => {
     await router.push("/playbooks");
   } catch (error) {
     console.error("Failed to save playbook:", error);
-    toast.error(`Failed to ${isEditMode.value ? "update" : "create"} playbook. Please try again.`);
+    const action = isEditMode.value ? t('toast.updateSuccess').split(' ')[0].toLowerCase() : t('toast.createSuccess').split(' ')[0].toLowerCase();
+    toast.error(t('toast.saveFailed', { action: isEditMode.value ? 'update' : 'create' }));
   } finally {
     isSubmitting.value = false;
   }
@@ -437,13 +439,13 @@ const handleSubmit = async () => {
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
-const deleteDialogTitle = ref("Delete Playbook");
+const deleteDialogTitle = ref(t('delete.title'));
 const deleteDialogDescription = ref("");
 
 // Handle delete
 const handleDelete = () => {
   if (!playbook.value) return;
-  deleteDialogDescription.value = `Are you sure you want to delete "${playbook.value.title}"? This action cannot be undone.`;
+  deleteDialogDescription.value = t('delete.confirmMessage', { name: playbook.value.title });
   showDeleteDialog.value = true;
 };
 
@@ -455,13 +457,13 @@ const confirmDelete = async () => {
 
     await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
-    toast.success("Playbook deleted successfully");
+    toast.success(t('toast.deleteSuccess'));
     markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
     await router.push("/playbooks");
   } catch (error) {
     console.error("Failed to delete playbook:", error);
-    toast.error("Failed to delete playbook. Please try again.");
+    toast.error(t('toast.deleteFailed'));
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
@@ -483,14 +485,14 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${isEditMode.value ? "Edit" : "Create"} Playbook - Hay Dashboard`),
+  title: computed(() => isEditMode.value ? t('edit.headTitle') : t('create.headTitle')),
   meta: [
     {
       name: "description",
       content: computed(() =>
         isEditMode.value
-          ? "Edit your automated conversation playbook"
-          : "Create a new automated conversation playbook",
+          ? t('create.editHeadDescription')
+          : t('create.headDescription'),
       ),
     },
   ],

@@ -1,0 +1,116 @@
+{
+  "dashboard": {
+    "page": {
+    "title": "Dashboard",
+    "description": "Welcome back! Here's what's happening with your AI agents.",
+    "seoTitle": "Dashboard - Hay",
+    "seoDescription": "Manage your AI agents and view performance metrics"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "viewAll": "View All",
+    "createFirstAgent": "Create Your First Agent"
+  },
+  "metrics": {
+    "activeAgents": "Active Agents",
+    "newThisWeek": "new this week",
+    "totalConversations": "Total Conversations",
+    "resolved": "resolved",
+    "resolutionRate": "Resolution Rate",
+    "ofConversations": "of conversations",
+    "avgMessages": "Avg Messages",
+    "messagesPer": "messages per",
+    "conversation": "conversation"
+  },
+  "activity": {
+    "title": "Conversation Activity",
+    "description": "Daily conversation volume"
+  },
+  "topAgents": {
+    "title": "Top Performing Agents",
+    "description": "Best agents by resolution rate this month",
+    "conversations": "{count} conversations",
+    "resolutionRate": "resolution rate",
+    "emptyTitle": "No agents created yet"
+  },
+  "recentConversations": {
+    "title": "Recent Conversations",
+    "description": "Latest customer interactions",
+    "emptyTitle": "No conversations yet",
+    "emptyDescription": "Start chatting with your agents to see conversations here"
+  },
+  "sentiment": {
+    "scoreTitle": "Customer Sentiment Score",
+    "scorePeriod": "Last 30 days",
+    "breakdownTitle": "Sentiment Breakdown",
+    "breakdownDescription": "Detailed analysis by sentiment type",
+    "messages": "{count} messages",
+    "emptyTitle": "No sentiment data yet",
+    "emptyDescription": "Analysis will appear as messages are processed"
+  },
+  "timeAgo": {
+    "justNow": "Just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
+  },
+  "gettingStarted": {
+    "title": "Getting Started",
+    "description": "You're just a few steps away from having Hay handle your repetitive support tasks so your team can focus on what truly matters — helping customers and growing your business.",
+    "progress": {
+      "title": "Onboarding Progress",
+      "stepsCompleted": "{completed} of {total} steps completed",
+      "percentComplete": "{percent}% Complete",
+      "allCompleted": "Congratulations! You've completed all onboarding steps."
+    },
+    "integrations": {
+      "title": "Choose integrations",
+      "subtitle": "Connect your favorite tools and platforms to Hay",
+      "description": "Hay works where your team already does — plug in apps like {zendesk}, {shopify}, or {whatsapp} in just a few clicks to start syncing conversations automatically.",
+      "count": "{count} integrations connected",
+      "browseAll": "Browse All Integrations",
+      "suggest": "Suggest an Integration"
+    },
+    "agent": {
+      "title": "Create an agent",
+      "subtitle": "Your AI teammate starts here.",
+      "description": "Define your first Hay agent — give it a name, choose its tone, and decide which channels it should handle.",
+      "count": "{count} agents created",
+      "countOne": "{count} agent created",
+      "countOther": "{count} agents created",
+      "createAgent": "Create Agent",
+      "viewAgents": "View Agents"
+    },
+    "documents": {
+      "title": "Upload training documents",
+      "subtitle": "Teach Hay just like you'd train a new team member.",
+      "description": "Upload your existing playbooks, FAQs, or process docs — Hay learns instantly and never forgets.",
+      "countOne": "{count} document uploaded",
+      "countOther": "{count} documents uploaded",
+      "uploadDocuments": "Upload Documents",
+      "viewDocuments": "View Documents",
+      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+    },
+    "playbook": {
+      "title": "Create a playbook",
+      "subtitle": "Automate common workflows and actions.",
+      "description": "Playbooks let you design how Hay should respond, escalate, or perform tasks (like refunds or order lookups) — all without code.",
+      "countOne": "{count} playbook created",
+      "countOther": "{count} playbooks created",
+      "createPlaybook": "Create Playbook",
+      "viewPlaybooks": "View Playbooks",
+      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+    },
+    "playground": {
+      "title": "Test the agent in a playground chat",
+      "subtitle": "See your agent in action before going live.",
+      "description": "Use the built-in playground to test how Hay responds, tweak instructions, and perfect the experience before connecting to real customers.",
+      "countOne": "{count} conversation started",
+      "countOther": "{count} conversations started",
+      "startChat": "Start Playground Chat",
+      "viewConversations": "View Conversations",
+      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+    }
+  }
+  }
+}

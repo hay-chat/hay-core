@@ -1,5 +1,5 @@
 <template>
-  <Page title="Playbooks" description="Automated conversation flows and responses for your agents">
+  <Page :title="t('page.title')" :description="t('page.description')">
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
@@ -8,7 +8,7 @@
         </Button>
         <Button @click="router.push('/playbooks/wizard')">
           <Sparkles class="h-4 w-4 mr-2" />
-          Generate Playbook
+          {{ t('actions.generatePlaybook') }}
         </Button>
       </div>
     </template>
@@ -16,23 +16,23 @@
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
       <MetricCard
-        title="Total Playbooks"
+        :title="t('stats.totalPlaybooks')"
         :metric="stats.total"
-        :subtitle="`+${stats.newThisMonth} this month`"
+        :subtitle="t('stats.newThisMonth', { count: stats.newThisMonth })"
         :icon="Book"
       />
       <MetricCard
-        title="Active"
+        :title="t('stats.active')"
         :metric="stats.active"
-        :subtitle="`${
-          stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
-        }% of total`"
+        :subtitle="t('stats.percentOfTotal', {
+          percent: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
+        })"
         :icon="Play"
       />
       <MetricCard
-        title="Total Triggers"
+        :title="t('stats.totalTriggers')"
         :metric="stats.totalTriggers"
-        subtitle="Last 30 days"
+        :subtitle="t('stats.last30Days')"
         :icon="Zap"
       />
     </div>
@@ -43,7 +43,7 @@
         <div class="relative">
           <Input
             v-model="searchQuery"
-            placeholder="Search playbooks..."
+            :placeholder="t('filters.searchPlaceholder')"
             class="pl-8 min-w-[300px]"
             :icon-start="Search"
           />
@@ -52,25 +52,25 @@
         <Input
           v-model="selectedCategory"
           type="select"
-          placeholder="All Categories"
+          :placeholder="t('filters.allCategories')"
           :options="[
-            { label: 'All Categories', value: '' },
-            { label: 'Customer Support', value: 'customer-support' },
-            { label: 'Sales', value: 'sales' },
-            { label: 'Technical', value: 'technical' },
-            { label: 'Custom', value: 'custom' },
+            { label: t('filters.allCategories'), value: '' },
+            { label: t('filters.customerSupport'), value: 'customer-support' },
+            { label: t('filters.sales'), value: 'sales' },
+            { label: t('filters.technical'), value: 'technical' },
+            { label: t('filters.custom'), value: 'custom' },
           ]"
         />
 
         <Input
           v-model="selectedStatus"
           type="select"
-          placeholder="All Status"
+          :placeholder="t('filters.allStatus')"
           :options="[
-            { label: 'All Status', value: '' },
-            { label: 'Active', value: 'active' },
-            { label: 'Archived', value: 'archived' },
-            { label: 'Draft', value: 'draft' },
+            { label: t('filters.allStatus'), value: '' },
+            { label: t('filters.statusActive'), value: 'active' },
+            { label: t('filters.statusArchived'), value: 'archived' },
+            { label: t('filters.statusDraft'), value: 'draft' },
           ]"
         />
       </div>
@@ -102,14 +102,14 @@
     <!-- Empty State -->
     <EmptyState
       v-else-if="filteredPlaybooks.length === 0"
-      :title="searchQuery ? 'No playbooks found' : 'No playbooks created yet'"
+      :title="searchQuery ? t('empty.noPlaybooksFound') : t('empty.noPlaybooksCreated')"
       :description="
         searchQuery
-          ? 'Try adjusting your search terms.'
-          : 'Create your first playbook to automate conversations.'
+          ? t('empty.adjustSearch')
+          : t('empty.createFirst')
       "
       illustration="/bale/playbook.svg"
-      :action="searchQuery ? undefined : 'Create Your First Playbook'"
+      :action="searchQuery ? undefined : t('actions.createFirstPlaybook')"
       @click="router.push('/playbooks/new')"
     />
 
@@ -144,11 +144,11 @@
         <CardContent>
           <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">Agents:</span>
+              <span class="text-neutral-muted">{{ t('table.agents') }}:</span>
               <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
             </div>
             <div v-if="playbook.created_at" class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">Created:</span>
+              <span class="text-neutral-muted">{{ t('table.created') }}:</span>
               <span class="font-medium">{{ formatDate(new Date(playbook.created_at)) }}</span>
             </div>
           </div>
@@ -159,18 +159,18 @@
     <!-- Playbooks Table View -->
     <Card v-else>
       <CardHeader>
-        <h3 class="text-lg font-medium">Playbooks</h3>
+        <h3 class="text-lg font-medium">{{ t('table.playbooks') }}</h3>
       </CardHeader>
       <CardContent>
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead>
               <tr class="border-b">
-                <th class="text-left py-3 px-4 font-medium">Name</th>
-                <th class="text-left py-3 px-4 font-medium">Agents</th>
-                <th class="text-left py-3 px-4 font-medium">Status</th>
-                <th class="text-left py-3 px-4 font-medium">Created</th>
-                <th class="text-left py-3 px-4 font-medium">Actions</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t('table.name') }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t('table.agents') }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t('table.status') }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t('table.created') }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t('table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -190,7 +190,7 @@
                     </div>
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm">{{ playbook.agents?.length || 0 }} agents</td>
+                <td class="py-3 px-4 text-sm">{{ t('table.agentsCount', { count: playbook.agents?.length || 0 }) }}</td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status || 'draft')">
                     {{ playbook.status }}
@@ -232,7 +232,7 @@
       v-model:open="showDeleteDialog"
       :title="deleteDialogTitle"
       :description="deleteDialogDescription"
-      confirm-text="Delete"
+      :confirm-text="$t('common.delete')"
       :destructive="true"
       @confirm="confirmDelete"
     />
@@ -261,6 +261,7 @@ import { HayApi } from "@/utils/api";
 import DataPagination from "@/components/DataPagination.vue";
 import MetricCard from "@/components/MetricCard.vue";
 
+const { t } = useI18n();
 const toast = useToast();
 const router = useRouter();
 
@@ -364,7 +365,7 @@ const duplicatePlaybook = (id: string) => {
 // Delete dialog state
 const showDeleteDialog = ref(false);
 const playbookToDelete = ref<Playbook | null>(null);
-const deleteDialogTitle = ref("Delete Playbook");
+const deleteDialogTitle = ref(t('delete.title'));
 const deleteDialogDescription = ref("");
 
 const deletePlaybook = (id: string) => {
@@ -372,7 +373,7 @@ const deletePlaybook = (id: string) => {
   if (!playbook) return;
 
   playbookToDelete.value = playbook;
-  deleteDialogDescription.value = `Are you sure you want to delete "${playbook.title}"? This action cannot be undone.`;
+  deleteDialogDescription.value = t('delete.confirmMessage', { name: playbook.title });
   showDeleteDialog.value = true;
 };
 
@@ -385,10 +386,10 @@ const confirmDelete = async () => {
     // Remove from local list
     playbooks.value = playbooks.value.filter((p) => p.id !== playbookToDelete.value!.id);
 
-    toast.success("Playbook deleted successfully");
+    toast.success(t('toast.deleteSuccess'));
   } catch (error) {
     console.error("Failed to delete playbook:", error);
-    toast.error("Failed to delete playbook");
+    toast.error(t('toast.deleteFailed'));
   } finally {
     playbookToDelete.value = null;
     showDeleteDialog.value = false;
@@ -409,7 +410,7 @@ const fetchPlaybooks = async () => {
     playbooks.value = (response || []) as Playbook[];
   } catch (error) {
     console.error("Failed to fetch playbooks:", error);
-    toast.error("Failed to load playbooks");
+    toast.error(t('toast.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -438,11 +439,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Playbooks - Hay Dashboard",
+  title: t('page.headTitle'),
   meta: [
     {
       name: "description",
-      content: "Manage automated conversation flows and responses",
+      content: t('page.description'),
     },
   ],
 });

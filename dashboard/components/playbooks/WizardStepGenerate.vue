@@ -2,36 +2,36 @@
   <div class="space-y-6">
     <!-- Summary of collected data -->
     <div class="rounded-lg border border-border bg-background-secondary p-4 space-y-3">
-      <p class="text-sm font-medium text-foreground">Summary</p>
+      <p class="text-sm font-medium text-foreground">{{ $t("wizard.generate.summaryTitle") }}</p>
       <div class="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p class="text-neutral-muted">Purpose</p>
+          <p class="text-neutral-muted">{{ $t("wizard.generate.purposeLabel") }}</p>
           <p class="text-foreground line-clamp-2">{{ wizardData.purpose }}</p>
         </div>
         <div>
-          <p class="text-neutral-muted">Actions</p>
+          <p class="text-neutral-muted">{{ $t("wizard.generate.actionsLabel") }}</p>
           <p class="text-foreground">
             {{
               wizardData.selectedActions.length === 0
-                ? "None (answer-only)"
-                : `${wizardData.selectedActions.length} selected`
+                ? $t("wizard.generate.actionsNone")
+                : $t("wizard.generate.actionsSelected", { count: wizardData.selectedActions.length })
             }}
           </p>
         </div>
         <div>
-          <p class="text-neutral-muted">Documents</p>
+          <p class="text-neutral-muted">{{ $t("wizard.generate.documentsLabel") }}</p>
           <p class="text-foreground">
             {{
               wizardData.selectedDocumentIds.length === 0
-                ? "None"
-                : `${wizardData.selectedDocumentIds.length} selected`
+                ? $t("wizard.generate.documentsNone")
+                : $t("wizard.generate.documentsSelected", { count: wizardData.selectedDocumentIds.length })
             }}
           </p>
         </div>
         <div>
-          <p class="text-neutral-muted">Boundaries</p>
+          <p class="text-neutral-muted">{{ $t("wizard.generate.boundariesLabel") }}</p>
           <p class="text-foreground">
-            {{ hasBoundaries ? "Configured" : "None set" }}
+            {{ hasBoundaries ? $t("wizard.generate.boundariesConfigured") : $t("wizard.generate.boundariesNone") }}
           </p>
         </div>
       </div>
@@ -40,11 +40,11 @@
     <!-- Generate button (before generation) -->
     <div v-if="!generatedResult && !generating" class="flex flex-col items-center gap-3 py-4">
       <p class="text-sm text-neutral-muted text-center">
-        Ready to generate your playbook instructions based on the information you provided.
+        {{ $t("wizard.generate.readyText") }}
       </p>
       <Button size="lg" @click="$emit('generate')">
         <Sparkles class="h-4 w-4 mr-2" />
-        Generate Instructions
+        {{ $t("wizard.generate.generateButton") }}
       </Button>
     </div>
 
@@ -52,8 +52,8 @@
     <div v-else-if="generating" class="flex flex-col items-center gap-4 py-8">
       <Loader2 class="h-8 w-8 animate-spin text-primary" />
       <div class="text-center space-y-1">
-        <p class="text-sm font-medium text-foreground">Generating instructions...</p>
-        <p class="text-sm text-neutral-muted">This may take a few seconds.</p>
+        <p class="text-sm font-medium text-foreground">{{ $t("wizard.generate.generatingText") }}</p>
+        <p class="text-sm text-neutral-muted">{{ $t("wizard.generate.generatingHint") }}</p>
       </div>
     </div>
 
@@ -61,22 +61,22 @@
     <template v-else-if="generatedResult">
       <div class="space-y-4">
         <div class="space-y-1">
-          <Label>Title</Label>
+          <Label>{{ $t("wizard.generate.titleLabel") }}</Label>
           <p class="text-foreground">{{ generatedResult.title }}</p>
         </div>
 
         <div class="space-y-1">
-          <Label>Trigger</Label>
+          <Label>{{ $t("wizard.generate.triggerLabel") }}</Label>
           <p class="text-sm text-neutral-muted">{{ generatedResult.trigger }}</p>
         </div>
 
         <div class="space-y-1">
-          <Label>Description</Label>
+          <Label>{{ $t("wizard.generate.descriptionLabel") }}</Label>
           <p class="text-sm text-foreground">{{ generatedResult.description }}</p>
         </div>
 
         <div class="space-y-2">
-          <Label>Instructions</Label>
+          <Label>{{ $t("wizard.generate.instructionsLabel") }}</Label>
           <!-- eslint-disable-next-line vue/no-v-html -->
           <div
             class="rounded-lg border border-border bg-background-secondary p-4 prose prose-sm max-w-none instructions-preview"
@@ -87,13 +87,13 @@
 
       <Alert variant="info" :icon="InfoIcon">
         <AlertDescription>
-          This is a starting point. You'll be able to refine everything in the editor.
+          {{ $t("wizard.generate.startingPointText") }}
         </AlertDescription>
       </Alert>
 
       <Button variant="outline" size="sm" @click="$emit('generate')">
         <RefreshCw class="h-4 w-4 mr-2" />
-        Regenerate
+        {{ $t("wizard.generate.regenerateButton") }}
       </Button>
     </template>
   </div>

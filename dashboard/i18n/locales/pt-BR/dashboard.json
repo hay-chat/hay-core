@@ -1,0 +1,116 @@
+{
+  "dashboard": {
+    "page": {
+    "title": "Painel",
+    "description": "Bem-vindo de volta! Veja o que está acontecendo com seus agentes de IA.",
+    "seoTitle": "Painel - Hay",
+    "seoDescription": "Gerencie seus agentes de IA e veja métricas de desempenho"
+  },
+  "actions": {
+    "refresh": "Atualizar",
+    "viewAll": "Ver Todos",
+    "createFirstAgent": "Crie Seu Primeiro Agente"
+  },
+  "metrics": {
+    "activeAgents": "Agentes Ativos",
+    "newThisWeek": "novos esta semana",
+    "totalConversations": "Total de Conversas",
+    "resolved": "resolvidas",
+    "resolutionRate": "Taxa de Resolução",
+    "ofConversations": "das conversas",
+    "avgMessages": "Média de Mensagens",
+    "messagesPer": "mensagens por",
+    "conversation": "conversa"
+  },
+  "activity": {
+    "title": "Atividade de Conversas",
+    "description": "Volume diário de conversas"
+  },
+  "topAgents": {
+    "title": "Melhores Agentes",
+    "description": "Melhores agentes por taxa de resolução este mês",
+    "conversations": "{count} conversas",
+    "resolutionRate": "taxa de resolução",
+    "emptyTitle": "Nenhum agente criado ainda"
+  },
+  "recentConversations": {
+    "title": "Conversas Recentes",
+    "description": "Últimas interações com clientes",
+    "emptyTitle": "Nenhuma conversa ainda",
+    "emptyDescription": "Comece a conversar com seus agentes para ver as conversas aqui"
+  },
+  "sentiment": {
+    "scoreTitle": "Pontuação de Sentimento do Cliente",
+    "scorePeriod": "Últimos 30 dias",
+    "breakdownTitle": "Análise de Sentimento",
+    "breakdownDescription": "Análise detalhada por tipo de sentimento",
+    "messages": "{count} mensagens",
+    "emptyTitle": "Sem dados de sentimento ainda",
+    "emptyDescription": "A análise aparecerá conforme as mensagens forem processadas"
+  },
+  "timeAgo": {
+    "justNow": "Agora mesmo",
+    "minutesAgo": "{count}m atrás",
+    "hoursAgo": "{count}h atrás",
+    "daysAgo": "{count}d atrás"
+  },
+  "gettingStarted": {
+    "title": "Primeiros Passos",
+    "description": "Você está a poucos passos de ter o Hay cuidando das suas tarefas de suporte repetitivas, para que sua equipe possa focar no que realmente importa — ajudar clientes e fazer seu negócio crescer.",
+    "progress": {
+      "title": "Progresso de Integração",
+      "stepsCompleted": "{completed} de {total} etapas concluídas",
+      "percentComplete": "{percent}% Concluído",
+      "allCompleted": "Parabéns! Você completou todas as etapas de integração."
+    },
+    "integrations": {
+      "title": "Escolha integrações",
+      "subtitle": "Conecte suas ferramentas e plataformas favoritas ao Hay",
+      "description": "O Hay funciona onde sua equipe já trabalha — conecte apps como {zendesk}, {shopify} ou {whatsapp} em poucos cliques para começar a sincronizar conversas automaticamente.",
+      "count": "{count} integrações conectadas",
+      "browseAll": "Ver Todas as Integrações",
+      "suggest": "Sugerir uma Integração"
+    },
+    "agent": {
+      "title": "Crie um agente",
+      "subtitle": "Seu colega de equipe de IA começa aqui.",
+      "description": "Defina seu primeiro agente Hay — dê um nome, escolha o tom e decida quais canais ele deve atender.",
+      "count": "{count} agentes criados",
+      "countOne": "{count} agente criado",
+      "countOther": "{count} agentes criados",
+      "createAgent": "Criar Agente",
+      "viewAgents": "Ver Agentes"
+    },
+    "documents": {
+      "title": "Envie documentos de treinamento",
+      "subtitle": "Ensine o Hay como você treinaria um novo membro da equipe.",
+      "description": "Envie seus playbooks, FAQs ou documentos de processos existentes — o Hay aprende instantaneamente e nunca esquece.",
+      "countOne": "{count} documento enviado",
+      "countOther": "{count} documentos enviados",
+      "uploadDocuments": "Enviar Documentos",
+      "viewDocuments": "Ver Documentos",
+      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay vai funcionar melhor assim."
+    },
+    "playbook": {
+      "title": "Crie um playbook",
+      "subtitle": "Automatize fluxos de trabalho e ações comuns.",
+      "description": "Playbooks permitem definir como o Hay deve responder, escalar ou executar tarefas (como reembolsos ou consultas de pedidos) — tudo sem código.",
+      "countOne": "{count} playbook criado",
+      "countOther": "{count} playbooks criados",
+      "createPlaybook": "Criar Playbook",
+      "viewPlaybooks": "Ver Playbooks",
+      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay vai funcionar melhor assim."
+    },
+    "playground": {
+      "title": "Teste o agente em um chat playground",
+      "subtitle": "Veja seu agente em ação antes de ir ao ar.",
+      "description": "Use o playground integrado para testar como o Hay responde, ajustar instruções e aperfeiçoar a experiência antes de conectar com clientes reais.",
+      "countOne": "{count} conversa iniciada",
+      "countOther": "{count} conversas iniciadas",
+      "startChat": "Iniciar Chat Playground",
+      "viewConversations": "Ver Conversas",
+      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay vai funcionar melhor assim."
+    }
+  }
+  }
+}

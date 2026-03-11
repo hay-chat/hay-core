@@ -1,18 +1,18 @@
 <template>
-  <Page title="API Tokens" description="Manage API tokens for organization-level access">
+  <Page :title="$t('apiTokens.title')" :description="$t('apiTokens.description')">
     <template #header>
       <Button variant="default" size="sm" @click="openCreateDialog">
         <Plus class="h-4 w-4 mr-2" />
-        Create Token
+        {{ $t('apiTokens.createToken') }}
       </Button>
     </template>
 
     <!-- Tokens List -->
     <Card>
       <CardHeader>
-        <CardTitle>API Tokens</CardTitle>
+        <CardTitle>{{ $t('apiTokens.apiTokens') }}</CardTitle>
         <CardDescription>
-          Tokens provide organization-level API access. They can only be viewed once upon creation.
+          {{ $t('apiTokens.apiTokensDescription') }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -22,13 +22,13 @@
           class="text-center py-12 border-2 border-dashed border-muted rounded-lg"
         >
           <Key class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-          <h3 class="text-lg font-medium mb-2">No API tokens yet</h3>
+          <h3 class="text-lg font-medium mb-2">{{ $t('apiTokens.noTokensTitle') }}</h3>
           <p class="text-sm text-neutral-muted mb-4">
-            Create your first API token to start using the API
+            {{ $t('apiTokens.noTokensDescription') }}
           </p>
           <Button @click="openCreateDialog">
             <Plus class="h-4 w-4 mr-2" />
-            Create Token
+            {{ $t('apiTokens.createToken') }}
           </Button>
         </div>
 
@@ -43,9 +43,9 @@
               <div class="flex items-center gap-3 mb-2">
                 <h4 class="font-medium">{{ token.name }}</h4>
                 <Badge :variant="token.isActive ? 'success' : 'secondary'">
-                  {{ token.isActive ? "Active" : "Inactive" }}
+                  {{ token.isActive ? $t('apiTokens.active') : $t('apiTokens.inactive') }}
                 </Badge>
-                <Badge v-if="isExpired(token)" variant="destructive">Expired</Badge>
+                <Badge v-if="isExpired(token)" variant="destructive">{{ $t('apiTokens.expired') }}</Badge>
               </div>
 
               <div class="font-mono text-xs bg-background-tertiary px-3 py-1.5 rounded inline-block mb-2">
@@ -53,10 +53,10 @@
               </div>
 
               <div class="flex items-center gap-4 text-sm text-neutral-muted">
-                <span>Created {{ formatDate(token.createdAt) }}</span>
-                <span v-if="token.lastUsedAt">Last used {{ formatDate(token.lastUsedAt) }}</span>
-                <span v-else>Never used</span>
-                <span v-if="token.expiresAt">Expires {{ formatDate(token.expiresAt) }}</span>
+                <span>{{ $t('apiTokens.created', { date: formatDate(token.createdAt) }) }}</span>
+                <span v-if="token.lastUsedAt">{{ $t('apiTokens.lastUsed', { date: formatDate(token.lastUsedAt) }) }}</span>
+                <span v-else>{{ $t('apiTokens.neverUsed') }}</span>
+                <span v-if="token.expiresAt">{{ $t('apiTokens.expires', { date: formatDate(token.expiresAt) }) }}</span>
               </div>
 
               <!-- Scopes -->
@@ -65,7 +65,7 @@
                   {{ scope }}
                 </Badge>
                 <Badge v-if="token.scopes.length > 5" variant="outline" class="text-xs">
-                  +{{ token.scopes.length - 5 }} more
+                  {{ $t('apiTokens.moreScopes', { count: token.scopes.length - 5 }) }}
                 </Badge>
               </div>
             </div>
@@ -96,41 +96,41 @@
     <Dialog v-model:open="createDialogOpen">
       <DialogContent class="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create API Token</DialogTitle>
+          <DialogTitle>{{ $t('apiTokens.createDialogTitle') }}</DialogTitle>
           <DialogDescription>
-            Generate a new API token for organization-level access. The token will only be shown once.
+            {{ $t('apiTokens.createDialogDescription') }}
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <!-- Token Name -->
           <div>
-            <Label for="token-name">Token Name</Label>
+            <Label for="token-name">{{ $t('apiTokens.tokenName') }}</Label>
             <Input
               id="token-name"
               v-model="newToken.name"
-              placeholder="Production API Token"
+              :placeholder="$t('apiTokens.tokenNamePlaceholder')"
               class="mt-1"
             />
           </div>
 
           <!-- Expiration Date (Optional) -->
           <div>
-            <Label for="token-expiry">Expiration Date (Optional)</Label>
+            <Label for="token-expiry">{{ $t('apiTokens.expirationDate') }}</Label>
             <Input
               id="token-expiry"
               v-model="newToken.expiresAt"
               type="date"
               class="mt-1"
             />
-            <p class="text-xs text-neutral-muted mt-1">Leave empty for no expiration</p>
+            <p class="text-xs text-neutral-muted mt-1">{{ $t('apiTokens.noExpiration') }}</p>
           </div>
 
           <!-- Scopes -->
           <div>
-            <Label>Scopes</Label>
+            <Label>{{ $t('apiTokens.scopes') }}</Label>
             <p class="text-xs text-neutral-muted mb-3">
-              Select which API operations this token can perform (not enforced yet)
+              {{ $t('apiTokens.scopesDescription') }}
             </p>
 
             <div class="space-y-4">
@@ -156,13 +156,13 @@
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="createDialogOpen = false">Cancel</Button>
+          <Button variant="outline" @click="createDialogOpen = false">{{ $t('apiTokens.cancel') }}</Button>
           <Button
             :loading="creating"
             :disabled="!newToken.name || creating"
             @click="createToken"
           >
-            Generate Token
+            {{ $t('apiTokens.generateToken') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -172,18 +172,18 @@
     <Dialog v-model:open="showTokenDialogOpen">
       <DialogContent class="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Your API Token</DialogTitle>
+          <DialogTitle>{{ $t('apiTokens.yourApiToken') }}</DialogTitle>
           <DialogDescription>
-            Copy this token now. You won't be able to see it again!
+            {{ $t('apiTokens.copyTokenWarning') }}
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <Alert variant="warning">
             <AlertTriangle class="h-4 w-4" />
-            <AlertTitle>Important!</AlertTitle>
+            <AlertTitle>{{ $t('apiTokens.importantWarning') }}</AlertTitle>
             <AlertDescription>
-              This is the only time you'll see this token. Make sure to copy it and store it securely.
+              {{ $t('apiTokens.importantWarningDescription') }}
             </AlertDescription>
           </Alert>
 
@@ -202,12 +202,12 @@
               @click="copyToken"
             >
               <Copy class="h-4 w-4" />
-              {{ copied ? "Copied!" : "Copy" }}
+              {{ copied ? $t('apiTokens.copied') : $t('apiTokens.copy') }}
             </Button>
           </div>
 
           <div v-if="createdTokenScopes.length > 0" class="space-y-2">
-            <Label>Token Scopes:</Label>
+            <Label>{{ $t('apiTokens.tokenScopes') }}</Label>
             <div class="flex flex-wrap gap-1">
               <Badge v-for="scope in createdTokenScopes" :key="scope" variant="outline">
                 {{ scope }}
@@ -217,7 +217,7 @@
         </div>
 
         <DialogFooter>
-          <Button @click="closeTokenDialog">Done</Button>
+          <Button @click="closeTokenDialog">{{ $t('apiTokens.done') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -226,24 +226,24 @@
     <Dialog v-model:open="editDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit API Token</DialogTitle>
-          <DialogDescription>Update the token name and scopes</DialogDescription>
+          <DialogTitle>{{ $t('apiTokens.editDialogTitle') }}</DialogTitle>
+          <DialogDescription>{{ $t('apiTokens.editDialogDescription') }}</DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <div>
-            <Label for="edit-token-name">Token Name</Label>
+            <Label for="edit-token-name">{{ $t('apiTokens.tokenNameLabel') }}</Label>
             <Input
               id="edit-token-name"
               v-model="editingToken.name"
-              placeholder="Token name"
+              :placeholder="$t('apiTokens.tokenNameEditPlaceholder')"
               class="mt-1"
             />
           </div>
 
           <!-- Scopes -->
           <div>
-            <Label>Scopes</Label>
+            <Label>{{ $t('apiTokens.scopes') }}</Label>
             <div class="space-y-4 mt-2">
               <div v-for="(scopes, group) in scopeGroups" :key="group" class="space-y-2">
                 <h4 class="font-medium text-sm">{{ group }}</h4>
@@ -267,8 +267,8 @@
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="editDialogOpen = false">Cancel</Button>
-          <Button :loading="updating" @click="updateToken">Save Changes</Button>
+          <Button variant="outline" @click="editDialogOpen = false">{{ $t('apiTokens.cancel') }}</Button>
+          <Button :loading="updating" @click="updateToken">{{ $t('apiTokens.saveChanges') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -278,6 +278,8 @@
 <script setup lang="ts">
 import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+
+const { t } = useI18n();
 
 // State
 const loading = ref(false);
@@ -452,7 +454,7 @@ const updateToken = async () => {
 };
 
 const revokeToken = async (id: string) => {
-  if (!confirm("Are you sure you want to revoke this token? It will stop working immediately.")) {
+  if (!confirm(t('apiTokens.revokeConfirm'))) {
     return;
   }
 
@@ -465,11 +467,7 @@ const revokeToken = async (id: string) => {
 };
 
 const deleteToken = async (id: string) => {
-  if (
-    !confirm(
-      "Are you sure you want to permanently delete this token? This action cannot be undone.",
-    )
-  ) {
+  if (!confirm(t('apiTokens.deleteConfirm'))) {
     return;
   }
 
@@ -513,11 +511,11 @@ definePageMeta({
 
 // Head
 useHead({
-  title: "API Tokens - Settings",
+  title: t('apiTokens.headTitle'),
   meta: [
     {
       name: "description",
-      content: "Manage API tokens for organization-level access",
+      content: t('apiTokens.headDescription'),
     },
   ],
 });

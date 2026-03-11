@@ -1,11 +1,11 @@
 <template>
-  <Page title="Dashboard" description="Welcome back! Here's what's happening with your AI agents.">
+  <Page :title="$t('dashboard.page.title')" :description="$t('dashboard.page.description')">
     <template #header>
       <div class="flex gap-4">
         <DateRangeSelector v-model="dateRange" @change="refreshData" />
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
-          Refresh
+          {{ $t('dashboard.actions.refresh') }}
         </Button>
       </div>
     </template>
@@ -13,33 +13,33 @@
     <!-- Key Metrics Cards -->
     <div class="grid gap-4 mb-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
-        title="Active Agents"
+        :title="$t('dashboard.metrics.activeAgents')"
         :icon="Bot"
         :metric="metrics.activeAgents"
         :subtitle="`+${metrics.newAgentsThisWeek}`"
-        subtitle-suffix="new this week"
+        :subtitle-suffix="$t('dashboard.metrics.newThisWeek')"
         subtitle-color="green"
         :show-cache-indicator="false"
         :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.AGENTS)"
       />
 
       <MetricCard
-        title="Total Conversations"
+        :title="$t('dashboard.metrics.totalConversations')"
         :icon="MessageSquare"
         :metric="conversationMetrics.totalConversations"
         :subtitle="`${conversationMetrics.resolvedConversations}`"
-        subtitle-suffix="resolved"
+        :subtitle-suffix="$t('dashboard.metrics.resolved')"
         subtitle-color="green"
         :show-cache-indicator="false"
         :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
       />
 
       <MetricCard
-        title="Resolution Rate"
+        :title="$t('dashboard.metrics.resolutionRate')"
         :icon="CheckCircle"
         :metric="`${conversationMetrics.resolutionRate.toFixed(1)}%`"
-        subtitle="of conversations"
-        subtitle-suffix="resolved"
+        :subtitle="$t('dashboard.metrics.ofConversations')"
+        :subtitle-suffix="$t('dashboard.metrics.resolved')"
         subtitle-color="green"
         :format-metric="false"
         :show-cache-indicator="false"
@@ -47,11 +47,11 @@
       />
 
       <MetricCard
-        title="Avg Messages"
+        :title="$t('dashboard.metrics.avgMessages')"
         :icon="MessageCircle"
         :metric="conversationMetrics.avgMessagesPerConversation.toFixed(1)"
-        subtitle="messages per"
-        subtitle-suffix="conversation"
+        :subtitle="$t('dashboard.metrics.messagesPer')"
+        :subtitle-suffix="$t('dashboard.metrics.conversation')"
         :format-metric="false"
         :show-cache-indicator="false"
         :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
@@ -63,8 +63,8 @@
       <!-- Activity Chart -->
       <Card>
         <CardHeader>
-          <CardTitle>Conversation Activity</CardTitle>
-          <CardDescription>Daily conversation volume</CardDescription>
+          <CardTitle>{{ $t('dashboard.activity.title') }}</CardTitle>
+          <CardDescription>{{ $t('dashboard.activity.description') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="">
@@ -132,11 +132,11 @@
         <CardHeader>
           <div class="flex items-center justify-between">
             <div>
-              <CardTitle>Top Performing Agents</CardTitle>
-              <CardDescription> Best agents by resolution rate this month </CardDescription>
+              <CardTitle>{{ $t('dashboard.topAgents.title') }}</CardTitle>
+              <CardDescription>{{ $t('dashboard.topAgents.description') }}</CardDescription>
             </div>
             <Button variant="ghost" size="sm" @click="viewAllAgents">
-              View All
+              {{ $t('dashboard.actions.viewAll') }}
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
@@ -156,20 +156,20 @@
                   <p class="font-medium text-foreground">
                     {{ agent.name }}
                   </p>
-                  <p class="text-sm text-neutral-muted">{{ agent.conversations }} conversations</p>
+                  <p class="text-sm text-neutral-muted">{{ $t('dashboard.topAgents.conversations', { count: agent.conversations }) }}</p>
                 </div>
               </div>
               <div class="text-right">
                 <div class="text-sm font-medium text-foreground">{{ agent.resolutionRate }}%</div>
-                <div class="text-xs text-neutral-muted">resolution rate</div>
+                <div class="text-xs text-neutral-muted">{{ $t('dashboard.topAgents.resolutionRate') }}</div>
               </div>
             </div>
           </div>
           <div v-else class="text-center py-8 text-neutral-muted">
             <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No agents created yet</p>
+            <p>{{ $t('dashboard.topAgents.emptyTitle') }}</p>
             <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
-              Create Your First Agent
+              {{ $t('dashboard.actions.createFirstAgent') }}
             </Button>
           </div>
         </CardContent>
@@ -180,11 +180,11 @@
         <CardHeader>
           <div class="flex items-center justify-between">
             <div>
-              <CardTitle>Recent Conversations</CardTitle>
-              <CardDescription> Latest customer interactions </CardDescription>
+              <CardTitle>{{ $t('dashboard.recentConversations.title') }}</CardTitle>
+              <CardDescription>{{ $t('dashboard.recentConversations.description') }}</CardDescription>
             </div>
             <Button variant="ghost" size="sm" @click="viewAllConversations">
-              View All
+              {{ $t('dashboard.actions.viewAll') }}
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
@@ -233,8 +233,8 @@
           </div>
           <div v-else class="text-center py-8 text-neutral-muted">
             <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No conversations yet</p>
-            <p class="text-sm mt-2">Start chatting with your agents to see conversations here</p>
+            <p>{{ $t('dashboard.recentConversations.emptyTitle') }}</p>
+            <p class="text-sm mt-2">{{ $t('dashboard.recentConversations.emptyDescription') }}</p>
           </div>
         </CardContent>
       </Card>
@@ -244,13 +244,13 @@
       <!-- Sentiment Score Gauge -->
       <Card>
         <CardHeader>
-          <CardTitle>Customer Sentiment Score</CardTitle>
-          <CardDescription>Last 30 days</CardDescription>
+          <CardTitle>{{ $t('dashboard.sentiment.scoreTitle') }}</CardTitle>
+          <CardDescription>{{ $t('dashboard.sentiment.scorePeriod') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex align-center justify-center">
           <SimpleGauge
-            title="Customer Sentiment Score"
-            subtitle="Last 30 days"
+            :title="$t('dashboard.sentiment.scoreTitle')"
+            :subtitle="$t('dashboard.sentiment.scorePeriod')"
             :counts="sentimentCounts"
             :show-breakdown="true"
             :show-view-report="true"
@@ -262,8 +262,8 @@
       <!-- Sentiment Breakdown -->
       <Card>
         <CardHeader>
-          <CardTitle>Sentiment Breakdown</CardTitle>
-          <CardDescription>Detailed analysis by sentiment type</CardDescription>
+          <CardTitle>{{ $t('dashboard.sentiment.breakdownTitle') }}</CardTitle>
+          <CardDescription>{{ $t('dashboard.sentiment.breakdownDescription') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div v-if="sentimentBreakdown.length > 0" class="space-y-4">
@@ -277,7 +277,7 @@
                 <component :is="sentiment.icon" :class="['h-8 w-8', sentiment.iconClass]" />
                 <div>
                   <p class="font-medium text-foreground capitalize">{{ sentiment.type }}</p>
-                  <p class="text-sm text-muted-foreground">{{ sentiment.count }} messages</p>
+                  <p class="text-sm text-muted-foreground">{{ $t('dashboard.sentiment.messages', { count: sentiment.count }) }}</p>
                 </div>
               </div>
               <div class="text-right">
@@ -289,8 +289,8 @@
           </div>
           <div v-else class="text-center py-8 text-muted-foreground">
             <Smile class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No sentiment data yet</p>
-            <p class="text-sm mt-2">Analysis will appear as messages are processed</p>
+            <p>{{ $t('dashboard.sentiment.emptyTitle') }}</p>
+            <p class="text-sm mt-2">{{ $t('dashboard.sentiment.emptyDescription') }}</p>
           </div>
         </CardContent>
       </Card>
@@ -320,6 +320,7 @@ import { HayApi } from "@/utils/api";
 import { useAnalyticsStore } from "@/stores/analytics";
 
 // State
+const { t } = useI18n();
 const loading = ref(false);
 const router = useRouter();
 const documentStatsWidget = ref<{ refresh: () => void } | null>(null);
@@ -561,16 +562,16 @@ const formatTimeAgo = (date: Date) => {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return "Just now";
+    return t("dashboard.timeAgo.justNow");
   } else if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
-    return `${minutes}m ago`;
+    return t("dashboard.timeAgo.minutesAgo", { count: minutes });
   } else if (diffInSeconds < 86400) {
     const hours = Math.floor(diffInSeconds / 3600);
-    return `${hours}h ago`;
+    return t("dashboard.timeAgo.hoursAgo", { count: hours });
   } else {
     const days = Math.floor(diffInSeconds / 86400);
-    return `${days}d ago`;
+    return t("dashboard.timeAgo.daysAgo", { count: days });
   }
 };
 
@@ -751,11 +752,11 @@ watch(dateRange, async () => {
 
 // SEO
 useHead({
-  title: "Dashboard - Hay",
+  title: t("dashboard.page.seoTitle"),
   meta: [
     {
       name: "description",
-      content: "Manage your AI agents and view performance metrics",
+      content: t("dashboard.page.seoDescription"),
     },
   ],
 });

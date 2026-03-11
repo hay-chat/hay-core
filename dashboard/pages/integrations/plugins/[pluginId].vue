@@ -5,23 +5,23 @@
       <div class="flex items-center space-x-4">
         <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Back to Marketplace
+          {{ $t("pluginSettings.backToMarketplace") }}
         </Button>
       </div>
       <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" @click="handleRestartPlugin" :disabled="restarting">
+        <Button variant="outline" size="sm" :disabled="restarting" @click="handleRestartPlugin">
           <Loader2 v-if="restarting" class="h-4 w-4 mr-2 animate-spin" />
           <RotateCw v-else class="h-4 w-4 mr-2" />
-          {{ restarting ? "Restarting..." : "Restart Worker" }}
+          {{ restarting ? $t("pluginSettings.restarting") : $t("pluginSettings.restartWorker") }}
         </Button>
         <Button
           variant="secondary"
           size="sm"
-          @click="showDisableConfirm = true"
           :disabled="disabling"
+          @click="showDisableConfirm = true"
         >
           <Loader2 v-if="disabling" class="h-4 w-4 mr-2 animate-spin" />
-          {{ disabling ? "Disabling..." : "Disable Plugin" }}
+          {{ disabling ? $t("pluginSettings.disabling") : $t("pluginSettings.disablePlugin") }}
         </Button>
       </div>
     </div>
@@ -29,9 +29,13 @@
     <!-- Disable Confirmation Dialog -->
     <ConfirmDialog
       v-model:open="showDisableConfirm"
-      title="Disable Plugin?"
-      :description="`Are you sure you want to disable ${plugin?.name || getPluginDisplayName(pluginId)}? This will stop the plugin from being used in your organization.`"
-      confirm-text="Disable"
+      :title="$t('pluginSettings.disableConfirm.title')"
+      :description="
+        $t('pluginSettings.disableConfirm.description', {
+          name: plugin?.name || getPluginDisplayName(pluginId),
+        })
+      "
+      :confirm-text="$t('pluginSettings.disableConfirm.confirm')"
       destructive
       @confirm="handleDisablePlugin"
     />
@@ -58,9 +62,11 @@
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-12">
       <AlertCircle class="h-12 w-12 text-destructive mx-auto mb-4" />
-      <h3 class="text-lg font-medium mb-2">Failed to load plugin</h3>
+      <h3 class="text-lg font-medium mb-2">{{ $t("pluginSettings.error.loadFailed") }}</h3>
       <p class="text-neutral-muted mb-4">{{ error }}</p>
-      <Button @click="router.push('/integrations/marketplace')"> Return to Marketplace </Button>
+      <Button @click="router.push('/integrations/marketplace')">
+        {{ $t("pluginSettings.error.returnToMarketplace") }}
+      </Button>
     </div>
 
     <!-- Plugin Settings -->
@@ -75,11 +81,11 @@
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
-                  @error="handleThumbnailError($event)"
                   onerror="
                     this.style.display = 'none';
                     this.nextElementSibling.style.display = 'flex';
                   "
+                  @error="handleThumbnailError($event)"
                 />
                 <div
                   :class="[
@@ -105,7 +111,7 @@
                 class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
               >
                 <Loader2 class="w-3 h-3 mr-1.5 animate-spin" />
-                Testing Connection
+                {{ $t("pluginSettings.connection.testing") }}
               </div>
               <!-- Result Badge -->
               <div
@@ -125,19 +131,23 @@
                       : 'bg-red-600 dark:bg-red-400',
                   ]"
                 ></div>
-                {{ testResult.success ? "Connected" : "Connection Failed" }}
+                {{
+                  testResult.success
+                    ? $t("pluginSettings.connection.connected")
+                    : $t("pluginSettings.connection.failed")
+                }}
               </div>
             </div>
 
             <!-- Enable Button (when not enabled) -->
             <div v-if="!enabled">
               <Button
-                @click="handleEnablePlugin"
                 :disabled="enabling"
                 size="lg"
                 :loading="enabling"
+                @click="handleEnablePlugin"
               >
-                Enable Plugin
+                {{ $t("pluginSettings.enablePlugin") }}
               </Button>
             </div>
           </div>
@@ -172,11 +182,13 @@
       >
         <AlertTitle>
           <span v-if="testResult.status === 'unconfigured'">
-            <Badge variant="secondary" class="mr-2">Needs Authentication</Badge>
-            {{ testResult.message || "Please configure your credentials" }}
+            <Badge variant="secondary" class="mr-2">{{
+              $t("pluginSettings.connection.needsAuth")
+            }}</Badge>
+            {{ testResult.message || $t("pluginSettings.connection.configureCredentials") }}
           </span>
           <span v-else>
-            {{ testResult.message || "Connection failed" }}
+            {{ testResult.message || $t("pluginSettings.connection.connectionFailed") }}
           </span>
         </AlertTitle>
         <AlertDescription v-if="testResult.status !== 'unconfigured'">
@@ -187,8 +199,8 @@
             {{ testResult.error }}
           </div>
           <div class="mt-3">
-            <Button variant="outline" size="sm" @click="testConnection" :loading="testing">
-              Try Again
+            <Button variant="outline" size="sm" :loading="testing" @click="testConnection">
+              {{ $t("pluginSettings.connection.tryAgain") }}
             </Button>
           </div>
         </AlertDescription>
@@ -199,7 +211,7 @@
         <!-- Description Card -->
         <Card v-if="plugin.manifest?.description">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle>{{ $t("pluginSettings.about") }}</CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-muted-foreground">{{ plugin.manifest.description }}</p>
@@ -209,8 +221,8 @@
         <!-- Capabilities Card -->
         <Card v-if="plugin.manifest?.capabilities">
           <CardHeader>
-            <CardTitle>Capabilities</CardTitle>
-            <CardDescription>What this plugin can do</CardDescription>
+            <CardTitle>{{ $t("pluginSettings.capabilities.title") }}</CardTitle>
+            <CardDescription>{{ $t("pluginSettings.capabilities.description") }}</CardDescription>
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
@@ -218,22 +230,22 @@
               <div v-if="plugin.manifest.capabilities.chat_connector" class="space-y-3">
                 <div class="flex items-center gap-2">
                   <MessageSquare class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">Chat Connector</h4>
+                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.chatConnector") }}</h4>
                 </div>
                 <div class="pl-7 space-y-2 text-sm text-muted-foreground">
                   <div v-if="plugin.manifest.capabilities.chat_connector.features?.send_message">
                     <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    Send messages
+                    {{ $t("pluginSettings.capabilities.sendMessages") }}
                   </div>
                   <div v-if="plugin.manifest.capabilities.chat_connector.features?.receive_message">
                     <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    Receive messages
+                    {{ $t("pluginSettings.capabilities.receiveMessages") }}
                   </div>
                   <div
                     v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations"
                   >
                     <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    List conversations
+                    {{ $t("pluginSettings.capabilities.listConversations") }}
                   </div>
                 </div>
               </div>
@@ -249,10 +261,10 @@
               >
                 <div class="flex items-center gap-2">
                   <Cpu class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">MCP Connector</h4>
+                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.mcpConnector") }}</h4>
                 </div>
                 <p class="pl-7 text-sm text-muted-foreground">
-                  Provides AI tools and resources through Model Context Protocol
+                  {{ $t("pluginSettings.capabilities.mcpDescription") }}
                 </p>
               </div>
 
@@ -260,10 +272,12 @@
               <div v-if="plugin.manifest.capabilities.document_importer" class="space-y-3">
                 <div class="flex items-center gap-2">
                   <FileText class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">Document Importer</h4>
+                  <h4 class="font-medium">
+                    {{ $t("pluginSettings.capabilities.documentImporter") }}
+                  </h4>
                 </div>
                 <p class="pl-7 text-sm text-muted-foreground">
-                  Import and process documents from external sources
+                  {{ $t("pluginSettings.capabilities.documentImporterDescription") }}
                 </p>
               </div>
             </div>
@@ -280,10 +294,12 @@
           "
         >
           <CardHeader>
-            <CardTitle>Available Actions</CardTitle>
-            <CardDescription
-              >{{ plugin.manifest.capabilities.mcp.tools.length }} tools available</CardDescription
-            >
+            <CardTitle>{{ $t("pluginSettings.availableActions.title") }}</CardTitle>
+            <CardDescription>{{
+              $t("pluginSettings.availableActions.toolsAvailable", {
+                count: plugin.manifest.capabilities.mcp.tools.length,
+              })
+            }}</CardDescription>
           </CardHeader>
           <CardContent>
             <div class="grid gap-3">
@@ -355,7 +371,9 @@
           <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
             <TabsList class="w-full justify-start rounded-none border-b">
               <!-- Settings Tab (shown when there's configuration and tabs) -->
-              <TabsTrigger v-if="hasConfiguration" value="settings">Settings</TabsTrigger>
+              <TabsTrigger v-if="hasConfiguration" value="settings">{{
+                $t("pluginSettings.tabs.settings")
+              }}</TabsTrigger>
               <!-- Custom Tab Extensions -->
               <TabsTrigger v-for="tab in sortedTabExtensions" :key="tab.id" :value="tab.id">
                 {{ tab.name }}
@@ -412,10 +430,13 @@
       <!-- Configuration Form (shown when no tabs are present and enabled) -->
       <Card v-if="enabled && hasConfiguration && tabExtensions.length === 0">
         <CardHeader>
-          <CardTitle>Configuration</CardTitle>
+          <CardTitle>{{ $t("pluginSettings.configuration.title") }}</CardTitle>
           <CardDescription>
-            Configure your
-            {{ plugin.name || getPluginDisplayName(plugin.id) }} settings
+            {{
+              $t("pluginSettings.configuration.description", {
+                name: plugin.name || getPluginDisplayName(plugin.id),
+              })
+            }}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -441,18 +462,25 @@
       <!-- Test Connection for Connectors (only when enabled) -->
       <Card v-if="enabled && plugin.type.includes('connector')">
         <CardHeader>
-          <CardTitle>Connection Test</CardTitle>
+          <CardTitle>{{ $t("pluginSettings.connectionTest.title") }}</CardTitle>
           <CardDescription>
-            Test your
-            {{ plugin.name || getPluginDisplayName(plugin.id) }} connection
+            {{
+              $t("pluginSettings.connectionTest.description", {
+                name: plugin.name || getPluginDisplayName(plugin.id),
+              })
+            }}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div class="space-y-4">
-            <Button @click="testConnection" :disabled="testing">
+            <Button :disabled="testing" @click="testConnection">
               <Zap v-if="!testing" class="h-4 w-4 mr-2" />
               <Loader2 v-else class="h-4 w-4 mr-2 animate-spin" />
-              {{ testing ? "Testing..." : "Test Connection" }}
+              {{
+                testing
+                  ? $t("pluginSettings.connectionTest.testing")
+                  : $t("pluginSettings.connectionTest.testConnection")
+              }}
             </Button>
 
             {{ testResult }}
@@ -478,14 +506,14 @@
                     variant="secondary"
                     class="mr-2"
                   >
-                    Needs Authentication
+                    {{ $t("pluginSettings.connection.needsAuth") }}
                   </Badge>
                   {{
                     testResult.success
-                      ? "Connection successful!"
+                      ? $t("pluginSettings.connectionTest.success")
                       : testResult.status === "unconfigured"
-                        ? "Configuration required"
-                        : "Connection failed"
+                        ? $t("pluginSettings.connectionTest.configRequired")
+                        : $t("pluginSettings.connectionTest.failed")
                   }}
                 </span>
               </div>
@@ -504,7 +532,7 @@
                 v-if="!testResult.success && testResult.status !== 'unconfigured'"
                 class="mt-2 text-xs opacity-75"
               >
-                Please check your configuration and try again.
+                {{ $t("pluginSettings.connectionTest.checkConfig") }}
               </p>
             </div>
           </div>
@@ -565,6 +593,8 @@ import { useDomain } from "@/composables/useDomain";
 import { sanitizeHtml } from "@/utils/sanitize";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+
+const { t } = useI18n();
 
 // Constants
 const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
@@ -872,7 +902,7 @@ const fetchPlugin = async () => {
     await loadPluginExtensions();
   } catch (err) {
     console.error("Failed to fetch plugin:", err);
-    error.value = "Failed to load plugin details";
+    error.value = t("pluginSettings.error.loadFailed");
   } finally {
     loading.value = false;
 
@@ -935,7 +965,7 @@ const saveConfiguration = async () => {
     editingEnvFields.value.clear();
 
     // Show success toast
-    toast.success("Configuration saved successfully");
+    toast.success(t("pluginSettings.toast.configSaved"));
 
     // Reload the entire plugin configuration to get fresh state
     await fetchPlugin();
@@ -943,7 +973,8 @@ const saveConfiguration = async () => {
     console.error("Failed to save configuration:", err);
 
     // Show error toast
-    const errorMessage = err?.message || err?.data?.message || "Failed to save configuration";
+    const errorMessage =
+      err?.message || err?.data?.message || t("pluginSettings.toast.configSaveFailed");
     toast.error(errorMessage);
   } finally {
     saving.value = false;
@@ -992,14 +1023,14 @@ const handleResetToEnv = async (key: string) => {
     });
 
     // Show success toast
-    toast.success("Reset to environment variable");
+    toast.success(t("pluginSettings.toast.resetToEnv"));
 
     // Reload plugin configuration to refresh state
     await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to reset to env:", err);
     const errorMessage =
-      err?.message || err?.data?.message || "Failed to reset to environment variable";
+      err?.message || err?.data?.message || t("pluginSettings.toast.resetToEnvFailed");
     toast.error(errorMessage);
   }
 };
@@ -1099,7 +1130,9 @@ const testConnection = async () => {
       success: result.success,
       message:
         result.message ||
-        (result.success ? "Connection established successfully" : "Connection failed"),
+        (result.success
+          ? t("pluginSettings.toast.connectionEstablished")
+          : t("pluginSettings.connection.connectionFailed")),
       error: result.error, // Include detailed error information
     };
   } catch (err: any) {
@@ -1111,7 +1144,7 @@ const testConnection = async () => {
 
     testResult.value = {
       success: false,
-      message: err?.message || "Failed to establish connection. Please check your configuration.",
+      message: err?.message || t("pluginSettings.toast.connectionCheckFailed"),
     };
   } finally {
     // Only clear testing state if this controller is still active
@@ -1131,14 +1164,15 @@ const handleEnablePlugin = async () => {
       configuration: {},
     });
 
-    toast.success("Plugin enabled successfully");
+    toast.success(t("pluginSettings.toast.enabledSuccess"));
 
     // Reload plugin data to show settings
     await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to enable plugin:", err);
 
-    const errorMessage = err?.message || err?.data?.message || "Failed to enable plugin";
+    const errorMessage =
+      err?.message || err?.data?.message || t("pluginSettings.toast.enableFailed");
     toast.error(errorMessage);
   } finally {
     enabling.value = false;
@@ -1153,14 +1187,15 @@ const handleDisablePlugin = async () => {
       pluginId: pluginId.value,
     });
 
-    toast.success("Plugin disabled successfully");
+    toast.success(t("pluginSettings.toast.disabledSuccess"));
 
     // Redirect back to marketplace after disabling
     router.push("/integrations/marketplace");
   } catch (err: any) {
     console.error("Failed to disable plugin:", err);
 
-    const errorMessage = err?.message || err?.data?.message || "Failed to disable plugin";
+    const errorMessage =
+      err?.message || err?.data?.message || t("pluginSettings.toast.disableFailed");
     toast.error(errorMessage);
   } finally {
     disabling.value = false;
@@ -1175,7 +1210,7 @@ const handleRestartPlugin = async () => {
       pluginId: pluginId.value,
     });
 
-    toast.success("Plugin worker restarted successfully");
+    toast.success(t("pluginSettings.toast.restartedSuccess"));
 
     // Refresh plugin data and test connection after restart
     await fetchPlugin();
@@ -1187,7 +1222,8 @@ const handleRestartPlugin = async () => {
   } catch (err: any) {
     console.error("Failed to restart plugin:", err);
 
-    const errorMessage = err?.message || err?.data?.message || "Failed to restart plugin";
+    const errorMessage =
+      err?.message || err?.data?.message || t("pluginSettings.toast.restartFailed");
     toast.error(errorMessage);
   } finally {
     restarting.value = false;
@@ -1199,7 +1235,7 @@ const handleOAuthCallback = () => {
   const oauthStatus = route.query.oauth as string | undefined;
 
   if (oauthStatus === "success") {
-    toast.success("OAuth connection established successfully");
+    toast.success(t("pluginSettings.toast.oauthSuccess"));
 
     // Clean up URL by removing query params
     router.replace({
@@ -1210,7 +1246,7 @@ const handleOAuthCallback = () => {
     // Reload plugin data to refresh OAuth connection status
     fetchPlugin();
   } else if (oauthStatus === "error") {
-    toast.error("OAuth connection failed. Please try again.");
+    toast.error(t("pluginSettings.toast.oauthFailed"));
 
     // Clean up URL
     router.replace({
@@ -1257,8 +1293,8 @@ definePageMeta({
 useHead({
   title: computed(() =>
     plugin.value
-      ? `${getPluginDisplayName(plugin.value.name)} Settings - Hay Dashboard`
-      : "Plugin Settings - Hay Dashboard",
+      ? t("pluginSettings.headTitleWithName", { name: getPluginDisplayName(plugin.value.name) })
+      : t("pluginSettings.headTitle"),
   ),
 });
 </script>

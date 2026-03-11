@@ -3,6 +3,7 @@ import * as path from "path";
 import mjml2html from "mjml";
 import type { EmailTemplate, TemplateRenderOptions } from "../types/email.types";
 import { createLogger } from "@server/lib/logger";
+import { EmailTranslationService } from "./email-translation.service";
 
 const logger = createLogger("template");
 
@@ -11,11 +12,13 @@ export class TemplateService {
   private templateDir: string;
   private baseMjmlPath: string;
   private contentDir: string;
+  private translationService: EmailTranslationService;
 
   constructor() {
     this.templateDir = path.join(__dirname, "../templates/email");
     this.baseMjmlPath = path.join(this.templateDir, "base.mjml");
     this.contentDir = path.join(this.templateDir, "content");
+    this.translationService = new EmailTranslationService();
   }
 
   /**
@@ -24,6 +27,7 @@ export class TemplateService {
   async initialize(): Promise<void> {
     try {
       await this.loadTemplates();
+      await this.translationService.initialize();
     } catch (error) {
       logger.error({ err: error }, "Failed to initialize template service");
     }
@@ -168,8 +172,13 @@ export class TemplateService {
     // Handle both {{content}} and {{ content }} (with spaces)
     const fullMjml = baseMjml.replace(/\{\{\s*content\s*\}\}/g, mjmlContent);
 
-    // Then replace ALL variables in one pass
-    const mjmlWithVars = this.replaceVariables(fullMjml, variables);
+    // Two-pass variable substitution for i18n support:
+    // Pass 1: Replace translation keys (t.*) with their values (which may contain {{ variable }} placeholders)
+    const translations = this.translationService.getTranslations(templateId, options.locale);
+    const mjmlWithTranslations = this.replaceVariables(fullMjml, translations);
+
+    // Pass 2: Replace regular variables (userName, companyName, etc.)
+    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables);
 
     // Compile MJML to HTML
     // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
@@ -356,6 +365,16 @@ export class TemplateService {
   }
 
   /**
+   * Get translated subject for a template.
+   * Falls back to the subject from the MJML comment if no translation is found.
+   */
+  getTranslatedSubject(templateId: string, locale?: string): string | null {
+    return this.translationService.getSubject(templateId, locale)
+      || this.getTemplate(templateId)?.subject
+      || null;
+  }
+
+  /**
    * Clear template cache
    */
   clearCache(): void {
@@ -363,10 +382,11 @@ export class TemplateService {
   }
 
   /**
-   * Reload templates
+   * Reload templates and translations
    */
   async reloadTemplates(): Promise<void> {
     this.clearCache();
     await this.loadTemplates();
+    await this.translationService.reload();
   }
 }
