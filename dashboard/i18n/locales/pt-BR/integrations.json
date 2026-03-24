@@ -138,12 +138,12 @@
     "requirements": {
       "title": "Requisitos da Integração",
       "manifest": {
-        "title": "manifest.json válido",
-        "description": "Deve incluir um arquivo manifest.json na raiz com os campos id, name e version"
+        "title": "package.json válido com campo hay-plugin",
+        "description": "Deve incluir um package.json com um campo 'hay-plugin' contendo ao menos um 'entry' apontando para o servidor MCP"
       },
       "pluginId": {
         "title": "ID de integração válido",
-        "description": "O ID da integração deve conter apenas letras minúsculas, números e hífens"
+        "description": "O nome do pacote no package.json deve ser um nome npm válido (letras minúsculas, números, hífens, escopo opcional)"
       },
       "zipFormat": {
         "title": "Formato ZIP",

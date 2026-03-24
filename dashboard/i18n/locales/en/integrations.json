@@ -138,12 +138,12 @@
     "requirements": {
       "title": "Integration Requirements",
       "manifest": {
-        "title": "Valid manifest.json",
-        "description": "Must include a manifest.json file in the root with id, name, and version fields"
+        "title": "Valid package.json with hay-plugin field",
+        "description": "Must include a package.json with a 'hay-plugin' field containing at least an 'entry' pointing to the MCP server"
       },
       "pluginId": {
         "title": "Valid integration ID",
-        "description": "Integration ID must contain only lowercase letters, numbers, and hyphens"
+        "description": "The package name in package.json must be a valid npm name (lowercase letters, numbers, hyphens, optional scope)"
       },
       "zipFormat": {
         "title": "ZIP format",
