@@ -208,7 +208,7 @@ export class EmailService {
         ...(options.variables || {}),
       };
 
-      const { html, text } = await this.templateService.render({
+      let { html, text } = await this.templateService.render({
         template: options.template,
         variables: mergedVariables,
         locale: options.locale,
@@ -235,10 +235,30 @@ export class EmailService {
         }
       }
 
+      // Re-render with emailTitle and emailPreview now that subject is resolved
+      // These are used in base.mjml <mj-title> and <mj-preview> tags
+      const finalSubject = subject || "No Subject";
+      if (!mergedVariables.emailTitle || !mergedVariables.emailPreview) {
+        mergedVariables.emailTitle = mergedVariables.emailTitle || finalSubject;
+        mergedVariables.emailPreview = mergedVariables.emailPreview || finalSubject;
+        mergedVariables.recipientEmail = mergedVariables.recipientEmail || options.to;
+
+        const rerendered = await this.templateService.render({
+          template: options.template,
+          variables: mergedVariables,
+          locale: options.locale,
+          useCache: true,
+          stripComments: true,
+          minify: true,
+        });
+        html = rerendered.html;
+        text = rerendered.text;
+      }
+
       // Build email options, excluding undefined 'from' to allow default fallback
       const emailOptions: EmailOptions = {
         to: options.to,
-        subject: subject || "No Subject",
+        subject: finalSubject,
         html,
         text,
         ...(options.from && { from: options.from }),
