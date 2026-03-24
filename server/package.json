@@ -7,7 +7,7 @@
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
     "build": "npm run build:plugins && tsc && tsc-alias && npm run copy:templates",
-    "copy:templates": "cp -r templates dist/",
+    "copy:templates": "cp -r templates dist/ && cp -r i18n dist/",
     "build:plugins": "cd .. && ./scripts/build-plugins.sh",
     "start": "node dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
