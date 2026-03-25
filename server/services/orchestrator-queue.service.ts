@@ -11,6 +11,8 @@ export const ORCHESTRATOR_QUEUES = {
   DEAD: "orchestrator.process.dead",
 } as const;
 
+export const MAX_RETRY_ATTEMPTS = 3;
+
 export type OrchestratorTrigger =
   | "customer_message"
   | "ai_return"
@@ -26,6 +28,11 @@ export interface OrchestratorMessage {
   trigger: OrchestratorTrigger;
   timestamp: string;
   attempt: number;
+}
+
+export interface OrchestratorDeadLetterMessage extends OrchestratorMessage {
+  failedAt: string;
+  error: string;
 }
 
 /**
@@ -56,11 +63,12 @@ class OrchestratorQueueService {
       messageTtl: 10000, // 10s retry delay
     });
 
-    // Main processing queue — failed messages go to retry queue
+    // Main processing queue — any unhandled consumer nacks route to dead queue.
+    // Retries are explicit and bounded in the worker.
     await rabbitmqService.assertQueue(ORCHESTRATOR_QUEUES.PROCESS, {
       durable: true,
       deadLetterExchange: "",
-      deadLetterRoutingKey: ORCHESTRATOR_QUEUES.RETRY,
+      deadLetterRoutingKey: ORCHESTRATOR_QUEUES.DEAD,
     });
 
     debugLog("orchestrator-queue", "All orchestrator queues declared");
@@ -102,6 +110,34 @@ class OrchestratorQueueService {
     });
 
     return sent;
+  }
+
+  async enqueueRetry(message: OrchestratorMessage): Promise<boolean> {
+    if (!rabbitmqService.isConnected()) {
+      return false;
+    }
+
+    const retryMessage: OrchestratorMessage = {
+      ...message,
+      attempt: message.attempt + 1,
+      timestamp: new Date().toISOString(),
+    };
+
+    return rabbitmqService.publish(ORCHESTRATOR_QUEUES.RETRY, retryMessage);
+  }
+
+  async enqueueDead(message: OrchestratorMessage, error: string): Promise<boolean> {
+    if (!rabbitmqService.isConnected()) {
+      return false;
+    }
+
+    const deadLetterMessage: OrchestratorDeadLetterMessage = {
+      ...message,
+      failedAt: new Date().toISOString(),
+      error,
+    };
+
+    return rabbitmqService.publish(ORCHESTRATOR_QUEUES.DEAD, deadLetterMessage);
   }
 }
 

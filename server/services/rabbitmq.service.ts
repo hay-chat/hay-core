@@ -1,7 +1,10 @@
 import amqplib, { type ChannelModel, type Channel, type ConsumeMessage } from "amqplib";
 import { config } from "@server/config/env";
 import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { EventEmitter } from "events";
+
+const logger = createLogger("rabbitmq");
 
 /**
  * RabbitMQ Service
@@ -17,7 +20,13 @@ export class RabbitMQService extends EventEmitter {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
   private readonly maxReconnectDelay = 30000;
-  private consumers = new Map<string, (msg: ConsumeMessage) => Promise<void>>();
+  private consumers = new Map<
+    string,
+    {
+      handler: (msg: ConsumeMessage) => Promise<void>;
+      options?: { prefetch?: number };
+    }
+  >();
   private declaredQueues = new Set<string>();
   private consumerTags = new Map<string, string>();
 
@@ -36,7 +45,7 @@ export class RabbitMQService extends EventEmitter {
       this.isInitialized = true;
       debugLog("rabbitmq", "RabbitMQ service fully initialized and ready");
     } catch (error) {
-      console.error("[RabbitMQ] Failed to initialize:", error);
+      logger.error({ err: error }, "Failed to initialize RabbitMQ");
       throw error;
     }
   }
@@ -47,11 +56,11 @@ export class RabbitMQService extends EventEmitter {
     });
 
     this.connection.on("error", (err) => {
-      console.error("[RabbitMQ] Connection error:", err);
+      logger.error({ err }, "RabbitMQ connection error");
     });
 
     this.connection.on("close", () => {
-      console.warn("[RabbitMQ] Connection closed");
+      logger.warn("RabbitMQ connection closed");
       this.channel = null;
       this.connection = null;
       this.declaredQueues.clear();
@@ -63,7 +72,7 @@ export class RabbitMQService extends EventEmitter {
     this.channel = await this.connection.createChannel();
 
     this.channel.on("error", (err) => {
-      console.error("[RabbitMQ] Channel error:", err);
+      logger.error({ err }, "RabbitMQ channel error");
     });
 
     this.channel.on("close", () => {
@@ -82,7 +91,7 @@ export class RabbitMQService extends EventEmitter {
     this.reconnecting = true;
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[RabbitMQ] Max reconnect attempts reached, giving up");
+      logger.error("Max reconnect attempts reached, giving up");
       return;
     }
 
@@ -98,7 +107,7 @@ export class RabbitMQService extends EventEmitter {
         await this.restoreState();
         debugLog("rabbitmq", "Reconnected and restored state");
       } catch (error) {
-        console.error("[RabbitMQ] Reconnect failed:", error);
+        logger.error({ err: error }, "Reconnect failed");
         this.reconnecting = false;
         this.scheduleReconnect();
       }
@@ -115,8 +124,8 @@ export class RabbitMQService extends EventEmitter {
     }
 
     // Re-attach consumers
-    for (const [queue, handler] of this.consumers.entries()) {
-      await this.consumeInternal(queue, handler);
+    for (const [queue, { handler, options }] of this.consumers.entries()) {
+      await this.consumeInternal(queue, handler, options);
     }
   }
 
@@ -142,7 +151,7 @@ export class RabbitMQService extends EventEmitter {
    */
   async publish<T extends { messageId?: string }>(queue: string, message: T): Promise<boolean> {
     if (!this.channel) {
-      console.warn("[RabbitMQ] Channel not available, message not published", { queue });
+      logger.warn({ queue }, "Channel not available, message not published");
       return false;
     }
 
@@ -162,7 +171,7 @@ export class RabbitMQService extends EventEmitter {
 
       return sent;
     } catch (error) {
-      console.error(`[RabbitMQ] Failed to publish to ${queue}:`, error);
+      logger.error({ err: error, queue }, "Failed to publish to queue");
       return false;
     }
   }
@@ -177,22 +186,22 @@ export class RabbitMQService extends EventEmitter {
     handler: (msg: ConsumeMessage) => Promise<void>,
     options?: { prefetch?: number },
   ): Promise<void> {
-    this.consumers.set(queue, handler);
-
-    if (options?.prefetch && this.channel) {
-      await this.channel.prefetch(options.prefetch);
-    }
-
-    await this.consumeInternal(queue, handler);
+    this.consumers.set(queue, { handler, options });
+    await this.consumeInternal(queue, handler, options);
   }
 
   private async consumeInternal(
     queue: string,
     handler: (msg: ConsumeMessage) => Promise<void>,
+    options?: { prefetch?: number },
   ): Promise<void> {
     if (!this.channel) {
       debugLog("rabbitmq", `Cannot consume ${queue}: channel not available`);
       return;
+    }
+
+    if (options?.prefetch) {
+      await this.channel.prefetch(options.prefetch);
     }
 
     const { consumerTag } = await this.channel.consume(queue, async (msg) => {
@@ -201,7 +210,7 @@ export class RabbitMQService extends EventEmitter {
       try {
         await handler(msg);
       } catch (error) {
-        console.error(`[RabbitMQ] Consumer error on ${queue}:`, error);
+        logger.error({ err: error, queue }, "Consumer handler error");
         // Nack without requeue on handler exceptions — let dead-letter handle it
         this.nack(msg, false);
       }
@@ -238,7 +247,7 @@ export class RabbitMQService extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
-    console.log("[RabbitMQ] Shutting down...");
+    logger.info("Shutting down RabbitMQ...");
     this.isInitialized = false;
 
     try {
@@ -261,7 +270,7 @@ export class RabbitMQService extends EventEmitter {
         await this.connection.close();
       }
     } catch (error) {
-      console.error("[RabbitMQ] Error during shutdown:", error);
+      logger.error({ err: error }, "Error during shutdown");
     }
 
     this.channel = null;
@@ -269,7 +278,7 @@ export class RabbitMQService extends EventEmitter {
     this.consumers.clear();
     this.consumerTags.clear();
     this.declaredQueues.clear();
-    console.log("[RabbitMQ] Shutdown complete");
+    logger.info("RabbitMQ shutdown complete");
   }
 }
 

@@ -5,10 +5,20 @@ import { rabbitmqService } from "@server/services/rabbitmq.service";
 import {
   orchestratorQueueService,
   ORCHESTRATOR_QUEUES,
+  MAX_RETRY_ATTEMPTS,
   type OrchestratorMessage,
 } from "@server/services/orchestrator-queue.service";
 
 const logger = createLogger("orchestrator-worker");
+
+function isNonRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  return (
+    error.message.includes("Conversation does not need processing") ||
+    error.message.includes("Last customer message not found")
+  );
+}
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
@@ -90,12 +100,67 @@ export class OrchestratorWorker {
             "Successfully processed conversation",
           );
         } catch (error) {
-          logger.error(
-            { err: error, conversationId: data.conversationId },
-            "Failed to process conversation",
-          );
-          // Nack without requeue — message goes to retry queue via dead-letter
-          rabbitmqService.nack(msg, false);
+          const currentAttempt = data.attempt || 1;
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown orchestrator error";
+
+          if (isNonRetryableError(error)) {
+            logger.debug(
+              {
+                conversationId: data.conversationId,
+                trigger: data.trigger,
+                attempt: currentAttempt,
+                error: errorMessage,
+              },
+              "Skipping retry for non-retryable orchestrator error",
+            );
+            rabbitmqService.ack(msg);
+            return;
+          }
+
+          try {
+            if (currentAttempt >= MAX_RETRY_ATTEMPTS) {
+              await orchestratorQueueService.enqueueDead(data, errorMessage);
+              rabbitmqService.ack(msg);
+              logger.error(
+                {
+                  conversationId: data.conversationId,
+                  trigger: data.trigger,
+                  attempt: currentAttempt,
+                  maxAttempts: MAX_RETRY_ATTEMPTS,
+                  error: errorMessage,
+                },
+                "Max retry attempts reached, moved to dead queue",
+              );
+              return;
+            }
+
+            await orchestratorQueueService.enqueueRetry(data);
+            rabbitmqService.ack(msg);
+            logger.warn(
+              {
+                conversationId: data.conversationId,
+                trigger: data.trigger,
+                currentAttempt,
+                nextAttempt: currentAttempt + 1,
+                maxAttempts: MAX_RETRY_ATTEMPTS,
+                error: errorMessage,
+              },
+              "Conversation processing failed, scheduled retry",
+            );
+          } catch (retryError) {
+            logger.error(
+              {
+                err: retryError,
+                conversationId: data.conversationId,
+                trigger: data.trigger,
+                attempt: currentAttempt,
+              },
+              "Failed to schedule retry/dead-letter, nacking message",
+            );
+            // Fallback: route via queue dead-letter configuration.
+            rabbitmqService.nack(msg, false);
+          }
         }
       },
       { prefetch: 2 },
