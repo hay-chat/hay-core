@@ -241,7 +241,7 @@ export class EmailService {
       if (!mergedVariables.emailTitle || !mergedVariables.emailPreview) {
         mergedVariables.emailTitle = mergedVariables.emailTitle || finalSubject;
         mergedVariables.emailPreview = mergedVariables.emailPreview || finalSubject;
-        mergedVariables.recipientEmail = mergedVariables.recipientEmail || options.to;
+        mergedVariables.recipientEmail = mergedVariables.recipientEmail || (Array.isArray(options.to) ? options.to[0] : options.to);
 
         const rerendered = await this.templateService.render({
           template: options.template,
