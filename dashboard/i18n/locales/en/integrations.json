@@ -1,0 +1,239 @@
+{
+  "marketplace": {
+    "title": "Integration Marketplace",
+    "description": "Discover and install integrations to extend your platform capabilities",
+    "headTitle": "Integration Marketplace - Hay Dashboard",
+    "uploadPlugin": "Upload Integration",
+    "manageCustom": "Manage Custom ({count})",
+    "refresh": "Refresh",
+    "stats": {
+      "totalPlugins": "Total Integrations",
+      "availablePlugins": "Available integrations",
+      "installed": "Installed",
+      "activePlugins": "Active integrations",
+      "channels": "Channels",
+      "communicationChannels": "Communication channels",
+      "mcpConnectors": "MCP Connectors",
+      "modelContextProtocol": "Model Context Protocol"
+    },
+    "categories": {
+      "label": "Categories:",
+      "all": "All Integrations",
+      "channels": "Channels",
+      "mcpConnectors": "MCP Connectors",
+      "documentImporters": "Document Importers",
+      "retrievers": "Retrievers",
+      "playbooks": "Playbooks"
+    },
+    "search": "Search integrations...",
+    "empty": {
+      "title": "No integrations found",
+      "searchHint": "Try adjusting your search terms.",
+      "categoryHint": "No integrations match your selected category."
+    },
+    "pluginTypes": {
+      "channel": "Channel",
+      "mcpConnector": "MCP Connector",
+      "documentImporter": "Document Importer",
+      "retriever": "Retriever",
+      "playbook": "Playbook"
+    },
+    "actions": {
+      "install": "Install",
+      "installing": "Installing...",
+      "configure": "Configure",
+      "remove": "Remove",
+      "removing": "Removing...",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "custom": "Custom",
+    "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
+    "toast": {
+      "enabledSuccess": "Integration {name} enabled successfully",
+      "disabledSuccess": "Integration {name} disabled successfully",
+      "deletedSuccess": "Integration deleted successfully",
+      "enableFailed": "Failed to enable integration",
+      "disableFailed": "Failed to disable integration",
+      "deleteFailed": "Failed to delete integration"
+    }
+  },
+  "manage": {
+    "title": "Manage Custom Integrations",
+    "description": "View and manage your organization's custom integrations",
+    "headTitle": "Manage Custom Integrations - Hay Dashboard",
+    "uploadPlugin": "Upload Integration",
+    "refresh": "Refresh",
+    "stats": {
+      "customPlugins": "Custom Integrations",
+      "uploadedByOrg": "Uploaded by your organization",
+      "enabled": "Enabled",
+      "currentlyActive": "Currently active",
+      "totalSize": "Total Size",
+      "storageUsed": "Storage used"
+    },
+    "loading": "Loading integrations...",
+    "empty": {
+      "title": "No custom integrations",
+      "description": "Upload your first custom integration to get started"
+    },
+    "table": {
+      "title": "Custom Integrations",
+      "version": "Version: {version}",
+      "id": "ID: {id}",
+      "uploaded": "Uploaded: {date}"
+    },
+    "actions": {
+      "enable": "Enable",
+      "enabling": "Enabling...",
+      "disable": "Disable",
+      "disabling": "Disabling...",
+      "settings": "Settings",
+      "update": "Update",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
+    "updateComingSoon": "Update functionality coming soon",
+    "toast": {
+      "enabledSuccess": "Integration enabled successfully",
+      "disabledSuccess": "Integration disabled successfully",
+      "deletedSuccess": "Integration deleted successfully",
+      "enableFailed": "Failed to enable integration",
+      "disableFailed": "Failed to disable integration",
+      "deleteFailed": "Failed to delete integration"
+    }
+  },
+  "upload": {
+    "title": "Upload Custom Integration",
+    "description": "Upload a custom integration to extend your platform",
+    "headTitle": "Upload Integration - Hay Dashboard",
+    "backToMarketplace": "Back to Marketplace",
+    "card": {
+      "title": "Upload Integration ZIP",
+      "description": "Upload a ZIP file containing your custom integration. The ZIP must include a manifest.json file in the root."
+    },
+    "file": {
+      "label": "Integration File",
+      "dropHint": "Drop your integration ZIP here or click to browse",
+      "maxSize": "Maximum file size: 50MB",
+      "selectFile": "Select File",
+      "remove": "Remove"
+    },
+    "success": {
+      "message": "Integration uploaded successfully!",
+      "uploadAnother": "Upload Another",
+      "viewMarketplace": "View Marketplace"
+    },
+    "progress": {
+      "uploading": "Uploading...",
+      "uploadPlugin": "Upload Integration"
+    },
+    "errors": {
+      "title": "Upload Failed",
+      "zipOnly": "Only ZIP files are allowed",
+      "tooLarge": "File size exceeds 50MB limit",
+      "uploadFailed": "Failed to upload integration"
+    },
+    "requirements": {
+      "title": "Integration Requirements",
+      "manifest": {
+        "title": "Valid package.json with hay-plugin field",
+        "description": "Must include a package.json with a 'hay-plugin' field containing at least an 'entry' pointing to the MCP server"
+      },
+      "pluginId": {
+        "title": "Valid integration ID",
+        "description": "The package name in package.json must be a valid npm name (lowercase letters, numbers, hyphens, optional scope)"
+      },
+      "zipFormat": {
+        "title": "ZIP format",
+        "description": "File must be in ZIP format with a maximum size of 50MB"
+      },
+      "noPathTraversal": {
+        "title": "No path traversal",
+        "description": "ZIP must not contain files with absolute paths or .."
+      }
+    },
+    "toast": {
+      "uploadedSuccess": "Integration {name} uploaded successfully!"
+    }
+  },
+  "pluginSettings": {
+    "backToMarketplace": "Back to Marketplace",
+    "headTitle": "Integration Settings - Hay Dashboard",
+    "headTitleWithName": "{name} Settings - Hay Dashboard",
+    "restartWorker": "Restart Worker",
+    "restarting": "Restarting...",
+    "disablePlugin": "Disable Integration",
+    "disabling": "Disabling...",
+    "enablePlugin": "Enable Integration",
+    "disableConfirm": {
+      "title": "Disable Integration?",
+      "description": "Are you sure you want to disable {name}? This will stop the integration from being used in your organization.",
+      "confirm": "Disable"
+    },
+    "error": {
+      "loadFailed": "Failed to load integration",
+      "returnToMarketplace": "Return to Marketplace"
+    },
+    "connection": {
+      "testing": "Testing Connection",
+      "connected": "Connected",
+      "failed": "Connection Failed",
+      "needsAuth": "Needs Authentication",
+      "configureCredentials": "Please configure your credentials",
+      "connectionFailed": "Connection failed",
+      "tryAgain": "Try Again"
+    },
+    "about": "About",
+    "capabilities": {
+      "title": "Capabilities",
+      "description": "What this integration can do",
+      "chatConnector": "Chat Connector",
+      "sendMessages": "Send messages",
+      "receiveMessages": "Receive messages",
+      "listConversations": "List conversations",
+      "mcpConnector": "MCP Connector",
+      "mcpDescription": "Provides AI tools and resources through Model Context Protocol",
+      "documentImporter": "Document Importer",
+      "documentImporterDescription": "Import and process documents from external sources"
+    },
+    "availableActions": {
+      "title": "Available Actions",
+      "toolsAvailable": "{count} tools available"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "description": "Configure your {name} settings"
+    },
+    "connectionTest": {
+      "title": "Connection Test",
+      "description": "Test your {name} connection",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "success": "Connection successful!",
+      "configRequired": "Configuration required",
+      "failed": "Connection failed",
+      "checkConfig": "Please check your configuration and try again."
+    },
+    "tabs": {
+      "settings": "Settings"
+    },
+    "toast": {
+      "configSaved": "Configuration saved successfully",
+      "configSaveFailed": "Failed to save configuration",
+      "enabledSuccess": "Integration enabled successfully",
+      "enableFailed": "Failed to enable integration",
+      "disabledSuccess": "Integration disabled successfully",
+      "disableFailed": "Failed to disable integration",
+      "restartedSuccess": "Integration worker restarted successfully",
+      "restartFailed": "Failed to restart integration",
+      "resetToEnv": "Reset to environment variable",
+      "resetToEnvFailed": "Failed to reset to environment variable",
+      "oauthSuccess": "OAuth connection established successfully",
+      "oauthFailed": "OAuth connection failed. Please try again.",
+      "connectionEstablished": "Connection established successfully",
+      "connectionCheckFailed": "Failed to establish connection. Please check your configuration."
+    }
+  }
+}

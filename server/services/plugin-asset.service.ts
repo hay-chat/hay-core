@@ -3,6 +3,9 @@ import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-asset");
 
 interface AssetCache {
   content: string | Buffer;
@@ -247,7 +250,7 @@ export class PluginAssetService {
       if (error.code === "ENOENT") {
         res.status(404).json({ error: "File not found" });
       } else {
-        console.error(`Failed to serve public file ${filePath} for plugin ${pluginName}:`, error);
+        logger.error({ err: error, filePath, pluginName }, "Failed to serve public file");
         res.status(500).json({ error: "Failed to load file" });
       }
     }
@@ -348,7 +351,7 @@ export class PluginAssetService {
       if (error.code === "ENOENT") {
         res.status(404).json({ error: "File not found" });
       } else {
-        console.error(`Failed to serve UI asset ${assetPath} for plugin ${pluginName}:`, error);
+        logger.error({ err: error, assetPath, pluginName }, "Failed to serve UI asset");
         res.status(500).json({ error: "Failed to load file" });
       }
     }

@@ -49,7 +49,6 @@ export default defineNuxtConfig({
         module: "esnext",
         experimentalDecorators: true,
         emitDecoratorMetadata: true,
-        types: ["vite/client"],
         paths: {
           "@server/*": ["../server/*"],
           "@/*": ["./*"],
@@ -76,7 +75,33 @@ export default defineNuxtConfig({
   css: ["@/assets/css/main.css"],
 
   // Modules
-  modules: ["@nuxtjs/tailwindcss", "@pinia/nuxt", "@vueuse/nuxt"],
+  modules: ["@nuxtjs/tailwindcss", "@pinia/nuxt", "@vueuse/nuxt", "@nuxtjs/i18n"],
+
+  // Internationalization
+  i18n: {
+    locales: [
+      {
+        code: "en",
+        name: "English",
+        files: ["en/common.json", "en/auth.json", "en/agents.json", "en/settings.json", "en/dashboard.json", "en/playbooks.json", "en/conversations.json", "en/integrations.json", "en/documents.json", "en/queue.json", "en/privacy-pages.json", "en/organizations.json"],
+      },
+      {
+        code: "pt-BR",
+        name: "Português (Brasil)",
+        files: ["pt-BR/common.json", "pt-BR/auth.json", "pt-BR/agents.json", "pt-BR/settings.json", "pt-BR/dashboard.json", "pt-BR/playbooks.json", "pt-BR/conversations.json", "pt-BR/integrations.json", "pt-BR/documents.json", "pt-BR/queue.json", "pt-BR/privacy-pages.json", "pt-BR/organizations.json"],
+      },
+    ],
+    langDir: "locales",
+    defaultLocale: "en",
+    strategy: "no_prefix",
+    detectBrowserLanguage: {
+      useCookie: true,
+      cookieKey: "hay_locale",
+      alwaysRedirect: false,
+      fallbackLocale: "en",
+    },
+    vueI18n: "./i18n.config.ts",
+  },
 
   // Auto-import configuration
   imports: {
@@ -169,6 +194,10 @@ export default defineNuxtConfig({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "description", content: "Hay platform dashboard application" },
         { name: "robots", content: "noindex, nofollow" },
+      ],
+      script: [
+        // TEMPORARY: Figma capture script - remove after capture
+        { src: "https://mcp.figma.com/mcp/html-to-design/capture.js", async: true },
       ],
       link: [
         { rel: "preconnect", href: "https://fonts.googleapis.com" },

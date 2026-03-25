@@ -20,13 +20,9 @@
 
       <!-- Header -->
       <div class="text-center">
-        <CardTitle class="text-2xl"> Create your account </CardTitle>
+        <CardTitle class="text-2xl"> {{ $t("signup.title") }} </CardTitle>
         <CardDescription class="mt-2">
-          {{
-            invitationContext
-              ? "Complete your account to join the organization"
-              : "Get started with your Hay organization"
-          }}
+          {{ invitationContext ? $t("signup.descriptionInvitation") : $t("signup.description") }}
         </CardDescription>
       </div>
 
@@ -69,9 +65,9 @@
           <Input
             id="organizationName"
             v-model="form.organizationName"
-            label="Organization name"
+            :label="$t('signup.orgNameLabel')"
             type="text"
-            placeholder="Enter your organization name"
+            :placeholder="$t('signup.orgNamePlaceholder')"
             required
             :class="errors.organizationName ? 'border-red-500' : ''"
             @blur="() => nextTick(() => validateField('organizationName'))"
@@ -79,7 +75,7 @@
           <p v-if="errors.organizationName" class="text-sm text-red-600">
             {{ errors.organizationName }}
           </p>
-          <p v-else class="text-sm text-gray-500">This will be used to identify your workspace</p>
+          <p v-else class="text-sm text-gray-500">{{ $t("signup.orgNameHelper") }}</p>
         </div>
 
         <!-- Admin Email -->
@@ -87,9 +83,9 @@
           <Input
             id="email"
             v-model="form.email"
-            :label="invitationContext ? 'Email address' : 'Admin email address'"
+            :label="invitationContext ? $t('signup.emailLabelInvitation') : $t('signup.emailLabel')"
             type="email"
-            placeholder="Enter your email"
+            :placeholder="$t('signup.emailPlaceholder')"
             required
             :readonly="!!invitationContext"
             :class="errors.email ? 'border-red-500' : ''"
@@ -99,7 +95,7 @@
             {{ errors.email }}
           </p>
           <p v-else-if="!invitationContext" class="text-sm text-gray-500">
-            This will be your admin account email
+            {{ $t("signup.emailHelper") }}
           </p>
         </div>
 
@@ -108,9 +104,9 @@
           <Input
             id="fullName"
             v-model="form.fullName"
-            label="Full name"
+            :label="$t('signup.nameLabel')"
             type="text"
-            placeholder="Enter your full name"
+            :placeholder="$t('signup.namePlaceholder')"
             required
             :class="errors.fullName ? 'border-red-500' : ''"
             @blur="() => nextTick(() => validateField('fullName'))"
@@ -125,9 +121,9 @@
           <Input
             id="password"
             v-model="form.password"
-            label="Password"
+            :label="$t('signup.passwordLabel')"
             type="password"
-            placeholder="Create a strong password"
+            :placeholder="$t('signup.passwordPlaceholder')"
             required
             :class="errors.password ? 'border-red-500' : ''"
             @blur="() => nextTick(() => validateField('password'))"
@@ -145,9 +141,9 @@
           <Input
             id="confirmPassword"
             v-model="form.confirmPassword"
-            label="Confirm password"
+            :label="$t('signup.confirmPasswordLabel')"
             type="password"
-            placeholder="Confirm your password"
+            :placeholder="$t('signup.confirmPasswordPlaceholder')"
             required
             :class="errors.confirmPassword ? 'border-red-500' : ''"
             @blur="() => nextTick(() => validateField('confirmPassword'))"
@@ -161,21 +157,21 @@
         <div class="space-y-3">
           <Input id="terms" v-model="form.acceptTerms" type="checkbox" class="items-start">
             <span class="text-sm text-gray-700 cursor-pointer leading-5">
-              I agree to the
+              {{ $t("signup.termsAgree") }}
               <NuxtLink to="/terms" class="text-primary hover:text-primary/80 font-medium">
-                Terms of Service
+                {{ $t("signup.termsOfService") }}
               </NuxtLink>
-              and
+              {{ $t("signup.and") }}
               <NuxtLink to="/privacy" class="text-primary hover:text-primary/80 font-medium">
-                Privacy Policy
+                {{ $t("signup.privacyPolicy") }}
               </NuxtLink>
             </span>
           </Input>
 
           <Input id="marketing" v-model="form.acceptMarketing" type="checkbox" class="items-start">
             <span class="text-sm text-gray-700 cursor-pointer leading-5">
-              I would like to receive product updates and marketing communications
-              <span class="text-gray-500">(optional)</span>
+              {{ $t("signup.marketingConsent") }}
+              <span class="text-gray-500">{{ $t("signup.optional") }}</span>
             </span>
           </Input>
         </div>
@@ -188,7 +184,7 @@
           :loading="authStore.isLoading"
           :disabled="!isFormValid"
         >
-          Create account
+          {{ $t("signup.submit") }}
         </Button>
 
         <!-- Error Message -->
@@ -202,9 +198,9 @@
       <!-- Login link -->
       <div class="text-center">
         <p class="text-sm text-gray-600">
-          Already have an account?
+          {{ $t("signup.hasAccount") }}
           <NuxtLink to="/login" class="font-medium text-primary hover:text-primary/80">
-            Sign in
+            {{ $t("signup.signIn") }}
           </NuxtLink>
         </p>
       </div>
@@ -222,6 +218,9 @@ definePageMeta({
   layout: false,
   public: true,
 });
+
+// i18n
+const { t } = useI18n();
 
 // Navigation
 const router = useRouter();
@@ -344,9 +343,9 @@ const validateField = (field: keyof typeof errors) => {
   switch (field) {
     case "organizationName":
       if (!form.organizationName) {
-        errors.organizationName = "Organization name is required";
+        errors.organizationName = t("signup.errors.orgNameRequired");
       } else if (form.organizationName.length < 2) {
-        errors.organizationName = "Organization name must be at least 2 characters";
+        errors.organizationName = t("signup.errors.orgNameMinLength");
       } else {
         errors.organizationName = "";
       }
@@ -354,9 +353,9 @@ const validateField = (field: keyof typeof errors) => {
 
     case "email":
       if (!form.email) {
-        errors.email = "Email is required";
+        errors.email = t("signup.errors.emailRequired");
       } else if (!validateEmail(form.email)) {
-        errors.email = "Please enter a valid email address";
+        errors.email = t("signup.errors.emailInvalid");
       } else {
         errors.email = "";
       }
@@ -364,9 +363,9 @@ const validateField = (field: keyof typeof errors) => {
 
     case "fullName":
       if (!form.fullName) {
-        errors.fullName = "Full name is required";
+        errors.fullName = t("signup.errors.nameRequired");
       } else if (form.fullName.length < 2) {
-        errors.fullName = "Full name must be at least 2 characters";
+        errors.fullName = t("signup.errors.nameMinLength");
       } else {
         errors.fullName = "";
       }
@@ -374,9 +373,9 @@ const validateField = (field: keyof typeof errors) => {
 
     case "password":
       if (!form.password) {
-        errors.password = "Password is required";
+        errors.password = t("signup.errors.passwordRequired");
       } else if (!passwordValidation.value.isValid) {
-        errors.password = "Password does not meet requirements";
+        errors.password = t("signup.errors.passwordRequirements");
       } else {
         errors.password = "";
       }
@@ -388,9 +387,9 @@ const validateField = (field: keyof typeof errors) => {
 
     case "confirmPassword":
       if (!form.confirmPassword) {
-        errors.confirmPassword = "Please confirm your password";
+        errors.confirmPassword = t("signup.errors.confirmRequired");
       } else if (form.password !== form.confirmPassword) {
-        errors.confirmPassword = "Passwords do not match";
+        errors.confirmPassword = t("signup.errors.passwordMismatch");
       } else {
         errors.confirmPassword = "";
       }
@@ -414,7 +413,7 @@ const handleSubmit = async () => {
   });
 
   if (!form.acceptTerms) {
-    error.value = "You must accept the Terms of Service to continue";
+    error.value = t("signup.errors.termsRequired");
     return;
   }
 
@@ -441,13 +440,11 @@ const handleSubmit = async () => {
     // Handle different types of registration errors
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (errorMessage.includes("already exists")) {
-      error.value =
-        "An account with this email address already exists. Please try signing in instead.";
+      error.value = t("signup.errors.emailExists");
     } else if (errorMessage.includes("Password")) {
-      error.value =
-        "Password does not meet security requirements. Please choose a stronger password.";
+      error.value = t("signup.errors.weakPassword");
     } else {
-      error.value = "Unable to create your account. Please check your information and try again.";
+      error.value = t("signup.errors.generic");
     }
     console.error("Signup error:", err);
   }
@@ -455,7 +452,7 @@ const handleSubmit = async () => {
 
 // SEO
 useHead({
-  title: "Sign Up - Hay Dashboard",
-  meta: [{ name: "description", content: "Create your Hay organization account" }],
+  title: t("signup.pageTitle"),
+  meta: [{ name: "description", content: t("signup.pageDescription") }],
 });
 </script>

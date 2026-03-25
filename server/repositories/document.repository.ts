@@ -81,6 +81,35 @@ export class DocumentRepository extends BaseRepository<Document> {
   }
 
   /**
+   * Get document counts grouped by status for an organization
+   */
+  async getStatusCounts(organizationId: string): Promise<Array<{ status: string; count: number }>> {
+    const results = await this.getRepository()
+      .createQueryBuilder("doc")
+      .select("doc.status", "status")
+      .addSelect("COUNT(*)", "count")
+      .where("doc.organization_id = :organizationId", { organizationId })
+      .groupBy("doc.status")
+      .orderBy("count", "DESC")
+      .getRawMany();
+
+    return results.map((row: { status: string; count: string }) => ({
+      status: row.status,
+      count: parseInt(row.count, 10),
+    }));
+  }
+
+  /**
+   * Find a document by its source URL within an organization.
+   * Used for deduplication during web imports.
+   */
+  async findBySourceUrl(sourceUrl: string, organizationId: string): Promise<Document | null> {
+    return await this.getRepository().findOne({
+      where: { sourceUrl, organizationId } as any,
+    });
+  }
+
+  /**
    * Apply document-specific includes/relations
    */
   protected override applyIncludes(

@@ -3,7 +3,7 @@
     @click="$emit('toggle')"
     class="hay-chat-button"
     :class="{ 'hay-chat-button--left': position === 'left' }"
-    aria-label="Open chat"
+    :aria-label="t('chat.open')"
   >
     <svg
       v-if="!isOpen"
@@ -39,9 +39,13 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "@/i18n";
+
+const t = useI18n();
+
 defineProps<{
   isOpen: boolean;
-  position: 'left' | 'right';
+  position: "left" | "right";
   unreadCount: number;
 }>();
 
@@ -50,14 +54,15 @@ defineEmits<{
 }>();
 </script>
 
-<style scoped>
+<style>
 .hay-chat-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
   width: 60px;
   height: 60px;
-  border-radius: 50%;
+  border-radius: 24px;
+  corner-shape: squircle;
   background: var(--hay-primary);
   border: none;
   cursor: pointer;

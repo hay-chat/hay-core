@@ -2,6 +2,9 @@ import { t, authenticatedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { vectorStoreService } from "@server/services/vector-store.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("embeddings");
 
 const embedInput = z.object({
   documentId: z.string().uuid().nullable().optional(),
@@ -68,7 +71,7 @@ export const embeddingsRouter = t.router({
         count: ids.length,
       };
     } catch (error) {
-      console.error("Error adding embeddings:", error);
+      logger.error({ err: error }, "Error adding embeddings");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to add embeddings",
@@ -100,7 +103,7 @@ export const embeddingsRouter = t.router({
         count: results.length,
       };
     } catch (error) {
-      console.error("Error searching embeddings:", error);
+      logger.error({ err: error }, "Error searching embeddings");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to search embeddings",
@@ -123,7 +126,7 @@ export const embeddingsRouter = t.router({
       const stats = await vectorStoreService.getStatistics(organizationId);
       return stats;
     } catch (error) {
-      console.error("Error getting embedding stats:", error);
+      logger.error({ err: error }, "Error getting embedding stats");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to get statistics",
@@ -159,7 +162,7 @@ export const embeddingsRouter = t.router({
           deleted,
         };
       } catch (error) {
-        console.error("Error deleting embeddings:", error);
+        logger.error({ err: error }, "Error deleting embeddings");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to delete embeddings",

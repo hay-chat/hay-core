@@ -7,6 +7,9 @@ import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("auth-middleware");
 
 /**
  * Load UserOrganization relationship for multi-org context
@@ -161,8 +164,12 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
 export async function optionalAuth(req: Request): Promise<AuthUser | null> {
   try {
     return await authenticate(req);
-  } catch {
-    // Suppress authentication errors for optional auth
+  } catch (error) {
+    // Re-throw authorization errors (e.g., user doesn't belong to organization)
+    // Only suppress authentication failures (missing/invalid credentials)
+    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
+      throw error;
+    }
     return null;
   }
 }
@@ -192,6 +199,5 @@ function logAuthSuccess(_method: string, _userId: string): void {
 }
 
 function logAuthFailure(method: string, error: unknown): void {
-  const message = error instanceof Error ? error.message : "Unknown error";
-  console.error(`[Auth] Failed ${method} authentication: ${message}`);
+  logger.error({ err: error, method }, "Authentication failed");
 }

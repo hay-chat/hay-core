@@ -1,0 +1,35 @@
+<!-- Signup Email Verification Content -->
+<mj-section mj-class="section-white">
+  <mj-column>
+    <mj-text mj-class="h2" padding="0 0 20px 0">
+      {{ t.verify-signup-email.title }}
+    </mj-text>
+
+    <mj-text mj-class="text-body">
+      {{ t.common.hi }}
+    </mj-text>
+
+    <mj-text mj-class="text-body" padding="10px 0">
+      {{ t.verify-signup-email.body }}
+    </mj-text>
+
+    <mj-button mj-class="btn-primary" href="{{verificationUrl}}">
+      {{ t.verify-signup-email.verifyButton }}
+    </mj-button>
+
+    <mj-text mj-class="text-small" padding="10px 0">
+      {{ t.common.copyPasteLink }}<br/>
+      <a href="{{verificationUrl}}" class="link-primary word-break">{{verificationUrl}}</a>
+    </mj-text>
+
+    <mj-divider padding="20px 0" />
+
+    <mj-text mj-class="text-danger" font-size="13px" line-height="20px" padding="0 0 10px 0">
+      ⚠️ <strong>{{ t.verify-signup-email.expirationWarning }}</strong>
+    </mj-text>
+
+    <mj-text mj-class="text-small">
+      {{ t.verify-signup-email.ignoreEmail }}
+    </mj-text>
+  </mj-column>
+</mj-section>

@@ -1,3 +1,7 @@
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("hooks");
+
 export interface HookPayload {
   organizationId: string;
   conversationId?: string;
@@ -32,7 +36,7 @@ export class HookManager {
     await Promise.all(
       handlers.map((handler) =>
         handler(payload).catch((error) => {
-          console.error(`Hook handler error for event ${event}:`, error);
+          logger.error({ err: error, event }, "Hook handler error");
         })
       )
     );

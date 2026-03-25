@@ -63,6 +63,7 @@ const buttonVariants = cva("btn-base", {
       xs: "btn-size-xs",
       lg: "btn-size-lg",
       icon: "btn-size-icon",
+      "icon-sm": "btn-size-icon-sm",
     },
   },
   defaultVariants: {
@@ -76,7 +77,7 @@ export interface ButtonProps {
   size?: VariantProps<typeof buttonVariants>["size"];
   disabled?: boolean;
   loading?: boolean;
-  class?: string;
+  class?: string | Record<string, boolean> | (string | Record<string, boolean>)[];
   href?: string;
   target?: string;
 }
@@ -208,6 +209,11 @@ const props = withDefaults(defineProps<ButtonProps>(), {
 .btn-size-icon {
   height: 2.5rem;
   width: 2.5rem;
+}
+
+.btn-size-icon-sm {
+  height: 1.75rem;
+  width: 1.75rem;
 }
 
 /* Button content wrapper */

@@ -1,76 +1,66 @@
 <template>
-  <Page title="Conversations" description="Monitor and manage all customer conversations">
+  <Page :title="$t('conversations.page.title')" :description="$t('conversations.page.description')">
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
         <Button size="sm" @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
-          Conversation Playground
+          {{ $t('conversations.actions.playground') }}
         </Button>
         <Button variant="outline" size="sm" @click="refreshConversations">
           <RefreshCcw class="h-4 w-4 mr-2" />
-          Refresh
+          {{ $t('conversations.actions.refresh') }}
         </Button>
       </div>
     </template>
 
     <!-- Stats Cards -->
-    <div class="grid gap-4 md:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-3">
       <MetricCard
-        title="Total Conversations"
+        :title="$t('conversations.stats.totalConversations')"
         :icon="MessageSquare"
         :metric="stats.total"
-        :subtitle="`+${stats.todayIncrease} today`"
+        :subtitle="$t('conversations.stats.todayIncrease', { count: stats.todayIncrease })"
       />
 
       <MetricCard
-        title="Active Now"
+        :title="$t('conversations.stats.activeNow')"
         :icon="Activity"
         :metric="stats.active"
-        subtitle="Real-time conversations"
+        :subtitle="$t('conversations.stats.realTimeConversations')"
       />
 
       <MetricCard
-        title="Avg Response Time"
+        :title="$t('conversations.stats.avgResponseTime')"
         :icon="Clock"
         :metric="`${stats.avgResponseTime}s`"
         :format-metric="false"
-        subtitle="-12% from yesterday"
+        :subtitle="$t('conversations.stats.yesterdayChange')"
         subtitle-color="green"
       />
 
-      <MetricCard
+      <!-- <MetricCard
         title="Satisfaction Rate"
         :icon="Heart"
         :metric="`${stats.satisfactionRate}%`"
         :format-metric="false"
         subtitle="+3.2% this week"
         subtitle-color="green"
-      />
+      /> -->
     </div>
 
     <!-- Filters and Search -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
-        <Input
-          v-model="searchQuery"
-          placeholder="Search conversations..."
-          :icon-start="Search"
-          class="w-[300px]"
-        />
+        <div class="min-w-[300px]">
+          <Input v-model="searchQuery" :placeholder="$t('conversations.filters.searchPlaceholder')" :icon-start="Search" />
+        </div>
 
         <Input
           v-model="selectedStatus"
           type="select"
           :options="statusOptions"
-          placeholder="All Status"
-        />
-
-        <Input
-          v-model="selectedAgent"
-          type="select"
-          :options="agentOptions"
-          placeholder="All Agents"
+          :placeholder="$t('conversations.filters.allStatus')"
         />
 
         <Input v-model="selectedTimeframe" type="select" :options="timeframeOptions" />
@@ -79,11 +69,11 @@
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm" @click="toggleBulkMode">
           <CheckSquare class="h-4 w-4 mr-2" />
-          {{ bulkMode ? "Exit" : "Select" }}
+          {{ bulkMode ? $t('conversations.actions.exit') : $t('conversations.actions.select') }}
         </Button>
         <Button v-if="selectedConversations.length > 0" variant="outline" size="sm">
           <Archive class="h-4 w-4 mr-2" />
-          Archive ({{ selectedConversations.length }})
+          {{ $t('conversations.actions.archive', { count: selectedConversations.length }) }}
         </Button>
       </div>
     </div>
@@ -108,27 +98,27 @@
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-12">
-      <Error label="Error Loading Conversations" />
+      <Error :label="$t('conversations.error.loadingConversations')" />
       <p class="text-neutral-muted mb-4">
         {{ error }}
       </p>
       <Button variant="outline" @click="fetchConversations">
         <RefreshCcw class="h-4 w-4 mr-2" />
-        Try Again
+        {{ $t('conversations.actions.tryAgain') }}
       </Button>
     </div>
 
     <!-- Empty State -->
     <EmptyState
       v-else-if="filteredConversations.length === 0"
-      :title="searchQuery ? 'No conversations found' : 'No conversations yet'"
+      :title="searchQuery ? $t('conversations.empty.noConversationsFound') : $t('conversations.empty.noConversationsYet')"
       :description="
         searchQuery
-          ? 'Try adjusting your search terms or filters.'
-          : 'Click \'New Conversation\' to start your first conversation.'
+          ? $t('conversations.empty.adjustSearch')
+          : $t('conversations.empty.startFirst')
       "
       illustration="/bale/conversation.svg"
-      :action="searchQuery ? undefined : 'Start Playground'"
+      :action="searchQuery ? undefined : $t('conversations.actions.startPlayground')"
       @click="openPlayground"
     />
 
@@ -147,12 +137,12 @@
                   @update:checked="toggleSelectAll"
                 />
               </TableHead>
-              <TableHead>Conversation</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Assigned To</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Satisfaction</TableHead>
-              <TableHead>Updated</TableHead>
+              <TableHead>{{ $t('conversations.table.conversation') }}</TableHead>
+              <TableHead>{{ $t('conversations.table.status') }}</TableHead>
+              <TableHead>{{ $t('conversations.table.assignedTo') }}</TableHead>
+              <TableHead>{{ $t('conversations.table.duration') }}</TableHead>
+              <TableHead>{{ $t('conversations.table.satisfaction') }}</TableHead>
+              <TableHead>{{ $t('conversations.table.updated') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,13 +162,13 @@
                 <div class="flex items-center space-x-3">
                   <div>
                     <div class="font-medium">
-                      {{ conversation.title || "New Conversation" }}
+                      {{ conversation.title || $t('conversations.table.newConversation') }}
                     </div>
                     <div class="text-xs text-neutral-muted">
                       {{ conversation.id.slice(0, 8) }}...
                     </div>
                     <div v-if="getWaitTime(conversation)" class="text-xs font-medium mt-1">
-                      Waiting {{ formatWaitTime(getWaitTime(conversation)!) }}
+                      {{ $t('conversations.table.waiting', { time: formatWaitTime(getWaitTime(conversation)!) }) }}
                     </div>
                   </div>
                 </div>
@@ -208,7 +198,7 @@
                   <Star class="h-4 w-4 text-yellow-500 fill-current" />
                   <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                 </div>
-                <span v-else class="text-xs text-neutral-muted">Not rated</span>
+                <span v-else class="text-xs text-neutral-muted">{{ $t('conversations.table.notRated') }}</span>
               </TableCell>
               <TableCell class="text-sm text-neutral-muted">
                 {{ formatRelativeTime(conversation.updated_at) }}
@@ -256,6 +246,9 @@ import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { useConversationTakeover } from "@/composables/useConversationTakeover";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
 import Avatar from "@/components/ui/Avatar.vue";
+
+// i18n
+const { t } = useI18n();
 
 // Router
 const router = useRouter();
@@ -344,25 +337,25 @@ const agents = ref([
 ]);
 
 // Select options
-const statusOptions = [
-  { label: "All Status", value: "" },
-  { label: "Active", value: "active" },
-  { label: "Resolved", value: "resolved" },
-  { label: "Escalated", value: "escalated" },
-  { label: "Closed", value: "closed" },
-];
+const statusOptions = computed(() => [
+  { label: t("conversations.filters.allStatus"), value: "" },
+  { label: t("conversations.filters.active"), value: "active" },
+  { label: t("conversations.filters.resolved"), value: "resolved" },
+  { label: t("conversations.filters.escalated"), value: "escalated" },
+  { label: t("conversations.filters.closed"), value: "closed" },
+]);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: "" },
+  { label: t("conversations.filters.allAgents"), value: "" },
   ...agents.value.map((agent) => ({ label: agent.name, value: agent.id })),
 ]);
 
-const timeframeOptions = [
-  { label: "Today", value: "today" },
-  { label: "This Week", value: "week" },
-  { label: "This Month", value: "month" },
-  { label: "All Time", value: "all" },
-];
+const timeframeOptions = computed(() => [
+  { label: t("conversations.filters.today"), value: "today" },
+  { label: t("conversations.filters.thisWeek"), value: "week" },
+  { label: t("conversations.filters.thisMonth"), value: "month" },
+  { label: t("conversations.filters.allTime"), value: "all" },
+]);
 
 // For now, we'll use the conversations directly from API (already paginated)
 // In the future, we should pass filters to the API
@@ -415,15 +408,15 @@ const getStatusIcon = (status: string) => {
 };
 
 const formatStatus = (status: string) => {
-  const labels = {
-    open: "Open",
-    processing: "Processing",
-    "pending-human": "Needs Attention",
-    "human-took-over": "Manual Control",
-    resolved: "Resolved",
-    closed: "Closed",
+  const keys: Record<string, string> = {
+    open: "conversations.status.open",
+    processing: "conversations.status.processing",
+    "pending-human": "conversations.status.pendingHuman",
+    "human-took-over": "conversations.status.humanTookOver",
+    resolved: "conversations.status.resolved",
+    closed: "conversations.status.closed",
   };
-  return labels[status as keyof typeof labels] || status;
+  return keys[status] ? t(keys[status]) : status;
 };
 
 const getFullName = (user: any) => {
@@ -514,7 +507,7 @@ const fetchConversations = async () => {
     totalConversations.value = response.pagination.total;
   } catch (err) {
     console.error("Failed to fetch conversations:", err);
-    error.value = "Failed to load conversations";
+    error.value = t("conversations.error.failedToLoad");
     conversations.value = [];
   } finally {
     loading.value = false;
@@ -642,11 +635,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Conversations - Hay Dashboard",
+  title: t("conversations.page.headTitle"),
   meta: [
     {
       name: "description",
-      content: "Monitor and manage all customer conversations",
+      content: t("conversations.page.headDescription"),
     },
   ],
 });

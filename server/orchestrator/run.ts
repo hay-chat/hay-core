@@ -1,5 +1,6 @@
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { playbookRepository } from "@server/repositories/playbook.repository";
+import { conversationSecretService } from "@server/services/conversation-secret.service";
 import { PerceptionLayer } from "./perception.layer";
 import { RetrievalLayer } from "./retrieval.layer";
 import { ExecutionLayer } from "./execution.layer";
@@ -11,8 +12,11 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, ProcessingPhase } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { PromptService } from "@server/services/prompt.service";
+import { createLogger } from "@server/lib/logger";
 import type { ExecutionResult } from "./execution.layer";
+
+const logger = createLogger("orchestrator-run");
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -31,6 +35,7 @@ async function publishStatusChange(
       await redisService.publish("websocket:events", {
         type: "conversation_status_changed",
         organizationId,
+        conversationId,
         payload: {
           conversationId,
           status,
@@ -41,7 +46,7 @@ async function publishStatusChange(
     } else {
       // Fallback to direct WebSocket if Redis not available
       const { websocketService } = await import("@server/services/websocket.service");
-      websocketService.sendToOrganization(organizationId, {
+      const statusPayload = {
         type: "conversation_status_changed",
         payload: {
           conversationId,
@@ -49,10 +54,12 @@ async function publishStatusChange(
           title,
           processingPhase,
         },
-      });
+      };
+      websocketService.sendToConversation(conversationId, statusPayload);
+      websocketService.sendToOrganization(organizationId, statusPayload);
     }
   } catch (error) {
-    console.error("[Orchestrator] Failed to publish status change:", error);
+    logger.error({ err: error }, "Failed to publish status change");
   }
 }
 
@@ -97,7 +104,7 @@ async function updateProcessingState(
       phase,
     );
   } catch (error) {
-    console.error("[Orchestrator] Failed to update processing state:", error);
+    logger.error({ err: error }, "Failed to update processing state");
   }
 }
 
@@ -223,34 +230,42 @@ async function saveConfidenceLog(
       orchestration_status: orchestrationStatus,
     });
 
-    debugLog("orchestrator", "Guardrail log saved", {
-      conversationId: conversation.id,
-      hasCompanyInterest: !!executionResult.companyInterest,
-      hasFactGrounding: !!executionResult.confidence,
-      logEntries: orchestrationStatus.guardrailLog.length,
-    });
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        hasCompanyInterest: !!executionResult.companyInterest,
+        hasFactGrounding: !!executionResult.confidence,
+        logEntries: orchestrationStatus.guardrailLog.length,
+      },
+      "Guardrail log saved",
+    );
   } catch (error) {
-    debugLog("orchestrator", "Error saving guardrail log", {
-      level: "error",
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error({ err: error }, "Error saving guardrail log");
   }
 }
 
 export const runConversation = async (conversationId: string) => {
+  // Note: findById is used here because this is called from the internal message queue
+  // with trusted conversation IDs (not user input). We validate org context below.
   const conversation = await conversationRepository.findById(conversationId);
   if (!conversation) {
     throw new Error("Conversation not found");
+  }
+  if (!conversation.organization_id) {
+    throw new Error("Conversation missing organization context");
   }
 
   // Skip processing for conversations taken over by humans
   // Check both status and assigned_user_id to handle race conditions
   if (conversation.status === "human-took-over" || conversation.assigned_user_id) {
-    debugLog("orchestrator", "Skipping - conversation taken over by human", {
-      conversationId,
-      status: conversation.status,
-      assignedUserId: conversation.assigned_user_id,
-    });
+    logger.debug(
+      {
+        conversationId,
+        status: conversation.status,
+        assignedUserId: conversation.assigned_user_id,
+      },
+      "Skipping - conversation taken over by human",
+    );
     return;
   }
 
@@ -269,9 +284,12 @@ export const runConversation = async (conversationId: string) => {
         last_processing_error: "Failed to acquire lock",
         last_processing_error_at: new Date(),
       });
-      debugLog("orchestrator", "Could not acquire lock, conversation already being processed", {
-        conversationId,
-      });
+      logger.debug(
+        {
+          conversationId,
+        },
+        "Could not acquire lock, conversation already being processed",
+      );
       return;
     }
 
@@ -347,19 +365,19 @@ export const runConversation = async (conversationId: string) => {
       shouldClose = closureValidation.shouldClose;
 
       if (!shouldClose) {
-        debugLog(
-          "orchestrator",
+        logger.debug(
+          { isGratitudeMessage, reason: closureValidation.reason },
           isGratitudeMessage
-            ? `Gratitude message detected but validation determined it's not a closure: ${closureValidation.reason}`
-            : `Closure intent detected but validation failed: ${closureValidation.reason}`,
+            ? "Gratitude message detected but validation determined it's not a closure"
+            : "Closure intent detected but validation failed",
         );
       }
     }
 
     if (shouldClose) {
-      debugLog(
-        "orchestrator",
-        `User indicated closure intent (${intent.label}) with confidence ${intent.score}, marking conversation as resolved`,
+      logger.debug(
+        { intentLabel: intent.label, intentScore: intent.score },
+        "User indicated closure intent, marking conversation as resolved",
       );
 
       // Generate a title for the conversation before closing
@@ -377,11 +395,38 @@ export const runConversation = async (conversationId: string) => {
         },
       });
 
-      // Add a closing message
-      const closingMessage =
-        intent.label === "close_satisfied"
-          ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
-          : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+      // Clean up ephemeral secrets from Redis
+      await conversationSecretService.deleteSecrets(conversation.id);
+
+      // Add a closing message generated contextually by the LLM
+      let closingMessage: string;
+      try {
+        const llmService = new LLMService();
+        const promptService = PromptService.getInstance();
+        const messages = await conversation.getPublicMessages();
+        const isSatisfied = intent.label === "close_satisfied";
+
+        const prompt = await promptService.getPrompt(
+          "conversation/user-closure-message",
+          {
+            satisfactionStatus: isSatisfied
+              ? "satisfied with the support received"
+              : "not fully satisfied",
+          },
+          { conversationId: conversation.id, organizationId: conversation.organization_id },
+        );
+
+        closingMessage = await llmService.invoke({
+          history: messages,
+          prompt,
+        });
+      } catch (error) {
+        logger.debug({ error }, "Error generating closing message, using fallback");
+        closingMessage =
+          intent.label === "close_satisfied"
+            ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
+            : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+      }
 
       await conversation.addMessage({
         content: closingMessage,
@@ -404,16 +449,22 @@ export const runConversation = async (conversationId: string) => {
     // Automatic agent selection during orchestration is no longer used.
     const currentAgent = conversation.agent_id;
     if (!currentAgent) {
-      debugLog("orchestrator", "WARNING: No agent assigned to conversation", {
-        conversationId: conversation.id,
-        organizationId: conversation.organization_id,
-      });
+      logger.debug(
+        {
+          conversationId: conversation.id,
+          organizationId: conversation.organization_id,
+        },
+        "WARNING: No agent assigned to conversation",
+      );
       // This shouldn't happen if conversation creation is working correctly
       // Agent should be set at creation time or fall back to organization default
     } else {
-      debugLog("orchestrator", "Agent assigned", {
-        agentId: currentAgent,
-      });
+      logger.debug(
+        {
+          agentId: currentAgent,
+        },
+        "Agent assigned",
+      );
     }
 
     // Update processing state to retrieving
@@ -427,25 +478,31 @@ export const runConversation = async (conversationId: string) => {
 
     const currentPlaybook = conversation.playbook_id;
 
-    debugLog("orchestrator", "Starting playbook retrieval", {
-      conversationId: conversation.id,
-      currentPlaybookId: currentPlaybook,
-      publicMessagesCount: publicMessages.length,
-    });
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        currentPlaybookId: currentPlaybook,
+        publicMessagesCount: publicMessages.length,
+      },
+      "Starting playbook retrieval",
+    );
 
     const activePlaybooks = await playbookRepository.findByStatus(
       conversation.organization_id,
       PlaybookStatus.ACTIVE,
     );
 
-    debugLog("orchestrator", "Retrieved active playbooks", {
-      activePlaybooksCount: activePlaybooks.length,
-      playbooks: activePlaybooks.map((p) => ({
-        id: p.id,
-        title: p.title,
-        trigger: p.trigger?.substring(0, 50),
-      })),
-    });
+    logger.debug(
+      {
+        activePlaybooksCount: activePlaybooks.length,
+        playbooks: activePlaybooks.map((p) => ({
+          id: p.id,
+          title: p.title,
+          trigger: p.trigger?.substring(0, 50),
+        })),
+      },
+      "Retrieved active playbooks",
+    );
 
     const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
       publicMessages,
@@ -454,64 +511,88 @@ export const runConversation = async (conversationId: string) => {
     );
 
     if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
-      debugLog("orchestrator", "Playbook candidate differs from current, updating conversation", {
-        oldPlaybookId: currentPlaybook,
-        newPlaybookId: playbookCandidate.id,
-        newPlaybookTitle: playbookCandidate.title,
-      });
+      logger.debug(
+        {
+          oldPlaybookId: currentPlaybook,
+          newPlaybookId: playbookCandidate.id,
+          newPlaybookTitle: playbookCandidate.title,
+        },
+        "Playbook candidate differs from current, updating conversation",
+      );
       await conversation.updatePlaybook(playbookCandidate.id);
     } else if (playbookCandidate) {
       // Check if enabled_tools is null despite having a playbook - this means tools were never fetched
       if (!conversation.enabled_tools || conversation.enabled_tools.length === 0) {
-        debugLog("orchestrator", "Playbook is set but enabled_tools is null, refreshing tools", {
-          playbookId: currentPlaybook,
-          enabledTools: conversation.enabled_tools,
-        });
+        logger.debug(
+          {
+            playbookId: currentPlaybook,
+            enabledTools: conversation.enabled_tools,
+          },
+          "Playbook is set but enabled_tools is null, refreshing tools",
+        );
         await conversation.updatePlaybook(playbookCandidate.id);
       } else {
-        debugLog("orchestrator", "Playbook candidate matches current playbook, no update needed", {
-          playbookId: currentPlaybook,
-          enabledToolsCount: conversation.enabled_tools.length,
-        });
+        logger.debug(
+          {
+            playbookId: currentPlaybook,
+            enabledToolsCount: conversation.enabled_tools.length,
+          },
+          "Playbook candidate matches current playbook, no update needed",
+        );
       }
     } else {
-      debugLog("orchestrator", "No playbook candidate selected", {
-        currentPlaybookId: currentPlaybook,
-      });
+      logger.debug(
+        {
+          currentPlaybookId: currentPlaybook,
+        },
+        "No playbook candidate selected",
+      );
     }
 
     // 02.2. Get Document Candidates
-    debugLog("orchestrator", "Starting document retrieval", {
-      conversationId: conversation.id,
-      currentDocumentIds: conversation.document_ids,
-    });
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        currentDocumentIds: conversation.document_ids,
+      },
+      "Starting document retrieval",
+    );
 
     const retrievedDocuments = await retrievalLayer.getRelevantDocuments(
       publicMessages,
       conversation.organization_id,
     );
 
-    debugLog("orchestrator", "Document retrieval complete", {
-      retrievedDocumentsCount: retrievedDocuments.length,
-      documents: retrievedDocuments,
-    });
+    logger.debug(
+      {
+        retrievedDocumentsCount: retrievedDocuments.length,
+        documents: retrievedDocuments,
+      },
+      "Document retrieval complete",
+    );
 
     if (retrievedDocuments.length > 0) {
       for (const document of retrievedDocuments) {
         if (!conversation.document_ids?.includes(document.id)) {
-          debugLog("orchestrator", "Adding new document to conversation", {
-            documentId: document.id,
-            similarity: document.similarity,
-          });
+          logger.debug(
+            {
+              documentId: document.id,
+              similarity: document.similarity,
+            },
+            "Adding new document to conversation",
+          );
           await conversation.addDocument(document.id);
         } else {
-          debugLog("orchestrator", "Document already attached to conversation", {
-            documentId: document.id,
-          });
+          logger.debug(
+            {
+              documentId: document.id,
+            },
+            "Document already attached to conversation",
+          );
         }
       }
     } else {
-      debugLog("orchestrator", "No relevant documents found");
+      logger.debug("No relevant documents found");
     }
 
     // 03. Initialize orchestration context if needed
@@ -531,13 +612,16 @@ export const runConversation = async (conversationId: string) => {
     await updateProcessingState(conversation, "executing", "Generating response");
 
     // Log current conversation state before execution
-    debugLog("orchestrator", "Conversation state before execution", {
-      conversationId: conversation.id,
-      playbookId: conversation.playbook_id,
-      enabledTools: conversation.enabled_tools,
-      enabledToolsCount: conversation.enabled_tools?.length || 0,
-      agentId: conversation.agent_id,
-    });
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        playbookId: conversation.playbook_id,
+        enabledTools: conversation.enabled_tools,
+        enabledToolsCount: conversation.enabled_tools?.length || 0,
+        agentId: conversation.agent_id,
+      },
+      "Conversation state before execution",
+    );
 
     // 04. Execution - Handle iterative execution with tool calls
     await handleExecutionLoop(conversation, language);
@@ -562,19 +646,19 @@ export const runConversation = async (conversationId: string) => {
 
       // Generate title after at least 2 customer messages
       if (customerMessages.length >= 2) {
-        debugLog("orchestrator", "Generating conversation title", {
-          conversationId: conversation.id,
-          customerMessagesCount: customerMessages.length,
-        });
+        logger.debug(
+          {
+            conversationId: conversation.id,
+            customerMessagesCount: customerMessages.length,
+          },
+          "Generating conversation title",
+        );
 
         // Generate title asynchronously (don't block processing)
         const { generateConversationTitle } = await import("./conversation-utils");
         generateConversationTitle(conversation.id, conversation.organization_id, false).catch(
           (error) => {
-            debugLog("orchestrator", "Error generating title during processing", {
-              level: "warn",
-              error: error instanceof Error ? error.message : String(error),
-            });
+            logger.warn({ err: error }, "Error generating title during processing");
           },
         );
       }
@@ -587,7 +671,7 @@ export const runConversation = async (conversationId: string) => {
       !error.message.includes("Conversation does not need processing") &&
       !error.message.includes("Last customer message not found")
     ) {
-      console.error("[Orchestrator] Error in conversation", error.message);
+      logger.error({ err: error }, "Error in conversation");
 
       // FAILURE: Track error
       const errorCount = (conversation.processing_error_count || 0) + 1;
@@ -613,19 +697,22 @@ export const runConversation = async (conversationId: string) => {
     try {
       await conversation.unlock();
     } catch (unlockError) {
-      console.error("[Orchestrator] CRITICAL: Failed to unlock conversation", {
-        conversationId,
-        error: unlockError,
-      });
+      logger.error(
+        {
+          conversationId,
+          err: unlockError,
+        },
+        "CRITICAL: Failed to unlock conversation",
+      );
       // Emergency fallback: Force clear lock via direct DB update
       try {
         await conversationRepository.updateById(conversation.id, {
           processing_locked_until: null,
           processing_locked_by: null,
         });
-        console.log("[Orchestrator] Emergency unlock completed via direct DB update");
+        logger.info("Emergency unlock completed via direct DB update");
       } catch (emergencyError) {
-        console.error("[Orchestrator] CRITICAL: Emergency unlock also failed", emergencyError);
+        logger.error({ err: emergencyError }, "CRITICAL: Emergency unlock also failed");
       }
     }
   }
@@ -647,7 +734,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    debugLog("orchestrator", `Execution iteration ${iterations}`);
+    logger.debug(`Execution iteration ${iterations}`);
 
     // Get current messages and execute (with confidence guardrails integrated)
     const executionResult: ExecutionResult | null = await executionLayer.execute(
@@ -657,16 +744,17 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
     if (!executionResult) {
       emptyRetries++;
-      debugLog("orchestrator", "No execution result", {
-        emptyRetries,
-        maxEmptyRetries: MAX_EMPTY_RETRIES,
-      });
+      logger.debug(
+        {
+          emptyRetries,
+          maxEmptyRetries: MAX_EMPTY_RETRIES,
+        },
+        "No execution result",
+      );
 
       // If we've retried too many times, use a fallback response
       if (emptyRetries >= MAX_EMPTY_RETRIES) {
-        debugLog("orchestrator", "Max empty retries reached, using fallback response", {
-          level: "warn",
-        });
+        logger.warn("Max empty retries reached, using fallback response");
         await conversation.addMessage({
           content: "I'm here to help! How can I assist you today?",
           type: MessageType.BOT_AGENT,
@@ -683,19 +771,58 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     // Reset empty retry counter on successful response
     emptyRetries = 0;
 
-    debugLog("orchestrator", "Processing execution result", {
-      step: executionResult.step,
-      hasUserMessage: !!executionResult.userMessage,
-      userMessagePreview: executionResult.userMessage?.substring(0, 100),
-      hasTool: !!executionResult.tool,
-      toolName: executionResult.tool?.name,
-      hasHandoff: !!executionResult.handoff,
-      hasClose: !!executionResult.close,
-      rationale: executionResult.rationale,
-    });
+    logger.debug(
+      {
+        step: executionResult.step,
+        hasUserMessage: !!executionResult.userMessage,
+        userMessagePreview: executionResult.userMessage?.substring(0, 100),
+        hasTool: !!executionResult.tool,
+        toolName: executionResult.tool?.name,
+        hasHandoff: !!executionResult.handoff,
+        hasClose: !!executionResult.close,
+        rationale: executionResult.rationale,
+      },
+      "Processing execution result",
+    );
+
+    // Enforce enabled_tools: reject tool calls not in the conversation's allowed list.
+    // Policy: when enabled_tools is null/empty (no playbook), all tools are allowed.
+    // When a playbook defines enabled_tools, only those tools may be called.
+    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
+      const enabledTools = conversation.enabled_tools;
+      if (enabledTools && enabledTools.length > 0) {
+        if (!enabledTools.includes(executionResult.tool.name)) {
+          logger.warn(
+            {
+              toolName: executionResult.tool.name,
+              enabledTools,
+              conversationId: conversation.id,
+            },
+            "Tool execution blocked — not in enabled_tools",
+          );
+          // Don't count blocked tool calls toward the iteration limit —
+          // feed an error back to the LLM so it can adjust instead of silently looping.
+          iterations--;
+          await conversation.addMessage({
+            content: `Tool "${executionResult.tool.name}" is not available in this conversation. Available tools: ${enabledTools.join(", ")}`,
+            type: MessageType.TOOL,
+            metadata: {
+              toolName: executionResult.tool.name,
+              status: "blocked",
+              reason: "not_in_enabled_tools",
+            },
+          });
+          continue;
+        }
+      }
+    }
 
     // Handle case where LLM returns both a userMessage and a tool call
-    if (executionResult.step === "CALL_TOOL" && executionResult.userMessage && executionResult.tool) {
+    if (
+      executionResult.step === "CALL_TOOL" &&
+      executionResult.userMessage &&
+      executionResult.tool
+    ) {
       // Only send the userMessage if this is the first tool call
       if (!hasToolCallBeenMade) {
         await conversation.addMessage({
@@ -748,14 +875,17 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Continue the loop to let LLM analyze the result
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
-      debugLog("orchestrator", "HANDOFF step detected", {
-        confidenceRelated: !!executionResult.confidence,
-        confidenceScore: executionResult.confidence?.score,
-      });
+      logger.debug(
+        {
+          confidenceRelated: !!executionResult.confidence,
+          confidenceScore: executionResult.confidence?.score,
+        },
+        "HANDOFF step detected",
+      );
 
       // Check if we've already processed handoff to avoid duplicates
       if (handoffProcessed) {
-        debugLog("orchestrator", "Handoff already processed, skipping duplicate");
+        logger.debug("Handoff already processed, skipping duplicate");
         continue;
       }
 
@@ -767,7 +897,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Get agent configuration
       const agent = await agentRepository.findById(conversation.agent_id!);
       if (!agent) {
-        console.warn("[Orchestrator] No agent found for handoff, using default behavior");
+        logger.warn("No agent found for handoff, using default behavior");
         await conversationRepository.update(conversation.id, conversation.organization_id, {
           status: "pending-human",
         });
@@ -799,7 +929,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       const onlineHumans = await userRepository.findOnlineByOrganization(
         conversation.organization_id,
       );
-      debugLog("orchestrator", `Found ${onlineHumans.length} online human agents`);
+      logger.debug(`Found ${onlineHumans.length} online human agents`);
 
       if (onlineHumans.length > 0) {
         // Humans are available
@@ -811,13 +941,13 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           availableInstructions.length > 0
         ) {
           // Execute custom instructions for when humans are available
-          debugLog("orchestrator", "Executing handoff instructions for available humans");
+          logger.debug("Executing handoff instructions for available humans");
           await conversation.addHandoffInstructions(availableInstructions, "available");
           // Continue loop to process the handoff instructions
           continue;
         } else {
           // Default behavior: update status and send message
-          debugLog("orchestrator", "No custom instructions, using default handoff");
+          logger.debug("No custom instructions, using default handoff");
           await conversationRepository.update(conversation.id, conversation.organization_id, {
             status: "pending-human",
           });
@@ -844,7 +974,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
                   "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
               });
             } catch (error) {
-              console.error("[Orchestrator] Error generating handoff message:", error);
+              logger.error({ err: error }, "Error generating handoff message");
               handoffMessage =
                 "I'm transferring you to a human agent. Someone will be with you shortly.";
             }
@@ -860,7 +990,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
               }),
             });
           } catch (error) {
-            console.error("[Orchestrator] Error generating handoff message:", error);
+            logger.error({ err: error }, "Error generating handoff message");
             await conversation.addMessage({
               content: "I'm connecting you with a human agent who will be with you shortly.",
               type: MessageType.BOT_AGENT,
@@ -894,7 +1024,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           unavailableInstructions.length > 0
         ) {
           // Execute custom instructions for when humans are not available
-          debugLog("orchestrator", "Executing handoff instructions for unavailable humans");
+          logger.debug("Executing handoff instructions for unavailable humans");
           await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
           // Continue loop to process the handoff instructions
           continue;
@@ -904,7 +1034,7 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             executionResult.userMessage ||
             "I apologize, but no human agents are currently available.";
 
-          debugLog("orchestrator", "No custom fallback, using default message");
+          logger.debug("No custom fallback, using default message");
           await conversation.addMessage({
             content: unavailableMessage,
             type: MessageType.BOT_AGENT,
@@ -918,13 +1048,15 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       }
     } else if (executionResult.step === "CLOSE") {
       // Handle conversation closure
-      debugLog("orchestrator", "CLOSE step detected");
+      logger.debug("CLOSE step detected");
       if (executionResult.userMessage) {
         await conversation.addMessage({
           content: executionResult.userMessage,
           type: MessageType.BOT_AGENT,
         });
       }
+      // Clean up ephemeral secrets from Redis
+      await conversationSecretService.deleteSecrets(conversation.id);
       break;
     } else {
       // Regular response (not a tool call) - end the loop
@@ -934,14 +1066,12 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
 
         // Detect if message claims action without executing tool
         if (executionResult.tool && executionResult.tool.name) {
-          debugLog(
-            "orchestrator",
-            "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
+          logger.error(
             {
-              level: "error",
               toolName: executionResult.tool.name,
               messagePreview: executionResult.userMessage.substring(0, 100),
             },
+            "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
           );
         }
 
@@ -955,38 +1085,38 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
               : {}),
           },
         });
-        debugLog(
-          "orchestrator",
-          "Added bot response " + executionResult.userMessage + ", ending execution loop",
+        logger.debug(
           {
+            messagePreview: executionResult.userMessage.substring(0, 100),
             confidenceScore: executionResult.confidence?.score,
             confidenceTier: executionResult.confidence?.tier,
           },
+          "Added bot response, ending execution loop",
         );
 
         break;
       } else {
         // Missing userMessage for non-tool/non-handoff/non-close steps
         emptyRetries++;
-        debugLog("orchestrator", "No user message in response, retrying", {
-          level: "error",
-          step: executionResult.step,
-          emptyRetries,
-          maxEmptyRetries: MAX_EMPTY_RETRIES,
-          hasTool: !!executionResult.tool,
-          toolName: executionResult.tool?.name,
-          hasHandoff: !!executionResult.handoff,
-          hasClose: !!executionResult.close,
-          rationale: executionResult.rationale,
-          fullResult: JSON.stringify(executionResult),
-          possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool,
-        });
+        logger.error(
+          {
+            step: executionResult.step,
+            emptyRetries,
+            maxEmptyRetries: MAX_EMPTY_RETRIES,
+            hasTool: !!executionResult.tool,
+            toolName: executionResult.tool?.name,
+            hasHandoff: !!executionResult.handoff,
+            hasClose: !!executionResult.close,
+            rationale: executionResult.rationale,
+            fullResult: JSON.stringify(executionResult),
+            possibleBug: executionResult.step === "RESPOND" && !!executionResult.tool,
+          },
+          "No user message in response, retrying",
+        );
 
         // If we've retried too many times, use a fallback response
         if (emptyRetries >= MAX_EMPTY_RETRIES) {
-          debugLog("orchestrator", "Max retries for missing userMessage, using fallback", {
-            level: "warn",
-          });
+          logger.warn("Max retries for missing userMessage, using fallback");
           await conversation.addMessage({
             content: "I'm here to help! How can I assist you today?",
             type: MessageType.BOT_AGENT,
@@ -1003,8 +1133,6 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
   }
 
   if (iterations >= MAX_ITERATIONS) {
-    debugLog("orchestrator", "Reached maximum execution iterations, ending loop", {
-      level: "warn",
-    });
+    logger.warn("Reached maximum execution iterations, ending loop");
   }
 }

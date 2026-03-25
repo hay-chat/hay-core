@@ -1,7 +1,9 @@
 import { redisService } from "./redis.service";
 import { jobRepository } from "../repositories/job.repository";
 import { Job, JobStatus } from "../entities/job.entity";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("job-queue");
 
 /**
  * Job Queue Service
@@ -29,7 +31,7 @@ export class JobQueueService {
     // Start processing jobs
     this.startProcessing();
 
-    debugLog("job-queue", "Job queue service initialized");
+    logger.info("Job queue service initialized");
   }
 
   /**
@@ -57,11 +59,11 @@ export class JobQueueService {
    * Handle incoming job update from Redis
    */
   private handleJobUpdate(event: any): void {
-    debugLog("job-queue", "Job update received", {
+    logger.debug({
       jobId: event.jobId,
       status: event.status,
       hasProgress: !!event.progress,
-    });
+    }, "Job update received");
   }
 
   /**
@@ -71,7 +73,7 @@ export class JobQueueService {
    */
   private startProcessing(): void {
     // No-op: Processing is now handled by scheduler
-    debugLog("job-queue", "Job processing handled by scheduler service");
+    logger.debug("Job processing handled by scheduler service");
   }
 
   /**
@@ -80,7 +82,7 @@ export class JobQueueService {
    */
   private stopProcessing(): void {
     // No-op: Processing is now handled by scheduler
-    debugLog("job-queue", "Job processing handled by scheduler service");
+    logger.debug("Job processing handled by scheduler service");
   }
 
   /**
@@ -109,7 +111,7 @@ export class JobQueueService {
     const job = await jobRepository.update(jobId, organizationId, update);
 
     if (!job) {
-      console.error(`[JobQueue] Failed to update job ${jobId}`);
+      logger.error({ jobId }, "Failed to update job");
       return null;
     }
 
@@ -183,17 +185,17 @@ export class JobQueueService {
     const job = await jobRepository.findById(jobId);
 
     if (!job || job.organizationId !== organizationId) {
-      console.error(`[JobQueue] Job ${jobId} not found or unauthorized`);
+      logger.error({ jobId }, "Job not found or unauthorized");
       return null;
     }
 
     // Only cancel jobs that are not already completed or failed
     if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
-      debugLog("job-queue", `Cannot cancel job ${jobId} - already ${job.status}`);
+      logger.debug({ jobId, status: job.status }, "Cannot cancel job - already terminal");
       return job;
     }
 
-    debugLog("job-queue", `Cancelling job ${jobId}`);
+    logger.debug({ jobId }, "Cancelling job");
 
     return this.updateJobStatus(jobId, organizationId, {
       status: JobStatus.CANCELLED,
@@ -209,7 +211,7 @@ export class JobQueueService {
    */
   async shutdown(): Promise<void> {
     this.stopProcessing();
-    debugLog("job-queue", "Job queue service shut down");
+    logger.info("Job queue service shut down");
   }
 }
 

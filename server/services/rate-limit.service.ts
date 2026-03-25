@@ -1,5 +1,7 @@
 import { redisService } from "./redis.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("rate-limit");
 
 /**
  * Rate Limiting Service
@@ -98,12 +100,12 @@ export class RateLimitService {
     if (!client) {
       if (failClosed) {
         // For critical endpoints (privacy, security), fail closed to prevent abuse
-        console.error("[RateLimit] Redis unavailable, rejecting request (fail-closed policy)");
+        logger.error("Redis unavailable, rejecting request (fail-closed policy)");
         throw new Error("Rate limiting service unavailable. Please try again later.");
       }
 
       // For non-critical endpoints, fail open
-      debugLog("rate-limit", "Redis unavailable, allowing request (fail-open policy)");
+      logger.debug("Redis unavailable, allowing request (fail-open policy)");
       return {
         limited: false,
         remaining: maxRequests,
@@ -121,11 +123,7 @@ export class RateLimitService {
         const ttl = await client.ttl(key);
         const resetAt = new Date(Date.now() + ttl * 1000);
 
-        debugLog("rate-limit", `Rate limit exceeded for key: ${key}`, {
-          count,
-          maxRequests,
-          resetAt,
-        });
+        logger.debug({ key, count, maxRequests, resetAt }, "Rate limit exceeded");
 
         return {
           limited: true,
@@ -145,11 +143,7 @@ export class RateLimitService {
       const remaining = Math.max(0, maxRequests - newCount);
       const resetAt = new Date(Date.now() + windowSeconds * 1000);
 
-      debugLog("rate-limit", `Rate limit check passed for key: ${key}`, {
-        newCount,
-        remaining,
-        maxRequests,
-      });
+      logger.debug({ key, newCount, remaining, maxRequests }, "Rate limit check passed");
 
       return {
         limited: false,
@@ -157,7 +151,7 @@ export class RateLimitService {
         resetAt,
       };
     } catch (error) {
-      console.error("[RateLimit] Error checking rate limit:", error);
+      logger.error({ err: error }, "Error checking rate limit");
 
       if (failClosed) {
         // For critical endpoints, fail closed on errors
@@ -184,7 +178,7 @@ export class RateLimitService {
 
     const key = `rate_limit:${type}:${identifier}`;
     await client.del(key);
-    debugLog("rate-limit", `Rate limit reset for key: ${key}`);
+    logger.debug({ key }, "Rate limit reset");
   }
 
   /**

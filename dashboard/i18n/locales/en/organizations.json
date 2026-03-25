@@ -1,0 +1,69 @@
+{
+  "organizations": {
+    "header": {
+      "created": "Created {date}",
+      "members": "{count} members",
+      "agents": "{count} agents",
+      "edit": "Edit",
+      "switchTo": "Switch To"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "members": "Members",
+      "settings": "Settings"
+    },
+    "overview": {
+      "totalMembers": "Total Members",
+      "activeAgents": "Active Agents",
+      "conversations": "Conversations",
+      "storageUsed": "Storage Used",
+      "thisMonth": "+{count} this month",
+      "thisWeek": "+{count} this week",
+      "fromLastMonth": "+{percent}% from last month",
+      "ofLimit": "of {limit}GB limit",
+      "recentActivity": "Recent Activity",
+      "latestUpdates": "Latest updates in this organization",
+      "resourceUsage": "Resource Usage",
+      "currentMonthUsage": "Current month usage overview",
+      "apiCalls": "API Calls",
+      "storage": "Storage",
+      "activeAgentsUsage": "Active Agents"
+    },
+    "members": {
+      "title": "Organization Members",
+      "description": "Manage who has access to this organization",
+      "inviteMember": "Invite Member",
+      "roles": {
+        "admin": "Admin",
+        "member": "Member",
+        "viewer": "Viewer"
+      }
+    },
+    "settings": {
+      "generalTitle": "General Settings",
+      "generalDescription": "Basic organization information and preferences",
+      "orgName": "Organization Name",
+      "orgNamePlaceholder": "Enter organization name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter description",
+      "timezone": "Timezone",
+      "saveChanges": "Save Changes",
+      "securityTitle": "Security Settings",
+      "securityDescription": "Configure security policies for this organization",
+      "twoFactor": "Two-Factor Authentication",
+      "twoFactorDescription": "Require 2FA for all members",
+      "sso": "SSO Integration",
+      "ssoDescription": "Enable single sign-on",
+      "saveSecuritySettings": "Save Security Settings",
+      "apiKeys": "API Keys",
+      "apiKeysDescription": "Manage API keys for this organization",
+      "primaryApiKey": "Primary API Key",
+      "usedForApiAccess": "Used for API access",
+      "regenerate": "Regenerate",
+      "copy": "Copy"
+    },
+    "notFound": "Organization not found",
+    "notFoundDescription": "The organization you're looking for doesn't exist or you don't have permission to view it.",
+    "backToOrganizations": "Back to Organizations"
+  }
+}

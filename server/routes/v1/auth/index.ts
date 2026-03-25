@@ -6,20 +6,32 @@ import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { Not, IsNull } from "typeorm";
+import { AuthCode } from "@server/entities/auth-code.entity";
 import {
   hashPassword,
   verifyPassword,
   generateSessionId,
+  hashApiKey,
+  generateSecureToken,
 } from "@server/lib/auth/utils/hashing";
 import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
-import { protectedProcedure, protectedProcedureWithoutOrg, publicProcedure, adminProcedure } from "@server/trpc/middleware/auth";
+import {
+  protectedProcedure,
+  protectedProcedureWithoutOrg,
+  publicProcedure,
+  adminProcedure,
+} from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
-import { emailService } from "@server/services/email.service";
+import { emailService, getOrganizationLocale } from "@server/services/email.service";
+import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
 import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("auth");
 
 /**
  * Helper function to get all organizations for a user with their roles
@@ -74,8 +86,27 @@ const refreshTokenSchema = z.object({
 
 export const authRouter = t.router({
   // Public endpoints
-  login: publicProcedure.input(loginSchema).mutation(async ({ input }) => {
+  login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     const { email, password } = input;
+
+    // Rate limit by IP: 10 attempts per 15 minutes
+    const ipAddress = ctx.ipAddress || "unknown";
+    const ipRateLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 15 * 60, true);
+    if (ipRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
+
+    // Rate limit by email: 5 attempts per 15 minutes
+    const emailRateLimit = await rateLimitService.checkEmailRateLimit(email, 5, 15 * 60, true);
+    if (emailRateLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again later.",
+      });
+    }
 
     // Find user by email with organization
     const userRepository = AppDataSource.getRepository(User);
@@ -110,6 +141,15 @@ export const authRouter = t.router({
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Account is deactivated",
+      });
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Email not verified. Please check your inbox for the verification link.",
+        cause: { type: "EMAIL_NOT_VERIFIED", email: user.email },
       });
     }
 
@@ -219,6 +259,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
+        emailVerified: false,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -273,6 +314,14 @@ export const authRouter = t.router({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid refresh token",
+        });
+      }
+
+      // Check token version — rejects tokens issued before password change/reset
+      if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Token has been revoked",
         });
       }
 
@@ -336,9 +385,11 @@ export const authRouter = t.router({
       }
 
       try {
-        // Generate reset token
+        // Generate reset token (high-entropy: 256 bits)
+        // SHA-256 is sufficient for high-entropy tokens — no brute-force risk.
+        // This enables direct DB lookup instead of O(n) argon2 scans.
         const resetToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = await hashPassword(resetToken, "argon2");
+        const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
 
         // Store token hash and expiration (24 hours)
         user.passwordResetTokenHash = tokenHash;
@@ -350,9 +401,15 @@ export const authRouter = t.router({
         const baseUrl = getDashboardUrl();
         const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Reset Your Password",
+          locale,
           template: "reset-password",
           variables: {
             userName: user.getFullName(),
@@ -377,7 +434,7 @@ export const authRouter = t.router({
         try {
           await auditLogService.logPasswordResetRequest(user.id, ctx.ipAddress, ctx.userAgent);
         } catch (error) {
-          console.error("Failed to log password reset request:", error);
+          logger.error({ err: error }, "Failed to log password reset request");
         }
 
         return {
@@ -385,7 +442,7 @@ export const authRouter = t.router({
           message: "If an account exists with this email, you will receive a password reset link.",
         };
       } catch (error) {
-        console.error("Failed to process password reset request:", error);
+        logger.error({ err: error }, "Failed to process password reset request");
         // Don't expose internal errors
         return {
           success: true,
@@ -399,24 +456,11 @@ export const authRouter = t.router({
     .query(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         return {
@@ -448,29 +492,16 @@ export const authRouter = t.router({
       z.object({
         token: z.string(),
         newPassword: z.string().min(8),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending password resets
-      const usersWithResets = await userRepository.find({
-        where: {
-          passwordResetTokenHash: Not(IsNull()),
-        },
+      // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+      const user = await userRepository.findOne({
+        where: { passwordResetTokenHash: tokenHash },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithResets) {
-        if (u.passwordResetTokenHash) {
-          const isValid = await verifyPassword(input.token, u.passwordResetTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -494,6 +525,9 @@ export const authRouter = t.router({
       // Hash new password
       user.password = await hashPassword(input.newPassword, "argon2");
 
+      // Invalidate all existing tokens by incrementing tokenVersion
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+
       // Clear password reset fields
       user.clearPasswordReset();
 
@@ -505,9 +539,15 @@ export const authRouter = t.router({
 
         // Send confirmation email
         await emailService.initialize();
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Your Password Has Been Changed",
+          locale,
           template: "password-changed",
           variables: {
             userName: user.getFullName(),
@@ -526,7 +566,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password reset or send email:", error);
+        logger.error({ err: error }, "Failed to log password reset or send email");
         // Don't fail the password reset if logging/email fails
       }
 
@@ -538,91 +578,95 @@ export const authRouter = t.router({
 
   // Protected endpoints
   me: protectedProcedureWithoutOrg
-    .output(z.object({
-      id: z.string(),
-      email: z.string(),
-      pendingEmail: z.string().nullable().optional(),
-      firstName: z.string().nullable().optional(),
-      lastName: z.string().nullable().optional(),
-      avatarUrl: z.string().nullable().optional(),
-      isActive: z.boolean(),
-      lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
-      lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
-      status: z.enum(["available", "away"]).optional(),
-      onlineStatus: z.enum(["online", "away", "offline"]),
-      authMethod: z.string(),
-      organizations: z.array(z.object({
+    .output(
+      z.object({
         id: z.string(),
-        name: z.string(),
-        slug: z.string(),
-        logo: z.string().nullable().optional(),
+        email: z.string(),
+        pendingEmail: z.string().nullable().optional(),
+        firstName: z.string().nullable().optional(),
+        lastName: z.string().nullable().optional(),
+        avatarUrl: z.string().nullable().optional(),
+        isActive: z.boolean(),
+        lastLoginAt: z.union([z.date(), z.string()]).nullable().optional(),
+        lastSeenAt: z.union([z.date(), z.string()]).nullable().optional(),
+        status: z.enum(["available", "away"]).optional(),
+        onlineStatus: z.enum(["online", "away", "offline"]),
+        authMethod: z.string(),
+        organizations: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            slug: z.string(),
+            logo: z.string().nullable().optional(),
+            role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
+            permissions: z.array(z.string()).nullable().optional(),
+            joinedAt: z.union([z.date(), z.string()]).optional(),
+            lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
+          }),
+        ),
+        activeOrganizationId: z.string().optional(),
         role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
-        permissions: z.array(z.string()).nullable().optional(),
-        joinedAt: z.union([z.date(), z.string()]).optional(),
-        lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
-      })),
-      activeOrganizationId: z.string().optional(),
-      role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
-    }))
+      }),
+    )
     .query(async ({ ctx }) => {
-    const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
+      const userEntity = ctx.user!.getUser(); // protectedProcedure guarantees user exists
 
-    // Fetch user with organization data
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: userEntity.id },
-      relations: ["organization"],
-    });
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
+      // Fetch user with organization data
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: userEntity.id },
+        relations: ["organization"],
       });
-    }
 
-    // Load all user organizations (multi-org support)
-    const organizations = await getUserOrganizations(user.id);
-
-    // Determine active organization
-    // Use the one from context if available, otherwise use most recently accessed or legacy
-    let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
-    if (!activeOrganizationId && organizations.length > 0) {
-      const mostRecent = organizations.reduce((prev, current) => {
-        if (!prev.lastAccessedAt) return current;
-        if (!current.lastAccessedAt) return prev;
-        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
-      });
-      activeOrganizationId = mostRecent.id;
-    }
-
-    // Get role for active organization or fall back to user role
-    let role = user.role;
-    if (activeOrganizationId && organizations.length > 0) {
-      const activeOrg = organizations.find(org => org.id === activeOrganizationId);
-      if (activeOrg) {
-        role = activeOrg.role;
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
       }
-    }
 
-    return {
-      id: user.id,
-      email: user.email,
-      pendingEmail: user.pendingEmail,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatarUrl: user.avatarUrl,
-      isActive: user.isActive,
-      lastLoginAt: user.lastLoginAt,
-      lastSeenAt: user.lastSeenAt,
-      status: user.status,
-      onlineStatus: user.getOnlineStatus(),
-      authMethod: ctx.user!.authMethod,
-      organizations,
-      activeOrganizationId,
-      role,
-    };
-  }),
+      // Load all user organizations (multi-org support)
+      const organizations = await getUserOrganizations(user.id);
+
+      // Determine active organization
+      // Use the one from context if available, otherwise use most recently accessed or legacy
+      let activeOrganizationId = ctx.user!.organizationId || user.organizationId;
+      if (!activeOrganizationId && organizations.length > 0) {
+        const mostRecent = organizations.reduce((prev, current) => {
+          if (!prev.lastAccessedAt) return current;
+          if (!current.lastAccessedAt) return prev;
+          return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+        });
+        activeOrganizationId = mostRecent.id;
+      }
+
+      // Get role for active organization or fall back to user role
+      let role = user.role;
+      if (activeOrganizationId && organizations.length > 0) {
+        const activeOrg = organizations.find((org) => org.id === activeOrganizationId);
+        if (activeOrg) {
+          role = activeOrg.role;
+        }
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        pendingEmail: user.pendingEmail,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive,
+        lastLoginAt: user.lastLoginAt,
+        lastSeenAt: user.lastSeenAt,
+        status: user.status,
+        onlineStatus: user.getOnlineStatus(),
+        authMethod: ctx.user!.authMethod,
+        organizations,
+        activeOrganizationId,
+        role,
+      };
+    }),
 
   logout: protectedProcedure.mutation(async () => {
     // In a stateless JWT system, logout is handled client-side
@@ -659,8 +703,9 @@ export const authRouter = t.router({
         });
       }
 
-      // Hash new password
+      // Hash new password and invalidate all existing tokens
       user.password = await hashPassword(input.newPassword, "argon2");
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
 
       // Log password change
@@ -672,9 +717,10 @@ export const authRouter = t.router({
 
         // Send email notification
         await emailService.initialize();
+        const locale = await getOrganizationLocale(ctx.organizationId);
         await emailService.sendTemplateEmail({
           to: user.email,
-          subject: "Your Password Has Been Changed",
+          locale,
           template: "password-changed",
           variables: {
             userName: user.getFullName(),
@@ -693,7 +739,7 @@ export const authRouter = t.router({
           },
         });
       } catch (error) {
-        console.error("Failed to log password change or send email:", error);
+        logger.error({ err: error }, "Failed to log password change or send email");
         // Don't fail the password change if logging/email fails
       }
 
@@ -774,7 +820,7 @@ export const authRouter = t.router({
             userAgent: ctx.userAgent,
           });
         } catch (error) {
-          console.error("Failed to log profile update:", error);
+          logger.error({ err: error }, "Failed to log profile update");
         }
       }
 
@@ -825,7 +871,7 @@ export const authRouter = t.router({
               await storageService.delete(uploadIdMatch[1]);
             }
           } catch (error) {
-            console.error("Failed to delete old avatar:", error);
+            logger.error({ err: error }, "Failed to delete old avatar");
             // Continue even if deletion fails
           }
         }
@@ -839,7 +885,7 @@ export const authRouter = t.router({
           avatarUrl: result.url,
         };
       } catch (error) {
-        console.error("Failed to upload avatar:", error);
+        logger.error({ err: error }, "Failed to upload avatar");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to upload avatar. Please try again.",
@@ -884,7 +930,7 @@ export const authRouter = t.router({
         success: true,
       };
     } catch (error) {
-      console.error("Failed to delete avatar:", error);
+      logger.error({ err: error }, "Failed to delete avatar");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to delete avatar. Please try again.",
@@ -933,9 +979,9 @@ export const authRouter = t.router({
         });
       }
 
-      // Generate verification token
+      // Generate verification token (high-entropy: 256 bits, SHA-256 for direct lookup)
       const verificationToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = await hashPassword(verificationToken, "argon2");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
       // Store pending email and token
       const oldEmail = user.email;
@@ -946,16 +992,17 @@ export const authRouter = t.router({
 
       // Send verification emails
       try {
-        console.log("📧 [updateEmail] Initializing email service...");
+        logger.debug("Initializing email service for email update");
         await emailService.initialize();
-        console.log("✅ [updateEmail] Email service initialized");
+        logger.debug("Email service initialized");
 
         const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-        console.log("🔗 [updateEmail] Verification URL:", verificationUrl);
-        console.log("📬 [updateEmail] Sending to NEW email:", input.newEmail.toLowerCase());
-        console.log("📬 [updateEmail] Sending to OLD email:", oldEmail);
+        logger.debug(
+          { verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail },
+          "Sending email change verification emails",
+        );
 
         const commonVariables = {
           userName: user.getFullName(),
@@ -975,10 +1022,11 @@ export const authRouter = t.router({
         };
 
         // Send verification email to NEW email
-        console.log("📤 [updateEmail] Sending verification email to NEW address...");
+        const locale = await getOrganizationLocale(ctx.organizationId);
+        logger.debug("Sending verification email to new address");
         const result1 = await emailService.sendTemplateEmail({
           to: input.newEmail.toLowerCase(),
-          subject: "Verify Your New Email Address",
+          locale,
           template: "verify-email-change",
           variables: {
             ...commonVariables,
@@ -986,32 +1034,31 @@ export const authRouter = t.router({
             recipientEmail: input.newEmail.toLowerCase(),
           },
         });
-        console.log("📨 [updateEmail] Verification email result:", result1);
+        logger.debug({ result: result1 }, "Verification email sent to new address");
 
         // Send notification to OLD email
-        console.log("📤 [updateEmail] Sending notification to OLD address...");
+        logger.debug("Sending notification email to old address");
         const result2 = await emailService.sendTemplateEmail({
           to: oldEmail,
-          subject: "Email Change Pending Verification",
+          locale,
           template: "email-change-pending",
           variables: {
             ...commonVariables,
             recipientEmail: oldEmail,
           },
         });
-        console.log("📨 [updateEmail] Notification email result:", result2);
+        logger.debug({ result: result2 }, "Notification email sent to old address");
 
-        console.log("✅ [updateEmail] All emails sent successfully");
+        logger.info("All email change verification emails sent successfully");
       } catch (error) {
-        console.error("❌ [updateEmail] Failed to send verification emails:", error);
-        console.error("❌ [updateEmail] Error stack:", error instanceof Error ? error.stack : "No stack");
+        logger.error({ err: error }, "Failed to send verification emails");
         // Rollback the pending email change
         await userRepository.update(user.id, {
           pendingEmail: null as any,
           emailVerificationTokenHash: null as any,
           emailVerificationExpiresAt: null as any,
         });
-        console.log("🔄 [updateEmail] Rolled back pending email change");
+        logger.warn("Rolled back pending email change due to email send failure");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to send verification email. Please try again.",
@@ -1020,7 +1067,8 @@ export const authRouter = t.router({
 
       return {
         success: true,
-        message: "Verification email sent. Please check your new email address to complete the change.",
+        message:
+          "Verification email sent. Please check your new email address to complete the change.",
         pendingEmail: user.pendingEmail,
       };
     }),
@@ -1045,24 +1093,14 @@ export const authRouter = t.router({
     .mutation(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
-      // Find all users with pending email changes (shouldn't be many)
-      const usersWithPending = await userRepository.find({
+      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+
+      let user = await userRepository.findOne({
         where: {
-          emailVerificationTokenHash: Not(IsNull()),
+          emailVerificationTokenHash: tokenHash,
         },
       });
-
-      // Find the user with the matching token
-      let user: User | null = null;
-      for (const u of usersWithPending) {
-        if (u.emailVerificationTokenHash) {
-          const isValid = await verifyPassword(input.token, u.emailVerificationTokenHash);
-          if (isValid) {
-            user = u;
-            break;
-          }
-        }
-      }
 
       if (!user) {
         throw new TRPCError({
@@ -1114,6 +1152,12 @@ export const authRouter = t.router({
         // Send confirmation emails
         await emailService.initialize();
 
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
         const emailVariables = {
           userName: user.getFullName(),
           userEmail: newEmail,
@@ -1134,19 +1178,19 @@ export const authRouter = t.router({
         // Notify both old and new email
         await emailService.sendTemplateEmail({
           to: oldEmail,
-          subject: "Your Email Address Has Been Changed",
+          locale,
           template: "email-changed",
           variables: { ...emailVariables, recipientEmail: oldEmail },
         });
 
         await emailService.sendTemplateEmail({
           to: newEmail,
-          subject: "Your Email Address Has Been Changed",
+          locale,
           template: "email-changed",
           variables: emailVariables,
         });
       } catch (error) {
-        console.error("Failed to send confirmation emails:", error);
+        logger.error({ err: error }, "Failed to send confirmation emails");
         // Don't fail the verification if email sending fails
       }
 
@@ -1189,7 +1233,163 @@ export const authRouter = t.router({
     };
   }),
 
-  resendEmailVerification: protectedProcedure.mutation(async ({ ctx }) => {
+  // ─── Signup Email Verification ──────────────────────────────
+
+  /**
+   * Request a signup verification token for the authenticated user.
+   * Called right after registration when emailVerified is false.
+   * Returns the plain token so the caller (backoffice) can include it in the verification email.
+   */
+  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: ctx.user!.id },
+    });
+
+    if (!user) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    if (user.emailVerified) {
+      return { success: true, token: null, expiresAt: null, message: "Email already verified" };
+    }
+
+    // Generate verification token (SHA-256 for O(1) DB lookup)
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await userRepository.save(user);
+
+    return {
+      success: true,
+      token: verificationToken,
+      expiresAt: user.emailVerificationExpiresAt.toISOString(),
+      message: "Verification token generated",
+    };
+  }),
+
+  /**
+   * Verify a user's email using a signup verification token.
+   * Public endpoint — no auth required.
+   */
+  verifyEmail: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { emailVerificationTokenHash: tokenHash },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired verification token",
+        });
+      }
+
+      // Check expiry
+      if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
+        user.clearEmailVerification();
+        await userRepository.save(user);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Verification link has expired. Please request a new one.",
+        });
+      }
+
+      // Mark as verified, clear token fields
+      user.emailVerified = true;
+      user.clearEmailVerification();
+      await userRepository.save(user);
+
+      return { success: true, message: "Email verified successfully", email: user.email };
+    }),
+
+  /**
+   * Resend signup verification email for an unverified user.
+   * Public endpoint (accepts email) — sends verification email directly.
+   * Always returns success to prevent user enumeration.
+   */
+  resendSignupVerification: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ input }) => {
+      const { email } = input;
+
+      // Rate limit: 3 requests per hour per email
+      const rateLimitResult = await rateLimitService.checkEmailRateLimit(email, 3, 60 * 60);
+      if (rateLimitResult.limited) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many requests. Please try again later.",
+        });
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { email: email.toLowerCase() },
+      });
+
+      // Always return success to prevent user enumeration
+      if (!user || !user.isActive || user.emailVerified) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Timing attack prevention
+        return {
+          success: true,
+          message: "If an unverified account exists, a new verification link will be sent.",
+        };
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+
+      user.emailVerificationTokenHash = tokenHash;
+      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await userRepository.save(user);
+
+      // Send verification email
+      try {
+        await emailService.initialize();
+
+        const baseUrl = getDashboardUrl();
+        const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}&type=signup`;
+
+        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
+          where: { userId: user.id },
+          relations: ["organization"],
+        });
+        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
+
+        await emailService.sendTemplateEmail({
+          to: user.email,
+          locale,
+          template: "verify-signup-email",
+          variables: {
+            userName: user.getFullName(),
+            verificationUrl,
+            companyName: "Hay",
+            currentYear: new Date().getFullYear().toString(),
+            companyAddress: "Hay Platform",
+            websiteUrl: "https://hay.chat",
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, "Failed to send signup verification email");
+        // Don't throw - token was saved, user can retry
+      }
+
+      return {
+        success: true,
+        message: "If an unverified account exists, a new verification link will be sent.",
+      };
+    }),
+
+  // ─── Email Change Verification (resend) ─────────────────────
+
+  resendEmailChangeVerification: protectedProcedure.mutation(async ({ ctx }) => {
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: ctx.user!.id },
@@ -1209,9 +1409,9 @@ export const authRouter = t.router({
       });
     }
 
-    // Generate new verification token
+    // Generate new verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     // Update token and expiry
     user.emailVerificationTokenHash = tokenHash;
@@ -1243,9 +1443,10 @@ export const authRouter = t.router({
       };
 
       // Send verification email to new email address
+      const locale = await getOrganizationLocale(ctx.organizationId);
       await emailService.sendTemplateEmail({
         to: user.pendingEmail,
-        subject: "Verify Your New Email Address",
+        locale,
         template: "verify-email-change",
         variables: {
           ...commonVariables,
@@ -1254,7 +1455,7 @@ export const authRouter = t.router({
         },
       });
     } catch (error) {
-      console.error("Failed to resend verification email:", error);
+      logger.error({ err: error }, "Failed to resend verification email");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to resend verification email. Please try again.",
@@ -1267,8 +1468,100 @@ export const authRouter = t.router({
     };
   }),
 
-  // API Key management has been moved to /api-tokens router
-  // See server/routes/v1/api-tokens/index.ts for organization-scoped API tokens
+  // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
+  generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const rawCode = generateSecureToken(32);
+    const codeHash = await hashApiKey(rawCode);
+
+    const authCodeRepo = AppDataSource.getRepository(AuthCode);
+    const authCode = authCodeRepo.create({
+      userId: ctx.user!.id,
+      codeHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      used: false,
+    });
+    await authCodeRepo.save(authCode);
+
+    return {
+      code: rawCode,
+      expiresAt: authCode.expiresAt,
+    };
+  }),
+
+  exchangeAuthCode: publicProcedure
+    .input(z.object({ code: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const codeHash = await hashApiKey(input.code);
+
+      const authCodeRepo = AppDataSource.getRepository(AuthCode);
+      const authCode = await authCodeRepo.findOne({
+        where: { codeHash, used: false },
+        relations: ["user"],
+      });
+
+      if (!authCode || !authCode.isValid()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired auth code",
+        });
+      }
+
+      // Mark as used immediately (single-use)
+      authCode.used = true;
+      await authCodeRepo.save(authCode);
+
+      const user = authCode.user!;
+
+      if (!user.isActive) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Account is deactivated",
+        });
+      }
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Email not verified. Please check your inbox for the verification link.",
+          cause: { type: "EMAIL_NOT_VERIFIED", email: user.email },
+        });
+      }
+
+      // Update last login
+      const userRepository = AppDataSource.getRepository(User);
+      user.lastLoginAt = new Date();
+      user.updateLastSeen();
+      await userRepository.save(user);
+
+      // Generate tokens
+      const sessionId = generateSessionId();
+      const tokens = generateTokens(user, sessionId);
+
+      // Load all user organizations
+      const organizations = await getUserOrganizations(user.id);
+
+      // Determine active organization
+      let activeOrganizationId = user.organizationId;
+      if (organizations.length > 0) {
+        const mostRecent = organizations.reduce((prev, current) => {
+          if (!prev.lastAccessedAt) return current;
+          if (!current.lastAccessedAt) return prev;
+          return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
+        });
+        activeOrganizationId = mostRecent.id;
+      }
+
+      return {
+        user: {
+          ...user.toJSON(),
+          organizations,
+          activeOrganizationId,
+          onlineStatus: user.getOnlineStatus(),
+        },
+        ...tokens,
+      };
+    }),
 
   // Admin endpoints
   listUsers: adminProcedure.query(async () => {

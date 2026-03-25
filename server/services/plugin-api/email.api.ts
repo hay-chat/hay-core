@@ -4,6 +4,9 @@ import type {
   EmailSendOptions,
   EmailResult,
 } from "@server/types/plugin-api.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-email-api");
 
 /**
  * Email API implementation for Plugin API
@@ -81,9 +84,10 @@ export class EmailAPIImpl implements EmailAPI {
       });
 
       // Log successful send for auditing
-      console.log(
-        `[Plugin:${this.pluginId}] Email sent to ${Array.isArray(recipients) ? recipients.join(", ") : recipients}`
-      );
+      logger.info({
+        pluginId: this.pluginId,
+        recipients: Array.isArray(recipients) ? recipients : [recipients],
+      }, "Email sent via plugin API");
 
       return {
         success: true,
@@ -91,7 +95,7 @@ export class EmailAPIImpl implements EmailAPI {
       };
     } catch (error) {
       // Log error for debugging
-      console.error(`[Plugin:${this.pluginId}] Failed to send email:`, error);
+      logger.error({ err: error, pluginId: this.pluginId }, "Failed to send email");
 
       return {
         success: false,

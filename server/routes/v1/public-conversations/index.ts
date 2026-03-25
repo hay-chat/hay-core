@@ -5,6 +5,12 @@ import { MessageType, MessageDirection } from "../../../database/entities/messag
 import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
+import { CustomerRepository } from "../../../repositories/customer.repository";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("public-conversations");
+
+const customerRepository = new CustomerRepository();
 
 const conversationService = new ConversationService();
 
@@ -23,6 +29,8 @@ const createPublicConversationSchema = z.object({
   }),
   metadata: z.record(z.any()).optional(),
   language: z.string().optional(),
+  context: z.record(z.any()).optional(),
+  customerExternalId: z.string().optional(),
 });
 
 // Schema for sending messages
@@ -32,6 +40,7 @@ const sendMessageSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
+  context: z.record(z.any()).optional(),
 });
 
 // Schema for getting messages
@@ -74,7 +83,23 @@ export const publicConversationsRouter = t.router({
         channel: "web",
         publicJwk: input.publicJwk,
         lastMessageAt: new Date(),
+        ...(input.context && Object.keys(input.context).length > 0
+          ? { context: input.context }
+          : {}),
       });
+
+      // Link customer if customerExternalId is provided
+      if (input.customerExternalId) {
+        const customer = await customerRepository.findByExternalId(
+          input.customerExternalId,
+          organizationId,
+        );
+        if (customer) {
+          await conversationRepository.updateById(conversation.id, {
+            customer_id: customer.id,
+          });
+        }
+      }
 
       // Generate initial nonce for this conversation
       const nonce = await dpopCacheService.generateNonce(conversation.id);
@@ -85,7 +110,7 @@ export const publicConversationsRouter = t.router({
         createdAt: conversation.created_at,
       };
     } catch (error) {
-      console.error("Error creating public conversation:", error);
+      logger.error({ err: error }, "Error creating public conversation");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to create conversation",
@@ -141,6 +166,7 @@ export const publicConversationsRouter = t.router({
           id: msg.id,
           content: msg.content,
           type: msg.type,
+          sender: msg.sender,
           direction:
             msg.direction ||
             (msg.type === MessageType.CUSTOMER ? MessageDirection.IN : MessageDirection.OUT),
@@ -162,7 +188,7 @@ export const publicConversationsRouter = t.router({
       if (error instanceof TRPCError) {
         throw error;
       }
-      console.error("Error getting messages:", error);
+      logger.error({ err: error }, "Error getting messages");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to get messages",
@@ -217,6 +243,12 @@ export const publicConversationsRouter = t.router({
         },
       });
 
+      // Merge incoming context into conversation context if provided
+      if (input.context && Object.keys(input.context).length > 0) {
+        const merged = { ...(conversation.context ?? {}), ...input.context };
+        await conversationRepository.updateById(conversation.id, { context: merged });
+      }
+
       return {
         messageId: message.id,
         nonce: verified.newNonce,
@@ -228,7 +260,7 @@ export const publicConversationsRouter = t.router({
       if (error instanceof TRPCError) {
         throw error;
       }
-      console.error("Error sending message:", error);
+      logger.error({ err: error }, "Error sending message");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to send message",
@@ -293,7 +325,7 @@ export const publicConversationsRouter = t.router({
         if (error instanceof TRPCError) {
           throw error;
         }
-        console.error("Error rotating keys:", error);
+        logger.error({ err: error }, "Error rotating keys");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to rotate keys",
@@ -411,7 +443,7 @@ export async function verifyDPoPForRequest(
 
     return { success: true, newNonce };
   } catch (error) {
-    console.error("DPoP verification error:", error);
+    logger.error({ err: error }, "DPoP verification error");
     return { success: false, error: "Verification failed" };
   }
 } // restart

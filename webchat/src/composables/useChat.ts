@@ -2,6 +2,7 @@ import { ref, computed, watch } from "vue";
 import { useWebSocket } from "./useWebSocket";
 import { useConversation } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
+import { initContext, getContext } from "./useWidgetContext";
 import {
   generateKeypair,
   storeKeypair,
@@ -26,6 +27,8 @@ export function useChat(config: HayChatConfig) {
   const isConversationClosed = ref(false);
   const isSending = ref(false);
   const lastReadMessageId = ref<string | null>(sessionStorage.getItem("hay-last-read-message-id"));
+  const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
+  const currentAgentName = ref<string | null>(null);
 
   // Get existing conversation ID from session storage
   const existingConversationId = ref<string | null>(sessionStorage.getItem("hay-conversation-id"));
@@ -73,10 +76,23 @@ export function useChat(config: HayChatConfig) {
         throw new Error("Failed to generate keypair");
       }
 
-      // Create conversation via HTTP
-      const conversationData = await conversation.createConversation(newKeypair.publicJwk);
+      // Create conversation via HTTP, passing current context and customerExternalId
+      const conversationData = await conversation.createConversation(
+        newKeypair.publicJwk,
+        getContext(),
+        config.customerExternalId,
+      );
       if (!conversationData) {
         throw new Error("Failed to create conversation");
+      }
+
+      // Fire onConversationStarted callback — if it returns a Promise, wait for it
+      // This allows the host to attach server-side secrets before input is enabled
+      if (config.onConversationStarted) {
+        const result = config.onConversationStarted({ id: conversationData.id });
+        if (result instanceof Promise) {
+          await result;
+        }
       }
 
       // Store keypair and conversation data
@@ -220,7 +236,17 @@ export function useChat(config: HayChatConfig) {
         content: msg.content,
         timestamp: new Date(msg.createdAt).getTime(),
         metadata: msg.metadata,
+        agentType: msg.type,
+        senderName: msg.sender || undefined,
       });
+
+      // Track agent type from messages
+      if (msg.type === "HumanAgent") {
+        currentAgentType.value = "HumanAgent";
+        if (msg.sender) {
+          currentAgentName.value = msg.sender;
+        }
+      }
 
       // Check for closure message
       if (msg.metadata?.isClosureMessage === true) {
@@ -238,6 +264,11 @@ export function useChat(config: HayChatConfig) {
       if (!isWebCryptoAvailable()) {
         console.error("[Webchat] WebCrypto API not available");
         throw new Error("WebCrypto not supported");
+      }
+
+      // Initialize context store from config
+      if (config.context && Object.keys(config.context).length > 0) {
+        initContext(config.context);
       }
 
       // Generate or retrieve customer ID
@@ -312,18 +343,22 @@ export function useChat(config: HayChatConfig) {
 
   // Set status change callback for conversation status updates
   setStatusChangeCallback((status: string, payload: any) => {
-    console.log("[Webchat] Conversation status changed to:", status, payload);
-
     // Handle conversation closure
     if (status === "closed" || status === "resolved") {
       isConversationClosed.value = true;
-      console.log("[Webchat] Conversation has been closed/resolved");
     }
 
     // Handle conversation reopening
     if (status === "open" && isConversationClosed.value) {
       isConversationClosed.value = false;
-      console.log("[Webchat] Conversation has been reopened");
+    }
+
+    // Track human takeover / release
+    if (status === "human-took-over") {
+      currentAgentType.value = "HumanAgent";
+    } else if (status === "open" && currentAgentType.value === "HumanAgent") {
+      currentAgentType.value = "BotAgent";
+      currentAgentName.value = null;
     }
   });
 
@@ -333,15 +368,12 @@ export function useChat(config: HayChatConfig) {
   const startRetryLoop = () => {
     if (retryTimer) return;
 
-    console.log("[MessageQueue] Starting retry loop");
     retryTimer = setInterval(async () => {
       // Skip if not initialized (we don't need WebSocket for HTTP sending)
       if (!isInitialized.value) return;
 
       const nextMessage = messageQueue.getNextRetry();
       if (nextMessage) {
-        console.log("[MessageQueue] Retrying message:", nextMessage.id);
-
         try {
           // Try to send the message again via HTTP
           await sendMessageInternal(
@@ -352,7 +384,6 @@ export function useChat(config: HayChatConfig) {
 
           // Success - remove from queue
           messageQueue.dequeue(nextMessage.id);
-          console.log("[MessageQueue] Message sent successfully:", nextMessage.id);
         } catch (error) {
           console.error("[MessageQueue] Retry failed for:", nextMessage.id, error);
           // Increment retry count
@@ -369,7 +400,6 @@ export function useChat(config: HayChatConfig) {
     if (retryTimer) {
       clearInterval(retryTimer);
       retryTimer = null;
-      console.log("[MessageQueue] Retry loop stopped");
     }
   };
 
@@ -379,7 +409,6 @@ export function useChat(config: HayChatConfig) {
   const startPolling = () => {
     if (pollingTimer) return;
 
-    console.log("[Webchat] Starting message polling every 10 seconds");
     pollingTimer = setInterval(async () => {
       // Skip if not initialized or no conversation
       if (!isInitialized.value || !conversationId.value) return;
@@ -396,7 +425,6 @@ export function useChat(config: HayChatConfig) {
     if (pollingTimer) {
       clearInterval(pollingTimer);
       pollingTimer = null;
-      console.log("[Webchat] Message polling stopped");
     }
   };
 
@@ -463,9 +491,72 @@ export function useChat(config: HayChatConfig) {
     await clearConversation();
     const created = await createNewConversation();
     if (created) {
-      console.log("[Webchat] New conversation started successfully");
     }
     return created;
+  };
+
+  // Merge server messages into existing messages (additive only - never removes messages)
+  const mergeMessages = (serverMessages: any[]) => {
+    const existingIds = new Set(messages.value.map((m) => m.id));
+    let added = 0;
+
+    for (const msg of serverMessages) {
+      // Skip messages we already have (including optimistic temp messages matched by content)
+      if (existingIds.has(msg.id)) continue;
+
+      const sender = msg.type === "Customer" ? "user" : "agent";
+      const newMessage: Message = {
+        id: msg.id,
+        sender,
+        content: msg.content,
+        timestamp: new Date(msg.createdAt).getTime(),
+        metadata: msg.metadata,
+        agentType: msg.type,
+        senderName: msg.sender || undefined,
+      };
+
+      // Track agent type from new messages
+      if (msg.type === "HumanAgent") {
+        currentAgentType.value = "HumanAgent";
+        if (msg.sender) {
+          currentAgentName.value = msg.sender;
+        }
+      }
+
+      // Check if this is a server confirmation of an optimistic user message
+      // Don't replace it — changing the key (temp-* → real ID) causes Vue to
+      // destroy and recreate the DOM element, which triggers a visual flash.
+      // Just skip the server duplicate; the temp message already shows correctly.
+      if (sender === "user") {
+        const hasTempMatch = messages.value.some(
+          (m) => m.id.startsWith("temp-") && m.sender === "user" && m.content === msg.content,
+        );
+        if (hasTempMatch) {
+          continue;
+        }
+      }
+
+      // If there's a greeting placeholder and the incoming message is from the agent,
+      // replace the greeting with the real server-generated message
+      const greetingIndex = messages.value.findIndex((m) => m.isGreeting);
+      if (greetingIndex !== -1 && sender === "agent") {
+        messages.value.splice(greetingIndex, 1, newMessage);
+        existingIds.add(msg.id);
+        added++;
+        continue;
+      }
+
+      messages.value.push(newMessage);
+      existingIds.add(msg.id);
+      added++;
+
+      // Check for closure message
+      if (msg.metadata?.isClosureMessage === true) {
+        isConversationClosed.value = true;
+      }
+    }
+
+    return added;
   };
 
   // Refresh messages from server to ensure we have the complete conversation
@@ -476,7 +567,6 @@ export function useChat(config: HayChatConfig) {
     }
 
     try {
-      console.log("[Webchat] Refreshing messages from server...");
       const wsUrl = `${config.baseUrl}/v1/publicConversations.getMessages`;
       const proof = await createDPoPProof(
         "POST",
@@ -503,9 +593,17 @@ export function useChat(config: HayChatConfig) {
       }
 
       if (messagesData?.messages) {
-        // Replace messages with fresh data from server
-        loadMessagesIntoUI(messagesData.messages);
-        console.log("[Webchat] Messages refreshed successfully:", messagesData.messages.length);
+        // If server returned 0 messages but we have messages locally, skip the update
+        // This prevents the conversation from disappearing due to transient server issues
+        if (messagesData.messages.length === 0 && messages.value.length > 0) {
+          console.log(
+            "[Webchat] Server returned 0 messages but we have local messages, skipping refresh",
+          );
+          return;
+        }
+
+        // Merge new messages into existing ones (additive only)
+        mergeMessages(messagesData.messages);
       }
 
       // Update conversation closed state
@@ -542,8 +640,15 @@ export function useChat(config: HayChatConfig) {
       throw new Error("Failed to create DPoP proof");
     }
 
-    // Send via HTTP instead of WebSocket
-    const result = await conversation.sendMessage(convId, text.trim(), proof, "POST", httpUrl);
+    // Send via HTTP instead of WebSocket, including current context for the orchestrator
+    const result = await conversation.sendMessage(
+      convId,
+      text.trim(),
+      proof,
+      "POST",
+      httpUrl,
+      getContext(),
+    );
 
     if (!result) {
       throw new Error("Failed to send message");
@@ -599,9 +704,8 @@ export function useChat(config: HayChatConfig) {
 
       await sendMessageInternal(text.trim(), conversationId.value!, retryCount);
 
-      // After successfully sending, refresh the conversation to get the complete message list
-      // This ensures we have all messages including bot responses
-      await refreshMessages();
+      // Don't call refreshMessages() here — the bot hasn't responded yet so it's
+      // wasted work. The 10-second polling loop and WebSocket handle new messages.
 
       isSending.value = false;
     } catch (error: any) {
@@ -720,6 +824,8 @@ export function useChat(config: HayChatConfig) {
     unreadCount,
     isSending,
     isConversationClosed,
+    currentAgentType,
+    currentAgentName,
 
     // Actions
     initialize,

@@ -1,4 +1,6 @@
-import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageStatus } from "../../../database/entities/message.entity";
@@ -9,6 +11,9 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { DeliveryState } from "@server/types/message-feedback.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversations");
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
@@ -83,34 +88,43 @@ export const conversationsRouter = t.router({
       return conversations;
     }),
 
-  get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    // For public access, try to get conversation without org ID restriction for now
-    // In production, you might want to check a public flag or use session tokens
-    const organizationId =
-      ctx.organizationId || process.env.DEFAULT_ORG_ID || "c3578568-c83b-493f-991c-ca2d34a3bd17";
-    const conversation = await conversationService.getConversation(input.id, organizationId);
+  get: authenticatedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Organization context required",
+        });
+      }
+      const conversation = await conversationService.getConversation(input.id, organizationId);
 
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
 
-    return conversation;
-  }),
+      return conversation;
+    }),
 
-  create: publicProcedure.input(createConversationSchema).mutation(async ({ ctx, input }) => {
-    // For public access, use organization ID from input or a default
-    const organizationId =
-      ctx.organizationId ||
-      input.metadata?.organizationId ||
-      process.env.DEFAULT_ORG_ID ||
-      "c3578568-c83b-493f-991c-ca2d34a3bd17";
-    const conversation = await conversationService.createConversation(organizationId, input);
+  create: authenticatedProcedure
+    .input(createConversationSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Organization ID must come from auth context or explicit input field (validated as UUID above)
+      const organizationId = ctx.organizationId || input.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID is required",
+        });
+      }
+      const conversation = await conversationService.createConversation(organizationId, input);
 
-    return conversation;
-  }),
+      return conversation;
+    }),
 
   update: authenticatedProcedure
     .input(
@@ -599,7 +613,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[approveMessage] Failed to publish approval event:", error);
+        logger.error({ err: error }, "Failed to publish approval event");
       }
 
       // TODO: Trigger actual message delivery to customer via WebSocket/plugin
@@ -683,7 +697,7 @@ export const conversationsRouter = t.router({
           });
         }
       } catch (error) {
-        console.error("[blockMessage] Failed to publish block event:", error);
+        logger.error({ err: error }, "Failed to publish block event");
       }
 
       return updatedMessage;
@@ -721,5 +735,32 @@ export const conversationsRouter = t.router({
         legalHold: conversation.legal_hold,
         legalHoldSetAt: conversation.legal_hold_set_at,
       };
+    }),
+
+  // Attach server-side secrets to a conversation (server-to-server, API key auth)
+  // Secrets are stored in Redis, never reach the LLM — injected into MCP tool calls only
+  addSecrets: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      await conversationSecretService.setSecrets(input.id, input.secrets);
+      return { success: true };
+    }),
+
+  // Merge public context into a conversation (server-to-server, API key auth)
+  // Context is stored in DB conversation.context JSONB and injected into the LLM prompt
+  addContext: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ id: z.string().uuid(), context: z.record(z.any()) }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.id);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      const merged = { ...(conversation.context ?? {}), ...input.context };
+      await conversationRepository.updateById(input.id, { context: merged });
+      return { success: true };
     }),
 });

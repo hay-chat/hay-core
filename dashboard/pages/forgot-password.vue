@@ -8,9 +8,9 @@
         </div>
 
         <div>
-          <CardTitle class="text-2xl"> Check your email </CardTitle>
+          <CardTitle class="text-2xl"> {{ $t("forgotPassword.successTitle") }} </CardTitle>
           <CardDescription class="mt-2">
-            We've sent a password reset link to
+            {{ $t("forgotPassword.successDescription") }}
             <strong>{{ form.email }}</strong>
           </CardDescription>
         </div>
@@ -18,8 +18,9 @@
         <div class="space-y-4">
           <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p class="text-sm text-blue-800">
-              <strong>Didn't receive the email?</strong><br />
-              Check your spam folder or try resending the link.
+              <strong>{{ $t("forgotPassword.didntReceive") }}</strong
+              ><br />
+              {{ $t("forgotPassword.checkSpam") }}
             </p>
           </div>
 
@@ -32,12 +33,14 @@
               :disabled="resendCooldown > 0"
               @click="resendEmail"
             >
-              <span v-if="resendCooldown > 0">Resend in {{ resendCooldown }}s</span>
-              <span v-else>Resend email</span>
+              <span v-if="resendCooldown > 0">{{
+                $t("forgotPassword.resendCooldown", { seconds: resendCooldown })
+              }}</span>
+              <span v-else>{{ $t("forgotPassword.resendEmail") }}</span>
             </Button>
 
             <Button variant="ghost" size="lg" class="w-full" @click="goBack">
-              Back to sign in
+              {{ $t("forgotPassword.backToSignIn") }}
             </Button>
           </div>
         </div>
@@ -47,9 +50,9 @@
       <div v-else class="space-y-6">
         <!-- Header -->
         <div class="text-center">
-          <CardTitle class="text-2xl"> Forgot your password? </CardTitle>
+          <CardTitle class="text-2xl"> {{ $t("forgotPassword.title") }} </CardTitle>
           <CardDescription class="mt-2">
-            Enter your email address and we'll send you a link to reset your password.
+            {{ $t("forgotPassword.description") }}
           </CardDescription>
         </div>
 
@@ -59,9 +62,9 @@
             <Input
               id="email"
               v-model="form.email"
-              label="Email address"
+              :label="$t('forgotPassword.emailLabel')"
               type="email"
-              placeholder="Enter your email"
+              :placeholder="$t('forgotPassword.emailPlaceholder')"
               required
               :class="errors.email ? 'border-red-500' : ''"
               @blur="validateField('email')"
@@ -70,7 +73,7 @@
               {{ errors.email }}
             </p>
             <p v-else class="text-sm text-gray-500">
-              We'll send a reset link to this email address
+              {{ $t("forgotPassword.emailHelper") }}
             </p>
           </div>
 
@@ -82,7 +85,7 @@
             :loading="loading"
             :disabled="!isFormValid"
           >
-            Send reset link
+            {{ $t("forgotPassword.submit") }}
           </Button>
 
           <!-- Error Message -->
@@ -100,7 +103,7 @@
             class="text-sm text-primary hover:text-primary/80 font-medium flex items-center justify-center space-x-1"
           >
             <ArrowLeft class="w-4 h-4" />
-            <span>Back to sign in</span>
+            <span>{{ $t("forgotPassword.backToSignIn") }}</span>
           </NuxtLink>
         </div>
       </div>
@@ -114,6 +117,7 @@ import { validateEmail } from "@/lib/utils";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
+const { t } = useI18n();
 const router = useRouter();
 const toast = useToast();
 
@@ -147,9 +151,9 @@ const validateField = (field: keyof typeof errors) => {
   switch (field) {
     case "email":
       if (!form.email) {
-        errors.email = "Email is required";
+        errors.email = t("forgotPassword.errors.emailRequired");
       } else if (!validateEmail(form.email)) {
-        errors.email = "Please enter a valid email address";
+        errors.email = t("forgotPassword.errors.emailInvalid");
       } else {
         errors.email = "";
       }
@@ -174,12 +178,12 @@ const handleSubmit = async () => {
 
     if (response.success) {
       emailSent.value = true;
-      toast.success("Password reset email sent successfully!");
+      toast.success(t("forgotPassword.toast.sent"));
     }
   } catch (err: any) {
     console.error("Password reset error:", err);
-    error.value = err.message || "Failed to send reset email. Please try again.";
-    toast.error("Failed to send reset email");
+    error.value = err.message || t("forgotPassword.toast.sendFailed");
+    toast.error(t("forgotPassword.toast.sendFailedTitle"));
   } finally {
     loading.value = false;
   }
@@ -195,14 +199,14 @@ const resendEmail = async () => {
     });
 
     if (response.success) {
-      toast.success("Password reset email resent successfully!");
+      toast.success(t("forgotPassword.toast.resent"));
       // Start cooldown timer
       startResendCooldown();
     }
   } catch (err: any) {
     console.error("Resend error:", err);
-    error.value = err.message || "Failed to resend email. Please try again.";
-    toast.error("Failed to resend email");
+    error.value = err.message || t("forgotPassword.toast.resendFailed");
+    toast.error(t("forgotPassword.toast.resendFailedTitle"));
   } finally {
     resendLoading.value = false;
   }
@@ -234,11 +238,11 @@ onMounted(() => {
 
 // SEO
 useHead({
-  title: "Forgot Password - Hay Dashboard",
+  title: t("forgotPassword.pageTitle"),
   meta: [
     {
       name: "description",
-      content: "Reset your Hay dashboard account password",
+      content: t("forgotPassword.pageDescription"),
     },
   ],
 });

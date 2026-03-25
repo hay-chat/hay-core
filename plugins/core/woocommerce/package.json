@@ -1,5 +1,5 @@
 {
-  "name": "@hay/plugin-woocommerce",
+  "name": "hay-plugin-woocommerce",
   "version": "1.0.0",
   "description": "Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows",
   "author": "Hay",

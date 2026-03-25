@@ -182,6 +182,14 @@ module.exports = {
         useError: "readonly",
         useSeoMeta: "readonly",
         defineNuxtLink: "readonly",
+        // i18n auto-imports
+        useI18n: "readonly",
+        useLocale: "readonly",
+        useLocalePath: "readonly",
+        useLocaleRoute: "readonly",
+        useSwitchLocalePath: "readonly",
+        defineI18nConfig: "readonly",
+        defineI18nRoute: "readonly",
         // Global utilities
         $fetch: "readonly",
       },
@@ -189,6 +197,10 @@ module.exports = {
     // TypeScript files in dashboard
     {
       files: ["dashboard/**/*.ts", "dashboard/**/*.js"],
+      globals: {
+        useI18n: "readonly",
+        defineI18nConfig: "readonly",
+      },
       rules: {
         "@typescript-eslint/no-var-requires": "off",
       },
@@ -198,7 +210,19 @@ module.exports = {
       files: ["server/**/*.ts", "server/**/*.js"],
       rules: {
         "@typescript-eslint/no-var-requires": "off",
-        "no-console": "off", // Server can use console for logging
+        "no-console": "error", // Use createLogger() from @server/lib/logger instead
+      },
+    },
+    // Server scripts and migrations (CLI tools, not app code)
+    {
+      files: [
+        "server/scripts/**/*.ts",
+        "server/database/migrations/**/*.ts",
+        "server/run-migration.ts",
+        "server/run-migrations.ts",
+      ],
+      rules: {
+        "no-console": "off", // CLI tools can use console directly
       },
     },
     // Configuration files
@@ -210,7 +234,16 @@ module.exports = {
     },
     // Test files
     {
-      files: ["**/*.test.ts", "**/*.spec.ts", "**/*.test.js", "**/*.spec.js"],
+      files: [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.test.js",
+        "**/*.spec.js",
+        "**/*.test.example.ts",
+        "**/tests/test-*.ts",
+        "**/tests/setup.ts",
+        "**/email-usage-example.ts",
+      ],
       env: {
         jest: true,
       },

@@ -18,6 +18,9 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { vectorStoreService } from "@server/services/vector-store.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("organizations");
 
 /**
  * Helper function to count active owners in an organization
@@ -159,7 +162,7 @@ export const organizationsRouter = t.router({
             slug: result.data.slug,
           });
         } catch (error) {
-          console.error("Failed to create audit log:", error);
+          logger.error({ err: error }, "Failed to create audit log");
         }
         return result;
       });
@@ -704,7 +707,7 @@ export const organizationsRouter = t.router({
           const storageService = new StorageService();
           await storageService.delete(organization.logoUploadId);
         } catch (error) {
-          console.error("Failed to delete organization logo:", error);
+          logger.error({ err: error }, "Failed to delete organization logo");
           // Continue with deletion even if logo deletion fails
         }
       }
@@ -737,7 +740,7 @@ export const organizationsRouter = t.router({
     // Log deletion event (after transaction completes)
     // Note: Can't log to audit_logs since the org is deleted
     // TODO: Log to external audit service for compliance tracking
-    console.log(`Organization deleted: ${orgName} (${orgId}) by user ${ctx.user!.id}`);
+    logger.info({ orgName, orgId, userId: ctx.user!.id }, "Organization deleted");
 
     return {
       success: true,

@@ -2,7 +2,12 @@ import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 import { UserOrganization } from "./user-organization.entity";
-import { getDefaultScopesForRole, hasRequiredScope, type Resource, type Action } from "@server/types/scopes";
+import {
+  getDefaultScopesForRole,
+  hasRequiredScope,
+  type Resource,
+  type Action,
+} from "@server/types/scopes";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -27,6 +32,9 @@ export class User extends BaseEntity {
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
+
+  @Column({ type: "boolean", default: false })
+  emailVerified!: boolean;
 
   @Column({ type: "timestamptz", nullable: true })
   lastLoginAt?: Date;
@@ -59,6 +67,10 @@ export class User extends BaseEntity {
   @Column({ type: "timestamptz", nullable: true })
   emailVerificationExpiresAt?: Date;
 
+  // Token revocation: increment on password change/reset to invalidate all refresh tokens
+  @Column({ type: "int", default: 0 })
+  tokenVersion!: number;
+
   // Password reset fields
   @Column({ type: "varchar", length: 255, nullable: true })
   passwordResetTokenHash?: string;
@@ -79,8 +91,15 @@ export class User extends BaseEntity {
 
   // Helper methods
   toJSON(): any {
-    const { password: _password, ...userWithoutPassword } = this;
-    return userWithoutPassword;
+    const {
+      password: _password,
+      passwordResetTokenHash: _prth,
+      passwordResetExpiresAt: _prea,
+      emailVerificationTokenHash: _evth,
+      emailVerificationExpiresAt: _evea,
+      ...safeUser
+    } = this;
+    return safeUser;
   }
 
   /**
@@ -97,10 +116,7 @@ export class User extends BaseEntity {
     const defaultScopes = getDefaultScopesForRole(this.role);
 
     // Combine default role scopes with custom permissions
-    const allScopes = [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    const allScopes = [...defaultScopes, ...(this.permissions || [])];
 
     // Use the scope matching system to check permissions
     return hasRequiredScope(resource as Resource, action as Action, allScopes);
@@ -112,10 +128,7 @@ export class User extends BaseEntity {
    */
   getScopes(): string[] {
     const defaultScopes = getDefaultScopesForRole(this.role);
-    return [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    return [...defaultScopes, ...(this.permissions || [])];
   }
 
   /**

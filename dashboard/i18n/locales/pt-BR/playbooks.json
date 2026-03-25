@@ -1,0 +1,205 @@
+{
+  "page": {
+    "title": "Playbooks",
+    "description": "Fluxos de conversação automatizados e respostas para seus agentes",
+    "headTitle": "Playbooks - Painel Hay"
+  },
+  "actions": {
+    "generatePlaybook": "Gerar Playbook",
+    "createPlaybook": "Criar Playbook",
+    "createFirstPlaybook": "Crie Seu Primeiro Playbook",
+    "createPlaybookOpenEditor": "Criar Playbook e Abrir Editor",
+    "deletePlaybook": "Excluir Playbook",
+    "saveChanges": "Salvar Alterações",
+    "viewAllPlaybooks": "Ver Todos os Playbooks",
+    "continueEditing": "Continuar Editando",
+    "backToList": "Voltar para lista",
+    "previous": "Anterior",
+    "continue": "Continuar",
+    "confirmLeave": "Sair da Página",
+    "leave": "Sair"
+  },
+  "stats": {
+    "totalPlaybooks": "Total de Playbooks",
+    "active": "Ativos",
+    "totalTriggers": "Total de Acionamentos",
+    "newThisMonth": "+{count} este mês",
+    "percentOfTotal": "{percent}% do total",
+    "last30Days": "Últimos 30 dias"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar playbooks...",
+    "allCategories": "Todas as Categorias",
+    "customerSupport": "Suporte ao Cliente",
+    "sales": "Vendas",
+    "technical": "Técnico",
+    "custom": "Personalizado",
+    "allStatus": "Todos os Status",
+    "statusActive": "Ativo",
+    "statusArchived": "Arquivado",
+    "statusDraft": "Rascunho"
+  },
+  "table": {
+    "playbooks": "Playbooks",
+    "name": "Nome",
+    "agents": "Agentes",
+    "agentsCount": "{count} agentes",
+    "status": "Status",
+    "created": "Criado",
+    "actions": "Ações"
+  },
+  "empty": {
+    "noPlaybooksFound": "Nenhum playbook encontrado",
+    "noPlaybooksCreated": "Nenhum playbook criado ainda",
+    "adjustSearch": "Tente ajustar seus termos de busca.",
+    "createFirst": "Crie seu primeiro playbook para automatizar conversas."
+  },
+  "form": {
+    "titleLabel": "Título",
+    "titlePlaceholder": "ex.: Automação de Suporte ao Cliente",
+    "triggerLabel": "Gatilho",
+    "triggerPlaceholder": "Este playbook será ativado quando o cliente disser:\n - Preciso de ajuda com minha conta...",
+    "triggerHint": "Defina quando este playbook deve ser ativado",
+    "descriptionLabel": "Descrição",
+    "descriptionPlaceholder": "Descreva o que este playbook faz...",
+    "instructionsLabel": "Instruções",
+    "instructionsHint": "Crie instruções passo a passo numeradas que os agentes seguirão ao executar este playbook",
+    "statusLabel": "Status",
+    "assignAgents": "Atribuir Agentes",
+    "assignedAgents": "Agentes Atribuídos",
+    "loadingAgents": "Carregando agentes...",
+    "noAgentsAvailable": "Nenhum agente disponível. Crie agentes primeiro.",
+    "createdDate": "Criado: {date}",
+    "lastUpdated": "Última atualização: {date}"
+  },
+  "edit": {
+    "title": "Editar {name}",
+    "description": "Atualize a configuração do seu playbook",
+    "headTitle": "Editar Playbook - Painel Hay"
+  },
+  "create": {
+    "title": "Criar Novo",
+    "description": "Defina fluxos de conversação automatizados para seus agentes",
+    "headTitle": "Criar Playbook - Painel Hay",
+    "headDescription": "Crie um novo playbook de conversação automatizada",
+    "editHeadDescription": "Edite seu playbook de conversação automatizada"
+  },
+  "validation": {
+    "titleRequired": "O título do playbook é obrigatório",
+    "titleMaxLength": "O título do playbook deve ter menos de 255 caracteres",
+    "triggerRequired": "O gatilho é obrigatório",
+    "triggerMaxLength": "O gatilho deve ter menos de 255 caracteres"
+  },
+  "toast": {
+    "deleteSuccess": "Playbook excluído com sucesso",
+    "deleteFailed": "Falha ao excluir playbook",
+    "updateSuccess": "Playbook atualizado com sucesso",
+    "createSuccess": "Playbook criado com sucesso",
+    "saveFailed": "Falha ao {action} playbook. Tente novamente.",
+    "loadFailed": "Falha ao carregar playbooks",
+    "loadAgentsFailed": "Falha ao carregar agentes",
+    "playbookNotFound": "Playbook não encontrado",
+    "generateFailed": "Falha ao gerar instruções. Tente novamente.",
+    "createFailed": "Falha ao criar playbook. Tente novamente."
+  },
+  "delete": {
+    "title": "Excluir Playbook",
+    "confirmMessage": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita."
+  },
+  "loading": {
+    "loadingPlaybook": "Carregando playbook...",
+    "playbookNotFound": "Playbook não encontrado"
+  },
+  "wizard": {
+    "title": "Criar Playbook",
+    "description": "Siga os passos para criar um novo playbook",
+    "headTitle": "Criar Playbook - Painel Hay",
+    "steps": {
+      "purpose": "Propósito",
+      "actions": "Ações",
+      "documents": "Documentos",
+      "boundaries": "Limites",
+      "generate": "Gerar"
+    },
+    "cancelDialog": {
+      "title": "Sair do assistente?",
+      "description": "Seu progresso será perdido. Tem certeza que deseja sair?"
+    },
+    "successDialog": {
+      "title": "Playbook Criado",
+      "description": "Seu playbook foi criado com sucesso. O que você gostaria de fazer agora?"
+    },
+    "purpose": {
+      "label": "Para que é este playbook?",
+      "placeholder": "ex.: Lidar com solicitações de reembolso para pedidos feitos nos últimos 30 dias",
+      "helperText": "Descreva o que este playbook deve ajudar a resolver ou automatizar. 1–3 frases recomendadas.",
+      "tipsTitle": "Dicas para uma boa descrição",
+      "tipsFocus": "Foque no problema ou tarefa específica que este playbook deve lidar",
+      "tipsMention": "Mencione quem normalmente precisa de ajuda com isso (ex.: clientes, equipe interna)",
+      "tipsOutcomes": "Inclua quaisquer resultados esperados (ex.: emitir um reembolso, escalar para gerente)"
+    },
+    "actions": {
+      "label": "Quais ações este playbook pode executar?",
+      "helperText": "Selecione as ferramentas que este playbook pode usar. Se nenhuma for selecionada, o playbook será apenas de resposta.",
+      "errorLoadTools": "Falha ao carregar ferramentas disponíveis. Tente novamente mais tarde.",
+      "noTools": "Nenhuma integração conectada ainda. Este playbook será apenas de resposta, a menos que você conecte integrações nas Configurações."
+    },
+    "documents": {
+      "label": "Quais documentos este playbook deve usar?",
+      "helperText": "Selecione documentos para fundamentar o playbook na sua base de conhecimento. Você pode pular esta etapa se nenhum documento for necessário.",
+      "errorLoad": "Falha ao carregar documentos. Tente novamente mais tarde.",
+      "noDocuments": "Nenhum documento encontrado. Você pode continuar sem documentos — o playbook dependerá apenas das instruções que você fornecer.",
+      "suggestedTitle": "Sugeridos para você",
+      "suggestedHint": "Com base na descrição do seu playbook",
+      "allDocumentsTitle": "Todos os documentos",
+      "filterPlaceholder": "Filtrar documentos...",
+      "documentsSelected": "{count} documento selecionado | {count} documentos selecionados"
+    },
+    "boundaries": {
+      "label": "Defina limites e regras de escalonamento",
+      "helperText": "Defina quando o playbook deve escalonar para um humano e quais tópicos deve evitar.",
+      "whyMatters": "Por que isso importa",
+      "warningText": "Regras claras de escalonamento evitam que seu playbook lide com situações sensíveis indevidas. Os limites mantêm as respostas focadas e seguras.",
+      "escalationLabel": "Sempre escalonar quando...",
+      "escalationPlaceholder": "ex.: Cliente menciona ação legal, solicita reembolso acima de R$500...",
+      "boundariesLabel": "Nunca responder perguntas sobre...",
+      "boundariesPlaceholder": "ex.: Políticas internas da empresa, preços de concorrentes...",
+      "acknowledgment": "Eu revisei as regras de escalonamento e limites",
+      "escalationExamples": {
+        "legal": "Ameaças legais",
+        "refund": "Solicitações de reembolso acima de R$500",
+        "safety": "Preocupações com segurança",
+        "manager": "Cliente pede para falar com gerente"
+      },
+      "boundaryExamples": {
+        "policies": "Políticas internas",
+        "competitor": "Comparações com concorrentes",
+        "medical": "Aconselhamento médico/jurídico",
+        "employee": "Informações de funcionários"
+      }
+    },
+    "generate": {
+      "summaryTitle": "Resumo",
+      "purposeLabel": "Propósito",
+      "actionsLabel": "Ações",
+      "actionsNone": "Nenhuma (apenas resposta)",
+      "actionsSelected": "{count} selecionadas",
+      "documentsLabel": "Documentos",
+      "documentsNone": "Nenhum",
+      "documentsSelected": "{count} selecionados",
+      "boundariesLabel": "Limites",
+      "boundariesConfigured": "Configurados",
+      "boundariesNone": "Nenhum definido",
+      "readyText": "Pronto para gerar as instruções do playbook com base nas informações fornecidas.",
+      "generateButton": "Gerar Instruções",
+      "generatingText": "Gerando instruções...",
+      "generatingHint": "Isso pode levar alguns segundos.",
+      "titleLabel": "Título",
+      "triggerLabel": "Gatilho",
+      "descriptionLabel": "Descrição",
+      "instructionsLabel": "Instruções",
+      "startingPointText": "Este é um ponto de partida. Você poderá refinar tudo no editor.",
+      "regenerateButton": "Regenerar"
+    }
+  }
+}

@@ -29,22 +29,22 @@
               {{ organization.description }}
             </p>
             <div class="mt-3 flex items-center space-x-4 text-sm text-neutral-muted">
-              <span>Created {{ formatDate(organization.createdAt) }}</span>
+              <span>{{ $t("organizations.header.created", { date: formatDate(organization.createdAt) }) }}</span>
               <span>•</span>
-              <span>{{ organization.memberCount }} members</span>
+              <span>{{ $t("organizations.header.members", { count: organization.memberCount }) }}</span>
               <span>•</span>
-              <span>{{ organization.agentCount }} agents</span>
+              <span>{{ $t("organizations.header.agents", { count: organization.agentCount }) }}</span>
             </div>
           </div>
         </div>
         <div class="flex space-x-3">
           <Button variant="outline" @click="editOrganization">
             <Settings class="mr-2 h-4 w-4" />
-            Edit
+            {{ $t("organizations.header.edit") }}
           </Button>
           <Button v-if="organization.id !== currentOrganization?.id" @click="switchToOrganization">
             <Building2 class="mr-2 h-4 w-4" />
-            Switch To
+            {{ $t("organizations.header.switchTo") }}
           </Button>
         </div>
       </div>
@@ -78,7 +78,7 @@
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> Total Members </CardTitle>
+              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.totalMembers") }} </CardTitle>
               <Users class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -86,14 +86,14 @@
                 {{ organization.memberCount }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">+2</span> this month
+                <span class="text-green-600">{{ $t("organizations.overview.thisMonth", { count: 2 }) }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> Active Agents </CardTitle>
+              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.activeAgents") }} </CardTitle>
               <Bot class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -101,14 +101,14 @@
                 {{ organization.agentCount }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">+1</span> this week
+                <span class="text-green-600">{{ $t("organizations.overview.thisWeek", { count: 1 }) }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> Conversations </CardTitle>
+              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.conversations") }} </CardTitle>
               <MessageSquare class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -116,19 +116,19 @@
                 {{ organization.totalConversations }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">+12%</span> from last month
+                <span class="text-green-600">{{ $t("organizations.overview.fromLastMonth", { percent: 12 }) }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> Storage Used </CardTitle>
+              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.storageUsed") }} </CardTitle>
               <HardDrive class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">{{ organization.storageUsed }}GB</div>
-              <p class="text-xs text-neutral-muted">of {{ organization.storageLimit }}GB limit</p>
+              <p class="text-xs text-neutral-muted">{{ $t("organizations.overview.ofLimit", { limit: organization.storageLimit }) }}</p>
             </CardContent>
           </Card>
         </div>
@@ -137,8 +137,8 @@
         <div class="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription> Latest updates in this organization </CardDescription>
+              <CardTitle>{{ $t("organizations.overview.recentActivity") }}</CardTitle>
+              <CardDescription> {{ $t("organizations.overview.latestUpdates") }} </CardDescription>
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
@@ -180,14 +180,14 @@
 
           <Card>
             <CardHeader>
-              <CardTitle>Resource Usage</CardTitle>
-              <CardDescription>Current month usage overview</CardDescription>
+              <CardTitle>{{ $t("organizations.overview.resourceUsage") }}</CardTitle>
+              <CardDescription>{{ $t("organizations.overview.currentMonthUsage") }}</CardDescription>
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
                 <div>
                   <div class="flex items-center justify-between text-sm">
-                    <span>API Calls</span>
+                    <span>{{ $t("organizations.overview.apiCalls") }}</span>
                     <span
                       >{{ organization.apiCalls.toLocaleString() }} /
                       {{ organization.apiLimit.toLocaleString() }}</span
@@ -205,7 +205,7 @@
 
                 <div>
                   <div class="flex items-center justify-between text-sm">
-                    <span>Storage</span>
+                    <span>{{ $t("organizations.overview.storage") }}</span>
                     <span
                       >{{ organization.storageUsed }}GB / {{ organization.storageLimit }}GB</span
                     >
@@ -222,7 +222,7 @@
 
                 <div>
                   <div class="flex items-center justify-between text-sm">
-                    <span>Active Agents</span>
+                    <span>{{ $t("organizations.overview.activeAgentsUsage") }}</span>
                     <span>{{ organization.agentCount }} / {{ organization.agentLimit }}</span>
                   </div>
                   <div class="mt-2 bg-background-tertiary rounded-full h-2">
@@ -244,12 +244,12 @@
       <div v-if="activeTab === 'members'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h3 class="text-lg font-medium text-foreground">Organization Members</h3>
-            <p class="text-sm text-neutral-muted">Manage who has access to this organization</p>
+            <h3 class="text-lg font-medium text-foreground">{{ $t("organizations.members.title") }}</h3>
+            <p class="text-sm text-neutral-muted">{{ $t("organizations.members.description") }}</p>
           </div>
           <Button @click="inviteMember">
             <UserPlus class="mr-2 h-4 w-4" />
-            Invite Member
+            {{ $t("organizations.members.inviteMember") }}
           </Button>
         </div>
 
@@ -283,9 +283,9 @@
                       class="px-3 py-1 border border-input bg-background rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       @change="updateMemberRole(member)"
                     >
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="admin">{{ $t("organizations.members.roles.admin") }}</option>
+                      <option value="member">{{ $t("organizations.members.roles.member") }}</option>
+                      <option value="viewer">{{ $t("organizations.members.roles.viewer") }}</option>
                     </select>
                   </div>
                   <Button variant="ghost" size="sm" @click="removeMember(member)">
@@ -302,28 +302,28 @@
       <div v-if="activeTab === 'settings'" class="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>General Settings</CardTitle>
-            <CardDescription> Basic organization information and preferences </CardDescription>
+            <CardTitle>{{ $t("organizations.settings.generalTitle") }}</CardTitle>
+            <CardDescription> {{ $t("organizations.settings.generalDescription") }} </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
-              <Label html-for="orgName">Organization Name</Label>
+              <Label html-for="orgName">{{ $t("organizations.settings.orgName") }}</Label>
               <Input
                 id="orgName"
                 v-model="organizationForm.name"
-                placeholder="Enter organization name"
+                :placeholder="$t('organizations.settings.orgNamePlaceholder')"
               />
             </div>
             <div>
-              <Label html-for="orgDescription">Description</Label>
+              <Label html-for="orgDescription">{{ $t("organizations.settings.descriptionLabel") }}</Label>
               <Input
                 id="orgDescription"
                 v-model="organizationForm.description"
-                placeholder="Enter description"
+                :placeholder="$t('organizations.settings.descriptionPlaceholder')"
               />
             </div>
             <div>
-              <Label html-for="timezone">Timezone</Label>
+              <Label html-for="timezone">{{ $t("organizations.settings.timezone") }}</Label>
               <select
                 id="timezone"
                 v-model="organizationForm.timezone"
@@ -336,57 +336,57 @@
               </select>
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSettings"> Save Changes </Button>
+              <Button @click="saveSettings"> {{ $t("organizations.settings.saveChanges") }} </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Security Settings</CardTitle>
-            <CardDescription> Configure security policies for this organization </CardDescription>
+            <CardTitle>{{ $t("organizations.settings.securityTitle") }}</CardTitle>
+            <CardDescription> {{ $t("organizations.settings.securityDescription") }} </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-medium">Two-Factor Authentication</p>
-                <p class="text-sm text-neutral-muted">Require 2FA for all members</p>
+                <p class="font-medium">{{ $t("organizations.settings.twoFactor") }}</p>
+                <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.twoFactorDescription") }}</p>
               </div>
               <Checkbox v-model:checked="organizationForm.require2FA" />
             </div>
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-medium">SSO Integration</p>
-                <p class="text-sm text-neutral-muted">Enable single sign-on</p>
+                <p class="font-medium">{{ $t("organizations.settings.sso") }}</p>
+                <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.ssoDescription") }}</p>
               </div>
               <Checkbox v-model:checked="organizationForm.ssoEnabled" />
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSecuritySettings"> Save Security Settings </Button>
+              <Button @click="saveSecuritySettings"> {{ $t("organizations.settings.saveSecuritySettings") }} </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>API Keys</CardTitle>
-            <CardDescription> Manage API keys for this organization </CardDescription>
+            <CardTitle>{{ $t("organizations.settings.apiKeys") }}</CardTitle>
+            <CardDescription> {{ $t("organizations.settings.apiKeysDescription") }} </CardDescription>
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
               <div class="flex justify-between items-center">
                 <div>
-                  <h4 class="font-medium">Primary API Key</h4>
-                  <p class="text-sm text-neutral-muted">Used for API access</p>
+                  <h4 class="font-medium">{{ $t("organizations.settings.primaryApiKey") }}</h4>
+                  <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.usedForApiAccess") }}</p>
                 </div>
                 <div class="flex space-x-2">
                   <Button variant="outline" size="sm" @click="regenerateApiKey">
                     <RefreshCw class="mr-2 h-4 w-4" />
-                    Regenerate
+                    {{ $t("organizations.settings.regenerate") }}
                   </Button>
                   <Button variant="outline" size="sm" @click="copyApiKey">
                     <Copy class="mr-2 h-4 w-4" />
-                    Copy
+                    {{ $t("organizations.settings.copy") }}
                   </Button>
                 </div>
               </div>
@@ -417,17 +417,18 @@
   <!-- Error State -->
   <div v-else class="text-center py-12">
     <AlertCircle class="mx-auto h-12 w-12 text-red-500" />
-    <h3 class="mt-4 text-lg font-medium text-foreground">Organization not found</h3>
+    <h3 class="mt-4 text-lg font-medium text-foreground">{{ $t("organizations.notFound") }}</h3>
     <p class="mt-2 text-sm text-neutral-muted">
-      The organization you're looking for doesn't exist or you don't have permission to view it.
+      {{ $t("organizations.notFoundDescription") }}
     </p>
     <div class="mt-6">
-      <Button @click="router.push('/organizations')"> Back to Organizations </Button>
+      <Button @click="router.push('/organizations')"> {{ $t("organizations.backToOrganizations") }} </Button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import {
   Building2,
   Settings,
@@ -445,10 +446,8 @@ import {
   Key,
 } from "lucide-vue-next";
 
+const { t } = useI18n();
 const router = useRouter();
-
-// TODO: Import organization store/composable
-// TODO: Import router params
 
 definePageMeta({
   // TODO: Add authentication middleware
@@ -488,9 +487,9 @@ const organizationForm = reactive<OrganizationForm>({
 
 // Tab configuration
 const tabs = [
-  { id: "overview", name: "Overview", icon: BarChart3 },
-  { id: "members", name: "Members", icon: Users },
-  { id: "settings", name: "Settings", icon: Settings },
+  { id: "overview", name: t("organizations.tabs.overview"), icon: BarChart3 },
+  { id: "members", name: t("organizations.tabs.members"), icon: Users },
+  { id: "settings", name: t("organizations.tabs.settings"), icon: Settings },
 ];
 
 interface Organization {
@@ -551,7 +550,7 @@ const recentActivity = ref([
     icon: UserPlus,
     title: "New member added",
     description: "Jane Smith joined the organization",
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
   },
   {
     id: 2,
@@ -559,7 +558,7 @@ const recentActivity = ref([
     icon: Bot,
     title: "Agent updated",
     description: "Customer Support Bot configuration was modified",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
   },
   {
     id: 3,
@@ -567,7 +566,7 @@ const recentActivity = ref([
     icon: Key,
     title: "API key regenerated",
     description: "Primary API key was regenerated for security",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8),
   },
 ]);
 
@@ -630,109 +629,73 @@ const loadOrganization = async () => {
     organizationForm.description = organization.value.description;
   } catch (error) {
     console.error("Error loading organization:", error);
-    // TODO: Show error notification
   } finally {
     loading.value = false;
   }
 };
 
 const editOrganization = () => {
-  // TODO: Switch to edit mode or open edit modal
   console.log("Edit organization");
 };
 
 const switchToOrganization = async () => {
   try {
-    // TODO: Implement organization switching logic
     console.log("Switch to organization:", organizationId);
-
-    // TODO: Update current organization in store
-    // TODO: Show success notification
-    // TODO: Redirect to dashboard
   } catch (error) {
     console.error("Error switching organization:", error);
-    // TODO: Show error notification
   }
 };
 
 const inviteMember = () => {
-  // TODO: Open invite member modal
   console.log("Invite member");
 };
 
 const updateMemberRole = async (member: Member) => {
   try {
-    // TODO: Update member role via API
     console.log("Update member role:", member.id, member.role);
-
-    // TODO: Show success notification
   } catch (error) {
     console.error("Error updating member role:", error);
-    // TODO: Show error notification
   }
 };
 
 const removeMember = async (member: Member) => {
   try {
-    // TODO: Show confirmation dialog
-    // TODO: Remove member via API
     console.log("Remove member:", member.id);
-
-    // TODO: Update members list
-    // TODO: Show success notification
   } catch (error) {
     console.error("Error removing member:", error);
-    // TODO: Show error notification
   }
 };
 
 const saveSettings = async () => {
   try {
-    // TODO: Save organization settings via API
     console.log("Save settings:", organizationForm);
-
-    // TODO: Update organization data
-    // TODO: Show success notification
   } catch (error) {
     console.error("Error saving settings:", error);
-    // TODO: Show error notification
   }
 };
 
 const saveSecuritySettings = async () => {
   try {
-    // TODO: Save security settings via API
     console.log("Save security settings");
-
-    // TODO: Show success notification
   } catch (error) {
     console.error("Error saving security settings:", error);
-    // TODO: Show error notification
   }
 };
 
 const regenerateApiKey = async () => {
   try {
-    // TODO: Show confirmation dialog
-    // TODO: Regenerate API key via API
     console.log("Regenerate API key");
-
-    // TODO: Update organization data with new key
-    // TODO: Show success notification
   } catch (error) {
     console.error("Error regenerating API key:", error);
-    // TODO: Show error notification
   }
 };
 
 const copyApiKey = async () => {
   try {
     await navigator.clipboard.writeText(organization.value?.apiKey || "");
-    // TODO: Show success notification
     console.log("API key copied to clipboard");
   } catch (error) {
     console.error("Error copying API key:", error);
-    // TODO: Show error notification
   }
 };
 
@@ -740,11 +703,6 @@ const copyApiKey = async () => {
 onMounted(async () => {
   await loadOrganization();
 });
-
-// TODO: Add real-time updates for organization data
-// TODO: Implement proper error handling
-// TODO: Add accessibility improvements
-// TODO: Add keyboard shortcuts
 
 // SEO
 useHead({

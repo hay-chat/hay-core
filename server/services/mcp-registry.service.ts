@@ -1,6 +1,9 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { MCPToolDefinition } from "../types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("mcp-registry");
 
 /**
  * MCP Tool with metadata
@@ -34,10 +37,16 @@ export class MCPRegistryService {
     serverId: string,
     tools: MCPToolDefinition[],
   ): Promise<void> {
-    console.log(
-      `[MCPRegistry] Registering ${tools.length} tools for ${organizationId}:${pluginId}:${serverId}`,
+    logger.debug(
+      {
+        organizationId,
+        pluginId,
+        serverId,
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name),
+      },
+      "Registering tools",
     );
-    console.log(`[MCPRegistry] Registered tools: ${tools.map((t) => t.name).join(", ")}`);
   }
 
   /**
@@ -53,7 +62,7 @@ export class MCPRegistryService {
         continue;
       }
 
-      // Get the semantic plugin ID (e.g., @hay/email-plugin) from the plugin registry
+      // Get the semantic plugin ID (e.g., hay-plugin-email) from the plugin registry
       // instance.pluginId is the UUID, instance.plugin.pluginId is the semantic ID
       const semanticPluginId = instance.plugin?.pluginId || instance.pluginId;
 
@@ -83,26 +92,26 @@ export class MCPRegistryService {
               });
             }
 
-            console.log(
-              `[MCPRegistry] Fetched ${data.tools?.length || 0} tools from ${semanticPluginId} worker`,
+            logger.debug(
+              { pluginId: semanticPluginId, toolCount: data.tools?.length || 0 },
+              "Fetched tools from worker",
             );
           } else {
-            console.warn(
-              `[MCPRegistry] Failed to fetch tools from ${semanticPluginId}: HTTP ${response.status}`,
+            logger.warn(
+              { pluginId: semanticPluginId, status: response.status },
+              "Failed to fetch tools from worker",
             );
           }
         } catch (error: any) {
-          console.warn(
-            `[MCPRegistry] Failed to fetch tools from ${semanticPluginId}:`,
-            error.message,
+          logger.warn(
+            { pluginId: semanticPluginId, error: error.message },
+            "Failed to fetch tools from worker",
           );
         }
       }
     }
 
-    console.log(
-      `[MCPRegistry] Found ${tools.length} total tools for organization ${organizationId}`,
-    );
+    logger.debug({ organizationId, toolCount: tools.length }, "Found total tools for organization");
     return tools;
   }
 
@@ -136,8 +145,9 @@ export class MCPRegistryService {
       throw new Error(`Plugin worker not running for ${tool.pluginId} (org: ${organizationId})`);
     }
 
-    console.log(
-      `[MCPRegistry] Executing tool ${toolName} via worker ${tool.pluginId} on port ${worker.port}`,
+    logger.debug(
+      { toolName, pluginId: tool.pluginId, port: worker.port },
+      "Executing tool via worker",
     );
 
     try {
@@ -157,10 +167,10 @@ export class MCPRegistryService {
       }
 
       const result = await response.json();
-      console.log(`[MCPRegistry] Tool ${toolName} executed successfully`);
+      logger.debug({ toolName }, "Tool executed successfully");
       return result;
     } catch (error: any) {
-      console.error(`[MCPRegistry] Tool execution failed for ${toolName}:`, error.message);
+      logger.error({ toolName, error: error.message }, "Tool execution failed");
       throw new Error(`Tool execution failed: ${error.message}`);
     }
   }

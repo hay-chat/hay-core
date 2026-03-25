@@ -2,17 +2,23 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import mjml2html from "mjml";
 import type { EmailTemplate, TemplateRenderOptions } from "../types/email.types";
+import { createLogger } from "@server/lib/logger";
+import { EmailTranslationService } from "./email-translation.service";
+
+const logger = createLogger("template");
 
 export class TemplateService {
   private templateCache: Map<string, EmailTemplate> = new Map();
   private templateDir: string;
   private baseMjmlPath: string;
   private contentDir: string;
+  private translationService: EmailTranslationService;
 
   constructor() {
     this.templateDir = path.join(__dirname, "../templates/email");
     this.baseMjmlPath = path.join(this.templateDir, "base.mjml");
     this.contentDir = path.join(this.templateDir, "content");
+    this.translationService = new EmailTranslationService();
   }
 
   /**
@@ -21,8 +27,9 @@ export class TemplateService {
   async initialize(): Promise<void> {
     try {
       await this.loadTemplates();
+      await this.translationService.initialize();
     } catch (error) {
-      console.error("Failed to initialize template service:", error);
+      logger.error({ err: error }, "Failed to initialize template service");
     }
   }
 
@@ -33,7 +40,7 @@ export class TemplateService {
     try {
       const contentDirExists = await this.fileExists(this.contentDir);
       if (!contentDirExists) {
-        console.warn("[TemplateService] Content directory not found");
+        logger.warn("Content directory not found");
         return;
       }
 
@@ -41,22 +48,22 @@ export class TemplateService {
       const files = await fs.readdir(this.contentDir);
       const mjmlFiles = files.filter((file) => file.endsWith(".mjml"));
 
-      console.log(`[TemplateService] Loading ${mjmlFiles.length} MJML templates...`);
+      logger.info({ count: mjmlFiles.length }, "Loading MJML templates");
 
       for (const file of mjmlFiles) {
         const templateId = file.replace(".mjml", "");
         const template = await this.loadMjmlTemplate(templateId);
         if (template) {
           this.templateCache.set(templateId, template);
-          console.log(`[TemplateService] ✓ Loaded template: ${templateId}`);
+          logger.info({ templateId }, "Loaded template");
         } else {
-          console.warn(`[TemplateService] ✗ Failed to load template: ${templateId}`);
+          logger.warn({ templateId }, "Failed to load template");
         }
       }
 
-      console.log(`[TemplateService] Total templates cached: ${this.templateCache.size}`);
+      logger.info({ count: this.templateCache.size }, "Total templates cached");
     } catch (error) {
-      console.error("Error loading templates:", error);
+      logger.error({ err: error }, "Error loading templates");
     }
   }
 
@@ -82,7 +89,7 @@ export class TemplateService {
         isMjml: true,
       };
     } catch (error) {
-      console.error(`Error loading MJML template ${templateId}:`, error);
+      logger.error({ err: error, templateId }, "Error loading MJML template");
       return null;
     }
   }
@@ -135,14 +142,14 @@ export class TemplateService {
 
     // If template is not in cache, try to load it
     if (!template) {
-      console.log(`[TemplateService] Template "${templateId}" not in cache, attempting to load...`);
+      logger.debug({ templateId }, "Template not in cache, attempting to load");
       const loadedTemplate = await this.loadMjmlTemplate(templateId);
       if (loadedTemplate) {
         this.templateCache.set(templateId, loadedTemplate);
         template = loadedTemplate;
-        console.log(`[TemplateService] ✓ Successfully loaded template: ${templateId}`);
+        logger.info({ templateId }, "Successfully loaded template");
       } else {
-        console.error(`[TemplateService] ✗ Failed to load template: ${templateId}`);
+        logger.error({ templateId }, "Failed to load template");
       }
     }
 
@@ -165,8 +172,15 @@ export class TemplateService {
     // Handle both {{content}} and {{ content }} (with spaces)
     const fullMjml = baseMjml.replace(/\{\{\s*content\s*\}\}/g, mjmlContent);
 
-    // Then replace ALL variables in one pass
-    const mjmlWithVars = this.replaceVariables(fullMjml, variables);
+    // Two-pass variable substitution for i18n support:
+    // Pass 1: Replace translation keys (t.*) with their values (which may contain {{ variable }} placeholders)
+    // Do NOT strip unmatched variables — they'll be resolved in Pass 2
+    const translations = this.translationService.getTranslations(templateId, options.locale);
+    const mjmlWithTranslations = this.replaceVariables(fullMjml, translations, false);
+
+    // Pass 2: Replace regular variables (userName, companyName, etc.)
+    // Strip any remaining unmatched variables after this final pass
+    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables, true);
 
     // Compile MJML to HTML
     // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
@@ -178,7 +192,7 @@ export class TemplateService {
     });
 
     if (result.errors.length > 0) {
-      console.warn("MJML compilation warnings:", result.errors);
+      logger.warn({ errors: result.errors }, "MJML compilation warnings");
     }
 
     let html = result.html;
@@ -198,41 +212,36 @@ export class TemplateService {
   /**
    * Replace variables in template content
    */
-  private replaceVariables(content: string, variables: Record<string, any>): string {
+  private replaceVariables(content: string, variables: Record<string, any>, stripUnmatched: boolean = true): string {
     let result = content;
     const originalLength = content.length;
 
     // Handle conditional blocks
     result = this.processConditionals(result, variables);
-    console.log(
-      `[TemplateService] After conditionals: ${originalLength} -> ${result.length} bytes`,
-    );
+    logger.debug({ originalLength, resultLength: result.length }, "After conditionals");
 
     // Handle loops
     result = this.processLoops(result, variables);
-    console.log(`[TemplateService] After loops: ${result.length} bytes`);
+    logger.debug({ resultLength: result.length }, "After loops");
 
     // Replace simple variables
     for (const [key, value] of Object.entries(variables)) {
       const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
       const matches = result.match(pattern);
       if (matches) {
-        console.log(`[TemplateService] Replacing ${matches.length} instances of {{${key}}}`);
+        logger.debug({ key, count: matches.length }, "Replacing variable instances");
       }
       result = result.replace(pattern, this.formatValue(value));
     }
 
-    // Count remaining unmatched variables before removal
-    const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
-    if (unmatchedVars) {
-      console.log(
-        `[TemplateService] Removing ${unmatchedVars.length} unmatched variables:`,
-        unmatchedVars.slice(0, 5),
-      );
+    // Only strip unmatched variables on the final pass
+    if (stripUnmatched) {
+      const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
+      if (unmatchedVars) {
+        logger.debug({ count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) }, "Removing unmatched variables");
+      }
+      result = result.replace(/\{\{[^}]+\}\}/g, "");
     }
-
-    // Remove any remaining unmatched variables
-    result = result.replace(/\{\{[^}]+\}\}/g, "");
 
     return result;
   }
@@ -249,9 +258,7 @@ export class TemplateService {
       const variable = condition.trim();
       const value = this.getNestedValue(variables, variable);
 
-      console.log(
-        `[TemplateService] Conditional #${matchCount}: {{#if ${variable}}} = ${!!value} (value: ${JSON.stringify(value)?.substring(0, 50)})`,
-      );
+      logger.debug({ conditionNumber: matchCount, variable, result: !!value }, "Processing conditional");
 
       if (value) {
         return block; // Don't recursively replace here - will be done in main replaceVariables
@@ -360,6 +367,16 @@ export class TemplateService {
   }
 
   /**
+   * Get translated subject for a template.
+   * Falls back to the subject from the MJML comment if no translation is found.
+   */
+  getTranslatedSubject(templateId: string, locale?: string): string | null {
+    return this.translationService.getSubject(templateId, locale)
+      || this.getTemplate(templateId)?.subject
+      || null;
+  }
+
+  /**
    * Clear template cache
    */
   clearCache(): void {
@@ -367,10 +384,11 @@ export class TemplateService {
   }
 
   /**
-   * Reload templates
+   * Reload templates and translations
    */
   async reloadTemplates(): Promise<void> {
     this.clearCache();
     await this.loadTemplates();
+    await this.translationService.reload();
   }
 }

@@ -1,10 +1,77 @@
 import type { MCPClient, MCPTool, MCPCallResult } from "./mcp-client.interface";
 import { oauthAuthStrategy } from "./oauth-auth-strategy.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
-import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { decryptConfig } from "../lib/auth/utils/encryption";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { v4 as uuidv4 } from "uuid";
+
+const logger = createLogger("remote-mcp");
+
+/**
+ * Validate that a URL does not point to private/internal networks (SSRF protection).
+ * Rejects private IP ranges, localhost, link-local, cloud metadata endpoints,
+ * and non-HTTP(S) schemes.
+ */
+function validatePublicUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid MCP server URL: ${url}`);
+  }
+
+  // Only allow HTTP(S) schemes
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Invalid URL scheme "${parsed.protocol}" — only http: and https: are allowed`);
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost variants
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1" ||
+    hostname === "0.0.0.0"
+  ) {
+    throw new Error("MCP server URL must not point to localhost");
+  }
+
+  // Block cloud metadata endpoints
+  if (hostname === "metadata.google.internal" || hostname === "169.254.169.254") {
+    throw new Error("MCP server URL must not point to cloud metadata endpoints");
+  }
+
+  // Block private/reserved IPv4 ranges
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b] = ipv4Match.map(Number);
+    if (
+      a === 10 || // 10.0.0.0/8
+      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+      (a === 192 && b === 168) || // 192.168.0.0/16
+      a === 127 || // 127.0.0.0/8
+      (a === 169 && b === 254) || // 169.254.0.0/16 (link-local)
+      a === 0 // 0.0.0.0/8
+    ) {
+      throw new Error("MCP server URL must not point to a private or reserved IP range");
+    }
+  }
+
+  // Block IPv6 private ranges (fc00::/7 = fc and fd prefixes, fe80::/10 = link-local)
+  if (hostname.startsWith("[")) {
+    const ipv6 = hostname.slice(1, -1).toLowerCase();
+    if (
+      ipv6.startsWith("fc") ||
+      ipv6.startsWith("fd") ||
+      ipv6.startsWith("fe80") ||
+      ipv6 === "::1"
+    ) {
+      throw new Error("MCP server URL must not point to a private or link-local IPv6 address");
+    }
+  }
+}
 
 /**
  * Remote MCP Client
@@ -18,6 +85,7 @@ export class RemoteMCPClient implements MCPClient {
   private connected: boolean = false;
 
   constructor(baseUrl: string, organizationId: string, pluginId: string) {
+    validatePublicUrl(baseUrl);
     this.baseUrl = baseUrl.replace(/\/$/, ""); // Remove trailing slash
     this.organizationId = organizationId;
     this.pluginId = pluginId;
@@ -27,18 +95,15 @@ export class RemoteMCPClient implements MCPClient {
    * Send JSON-RPC request and parse SSE response
    * Used for MCP servers that use Server-Sent Events (SSE) transport
    */
-  private async sendSSERequest(
-    request: any,
-    authHeaders: Record<string, string>
-  ): Promise<any> {
+  private async sendSSERequest(request: any, authHeaders: Record<string, string>): Promise<any> {
     // Try without forcing text/event-stream first - let server decide
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...authHeaders,
     };
 
-    console.log('🔄 Sending SSE request:', request.method);
-    console.log('🔄 Request headers:', { ...headers, Authorization: headers.Authorization?.substring(0, 30) + '...' });
+    logger.debug({ method: request.method }, "Sending SSE request");
+    logger.debug({ hasAuthHeader: !!headers.Authorization }, "Request headers prepared");
 
     const response = await fetch(this.baseUrl, {
       method: "POST",
@@ -46,35 +111,38 @@ export class RemoteMCPClient implements MCPClient {
       body: JSON.stringify(request),
     });
 
-    console.log('📡 SSE response status:', response.status, response.statusText);
-    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+    logger.debug(
+      { status: response.status, statusText: response.statusText },
+      "SSE response received",
+    );
+    logger.debug({ headers: Object.fromEntries(response.headers.entries()) }, "Response headers");
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('❌ SSE error response:', errorText);
+      logger.error({ status: response.status, errorText }, "SSE error response");
       throw new Error(`SSE request failed: ${response.status} ${response.statusText}`);
     }
 
     // Check if response is SSE
-    const contentType = response.headers.get('content-type');
-    console.log('📡 Content-Type:', contentType);
+    const contentType = response.headers.get("content-type");
+    logger.debug({ contentType }, "Response content type");
 
-    if (!contentType?.includes('text/event-stream')) {
+    if (!contentType?.includes("text/event-stream")) {
       // Not SSE, try to parse as regular JSON
-      console.log('⚠️  Not an SSE response, parsing as JSON');
+      logger.debug("Not an SSE response, parsing as JSON");
       const result = await response.json();
       return result;
     }
 
     // Parse SSE stream
-    console.log('📡 Parsing SSE stream...');
+    logger.debug("Parsing SSE stream");
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error('No response body reader available');
+      throw new Error("No response body reader available");
     }
 
     const decoder = new TextDecoder();
-    let buffer = '';
+    let buffer = "";
     let jsonResponse: any = null;
 
     try {
@@ -82,37 +150,37 @@ export class RemoteMCPClient implements MCPClient {
         const { done, value } = await reader.read();
 
         if (done) {
-          console.log('📡 SSE stream ended');
+          logger.debug("SSE stream ended");
           break;
         }
 
         buffer += decoder.decode(value, { stream: true });
-        console.log('📡 Buffer chunk received:', buffer.substring(0, 100) + '...');
+        logger.debug({ bufferLength: buffer.length }, "Buffer chunk received");
 
         // Process complete SSE messages (separated by double newlines)
-        const messages = buffer.split('\n\n');
-        buffer = messages.pop() || ''; // Keep incomplete message in buffer
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop() || ""; // Keep incomplete message in buffer
 
         for (const message of messages) {
           if (!message.trim()) continue;
 
-          console.log('📡 Processing SSE message:', message.substring(0, 200));
+          logger.debug({ messageLength: message.length }, "Processing SSE message");
 
           // Parse SSE format: "data: {...}"
-          const lines = message.split('\n');
+          const lines = message.split("\n");
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
+            if (line.startsWith("data: ")) {
               const jsonData = line.substring(6); // Remove "data: " prefix
               try {
                 const parsed = JSON.parse(jsonData);
-                console.log('✅ Parsed SSE JSON:', JSON.stringify(parsed, null, 2));
+                logger.debug({ parsedId: parsed.id }, "Parsed SSE JSON response");
 
                 // Store the JSON-RPC response
                 if (parsed.jsonrpc && parsed.id === request.id) {
                   jsonResponse = parsed;
                 }
               } catch (e) {
-                console.log('⚠️  Failed to parse SSE data line:', jsonData);
+                logger.warn({ dataLength: jsonData.length }, "Failed to parse SSE data line");
               }
             }
           }
@@ -120,7 +188,7 @@ export class RemoteMCPClient implements MCPClient {
 
         // If we got a response matching our request ID, we can stop
         if (jsonResponse) {
-          console.log('✅ Got matching JSON-RPC response, closing stream');
+          logger.debug("Got matching JSON-RPC response, closing stream");
           reader.cancel();
           break;
         }
@@ -130,7 +198,7 @@ export class RemoteMCPClient implements MCPClient {
     }
 
     if (!jsonResponse) {
-      throw new Error('No JSON-RPC response received from SSE stream');
+      throw new Error("No JSON-RPC response received from SSE stream");
     }
 
     return jsonResponse;
@@ -145,18 +213,13 @@ export class RemoteMCPClient implements MCPClient {
 
     // Try OAuth first
     try {
-      const oauthHeaders = await oauthAuthStrategy.getHeaders(
-        this.organizationId,
-        this.pluginId,
-      );
+      const oauthHeaders = await oauthAuthStrategy.getHeaders(this.organizationId, this.pluginId);
       Object.assign(headers, oauthHeaders);
-      debugLog("remote-mcp", `Using OAuth authentication for plugin ${this.pluginId}`);
+      logger.info({ pluginId: this.pluginId }, "Using OAuth authentication");
       return headers;
     } catch (error) {
       // OAuth not available, try API key fallback
-      debugLog("remote-mcp", `OAuth not available for plugin ${this.pluginId}, trying API key`, {
-        level: "debug",
-      });
+      logger.debug({ pluginId: this.pluginId }, "OAuth not available, trying API key");
     }
 
     // Try API key fallback
@@ -177,21 +240,19 @@ export class RemoteMCPClient implements MCPClient {
 
         if (apiKey) {
           headers.Authorization = `Bearer ${apiKey}`;
-          debugLog("remote-mcp", `Using API key authentication for plugin ${this.pluginId}`);
+          logger.info({ pluginId: this.pluginId }, "Using API key authentication");
           return headers;
         }
       }
     } catch (error) {
-      debugLog("remote-mcp", `Failed to get API key for plugin ${this.pluginId}`, {
-        level: "warn",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.warn(
+        { pluginId: this.pluginId, err: error instanceof Error ? error : new Error(String(error)) },
+        "Failed to get API key",
+      );
     }
 
     // No authentication available
-    debugLog("remote-mcp", `No authentication available for plugin ${this.pluginId}`, {
-      level: "warn",
-    });
+    logger.warn({ pluginId: this.pluginId }, "No authentication available");
     return headers;
   }
 
@@ -200,23 +261,17 @@ export class RemoteMCPClient implements MCPClient {
    */
   async connect(): Promise<void> {
     try {
-      console.log('\n========== REMOTE MCP CONNECT START (SSE) ==========');
-      console.log('Plugin ID:', this.pluginId);
-      console.log('MCP Server URL:', this.baseUrl);
+      logger.info(
+        { pluginId: this.pluginId, url: this.baseUrl },
+        "Connecting to remote MCP server via SSE",
+      );
 
       // Get auth headers (OAuth or API key)
       const authHeaders = await this.getAuthHeaders();
-      console.log('Auth headers obtained:', Object.keys(authHeaders));
-
-      // Log headers (without full token)
-      const logHeaders = { ...authHeaders };
-      if (logHeaders.Authorization) {
-        const parts = logHeaders.Authorization.split(' ');
-        if (parts.length === 2) {
-          logHeaders.Authorization = `${parts[0]} ${parts[1].substring(0, 20)}...`;
-        }
-      }
-      console.log('Request headers (masked):', logHeaders);
+      logger.debug(
+        { hasAuthHeader: !!authHeaders.Authorization, headerKeys: Object.keys(authHeaders) },
+        "Auth headers obtained",
+      );
 
       // Test connection with initialize request
       const initRequest = {
@@ -233,30 +288,29 @@ export class RemoteMCPClient implements MCPClient {
         },
       };
 
-      console.log('Sending initialize request via SSE...');
+      logger.debug("Sending initialize request via SSE");
 
       // Use SSE transport
       const result = await this.sendSSERequest(initRequest, authHeaders);
 
-      console.log('MCP server response:', JSON.stringify(result, null, 2));
+      logger.debug({ hasError: !!result.error }, "MCP server initialize response received");
 
       if (result.error) {
-        console.log('❌ MCP returned error:', result.error);
+        logger.error({ error: result.error }, "MCP initialization returned error");
         throw new Error(`MCP initialization error: ${result.error.message || result.error}`);
       }
 
       this.connected = true;
-      console.log('✅ Successfully connected to MCP server via SSE');
-      console.log('========== REMOTE MCP CONNECT SUCCESS ==========\n');
-      debugLog("remote-mcp", `Connected to remote MCP server: ${this.baseUrl}`);
+      logger.info({ url: this.baseUrl }, "Successfully connected to remote MCP server via SSE");
     } catch (error) {
-      console.log('❌ Failed to connect to MCP server');
-      console.log('Error:', error);
-      console.log('========== REMOTE MCP CONNECT FAILED ==========\n');
-      debugLog("remote-mcp", `Failed to connect to remote MCP server`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        {
+          err: error instanceof Error ? error : new Error(String(error)),
+          pluginId: this.pluginId,
+          url: this.baseUrl,
+        },
+        "Failed to connect to remote MCP server",
+      );
       throw error;
     }
   }
@@ -280,7 +334,7 @@ export class RemoteMCPClient implements MCPClient {
     };
 
     try {
-      console.log('📋 Listing tools via SSE...');
+      logger.debug("Listing tools via SSE");
 
       // Use SSE transport
       const result = await this.sendSSERequest(request, authHeaders);
@@ -295,13 +349,13 @@ export class RemoteMCPClient implements MCPClient {
         inputSchema: tool.inputSchema || {},
       }));
 
-      console.log(`✅ Retrieved ${tools.length} tools from MCP server`);
+      logger.info({ toolCount: tools.length }, "Retrieved tools from MCP server");
       return tools;
     } catch (error) {
-      debugLog("remote-mcp", `Failed to list tools`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        { err: error instanceof Error ? error : new Error(String(error)) },
+        "Failed to list tools",
+      );
       throw error;
     }
   }
@@ -328,7 +382,7 @@ export class RemoteMCPClient implements MCPClient {
     };
 
     try {
-      console.log(`🔧 Calling tool "${name}" via SSE...`);
+      logger.debug({ toolName: name }, "Calling tool via SSE");
 
       // Use SSE transport
       const result = await this.sendSSERequest(request, authHeaders);
@@ -345,7 +399,7 @@ export class RemoteMCPClient implements MCPClient {
 
       // Transform MCP result to our format
       const toolResult = result.result || {};
-      console.log(`✅ Tool "${name}" executed successfully`);
+      logger.info({ toolName: name }, "Tool executed successfully");
 
       return {
         content: toolResult.content || [],
@@ -353,10 +407,10 @@ export class RemoteMCPClient implements MCPClient {
         ...toolResult,
       };
     } catch (error) {
-      debugLog("remote-mcp", `Failed to call tool ${name}`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        { err: error instanceof Error ? error : new Error(String(error)), toolName: name },
+        "Failed to call tool",
+      );
       throw error;
     }
   }
@@ -375,5 +429,3 @@ export class RemoteMCPClient implements MCPClient {
     this.connected = false;
   }
 }
-
-

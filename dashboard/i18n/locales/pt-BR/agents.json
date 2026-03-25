@@ -1,0 +1,7 @@
+{
+  "language": {
+    "label": "Idioma de Resposta",
+    "placeholder": "Herdar da Organização",
+    "helperText": "O idioma que o agente usará para responder. Se não definido, herda o idioma padrão da organização."
+  }
+}

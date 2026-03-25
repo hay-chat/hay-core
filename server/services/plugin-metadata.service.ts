@@ -6,6 +6,9 @@
  */
 
 import type { PluginMetadata } from "../types/plugin-sdk.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-metadata");
 
 /**
  * Validate plugin metadata structure
@@ -156,8 +159,9 @@ export async function fetchMetadataFromWorker(
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-      console.log(
-        `[Metadata] Fetching metadata for ${pluginId} (attempt ${attempt}/${maxRetries}) on port ${port}`,
+      logger.debug(
+        { pluginId, attempt, maxRetries, port },
+        "Fetching metadata",
       );
 
       const response = await fetch(`http://localhost:${port}/metadata`, {
@@ -175,7 +179,7 @@ export async function fetchMetadataFromWorker(
       // Validate metadata structure
       validateMetadata(metadata);
 
-      console.log(`[Metadata] Successfully fetched metadata for ${pluginId}`);
+      logger.info({ pluginId }, "Successfully fetched metadata");
 
       return metadata;
     } catch (error) {
@@ -183,10 +187,11 @@ export async function fetchMetadataFromWorker(
       lastError = error as Error;
 
       if (error instanceof Error && error.name === "AbortError") {
-        console.warn(`[Metadata] Timeout for ${pluginId} (attempt ${attempt}/${maxRetries})`);
+        logger.warn({ pluginId, attempt, maxRetries }, "Metadata fetch timeout");
       } else {
-        console.warn(
-          `[Metadata] Fetch failed for ${pluginId} (attempt ${attempt}/${maxRetries}): ${error instanceof Error ? error.message : String(error)}`,
+        logger.warn(
+          { pluginId, attempt, maxRetries, error: error instanceof Error ? error.message : String(error) },
+          "Metadata fetch failed",
         );
       }
 

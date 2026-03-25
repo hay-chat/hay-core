@@ -13,12 +13,14 @@ import { Job, JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
-import { hashPassword, verifyPassword } from "@server/lib/auth/utils/hashing";
-import { emailService } from "./email.service";
+
+import { emailService, getOrganizationLocale } from "./email.service";
 import { auditLogService } from "./audit-log.service";
 import { jobQueueService } from "./job-queue.service";
 import { vectorStoreService } from "./vector-store.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("privacy");
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -78,9 +80,9 @@ export class PrivacyService {
       where: { email, deletedAt: IsNull() },
     });
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -114,7 +116,7 @@ export class PrivacyService {
       await this.sendVerificationEmail(email, verificationToken, "export", user?.firstName);
     } catch (error) {
       // Mark request as failed if email cannot be sent
-      console.error("[Privacy] Failed to send verification email:", error);
+      logger.error({ err: error }, "Failed to send verification email");
       request.status = "failed";
       request.errorMessage = "Failed to send verification email. Please try again.";
       await requestRepository.save(request);
@@ -122,10 +124,7 @@ export class PrivacyService {
       throw new Error("Failed to send verification email. Please try again later.");
     }
 
-    debugLog("privacy", `Export request created for ${email}`, {
-      requestId: request.id,
-      hasUser: !!user,
-    });
+    logger.debug({ email, requestId: request.id, hasUser: !!user }, "Export request created");
 
     return {
       requestId: request.id,
@@ -141,25 +140,16 @@ export class PrivacyService {
     return AppDataSource.transaction(async (manager) => {
       const requestRepository = manager.getRepository(PrivacyRequest);
 
-      // Find matching request
-      const requests = await requestRepository.find({
+      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+      const request = await requestRepository.findOne({
         where: {
           type: "export",
           status: "pending_verification",
-          verificationTokenHash: Not(IsNull()),
+          verificationTokenHash: tokenHash,
         },
       });
-
-      let request: PrivacyRequest | null = null;
-      for (const req of requests) {
-        if (req.verificationTokenHash) {
-          const isValid = await verifyPassword(token, req.verificationTokenHash);
-          if (isValid) {
-            request = req;
-            break;
-          }
-        }
-      }
 
       if (!request) {
         throw new Error("Invalid or expired verification token");
@@ -210,13 +200,10 @@ export class PrivacyService {
 
       // Process export asynchronously
       this.processExportJob(job.id, request.id).catch((error) => {
-        console.error("[Privacy] Export job failed:", error);
+        logger.error({ err: error }, "Export job failed");
       });
 
-      debugLog("privacy", `Export confirmed for ${request.email}`, {
-        requestId: request.id,
-        jobId: job.id,
-      });
+      logger.debug({ email: request.email, requestId: request.id, jobId: job.id }, "Export confirmed");
 
       return {
         requestId: request.id,
@@ -271,9 +258,9 @@ export class PrivacyService {
       throw new Error("No account found with this email address");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -303,7 +290,7 @@ export class PrivacyService {
       await this.sendVerificationEmail(email, verificationToken, "deletion", user.firstName);
     } catch (error) {
       // Mark request as failed if email cannot be sent
-      console.error("[Privacy] Failed to send verification email:", error);
+      logger.error({ err: error }, "Failed to send verification email");
       request.status = "failed";
       request.errorMessage = "Failed to send verification email. Please try again.";
       await requestRepository.save(request);
@@ -311,10 +298,7 @@ export class PrivacyService {
       throw new Error("Failed to send verification email. Please try again later.");
     }
 
-    debugLog("privacy", `Deletion request created for ${email}`, {
-      requestId: request.id,
-      userId: user.id,
-    });
+    logger.debug({ email, requestId: request.id, userId: user.id }, "Deletion request created");
 
     return {
       requestId: request.id,
@@ -328,25 +312,16 @@ export class PrivacyService {
   async confirmDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "deletion",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");
@@ -398,13 +373,10 @@ export class PrivacyService {
 
     // Process deletion asynchronously
     this.processDeletionJob(job.id, request.id).catch((error) => {
-      console.error("[Privacy] Deletion job failed:", error);
+      logger.error({ err: error }, "Deletion job failed");
     });
 
-    debugLog("privacy", `Deletion confirmed for ${request.email}`, {
-      requestId: request.id,
-      jobId: job.id,
-    });
+    logger.debug({ email: request.email, requestId: request.id, jobId: job.id }, "Deletion confirmed");
 
     return {
       requestId: request.id,
@@ -471,8 +443,9 @@ export class PrivacyService {
       throw new Error("This request cannot be cancelled (no verification token)");
     }
 
-    const isValid = await verifyPassword(token, request.verificationTokenHash);
-    if (!isValid) {
+    // SHA-256 compare (tokens are high-entropy, no need for argon2)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    if (tokenHash !== request.verificationTokenHash) {
       throw new Error("Invalid verification token");
     }
 
@@ -505,10 +478,7 @@ export class PrivacyService {
       ipAddress,
     });
 
-    debugLog("privacy", `Privacy request cancelled: ${requestId}`, {
-      type: request.type,
-      email: request.email,
-    });
+    logger.debug({ requestId, type: request.type, email: request.email }, "Privacy request cancelled");
   }
 
   /**
@@ -562,11 +532,7 @@ export class PrivacyService {
       request.downloadIpAddress &&
       request.downloadIpAddress !== ipAddress
     ) {
-      debugLog("privacy", "Download attempt from different IP", {
-        requestId,
-        originalIp: request.downloadIpAddress,
-        currentIp: ipAddress,
-      });
+      logger.debug({ requestId, originalIp: request.downloadIpAddress, currentIp: ipAddress }, "Download attempt from different IP");
 
       // Log security event
       await this.logPrivacyAction("privacy.download.ip_mismatch", request.email, request.userId, {
@@ -602,10 +568,7 @@ export class PrivacyService {
       ipAddress,
     });
 
-    debugLog("privacy", `Export downloaded for ${request.email}`, {
-      requestId: request.id,
-      downloadCount: request.downloadCount,
-    });
+    logger.debug({ email: request.email, requestId: request.id, downloadCount: request.downloadCount }, "Export downloaded");
 
     // Check if it's a ZIP file (new format) or JSON (legacy)
     const isZip = exportUrl.endsWith(".zip") || request.metadata?.exportFormat === "zip";
@@ -796,14 +759,10 @@ export class PrivacyService {
       // Send notification email
       await this.sendExportReadyEmail(request.email, requestId, downloadToken);
 
-      debugLog("privacy", `Export completed for ${request.email}`, {
-        requestId,
-        jobId,
-        filePath,
-      });
+      logger.debug({ email: request.email, requestId, jobId, filePath }, "Export completed");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("[Privacy] Export job failed:", error);
+      logger.error({ err: error }, "Export job failed");
 
       // Update request
       const request = await requestRepository.findOne({ where: { id: requestId } });
@@ -856,13 +815,10 @@ export class PrivacyService {
       // Send confirmation email
       await this.sendDeletionCompleteEmail(request.email);
 
-      debugLog("privacy", `Deletion completed for ${request.email}`, {
-        requestId,
-        jobId,
-      });
+      logger.debug({ email: request.email, requestId, jobId }, "Deletion completed");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("[Privacy] Deletion job failed:", error);
+      logger.error({ err: error }, "Deletion job failed");
 
       // Update request
       const request = await requestRepository.findOne({ where: { id: requestId } });
@@ -932,7 +888,7 @@ export class PrivacyService {
 
       await userRepository.save(user);
 
-      debugLog("privacy", `User data deleted for ${email}`, { userId });
+      logger.debug({ email, userId }, "User data deleted");
     });
   }
 
@@ -944,6 +900,7 @@ export class PrivacyService {
     token: string,
     type: "export" | "deletion",
     firstName?: string,
+    organizationId?: string,
   ): Promise<void> {
     await emailService.initialize();
 
@@ -951,13 +908,12 @@ export class PrivacyService {
     const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const subject =
-      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject,
       template,
+      locale,
       variables: {
         userName: firstName || email,
         verificationUrl,
@@ -979,16 +935,18 @@ export class PrivacyService {
     email: string,
     requestId: string,
     downloadToken: string,
+    organizationId?: string,
   ): Promise<void> {
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
     const downloadUrl = `${baseUrl}/privacy/download?requestId=${requestId}&token=${downloadToken}`;
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Export is Ready",
       template: "privacy-export-ready",
+      locale,
       variables: {
         downloadUrl,
         expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
@@ -1005,15 +963,16 @@ export class PrivacyService {
   /**
    * Send deletion complete notification
    */
-  private async sendDeletionCompleteEmail(email: string): Promise<void> {
+  private async sendDeletionCompleteEmail(email: string, organizationId?: string): Promise<void> {
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Has Been Deleted",
       template: "privacy-deletion-complete",
+      locale,
       variables: {
         companyName: "Hay",
         supportUrl: `${baseUrl}/support`,
@@ -1045,7 +1004,7 @@ export class PrivacyService {
         userAgent: metadata?.userAgent,
       });
     } catch (error) {
-      console.error("[Privacy] Failed to log audit action:", error);
+      logger.error({ err: error }, "Failed to log audit action");
     }
   }
 
@@ -1070,16 +1029,12 @@ export class PrivacyService {
     const customer = await this.findCustomer(organizationId, identifier);
 
     if (!customer) {
-      debugLog("privacy", `Customer not found for export request`, {
-        organizationId,
-        identifierType: identifier.type,
-        identifierValue: identifier.value,
-      });
+      logger.debug({ organizationId, identifierType: identifier.type, identifierValue: identifier.value }, "Customer not found for export request");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -1131,12 +1086,7 @@ export class PrivacyService {
       customer?.name,
     );
 
-    debugLog("privacy", `Customer export request created`, {
-      requestId: request.id,
-      organizationId,
-      hasCustomer: !!customer,
-      identifierType: identifier.type,
-    });
+    logger.debug({ requestId: request.id, organizationId, hasCustomer: !!customer, identifierType: identifier.type }, "Customer export request created");
 
     return {
       requestId: request.id,
@@ -1151,26 +1101,17 @@ export class PrivacyService {
   async confirmCustomerExport(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "export",
         subjectType: "customer",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");
@@ -1222,14 +1163,10 @@ export class PrivacyService {
 
     // Process export asynchronously
     this.processCustomerExportJob(job.id, request.id).catch((error) => {
-      console.error("[Privacy] Customer export job failed:", error);
+      logger.error({ err: error }, "Customer export job failed");
     });
 
-    debugLog("privacy", `Customer export confirmed`, {
-      requestId: request.id,
-      jobId: job.id,
-      organizationId: request.organizationId,
-    });
+    logger.debug({ requestId: request.id, jobId: job.id, organizationId: request.organizationId }, "Customer export confirmed");
 
     return {
       requestId: request.id,
@@ -1255,9 +1192,9 @@ export class PrivacyService {
       throw new Error("No customer found with this identifier");
     }
 
-    // Generate verification token
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = await hashPassword(verificationToken, "argon2");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
     const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -1305,11 +1242,7 @@ export class PrivacyService {
       customer.name,
     );
 
-    debugLog("privacy", `Customer deletion request created`, {
-      requestId: request.id,
-      organizationId,
-      customerId: customer.id,
-    });
+    logger.debug({ requestId: request.id, organizationId, customerId: customer.id }, "Customer deletion request created");
 
     return {
       requestId: request.id,
@@ -1323,26 +1256,17 @@ export class PrivacyService {
   async confirmCustomerDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find matching request
-    const requests = await requestRepository.find({
+    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const request = await requestRepository.findOne({
       where: {
         type: "deletion",
         subjectType: "customer",
         status: "pending_verification",
-        verificationTokenHash: Not(IsNull()),
+        verificationTokenHash: tokenHash,
       },
     });
-
-    let request: PrivacyRequest | null = null;
-    for (const req of requests) {
-      if (req.verificationTokenHash) {
-        const isValid = await verifyPassword(token, req.verificationTokenHash);
-        if (isValid) {
-          request = req;
-          break;
-        }
-      }
-    }
 
     if (!request) {
       throw new Error("Invalid or expired verification token");
@@ -1394,14 +1318,10 @@ export class PrivacyService {
 
     // Process deletion asynchronously
     this.processCustomerDeletionJob(job.id, request.id).catch((error) => {
-      console.error("[Privacy] Customer deletion job failed:", error);
+      logger.error({ err: error }, "Customer deletion job failed");
     });
 
-    debugLog("privacy", `Customer deletion confirmed`, {
-      requestId: request.id,
-      jobId: job.id,
-      organizationId: request.organizationId,
-    });
+    logger.debug({ requestId: request.id, jobId: job.id, organizationId: request.organizationId }, "Customer deletion confirmed");
 
     return {
       requestId: request.id,
@@ -1578,7 +1498,7 @@ export class PrivacyService {
         );
       }
     } catch (error) {
-      debugLog("privacy", "Error collecting embeddings for export", { error });
+      logger.debug({ error }, "Error collecting embeddings for export");
       // Continue without embeddings - they might not exist
     }
 
@@ -1684,16 +1604,10 @@ export class PrivacyService {
         request.organizationId!,
       );
 
-      debugLog("privacy", `Customer export completed`, {
-        requestId,
-        jobId,
-        customerId: request.customerId,
-        organizationId: request.organizationId,
-        exportFormat: "zip",
-      });
+      logger.debug({ requestId, jobId, customerId: request.customerId, organizationId: request.organizationId, exportFormat: "zip" }, "Customer export completed");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("[Privacy] Customer export job failed:", error);
+      logger.error({ err: error }, "Customer export job failed");
 
       // Update request
       const request = await requestRepository.findOne({ where: { id: requestId } });
@@ -1771,7 +1685,7 @@ export class PrivacyService {
               originalUrl: attachment.url,
             });
           } catch (err) {
-            debugLog("privacy", "Could not read local attachment", { localPath, error: err });
+            logger.debug({ localPath, error: err }, "Could not read local attachment");
           }
         } else if (attachment.url.startsWith("http")) {
           // Remote URL - download
@@ -1786,11 +1700,11 @@ export class PrivacyService {
               });
             }
           } catch (err) {
-            debugLog("privacy", "Could not download attachment", { url: attachment.url, error: err });
+            logger.debug({ url: attachment.url, error: err }, "Could not download attachment");
           }
         }
       } catch (err) {
-        debugLog("privacy", "Error processing attachment", { attachmentId: attachment.id, error: err });
+        logger.debug({ attachmentId: attachment.id, error: err }, "Error processing attachment");
       }
     }
 
@@ -1821,10 +1735,10 @@ export class PrivacyService {
             originalUrl: upload.path,
           });
         } catch (err) {
-          debugLog("privacy", "Could not read upload file", { localPath, error: err });
+          logger.debug({ localPath, error: err }, "Could not read upload file");
         }
       } catch (err) {
-        debugLog("privacy", "Error processing upload", { uploadId: upload.id, error: err });
+        logger.debug({ uploadId: upload.id, error: err }, "Error processing upload");
       }
     }
 
@@ -2079,7 +1993,7 @@ please contact ${supportContact}.
   private signExportData(data: string): string {
     // Use a signing key from environment or generate a deterministic one
     const { config } = require("@server/config/env");
-    const signingKey = config.jwt.secret || "hay-dsar-export-signing-key";
+    const signingKey = config.jwt.secret;
 
     const hmac = crypto.createHmac("sha256", signingKey);
     hmac.update(data);
@@ -2127,15 +2041,10 @@ please contact ${supportContact}.
       // Send confirmation email
       await this.sendCustomerDeletionCompleteEmail(request.email, request.organizationId);
 
-      debugLog("privacy", `Customer deletion completed`, {
-        requestId,
-        jobId,
-        customerId: request.customerId,
-        organizationId: request.organizationId,
-      });
+      logger.debug({ requestId, jobId, customerId: request.customerId, organizationId: request.organizationId }, "Customer deletion completed");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("[Privacy] Customer deletion job failed:", error);
+      logger.error({ err: error }, "Customer deletion job failed");
 
       // Update request
       const request = await requestRepository.findOne({ where: { id: requestId } });
@@ -2181,7 +2090,10 @@ please contact ${supportContact}.
       for (const attachment of message.attachments as any[]) {
         try {
           // Only delete local files (not external URLs)
-          if (attachment.url && (attachment.url.startsWith("/") || attachment.url.startsWith("./"))) {
+          if (
+            attachment.url &&
+            (attachment.url.startsWith("/") || attachment.url.startsWith("./"))
+          ) {
             // Extract path from URL (e.g., "/uploads/org/folder/file.jpg" -> "org/folder/file.jpg")
             const pathMatch = attachment.url.match(/\/uploads\/(.+)/);
 
@@ -2193,11 +2105,7 @@ please contact ${supportContact}.
               await fs.unlink(fullPath);
               deleted++;
 
-              debugLog("privacy", "Deleted attachment file", {
-                messageId: message.id,
-                attachmentId: attachment.id,
-                filePath,
-              });
+              logger.debug({ messageId: message.id, attachmentId: attachment.id, filePath }, "Deleted attachment file");
             }
           }
         } catch (error) {
@@ -2211,11 +2119,7 @@ please contact ${supportContact}.
           });
 
           // Log but don't fail transaction - file might already be deleted
-          debugLog("privacy", "Failed to delete attachment file (continuing)", {
-            messageId: message.id,
-            attachmentId: attachment.id,
-            error: errorMessage,
-          });
+          logger.debug({ messageId: message.id, attachmentId: attachment.id, error: errorMessage }, "Failed to delete attachment file (continuing)");
         }
       }
     }
@@ -2261,26 +2165,15 @@ please contact ${supportContact}.
       }
 
       // Delete message attachment files from storage
-      debugLog("privacy", "Deleting message attachment files", {
-        customerId,
-        messageCount: allMessageIds.length,
-      });
+      logger.debug({ customerId, messageCount: allMessageIds.length }, "Deleting message attachment files");
 
       const attachmentDeletionResult = await this.deleteMessageAttachments(allMessageIds, manager);
 
-      debugLog("privacy", "Attachment deletion completed", {
-        customerId,
-        deleted: attachmentDeletionResult.deleted,
-        failed: attachmentDeletionResult.failed,
-        errors: attachmentDeletionResult.errors.length,
-      });
+      logger.debug({ customerId, deleted: attachmentDeletionResult.deleted, failed: attachmentDeletionResult.failed, errors: attachmentDeletionResult.errors.length }, "Attachment deletion completed");
 
       // Log errors if any
       if (attachmentDeletionResult.errors.length > 0) {
-        debugLog("privacy", "Attachment deletion errors", {
-          customerId,
-          errors: attachmentDeletionResult.errors,
-        });
+        logger.debug({ customerId, errors: attachmentDeletionResult.errors }, "Attachment deletion errors");
       }
 
       // Delete embeddings associated with conversations and messages
@@ -2305,19 +2198,10 @@ please contact ${supportContact}.
           embeddingsDeleted += deletedByMessage;
         }
 
-        debugLog("privacy", "Deleted embeddings for customer", {
-          customerId,
-          organizationId,
-          embeddingsDeleted,
-          conversationIds: conversationIds.length,
-          messageIds: allMessageIds.length,
-        });
+        logger.debug({ customerId, organizationId, embeddingsDeleted, conversationIds: conversationIds.length, messageIds: allMessageIds.length }, "Deleted embeddings for customer");
       } catch (error) {
         // Log but don't fail the transaction - embeddings might not exist
-        debugLog("privacy", "Error deleting embeddings (continuing)", {
-          customerId,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+        logger.debug({ customerId, error: error instanceof Error ? error.message : "Unknown error" }, "Error deleting embeddings (continuing)");
       }
 
       // Anonymize messages in all conversations
@@ -2355,12 +2239,7 @@ please contact ${supportContact}.
       // Hard delete the customer record
       await customerRepository.delete({ id: customerId, organization_id: organizationId });
 
-      debugLog("privacy", `Customer data deleted`, {
-        customerId,
-        organizationId,
-        conversationsAffected: conversations.length,
-        embeddingsDeleted,
-      });
+      logger.debug({ customerId, organizationId, conversationsAffected: conversations.length, embeddingsDeleted }, "Customer data deleted");
     });
   }
 
@@ -2380,13 +2259,12 @@ please contact ${supportContact}.
     const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
 
     const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const subject =
-      type === "export" ? "Verify Your Data Export Request" : "Verify Your Data Deletion Request";
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject,
       template,
+      locale,
       variables: {
         userName: customerName || email,
         verificationUrl,
@@ -2414,11 +2292,12 @@ please contact ${supportContact}.
 
     const baseUrl = getDashboardUrl();
     const downloadUrl = `${baseUrl}/privacy/download?requestId=${requestId}&token=${downloadToken}`;
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Export is Ready",
       template: "privacy-export-ready",
+      locale,
       variables: {
         downloadUrl,
         expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
@@ -2442,11 +2321,12 @@ please contact ${supportContact}.
     await emailService.initialize();
 
     const baseUrl = getDashboardUrl();
+    const locale = await getOrganizationLocale(organizationId);
 
     await emailService.sendTemplateEmail({
       to: email,
-      subject: "Your Data Has Been Deleted",
       template: "privacy-deletion-complete",
+      locale,
       variables: {
         companyName: "Hay",
         supportUrl: `${baseUrl}/support`,
@@ -2498,7 +2378,7 @@ please contact ${supportContact}.
         return `${firstHextet}:${secondHextet}:${thirdHextet}::`;
       } catch (error) {
         // Safe fallback for any parsing errors
-        debugLog("privacy", "Failed to anonymize IPv6 address, using fallback", { ip, error });
+        logger.debug({ ip, error }, "Failed to anonymize IPv6 address, using fallback");
         return "0000:0000:0000::";
       }
     } else {
@@ -2507,14 +2387,14 @@ please contact ${supportContact}.
 
       // Validate IPv4 format
       if (parts.length !== 4) {
-        debugLog("privacy", "Invalid IPv4 address format, using fallback", { ip });
+        logger.debug({ ip }, "Invalid IPv4 address format, using fallback");
         return "0.0.0.0";
       }
 
       // Validate each octet is a number
       const octets = parts.map((p) => parseInt(p, 10));
       if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) {
-        debugLog("privacy", "Invalid IPv4 octet values, using fallback", { ip });
+        logger.debug({ ip }, "Invalid IPv4 octet values, using fallback");
         return "0.0.0.0";
       }
 
@@ -2606,21 +2486,17 @@ please contact ${supportContact}.
           if (ageInDays > retentionDays) {
             await fs.unlink(filePath);
             deletedCount++;
-            debugLog("privacy", `Deleted expired export: ${file}`, {
-              ageInDays: Math.round(ageInDays),
-            });
+            logger.debug({ file, ageInDays: Math.round(ageInDays) }, "Deleted expired export");
           }
         } catch (error) {
           errorCount++;
-          console.error(`[Privacy] Error processing file ${file}:`, error);
+          logger.error({ err: error, file }, "Error processing file during cleanup");
         }
       }
 
-      console.log(
-        `[Privacy] Cleanup complete: ${deletedCount} files deleted, ${errorCount} errors`,
-      );
+      logger.info({ deletedCount, errorCount }, "Cleanup complete");
     } catch (error) {
-      console.error("[Privacy] Failed to cleanup expired exports:", error);
+      logger.error({ err: error }, "Failed to cleanup expired exports");
       throw error;
     }
   }

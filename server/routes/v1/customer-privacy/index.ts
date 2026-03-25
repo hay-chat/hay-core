@@ -5,6 +5,9 @@ import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
 import { AppDataSource } from "@server/database/data-source";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("customer-privacy");
 
 /**
  * Customer Privacy Router
@@ -129,7 +132,7 @@ export const customerPrivacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        console.error("[Customer Privacy] Export request failed:", error);
+        logger.error({ err: error }, "Export request failed");
         const message =
           error instanceof Error
             ? error.message

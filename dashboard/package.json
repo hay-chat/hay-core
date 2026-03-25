@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.5.2",
@@ -24,14 +25,18 @@
     "sass": "^1.92.0"
   },
   "dependencies": {
+    "@nuxtjs/i18n": "^10.2.3",
     "@tiptap/extension-mention": "^2.26.3",
     "@tiptap/extension-placeholder": "^2.10.5",
+    "@tiptap/html": "^3.19.0",
     "@tiptap/pm": "^2.10.5",
     "@tiptap/starter-kit": "^2.10.5",
     "@tiptap/suggestion": "^2.10.5",
     "@tiptap/vue-3": "^2.10.5",
+    "canvas-confetti": "^1.9.4",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
+    "marked": "^17.0.1",
     "pinia-plugin-persistedstate": "^4.7.1",
     "sonner": "^2.0.7",
     "tippy.js": "^6.3.7",

@@ -4,7 +4,8 @@ import { useUserStore } from "@/stores/user";
 
 // Define role-protected routes
 // Map route paths to required roles
-const roleProtectedRoutes: Record<string, string[]> = {
+// Exported so custom menu items can register dynamic role restrictions
+export const roleProtectedRoutes: Record<string, string[]> = {
   // Admin only (owner, admin)
   "/settings/users": ["owner", "admin"],
   "/settings/api-tokens": ["owner", "admin"],

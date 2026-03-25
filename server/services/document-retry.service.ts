@@ -3,7 +3,9 @@ import { Document, DocumentationStatus } from "@server/entities/document.entity"
 import { documentRepository } from "@server/repositories/document.repository";
 import { documentProcessorService } from "./document-processor.service";
 import { websocketService } from "./websocket.service";
-import { MoreThan, LessThan, In } from "typeorm";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("document-retry");
 
 interface RetryQueueResult {
   processed: number;
@@ -22,6 +24,7 @@ interface RetryQueueResult {
  */
 export class DocumentRetryService {
   private readonly MAX_RETRY_COUNT = 3;
+  private readonly MAX_BATCH_SIZE = 100; // Process at most 10 documents per retry run
 
   /**
    * Calculate the minimum wait time based on retry count (exponential backoff)
@@ -48,10 +51,9 @@ export class DocumentRetryService {
       const query = repository
         .createQueryBuilder("document")
         .where("document.status = :status", { status: DocumentationStatus.PROCESSING })
-        .andWhere(
-          "COALESCE((document.processing_metadata->>'retryCount')::int, 0) < :maxRetries",
-          { maxRetries: this.MAX_RETRY_COUNT },
-        );
+        .andWhere("COALESCE((document.processing_metadata->>'retryCount')::int, 0) < :maxRetries", {
+          maxRetries: this.MAX_RETRY_COUNT,
+        });
 
       // Filter by organization if specified
       if (organizationId) {
@@ -76,13 +78,14 @@ export class DocumentRetryService {
         return timeSinceLastAttempt >= backoffTime;
       });
 
-      console.log(
-        `[DocumentRetry] Found ${eligibleDocuments.length}/${documents.length} documents eligible for retry`,
+      logger.info(
+        { eligible: eligibleDocuments.length, total: documents.length },
+        "Found documents eligible for retry",
       );
 
       return eligibleDocuments;
     } catch (error) {
-      console.error("[DocumentRetry] Error finding documents to retry:", error);
+      logger.error({ err: error }, "Error finding documents to retry");
       return [];
     }
   }
@@ -96,15 +99,16 @@ export class DocumentRetryService {
       // Fetch the document
       const document = await documentRepository.findByIdAndOrganization(documentId, organizationId);
       if (!document) {
-        console.error(`[DocumentRetry] Document ${documentId} not found`);
+        logger.error({ documentId }, "Document not found");
         return false;
       }
 
       // Check if document is eligible for retry
       const retryCount = document.processingMetadata?.retryCount || 0;
       if (retryCount >= this.MAX_RETRY_COUNT) {
-        console.warn(
-          `[DocumentRetry] Document ${documentId} has exceeded max retry count (${retryCount})`,
+        logger.warn(
+          { documentId, retryCount },
+          "Document has exceeded max retry count",
         );
 
         // Mark as ERROR if not already
@@ -133,12 +137,13 @@ export class DocumentRetryService {
 
       // Check if we have the necessary data to retry
       if (!document.sourceUrl) {
-        console.error(`[DocumentRetry] Document ${documentId} missing sourceUrl for retry`);
+        logger.error({ documentId }, "Document missing sourceUrl for retry");
         return false;
       }
 
-      console.log(
-        `[DocumentRetry] Retrying document ${documentId} from ${document.sourceUrl} (attempt ${retryCount + 1}/${this.MAX_RETRY_COUNT})`,
+      logger.info(
+        { documentId, sourceUrl: document.sourceUrl, attempt: retryCount + 1, maxRetries: this.MAX_RETRY_COUNT },
+        "Retrying document",
       );
 
       // TODO: We need to fetch the HTML content again since we don't store it
@@ -162,7 +167,7 @@ export class DocumentRetryService {
       ]);
 
       if (scrapedPages.length === 0) {
-        console.error(`[DocumentRetry] Failed to scrape ${document.sourceUrl} for retry`);
+        logger.error({ sourceUrl: document.sourceUrl }, "Failed to scrape URL for retry");
 
         await documentRepository.update(documentId, organizationId, {
           processingMetadata: {
@@ -208,7 +213,7 @@ export class DocumentRetryService {
 
       return result.success;
     } catch (error) {
-      console.error(`[DocumentRetry] Error retrying document ${documentId}:`, error);
+      logger.error({ err: error, documentId }, "Error retrying document");
       return false;
     }
   }
@@ -218,7 +223,7 @@ export class DocumentRetryService {
    * This is called by the scheduled job
    */
   async processRetryQueue(): Promise<RetryQueueResult> {
-    console.log("[DocumentRetry] Processing retry queue...");
+    logger.info("Processing retry queue");
 
     const result: RetryQueueResult = {
       processed: 0,
@@ -232,14 +237,19 @@ export class DocumentRetryService {
       const documents = await this.findDocumentsToRetry();
 
       if (documents.length === 0) {
-        console.log("[DocumentRetry] No documents to retry");
+        logger.info("No documents to retry");
         return result;
       }
 
-      console.log(`[DocumentRetry] Processing ${documents.length} documents...`);
+      // Cap the batch to avoid overwhelming target servers with concurrent retries
+      const batch = documents.slice(0, this.MAX_BATCH_SIZE);
+      logger.info(
+        { batchSize: batch.length, totalEligible: documents.length },
+        "Processing eligible documents",
+      );
 
-      // Process each document
-      for (const document of documents) {
+      // Process each document in the batch
+      for (const document of batch) {
         result.processed++;
 
         const success = await this.retryDocument(document.id, document.organizationId);
@@ -257,17 +267,18 @@ export class DocumentRetryService {
           error: success ? undefined : "Processing failed",
         });
 
-        // Add a small delay between documents to avoid overwhelming the system
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Delay between retries to avoid rate limiting on target servers
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      console.log(
-        `[DocumentRetry] Completed: ${result.succeeded} succeeded, ${result.failed} failed out of ${result.processed} total`,
+      logger.info(
+        { succeeded: result.succeeded, failed: result.failed, processed: result.processed },
+        "Retry queue processing completed",
       );
 
       return result;
     } catch (error) {
-      console.error("[DocumentRetry] Error processing retry queue:", error);
+      logger.error({ err: error }, "Error processing retry queue");
       return result;
     }
   }
@@ -293,12 +304,12 @@ export class DocumentRetryService {
         },
       });
 
-      console.log(`[DocumentRetry] Manual retry triggered for document ${documentId}`);
+      logger.info({ documentId }, "Manual retry triggered for document");
 
       // Perform the retry immediately
       return await this.retryDocument(documentId, organizationId);
     } catch (error) {
-      console.error(`[DocumentRetry] Error in manual retry for ${documentId}:`, error);
+      logger.error({ err: error, documentId }, "Error in manual retry");
       throw error;
     }
   }

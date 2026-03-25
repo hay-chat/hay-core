@@ -2,22 +2,21 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text font-size="24px" font-weight="600" color="#001af4" align="center" padding="0 0 10px 0">
-      Welcome to {{ companyName }}, {{ userName }}!
+      {{ t.welcome.title }}
     </mj-text>
 
     <mj-text font-size="18px" color="#666666" align="center" padding="0 0 30px 0">
-      We're excited to have you on board.
+      {{ t.welcome.subtitle }}
     </mj-text>
 
-    <mj-text color="#555555" line-height="24px"> Hi {{ userName }}, </mj-text>
+    <mj-text color="#555555" line-height="24px"> {{ t.common.hi }} </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
-      Thank you for signing up for {{ companyName }}! We're thrilled to have you as part of our
-      community.
+      {{ t.welcome.thankYou }}
     </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
-      Your account has been successfully created with the email address:
+      {{ t.welcome.accountCreated }}
       <strong>{{ userEmail }}</strong>
     </mj-text>
   </mj-column>
@@ -26,18 +25,18 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 10px 0">
-      Getting Started
+      {{ t.welcome.gettingStarted }}
     </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="0 0 10px 0">
-      Here are a few things you can do to get started:
+      {{ t.welcome.gettingStartedIntro }}
     </mj-text>
 
     <mj-text color="#555555" line-height="32px" padding="0 0 0 20px">
-      • Complete your profile to personalize your experience<br />
-      • Explore our features and tools<br />
-      • Connect with other members of our community<br />
-      • Check out our documentation and tutorials
+      &bull; {{ t.welcome.tip1 }}<br />
+      &bull; {{ t.welcome.tip2 }}<br />
+      &bull; {{ t.welcome.tip3 }}<br />
+      &bull; {{ t.welcome.tip4 }}
     </mj-text>
 
     <mj-button
@@ -50,7 +49,7 @@
       href="{{dashboardUrl}}"
       css-class="gradient-button"
     >
-      Go to Dashboard
+      {{ t.welcome.goToDashboard }}
     </mj-button>
 
     {{#if verificationRequired}}
@@ -62,8 +61,7 @@
       font-size="14px"
       line-height="20px"
     >
-      <strong>Action Required:</strong> Please verify your email address by clicking the link we
-      sent to {{ userEmail }}.
+      <strong>{{ t.common.actionRequired }}:</strong> {{ t.welcome.verificationAction }}
     </mj-text>
     {{/if}}
   </mj-column>
@@ -72,33 +70,33 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-text font-size="16px" font-weight="600" color="#333333" padding="0 0 10px 0">
-      Need Help?
+      {{ t.welcome.needHelp }}
     </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="0 0 10px 0">
-      Our support team is here to help you get the most out of {{ companyName }}:
+      {{ t.welcome.supportIntro }}
     </mj-text>
 
     <mj-text color="#555555" line-height="32px" padding="0 0 0 20px">
-      • Visit our
-      <a href="{{helpCenterUrl}}" style="color: #001af4; text-decoration: none">Help Center</a
+      &bull; Visit our
+      <a href="{{helpCenterUrl}}" style="color: #001af4; text-decoration: none">{{ t.welcome.helpCenter }}</a
       ><br />
-      • Read our
-      <a href="{{documentationUrl}}" style="color: #001af4; text-decoration: none">Documentation</a
+      &bull; Read our
+      <a href="{{documentationUrl}}" style="color: #001af4; text-decoration: none">{{ t.welcome.documentation }}</a
       ><br />
-      • Contact us at
+      &bull; Contact us at
       <a href="mailto:{{supportEmail}}" style="color: #001af4; text-decoration: none">{{
         supportEmail
       }}</a>
     </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="20px 0 0 0">
-      We're looking forward to seeing what you'll accomplish with {{ companyName }}!
+      {{ t.welcome.lookingForward }}
     </mj-text>
 
     <mj-text color="#555555" line-height="24px" padding="20px 0 0 0">
-      Best regards,<br />
-      The {{ companyName }} Team
+      {{ t.common.bestRegards }}<br />
+      {{ t.common.theTeam }}
     </mj-text>
   </mj-column>
 </mj-section>
@@ -106,7 +104,7 @@
 <mj-section background-color="#f8f9fa" padding="20px 25px">
   <mj-column>
     <mj-text align="center" color="#666666" font-size="14px" padding="0 0 15px 0">
-      Follow us on social media for updates and tips:
+      {{ t.welcome.followUs }}
     </mj-text>
     <mj-text align="center" font-size="14px">
       {{#if socialLinks.twitter}}

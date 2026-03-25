@@ -1,15 +1,15 @@
 <template>
-  <Page title="General Settings" description="Manage your platform preferences and configuration">
+  <Page :title="$t('general.title')" :description="$t('general.description')">
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="resetToDefaults">
           <RotateCcw class="h-4 w-4 mr-2" />
-          Reset to Defaults
+          {{ $t("general.resetToDefaults") }}
         </Button>
         <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
-          Save Changes
+          {{ $t("general.saveChanges") }}
         </Button>
       </div>
     </template>
@@ -24,36 +24,36 @@
     <!-- Organization Settings -->
     <Card>
       <CardHeader>
-        <CardTitle>Organization</CardTitle>
-        <CardDescription>Manage your organization details</CardDescription>
+        <CardTitle>{{ $t("organization.title") }}</CardTitle>
+        <CardDescription>{{ $t("organization.description") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <Input
           v-model="settings.organizationName"
-          label="Organization Name"
-          placeholder="Acme Corporation"
-          helper-text="The name of your organization"
+          :label="$t('organization.name')"
+          :placeholder="$t('organization.namePlaceholder')"
+          :helper-text="$t('organization.nameHelper')"
         />
 
         <Input
           v-model="settings.organizationAbout"
           type="textarea"
-          label="About Organization"
+          :label="$t('organization.about')"
           :rows="6"
-          placeholder="Describe what your organization does, what products or services you offer, your mission, values, etc. This information helps the AI assistant provide more contextually relevant responses."
-          helper-text="This information helps AI understand your business context. Max 10,000 characters."
+          :placeholder="$t('organization.aboutPlaceholder')"
+          :helper-text="$t('organization.aboutHelper')"
           :maxlength="10000"
         />
 
         <!-- Organization Logo -->
         <div>
-          <label class="text-sm font-medium mb-2 block">Logo</label>
+          <label class="text-sm font-medium mb-2 block">{{ $t("organization.logo") }}</label>
           <div class="space-y-4">
             <!-- Logo Preview -->
             <div v-if="logoUpload.preview.value || organizationLogo" class="flex items-start gap-4">
               <img
                 :src="logoUpload.preview.value || organizationLogo || ''"
-                alt="Organization logo"
+                :alt="$t('organization.logoAlt')"
                 class="h-24 w-24 rounded-lg border object-cover"
               />
               <Button
@@ -63,7 +63,7 @@
                 @click="removeLogo"
               >
                 <Trash2 class="h-4 w-4 mr-2" />
-                Remove Logo
+                {{ $t("organization.removeLogo") }}
               </Button>
             </div>
 
@@ -76,13 +76,13 @@
                 :disabled="logoUpload.isUploading.value"
               />
               <p class="text-sm text-muted-foreground">
-                Recommended: Square image, max 2MB (JPG, PNG, WebP, or GIF)
+                {{ $t("organization.logoRecommended") }}
               </p>
               <p v-if="logoUpload.error.value" class="text-sm text-destructive">
                 {{ logoUpload.error.value }}
               </p>
               <p v-if="logoUpload.isUploading.value" class="text-sm text-blue-600">
-                Uploading logo...
+                {{ $t("organization.logoUploading") }}
               </p>
             </div>
           </div>
@@ -93,28 +93,28 @@
     <!-- Platform Settings -->
     <Card>
       <CardHeader>
-        <CardTitle>Platform Settings</CardTitle>
-        <CardDescription>Configure basic platform preferences</CardDescription>
+        <CardTitle>{{ $t("platform.title") }}</CardTitle>
+        <CardDescription>{{ $t("platform.description") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="grid gap-4 md:grid-cols-2">
           <Input
             v-model="settings.defaultLanguage"
             type="select"
-            label="Default Language"
+            :label="$t('platform.defaultLanguage')"
             :options="[
-              { label: 'English', value: 'en' },
-              { label: 'Portuguese', value: 'pt' },
+              { label: $t('platform.languages.en'), value: 'en' },
+              { label: $t('platform.languages.pt'), value: 'pt' },
             ]"
-            helper-text="Default language for new conversations and system messages"
+            :helper-text="$t('platform.defaultLanguageHelper')"
           />
 
           <Input
             v-model="settings.timezone"
             type="select"
-            label="Timezone"
+            :label="$t('platform.timezone')"
             :options="timezoneOptions"
-            helper-text="Used for displaying timestamps and scheduling reports"
+            :helper-text="$t('platform.timezoneHelper')"
           />
         </div>
 
@@ -122,42 +122,41 @@
           <Input
             v-model="settings.dateFormat"
             type="select"
-            label="Date Format"
+            :label="$t('platform.dateFormat')"
             :options="[
               { label: 'MM/DD/YYYY (US)', value: 'MM/DD/YYYY' },
               { label: 'DD/MM/YYYY (EU)', value: 'DD/MM/YYYY' },
               { label: 'YYYY-MM-DD (ISO)', value: 'YYYY-MM-DD' },
               { label: 'DD MMM YYYY', value: 'DD MMM YYYY' },
             ]"
-            :helper-text="`Preview: ${formatDatePreview()}`"
+            :helper-text="$t('platform.dateFormatHelper', { preview: formatDatePreview() })"
           />
 
           <Input
             v-model="settings.timeFormat"
             type="select"
-            label="Time Format"
+            :label="$t('platform.timeFormat')"
             :options="[
-              { label: '12-hour (AM/PM)', value: '12h' },
-              { label: '24-hour', value: '24h' },
+              { label: $t('platform.timeFormats.12h'), value: '12h' },
+              { label: $t('platform.timeFormats.24h'), value: '24h' },
             ]"
-            :helper-text="`Preview: ${formatTimePreview()}`"
+            :helper-text="$t('platform.timeFormatHelper', { preview: formatTimePreview() })"
           />
         </div>
 
         <Input
           v-model="settings.defaultAgent"
           type="select"
-          label="Default Agent"
+          :label="$t('platform.defaultAgent')"
           :options="agentOptions"
-          placeholder="No default agent"
-          helper-text="Agent to handle conversations when no specific agent is assigned"
+          :placeholder="$t('platform.defaultAgentPlaceholder')"
+          :helper-text="$t('platform.defaultAgentHelper')"
         />
 
         <div class="space-y-2 pt-2 border-t">
-          <Label>Test Mode Default</Label>
+          <Label>{{ $t("platform.testMode") }}</Label>
           <p class="text-sm text-neutral-muted mb-3">
-            When enabled, AI messages require approval before sending to customers. Individual
-            agents can override this setting.
+            {{ $t("platform.testModeDescription") }}
           </p>
           <div class="flex items-center space-x-2">
             <Checkbox
@@ -166,11 +165,11 @@
               @update:checked="settings.testModeDefault = $event"
             />
             <label for="testModeDefault" class="text-sm font-medium cursor-pointer">
-              Require approval for AI messages by default
+              {{ $t("platform.testModeCheckbox") }}
             </label>
           </div>
           <p class="text-xs text-neutral-muted mt-2">
-            ℹ️ Note: Playground conversations always auto-send regardless of this setting.
+            ℹ️ {{ $t("platform.testModeNote") }}
           </p>
         </div>
       </CardContent>
@@ -179,37 +178,37 @@
     <!-- AI Confidence Guardrails -->
     <Card>
       <CardHeader>
-        <CardTitle>AI Confidence Guardrails</CardTitle>
+        <CardTitle>{{ $t("confidence.title") }}</CardTitle>
         <CardDescription>
-          Configure how AI responses are evaluated for confidence and accuracy
+          {{ $t("confidence.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- Confidence Thresholds -->
         <div class="space-y-4">
           <div>
-            <Label>Confidence Thresholds</Label>
+            <Label>{{ $t("confidence.thresholds") }}</Label>
             <p class="text-sm text-neutral-muted mb-4">
-              Set the minimum confidence scores required for different quality tiers
+              {{ $t("confidence.thresholdsDescription") }}
             </p>
             <div class="grid gap-4 md:grid-cols-2">
               <Input
                 v-model.number="settings.confidenceGuardrail.highThreshold"
                 type="number"
-                label="High Confidence Threshold"
+                :label="$t('confidence.highThreshold')"
                 :min="0"
                 :max="1"
                 :step="0.05"
-                helper-text="Minimum score for high confidence (0.0 - 1.0)"
+                :helper-text="$t('confidence.highThresholdHelper')"
               />
               <Input
                 v-model.number="settings.confidenceGuardrail.mediumThreshold"
                 type="number"
-                label="Medium Confidence Threshold"
+                :label="$t('confidence.mediumThreshold')"
                 :min="0"
                 :max="1"
                 :step="0.05"
-                helper-text="Minimum score for medium confidence (0.0 - 1.0)"
+                :helper-text="$t('confidence.mediumThresholdHelper')"
               />
             </div>
           </div>
@@ -220,42 +219,42 @@
           <Input
             v-model="settings.confidenceGuardrail.enableRecheck"
             type="switch"
-            label="Enable Automatic Recheck"
-            hint="When confidence is medium, automatically retrieve more documents and regenerate the response"
+            :label="$t('confidence.enableRecheck')"
+            :hint="$t('confidence.recheckHint')"
           />
 
           <Input
             v-model="settings.confidenceGuardrail.enableEscalation"
             type="switch"
-            label="Enable Human Escalation"
-            hint="When confidence is low, escalate to a human agent instead of sending the AI response"
+            :label="$t('confidence.enableEscalation')"
+            :hint="$t('confidence.escalationHint')"
           />
         </div>
 
         <!-- Recheck Configuration -->
         <div v-if="settings.confidenceGuardrail.enableRecheck" class="space-y-4 pt-2 border-t">
           <div>
-            <Label>Recheck Configuration</Label>
+            <Label>{{ $t("confidence.recheckConfig") }}</Label>
             <p class="text-sm text-neutral-muted mb-4">
-              Parameters used when rechecking medium-confidence responses
+              {{ $t("confidence.recheckConfigDescription") }}
             </p>
             <div class="grid gap-4 md:grid-cols-2">
               <Input
                 v-model.number="settings.confidenceGuardrail.recheckConfig.maxDocuments"
                 type="number"
-                label="Max Documents"
+                :label="$t('confidence.maxDocuments')"
                 :min="1"
                 :max="50"
-                helper-text="Number of documents to retrieve (default: 10)"
+                :helper-text="$t('confidence.maxDocumentsHelper')"
               />
               <Input
                 v-model.number="settings.confidenceGuardrail.recheckConfig.similarityThreshold"
                 type="number"
-                label="Similarity Threshold"
+                :label="$t('confidence.similarityThreshold')"
                 :min="0"
                 :max="1"
                 :step="0.05"
-                helper-text="Lower threshold for broader search (default: 0.3)"
+                :helper-text="$t('confidence.similarityThresholdHelper')"
               />
             </div>
           </div>
@@ -266,10 +265,10 @@
           <Input
             v-model="settings.confidenceGuardrail.fallbackMessage"
             type="textarea"
-            label="Fallback Message"
+            :label="$t('confidence.fallbackMessage')"
             :rows="3"
-            placeholder="Enter fallback message..."
-            helper-text="Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language."
+            :placeholder="$t('confidence.fallbackMessagePlaceholder')"
+            :helper-text="$t('confidence.fallbackMessageHelper')"
           />
         </div>
       </CardContent>
@@ -444,19 +443,19 @@
     <!-- Danger Zone - Only visible to owners -->
     <Card v-if="isOwner" class="!border-destructive">
       <CardHeader>
-        <CardTitle class="text-destructive">Danger Zone</CardTitle>
-        <CardDescription>Irreversible and destructive actions</CardDescription>
+        <CardTitle class="text-destructive">{{ $t("danger.title") }}</CardTitle>
+        <CardDescription>{{ $t("danger.description") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="flex items-center justify-between border p-4 rounded-lg">
           <div>
-            <p class="font-medium">Delete organization</p>
+            <p class="font-medium">{{ $t("danger.deleteOrg") }}</p>
             <p class="text-sm text-muted-foreground">
-              Once you delete an organization, there is no going back. Please be certain.
+              {{ $t("danger.deleteOrgWarning") }}
             </p>
           </div>
           <Button variant="destructive" @click="showDeleteDialog = true">
-            Delete organization
+            {{ $t("danger.deleteOrg") }}
           </Button>
         </div>
       </CardContent>
@@ -472,8 +471,10 @@ import { useFileUpload } from "@/composables/useFileUpload";
 import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
 
+const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
+const { setLocaleFromBackend } = useLocale();
 
 const logoUpload = useFileUpload({
   accept: "image/*",
@@ -661,7 +662,7 @@ const handleLogoSelect = async (event: Event) => {
 
   // Validate size
   if (file.size > 2 * 1024 * 1024) {
-    logoUpload.error.value = "File too large (max 2MB)";
+    logoUpload.error.value = t("organization.logoTooLarge");
     return;
   }
 
@@ -689,14 +690,14 @@ const handleLogoSelect = async (event: Event) => {
     // Reload settings to get the new logo URL and update the store
     await loadOrganizationSettings();
 
-    toast.success("Logo uploaded successfully");
+    toast.success(t("organization.logoUploadSuccess"));
 
     // Clear the file input so the same file can be selected again if needed
     target.value = "";
   } catch (error) {
     console.error("Failed to upload logo:", error);
-    toast.error("Failed to upload logo. Please try again.");
-    logoUpload.error.value = "Failed to upload logo";
+    toast.error(t("organization.logoUploadError"));
+    logoUpload.error.value = t("organization.logoUploadFailed");
   } finally {
     logoUpload.isUploading.value = false;
   }
@@ -748,11 +749,14 @@ const saveSettings = async () => {
         }
       }
 
-      toast.success("Settings saved successfully");
+      // Sync dashboard locale immediately when language changes
+      await setLocaleFromBackend(settings.value.defaultLanguage);
+
+      toast.success(t("general.saveSuccess"));
     }
   } catch (error) {
     console.error("Failed to save settings:", error);
-    toast.error("Failed to save settings. Please try again.");
+    toast.error(t("general.saveFailed"));
   } finally {
     isSaving.value = false;
   }
@@ -761,7 +765,7 @@ const saveSettings = async () => {
 const removeLogo = async () => {
   try {
     await Hay.organizations.deleteLogo.mutate();
-    toast.success("Logo removed successfully");
+    toast.success(t("organization.logoRemoveSuccess"));
     logoUpload.reset();
 
     // Clear logo from local state
@@ -776,7 +780,7 @@ const removeLogo = async () => {
     }
   } catch (error) {
     console.error("Failed to remove logo:", error);
-    toast.error("Failed to remove logo. Please try again.");
+    toast.error(t("organization.logoRemoveFailed"));
   }
 };
 
@@ -798,7 +802,7 @@ const loadOrganizationSettings = async () => {
 };
 
 const resetToDefaults = () => {
-  if (confirm("Are you sure you want to reset all settings to their default values?")) {
+  if (confirm(t("general.resetConfirm"))) {
     settings.value = {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
@@ -917,7 +921,7 @@ onMounted(async () => {
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));
   } catch (error) {
     console.error("Failed to load settings:", error);
-    toast.error("Error", "Failed to load settings");
+    toast.error(t("common.error"), t("general.loadFailed"));
   }
 });
 
@@ -929,11 +933,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "General Settings - Hay Dashboard",
+  title: computed(() => `${t("general.title")} - Hay Dashboard`),
   meta: [
     {
       name: "description",
-      content: "Manage your platform preferences and configuration",
+      content: computed(() => t("general.description")),
     },
   ],
 });

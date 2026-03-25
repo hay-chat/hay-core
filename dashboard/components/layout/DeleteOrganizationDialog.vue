@@ -2,27 +2,30 @@
   <Dialog v-model:open="isOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle class="text-destructive">Delete Organization</DialogTitle>
+        <DialogTitle class="text-destructive">{{ $t("deleteOrganization.title") }}</DialogTitle>
         <DialogDescription>
-          This action cannot be undone. This will permanently delete the organization and all
-          associated data.
+          {{ $t("deleteOrganization.description") }}
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-4">
         <div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p class="text-sm text-destructive font-medium mb-2">Warning: This will immediately:</p>
+          <p class="text-sm text-destructive font-medium mb-2">
+            {{ $t("deleteOrganization.warningTitle") }}
+          </p>
           <ul class="text-sm text-destructive/90 space-y-1 list-disc list-inside">
-            <li>Stop all active conversations</li>
-            <li>Delete all agents, playbooks, and documents</li>
-            <li>Remove all team members from the organization</li>
-            <li>Delete all customer data and conversation history</li>
-            <li>Invalidate all API keys</li>
+            <li>{{ $t("deleteOrganization.impact1") }}</li>
+            <li>{{ $t("deleteOrganization.impact2") }}</li>
+            <li>{{ $t("deleteOrganization.impact3") }}</li>
+            <li>{{ $t("deleteOrganization.impact4") }}</li>
+            <li>{{ $t("deleteOrganization.impact5") }}</li>
           </ul>
-          <p class="text-sm text-destructive font-bold mt-3">This action is irreversible.</p>
+          <p class="text-sm text-destructive font-bold mt-3">
+            {{ $t("deleteOrganization.irreversibleWarning") }}
+          </p>
         </div>
         <div class="space-y-2">
           <label class="text-sm font-medium">
-            Type <span class="font-mono font-bold">DELETE</span> to confirm
+            {{ $t("deleteOrganization.confirmLabel", { keyword: "DELETE" }) }}
           </label>
           <Input
             v-model="confirmText"
@@ -33,14 +36,16 @@
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="handleClose">Never mind</Button>
+        <Button variant="outline" @click="handleClose">{{
+          $t("deleteOrganization.cancelButton")
+        }}</Button>
         <Button
           variant="destructive"
           :loading="isDeleting"
           :disabled="confirmText !== 'DELETE'"
           @click="handleDelete"
         >
-          Delete Organization
+          {{ $t("deleteOrganization.deleteButton") }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -49,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useAuthStore } from "@/stores/auth";
@@ -64,6 +70,7 @@ const emit = defineEmits<{
   (e: "deleted"): void;
 }>();
 
+const { t } = useI18n();
 const { toast } = useToast();
 const authStore = useAuthStore();
 const userStore = useUserStore();
@@ -105,7 +112,7 @@ const handleDelete = async () => {
 
   // Validate confirmation text
   if (confirmText.value !== "DELETE") {
-    error.value = "Please type DELETE to confirm";
+    error.value = t("deleteOrganization.confirmError");
     return;
   }
 
@@ -118,8 +125,8 @@ const handleDelete = async () => {
 
     if (result.success) {
       toast.success(
-        "Organization deleted",
-        `${props.organizationName} has been permanently deleted.`,
+        t("deleteOrganization.successTitle"),
+        t("deleteOrganization.successMessage", { organizationName: props.organizationName }),
       );
 
       // Emit deleted event
@@ -150,8 +157,8 @@ const handleDelete = async () => {
     }
   } catch (err: any) {
     console.error("Failed to delete organization:", err);
-    error.value = err.message || "Failed to delete organization";
-    toast.error("Failed to delete organization", error.value);
+    error.value = err.message || t("deleteOrganization.deleteFailed");
+    toast.error(t("deleteOrganization.deleteFailed"), error.value);
   } finally {
     isDeleting.value = false;
   }

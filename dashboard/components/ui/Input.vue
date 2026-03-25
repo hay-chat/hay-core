@@ -122,7 +122,19 @@ export type SelectOption = string | { label: string; value: string | number };
 export interface InputProps {
   class?: string;
   modelValue?: string | number | boolean | undefined;
-  type?: "text" | "textarea" | "select" | "password" | "email" | "switch" | "checkbox" | "number";
+  type?:
+    | "text"
+    | "textarea"
+    | "select"
+    | "password"
+    | "email"
+    | "switch"
+    | "checkbox"
+    | "number"
+    | "search"
+    | "date"
+    | "url"
+    | "file";
   label?: string;
   hint?: string;
   error?: string;

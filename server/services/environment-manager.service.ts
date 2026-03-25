@@ -4,6 +4,9 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 import { oauthAuthStrategy } from "./oauth-auth-strategy.service";
 import { PluginAPIService } from "./plugin-api/plugin-api.service";
 import { config } from "@server/config/env";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("environment-manager");
 
 // Type for config schema
 type ConfigSchema = NonNullable<HayPluginManifest["configSchema"]>;
@@ -90,9 +93,9 @@ export class EnvironmentManagerService {
         }
       } catch (error) {
         // Log but don't fail - plugin may handle missing tokens gracefully
-        console.warn(
-          `Failed to inject OAuth tokens for plugin ${instance.plugin.pluginId}:`,
-          error,
+        logger.warn(
+          { err: error, pluginId: instance.plugin.pluginId },
+          "Failed to inject OAuth tokens for plugin",
         );
       }
     }
@@ -122,14 +125,15 @@ export class EnvironmentManagerService {
           env.HAY_API_URL = `${serverUrl}/v1`;
           env.HAY_API_TOKEN = apiToken;
 
-          console.log(
-            `[EnvironmentManager] Injected Plugin API credentials for ${instance.plugin.name} (capabilities: ${capabilities.join(", ")})`,
+          logger.debug(
+            { pluginName: instance.plugin.name, capabilities },
+            "Injected Plugin API credentials",
           );
         }
       } catch (error) {
-        console.warn(
-          `Failed to inject Plugin API credentials for plugin ${instance.plugin.pluginId}:`,
-          error,
+        logger.warn(
+          { err: error, pluginId: instance.plugin.pluginId },
+          "Failed to inject Plugin API credentials for plugin",
         );
       }
     }
@@ -230,9 +234,7 @@ export class EnvironmentManagerService {
     ];
 
     for (const varName of dangerousVars) {
-      if (!baseEnv[varName]) {
-        delete sandboxEnv[varName];
-      }
+      delete sandboxEnv[varName];
     }
 
     return sandboxEnv;

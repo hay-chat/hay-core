@@ -1,9 +1,12 @@
-import { Repository, SelectQueryBuilder, In, Not } from "typeorm";
+import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType, MessageStatus } from "@server/database/entities/message.entity";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("conversation-repo");
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   private messageRepository!: Repository<Message>;
@@ -48,6 +51,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
@@ -71,6 +75,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .leftJoinAndSelect("conversation.messages", "messages")
       .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
+      .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
@@ -78,14 +83,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { agent_id: agentId, organization_id: organizationId },
+      where: { agent_id: agentId, organization_id: organizationId, deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
 
   override async findByOrganization(organizationId: string): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { organization_id: organizationId },
+      where: { organization_id: organizationId, deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
@@ -149,7 +154,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   async getAvailableForProcessing(): Promise<Conversation[]> {
     if (!this.getRepository()) {
-      console.error("[ConversationRepository] Repository not initialized");
+      logger.error("Repository not initialized");
       return [];
     }
 
@@ -159,23 +164,25 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       const queryBuilder = this.getRepository().createQueryBuilder("conversation");
 
       // Only select conversations that are truly available for processing
-      queryBuilder.where(
-        "(conversation.status = :openStatus OR " +
-          "(conversation.status = :processingStatus AND conversation.processing_locked_until < :fiveMinutesAgo)) AND " +
-          "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
-        {
-          openStatus: "open",
-          processingStatus: "processing",
-          fiveMinutesAgo,
-        },
-      );
+      queryBuilder
+        .where("conversation.deleted_at IS NULL")
+        .andWhere(
+          "(conversation.status = :openStatus OR " +
+            "(conversation.status = :processingStatus AND conversation.processing_locked_until < :fiveMinutesAgo)) AND " +
+            "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :fiveMinutesAgo)",
+          {
+            openStatus: "open",
+            processingStatus: "processing",
+            fiveMinutesAgo,
+          },
+        );
 
       queryBuilder.leftJoinAndSelect("conversation.messages", "messages");
       queryBuilder.orderBy("conversation.created_at", "ASC");
 
       return await queryBuilder.getMany();
     } catch (error) {
-      console.error("[ConversationRepository] Error getting available conversations:", error);
+      logger.error({ err: error }, "Error getting available conversations");
       return [];
     }
   }
@@ -235,9 +242,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     const queryBuilder = this.getRepository().createQueryBuilder("entity");
 
     // Use organization_id instead of organizationId for conversations
-    queryBuilder.where("entity.organization_id = :organizationId", {
-      organizationId,
-    });
+    // Exclude soft-deleted (anonymized) conversations by default
+    queryBuilder
+      .where("entity.organization_id = :organizationId", {
+        organizationId,
+      })
+      .andWhere("entity.deleted_at IS NULL");
 
     // Add base where conditions if provided
     if (baseWhere) {
@@ -390,16 +400,40 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
-            console.warn(`Invalid relation '${relation}' for Conversation entity`);
+            logger.warn({ relation }, "Invalid relation for Conversation entity");
           }
       }
     });
   }
 
+  /**
+   * Find the most recent active conversation for a customer on a given channel.
+   * Used by channel plugins (WhatsApp, etc.) to reuse existing conversations
+   * instead of creating duplicates.
+   */
+  async findActiveByCustomerAndChannel(
+    customerId: string,
+    channel: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.customer_id = :customerId", { customerId })
+      .andWhere("conversation.channel = :channel", { channel })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.status IN (:...statuses)", {
+        statuses: ["open", "processing", "pending-human", "human-took-over"],
+      })
+      .andWhere("conversation.deleted_at IS NULL")
+      .orderBy("conversation.created_at", "DESC")
+      .getOne();
+  }
+
   async findReadyForProcessing(): Promise<Conversation[]> {
     const query = this.getRepository()
       .createQueryBuilder("conversation")
-      .where("conversation.needs_processing = :needsProcessing", {
+      .where("conversation.deleted_at IS NULL")
+      .andWhere("conversation.needs_processing = :needsProcessing", {
         needsProcessing: true,
       })
       .andWhere("conversation.status IN (:...statuses)", {
@@ -416,7 +450,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   async findAllOpenConversations(): Promise<Conversation[]> {
     return await this.getRepository().find({
-      where: { status: "open" },
+      where: { status: "open", deleted_at: IsNull() },
       order: { created_at: "DESC" },
     });
   }
@@ -498,13 +532,14 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const query = `
-      SELECT 
+      SELECT
         DATE(created_at) as date,
         COUNT(*) as count
-      FROM conversations 
-      WHERE organization_id = $1 
-        AND created_at >= $2 
+      FROM conversations
+      WHERE organization_id = $1
+        AND created_at >= $2
         AND created_at <= $3
+        AND deleted_at IS NULL
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `;
@@ -563,7 +598,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .createQueryBuilder("conversation")
       .where("conversation.organization_id = :organizationId", {
         organizationId: filters.organizationId,
-      });
+      })
+      .andWhere("conversation.deleted_at IS NULL");
 
     if (filters.startDate) {
       queryBuilder.andWhere("conversation.created_at >= :startDate", {

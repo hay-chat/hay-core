@@ -12,3 +12,4 @@ export * from "./privacy-request.entity";
 export * from "./scheduled-job.entity";
 export * from "./scheduled-job-history.entity";
 export * from "./upload.entity";
+export * from "./auth-code.entity";

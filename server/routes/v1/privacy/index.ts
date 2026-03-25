@@ -4,6 +4,9 @@ import { TRPCError } from "@trpc/server";
 import { publicProcedure } from "@server/trpc/middleware/auth";
 import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("privacy-routes");
 
 /**
  * Privacy Router
@@ -151,7 +154,7 @@ export const privacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        console.error("[Privacy] Export request failed:", error);
+        logger.error({ err: error }, "Export request failed");
         const message = error instanceof Error ? error.message : "Failed to process export request. Please try again later.";
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

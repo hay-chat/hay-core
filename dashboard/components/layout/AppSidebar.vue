@@ -27,7 +27,12 @@ import {
   Settings,
   BookOpen,
   Puzzle,
+  CreditCard,
+  Zap,
+  Globe,
+  ExternalLink,
 } from "lucide-vue-next";
+import type { Component } from "vue";
 
 import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
@@ -37,7 +42,9 @@ import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 import { Hay } from "@/utils/api";
+import { roleProtectedRoutes } from "@/middleware/auth.global";
 
+const { t } = useI18n();
 const userStore = useUserStore();
 const authStore = useAuthStore();
 const appStore = useAppStore();
@@ -48,6 +55,20 @@ const route = useRoute();
 // Plugin menu items
 const pluginMenuItems = ref<any[]>([]);
 
+// Map icon name strings from CUSTOM_MENU to Lucide components
+const ICON_MAP: Record<string, Component> = {
+  CreditCard,
+  Zap,
+  Globe,
+  ExternalLink,
+  Settings,
+  Puzzle,
+};
+
+function resolveIcon(iconName?: string): Component {
+  return (iconName && ICON_MAP[iconName]) || ExternalLink;
+}
+
 // Get user data from store with validation
 const user = computed(() => {
   // If authenticated but missing user data, trigger logout
@@ -55,17 +76,18 @@ const user = computed(() => {
     console.log("[AppSidebar] Missing user data while authenticated, logging out");
     authStore.logout();
     return {
-      name: "User",
-      email: "user@example.com",
+      name: t("user.defaultName"),
+      email: t("user.defaultEmail"),
       avatar: null,
     };
   }
 
   return {
     name: userStore.user
-      ? `${userStore.user.firstName || ""} ${userStore.user.lastName || ""}`.trim() || "User"
-      : "User",
-    email: userStore.user?.email || "user@example.com",
+      ? `${userStore.user.firstName || ""} ${userStore.user.lastName || ""}`.trim() ||
+        t("user.defaultName")
+      : t("user.defaultName"),
+    email: userStore.user?.email || t("user.defaultEmail"),
     avatar: userStore.user?.avatarUrl || null,
   };
 });
@@ -102,7 +124,7 @@ const navMain = computed(() => {
   // Only show "Getting Started" if onboarding is not completed
   if (!appStore.onboardingCompleted) {
     items.push({
-      title: "Getting Started",
+      title: t("nav.gettingStarted"),
       url: "/getting-started",
       icon: Sparkles,
       isActive: isPathActive("/getting-started"),
@@ -111,32 +133,26 @@ const navMain = computed(() => {
 
   items.push(
     {
-      title: "Dashboard",
+      title: t("nav.dashboard"),
       url: "/dashboard",
       icon: AreaChart,
       isActive: isPathActive("/dashboard"),
     },
     {
-      title: "Conversations",
+      title: t("nav.conversations"),
       url: "/conversations",
       icon: MessageSquare,
       badge: conversationsBadge.value,
       isActive: isPathActive("/conversations"),
     },
     {
-      title: "Documents",
+      title: t("nav.documents"),
       url: "/documents",
       icon: FileText,
       isActive: isPathActive("/documents"),
     },
-    // {
-    //   title: "Queue",
-    //   url: "/queue",
-    //   icon: ListTodo,
-    //   isActive: isPathActive("/queue"),
-    // },
     {
-      title: "Playbooks",
+      title: t("nav.playbooks"),
       url: "/playbooks",
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
@@ -152,13 +168,13 @@ const navMain = computed(() => {
   // Only show Integrations if admin or owner
   if (isAdminOrOwner) {
     items.push({
-      title: "Integrations",
+      title: t("nav.integrations"),
       url: "#",
       icon: Puzzle,
       isActive: isPathActive("/integrations"),
       items: [
         {
-          title: "Marketplace",
+          title: t("nav.marketplace"),
           url: "/integrations/marketplace",
           isActive: route.path === "/integrations/marketplace",
         },
@@ -172,6 +188,18 @@ const navMain = computed(() => {
     });
   }
 
+  // Add external/custom menu items at root level
+  const externalItems = pluginMenuItems.value
+    .filter((item) => (item.parent === "root" || !item.parent) && item.external)
+    .map((item) => ({
+      title: item.title,
+      url: item.url,
+      icon: resolveIcon(item.icon),
+      isActive: false,
+      external: true,
+    }));
+  items.push(...externalItems);
+
   // Build Settings submenu based on role
   const settingsItems = [];
 
@@ -179,32 +207,32 @@ const navMain = computed(() => {
   if (isAdminOrOwner) {
     settingsItems.push(
       {
-        title: "General",
+        title: t("nav.general"),
         url: "/settings/general",
         isActive: route.path === "/settings/general",
       },
       {
-        title: "Agents",
+        title: t("nav.agents"),
         url: "/agents",
         isActive: isPathActive("/agents"),
       },
       {
-        title: "Users",
+        title: t("nav.users"),
         url: "/settings/users",
         isActive: route.path === "/settings/users",
       },
       {
-        title: "Privacy & Data",
+        title: t("nav.privacyData"),
         url: "/settings/privacy",
         isActive: route.path === "/settings/privacy",
       },
       {
-        title: "API Tokens",
+        title: t("nav.apiTokens"),
         url: "/settings/api-tokens",
         isActive: route.path === "/settings/api-tokens",
       },
       {
-        title: "Webchat",
+        title: t("nav.webchat"),
         url: "/settings/webchat",
         isActive: route.path === "/settings/webchat",
       },
@@ -213,14 +241,14 @@ const navMain = computed(() => {
 
   // Customer Privacy is available to all roles
   settingsItems.push({
-    title: "Customer Privacy",
+    title: t("nav.customerPrivacy"),
     url: "/settings/customer-privacy",
     isActive: route.path === "/settings/customer-privacy",
   });
 
   // My Profile is available to all roles
   settingsItems.push({
-    title: "My Profile",
+    title: t("nav.myProfile"),
     url: "/settings/profile",
     isActive: route.path === "/settings/profile",
   });
@@ -239,7 +267,7 @@ const navMain = computed(() => {
   }
 
   items.push({
-    title: "Settings",
+    title: t("nav.settings"),
     url: "#",
     icon: Settings,
     isActive: isPathActive("/settings"),
@@ -254,6 +282,14 @@ onMounted(async () => {
   try {
     const response = await Hay.plugins.getMenuItems.query();
     pluginMenuItems.value = response.items || [];
+
+    // Register role restrictions for internal custom menu items
+    // so direct URL navigation is also guarded by the auth middleware
+    for (const item of pluginMenuItems.value) {
+      if (item.roles?.length && !item.external && item.url) {
+        roleProtectedRoutes[item.url] = item.roles;
+      }
+    }
   } catch (error) {
     console.error("Failed to fetch plugin menu items:", error);
   }

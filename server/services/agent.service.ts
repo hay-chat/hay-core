@@ -21,6 +21,8 @@ export class AgentService {
       testMode?: boolean | null;
       humanHandoffAvailableInstructions?: unknown[];
       humanHandoffUnavailableInstructions?: unknown[];
+      initialGreeting?: string;
+      language?: string | null;
     },
   ): Promise<Agent> {
     return await this.agentRepository.create({
@@ -34,6 +36,8 @@ export class AgentService {
       testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
+      initialGreeting: data.initialGreeting,
+      language: data.language,
       organization_id: organizationId,
     });
   }
@@ -64,6 +68,8 @@ export class AgentService {
       testMode?: boolean | null;
       humanHandoffAvailableInstructions?: unknown[];
       humanHandoffUnavailableInstructions?: unknown[];
+      initialGreeting?: string;
+      language?: string | null;
     },
   ): Promise<Agent | null> {
     return await this.agentRepository.update(agentId, organizationId, {
@@ -77,6 +83,8 @@ export class AgentService {
       testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
+      initialGreeting: data.initialGreeting,
+      language: data.language,
     });
   }
 

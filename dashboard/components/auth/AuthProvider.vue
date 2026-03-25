@@ -7,9 +7,10 @@
     >
       <Loading />
       <div v-if="showRefreshMessage" class="text-sm text-gray-500">
-        This is taking longer than expected.
-        <a href="javascript:void(0)" class="text-blue-500 underline" @click="refresh"
-          >Refresh the page</a
+        {{ $t("common.takingLonger") }}
+        <a href="javascript:void(0)" class="text-blue-500 underline" @click="refresh">{{
+          $t("common.refreshPage")
+        }}</a
         >.
       </div>
     </div>
@@ -24,9 +25,11 @@
 <script setup lang="ts">
 import { useAuthStore } from "@/stores/auth";
 import { useHeartbeat } from "@/composables/useHeartbeat";
+import { Hay } from "@/utils/api";
 
 const authStore = useAuthStore();
 const route = useRoute();
+const { setLocaleFromBackend } = useLocale();
 const showRefreshMessage = ref(false);
 const refreshTimer = ref<number | null>(null);
 
@@ -77,9 +80,20 @@ const initializeAuth = async () => {
     try {
       await authStore.initializeAuth();
 
-      // Start heartbeat after successful auth initialization
+      // Start heartbeat and sync locale after successful auth initialization
       if (authStore.isAuthenticated) {
         startHeartbeat();
+
+        // Sync dashboard locale with organization language setting
+        try {
+          const orgSettings = await Hay.organizations.getSettings.query();
+          if (orgSettings.defaultLanguage) {
+            await setLocaleFromBackend(orgSettings.defaultLanguage);
+          }
+        } catch (e) {
+          // Non-critical: locale stays at default if fetch fails
+          console.warn("[AuthProvider] Failed to sync locale from org settings:", e);
+        }
       }
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);

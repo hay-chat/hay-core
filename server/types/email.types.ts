@@ -30,8 +30,9 @@ export interface EmailOptions {
   priority?: "high" | "normal" | "low";
 }
 
-export interface EmailTemplateOptions extends Omit<EmailOptions, "html" | "text"> {
+export interface EmailTemplateOptions extends Omit<EmailOptions, "html" | "text" | "subject"> {
   template: string;
+  subject?: string;
   variables?: Record<string, any>;
   locale?: string;
 }
@@ -78,6 +79,7 @@ export interface TemplateVariable {
 export interface TemplateRenderOptions {
   template: string;
   variables: Record<string, any>;
+  locale?: string;
   useCache?: boolean;
   stripComments?: boolean;
   minify?: boolean;

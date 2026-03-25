@@ -1,0 +1,112 @@
+Hay Community License v1.0
+
+Copyright (c) 2024-present Hay Labs
+
+1.  Definitions
+
+    "Software" means the Hay platform source code, documentation, and
+    associated files in this repository.
+
+    "Hay Brand" means the name "Hay" or "Hay Chat", the Hay logo, and any other
+    trademarks, service marks, or trade dress owned by Hay Labs.
+
+    "Chat Widget" means the embeddable chat component provided as part
+    of the Software (located in the /webchat directory and any rendered
+    instances thereof).
+
+    "Attribution Notice" means the "Powered by Hay" branding, links, and
+    any other attribution displayed by the Chat Widget.
+
+2.  Grant of Rights
+
+    Subject to the conditions below, Hay Labs grants you a non-exclusive,
+    worldwide, royalty-free license to:
+
+    a. Use the Software for personal, internal, or commercial purposes
+    (e.g., deploying it to serve your own customers).
+    b. View, study, and learn from the source code.
+    c. Modify and create derivative works of the Software.
+    d. Distribute copies or derivative works of the Software, provided
+    you include this license and satisfy all conditions in Section 3.
+
+3.  Conditions
+
+    3.1 No Selling the Software
+
+        You may NOT sell, sublicense, or otherwise commercialize the
+        Software itself, or any derivative work thereof, as a standalone
+        product or service. This includes, without limitation:
+
+        - Offering the Software (or a modified version) as a paid product.
+        - Offering the Software as a hosted or managed service where the
+          primary value to the customer is the Software itself (i.e.,
+          competing with Hay's own hosted offering).
+        - Bundling the Software with other products or services for the
+          primary purpose of circumventing this restriction.
+
+        For clarity, you MAY use the Software internally within your own
+        organization and you MAY deploy the Software to serve your own
+        end users, provided the Software is not itself the product or
+        service being sold.
+
+    3.2 No Hay Brand Reuse
+
+        You may NOT use the Hay Brand in any way that suggests your
+        product, service, or organization is endorsed by, affiliated
+        with, or part of Hay Labs, except:
+
+        - As required by the Attribution Notice (Section 3.3).
+        - In truthful, factual statements (e.g., "built on Hay" or
+          "compatible with Hay") that do not imply endorsement.
+
+        If you distribute a modified version of the Software, you must
+        choose a distinct name for your version and must not use the
+        Hay Brand as part of that name.
+
+    3.3 Attribution in the Chat Widget
+
+        You must NOT remove, obscure, or alter the Attribution Notice
+        displayed by the Chat Widget. The "Powered by Hay" branding
+        (or its equivalent as updated by Hay Labs from time to time)
+        must remain visible and functional in any deployment, copy, or
+        derivative work that includes the Chat Widget.
+
+    3.4 License Preservation
+
+        Any copy or derivative work of the Software must include a copy
+        of this license and must not impose additional restrictions that
+        conflict with it.
+
+4.  Contributions
+
+    By submitting a contribution (pull request, patch, or other code) to
+    this repository, you grant Hay Labs a perpetual, worldwide,
+    non-exclusive, royalty-free, irrevocable license to use, reproduce,
+    modify, distribute, and sublicense your contribution as part of the
+    Software under this license or any future license chosen by Hay Labs.
+
+5.  No Trademark License
+
+    Except as expressly stated in Section 3.2 and 3.3, this license does
+    not grant permission to use the Hay Brand.
+
+6.  Disclaimer of Warranty
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+    NONINFRINGEMENT.
+
+7.  Limitation of Liability
+
+    IN NO EVENT SHALL HAY LABS OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM,
+    DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT,
+    OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+8.  Termination
+
+    This license terminates automatically if you violate any of its
+    conditions. Upon termination, you must cease all use and distribution
+    of the Software. Sections 5, 6, 7, and this Section 8 survive
+    termination.

@@ -23,9 +23,13 @@ import { Upload } from "../entities/upload.entity";
 import { ScheduledJob } from "../entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "../entities/scheduled-job-history.entity";
 import { WebchatSettings } from "./entities/webchat-settings.entity";
+import { AuthCode } from "../entities/auth-code.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
+import { createLogger } from "@server/lib/logger";
 import "reflect-metadata";
+
+const logger = createLogger("database");
 
 export const AppDataSource = new DataSource({
   type: config.database.type,
@@ -62,6 +66,7 @@ export const AppDataSource = new DataSource({
     ScheduledJob,
     ScheduledJobHistory,
     WebchatSettings,
+    AuthCode,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
@@ -76,65 +81,30 @@ export async function initializeDatabase(maxRetries = 3, retryDelay = 2000) {
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Attempting database connection (${attempt}/${maxRetries})...`);
+      logger.info({ attempt, maxRetries }, "Attempting database connection");
       await AppDataSource.initialize();
 
       // Enable required extensions if not already enabled
-      console.log("🔄 Enabling database extensions...");
+      logger.info("Enabling database extensions");
       await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS vector");
       await AppDataSource.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
 
-      console.log("✅ Database connection established");
-      console.log("✅ pgvector and pgcrypto extensions enabled");
+      logger.info("Database connection established, pgvector and pgcrypto extensions enabled");
       return true;
     } catch (error) {
       lastError = error;
-      console.error(`❌ Database connection attempt ${attempt}/${maxRetries} failed:`);
-
-      // Log detailed error information
-      interface DbError extends Error {
-        code?: string;
-        errno?: number;
-        syscall?: string;
-        address?: string;
-        port?: number;
-      }
-
-      if (error instanceof Error) {
-        const dbError = error as DbError;
-        console.error("  - Error message:", dbError.message);
-        console.error("  - Error name:", dbError.name);
-        if (dbError.code) {
-          console.error("  - Error code:", dbError.code);
-        }
-        if (dbError.errno) {
-          console.error("  - Error errno:", dbError.errno);
-        }
-        if (dbError.syscall) {
-          console.error("  - Error syscall:", dbError.syscall);
-        }
-        if (dbError.address) {
-          console.error("  - Error address:", dbError.address);
-        }
-        if (dbError.port) {
-          console.error("  - Error port:", dbError.port);
-        }
-      } else {
-        console.error("  - Full error:", error);
-      }
+      logger.error({ err: error, attempt, maxRetries }, "Database connection attempt failed");
 
       // If this wasn't the last attempt, wait before retrying
       if (attempt < maxRetries) {
-        console.log(`⏳ Retrying in ${retryDelay / 1000} seconds...`);
+        logger.info({ retryDelaySeconds: retryDelay / 1000 }, "Retrying database connection");
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
     }
   }
 
   // All retries failed
-  console.error(`\n❌ Failed to connect to database after ${maxRetries} attempts`);
-  console.error("❌ Database connection is required for the application to function properly");
-  console.error("❌ Please check your database configuration and ensure PostgreSQL is running\n");
+  logger.error({ maxRetries }, "Failed to connect to database after all attempts. Database connection is required. Please check your configuration and ensure PostgreSQL is running.");
 
   // Throw the last error to prevent server from starting
   throw lastError;

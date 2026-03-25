@@ -1,0 +1,15 @@
+export default {
+  "widget.defaultTitle": "Chatta con noi",
+  "widget.defaultSubtitle": "Di solito rispondiamo in pochi minuti",
+  "widget.defaultGreeting": "Ciao! Come possiamo aiutarti oggi?",
+  "chat.close": "Chiudi chat",
+  "chat.open": "Apri chat",
+  "chat.expand": "Espandi chat",
+  "chat.collapse": "Riduci chat",
+  "chat.conversationEnded": "Questa conversazione è terminata",
+  "chat.startNew": "Inizia Nuova Conversazione",
+  "chat.poweredBy": "Offerto da",
+  "chat.conversationClosed": "Conversazione Chiusa",
+  "input.placeholder": "Scrivi un messaggio...",
+  "input.send": "Invia messaggio",
+} as const;

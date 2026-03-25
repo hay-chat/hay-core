@@ -1,0 +1,15 @@
+export default {
+  "widget.defaultTitle": "チャットで相談",
+  "widget.defaultSubtitle": "通常、数分以内に返信いたします",
+  "widget.defaultGreeting": "こんにちは！本日はどのようなご用件でしょうか？",
+  "chat.close": "チャットを閉じる",
+  "chat.open": "チャットを開く",
+  "chat.expand": "チャットを拡大",
+  "chat.collapse": "チャットを縮小",
+  "chat.conversationEnded": "この会話は終了しました",
+  "chat.startNew": "新しい会話を始める",
+  "chat.poweredBy": "Powered by",
+  "chat.conversationClosed": "会話終了",
+  "input.placeholder": "メッセージを入力...",
+  "input.send": "メッセージを送信",
+} as const;

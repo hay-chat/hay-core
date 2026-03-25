@@ -1,5 +1,7 @@
 <template>
-  <div class="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center mt-4 gap-2">
+  <div
+    class="dialog-footer flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center mt-4 gap-2"
+  >
     <!-- Secondary actions (left side on desktop) -->
     <div v-if="$slots.secondary" class="flex flex-col-reverse sm:flex-row gap-2">
       <slot name="secondary" />

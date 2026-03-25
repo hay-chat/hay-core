@@ -9,7 +9,9 @@ import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
 import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
 
 interface WebSocketClient {
@@ -78,7 +80,7 @@ export class WebSocketService {
         path: "/ws",
         clientTracking: true,
       });
-      debugLog("websocket", `WebSocket server initialized on standalone port ${serverOrPort}`);
+      logger.debug({ port: serverOrPort }, "WebSocket server initialized on standalone port");
     } else {
       // WebSocket server attached to existing HTTP server
       this.wss = new WebSocketServer({
@@ -86,7 +88,7 @@ export class WebSocketService {
         path: "/ws",
         clientTracking: true,
       });
-      debugLog("websocket", "WebSocket server initialized");
+      logger.debug("WebSocket server initialized");
     }
 
     this.wss.on("connection", (ws, req) => {
@@ -119,12 +121,10 @@ export class WebSocketService {
       });
 
       this.redisInitialized = true;
-      debugLog("websocket", "Redis pub/sub initialized for cross-server broadcasting");
+      logger.debug("Redis pub/sub initialized for cross-server broadcasting");
     } catch (error) {
-      console.error("[WebSocket] Failed to initialize Redis:", error);
-      console.warn(
-        "[WebSocket] Running without Redis - events will not be broadcast across server instances",
-      );
+      logger.error({ err: error }, "Failed to initialize Redis");
+      logger.warn("Running without Redis - events will not be broadcast across server instances");
     }
   }
 
@@ -135,7 +135,7 @@ export class WebSocketService {
     const { type, organizationId, conversationId, payload } = event;
 
     if (!type || !organizationId) {
-      console.error("[WebSocket] Invalid Redis event:", event);
+      logger.error({ event }, "Invalid Redis event");
       return;
     }
 
@@ -159,19 +159,19 @@ export class WebSocketService {
       if (isPublicMessage && payload.deliveryState === "sent") {
         const conversationSent = this.sendToConversation(conversationId, messagePayload);
 
-        debugLog(
-          "websocket",
-          `Broadcasted ${payload.type} SENT message to ${conversationSent} conversation clients and ${orgSent} org clients`,
+        logger.debug(
+          { messageType: payload.type, conversationSent, orgSent },
+          "Broadcasted SENT message to conversation and org clients",
         );
       } else if (!isPublicMessage) {
-        debugLog(
-          "websocket",
-          `Broadcasted ${payload.type} (internal) message to ${orgSent} org clients only`,
+        logger.debug(
+          { messageType: payload.type, orgSent },
+          "Broadcasted internal message to org clients only",
         );
       } else {
-        debugLog(
-          "websocket",
-          `Broadcasted ${payload.type} QUEUED message to ${orgSent} org clients only (not to conversation)`,
+        logger.debug(
+          { messageType: payload.type, orgSent },
+          "Broadcasted QUEUED message to org clients only",
         );
       }
     } else if (type === "conversation_status_changed" && conversationId) {
@@ -179,9 +179,9 @@ export class WebSocketService {
       const conversationSent = this.sendToConversation(conversationId, { type, payload });
       const orgSent = this.sendToOrganization(organizationId, { type, payload });
 
-      debugLog(
-        "websocket",
-        `Broadcasted ${type} to ${conversationSent} conversation clients and ${orgSent} organization clients`,
+      logger.debug(
+        { type, conversationSent, orgSent },
+        "Broadcasted status change to conversation and org clients",
       );
     } else if (
       type === "conversation_created" ||
@@ -191,12 +191,12 @@ export class WebSocketService {
       // Broadcast conversation list updates to all organization clients
       const sent = this.sendToOrganization(organizationId, { type, payload });
 
-      debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
+      logger.debug({ type, sent }, "Broadcasted event from Redis to local clients");
     } else {
       // Broadcast to all clients in the organization for other events
       const sent = this.sendToOrganization(organizationId, { type, payload });
 
-      debugLog("websocket", `Broadcasted ${type} from Redis to ${sent} local clients`);
+      logger.debug({ type, sent }, "Broadcasted event from Redis to local clients");
     }
   }
 
@@ -207,7 +207,7 @@ export class WebSocketService {
     const { jobId, organizationId, status, progress, result, error } = event;
 
     if (!jobId || !organizationId) {
-      console.error("[WebSocket] Invalid job update event:", event);
+      logger.error({ event }, "Invalid job update event");
       return;
     }
 
@@ -221,7 +221,7 @@ export class WebSocketService {
       error,
     });
 
-    debugLog("websocket", `Broadcasted job update for ${jobId} to ${sent} clients`);
+    logger.debug({ jobId, sent }, "Broadcasted job update");
   }
 
   /**
@@ -250,9 +250,9 @@ export class WebSocketService {
     // Authenticate if token provided
     if (token) {
       const authenticated = this.authenticateClient(clientId, token);
-      debugLog(
-        "websocket",
-        `Client ${clientId} authentication: ${authenticated}, org: ${client.organizationId}`,
+      logger.debug(
+        { clientId, authenticated, organizationId: client.organizationId },
+        "Client authentication result",
       );
 
       // Add to organization clients if authenticated
@@ -261,11 +261,14 @@ export class WebSocketService {
           this.organizationClients.set(client.organizationId, new Set());
         }
         this.organizationClients.get(client.organizationId)!.add(clientId);
-        debugLog("websocket", `Added client ${clientId} to organization ${client.organizationId}`);
+        logger.debug(
+          { clientId, organizationId: client.organizationId },
+          "Added client to organization",
+        );
       } else {
-        debugLog(
-          "websocket",
-          `Client ${clientId} NOT added to organization (authenticated: ${client.authenticated}, org: ${client.organizationId})`,
+        logger.debug(
+          { clientId, authenticated: client.authenticated, organizationId: client.organizationId },
+          "Client NOT added to organization",
         );
       }
     }
@@ -280,7 +283,7 @@ export class WebSocketService {
     });
 
     ws.on("error", (error) => {
-      console.error(`WebSocket error for client ${clientId}:`, error);
+      logger.error({ err: error, clientId }, "WebSocket error for client");
       this.handleDisconnect(clientId);
     });
 
@@ -345,10 +348,10 @@ export class WebSocketService {
           break;
 
         default:
-          debugLog("websocket", `Unknown message type: ${message.type}`);
+          logger.debug({ messageType: message.type }, "Unknown message type");
       }
     } catch (error) {
-      console.error(`Failed to handle message from ${clientId}:`, error);
+      logger.error({ err: error, clientId }, "Failed to handle message");
       client.ws.send(
         JSON.stringify({
           type: "error",
@@ -405,7 +408,7 @@ export class WebSocketService {
 
       // Webchat is now a core feature, no longer requires plugin instance
       // Just log the connection for debugging
-      debugLog("websocket", `Webchat client connected to conversation ${conversation.id}`);
+      logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
     }
 
     // Send identification confirmation
@@ -483,9 +486,7 @@ export class WebSocketService {
         newNonce = dpopVerification.newNonce;
       }
 
-      console.log(
-        `[WebSocket.handleChatMessage] Saving customer message to conversation ${conversation.id}`,
-      );
+      logger.debug({ conversationId: conversation.id }, "Saving customer message to conversation");
 
       // Save customer message using conversation.addMessage() to ensure broadcasting
       // addMessage() also enqueues the conversation for RabbitMQ processing
@@ -495,7 +496,7 @@ export class WebSocketService {
         sender: "customer",
       });
 
-      console.log(`[WebSocket.handleChatMessage] Message saved with ID: ${savedMessage.id}`);
+      logger.debug({ messageId: savedMessage.id }, "Message saved");
 
       // Send confirmation with new nonce (if DPoP was validated)
       const confirmationPayload = {
@@ -503,15 +504,15 @@ export class WebSocketService {
         messageId: savedMessage.id,
         ...(newNonce && { nonce: newNonce }),
       };
-      console.log(
-        `[WebSocket.handleChatMessage] Sending confirmation to client:`,
-        confirmationPayload,
-      );
+      logger.debug({ confirmationPayload }, "Sending confirmation to client");
       client.ws.send(JSON.stringify(confirmationPayload));
 
-      debugLog("websocket", `Webchat message processed for conversation ${conversation.id}`);
+      // Note: Message broadcasting is handled automatically by conversation.addMessage()
+      // Orchestrator processing is triggered via RabbitMQ queue from conversation.addMessage()
+
+      logger.debug({ conversationId: conversation.id }, "Webchat message processed");
     } catch (error) {
-      console.error("Failed to process webchat message:", error);
+      logger.error({ err: error }, "Failed to process webchat message");
       client.ws.send(
         JSON.stringify({
           type: "error",
@@ -583,9 +584,9 @@ export class WebSocketService {
     // They already receive ALL messages via organizationClients, so adding them to conversationClients
     // would cause duplicate message delivery
     if (client.authenticated && client.organizationId) {
-      debugLog(
-        "websocket",
-        `Client ${clientId} is authenticated org member - skipping conversationClients subscription (will receive via organizationClients)`,
+      logger.debug(
+        { clientId },
+        "Client is authenticated org member - skipping conversationClients subscription",
       );
       // Still set conversationId for client metadata, but don't add to conversationClients map
       client.conversationId = conversationId as string;
@@ -600,9 +601,9 @@ export class WebSocketService {
 
     client.conversationId = conversationId as string;
 
-    debugLog(
-      "websocket",
-      `Client ${clientId} subscribed to conversation ${conversationId} (webchat client)`,
+    logger.debug(
+      { clientId, conversationId },
+      "Client subscribed to conversation (webchat client)",
     );
   }
 
@@ -623,9 +624,9 @@ export class WebSocketService {
         }
       }
 
-      debugLog(
-        "websocket",
-        `Webchat client disconnected from conversation ${client.conversationId}`,
+      logger.debug(
+        { conversationId: client.conversationId },
+        "Webchat client disconnected from conversation",
       );
     }
 
@@ -726,7 +727,7 @@ export class WebSocketService {
       }
     }
 
-    debugLog("websocket", `Sent message to ${sent} clients in organization ${organizationId}`);
+    logger.debug({ organizationId, sent }, "Sent message to organization clients");
     return sent;
   }
 

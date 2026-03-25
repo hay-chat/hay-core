@@ -4,12 +4,13 @@
   "private": true,
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "node-version": "22.10.0",
   "workspaces": [
     "dashboard",
     "server",
     "packages/plugin-sdk",
+    "packages/server-sdk",
     "plugins/core/*"
   ],
   "scripts": {
@@ -35,8 +36,9 @@
     "lint:fix": "eslint \"server/**/*.{js,ts}\" \"dashboard/**/*.{js,ts,vue}\" --cache --fix",
     "lint:dashboard": "eslint \"dashboard/**/*.{js,ts,vue}\" --cache",
     "lint:server": "eslint \"server/**/*.{js,ts}\" --cache",
-    "typecheck": "npm run typecheck:plugin-sdk && npm run typecheck:dashboard && npm run typecheck:server",
+    "typecheck": "npm run typecheck:plugin-sdk && npm run typecheck:server-sdk && npm run typecheck:dashboard && npm run typecheck:server",
     "typecheck:plugin-sdk": "cd packages/plugin-sdk && npm run typecheck",
+    "typecheck:server-sdk": "cd packages/server-sdk && npm run typecheck",
     "typecheck:dashboard": "cd dashboard && npm run typecheck",
     "typecheck:server": "cd server && npm run typecheck",
     "clean": "npm run clean:plugin-sdk && npm run clean:dashboard && npm run clean:server",
@@ -52,11 +54,12 @@
     "migration:revert": "cd server && npm run migration:revert",
     "migration:show": "cd server && npm run migration:show",
     "plugins:cleanup": "tsx scripts/cleanup-missing-plugins.ts",
+    "reset:rate-limits": "tsx scripts/reset-rate-limits.ts",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
     "env:local": "./scripts/switch-env.sh local",
     "env:cloud": "./scripts/switch-env.sh cloud",
     "env:status": "./scripts/switch-env.sh status",
-    "postinstall": "git submodule update --init --recursive && cd dashboard && nuxt prepare"
+    "postinstall": "git submodule update --init --recursive || echo 'Warning: git submodule update failed (non-fatal)'; cd dashboard && nuxt prepare"
   },
   "overrides": {
     "vite": "^6.0.0",
@@ -69,8 +72,15 @@
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:packages/plugin-sdk",
+    "@mozilla/readability": "^0.6.0",
     "@types/amqplib": "^0.10.8",
     "@types/archiver": "^7.0.0",
-    "amqplib": "^0.10.9"
+    "@types/turndown": "^5.0.6",
+    "amqplib": "^0.10.9",
+    "linkedom": "^0.18.12",
+    "turndown": "^7.2.2"
+  },
+  "devDependencies": {
+    "ts-jest": "^29.4.6"
   }
 }

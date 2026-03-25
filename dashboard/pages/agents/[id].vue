@@ -57,6 +57,15 @@
               helper-text="The first message customers will see when starting a conversation. If left empty, a default greeting will be used. This message will be automatically translated to match the conversation's language."
               placeholder="Hello! How can I help you today?"
             />
+            <!-- Language Field -->
+            <Input
+              id="language"
+              v-model="form.language"
+              type="select"
+              :label="$t('language.label')"
+              :options="languageOptions"
+              :helper-text="$t('language.helperText')"
+            />
             <!-- Tone Field -->
             <div>
               <Label cla>Tone</Label>
@@ -287,6 +296,7 @@ const initialForm = ref({
   trigger: "",
   enabled: true,
   testMode: null as boolean | null,
+  language: "",
   humanHandoffAvailableInstructions: [] as any,
   humanHandoffUnavailableInstructions: [] as any,
 });
@@ -317,6 +327,26 @@ Example: "Hey there! Totally get it — that happens sometimes 😅 Let me check
 Example: "Great question! Let's get this sorted out right away 🎉 I just need your email to find your order!"`,
 };
 
+// Language options for the agent language select
+// null = inherit from organization (shown as first option)
+const languageOptions = [
+  { label: "Inherit from Organization", value: "" },
+  { label: "English", value: "en" },
+  { label: "Português", value: "pt" },
+  { label: "Español", value: "es" },
+  { label: "Français", value: "fr" },
+  { label: "Deutsch", value: "de" },
+  { label: "Italiano", value: "it" },
+  { label: "Nederlands", value: "nl" },
+  { label: "日本語", value: "ja" },
+  { label: "中文", value: "zh" },
+  { label: "한국어", value: "ko" },
+  { label: "العربية", value: "ar" },
+  { label: "Türkçe", value: "tr" },
+  { label: "Polski", value: "pl" },
+  { label: "Русский", value: "ru" },
+];
+
 // Form state
 const form = ref({
   name: "",
@@ -328,6 +358,7 @@ const form = ref({
   trigger: "",
   enabled: true,
   testMode: null as boolean | null,
+  language: "",
   humanHandoffAvailableInstructions: { blocks: [] } as any,
   humanHandoffUnavailableInstructions: { blocks: [] } as any,
 });
@@ -415,6 +446,7 @@ onMounted(async () => {
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
         testMode: testModeValue,
+        language: (agentResponse as any).language || "",
         enabled: agentResponse.enabled ?? true,
         humanHandoffAvailableInstructions: (agentResponse as any)
           .human_handoff_available_instructions || { blocks: [] },
@@ -501,6 +533,7 @@ const handleSubmit = async () => {
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
       testMode: testModeValue,
+      language: (form.value.language || null) as any,
       humanHandoffAvailableInstructions: savedHandoffAvailable || { blocks: [] },
       humanHandoffUnavailableInstructions: savedHandoffUnavailable || { blocks: [] },
     };

@@ -1,26 +1,25 @@
 <template>
-  <Page title="Customer Privacy" description="Manage GDPR data requests for your customers">
+  <Page :title="$t('customerPrivacy.title')" :description="$t('customerPrivacy.description')">
     <!-- Info Alert -->
     <Alert class="mb-6">
-      <AlertTitle>Customer Privacy Management</AlertTitle>
+      <AlertTitle>{{ $t('customerPrivacy.infoTitle') }}</AlertTitle>
       <AlertDescription>
-        Organizations can initiate GDPR data export or deletion requests on behalf of their
-        customers. The customer will receive a verification email to confirm the request.
+        {{ $t('customerPrivacy.infoDescription') }}
       </AlertDescription>
     </Alert>
 
     <!-- Error Alert -->
     <Alert v-if="errorState.type" variant="destructive" class="mb-6">
       <AlertTitle>
-        {{ errorState.type === "rate_limit" ? "Too Many Requests" : "Error" }}
+        {{ errorState.type === "rate_limit" ? $t('customerPrivacy.tooManyRequests') : $t('customerPrivacy.error') }}
       </AlertTitle>
       <AlertDescription>
         {{ errorState.message }}
         <div v-if="errorState.retryAfter" class="mt-2 font-medium">
-          Try again after: {{ formatTime(errorState.retryAfter) }}
+          {{ $t('customerPrivacy.tryAgainAfter', { time: formatTime(errorState.retryAfter) }) }}
         </div>
         <div v-if="errorState.type === 'email_failed'" class="mt-2">
-          Please check your spam folder or try again later.
+          {{ $t('customerPrivacy.checkSpamFolder') }}
         </div>
       </AlertDescription>
       <Button
@@ -30,37 +29,36 @@
         class="mt-2"
         @click="errorState = { type: null, message: '' }"
       >
-        Dismiss
+        {{ $t('customerPrivacy.dismiss') }}
       </Button>
     </Alert>
 
     <!-- Data Retention Policy -->
     <Card>
       <CardHeader>
-        <CardTitle>Data Retention Policy</CardTitle>
+        <CardTitle>{{ $t('customerPrivacy.dataRetentionPolicy') }}</CardTitle>
         <CardDescription>
-          Configure automatic anonymization of closed conversations for GDPR compliance
+          {{ $t('customerPrivacy.dataRetentionPolicyDescription') }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="space-y-2">
-          <Label for="retentionDays">Conversation Retention Period</Label>
+          <Label for="retentionDays">{{ $t('customerPrivacy.retentionPeriod') }}</Label>
           <Select v-model="retentionDays" id="retentionDays">
             <SelectTrigger>
-              <SelectValue placeholder="Select retention period" />
+              <SelectValue :placeholder="$t('customerPrivacy.selectRetentionPeriod')" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem :value="null">Disabled (keep forever)</SelectItem>
-              <SelectItem :value="30">30 days</SelectItem>
-              <SelectItem :value="60">60 days</SelectItem>
-              <SelectItem :value="90">90 days</SelectItem>
-              <SelectItem :value="180">180 days</SelectItem>
-              <SelectItem :value="365">365 days (1 year)</SelectItem>
+              <SelectItem :value="null">{{ $t('customerPrivacy.retentionDisabled') }}</SelectItem>
+              <SelectItem :value="30">{{ $t('customerPrivacy.retentionDays', { days: 30 }) }}</SelectItem>
+              <SelectItem :value="60">{{ $t('customerPrivacy.retentionDays', { days: 60 }) }}</SelectItem>
+              <SelectItem :value="90">{{ $t('customerPrivacy.retentionDays', { days: 90 }) }}</SelectItem>
+              <SelectItem :value="180">{{ $t('customerPrivacy.retentionDays', { days: 180 }) }}</SelectItem>
+              <SelectItem :value="365">{{ $t('customerPrivacy.retentionYear') }}</SelectItem>
             </SelectContent>
           </Select>
           <p class="text-sm text-muted-foreground">
-            After this period, closed conversations will be anonymized. Messages are deleted but
-            analytics metadata is preserved.
+            {{ $t('customerPrivacy.retentionHelp') }}
           </p>
         </div>
 
@@ -70,12 +68,9 @@
           <div class="flex items-start space-x-2">
             <AlertTriangle class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <div class="text-sm">
-              <p class="font-medium text-amber-800 dark:text-amber-200">Important</p>
+              <p class="font-medium text-amber-800 dark:text-amber-200">{{ $t('customerPrivacy.retentionImportant') }}</p>
               <p class="text-amber-700 dark:text-amber-300">
-                When enabled, closed conversations older than the retention period will be
-                automatically anonymized daily. Messages will be permanently deleted, but
-                conversation metadata is preserved for analytics. Conversations marked with "Legal
-                Hold" are exempt from anonymization.
+                {{ $t('customerPrivacy.retentionWarning') }}
               </p>
             </div>
           </div>
@@ -83,7 +78,7 @@
 
         <Button @click="saveRetentionPolicy" :disabled="isSavingRetention">
           <Save class="h-4 w-4 mr-2" />
-          {{ isSavingRetention ? "Saving..." : "Save Retention Policy" }}
+          {{ isSavingRetention ? $t('customerPrivacy.saving') : $t('customerPrivacy.saveRetentionPolicy') }}
         </Button>
       </CardContent>
     </Card>
@@ -91,24 +86,24 @@
     <!-- Initiate Request Form -->
     <Card>
       <CardHeader>
-        <CardTitle>Initiate Privacy Request</CardTitle>
+        <CardTitle>{{ $t('customerPrivacy.initiateRequest') }}</CardTitle>
         <CardDescription>
-          Start a GDPR data export or deletion request for one of your customers
+          {{ $t('customerPrivacy.initiateRequestDescription') }}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form @submit.prevent="initiateRequest" class="space-y-4">
           <!-- Identifier Type Selector -->
           <div class="space-y-2">
-            <Label for="identifierType">Identify Customer By</Label>
+            <Label for="identifierType">{{ $t('customerPrivacy.identifyCustomerBy') }}</Label>
             <Select v-model="identifierType" id="identifierType">
               <SelectTrigger>
-                <SelectValue placeholder="Select identifier type" />
+                <SelectValue :placeholder="$t('customerPrivacy.selectIdentifierType')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="email">Email Address</SelectItem>
-                <SelectItem value="phone">Phone Number</SelectItem>
-                <SelectItem value="externalId">External Customer ID</SelectItem>
+                <SelectItem value="email">{{ $t('customerPrivacy.identifierEmail') }}</SelectItem>
+                <SelectItem value="phone">{{ $t('customerPrivacy.identifierPhone') }}</SelectItem>
+                <SelectItem value="externalId">{{ $t('customerPrivacy.identifierExternalId') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -134,7 +129,7 @@
               class="flex-1"
             >
               <Download class="h-4 w-4 mr-2" />
-              Request Data Export
+              {{ $t('customerPrivacy.requestDataExport') }}
             </Button>
             <Button
               type="submit"
@@ -144,14 +139,14 @@
               class="flex-1"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              Request Data Deletion
+              {{ $t('customerPrivacy.requestDataDeletion') }}
             </Button>
           </div>
 
           <!-- Loading State -->
           <div v-if="isLoading" class="flex items-center justify-center py-4">
             <Loader2 class="h-6 w-6 animate-spin text-neutral-muted" />
-            <span class="ml-2 text-sm text-neutral-muted">Processing request...</span>
+            <span class="ml-2 text-sm text-neutral-muted">{{ $t('customerPrivacy.processingRequest') }}</span>
           </div>
 
           <!-- Success/Error Messages -->
@@ -173,9 +168,9 @@
     <!-- Request History -->
     <Card>
       <CardHeader>
-        <CardTitle>Request History</CardTitle>
+        <CardTitle>{{ $t('customerPrivacy.requestHistory') }}</CardTitle>
         <CardDescription>
-          View and track all customer privacy requests initiated by your organization
+          {{ $t('customerPrivacy.requestHistoryDescription') }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -204,6 +199,7 @@ import {
 } from "lucide-vue-next";
 import { useToast } from "@/composables/useToast";
 
+const { t } = useI18n();
 const toast = useToast();
 import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
 
@@ -263,26 +259,26 @@ const formatTime = (date: Date): string => {
 const identifierLabel = computed(() => {
   switch (identifierType.value) {
     case "email":
-      return "Customer Email Address";
+      return t('customerPrivacy.customerEmailAddress');
     case "phone":
-      return "Customer Phone Number";
+      return t('customerPrivacy.customerPhoneNumber');
     case "externalId":
-      return "External Customer ID";
+      return t('customerPrivacy.externalCustomerId');
     default:
-      return "Customer Identifier";
+      return t('customerPrivacy.customerIdentifier');
   }
 });
 
 const identifierPlaceholder = computed(() => {
   switch (identifierType.value) {
     case "email":
-      return "customer@example.com";
+      return t('customerPrivacy.emailPlaceholder');
     case "phone":
-      return "+1234567890";
+      return t('customerPrivacy.phonePlaceholder');
     case "externalId":
-      return "cust_abc123";
+      return t('customerPrivacy.externalIdPlaceholder');
     default:
-      return "Enter customer identifier";
+      return t('customerPrivacy.identifierPlaceholder');
   }
 });
 
@@ -412,10 +408,10 @@ const saveRetentionPolicy = async () => {
     await Hay.organizations.updateSettings.mutate({
       retentionDays: retentionDays.value,
     });
-    toast.success("Success", "Retention policy saved successfully");
+    toast.success(t('customerPrivacy.retentionSaveSuccess'));
   } catch (error) {
     console.error("Failed to save retention policy:", error);
-    toast.error("Error", "Failed to save retention policy");
+    toast.error(t('customerPrivacy.retentionSaveFailed'));
   } finally {
     isSavingRetention.value = false;
   }

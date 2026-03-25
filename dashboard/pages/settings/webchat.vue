@@ -1,57 +1,57 @@
 <template>
   <Page
-    title="Webchat Settings"
-    description="Customize your website chat widget appearance and behavior"
+    :title="$t('webchat.title')"
+    :description="$t('webchat.description')"
     width="max"
   >
     <!-- Appearance -->
     <Card>
       <CardHeader>
-        <CardTitle>Widget Appearance</CardTitle>
-        <CardDescription>Customize how the chat widget looks on your website</CardDescription>
+        <CardTitle>{{ $t('webchat.widgetAppearance') }}</CardTitle>
+        <CardDescription>{{ $t('webchat.widgetAppearanceDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
           <Input
             id="widgetTitle"
             v-model="settingsForm.widgetTitle"
-            label="Widget Title"
-            placeholder="Chat with us"
+            :label="$t('webchat.widgetTitle')"
+            :placeholder="$t('webchat.widgetTitlePlaceholder')"
           />
 
           <Input
             id="widgetSubtitle"
             v-model="settingsForm.widgetSubtitle"
-            label="Widget Subtitle"
-            placeholder="We typically reply within minutes"
+            :label="$t('webchat.widgetSubtitle')"
+            :placeholder="$t('webchat.widgetSubtitlePlaceholder')"
           />
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <div class="space-y-2">
-            <Label for="position">Position</Label>
+            <Label for="position">{{ $t('webchat.position') }}</Label>
             <Select v-model="settingsForm.position">
               <SelectTrigger id="position">
-                <SelectValue placeholder="Select position" />
+                <SelectValue :placeholder="$t('webchat.selectPosition')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="right">Right</SelectItem>
-                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="right">{{ $t('webchat.positionRight') }}</SelectItem>
+                <SelectItem value="left">{{ $t('webchat.positionLeft') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div class="space-y-2">
-            <Label for="theme">Theme</Label>
+            <Label for="theme">{{ $t('webchat.theme') }}</Label>
             <Select v-model="settingsForm.theme">
               <SelectTrigger id="theme">
-                <SelectValue placeholder="Select theme" />
+                <SelectValue :placeholder="$t('webchat.selectTheme')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="blue">Blue</SelectItem>
-                <SelectItem value="green">Green</SelectItem>
-                <SelectItem value="purple">Purple</SelectItem>
-                <SelectItem value="black">Black</SelectItem>
+                <SelectItem value="blue">{{ $t('webchat.themeBlue') }}</SelectItem>
+                <SelectItem value="green">{{ $t('webchat.themeGreen') }}</SelectItem>
+                <SelectItem value="purple">{{ $t('webchat.themePurple') }}</SelectItem>
+                <SelectItem value="black">{{ $t('webchat.themeBlack') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -62,21 +62,21 @@
     <!-- Behavior -->
     <Card>
       <CardHeader>
-        <CardTitle>Widget Behavior</CardTitle>
-        <CardDescription>Configure greeting messages and interaction</CardDescription>
+        <CardTitle>{{ $t('webchat.widgetBehavior') }}</CardTitle>
+        <CardDescription>{{ $t('webchat.widgetBehaviorDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="flex items-center space-x-2">
           <Switch id="showGreeting" v-model:checked="settingsForm.showGreeting" />
-          <Label for="showGreeting">Show greeting message when chat opens</Label>
+          <Label for="showGreeting">{{ $t('webchat.showGreeting') }}</Label>
         </div>
 
         <Textarea
           v-if="settingsForm.showGreeting"
           id="greetingMessage"
           v-model="settingsForm.greetingMessage"
-          label="Greeting Message"
-          placeholder="Hello! How can we help you today?"
+          :label="$t('webchat.greetingMessage')"
+          :placeholder="$t('webchat.greetingMessagePlaceholder')"
           :rows="3"
         />
       </CardContent>
@@ -85,22 +85,22 @@
     <!-- Security -->
     <Card>
       <CardHeader>
-        <CardTitle>Security & Access</CardTitle>
-        <CardDescription>Control where your widget can be embedded</CardDescription>
+        <CardTitle>{{ $t('webchat.securityAccess') }}</CardTitle>
+        <CardDescription>{{ $t('webchat.securityAccessDescription') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <Textarea
           id="allowedDomains"
           v-model="allowedDomainsText"
-          label="Allowed Domains"
-          placeholder="example.com&#10;app.example.com&#10;*"
-          description="Enter one domain per line. Use * to allow all domains."
+          :label="$t('webchat.allowedDomains')"
+          :placeholder="$t('webchat.allowedDomainsPlaceholder')"
+          :description="$t('webchat.allowedDomainsDescription')"
           :rows="4"
         />
 
         <div class="flex items-center space-x-2">
           <Switch id="isEnabled" v-model:checked="settingsForm.isEnabled" />
-          <Label for="isEnabled">Enable webchat widget</Label>
+          <Label for="isEnabled">{{ $t('webchat.enableWebchat') }}</Label>
         </div>
       </CardContent>
     </Card>
@@ -108,21 +108,19 @@
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
       <Button variant="outline" :disabled="!hasChanges || isSaving" @click="resetForm">
-        Reset
+        {{ $t('webchat.reset') }}
       </Button>
       <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
         <Save class="h-4 w-4 mr-2" />
-        Save Changes
+        {{ $t('webchat.saveChanges') }}
       </Button>
     </div>
 
     <!-- Installation -->
     <Card>
       <CardHeader>
-        <CardTitle>Installation Code</CardTitle>
-        <CardDescription
-          >Add this code to your website before the closing &lt;/body&gt; tag</CardDescription
-        >
+        <CardTitle>{{ $t('webchat.installationCode') }}</CardTitle>
+        <CardDescription>{{ $t('webchat.installationCodeDescription') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="relative">
@@ -137,7 +135,7 @@
           >
             <Copy v-if="!copied" class="h-3 w-3 mr-1" />
             <Check v-else class="h-3 w-3 mr-1" />
-            {{ copied ? "Copied!" : "Copy" }}
+            {{ copied ? $t('apiTokens.copied') : $t('apiTokens.copy') }}
           </Button>
         </div>
       </CardContent>
@@ -153,6 +151,7 @@ import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { useDomain } from "@/composables/useDomain";
 
+const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
 const { getApiUrl } = useDomain();
@@ -204,8 +203,8 @@ const installationCode = computed(() => {
     greetingMessage: '${settingsForm.value.greetingMessage}'
   };
 </${"script"}>
-<${"script"} src="${apiBaseUrl}/webchat/widget.js" async></${"script"}>
-<link rel="stylesheet" href="${apiBaseUrl}/webchat/widget.css">`;
+<${"script"} src="${apiBaseUrl}/v1/webchat/widget.js" async></${"script"}>
+<link rel="stylesheet" href="${apiBaseUrl}/v1/webchat/widget.css">`;
 });
 
 // Load settings
@@ -227,7 +226,7 @@ async function loadSettings() {
     originalSettings.value = { ...settingsForm.value, allowedDomains: settings.allowedDomains };
   } catch (error) {
     console.error("Failed to load webchat settings:", error);
-    toast.error("Failed to load webchat settings");
+    toast.error(t('webchat.loadFailed'));
   }
 }
 
@@ -248,10 +247,10 @@ async function saveSettings() {
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
 
-    toast.success("Webchat settings saved successfully");
+    toast.success(t('webchat.saveSuccess'));
   } catch (error) {
     console.error("Failed to save webchat settings:", error);
-    toast.error("Failed to save webchat settings");
+    toast.error(t('webchat.saveFailed'));
   } finally {
     isSaving.value = false;
   }

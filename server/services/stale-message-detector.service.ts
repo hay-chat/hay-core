@@ -2,7 +2,9 @@ import { AppDataSource } from "../database/data-source";
 import { Conversation } from "../database/entities/conversation.entity";
 import { MessageType } from "../database/entities/message.entity";
 import { config } from "../config/env";
-import { debugLog } from "../lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("stale-message");
 
 export enum StaleReason {
   LOCK_EXPIRED = "lock_expired",
@@ -35,7 +37,7 @@ export class StaleMessageDetectorService {
    */
   async detectStaleConversations(): Promise<StaleConversation[]> {
     if (!AppDataSource?.isInitialized) {
-      debugLog("stale-detector", "Database not initialized, skipping detection");
+      logger.debug("Database not initialized, skipping detection");
       return [];
     }
 
@@ -131,19 +133,12 @@ export class StaleMessageDetectorService {
       });
 
       if (staleConversations.length > 0) {
-        debugLog(
-          "stale-detector",
-          `Found ${staleConversations.length} stale conversations`,
-          {
-            total: staleConversations.length,
-            byReason: this.groupByReason(staleConversations),
-          }
-        );
+        logger.debug({ total: staleConversations.length, byReason: this.groupByReason(staleConversations) }, "Found stale conversations");
       }
 
       return staleConversations;
     } catch (error) {
-      console.error("[StaleMessageDetector] Error detecting stale conversations:", error);
+      logger.error({ err: error }, "Error detecting stale conversations");
       return [];
     }
   }

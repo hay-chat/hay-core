@@ -4,7 +4,7 @@
       <AppSidebar />
       <div class="flex-1 flex flex-col">
         <!-- <SidebarTrigger class="md:hidden" /> -->
-        <main class="flex-1 overflow-y-auto">
+        <main class="flex-1 overflow-y-auto bg-neutral-50">
           <slot />
         </main>
       </div>

@@ -1,0 +1,41 @@
+{
+  "name": "hay-channel-whatsapp-twilio",
+  "version": "1.0.0",
+  "description": "Connect WhatsApp as a communication channel via Twilio",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "WhatsApp",
+    "category": "channel",
+    "channel": "whatsapp",
+    "capabilities": [
+      "messages",
+      "customers"
+    ],
+    "env": [
+      "TWILIO_ACCOUNT_SID",
+      "TWILIO_AUTH_TOKEN",
+      "TWILIO_WHATSAPP_NUMBER"
+    ]
+  },
+  "scripts": {
+    "build": "npm run build:ui && tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run build:ui && tsc",
+    "dev:ui": "vite build --watch --config vite.config.ui.ts"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk",
+    "twilio": "^5.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "vue": "^3.4.0"
+  }
+}

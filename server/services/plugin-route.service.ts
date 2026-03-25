@@ -6,6 +6,9 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { environmentManagerService } from "./environment-manager.service";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-route");
 
 interface RateLimitEntry {
   count: number;
@@ -90,7 +93,7 @@ export class PluginRouteService {
 
         const webhookSecret = env.WEBHOOK_SECRET || instance.config?.webhookSecret;
         if (!webhookSecret) {
-          console.error(`Webhook secret not configured for ${pluginName}`);
+          logger.error({ pluginName }, "Webhook secret not configured");
           res.status(500).json({ error: "Webhook secret not configured" });
           return;
         }
@@ -166,7 +169,7 @@ export class PluginRouteService {
 
       res.status(proxyResponse.status).json(responseBody);
     } catch (error) {
-      console.error(`Webhook error for ${pluginName}/${fullPath}:`, error);
+      logger.error({ err: error, pluginName, path: fullPath }, "Webhook error");
       res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -196,19 +199,33 @@ export class PluginRouteService {
         .update(`${timestamp}.${payload}`)
         .digest("hex");
 
-      return sig === expectedSig;
+      return this.timingSafeCompare(sig, expectedSig);
     } else if (headerName.toLowerCase().includes("github")) {
       // GitHub format: sha256=signature
       const expectedSig =
         "sha256=" + crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-      return signature === expectedSig;
+      return this.timingSafeCompare(signature, expectedSig);
     } else {
       // Default: plain HMAC
       const expectedSig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-      return signature === expectedSig;
+      return this.timingSafeCompare(signature, expectedSig);
     }
+  }
+
+  /**
+   * Timing-safe string comparison to prevent timing attacks on signature verification
+   */
+  private timingSafeCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // Compare against self to maintain constant time, then return false
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
   }
 
   /**
@@ -285,7 +302,7 @@ export class PluginRouteService {
     }
 
     if (cleared > 0) {
-      console.log(`[PluginRoute] Cleared ${cleared} expired rate limit entries`);
+      logger.debug({ cleared }, "Cleared expired rate limit entries");
     }
   }
 
@@ -296,7 +313,7 @@ export class PluginRouteService {
    */
   startCleanup(): void {
     // No-op: Cleanup is now handled by scheduler
-    console.log("[PluginRoute] Rate limit cleanup handled by scheduler service");
+    logger.debug("Rate limit cleanup handled by scheduler service");
   }
 }
 

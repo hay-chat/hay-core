@@ -1,6 +1,8 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { MessageRepository } from "../repositories/message.repository";
+import { DocumentRepository } from "../repositories/document.repository";
 import { MessageType, MessageSentiment } from "../database/entities/message.entity";
+import { DocumentationStatus } from "../entities/document.entity";
 
 export interface AnalyticsFilters {
   startDate?: Date;
@@ -23,10 +25,12 @@ export interface SentimentDistribution {
 export class AnalyticsService {
   private conversationRepository: ConversationRepository;
   private messageRepository: MessageRepository;
+  private documentRepository: DocumentRepository;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
+    this.documentRepository = new DocumentRepository();
   }
 
   async getConversationActivity(filters: AnalyticsFilters): Promise<ConversationActivityData[]> {
@@ -38,12 +42,7 @@ export class AnalyticsService {
 
     const days = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
 
-    return await this.conversationRepository.getDailyStats(
-      organizationId,
-      days,
-      start,
-      end
-    );
+    return await this.conversationRepository.getDailyStats(organizationId, days, start, end);
   }
 
   async getSentimentAnalysis(filters: AnalyticsFilters): Promise<SentimentDistribution[]> {
@@ -53,7 +52,7 @@ export class AnalyticsService {
     const sentimentCounts = await this.messageRepository.getSentimentDistribution(
       organizationId,
       startDate,
-      endDate
+      endDate,
     );
 
     // Calculate total and percentages
@@ -61,12 +60,12 @@ export class AnalyticsService {
 
     // Ensure all sentiments are included, even with 0 count
     const allSentiments = Object.values(MessageSentiment);
-    const sentimentMap = new Map(sentimentCounts.map(item => [item.sentiment, item.count]));
+    const sentimentMap = new Map(sentimentCounts.map((item) => [item.sentiment, item.count]));
 
-    return allSentiments.map(sentiment => ({
+    return allSentiments.map((sentiment) => ({
       sentiment,
       count: sentimentMap.get(sentiment) || 0,
-      percentage: total > 0 ? ((sentimentMap.get(sentiment) || 0) / total) * 100 : 0
+      percentage: total > 0 ? ((sentimentMap.get(sentiment) || 0) / total) * 100 : 0,
     }));
   }
 
@@ -77,28 +76,45 @@ export class AnalyticsService {
     const totalConversations = await this.conversationRepository.countByFilters({
       organizationId,
       startDate,
-      endDate
+      endDate,
     });
 
     const resolvedConversations = await this.conversationRepository.countByFilters({
       organizationId,
       startDate,
       endDate,
-      status: 'resolved'
+      status: "resolved",
     });
 
-    const avgMessagesPerConversation = await this.messageRepository.getAverageMessagesPerConversation(
-      organizationId,
-      startDate,
-      endDate
-    );
+    const avgMessagesPerConversation =
+      await this.messageRepository.getAverageMessagesPerConversation(
+        organizationId,
+        startDate,
+        endDate,
+      );
 
     return {
       totalConversations,
       resolvedConversations,
-      resolutionRate: totalConversations > 0 ? (resolvedConversations / totalConversations) * 100 : 0,
-      avgMessagesPerConversation
+      resolutionRate:
+        totalConversations > 0 ? (resolvedConversations / totalConversations) * 100 : 0,
+      avgMessagesPerConversation,
     };
+  }
+
+  async getDocumentStatusCounts(
+    organizationId: string,
+  ): Promise<Array<{ status: string; count: number }>> {
+    const statusCounts = await this.documentRepository.getStatusCounts(organizationId);
+
+    // Ensure all statuses are represented, even with 0 count
+    const allStatuses = Object.values(DocumentationStatus);
+    const statusMap = new Map(statusCounts.map((item) => [item.status, item.count]));
+
+    return allStatuses.map((status) => ({
+      status,
+      count: statusMap.get(status) || 0,
+    }));
   }
 
   async getResponseTimeAnalytics(filters: AnalyticsFilters) {
@@ -107,7 +123,7 @@ export class AnalyticsService {
     return {
       averageResponseTime: 0,
       medianResponseTime: 0,
-      p95ResponseTime: 0
+      p95ResponseTime: 0,
     };
   }
 }

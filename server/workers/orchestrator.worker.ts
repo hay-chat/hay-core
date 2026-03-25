@@ -1,12 +1,14 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
 import {
   orchestratorQueueService,
   ORCHESTRATOR_QUEUES,
   type OrchestratorMessage,
 } from "@server/services/orchestrator-queue.service";
+
+const logger = createLogger("orchestrator-worker");
 
 export class OrchestratorWorker {
   private orchestrator?: Orchestrator;
@@ -20,16 +22,16 @@ export class OrchestratorWorker {
 
     // Only initialize if database is connected
     if (!AppDataSource.isInitialized) {
-      console.warn("Database not initialized, skipping orchestrator initialization");
+      logger.warn("Database not initialized, skipping orchestrator initialization");
       return;
     }
 
     try {
       this.orchestrator = new Orchestrator();
       this.initialized = true;
-      debugLog("worker", "Orchestrator worker initialized successfully");
+      logger.info("Orchestrator worker initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize orchestrator worker:", error);
+      logger.error({ err: error }, "Failed to initialize orchestrator worker");
       this.initialized = false;
     }
   }
@@ -43,7 +45,7 @@ export class OrchestratorWorker {
     await this.initialize();
 
     if (!this.initialized || !this.orchestrator) {
-      console.warn("[Worker] Orchestrator not initialized, skipping RabbitMQ consumer setup");
+      logger.warn("Orchestrator not initialized, skipping RabbitMQ consumer setup");
       return;
     }
 
@@ -53,7 +55,7 @@ export class OrchestratorWorker {
 
     // Re-attach consumer on reconnect
     rabbitmqService.on("connected", async () => {
-      debugLog("worker", "RabbitMQ reconnected, re-attaching consumer");
+      logger.info("RabbitMQ reconnected, re-attaching consumer");
       await orchestratorQueueService.declareQueues();
       await this.startConsuming();
     });
@@ -71,18 +73,27 @@ export class OrchestratorWorker {
       async (msg) => {
         const data = rabbitmqService.parseMessage<OrchestratorMessage>(msg);
 
-        debugLog("worker", `Processing conversation from queue`, {
-          conversationId: data.conversationId,
-          trigger: data.trigger,
-          attempt: data.attempt,
-        });
+        logger.debug(
+          {
+            conversationId: data.conversationId,
+            trigger: data.trigger,
+            attempt: data.attempt,
+          },
+          "Processing conversation from queue",
+        );
 
         try {
           await this.orchestrator!.processConversation(data.conversationId);
           rabbitmqService.ack(msg);
-          debugLog("worker", `Successfully processed conversation ${data.conversationId}`);
+          logger.debug(
+            { conversationId: data.conversationId },
+            "Successfully processed conversation",
+          );
         } catch (error) {
-          console.error(`[Worker] Failed to process conversation ${data.conversationId}:`, error);
+          logger.error(
+            { err: error, conversationId: data.conversationId },
+            "Failed to process conversation",
+          );
           // Nack without requeue — message goes to retry queue via dead-letter
           rabbitmqService.nack(msg, false);
         }
@@ -90,7 +101,7 @@ export class OrchestratorWorker {
       { prefetch: 2 },
     );
 
-    console.log("[Worker] RabbitMQ consumer started for orchestrator.process");
+    logger.info("RabbitMQ consumer started for orchestrator.process");
   }
 
   /**
@@ -103,7 +114,7 @@ export class OrchestratorWorker {
       if (!this.initialized || !this.orchestrator) return;
       await this.orchestrator.loop();
     } catch (error) {
-      console.error("Orchestrator tick error:", error);
+      logger.error({ err: error }, "Orchestrator tick error");
     }
   }
 
@@ -113,7 +124,7 @@ export class OrchestratorWorker {
    */
   stop(): void {
     this.consuming = false;
-    debugLog("worker", "Orchestrator worker stopped");
+    logger.info("Orchestrator worker stopped");
   }
 
   /**
@@ -130,7 +141,7 @@ export class OrchestratorWorker {
 
       await this.orchestrator.checkInactivity();
     } catch (error) {
-      console.error("[Worker] Inactivity check error:", error);
+      logger.error({ err: error }, "Inactivity check error");
     }
   }
 }

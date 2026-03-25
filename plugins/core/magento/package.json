@@ -1,5 +1,5 @@
 {
-  "name": "@hay/plugin-magento",
+  "name": "hay-plugin-magento",
   "version": "1.0.0",
   "description": "Connect your Magento store to manage products, orders, customers, and e-commerce operations",
   "author": "Hay",

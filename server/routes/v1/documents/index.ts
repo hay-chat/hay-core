@@ -23,6 +23,11 @@ import { jobQueueService } from "@server/services/job-queue.service";
 import { documentProcessorService } from "@server/services/document-processor.service";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
+import { AppDataSource } from "@server/database/data-source";
+import { websocketService } from "@server/services/websocket.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("documents");
 
 export const documentsRouter = t.router({
   list: createListProcedure(documentListInputSchema, documentRepository),
@@ -63,44 +68,112 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Ensure vector store is initialized
-      if (!vectorStoreService.initialized) {
-        await vectorStoreService.initialize();
+      const organizationId = ctx.organizationId!;
+      const query = input.query.trim();
+      const limit = input.limit;
+
+      // Run vector search and keyword search in parallel
+      const [vectorResults, keywordResults] = await Promise.all([
+        // Vector similarity search (grouped by document)
+        (async () => {
+          if (!vectorStoreService.initialized) {
+            await vectorStoreService.initialize();
+          }
+          return vectorStoreService.searchDocuments(organizationId, query, limit);
+        })(),
+        // Keyword search directly on documents table (title + content ILIKE)
+        (async () => {
+          const keywordQuery = `
+            SELECT
+              id,
+              CASE
+                WHEN title ILIKE $2 THEN 0.9
+                WHEN title ILIKE $3 THEN 0.7
+                WHEN content ILIKE $3 THEN 0.4
+                ELSE 0
+              END as keyword_score
+            FROM documents
+            WHERE organization_id = $1
+              AND (title ILIKE $3 OR content ILIKE $3)
+            ORDER BY
+              CASE WHEN title ILIKE $2 THEN 0 ELSE 1 END,
+              CASE WHEN title ILIKE $3 THEN 0 ELSE 1 END
+            LIMIT $4
+          `;
+          const escapedQuery = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
+          return AppDataSource.query(keywordQuery, [
+            organizationId,
+            escapedQuery, // exact title match
+            `%${escapedQuery}%`, // partial match
+            limit,
+          ]) as Promise<Array<{ id: string; keyword_score: number }>>;
+        })(),
+      ]);
+
+      // Merge results: combine scores from both sources
+      const scoreMap = new Map<string, { vectorScore: number; keywordScore: number }>();
+
+      for (const vr of vectorResults) {
+        scoreMap.set(vr.documentId, {
+          vectorScore: vr.similarity,
+          keywordScore: 0,
+        });
       }
 
-      // Search using the vector store service
-      const searchResults = await vectorStoreService.search(
-        ctx.organizationId!,
-        input.query,
-        input.limit,
-      );
+      for (const kr of keywordResults) {
+        const existing = scoreMap.get(kr.id);
+        if (existing) {
+          existing.keywordScore = parseFloat(String(kr.keyword_score));
+        } else {
+          scoreMap.set(kr.id, {
+            vectorScore: 0,
+            keywordScore: parseFloat(String(kr.keyword_score)),
+          });
+        }
+      }
 
-      // Get document details for the search results
-      const documentIds = [
-        ...new Set(searchResults.map((r) => r.metadata?.documentId).filter(Boolean)),
-      ];
+      // Compute combined relevance score
+      const rankedDocIds = [...scoreMap.entries()]
+        .map(([docId, scores]) => {
+          // Weight: vector similarity contributes 60%, keyword match 40%
+          // Documents matching both get a natural boost
+          const combinedScore = scores.vectorScore * 0.6 + scores.keywordScore * 0.4;
+          return { docId, score: combinedScore };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
 
-      const documents =
-        documentIds.length > 0
-          ? (
-              await Promise.all(documentIds.map((id) => documentRepository.findById(id as string)))
-            ).filter((doc) => doc && doc.organizationId === ctx.organizationId)
-          : [];
+      if (rankedDocIds.length === 0) {
+        return [];
+      }
 
-      // Map results with document details
-      return searchResults.map((result) => {
-        const doc = documents.find((d) => d?.id === result.metadata?.documentId);
-        return {
-          id: result.id,
-          documentId: result.metadata?.documentId,
-          title: doc?.title || "Untitled",
-          content: result.content.substring(0, 200) + "...",
-          similarity: result.similarity,
-          type: doc?.type || DocumentationType.ARTICLE,
-          status: doc?.status || DocumentationStatus.PUBLISHED,
-          metadata: result.metadata,
-        };
-      });
+      // Fetch full document details for all matched documents
+      const documents = (
+        await Promise.all(rankedDocIds.map(({ docId }) => documentRepository.findById(docId)))
+      ).filter((doc) => doc && doc.organizationId === organizationId);
+
+      // Return documents in ranked order, skipping any not found
+      const results = [];
+      for (const { docId, score } of rankedDocIds) {
+        const doc = documents.find((d) => d?.id === docId);
+        if (!doc) continue;
+        results.push({
+          id: doc.id,
+          title: doc.title || "Untitled",
+          description: doc.description,
+          content: doc.content?.substring(0, 200) || "",
+          type: doc.type || DocumentationType.ARTICLE,
+          status: doc.status || DocumentationStatus.PUBLISHED,
+          visibility: doc.visibility,
+          sourceUrl: doc.sourceUrl,
+          importMethod: doc.importMethod,
+          relevanceScore: score,
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
+          hasAttachment: !!(doc.attachments && doc.attachments.length > 0),
+        });
+      }
+      return results;
     }),
   create: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.CREATE)
     .input(
@@ -153,7 +226,7 @@ export const documentsRouter = t.router({
             },
           ];
         } catch (uploadError) {
-          console.error("Failed to save document file to storage:", uploadError);
+          logger.error({ err: uploadError }, "Failed to save document file to storage");
           // Continue without attachment - document content will still be processed
         }
       }
@@ -431,6 +504,7 @@ export const documentsRouter = t.router({
     .input(
       z.object({
         url: z.string().url(),
+        autoImport: z.boolean().optional().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -447,6 +521,7 @@ export const documentsRouter = t.router({
         data: {
           type: "page_discovery",
           url: input.url,
+          autoImport: input.autoImport,
           progress: {
             status: "starting",
             pagesFound: 0,
@@ -460,7 +535,7 @@ export const documentsRouter = t.router({
       });
 
       // Start the discovery process asynchronously
-      processPageDiscovery(ctx.organizationId, job.id, input.url);
+      processPageDiscovery(ctx.organizationId, job.id, input.url, input.autoImport);
 
       return {
         jobId: job.id,
@@ -720,38 +795,58 @@ async function processWebImport(
 ) {
   try {
     // Log received metadata for debugging
-    console.log("[Web Import] Received metadata:", metadata);
+    logger.debug({ metadata }, "Web import received metadata");
 
     // Update job status to processing
     await jobQueueService.updateJobStatus(jobId, organizationId, {
       status: JobStatus.PROCESSING,
     });
 
-    // Create placeholder documents immediately so users can see them
+    // Create or update placeholder documents — reuse existing documents with the same sourceUrl
     const placeholderDocuments = [];
     for (const page of selectedPages) {
-      const doc = await documentRepository.create({
-        title: page.title || new URL(page.url).pathname,
-        content: `Processing content from ${page.url}...`,
-        type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
-        status: DocumentationStatus.PROCESSING, // Mark as processing
-        visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
-        tags: metadata?.tags as string[] | undefined,
-        categories: metadata?.categories as string[] | undefined,
-        importMethod: ImportMethod.WEB,
-        sourceUrl: page.url,
-        organizationId,
-        processingMetadata: {
-          retryCount: 0,
-          lastAttemptAt: new Date(),
-          jobId,
-          processingStage: "scraping",
-        },
-      });
-      placeholderDocuments.push(doc);
+      const existingDoc = await documentRepository.findBySourceUrl(page.url, organizationId);
+
+      if (existingDoc) {
+        // Update existing document instead of creating a duplicate
+        const updated = await documentRepository.update(existingDoc.id, organizationId, {
+          title: page.title || existingDoc.title,
+          content: `Processing content from ${page.url}...`,
+          status: DocumentationStatus.PROCESSING,
+          processingMetadata: {
+            retryCount: 0,
+            lastAttemptAt: new Date(),
+            jobId,
+            processingStage: "scraping",
+          },
+        });
+        if (updated) {
+          placeholderDocuments.push(updated);
+        }
+      } else {
+        const doc = await documentRepository.create({
+          title: page.title || new URL(page.url).pathname,
+          content: `Processing content from ${page.url}...`,
+          type: (metadata?.type as DocumentationType) || DocumentationType.ARTICLE,
+          status: DocumentationStatus.PROCESSING,
+          visibility: (metadata?.visibility as DocumentVisibility) || DocumentVisibility.PRIVATE,
+          tags: metadata?.tags as string[] | undefined,
+          categories: metadata?.categories as string[] | undefined,
+          importMethod: ImportMethod.WEB,
+          sourceUrl: page.url,
+          organizationId,
+          processingMetadata: {
+            retryCount: 0,
+            lastAttemptAt: new Date(),
+            jobId,
+            processingStage: "scraping",
+          },
+        });
+        placeholderDocuments.push(doc);
+      }
     }
 
-    console.log(`Created ${placeholderDocuments.length} placeholder documents`);
+    logger.info({ count: placeholderDocuments.length }, "Created placeholder documents");
 
     // Initialize scraper
     const scraper = new WebScraperService();
@@ -781,7 +876,7 @@ async function processWebImport(
       // Check if job was cancelled
       const currentJob = await jobRepository.findById(jobId);
       if (currentJob?.status === JobStatus.CANCELLED) {
-        console.log(`[Web Import] Job ${jobId} was cancelled, stopping processing`);
+        logger.info({ jobId }, "Web import job was cancelled, stopping processing");
         break;
       }
 
@@ -791,7 +886,7 @@ async function processWebImport(
         // Find the corresponding placeholder document
         const placeholderDoc = placeholderDocuments.find((d) => d.sourceUrl === page.url);
         if (!placeholderDoc) {
-          console.error(`No placeholder document found for ${page.url}`);
+          logger.error({ url: page.url }, "No placeholder document found for URL");
           failedPages.push({ url: page.url, error: "Placeholder document not found" });
           continue;
         }
@@ -843,7 +938,7 @@ async function processWebImport(
         });
       } catch (pageError) {
         const errorMessage = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Failed to process page ${page.url}:`, errorMessage);
+        logger.error({ url: page.url, error: errorMessage }, "Failed to process page");
         failedPages.push({ url: page.url, error: errorMessage });
 
         // Error is already tracked in document metadata by the processor service
@@ -865,7 +960,7 @@ async function processWebImport(
 
     await jobQueueService.completeJob(jobId, organizationId, jobResult);
   } catch (error) {
-    console.error("Web import error:", error);
+    logger.error({ err: error }, "Web import error");
 
     // Update job as failed
     await jobQueueService.failJob(
@@ -877,7 +972,7 @@ async function processWebImport(
 }
 
 // Async function to process page discovery
-async function processPageDiscovery(organizationId: string, jobId: string, url: string) {
+async function processPageDiscovery(organizationId: string, jobId: string, url: string, autoImport = false) {
   try {
     // Update job status to processing
     await jobQueueService.updateJobStatus(jobId, organizationId, {
@@ -885,6 +980,7 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
       data: {
         type: "page_discovery",
         url,
+        autoImport,
         progress: {
           status: "discovering",
           pagesFound: 0,
@@ -938,8 +1034,30 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
       pages,
       totalFound: pages.length,
     });
+
+    // Auto-import all discovered pages if requested
+    if (autoImport && pages.length > 0) {
+      logger.info({ organizationId, url, pageCount: pages.length }, "Auto-importing discovered pages");
+
+      const selectedPages = pages.map((p) => ({ ...p, selected: true }));
+
+      const importJob = await jobRepository.create({
+        title: `Import from ${new URL(url).hostname}`,
+        description: `Auto-importing ${selectedPages.length} pages from ${url}`,
+        status: JobStatus.QUEUED,
+        priority: JobPriority.NORMAL,
+        data: {
+          type: "web_import",
+          url,
+          pages: selectedPages,
+        },
+        organizationId,
+      });
+
+      processWebImport(organizationId, importJob.id, url, selectedPages);
+    }
   } catch (error) {
-    console.error("Error in page discovery:", error);
+    logger.error({ err: error }, "Error in page discovery");
 
     // Update job as failed
     await jobQueueService.failJob(
@@ -962,11 +1080,18 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     const scraper = new WebScraperService();
     const htmlProcessor = new HtmlProcessor();
 
-    // Scrape the single URL
+    // Scrape only the single document URL (not the entire site)
     if (!document.sourceUrl) {
       throw new Error("Document has no source URL to recrawl");
     }
-    const pages = await scraper.scrapeWebsite(document.sourceUrl);
+    const pages = await scraper.scrapeSelectedPages([
+      {
+        url: document.sourceUrl,
+        title: document.title,
+        selected: true,
+        discoveredAt: new Date(),
+      },
+    ]);
 
     if (pages.length === 0) {
       throw new Error("Failed to recrawl the page");
@@ -977,10 +1102,11 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
     // Convert HTML to markdown
     const processed = await htmlProcessor.process(Buffer.from(page.html), page.title);
 
-    // Update document
+    // Update document content and mark as published
     await documentRepository.update(document.id, organizationId, {
       content: processed.content,
       lastCrawledAt: new Date(),
+      status: DocumentationStatus.PUBLISHED,
     });
 
     // Regenerate embeddings
@@ -1019,8 +1145,27 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
       embeddingsCreated: embeddingIds.length,
       chunksCreated: chunks.length,
     });
+
+    // Notify frontend of status change
+    websocketService.sendToOrganization(organizationId, {
+      type: "document:status-updated",
+      payload: {
+        documentId: document.id,
+        status: DocumentationStatus.PUBLISHED,
+      },
+    });
   } catch (error) {
-    console.error("Recrawl error:", error);
+    logger.error({ err: error }, "Recrawl error");
+
+    // Update document status to error
+    await documentRepository.update(document.id, organizationId, {
+      status: DocumentationStatus.ERROR,
+      processingMetadata: {
+        ...document.processingMetadata,
+        lastError: error instanceof Error ? error.message : "Unknown error",
+        lastAttemptAt: new Date(),
+      },
+    });
 
     // Update job as failed
     await jobQueueService.failJob(
@@ -1028,5 +1173,14 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
       organizationId,
       error instanceof Error ? error.message : "Unknown error",
     );
+
+    // Notify frontend of error status
+    websocketService.sendToOrganization(organizationId, {
+      type: "document:status-updated",
+      payload: {
+        documentId: document.id,
+        status: DocumentationStatus.ERROR,
+      },
+    });
   }
 }

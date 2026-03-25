@@ -55,7 +55,7 @@ plugins/core/my-plugin/
 
 ```json
 {
-  "name": "@hay/plugin-my-plugin",
+  "name": "hay-plugin-my-plugin",
   "version": "1.0.0",
   "description": "Description of what your plugin does",
   "author": "Hay",

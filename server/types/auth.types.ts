@@ -3,6 +3,8 @@ import { User } from "../entities/user.entity";
 export interface JWTPayload {
   userId: string;
   email: string;
+  type?: "access" | "refresh";
+  tokenVersion?: number;
   iat?: number;
   exp?: number;
 }

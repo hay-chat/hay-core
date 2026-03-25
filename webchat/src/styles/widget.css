@@ -31,6 +31,18 @@
   position: fixed;
   z-index: 999999;
   pointer-events: none;
+
+  --color-neutral-50: oklch(98.5% 0.002 247.839);
+  --color-neutral-100: oklch(96.7% 0.003 264.542);
+  --color-neutral-200: oklch(92.8% 0.006 264.531);
+  --color-neutral-300: oklch(87.2% 0.01 258.338);
+  --color-neutral-400: oklch(70.7% 0.022 261.325);
+  --color-neutral-500: oklch(55.1% 0.027 264.364);
+  --color-neutral-600: oklch(44.6% 0.03 256.802);
+  --color-neutral-700: oklch(37.3% 0.034 259.733);
+  --color-neutral-800: oklch(27.8% 0.033 256.848);
+  --color-neutral-900: oklch(21% 0.034 264.665);
+  --color-neutral-950: oklch(13% 0.028 261.692);
 }
 
 #hay-webchat-root * {
@@ -39,12 +51,12 @@
 
 /* Typography */
 #hay-webchat-root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji';
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   font-size: 16px;
   line-height: 1.5;
-  color: #1f2937;
+  color: var(--color-neutral-800);
 }
 
 /* Scrollbar styling */
@@ -53,21 +65,20 @@
 }
 
 #hay-webchat-root ::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: var(--color-neutral-100);
 }
 
 #hay-webchat-root ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--color-neutral-300);
   border-radius: 3px;
 }
 
 #hay-webchat-root ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--color-neutral-400);
 }
 
 /* Focus styles */
 #hay-webchat-root button:focus-visible,
-#hay-webchat-root textarea:focus-visible,
 #hay-webchat-root input:focus-visible {
   outline: 2px solid var(--hay-primary);
   outline-offset: 2px;

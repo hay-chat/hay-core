@@ -1,14 +1,11 @@
 <template>
-  <Page
-    title="Plugin Marketplace"
-    description="Discover and install plugins to extend your platform capabilities"
-  >
+  <Page :title="$t('marketplace.title')" :description="$t('marketplace.description')">
     <!-- Header -->
     <template #header>
       <div class="flex space-x-2">
         <Button v-if="userStore.isAdmin" size="sm" @click="navigateToUpload">
           <Upload class="h-4 w-4 mr-2" />
-          Upload Plugin
+          {{ $t("marketplace.uploadPlugin") }}
         </Button>
         <Button
           v-if="userStore.isAdmin && customPluginsCount > 0"
@@ -17,11 +14,11 @@
           @click="navigateToManage"
         >
           <Settings class="h-4 w-4 mr-2" />
-          Manage Custom ({{ customPluginsCount }})
+          {{ $t("marketplace.manageCustom", { count: customPluginsCount }) }}
         </Button>
         <Button variant="outline" size="sm" @click="refreshPlugins">
           <RefreshCcw class="h-4 w-4 mr-2" />
-          Refresh
+          {{ $t("marketplace.refresh") }}
         </Button>
       </div>
     </template>
@@ -29,35 +26,35 @@
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-4">
       <MetricCard
-        title="Total Plugins"
+        :title="$t('marketplace.stats.totalPlugins')"
         :metric="stats.total"
-        subtitle="Available plugins"
+        :subtitle="$t('marketplace.stats.availablePlugins')"
         :icon="Package"
       />
       <MetricCard
-        title="Installed"
+        :title="$t('marketplace.stats.installed')"
         :metric="stats.enabled"
-        subtitle="Active plugins"
+        :subtitle="$t('marketplace.stats.activePlugins')"
         :icon="CheckCircle"
         subtitle-color="green"
       />
       <MetricCard
-        title="Channels"
+        :title="$t('marketplace.stats.channels')"
         :metric="stats.chatConnectors"
-        subtitle="Communication channels"
+        :subtitle="$t('marketplace.stats.communicationChannels')"
         :icon="MessageSquare"
       />
       <MetricCard
-        title="MCP Connectors"
+        :title="$t('marketplace.stats.mcpConnectors')"
         :metric="stats.mcpConnectors"
-        subtitle="Model Context Protocol"
+        :subtitle="$t('marketplace.stats.modelContextProtocol')"
         :icon="Cpu"
       />
     </div>
 
     <!-- Categories -->
     <div class="flex items-center space-x-2">
-      <span class="text-sm font-medium">Categories:</span>
+      <span class="text-sm font-medium">{{ $t("marketplace.categories.label") }}</span>
       <div class="flex space-x-2 flex-wrap gap-2">
         <Button
           v-for="category in categories"
@@ -76,7 +73,7 @@
     <div class="flex items-center space-x-4">
       <div class="relative flex-1 max-w-sm">
         <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
-        <Input v-model="searchQuery" placeholder="Search plugins..." class="pl-8" />
+        <Input v-model="searchQuery" :placeholder="$t('marketplace.search')" class="pl-8" />
       </div>
     </div>
 
@@ -99,12 +96,10 @@
     <!-- Empty State -->
     <div v-else-if="filteredPlugins.length === 0" class="text-center py-12">
       <Package class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-      <h3 class="text-lg font-medium mb-2">No plugins found</h3>
+      <h3 class="text-lg font-medium mb-2">{{ $t("marketplace.empty.title") }}</h3>
       <p class="text-neutral-muted">
         {{
-          searchQuery
-            ? "Try adjusting your search terms."
-            : "No plugins match your selected category."
+          searchQuery ? $t("marketplace.empty.searchHint") : $t("marketplace.empty.categoryHint")
         }}
       </p>
     </div>
@@ -124,7 +119,10 @@
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
-                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                  onerror="
+                    this.style.display = 'none';
+                    this.nextElementSibling.style.display = 'flex';
+                  "
                   @error="handleThumbnailError($event)"
                 />
               </div>
@@ -133,7 +131,9 @@
                   <CardTitle class="text-lg">
                     {{ plugin.name }}
                   </CardTitle>
-                  <Badge v-if="plugin.isCustom" variant="outline" class="text-xs"> Custom </Badge>
+                  <Badge v-if="plugin.isCustom" variant="outline" class="text-xs">
+                    {{ $t("marketplace.custom") }}
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -157,13 +157,17 @@
                 @click="enablePlugin(plugin.id)"
               >
                 <Plug class="h-3 w-3 mr-1" />
-                {{ enablingPlugin === plugin.id ? "Installing..." : "Install" }}
+                {{
+                  enablingPlugin === plugin.id
+                    ? $t("marketplace.actions.installing")
+                    : $t("marketplace.actions.install")
+                }}
               </Button>
 
               <template v-else>
                 <Button size="sm" @click="navigateToSettings(plugin.id)">
                   <Settings class="h-3 w-3 mr-1" />
-                  Configure
+                  {{ $t("marketplace.actions.configure") }}
                 </Button>
                 <Button
                   variant="outline"
@@ -172,7 +176,11 @@
                   @click="disablePlugin(plugin.id)"
                 >
                   <Power class="h-3 w-3 mr-1" />
-                  {{ disablingPlugin === plugin.id ? "Removing..." : "Remove" }}
+                  {{
+                    disablingPlugin === plugin.id
+                      ? $t("marketplace.actions.removing")
+                      : $t("marketplace.actions.remove")
+                  }}
                 </Button>
               </template>
 
@@ -185,7 +193,11 @@
                 @click="deletePlugin(plugin.id)"
               >
                 <Trash2 class="h-3 w-3 mr-1" />
-                {{ deletingPlugin === plugin.id ? "Deleting..." : "Delete" }}
+                {{
+                  deletingPlugin === plugin.id
+                    ? $t("marketplace.actions.deleting")
+                    : $t("marketplace.actions.delete")
+                }}
               </Button>
             </div>
           </div>
@@ -218,6 +230,8 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
+
+const { t } = useI18n();
 
 // Reactive state
 const loading = ref(true);
@@ -255,14 +269,14 @@ const stats = computed(() => {
 });
 
 // Categories
-const categories = [
-  { id: "all", name: "All Plugins", icon: Globe },
-  { id: "channel", name: "Channels", icon: MessageSquare },
-  { id: "mcp-connector", name: "MCP Connectors", icon: Cpu },
-  { id: "document_importer", name: "Document Importers", icon: FileText },
-  { id: "retriever", name: "Retrievers", icon: Database },
-  { id: "playbook", name: "Playbooks", icon: Zap },
-];
+const categories = computed(() => [
+  { id: "all", name: t("marketplace.categories.all"), icon: Globe },
+  { id: "channel", name: t("marketplace.categories.channels"), icon: MessageSquare },
+  { id: "mcp-connector", name: t("marketplace.categories.mcpConnectors"), icon: Cpu },
+  { id: "document_importer", name: t("marketplace.categories.documentImporters"), icon: FileText },
+  { id: "retriever", name: t("marketplace.categories.retrievers"), icon: Database },
+  { id: "playbook", name: t("marketplace.categories.playbooks"), icon: Zap },
+]);
 
 // Computed filtered plugins (only show available/non-enabled plugins)
 const filteredPlugins = computed(() => {
@@ -287,36 +301,16 @@ const filteredPlugins = computed(() => {
   return filtered;
 });
 
-const pluginTypes = {
-  channel: {
-    label: "Channel",
-    icon: MessageSquare,
-    bg: "bg-blue-600",
-  },
-  "mcp-connector": {
-    label: "MCP Connector",
-    icon: Cpu,
-    bg: "bg-purple-600",
-  },
-  document_importer: {
-    label: "Document Importer",
-    icon: FileText,
-    bg: "bg-green-600",
-  },
-  retriever: {
-    label: "Retriever",
-    icon: Database,
-    bg: "bg-orange-600",
-  },
-  playbook: {
-    label: "Playbook",
-    icon: Zap,
-    bg: "bg-pink-600",
-  },
+const pluginTypeKeys: Record<string, string> = {
+  channel: "marketplace.pluginTypes.channel",
+  "mcp-connector": "marketplace.pluginTypes.mcpConnector",
+  document_importer: "marketplace.pluginTypes.documentImporter",
+  retriever: "marketplace.pluginTypes.retriever",
+  playbook: "marketplace.pluginTypes.playbook",
 };
 
 const formatPluginType = (type: string) => {
-  return pluginTypes[type as keyof typeof pluginTypes].label;
+  return t(pluginTypeKeys[type] || type);
 };
 
 const getPluginThumbnail = (pluginId: string) => {
@@ -360,7 +354,8 @@ const enablePlugin = async (pluginId: string) => {
     await appStore.enablePlugin(pluginId);
 
     // Show success toast
-    toast.success(`Plugin ${pluginId.replace("hay-plugin-", "")} enabled successfully`);
+    const pluginName = pluginId.replace("hay-plugin-", "");
+    toast.success(t("marketplace.toast.enabledSuccess", { name: pluginName }));
 
     // Navigate to settings if plugin has configuration
     const plugin = appStore.getPluginById(pluginId);
@@ -373,7 +368,9 @@ const enablePlugin = async (pluginId: string) => {
     // Show error toast with details
     // TRPCError messages are in error.message for client errors
     const errorMessage =
-      (error as any)?.message || (error as any)?.data?.message || "Failed to enable plugin";
+      (error as any)?.message ||
+      (error as any)?.data?.message ||
+      t("marketplace.toast.enableFailed");
 
     // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
@@ -391,13 +388,16 @@ const disablePlugin = async (pluginId: string) => {
     await appStore.disablePlugin(pluginId);
 
     // Show success toast
-    toast.success(`Plugin ${pluginId.replace("hay-plugin-", "")} disabled successfully`);
+    const pluginName = pluginId.replace("hay-plugin-", "");
+    toast.success(t("marketplace.toast.disabledSuccess", { name: pluginName }));
   } catch (error: unknown) {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details
     const errorMessage =
-      (error as any)?.message || (error as any)?.data?.message || "Failed to disable plugin";
+      (error as any)?.message ||
+      (error as any)?.data?.message ||
+      t("marketplace.toast.disableFailed");
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {
@@ -423,13 +423,13 @@ const deletePlugin = async (pluginId: string) => {
   const { getApiUrl } = useDomain();
 
   // Confirm deletion
-  if (!confirm(`Are you sure you want to delete this plugin? This action cannot be undone.`)) {
+  if (!confirm(t("marketplace.confirmDelete"))) {
     deletingPlugin.value = null;
     return;
   }
 
   try {
-    const response = await fetch(getApiUrl(`/v1/plugins/${pluginId}`), {
+    const response = await fetch(getApiUrl(`/v1/plugins/${encodeURIComponent(pluginId)}`), {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${authStore.tokens?.accessToken}`,
@@ -439,14 +439,14 @@ const deletePlugin = async (pluginId: string) => {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Failed to delete plugin");
+      throw new Error(error.error || t("marketplace.toast.deleteFailed"));
     }
 
-    toast.success(`Plugin deleted successfully`);
+    toast.success(t("marketplace.toast.deletedSuccess"));
     await appStore.fetchPlugins();
   } catch (error: unknown) {
     console.error("Failed to delete plugin:", error);
-    const errorMessage = (error as any)?.message || "Failed to delete plugin";
+    const errorMessage = (error as any)?.message || t("marketplace.toast.deleteFailed");
     toast.error(errorMessage);
   } finally {
     deletingPlugin.value = null;
@@ -465,11 +465,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Plugin Marketplace - Hay Dashboard",
+  title: t("marketplace.headTitle"),
   meta: [
     {
       name: "description",
-      content: "Discover and install plugins to extend your platform capabilities",
+      content: t("marketplace.description"),
     },
   ],
 });
