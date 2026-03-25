@@ -42,7 +42,9 @@ export class RabbitMQService extends EventEmitter {
   }
 
   private async connect(): Promise<void> {
-    this.connection = await amqplib.connect(config.rabbitmq.url);
+    this.connection = await amqplib.connect(config.rabbitmq.url, {
+      timeout: 10_000, // 10s TCP connection timeout
+    });
 
     this.connection.on("error", (err) => {
       console.error("[RabbitMQ] Connection error:", err);
