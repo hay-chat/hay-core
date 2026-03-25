@@ -203,7 +203,7 @@ export class EmailService {
       };
 
       // Merge with provided variables (provided variables take precedence)
-      const mergedVariables = {
+      const mergedVariables: Record<string, string> = {
         ...defaultVariables,
         ...(options.variables || {}),
       };
