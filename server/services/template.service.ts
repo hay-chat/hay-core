@@ -174,11 +174,13 @@ export class TemplateService {
 
     // Two-pass variable substitution for i18n support:
     // Pass 1: Replace translation keys (t.*) with their values (which may contain {{ variable }} placeholders)
+    // Do NOT strip unmatched variables — they'll be resolved in Pass 2
     const translations = this.translationService.getTranslations(templateId, options.locale);
-    const mjmlWithTranslations = this.replaceVariables(fullMjml, translations);
+    const mjmlWithTranslations = this.replaceVariables(fullMjml, translations, false);
 
     // Pass 2: Replace regular variables (userName, companyName, etc.)
-    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables);
+    // Strip any remaining unmatched variables after this final pass
+    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables, true);
 
     // Compile MJML to HTML
     // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
@@ -210,7 +212,7 @@ export class TemplateService {
   /**
    * Replace variables in template content
    */
-  private replaceVariables(content: string, variables: Record<string, any>): string {
+  private replaceVariables(content: string, variables: Record<string, any>, stripUnmatched: boolean = true): string {
     let result = content;
     const originalLength = content.length;
 
@@ -232,14 +234,14 @@ export class TemplateService {
       result = result.replace(pattern, this.formatValue(value));
     }
 
-    // Count remaining unmatched variables before removal
-    const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
-    if (unmatchedVars) {
-      logger.debug({ count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) }, "Removing unmatched variables");
+    // Only strip unmatched variables on the final pass
+    if (stripUnmatched) {
+      const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
+      if (unmatchedVars) {
+        logger.debug({ count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) }, "Removing unmatched variables");
+      }
+      result = result.replace(/\{\{[^}]+\}\}/g, "");
     }
-
-    // Remove any remaining unmatched variables
-    result = result.replace(/\{\{[^}]+\}\}/g, "");
 
     return result;
   }

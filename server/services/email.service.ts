@@ -196,11 +196,28 @@ export class EmailService {
       logger.debug({ template: options.template }, "Rendering template");
 
       // Inject default variables for all templates
-      const defaultVariables = {
+      const defaultVariables: Record<string, string> = {
         logoUrl: `${getCdnUrl()}/logos/logo.png`,
         websiteUrl: getDashboardUrl(),
         currentYear: new Date().getFullYear().toString(),
+        recipientEmail: Array.isArray(options.to) ? options.to[0] : options.to,
       };
+
+      // Resolve subject early so we can inject emailTitle/emailPreview before rendering
+      let subject = options.subject;
+      if (!subject) {
+        subject = this.templateService.getTranslatedSubject(options.template, options.locale) ?? undefined;
+        if (subject && options.variables) {
+          for (const [key, value] of Object.entries(options.variables)) {
+            subject = subject!.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), String(value));
+          }
+        }
+      }
+      const finalSubject = subject || "No Subject";
+
+      // Add emailTitle and emailPreview defaults (used in base.mjml)
+      defaultVariables.emailTitle = finalSubject;
+      defaultVariables.emailPreview = finalSubject;
 
       // Merge with provided variables (provided variables take precedence)
       const mergedVariables: Record<string, string> = {
@@ -208,7 +225,7 @@ export class EmailService {
         ...(options.variables || {}),
       };
 
-      let { html, text } = await this.templateService.render({
+      const { html, text } = await this.templateService.render({
         template: options.template,
         variables: mergedVariables,
         locale: options.locale,
@@ -217,43 +234,6 @@ export class EmailService {
         minify: true,
       });
       logger.debug("Template rendered successfully");
-
-      // Resolve subject: explicit > translated > template comment fallback
-      let subject = options.subject;
-
-      if (!subject) {
-        // Try translated subject first, then fall back to template comment
-        subject = this.templateService.getTranslatedSubject(options.template, options.locale) ?? undefined;
-        if (subject) {
-          logger.debug({ subject, locale: options.locale }, "Using translated subject");
-          // Replace variables in translated subject
-          if (options.variables) {
-            for (const [key, value] of Object.entries(options.variables)) {
-              subject = subject!.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), String(value));
-            }
-          }
-        }
-      }
-
-      // Re-render with emailTitle and emailPreview now that subject is resolved
-      // These are used in base.mjml <mj-title> and <mj-preview> tags
-      const finalSubject = subject || "No Subject";
-      if (!mergedVariables.emailTitle || !mergedVariables.emailPreview) {
-        mergedVariables.emailTitle = mergedVariables.emailTitle || finalSubject;
-        mergedVariables.emailPreview = mergedVariables.emailPreview || finalSubject;
-        mergedVariables.recipientEmail = mergedVariables.recipientEmail || (Array.isArray(options.to) ? options.to[0] : options.to);
-
-        const rerendered = await this.templateService.render({
-          template: options.template,
-          variables: mergedVariables,
-          locale: options.locale,
-          useCache: true,
-          stripComments: true,
-          minify: true,
-        });
-        html = rerendered.html;
-        text = rerendered.text;
-      }
 
       // Build email options, excluding undefined 'from' to allow default fallback
       const emailOptions: EmailOptions = {
