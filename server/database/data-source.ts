@@ -24,6 +24,7 @@ import { ScheduledJob } from "../entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "../entities/scheduled-job-history.entity";
 import { WebchatSettings } from "./entities/webchat-settings.entity";
 import { AuthCode } from "../entities/auth-code.entity";
+import { GitConnection } from "../entities/git-connection.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
@@ -67,6 +68,7 @@ export const AppDataSource = new DataSource({
     ScheduledJobHistory,
     WebchatSettings,
     AuthCode,
+    GitConnection,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
@@ -104,7 +106,10 @@ export async function initializeDatabase(maxRetries = 3, retryDelay = 2000) {
   }
 
   // All retries failed
-  logger.error({ maxRetries }, "Failed to connect to database after all attempts. Database connection is required. Please check your configuration and ensure PostgreSQL is running.");
+  logger.error(
+    { maxRetries },
+    "Failed to connect to database after all attempts. Database connection is required. Please check your configuration and ensure PostgreSQL is running.",
+  );
 
   // Throw the last error to prevent server from starting
   throw lastError;

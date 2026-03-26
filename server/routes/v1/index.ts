@@ -21,6 +21,7 @@ import { auditLogsRouter } from "./audit-logs";
 import { webchatRouter } from "./webchat";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 import { pluginApiTrpcRouter } from "./plugin-api/trpc";
+import { gitConnectionsRouter } from "./git-connections";
 
 // Core routers - always available
 const coreRouters = {
@@ -45,6 +46,7 @@ const coreRouters = {
   auditLogs: auditLogsRouter,
   webchat: webchatRouter,
   pluginApi: pluginApiTrpcRouter,
+  gitConnections: gitConnectionsRouter,
 };
 
 // Create v1Router with core + plugin routers

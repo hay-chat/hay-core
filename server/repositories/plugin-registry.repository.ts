@@ -71,12 +71,34 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   }
 
   /**
-   * Find all plugins visible to an organization (core + org's custom)
+   * Find all plugins visible to an organization (core + org's custom + org's git)
    */
   override async findByOrganization(organizationId: string): Promise<PluginRegistry[]> {
     return this.getRepository().find({
-      where: [{ sourceType: "core" }, { organizationId, sourceType: "custom" }],
+      where: [
+        { sourceType: "core" },
+        { organizationId, sourceType: "custom" },
+        { organizationId, sourceType: "git" },
+      ],
       order: { name: "ASC" },
+    });
+  }
+
+  /**
+   * Find all git-sourced plugins (across all orgs, for sync job)
+   */
+  async findAllGitPlugins(): Promise<PluginRegistry[]> {
+    return this.getRepository().find({
+      where: { sourceType: "git" },
+    });
+  }
+
+  /**
+   * Find git-sourced plugins for a specific connection
+   */
+  async findByGitConnection(gitConnectionId: string): Promise<PluginRegistry[]> {
+    return this.getRepository().find({
+      where: { gitConnectionId },
     });
   }
 

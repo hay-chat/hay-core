@@ -129,7 +129,7 @@ export class PluginManagerService {
    */
   public async registerPlugin(
     pluginPath: string,
-    sourceType: "core" | "custom",
+    sourceType: "core" | "custom" | "git",
     organizationId: string | null,
   ): Promise<void> {
     try {
@@ -331,9 +331,10 @@ export class PluginManagerService {
       const { storageService } = await import("./storage.service");
       const AdmZip = (await import("adm-zip")).default;
 
-      // Get all custom plugins that have ZIP uploads
+      // Get all custom/git plugins that have ZIP/archive uploads
       const customPlugins = Array.from(this.registry.values()).filter(
-        (plugin) => plugin.sourceType === "custom" && plugin.zipUploadId,
+        (plugin) =>
+          (plugin.sourceType === "custom" || plugin.sourceType === "git") && plugin.zipUploadId,
       );
 
       if (customPlugins.length === 0) {
@@ -352,13 +353,13 @@ export class PluginManagerService {
             .catch(() => false);
 
           if (!dirExists && plugin.zipUploadId) {
-            logger.info({ pluginName: plugin.name }, "Restoring plugin from ZIP");
+            logger.info(
+              { pluginName: plugin.name, sourceType: plugin.sourceType },
+              "Restoring plugin from archive",
+            );
 
-            // Download ZIP from storage
+            // Download archive from storage
             const { buffer } = await storageService.download(plugin.zipUploadId);
-
-            // Extract ZIP to file system
-            const zip = new AdmZip(buffer);
 
             // Create organization directory if needed
             const orgDir = path.dirname(pluginPath);
@@ -371,8 +372,16 @@ export class PluginManagerService {
               await fs.mkdir(orgDir, { recursive: true });
             }
 
-            // Extract to plugin directory
-            zip.extractAllTo(pluginPath, true);
+            // Extract based on source type
+            if (plugin.sourceType === "git") {
+              // Git plugins are stored as tar.gz archives
+              const { extractTarball } = await import("@server/lib/git/tarball");
+              await extractTarball(buffer, pluginPath);
+            } else {
+              // Custom plugins are stored as ZIP files
+              const zip = new AdmZip(buffer);
+              zip.extractAllTo(pluginPath, true);
+            }
 
             logger.info(
               { pluginName: plugin.name, pluginPath: plugin.pluginPath },

@@ -207,6 +207,13 @@ export const config = {
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
   },
 
+  github: {
+    appId: process.env.GITHUB_APP_ID || "",
+    appPrivateKey: (process.env.GITHUB_APP_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+    appName: process.env.GITHUB_APP_NAME || "",
+    webhookSecret: process.env.GITHUB_APP_WEBHOOK_SECRET || "",
+  },
+
   customMenu: {
     items: (() => {
       const raw = process.env.CUSTOM_MENU;

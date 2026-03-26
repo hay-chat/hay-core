@@ -192,6 +192,25 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   // ============================================================
+  // GIT PLUGIN SYNC
+  // ============================================================
+  {
+    name: "git-plugin-sync",
+    description: "Check git-sourced plugins for updates and sync if changed",
+    schedule: 900000, // Every 15 minutes
+    handler: async () => {
+      const { gitConnectionService } = await import("./git-connection.service");
+      await gitConnectionService.syncAllGitPlugins();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 600000, // 10 minutes max
+    retryOnFailure: true,
+    maxRetries: 2,
+    skipDatabaseLogging: true,
+  },
+
+  // ============================================================
   // OAUTH TOKEN MANAGEMENT
   // ============================================================
   {

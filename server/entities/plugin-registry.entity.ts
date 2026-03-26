@@ -11,6 +11,7 @@ import {
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { PluginMetadata, PluginMetadataState } from "../types/plugin-sdk.types";
 import { Organization } from "./organization.entity";
+import { GitConnection } from "./git-connection.entity";
 import { Upload } from "./upload.entity";
 import { User } from "./user.entity";
 
@@ -89,7 +90,7 @@ export class PluginRegistry {
 
   // Custom plugin fields
   @Column({ type: "varchar", length: 50, default: "core" })
-  sourceType!: "core" | "custom";
+  sourceType!: "core" | "custom" | "git";
 
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;
@@ -117,6 +118,29 @@ export class PluginRegistry {
 
   @Column({ type: "timestamptz", nullable: true })
   uploadedAt?: Date;
+
+  // Git-sourced plugin fields
+  @Column({ type: "uuid", nullable: true })
+  gitConnectionId?: string;
+
+  @ManyToOne(() => GitConnection, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "git_connection_id" })
+  gitConnection?: GitConnection;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  gitRepoFullName?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  gitBranch?: string;
+
+  @Column({ type: "varchar", length: 64, nullable: true })
+  gitLastCommitSha?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  gitLastSyncAt?: Date;
+
+  @Column({ type: "text", nullable: true })
+  gitSyncError?: string;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;

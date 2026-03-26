@@ -283,6 +283,51 @@ async function startServer() {
     }
   });
 
+  // GitHub App installation callback
+  server.get("/github/callback", async (req, res) => {
+    const { getDashboardUrl: getDashUrl } = await import("@server/config/env");
+    const { installation_id, setup_action, state } = req.query;
+
+    if (!installation_id || !state) {
+      return res.status(400).send(`
+        <html>
+          <head><title>GitHub Error</title></head>
+          <body>
+            <h1>GitHub App Installation Error</h1>
+            <p>Missing installation_id or state parameter.</p>
+            <a href="${getDashUrl()}">Return to Dashboard</a>
+          </body>
+        </html>
+      `);
+    }
+
+    try {
+      const { gitConnectionService } = await import("@server/services/git-connection.service");
+      const connection = await gitConnectionService.handleInstallation(
+        installation_id as string,
+        (setup_action as string) || "install",
+        state as string,
+      );
+
+      const dashboardUrl = getDashUrl();
+      logger.info({ accountLogin: connection.accountLogin }, "GitHub App installation successful");
+      return res.redirect(`${dashboardUrl}/settings/git-connections?status=success`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error({ err: error }, "GitHub App installation callback failed");
+      return res.status(400).send(`
+        <html>
+          <head><title>GitHub Error</title></head>
+          <body>
+            <h1>GitHub App Installation Failed</h1>
+            <p>${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+            <a href="${getDashUrl()}">Return to Dashboard</a>
+          </body>
+        </html>
+      `);
+    }
+  });
+
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)
   const wellKnownRouter = await import("@server/routes/well-known");
   server.use(wellKnownRouter.default);
