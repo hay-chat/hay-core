@@ -153,6 +153,15 @@ export class Orchestrator {
                 conversation.organization_id,
                 { needs_processing: true },
               );
+
+              // Enqueue for RabbitMQ processing
+              const { orchestratorQueueService } =
+                await import("@server/services/orchestrator-queue.service");
+              await orchestratorQueueService.enqueue(
+                conversation.id,
+                conversation.organization_id,
+                "inactivity",
+              );
             }
           }
 

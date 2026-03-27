@@ -187,6 +187,33 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     }
   }
 
+  /**
+   * Find conversations where needs_processing=true but haven't been updated recently.
+   * Used by the sweep safety net to re-enqueue conversations that may have been missed.
+   */
+  async getStaleUnprocessed(thresholdMs: number): Promise<Conversation[]> {
+    if (!this.getRepository()) {
+      return [];
+    }
+
+    try {
+      const threshold = new Date(Date.now() - thresholdMs);
+
+      return await this.getRepository()
+        .createQueryBuilder("conversation")
+        .where("conversation.needs_processing = :needsProcessing", { needsProcessing: true })
+        .andWhere("conversation.updated_at < :threshold", { threshold })
+        .andWhere("conversation.status IN (:...statuses)", {
+          statuses: ["open", "processing"],
+        })
+        .select(["conversation.id", "conversation.organization_id"])
+        .getMany();
+    } catch (error) {
+      console.error("[ConversationRepository] Error getting stale unprocessed:", error);
+      return [];
+    }
+  }
+
   override async delete(id: string, organizationId: string): Promise<boolean> {
     const result = await this.getRepository().delete({
       id,

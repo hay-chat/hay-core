@@ -159,18 +159,30 @@ export class WebSocketService {
       if (isPublicMessage && payload.deliveryState === "sent") {
         const conversationSent = this.sendToConversation(conversationId, messagePayload);
 
-        logger.debug({ messageType: payload.type, conversationSent, orgSent }, "Broadcasted SENT message to conversation and org clients");
+        logger.debug(
+          { messageType: payload.type, conversationSent, orgSent },
+          "Broadcasted SENT message to conversation and org clients",
+        );
       } else if (!isPublicMessage) {
-        logger.debug({ messageType: payload.type, orgSent }, "Broadcasted internal message to org clients only");
+        logger.debug(
+          { messageType: payload.type, orgSent },
+          "Broadcasted internal message to org clients only",
+        );
       } else {
-        logger.debug({ messageType: payload.type, orgSent }, "Broadcasted QUEUED message to org clients only");
+        logger.debug(
+          { messageType: payload.type, orgSent },
+          "Broadcasted QUEUED message to org clients only",
+        );
       }
     } else if (type === "conversation_status_changed" && conversationId) {
       // Broadcast status changes to BOTH conversation clients (webchat) AND organization clients (dashboard)
       const conversationSent = this.sendToConversation(conversationId, { type, payload });
       const orgSent = this.sendToOrganization(organizationId, { type, payload });
 
-      logger.debug({ type, conversationSent, orgSent }, "Broadcasted status change to conversation and org clients");
+      logger.debug(
+        { type, conversationSent, orgSent },
+        "Broadcasted status change to conversation and org clients",
+      );
     } else if (
       type === "conversation_created" ||
       type === "conversation_updated" ||
@@ -238,7 +250,10 @@ export class WebSocketService {
     // Authenticate if token provided
     if (token) {
       const authenticated = this.authenticateClient(clientId, token);
-      logger.debug({ clientId, authenticated, organizationId: client.organizationId }, "Client authentication result");
+      logger.debug(
+        { clientId, authenticated, organizationId: client.organizationId },
+        "Client authentication result",
+      );
 
       // Add to organization clients if authenticated
       if (client.authenticated && client.organizationId) {
@@ -246,9 +261,15 @@ export class WebSocketService {
           this.organizationClients.set(client.organizationId, new Set());
         }
         this.organizationClients.get(client.organizationId)!.add(clientId);
-        logger.debug({ clientId, organizationId: client.organizationId }, "Added client to organization");
+        logger.debug(
+          { clientId, organizationId: client.organizationId },
+          "Added client to organization",
+        );
       } else {
-        logger.debug({ clientId, authenticated: client.authenticated, organizationId: client.organizationId }, "Client NOT added to organization");
+        logger.debug(
+          { clientId, authenticated: client.authenticated, organizationId: client.organizationId },
+          "Client NOT added to organization",
+        );
       }
     }
 
@@ -465,11 +486,10 @@ export class WebSocketService {
         newNonce = dpopVerification.newNonce;
       }
 
-      const { orchestratorWorker } = await import("@server/workers/orchestrator.worker");
-
       logger.debug({ conversationId: conversation.id }, "Saving customer message to conversation");
 
       // Save customer message using conversation.addMessage() to ensure broadcasting
+      // addMessage() also enqueues the conversation for RabbitMQ processing
       const savedMessage = await conversation.addMessage({
         content: message.content,
         type: MessageType.CUSTOMER,
@@ -488,11 +508,7 @@ export class WebSocketService {
       client.ws.send(JSON.stringify(confirmationPayload));
 
       // Note: Message broadcasting is handled automatically by conversation.addMessage()
-      // via Redis pub/sub or direct WebSocket
-
-      // Trigger orchestrator to process the message and generate response
-      logger.debug({ conversationId: conversation.id }, "Triggering orchestrator for conversation");
-      await orchestratorWorker.tick();
+      // Orchestrator processing is triggered via RabbitMQ queue from conversation.addMessage()
 
       logger.debug({ conversationId: conversation.id }, "Webchat message processed");
     } catch (error) {
@@ -568,7 +584,10 @@ export class WebSocketService {
     // They already receive ALL messages via organizationClients, so adding them to conversationClients
     // would cause duplicate message delivery
     if (client.authenticated && client.organizationId) {
-      logger.debug({ clientId }, "Client is authenticated org member - skipping conversationClients subscription");
+      logger.debug(
+        { clientId },
+        "Client is authenticated org member - skipping conversationClients subscription",
+      );
       // Still set conversationId for client metadata, but don't add to conversationClients map
       client.conversationId = conversationId as string;
       return;
@@ -582,7 +601,10 @@ export class WebSocketService {
 
     client.conversationId = conversationId as string;
 
-    logger.debug({ clientId, conversationId }, "Client subscribed to conversation (webchat client)");
+    logger.debug(
+      { clientId, conversationId },
+      "Client subscribed to conversation (webchat client)",
+    );
   }
 
   /**
@@ -602,7 +624,10 @@ export class WebSocketService {
         }
       }
 
-      logger.debug({ conversationId: client.conversationId }, "Webchat client disconnected from conversation");
+      logger.debug(
+        { conversationId: client.conversationId },
+        "Webchat client disconnected from conversation",
+      );
     }
 
     // Remove from organization clients

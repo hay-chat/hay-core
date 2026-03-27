@@ -801,18 +801,26 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
 
       // Update conversation with cooldown and processing status
+      const shouldProcess = newStatus === "open";
       await conversationRepository.update(this.id, this.organization_id, {
         status: newStatus,
-        needs_processing: newStatus === "open", // Only process if returning to open
+        needs_processing: shouldProcess,
         cooldown_until: cooldownUntil,
         lastMessageAt: new Date(),
       });
 
       // Update local instance
       this.cooldown_until = cooldownUntil;
-      this.needs_processing = newStatus === "open";
+      this.needs_processing = shouldProcess;
       this.lastMessageAt = new Date();
       this.status = newStatus;
+
+      // Enqueue for RabbitMQ processing
+      if (shouldProcess) {
+        const { orchestratorQueueService } =
+          await import("../../services/orchestrator-queue.service");
+        await orchestratorQueueService.enqueue(this.id, this.organization_id, "customer_message");
+      }
     }
 
     // Check if test mode is enabled for bot messages
@@ -1183,6 +1191,11 @@ Translated message:`;
     if (returnToMode === "ai") {
       this.needs_processing = true;
       this.previous_status = null;
+
+      // Enqueue for RabbitMQ processing
+      const { orchestratorQueueService } =
+        await import("../../services/orchestrator-queue.service");
+      await orchestratorQueueService.enqueue(this.id, this.organization_id, "ai_return");
     }
   }
 

@@ -27,20 +27,23 @@ export class MessageRecoveryService {
    */
   async recoverStaleConversation(
     staleConv: StaleConversation,
-    dryRun: boolean = false
+    dryRun: boolean = false,
   ): Promise<RecoveryResult> {
     const conversation = await this.conversationRepository.findById(staleConv.conversationId);
     if (!conversation) {
       return { success: false, action: "conversation_not_found" };
     }
 
-    logger.info({
-      conversationId: staleConv.conversationId,
-      reason: staleConv.stuckReason,
-      staleDuration: staleConv.staleDuration,
-      attempts: staleConv.processingAttempts,
-      errors: staleConv.processingErrorCount,
-    }, "Attempting recovery for conversation");
+    logger.info(
+      {
+        conversationId: staleConv.conversationId,
+        reason: staleConv.stuckReason,
+        staleDuration: staleConv.staleDuration,
+        attempts: staleConv.processingAttempts,
+        errors: staleConv.processingErrorCount,
+      },
+      "Attempting recovery for conversation",
+    );
 
     if (dryRun) {
       return { success: true, action: "dry_run" };
@@ -60,27 +63,48 @@ export class MessageRecoveryService {
       });
 
       // Apply recovery strategy based on stuck reason
+      let result: RecoveryResult;
       switch (staleConv.stuckReason) {
         case StaleReason.LOCK_EXPIRED:
-          return await this.recoverFromLockExpiry(conversation);
+          result = await this.recoverFromLockExpiry(conversation);
+          break;
 
         case StaleReason.NO_RESPONSE_TIMEOUT:
-          return await this.recoverFromNoResponseTimeout(conversation);
+          result = await this.recoverFromNoResponseTimeout(conversation);
+          break;
 
         case StaleReason.REPEATED_FAILURES:
-          return await this.recoverFromRepeatedFailures(conversation);
+          result = await this.recoverFromRepeatedFailures(conversation);
+          break;
 
         case StaleReason.ABANDONED_PROCESSING:
-          return await this.recoverFromAbandonedProcessing(conversation);
+          result = await this.recoverFromAbandonedProcessing(conversation);
+          break;
 
         case StaleReason.COOLDOWN_STUCK:
-          return await this.recoverFromCooldownStuck(conversation);
+          result = await this.recoverFromCooldownStuck(conversation);
+          break;
 
         default:
           return { success: false, action: "unknown_stuck_reason" };
       }
+
+      // Enqueue for RabbitMQ processing after successful recovery
+      if (result.success) {
+        const { orchestratorQueueService } = await import("./orchestrator-queue.service");
+        await orchestratorQueueService.enqueue(
+          staleConv.conversationId,
+          conversation.organization_id,
+          "recovery",
+        );
+      }
+
+      return result;
     } catch (error) {
-      logger.error({ err: error, conversationId: staleConv.conversationId }, "Recovery failed for conversation");
+      logger.error(
+        { err: error, conversationId: staleConv.conversationId },
+        "Recovery failed for conversation",
+      );
       return {
         success: false,
         action: "recovery_error",
@@ -137,11 +161,14 @@ export class MessageRecoveryService {
     // Calculate exponential backoff: 1s, 2s, 4s, 8s, 16s (max 60s)
     const backoffDelay = Math.min(1000 * Math.pow(2, errorCount), 60000);
 
-    logger.debug({
-      conversationId: conversation.id,
-      errorCount,
-      backoffMs: backoffDelay,
-    }, "Applying backoff for conversation");
+    logger.debug(
+      {
+        conversationId: conversation.id,
+        errorCount,
+        backoffMs: backoffDelay,
+      },
+      "Applying backoff for conversation",
+    );
 
     // Wait for backoff period
     await new Promise((resolve) => setTimeout(resolve, backoffDelay));
@@ -178,7 +205,10 @@ export class MessageRecoveryService {
       stuck_reason: null,
     });
 
-    logger.debug({ conversationId: conversation.id }, "Reset abandoned processing for conversation");
+    logger.debug(
+      { conversationId: conversation.id },
+      "Reset abandoned processing for conversation",
+    );
     return { success: true, action: "reset_and_requeued" };
   }
 
@@ -240,12 +270,15 @@ export class MessageRecoveryService {
     // Broadcast alert to organization
     await this.publishStuckConversationAlert(conversation);
 
-    logger.info({
-      conversationId: conversation.id,
-      reason,
-      errorCount: conversation.processing_error_count,
-      lastError: conversation.last_processing_error,
-    }, "Escalated conversation to human");
+    logger.info(
+      {
+        conversationId: conversation.id,
+        reason,
+        errorCount: conversation.processing_error_count,
+        lastError: conversation.last_processing_error,
+      },
+      "Escalated conversation to human",
+    );
 
     return {
       success: true,
@@ -262,15 +295,12 @@ export class MessageRecoveryService {
 
       await conversationEventsService.broadcastConversationUpdated(
         conversation,
-        ["status"] // This will automatically trigger conversation_status_changed event
+        ["status"], // This will automatically trigger conversation_status_changed event
       );
 
       logger.debug({ conversationId: conversation.id }, "Published stuck conversation alert");
     } catch (error) {
-      logger.error(
-        { err: error },
-        "Failed to publish stuck conversation alert",
-      );
+      logger.error({ err: error }, "Failed to publish stuck conversation alert");
     }
   }
 
@@ -280,7 +310,7 @@ export class MessageRecoveryService {
   async manualRecovery(conversationId: string, organizationId: string): Promise<RecoveryResult> {
     const conversation = await this.conversationRepository.findByIdAndOrganization(
       conversationId,
-      organizationId
+      organizationId,
     );
 
     if (!conversation) {
@@ -304,6 +334,10 @@ export class MessageRecoveryService {
     });
 
     logger.info({ conversationId }, "Manual recovery completed for conversation");
+
+    // Enqueue for RabbitMQ processing
+    const { orchestratorQueueService } = await import("./orchestrator-queue.service");
+    await orchestratorQueueService.enqueue(conversationId, organizationId, "recovery");
 
     return {
       success: true,

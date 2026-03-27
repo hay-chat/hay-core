@@ -117,6 +117,10 @@ export const config = {
     tls: process.env.REDIS_TLS === "true" ? {} : undefined,
   },
 
+  rabbitmq: {
+    url: process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672/",
+  },
+
   jwt: {
     secret: process.env.JWT_SECRET || "",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
