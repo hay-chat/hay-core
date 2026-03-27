@@ -521,8 +521,14 @@ export class ToolExecutionService {
       logger.debug({ result }, "MCP response received");
 
       if (result.isError) {
-        // Preserve the full error object for better error visibility
-        const errorDetails = result.error || { message: "Unknown error" };
+        // Extract error from MCP response — error text may be in content or error field
+        const contentText = Array.isArray(result.content)
+          ? result.content
+              .filter((c: { type: string }) => c.type === "text")
+              .map((c: { text?: string }) => c.text || "")
+              .join("\n")
+          : null;
+        const errorDetails = contentText || result.error || "Unknown error";
         const errorMessage =
           typeof errorDetails === "object" ? JSON.stringify(errorDetails) : String(errorDetails);
 
