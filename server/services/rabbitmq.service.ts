@@ -55,7 +55,7 @@ export class RabbitMQService extends EventEmitter {
       timeout: 10_000, // 10s TCP connection timeout
     });
 
-    this.connection.on("error", (err) => {
+    this.connection.on("error", (err: Error) => {
       logger.error({ err }, "RabbitMQ connection error");
     });
 
@@ -71,7 +71,7 @@ export class RabbitMQService extends EventEmitter {
 
     this.channel = await this.connection.createChannel();
 
-    this.channel.on("error", (err) => {
+    this.channel.on("error", (err: Error) => {
       logger.error({ err }, "RabbitMQ channel error");
     });
 
@@ -204,17 +204,20 @@ export class RabbitMQService extends EventEmitter {
       await this.channel.prefetch(options.prefetch);
     }
 
-    const { consumerTag } = await this.channel.consume(queue, async (msg) => {
-      if (!msg) return;
+    const { consumerTag } = await this.channel.consume(
+      queue,
+      async (msg: ConsumeMessage | null) => {
+        if (!msg) return;
 
-      try {
-        await handler(msg);
-      } catch (error) {
-        logger.error({ err: error, queue }, "Consumer handler error");
-        // Nack without requeue on handler exceptions — let dead-letter handle it
-        this.nack(msg, false);
-      }
-    });
+        try {
+          await handler(msg);
+        } catch (error) {
+          logger.error({ err: error, queue }, "Consumer handler error");
+          // Nack without requeue on handler exceptions — let dead-letter handle it
+          this.nack(msg, false);
+        }
+      },
+    );
 
     this.consumerTags.set(queue, consumerTag);
     debugLog("rabbitmq", `Consuming from queue: ${queue}`, { consumerTag });
