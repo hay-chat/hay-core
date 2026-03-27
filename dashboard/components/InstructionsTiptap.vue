@@ -48,6 +48,7 @@ import { configureSlashCommand } from "@/components/tiptap/SlashCommand";
 import type { MCPTool, DocumentItem } from "@/components/tiptap/MentionExtension";
 import { HayApi } from "@/utils/api";
 import { useDomain } from "@/composables/useDomain";
+import { useToolLabel } from "@/composables/useToolLabel";
 
 interface Props {
   initialData?: JSONContent;
@@ -129,15 +130,24 @@ const editorContent = computed(() => {
 const { getApiUrl } = useDomain();
 const apiBaseUrl = getApiUrl();
 
+// Resolve tool labels using plugin translations
+const { getToolLabel } = useToolLabel();
+const resolvedTools = computed(() =>
+  mcpTools.value.map((tool) => ({
+    ...tool,
+    label: getToolLabel(tool.pluginId, tool.name),
+  })),
+);
+
 // Tiptap extensions
 const editorExtensions = computed(() => [
   configureMentionExtension({
-    mcpTools: mcpTools.value,
+    mcpTools: resolvedTools.value,
     documents: documents.value,
     apiBaseUrl,
   }),
   configureSlashCommand({
-    mcpTools: mcpTools.value,
+    mcpTools: resolvedTools.value,
     documents: documents.value,
   }),
 ]);

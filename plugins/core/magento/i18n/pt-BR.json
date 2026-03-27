@@ -1,0 +1,72 @@
+{
+  "name": "Magento",
+  "description": "Conecte sua loja Magento para gerenciar produtos, pedidos, clientes e operações de e-commerce",
+  "tools": {
+    "get_product_by_sku": {
+      "label": "Buscar Produto por SKU",
+      "description": "Obter informações detalhadas de um produto pelo SKU (Unidade de Manutenção de Estoque)"
+    },
+    "get_product_by_id": {
+      "label": "Buscar Produto por ID",
+      "description": "Obter informações detalhadas de um produto pelo seu ID numérico"
+    },
+    "search_products": {
+      "label": "Pesquisar Produtos",
+      "description": "Pesquisar produtos usando um termo de busca com suporte a paginação"
+    },
+    "advanced_product_search": {
+      "label": "Pesquisa Avançada de Produtos",
+      "description": "Pesquisar produtos com opções avançadas de filtro e critérios por campos personalizados"
+    },
+    "get_product_categories": {
+      "label": "Buscar Categorias do Produto",
+      "description": "Obter todas as categorias de um produto específico pelo SKU"
+    },
+    "get_related_products": {
+      "label": "Buscar Produtos Relacionados",
+      "description": "Obter produtos relacionados a um produto específico pelo SKU"
+    },
+    "get_product_stock": {
+      "label": "Buscar Estoque do Produto",
+      "description": "Obter informações de estoque de um produto pelo SKU"
+    },
+    "get_product_attributes": {
+      "label": "Buscar Atributos do Produto",
+      "description": "Obter todos os atributos (base e personalizados) de um produto pelo SKU"
+    },
+    "update_product_attribute": {
+      "label": "Atualizar Atributo do Produto",
+      "description": "Atualizar um atributo específico de um produto pelo SKU"
+    },
+    "get_revenue": {
+      "label": "Buscar Faturamento",
+      "description": "Obter o faturamento total para um período com filtro por status"
+    },
+    "get_revenue_by_country": {
+      "label": "Buscar Faturamento por País",
+      "description": "Obter faturamento filtrado por país para um período"
+    },
+    "get_order_count": {
+      "label": "Buscar Quantidade de Pedidos",
+      "description": "Obter o número de pedidos para um período com filtro por status"
+    },
+    "get_product_sales": {
+      "label": "Buscar Vendas de Produtos",
+      "description": "Obter estatísticas de quantidade de produtos vendidos em um período com filtros por país e status"
+    },
+    "get_customer_ordered_products_by_email": {
+      "label": "Buscar Produtos Pedidos por E-mail do Cliente",
+      "description": "Obter todos os produtos pedidos por um cliente através do endereço de e-mail com informações detalhadas"
+    }
+  },
+  "config": {
+    "baseUrl": {
+      "label": "URL Base do Magento",
+      "description": "URL base da API REST do Magento 2 (ex: https://seudominio.com/rest/V1)"
+    },
+    "apiToken": {
+      "label": "Token da API",
+      "description": "Token da API do Magento (crie em Sistema > Integrações)"
+    }
+  }
+}

@@ -1531,5 +1531,31 @@ export const validateAuth = authenticatedProcedure
     }
   });
 
+/**
+ * Get plugin translations for a given locale
+ *
+ * Returns i18n data for all plugins that have translations available.
+ * Used by the frontend to merge plugin translations into Vue I18n at runtime.
+ */
+export const getPluginTranslations = authenticatedProcedure
+  .input(z.object({ locale: z.string() }))
+  .query(async ({ input }) => {
+    const plugins = pluginManagerService.getAllPlugins();
+    const translations: Record<string, any> = {};
+
+    for (const plugin of plugins) {
+      const manifest = plugin.manifest as HayPluginManifest;
+      if (manifest.i18n) {
+        // Try exact locale, then fallback to "en"
+        const localeData = manifest.i18n[input.locale] || manifest.i18n["en"];
+        if (localeData) {
+          translations[plugin.pluginId] = localeData;
+        }
+      }
+    }
+
+    return translations;
+  });
+
 // Note: Plugin UI assets are now served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
 // See server/main.ts for the Express route handler and server/services/plugin-asset.service.ts for implementation

@@ -1,0 +1,76 @@
+{
+  "name": "HubSpot",
+  "description": "Conecte seu CRM HubSpot para acessar e gerenciar contatos, empresas, negociações, tickets e outros objetos do CRM",
+  "tools": {
+    "hubspot_create_contact": {
+      "label": "Criar Contato",
+      "description": "Cria um novo contato no HubSpot CRM com detecção de duplicatas"
+    },
+    "hubspot_create_company": {
+      "label": "Criar Empresa",
+      "description": "Cria uma nova empresa no HubSpot CRM com detecção de duplicatas"
+    },
+    "hubspot_get_company_activity": {
+      "label": "Ver Atividades da Empresa",
+      "description": "Recupera o histórico completo de interações de uma empresa, incluindo e-mails, ligações, reuniões, notas e tarefas"
+    },
+    "hubspot_get_recent_engagements": {
+      "label": "Ver Interações Recentes",
+      "description": "Busca atividades recentes em todos os registros do CRM"
+    },
+    "hubspot_get_active_companies": {
+      "label": "Ver Empresas Ativas",
+      "description": "Lista as empresas modificadas recentemente"
+    },
+    "hubspot_get_active_contacts": {
+      "label": "Ver Contatos Ativos",
+      "description": "Lista os contatos modificados recentemente"
+    },
+    "hubspot_update_contact": {
+      "label": "Atualizar Contato",
+      "description": "Edita as informações de um contato existente"
+    },
+    "hubspot_update_company": {
+      "label": "Atualizar Empresa",
+      "description": "Edita as informações de uma empresa existente"
+    },
+    "hubspot_search_contacts": {
+      "label": "Buscar Contatos",
+      "description": "Pesquisa contatos usando diversos critérios"
+    },
+    "hubspot_search_companies": {
+      "label": "Buscar Empresas",
+      "description": "Pesquisa empresas usando diversos critérios"
+    },
+    "hubspot_get_deals": {
+      "label": "Ver Negociações",
+      "description": "Recupera negociações do HubSpot CRM"
+    },
+    "hubspot_get_tickets": {
+      "label": "Ver Tickets",
+      "description": "Recupera tickets de suporte do HubSpot CRM"
+    },
+    "hubspot_get_products": {
+      "label": "Ver Produtos",
+      "description": "Recupera produtos do HubSpot CRM"
+    },
+    "hubspot_get_quotes": {
+      "label": "Ver Orçamentos",
+      "description": "Recupera orçamentos do HubSpot CRM"
+    },
+    "hubspot_get_invoices": {
+      "label": "Ver Faturas",
+      "description": "Recupera faturas do HubSpot CRM"
+    }
+  },
+  "config": {
+    "clientId": {
+      "label": "ID do Cliente OAuth",
+      "description": "ID do cliente OAuth do HubSpot"
+    },
+    "clientSecret": {
+      "label": "Chave Secreta OAuth",
+      "description": "Chave secreta do cliente OAuth do HubSpot"
+    }
+  }
+}

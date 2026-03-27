@@ -1,0 +1,96 @@
+{
+  "name": "WooCommerce",
+  "description": "Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows",
+  "tools": {
+    "get_products": {
+      "label": "Get Products",
+      "description": "Retrieve a list of WooCommerce products"
+    },
+    "get_product": {
+      "label": "Get Product",
+      "description": "Get a specific WooCommerce product by ID"
+    },
+    "create_product": {
+      "label": "Create Product",
+      "description": "Create a new WooCommerce product"
+    },
+    "update_product": {
+      "label": "Update Product",
+      "description": "Update an existing WooCommerce product"
+    },
+    "delete_product": {
+      "label": "Delete Product",
+      "description": "Delete a WooCommerce product"
+    },
+    "get_orders": {
+      "label": "Get Orders",
+      "description": "Retrieve a list of WooCommerce orders"
+    },
+    "get_order": {
+      "label": "Get Order",
+      "description": "Get a specific WooCommerce order by ID"
+    },
+    "create_order": {
+      "label": "Create Order",
+      "description": "Create a new WooCommerce order"
+    },
+    "update_order": {
+      "label": "Update Order",
+      "description": "Update an existing WooCommerce order"
+    },
+    "get_customers": {
+      "label": "Get Customers",
+      "description": "Retrieve a list of WooCommerce customers"
+    },
+    "get_customer": {
+      "label": "Get Customer",
+      "description": "Get a specific WooCommerce customer by ID"
+    },
+    "create_customer": {
+      "label": "Create Customer",
+      "description": "Create a new WooCommerce customer"
+    },
+    "update_customer": {
+      "label": "Update Customer",
+      "description": "Update an existing WooCommerce customer"
+    },
+    "get_product_categories": {
+      "label": "Get Product Categories",
+      "description": "Retrieve WooCommerce product categories"
+    },
+    "create_product_category": {
+      "label": "Create Product Category",
+      "description": "Create a new WooCommerce product category"
+    },
+    "get_coupons": {
+      "label": "Get Coupons",
+      "description": "Retrieve WooCommerce coupons"
+    },
+    "create_coupon": {
+      "label": "Create Coupon",
+      "description": "Create a new WooCommerce coupon"
+    }
+  },
+  "config": {
+    "siteUrl": {
+      "label": "WordPress Site URL",
+      "description": "Your WordPress/WooCommerce site URL (e.g., https://mystore.com)"
+    },
+    "consumerKey": {
+      "label": "Consumer Key",
+      "description": "WooCommerce REST API Consumer Key"
+    },
+    "consumerSecret": {
+      "label": "Consumer Secret",
+      "description": "WooCommerce REST API Consumer Secret"
+    },
+    "username": {
+      "label": "WordPress Username (Optional)",
+      "description": "WordPress admin username for WordPress REST API endpoints"
+    },
+    "password": {
+      "label": "WordPress Password (Optional)",
+      "description": "WordPress admin password for WordPress REST API endpoints"
+    }
+  }
+}

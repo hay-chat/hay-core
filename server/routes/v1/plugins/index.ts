@@ -17,6 +17,7 @@ import {
   getOAuthStatus,
   revokeOAuth,
   validateAuth,
+  getPluginTranslations,
 } from "./plugins.handler";
 
 export const pluginsRouter = t.router({
@@ -33,6 +34,7 @@ export const pluginsRouter = t.router({
   getMenuItems: getMenuItems,
   testConnection: testConnection,
   validateAuth: validateAuth,
+  getPluginTranslations: getPluginTranslations,
   // Note: Plugin UI assets are served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
   oauth: {
     initiate: initiateOAuth,

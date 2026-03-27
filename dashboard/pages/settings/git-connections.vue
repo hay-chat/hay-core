@@ -68,11 +68,13 @@
                   <h4 class="font-medium">{{ connection.accountLogin }}</h4>
                   <Badge variant="success">{{ connection.status }}</Badge>
                   <Badge variant="outline">{{
-                    connection.repositorySelection === "all" ? "All repos" : "Selected repos"
+                    connection.repositorySelection === "all"
+                      ? $t("gitConnections.allRepos")
+                      : $t("gitConnections.selectedRepos")
                   }}</Badge>
                 </div>
                 <p class="text-sm text-neutral-muted">
-                  {{ connection.accountType }} &middot; Connected
+                  {{ connection.accountType }} &middot; {{ $t("gitConnections.connectedPrefix") }}
                   {{ formatDate(connection.createdAt) }}
                 </p>
               </div>
@@ -366,10 +368,10 @@ const formatDate = (date: Date | string) => {
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days === 0) return t("gitConnections.dateToday");
+  if (days === 1) return t("gitConnections.dateYesterday");
+  if (days < 7) return t("gitConnections.dateDaysAgo", { days });
+  if (days < 30) return t("gitConnections.dateWeeksAgo", { weeks: Math.floor(days / 7) });
   return d.toLocaleDateString();
 };
 
@@ -385,9 +387,9 @@ const completeGitHubInstallation = async () => {
     const result = await Hay.gitConnections.completeInstallation.mutate({
       installationId,
     });
-    toast.success(`Connected to ${result.accountLogin}`);
+    toast.success(t("gitConnections.connectedTo", { accountLogin: result.accountLogin }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to complete installation";
+    const message = error instanceof Error ? error.message : t("gitConnections.completionFailed");
     toast.error(message);
   }
 

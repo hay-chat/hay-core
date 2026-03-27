@@ -314,8 +314,10 @@
                   <Zap class="h-4 w-4 text-primary" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <h4 class="font-medium text-sm">{{ tool.label || tool.name }}</h4>
-                  <p class="text-xs text-muted-foreground mt-1">{{ tool.description }}</p>
+                  <h4 class="font-medium text-sm">{{ getToolLabel(pluginId, tool.name) }}</h4>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    {{ getToolDescription(pluginId, tool.name, tool.description) }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -593,8 +595,10 @@ import { useDomain } from "@/composables/useDomain";
 import { sanitizeHtml } from "@/utils/sanitize";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+import { useToolLabel } from "@/composables/useToolLabel";
 
 const { t } = useI18n();
+const { getToolLabel, getToolDescription } = useToolLabel();
 
 // Constants
 const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately

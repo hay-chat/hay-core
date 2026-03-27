@@ -139,6 +139,18 @@ export interface HayPluginManifest {
     tabOrder?: number;
     props?: Record<string, any>;
   }>;
+  i18n?: Record<string, PluginLocale>;
+}
+
+/**
+ * Plugin locale data for a single language
+ * Provides human-readable translations for plugin metadata and MCP tools
+ */
+export interface PluginLocale {
+  name?: string;
+  description?: string;
+  tools?: Record<string, { label: string; description?: string }>;
+  config?: Record<string, { label: string; description?: string }>;
 }
 
 export interface WebhookRequest {

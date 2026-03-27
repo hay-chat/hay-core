@@ -1,0 +1,212 @@
+{
+  "name": "Zendesk",
+  "description": "Conecte sua conta Zendesk para gerenciar tickets, clientes e fluxos de suporte",
+  "tools": {
+    "list_tickets": {
+      "label": "Listar Tickets",
+      "description": "Lista os tickets no Zendesk"
+    },
+    "get_ticket": {
+      "label": "Ver Ticket",
+      "description": "Busca um ticket pelo ID"
+    },
+    "create_ticket": {
+      "label": "Criar Ticket",
+      "description": "Cria um novo ticket"
+    },
+    "update_ticket": {
+      "label": "Atualizar Ticket",
+      "description": "Atualiza um ticket existente"
+    },
+    "delete_ticket": {
+      "label": "Excluir Ticket",
+      "description": "Exclui um ticket"
+    },
+    "list_users": {
+      "label": "Listar Usu\u00e1rios",
+      "description": "Lista os usu\u00e1rios no Zendesk"
+    },
+    "get_user": {
+      "label": "Ver Usu\u00e1rio",
+      "description": "Busca um usu\u00e1rio pelo ID"
+    },
+    "create_user": {
+      "label": "Criar Usu\u00e1rio",
+      "description": "Cria um novo usu\u00e1rio"
+    },
+    "update_user": {
+      "label": "Atualizar Usu\u00e1rio",
+      "description": "Atualiza um usu\u00e1rio existente"
+    },
+    "delete_user": {
+      "label": "Excluir Usu\u00e1rio",
+      "description": "Exclui um usu\u00e1rio"
+    },
+    "list_organizations": {
+      "label": "Listar Organiza\u00e7\u00f5es",
+      "description": "Lista as organiza\u00e7\u00f5es no Zendesk"
+    },
+    "get_organization": {
+      "label": "Ver Organiza\u00e7\u00e3o",
+      "description": "Busca uma organiza\u00e7\u00e3o pelo ID"
+    },
+    "create_organization": {
+      "label": "Criar Organiza\u00e7\u00e3o",
+      "description": "Cria uma nova organiza\u00e7\u00e3o"
+    },
+    "update_organization": {
+      "label": "Atualizar Organiza\u00e7\u00e3o",
+      "description": "Atualiza uma organiza\u00e7\u00e3o existente"
+    },
+    "delete_organization": {
+      "label": "Excluir Organiza\u00e7\u00e3o",
+      "description": "Exclui uma organiza\u00e7\u00e3o"
+    },
+    "list_groups": {
+      "label": "Listar Grupos",
+      "description": "Lista os grupos de agentes no Zendesk"
+    },
+    "get_group": {
+      "label": "Ver Grupo",
+      "description": "Busca um grupo pelo ID"
+    },
+    "create_group": {
+      "label": "Criar Grupo",
+      "description": "Cria um novo grupo de agentes"
+    },
+    "update_group": {
+      "label": "Atualizar Grupo",
+      "description": "Atualiza um grupo existente"
+    },
+    "delete_group": {
+      "label": "Excluir Grupo",
+      "description": "Exclui um grupo"
+    },
+    "list_macros": {
+      "label": "Listar Macros",
+      "description": "Lista as macros no Zendesk"
+    },
+    "get_macro": {
+      "label": "Ver Macro",
+      "description": "Busca uma macro pelo ID"
+    },
+    "create_macro": {
+      "label": "Criar Macro",
+      "description": "Cria uma nova macro"
+    },
+    "update_macro": {
+      "label": "Atualizar Macro",
+      "description": "Atualiza uma macro existente"
+    },
+    "delete_macro": {
+      "label": "Excluir Macro",
+      "description": "Exclui uma macro"
+    },
+    "list_views": {
+      "label": "Listar Visualiza\u00e7\u00f5es",
+      "description": "Lista as visualiza\u00e7\u00f5es no Zendesk"
+    },
+    "get_view": {
+      "label": "Ver Visualiza\u00e7\u00e3o",
+      "description": "Busca uma visualiza\u00e7\u00e3o pelo ID"
+    },
+    "create_view": {
+      "label": "Criar Visualiza\u00e7\u00e3o",
+      "description": "Cria uma nova visualiza\u00e7\u00e3o"
+    },
+    "update_view": {
+      "label": "Atualizar Visualiza\u00e7\u00e3o",
+      "description": "Atualiza uma visualiza\u00e7\u00e3o existente"
+    },
+    "delete_view": {
+      "label": "Excluir Visualiza\u00e7\u00e3o",
+      "description": "Exclui uma visualiza\u00e7\u00e3o"
+    },
+    "list_triggers": {
+      "label": "Listar Gatilhos",
+      "description": "Lista os gatilhos no Zendesk"
+    },
+    "get_trigger": {
+      "label": "Ver Gatilho",
+      "description": "Busca um gatilho pelo ID"
+    },
+    "create_trigger": {
+      "label": "Criar Gatilho",
+      "description": "Cria um novo gatilho"
+    },
+    "update_trigger": {
+      "label": "Atualizar Gatilho",
+      "description": "Atualiza um gatilho existente"
+    },
+    "delete_trigger": {
+      "label": "Excluir Gatilho",
+      "description": "Exclui um gatilho"
+    },
+    "list_automations": {
+      "label": "Listar Automa\u00e7\u00f5es",
+      "description": "Lista as automa\u00e7\u00f5es no Zendesk"
+    },
+    "get_automation": {
+      "label": "Ver Automa\u00e7\u00e3o",
+      "description": "Busca uma automa\u00e7\u00e3o pelo ID"
+    },
+    "create_automation": {
+      "label": "Criar Automa\u00e7\u00e3o",
+      "description": "Cria uma nova automa\u00e7\u00e3o"
+    },
+    "update_automation": {
+      "label": "Atualizar Automa\u00e7\u00e3o",
+      "description": "Atualiza uma automa\u00e7\u00e3o existente"
+    },
+    "delete_automation": {
+      "label": "Excluir Automa\u00e7\u00e3o",
+      "description": "Exclui uma automa\u00e7\u00e3o"
+    },
+    "list_articles": {
+      "label": "Listar Artigos",
+      "description": "Lista os artigos da Central de Ajuda"
+    },
+    "get_article": {
+      "label": "Ver Artigo",
+      "description": "Busca um artigo da Central de Ajuda pelo ID"
+    },
+    "create_article": {
+      "label": "Criar Artigo",
+      "description": "Cria um novo artigo na Central de Ajuda"
+    },
+    "update_article": {
+      "label": "Atualizar Artigo",
+      "description": "Atualiza um artigo existente na Central de Ajuda"
+    },
+    "delete_article": {
+      "label": "Excluir Artigo",
+      "description": "Exclui um artigo da Central de Ajuda"
+    },
+    "search": {
+      "label": "Pesquisar",
+      "description": "Pesquisa em todos os dados do Zendesk"
+    },
+    "get_talk_stats": {
+      "label": "Ver Estat\u00edsticas do Talk",
+      "description": "Consulta as estat\u00edsticas do Zendesk Talk"
+    },
+    "list_chats": {
+      "label": "Listar Chats",
+      "description": "Lista as conversas do Zendesk Chat"
+    }
+  },
+  "config": {
+    "subdomain": {
+      "label": "Subdom\u00ednio Zendesk",
+      "description": "Seu subdom\u00ednio do Zendesk (ex: \"minhaempresa\" de minhaempresa.zendesk.com)"
+    },
+    "email": {
+      "label": "E-mail do Administrador",
+      "description": "Endere\u00e7o de e-mail do usu\u00e1rio administrador do Zendesk"
+    },
+    "apiToken": {
+      "label": "Token da API",
+      "description": "Token da API do Zendesk (gerado em Centro de Administra\u00e7\u00e3o > APIs > Tokens de API)"
+    }
+  }
+}

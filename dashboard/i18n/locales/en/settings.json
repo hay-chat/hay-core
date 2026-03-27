@@ -570,6 +570,15 @@
     "noGitPlugins": "No plugins installed from Git yet",
     "noGitPluginsDescription": "Connect a GitHub account and install a plugin from a repository.",
     "repo": "Repository",
-    "syncError": "Sync Error"
+    "syncError": "Sync Error",
+    "allRepos": "All repos",
+    "selectedRepos": "Selected repos",
+    "connectedPrefix": "Connected",
+    "dateToday": "today",
+    "dateYesterday": "yesterday",
+    "dateDaysAgo": "{days} days ago",
+    "dateWeeksAgo": "{weeks} weeks ago",
+    "connectedTo": "Connected to {accountLogin}",
+    "completionFailed": "Failed to complete installation"
   }
 }

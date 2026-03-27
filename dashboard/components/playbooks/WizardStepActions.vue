@@ -46,6 +46,7 @@
 import { ref, computed, onMounted } from "vue";
 import { Info } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
+import { useToolLabel } from "@/composables/useToolLabel";
 
 interface MCPTool {
   id: string;
@@ -75,9 +76,18 @@ const tools = ref<MCPTool[]>([]);
 const loading = ref(false);
 const error = ref(false);
 
+const { getToolLabel } = useToolLabel();
+
+const resolvedTools = computed(() =>
+  tools.value.map((tool) => ({
+    ...tool,
+    label: getToolLabel(tool.pluginId, tool.name),
+  })),
+);
+
 const groupedTools = computed(() => {
   const groups = new Map<string, MCPTool[]>();
-  for (const tool of tools.value) {
+  for (const tool of resolvedTools.value) {
     const existing = groups.get(tool.pluginName);
     if (existing) {
       existing.push(tool);

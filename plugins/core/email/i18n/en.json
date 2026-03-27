@@ -1,0 +1,20 @@
+{
+  "name": "Email",
+  "description": "Send emails using the platform email service with configurable recipient lists",
+  "tools": {
+    "healthcheck": {
+      "label": "Health Check",
+      "description": "Check if the email plugin is working correctly and return configuration status"
+    },
+    "send-email": {
+      "label": "Send Email",
+      "description": "Send an email to configured recipients using the platform's email service"
+    }
+  },
+  "config": {
+    "recipients": {
+      "label": "Email Recipients",
+      "description": "Comma-separated list of email addresses to send to"
+    }
+  }
+}

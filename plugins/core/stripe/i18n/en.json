@@ -1,0 +1,11 @@
+{
+  "name": "Stripe",
+  "description": "Connect your Stripe account to manage payments, customers, subscriptions, and more",
+  "tools": {},
+  "config": {
+    "apiKey": {
+      "label": "API Key",
+      "description": "Stripe API key (starts with sk_test_ or sk_live_)"
+    }
+  }
+}

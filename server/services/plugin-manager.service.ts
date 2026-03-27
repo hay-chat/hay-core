@@ -190,6 +190,25 @@ export class PluginManagerService {
         channel: hayPlugin.channel || undefined, // For channel-type plugins
       };
 
+      // Load i18n translations from plugin's i18n/ directory
+      const i18nDir = path.join(pluginPath, "i18n");
+      const i18n: Record<string, any> = {};
+      try {
+        const i18nFiles = await fs.readdir(i18nDir);
+        for (const file of i18nFiles) {
+          if (file.endsWith(".json")) {
+            const locale = file.replace(".json", "");
+            const content = await fs.readFile(path.join(i18nDir, file), "utf-8");
+            i18n[locale] = JSON.parse(content);
+          }
+        }
+      } catch {
+        // No i18n directory — that's fine
+      }
+      if (Object.keys(i18n).length > 0) {
+        manifest.i18n = i18n;
+      }
+
       // Calculate checksum of plugin files
       const checksum = await this.calculatePluginChecksum(pluginPath);
 

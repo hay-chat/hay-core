@@ -1,0 +1,19 @@
+{
+  "name": "WhatsApp",
+  "description": "Connect WhatsApp as a communication channel via Twilio",
+  "tools": {},
+  "config": {
+    "accountSid": {
+      "label": "Twilio Account SID",
+      "description": "Your Twilio Account SID (starts with AC)"
+    },
+    "authToken": {
+      "label": "Twilio Auth Token",
+      "description": "Your Twilio Auth Token"
+    },
+    "whatsappNumber": {
+      "label": "WhatsApp Number",
+      "description": "Your Twilio WhatsApp-enabled phone number in E.164 format (e.g., \"+14155238886\")"
+    }
+  }
+}

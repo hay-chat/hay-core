@@ -1,0 +1,20 @@
+{
+  "name": "E-mail",
+  "description": "Envie e-mails usando o serviço de e-mail da plataforma com listas de destinatários configuráveis",
+  "tools": {
+    "healthcheck": {
+      "label": "Verificação de Saúde",
+      "description": "Verificar se o plugin de e-mail está funcionando corretamente e retornar o status da configuração"
+    },
+    "send-email": {
+      "label": "Enviar E-mail",
+      "description": "Enviar um e-mail para os destinatários configurados usando o serviço de e-mail da plataforma"
+    }
+  },
+  "config": {
+    "recipients": {
+      "label": "Destinatários",
+      "description": "Lista de endereços de e-mail separados por vírgula"
+    }
+  }
+}

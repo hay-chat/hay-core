@@ -1,0 +1,72 @@
+{
+  "name": "Magento",
+  "description": "Connect your Magento store to manage products, orders, customers, and e-commerce operations",
+  "tools": {
+    "get_product_by_sku": {
+      "label": "Get Product by SKU",
+      "description": "Get detailed information about a product by its SKU (Stock Keeping Unit)"
+    },
+    "get_product_by_id": {
+      "label": "Get Product by ID",
+      "description": "Get detailed information about a product by its numeric ID"
+    },
+    "search_products": {
+      "label": "Search Products",
+      "description": "Search for products using a query term with pagination support"
+    },
+    "advanced_product_search": {
+      "label": "Advanced Product Search",
+      "description": "Search for products with advanced filtering options and custom field criteria"
+    },
+    "get_product_categories": {
+      "label": "Get Product Categories",
+      "description": "Get all categories for a specific product by SKU"
+    },
+    "get_related_products": {
+      "label": "Get Related Products",
+      "description": "Get products related to a specific product by SKU"
+    },
+    "get_product_stock": {
+      "label": "Get Product Stock",
+      "description": "Get stock information for a product by SKU"
+    },
+    "get_product_attributes": {
+      "label": "Get Product Attributes",
+      "description": "Get all attributes (base and custom) for a product by SKU"
+    },
+    "update_product_attribute": {
+      "label": "Update Product Attribute",
+      "description": "Update a specific attribute of a product by SKU"
+    },
+    "get_revenue": {
+      "label": "Get Revenue",
+      "description": "Get the total revenue for a given date range with status filtering"
+    },
+    "get_revenue_by_country": {
+      "label": "Get Revenue by Country",
+      "description": "Get revenue filtered by country for a given date range"
+    },
+    "get_order_count": {
+      "label": "Get Order Count",
+      "description": "Get the number of orders for a given date range with status filtering"
+    },
+    "get_product_sales": {
+      "label": "Get Product Sales",
+      "description": "Get statistics about the quantity of products sold in a given date range with country and status filtering"
+    },
+    "get_customer_ordered_products_by_email": {
+      "label": "Get Customer Ordered Products by Email",
+      "description": "Get all ordered products for a customer by email address with detailed product information"
+    }
+  },
+  "config": {
+    "baseUrl": {
+      "label": "Magento Base URL",
+      "description": "Your Magento 2 REST API base URL (e.g., https://yourdomain.com/rest/V1)"
+    },
+    "apiToken": {
+      "label": "API Token",
+      "description": "Magento API token (create in System > Integrations)"
+    }
+  }
+}

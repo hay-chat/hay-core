@@ -1,0 +1,96 @@
+{
+  "name": "WooCommerce",
+  "description": "Conecte sua loja WooCommerce para gerenciar produtos, pedidos, clientes e fluxos de e-commerce",
+  "tools": {
+    "get_products": {
+      "label": "Buscar Produtos",
+      "description": "Recuperar uma lista de produtos do WooCommerce"
+    },
+    "get_product": {
+      "label": "Buscar Produto",
+      "description": "Buscar um produto específico do WooCommerce pelo ID"
+    },
+    "create_product": {
+      "label": "Criar Produto",
+      "description": "Criar um novo produto no WooCommerce"
+    },
+    "update_product": {
+      "label": "Atualizar Produto",
+      "description": "Atualizar um produto existente no WooCommerce"
+    },
+    "delete_product": {
+      "label": "Excluir Produto",
+      "description": "Excluir um produto do WooCommerce"
+    },
+    "get_orders": {
+      "label": "Buscar Pedidos",
+      "description": "Recuperar uma lista de pedidos do WooCommerce"
+    },
+    "get_order": {
+      "label": "Buscar Pedido",
+      "description": "Buscar um pedido específico do WooCommerce pelo ID"
+    },
+    "create_order": {
+      "label": "Criar Pedido",
+      "description": "Criar um novo pedido no WooCommerce"
+    },
+    "update_order": {
+      "label": "Atualizar Pedido",
+      "description": "Atualizar um pedido existente no WooCommerce"
+    },
+    "get_customers": {
+      "label": "Buscar Clientes",
+      "description": "Recuperar uma lista de clientes do WooCommerce"
+    },
+    "get_customer": {
+      "label": "Buscar Cliente",
+      "description": "Buscar um cliente específico do WooCommerce pelo ID"
+    },
+    "create_customer": {
+      "label": "Criar Cliente",
+      "description": "Criar um novo cliente no WooCommerce"
+    },
+    "update_customer": {
+      "label": "Atualizar Cliente",
+      "description": "Atualizar um cliente existente no WooCommerce"
+    },
+    "get_product_categories": {
+      "label": "Buscar Categorias de Produtos",
+      "description": "Recuperar categorias de produtos do WooCommerce"
+    },
+    "create_product_category": {
+      "label": "Criar Categoria de Produto",
+      "description": "Criar uma nova categoria de produto no WooCommerce"
+    },
+    "get_coupons": {
+      "label": "Buscar Cupons",
+      "description": "Recuperar cupons do WooCommerce"
+    },
+    "create_coupon": {
+      "label": "Criar Cupom",
+      "description": "Criar um novo cupom no WooCommerce"
+    }
+  },
+  "config": {
+    "siteUrl": {
+      "label": "URL do Site WordPress",
+      "description": "URL do seu site WordPress/WooCommerce (ex: https://minhaloja.com)"
+    },
+    "consumerKey": {
+      "label": "Chave do Consumidor",
+      "description": "Chave do Consumidor da API REST do WooCommerce"
+    },
+    "consumerSecret": {
+      "label": "Segredo do Consumidor",
+      "description": "Segredo do Consumidor da API REST do WooCommerce"
+    },
+    "username": {
+      "label": "Usuário WordPress (Opcional)",
+      "description": "Nome de usuário admin do WordPress para endpoints da API REST"
+    },
+    "password": {
+      "label": "Senha WordPress (Opcional)",
+      "description": "Senha admin do WordPress para endpoints da API REST"
+    }
+  }
+}

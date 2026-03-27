@@ -1,0 +1,76 @@
+{
+  "name": "HubSpot",
+  "description": "Connect your HubSpot CRM to access and manage contacts, companies, deals, tickets, and other CRM objects",
+  "tools": {
+    "hubspot_create_contact": {
+      "label": "Create Contact",
+      "description": "Create a new contact in HubSpot CRM with duplicate detection"
+    },
+    "hubspot_create_company": {
+      "label": "Create Company",
+      "description": "Create a new company in HubSpot CRM with duplicate detection"
+    },
+    "hubspot_get_company_activity": {
+      "label": "Get Company Activity",
+      "description": "Retrieve comprehensive engagement history for a specific company including emails, calls, meetings, notes, and tasks"
+    },
+    "hubspot_get_recent_engagements": {
+      "label": "Get Recent Engagements",
+      "description": "Fetch recent activities across all CRM records"
+    },
+    "hubspot_get_active_companies": {
+      "label": "Get Active Companies",
+      "description": "List recently modified companies"
+    },
+    "hubspot_get_active_contacts": {
+      "label": "Get Active Contacts",
+      "description": "List recently modified contacts"
+    },
+    "hubspot_update_contact": {
+      "label": "Update Contact",
+      "description": "Modify existing contact information"
+    },
+    "hubspot_update_company": {
+      "label": "Update Company",
+      "description": "Modify existing company information"
+    },
+    "hubspot_search_contacts": {
+      "label": "Search Contacts",
+      "description": "Search for contacts using various criteria"
+    },
+    "hubspot_search_companies": {
+      "label": "Search Companies",
+      "description": "Search for companies using various criteria"
+    },
+    "hubspot_get_deals": {
+      "label": "Get Deals",
+      "description": "Retrieve deals from HubSpot CRM"
+    },
+    "hubspot_get_tickets": {
+      "label": "Get Tickets",
+      "description": "Retrieve support tickets from HubSpot CRM"
+    },
+    "hubspot_get_products": {
+      "label": "Get Products",
+      "description": "Retrieve products from HubSpot CRM"
+    },
+    "hubspot_get_quotes": {
+      "label": "Get Quotes",
+      "description": "Retrieve quotes from HubSpot CRM"
+    },
+    "hubspot_get_invoices": {
+      "label": "Get Invoices",
+      "description": "Retrieve invoices from HubSpot CRM"
+    }
+  },
+  "config": {
+    "clientId": {
+      "label": "OAuth Client ID",
+      "description": "HubSpot OAuth client ID"
+    },
+    "clientSecret": {
+      "label": "OAuth Client Secret",
+      "description": "HubSpot OAuth client secret"
+    }
+  }
+}

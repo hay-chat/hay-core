@@ -17,12 +17,14 @@
 <script setup lang="ts">
 import { useWebSocket } from "@/composables/useWebSocket";
 import { useNotifications } from "@/composables/useNotifications";
+import { usePluginTranslations } from "@/composables/usePluginTranslations";
 import { useToast } from "@/composables/useToast";
 import { onMounted } from "vue";
 
 // Initialize WebSocket connection for real-time updates
 const websocket = useWebSocket();
 const notifications = useNotifications();
+const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 const { toast } = useToast();
 
 onMounted(() => {
@@ -31,6 +33,9 @@ onMounted(() => {
 
   // Connect to WebSocket
   websocket.connect();
+
+  // Load plugin i18n translations
+  loadPluginTranslations();
 
   // Check for organization switch success message
   const orgSwitchSuccess = sessionStorage.getItem("org-switch-success");
