@@ -1,6 +1,7 @@
 import { t } from "@server/trpc";
 import {
   getInstallUrl,
+  completeInstallation,
   listConnections,
   removeConnection,
   listRepos,
@@ -11,6 +12,7 @@ import {
 
 export const gitConnectionsRouter = t.router({
   getInstallUrl,
+  completeInstallation,
   list: listConnections,
   remove: removeConnection,
   listRepos,

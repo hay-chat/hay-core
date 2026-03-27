@@ -284,48 +284,34 @@ async function startServer() {
   });
 
   // GitHub App installation callback
+  // GitHub redirects here after app installation with installation_id and setup_action.
+  // The state parameter may or may not be present depending on how the user reached the install page.
+  // We redirect to the dashboard which will complete the connection via tRPC (authenticated).
   server.get("/github/callback", async (req, res) => {
     const { getDashboardUrl: getDashUrl } = await import("@server/config/env");
-    const { installation_id, setup_action, state } = req.query;
+    const { installation_id, setup_action } = req.query;
 
-    if (!installation_id || !state) {
+    if (!installation_id) {
       return res.status(400).send(`
         <html>
           <head><title>GitHub Error</title></head>
           <body>
             <h1>GitHub App Installation Error</h1>
-            <p>Missing installation_id or state parameter.</p>
+            <p>Missing installation_id parameter.</p>
             <a href="${getDashUrl()}">Return to Dashboard</a>
           </body>
         </html>
       `);
     }
 
-    try {
-      const { gitConnectionService } = await import("@server/services/git-connection.service");
-      const connection = await gitConnectionService.handleInstallation(
-        installation_id as string,
-        (setup_action as string) || "install",
-        state as string,
-      );
-
-      const dashboardUrl = getDashUrl();
-      logger.info({ accountLogin: connection.accountLogin }, "GitHub App installation successful");
-      return res.redirect(`${dashboardUrl}/settings/git-connections?status=success`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      logger.error({ err: error }, "GitHub App installation callback failed");
-      return res.status(400).send(`
-        <html>
-          <head><title>GitHub Error</title></head>
-          <body>
-            <h1>GitHub App Installation Failed</h1>
-            <p>${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-            <a href="${getDashUrl()}">Return to Dashboard</a>
-          </body>
-        </html>
-      `);
-    }
+    // Redirect to dashboard with the installation_id — the frontend will call
+    // the authenticated tRPC endpoint to complete the connection.
+    const dashboardUrl = getDashUrl();
+    const params = new URLSearchParams({
+      installation_id: installation_id as string,
+      setup_action: (setup_action as string) || "install",
+    });
+    return res.redirect(`${dashboardUrl}/settings/git-connections?${params.toString()}`);
   });
 
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)

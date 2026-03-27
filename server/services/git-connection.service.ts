@@ -81,22 +81,14 @@ export class GitConnectionService {
   }
 
   /**
-   * Handle the GitHub App installation callback.
-   * Called after the user installs the app and GitHub redirects back.
+   * Complete a GitHub App installation.
+   * Called from the authenticated tRPC endpoint after GitHub redirects back to the dashboard.
    */
   async handleInstallation(
     installationId: string,
-    setupAction: string,
-    state: string,
+    organizationId: string,
+    userId: string,
   ): Promise<GitConnection> {
-    // Validate state from Redis
-    const oauthState = await oauthStateService.retrieveState(state);
-    if (!oauthState) {
-      throw new Error("Invalid or expired state parameter");
-    }
-
-    const { organizationId, userId } = oauthState;
-
     // Check if this installation is already connected
     const existing = await gitConnectionRepository.findByInstallationId("github", installationId);
     if (existing) {

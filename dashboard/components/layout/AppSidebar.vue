@@ -236,6 +236,11 @@ const navMain = computed(() => {
         url: "/settings/webchat",
         isActive: route.path === "/settings/webchat",
       },
+      {
+        title: t("nav.gitConnections"),
+        url: "/settings/git-connections",
+        isActive: route.path === "/settings/git-connections",
+      },
     );
   }
 

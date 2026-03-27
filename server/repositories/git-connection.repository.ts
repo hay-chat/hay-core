@@ -7,11 +7,11 @@ export class GitConnectionRepository extends BaseRepository<GitConnection> {
     super(GitConnection);
   }
 
-  async findById(id: string): Promise<GitConnection | null> {
+  override async findById(id: string): Promise<GitConnection | null> {
     return this.getRepository().findOne({ where: { id } });
   }
 
-  async findByOrganization(organizationId: string): Promise<GitConnection[]> {
+  override async findByOrganization(organizationId: string): Promise<GitConnection[]> {
     return this.getRepository().find({
       where: { organizationId },
       order: { createdAt: "DESC" },

@@ -85,6 +85,12 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         uploadedBy: plugin.uploadedBy,
         status: plugin.status || PluginStatus.AVAILABLE, // Include status field
         metadata: plugin.metadata, // Include full metadata
+        // Git-sourced plugin fields
+        gitRepoFullName: plugin.gitRepoFullName,
+        gitBranch: plugin.gitBranch,
+        gitLastCommitSha: plugin.gitLastCommitSha,
+        gitLastSyncAt: plugin.gitLastSyncAt,
+        gitSyncError: plugin.gitSyncError,
       };
 
       return result;

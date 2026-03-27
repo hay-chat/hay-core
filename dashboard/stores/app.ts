@@ -15,7 +15,7 @@ interface Plugin {
   hasCustomUI: boolean;
   capabilities?: Record<string, unknown>;
   features?: Record<string, unknown>;
-  sourceType?: "core" | "custom";
+  sourceType?: "core" | "custom" | "git";
   isCustom?: boolean;
   uploadedAt?: string;
   uploadedBy?: string;

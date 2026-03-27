@@ -15,6 +15,34 @@ export const getInstallUrl = authenticatedProcedure.query(async ({ ctx }) => {
 });
 
 /**
+ * Complete a GitHub App installation.
+ * Called by the frontend after GitHub redirects back with installation_id.
+ */
+export const completeInstallation = authenticatedProcedure
+  .input(
+    z.object({
+      installationId: z.string().min(1),
+    }),
+  )
+  .mutation(async ({ input, ctx }) => {
+    try {
+      const connection = await gitConnectionService.handleInstallation(
+        input.installationId,
+        ctx.organizationId!,
+        ctx.user!.id,
+      );
+      return {
+        success: true,
+        connectionId: connection.id,
+        accountLogin: connection.accountLogin,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Installation failed";
+      throw new TRPCError({ code: "BAD_REQUEST", message });
+    }
+  });
+
+/**
  * List all git connections for the organization.
  */
 export const listConnections = authenticatedProcedure.query(async ({ ctx }) => {
@@ -22,6 +50,7 @@ export const listConnections = authenticatedProcedure.query(async ({ ctx }) => {
   return connections.map((c) => ({
     id: c.id,
     provider: c.provider,
+    installationId: c.installationId,
     accountLogin: c.accountLogin,
     accountType: c.accountType,
     repositorySelection: c.repositorySelection,
