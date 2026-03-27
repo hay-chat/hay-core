@@ -55,9 +55,23 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     const existing = await this.findByPluginId(plugin.pluginId!);
 
     if (existing) {
+      // Preserve sourceType — it's set at installation time and shouldn't be
+      // overwritten by filesystem re-discovery (which always passes "custom"
+      // for plugins under the custom/ directory, even if they're git-sourced)
+      const { sourceType, ...updateFields } = plugin;
+
+      // Repair: if the record has git metadata, ensure sourceType is "git"
+      const resolvedSourceType = existing.gitConnectionId ? "git" : existing.sourceType;
+
+      // If plugin source changed (checksum differs), reset install/build flags
+      // so dependencies get reinstalled and code gets rebuilt
+      const checksumChanged = updateFields.checksum && updateFields.checksum !== existing.checksum;
+
       await this.getRepository().update(existing.id, {
-        ...plugin,
+        ...updateFields,
+        sourceType: resolvedSourceType,
         status: PluginStatus.AVAILABLE, // Plugin exists on filesystem
+        ...(checksumChanged ? { installed: false, built: false } : {}),
         updatedAt: new Date(),
       } as any);
       return (await this.getRepository().findOne({ where: { id: existing.id } }))!;

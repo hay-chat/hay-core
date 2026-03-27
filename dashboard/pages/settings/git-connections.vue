@@ -346,7 +346,7 @@ const syncPlugin = async (plugin: any) => {
   syncingPlugins.value[plugin.id] = true;
   try {
     const result = await Hay.gitConnections.syncPlugin.mutate({
-      pluginId: plugin.id,
+      pluginId: plugin.dbId,
     });
     if (result.updated) {
       toast.success(t("gitConnections.syncSuccess"));

@@ -223,6 +223,10 @@ export class GitConnectionService {
     const { pluginManagerService } = await import("./plugin-manager.service");
     await pluginManagerService.registerPlugin(extractPath, "git", organizationId);
 
+    // Install dependencies and build
+    await pluginManagerService.installPlugin(pluginId);
+    await pluginManagerService.buildPlugin(pluginId);
+
     // Update registry with git metadata
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (plugin) {
@@ -327,11 +331,13 @@ export class GitConnectionService {
       plugin.gitBranch!,
     );
 
-    // Stop running workers
+    // Stop running workers — track if it was running so we can restart after update
+    let wasRunning = false;
+    const { getPluginRunnerService } = await import("./plugin-runner.service");
+    const runner = getPluginRunnerService();
     try {
-      const { getPluginRunnerService } = await import("./plugin-runner.service");
-      const runner = getPluginRunnerService();
       if (plugin.organizationId && runner.isRunning(plugin.organizationId, plugin.pluginId)) {
+        wasRunning = true;
         await runner.stopWorker(plugin.organizationId, plugin.pluginId);
       }
     } catch {
@@ -361,9 +367,11 @@ export class GitConnectionService {
     await fs.rm(extractPath, { recursive: true, force: true }).catch(() => {});
     await extractTarball(archive.buffer, extractPath);
 
-    // Re-register plugin
+    // Re-register plugin, reinstall dependencies, and rebuild
     const { pluginManagerService } = await import("./plugin-manager.service");
     await pluginManagerService.registerPlugin(extractPath, "git", plugin.organizationId!);
+    await pluginManagerService.installPlugin(plugin.pluginId);
+    await pluginManagerService.buildPlugin(plugin.pluginId);
 
     // Update git metadata
     await AppDataSource.getRepository(
@@ -375,6 +383,19 @@ export class GitConnectionService {
       zipFilePath: uploadResult.upload.path,
       zipUploadId: uploadResult.upload.id,
     } as any);
+
+    // Restart worker if it was running before the update
+    if (wasRunning && plugin.organizationId) {
+      try {
+        await runner.startWorker(plugin.organizationId, plugin.pluginId);
+        logger.info({ pluginId: plugin.pluginId }, "Restarted plugin worker after sync");
+      } catch (error) {
+        logger.error(
+          { err: error, pluginId: plugin.pluginId },
+          "Failed to restart plugin worker after sync",
+        );
+      }
+    }
 
     logger.info({ pluginId: plugin.pluginId, newSha: archive.commitSha }, "Plugin synced from git");
 

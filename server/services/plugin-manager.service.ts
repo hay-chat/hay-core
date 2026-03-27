@@ -1,4 +1,4 @@
-import { promises as fs, readFileSync } from "fs";
+import { promises as fs, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
@@ -402,9 +402,17 @@ export class PluginManagerService {
               zip.extractAllTo(pluginPath, true);
             }
 
+            // Re-register the plugin so it's discovered and status is reset to AVAILABLE
+            const fullPluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+            await this.registerPlugin(
+              fullPluginPath,
+              plugin.sourceType as "custom" | "git",
+              plugin.organizationId || null,
+            );
+
             logger.info(
               { pluginName: plugin.name, pluginPath: plugin.pluginPath },
-              "Restored plugin",
+              "Restored plugin from archive",
             );
           }
         } catch (error) {
@@ -433,6 +441,13 @@ export class PluginManagerService {
     try {
       const packageJsonPath = path.join(pluginPath, "package.json");
       const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+
+      // For custom/git plugins, fix @hay/plugin-sdk dependency path.
+      // External plugins reference the SDK with a file: path relative to their
+      // own repo, which breaks when extracted inside the monorepo.
+      if (!isWorkspacePlugin) {
+        this.fixPluginSdkPath(pluginPath, packageJson);
+      }
 
       // Only run npm install if there are dependencies
       if (packageJson.dependencies || packageJson.devDependencies) {
@@ -837,6 +852,39 @@ export class PluginManagerService {
   async stopPluginWorker(organizationId: string, pluginId: string): Promise<void> {
     logger.info({ organizationId, pluginId }, "Stopping worker");
     await this.runnerService.stopWorker(organizationId, pluginId);
+  }
+
+  /**
+   * Fix @hay/plugin-sdk file: dependency path for custom/git plugins.
+   * External plugins reference the SDK with a relative path that only works
+   * in their own repo. We rewrite it to the correct path within the monorepo.
+   */
+  private fixPluginSdkPath(pluginPath: string, packageJson: any): void {
+    const sdkAbsPath = path.join(this.pluginsDir, "..", "packages", "plugin-sdk");
+    const sdkRelPath = path.relative(pluginPath, sdkAbsPath);
+    let modified = false;
+
+    for (const depKey of ["dependencies", "devDependencies"] as const) {
+      const deps = packageJson[depKey];
+      if (deps?.["@hay/plugin-sdk"] && deps["@hay/plugin-sdk"].startsWith("file:")) {
+        const currentTarget = deps["@hay/plugin-sdk"].replace("file:", "");
+        const resolvedCurrent = path.resolve(pluginPath, currentTarget);
+        // Only rewrite if the current path doesn't resolve to the actual SDK
+        if (resolvedCurrent !== sdkAbsPath) {
+          deps["@hay/plugin-sdk"] = `file:${sdkRelPath}`;
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      const packageJsonPath = path.join(pluginPath, "package.json");
+      writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
+      logger.info(
+        { pluginPath: path.basename(pluginPath) },
+        "Fixed @hay/plugin-sdk dependency path",
+      );
+    }
   }
 
   /**
