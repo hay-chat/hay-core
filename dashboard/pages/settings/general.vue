@@ -168,9 +168,7 @@
               {{ $t("platform.testModeCheckbox") }}
             </label>
           </div>
-          <p class="text-xs text-neutral-muted mt-2">
-            ℹ️ {{ $t("platform.testModeNote") }}
-          </p>
+          <p class="text-xs text-neutral-muted mt-2">ℹ️ {{ $t("platform.testModeNote") }}</p>
         </div>
       </CardContent>
     </Card>
@@ -751,6 +749,14 @@ const saveSettings = async () => {
 
       // Sync dashboard locale immediately when language changes
       await setLocaleFromBackend(settings.value.defaultLanguage);
+
+      // Sync date/time formatting immediately when settings change
+      const { setOrgDateTimeSettings } = useOrgDateTime();
+      setOrgDateTimeSettings({
+        dateFormat: settings.value.dateFormat,
+        timeFormat: settings.value.timeFormat,
+        timezone: settings.value.timezone,
+      });
 
       toast.success(t("general.saveSuccess"));
     }

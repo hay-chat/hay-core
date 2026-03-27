@@ -3,19 +3,19 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight">{{ $t('security.title') }}</h1>
+        <h1 class="text-3xl font-bold tracking-tight">{{ $t("security.title") }}</h1>
         <p class="text-neutral-muted">
-          {{ $t('security.description') }}
+          {{ $t("security.description") }}
         </p>
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="outline" @click="downloadSecurityReport">
           <Download class="h-4 w-4 mr-2" />
-          {{ $t('security.securityReport') }}
+          {{ $t("security.securityReport") }}
         </Button>
         <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
           <Save class="h-4 w-4 mr-2" />
-          {{ $t('security.saveChanges') }}
+          {{ $t("security.saveChanges") }}
         </Button>
       </div>
     </div>
@@ -23,8 +23,8 @@
     <!-- Security Overview -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('security.securityOverview') }}</CardTitle>
-        <CardDescription>{{ $t('security.securityOverviewDescription') }}</CardDescription>
+        <CardTitle>{{ $t("security.securityOverview") }}</CardTitle>
+        <CardDescription>{{ $t("security.securityOverviewDescription") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-3">
@@ -33,7 +33,7 @@
               <Shield class="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('security.securityScore') }}</div>
+              <div class="font-medium">{{ $t("security.securityScore") }}</div>
               <div class="text-2xl font-bold text-green-600">{{ securityScore }}/100</div>
             </div>
           </div>
@@ -43,7 +43,7 @@
               <Key class="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('security.activeSessions') }}</div>
+              <div class="font-medium">{{ $t("security.activeSessions") }}</div>
               <div class="text-2xl font-bold">
                 {{ activeSessions }}
               </div>
@@ -55,7 +55,7 @@
               <AlertTriangle class="h-5 w-5 text-orange-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('security.securityAlerts') }}</div>
+              <div class="font-medium">{{ $t("security.securityAlerts") }}</div>
               <div class="text-2xl font-bold">
                 {{ securityAlerts }}
               </div>
@@ -65,7 +65,7 @@
 
         <!-- Security Recommendations -->
         <div v-if="recommendations.length > 0" class="mt-6">
-          <h3 class="font-medium mb-3">{{ $t('security.securityRecommendations') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.securityRecommendations") }}</h3>
           <div class="space-y-2">
             <div
               v-for="rec in recommendations"
@@ -82,7 +82,7 @@
                 </div>
               </div>
               <Button variant="outline" size="sm" @click="implementRecommendation(rec.id)">
-                {{ $t('security.fix') }}
+                {{ $t("security.fix") }}
               </Button>
             </div>
           </div>
@@ -93,68 +93,78 @@
     <!-- Authentication Settings -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('security.authentication') }}</CardTitle>
-        <CardDescription>{{ $t('security.authenticationDescription') }}</CardDescription>
+        <CardTitle>{{ $t("security.authentication") }}</CardTitle>
+        <CardDescription>{{ $t("security.authenticationDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- Password Requirements -->
         <div>
-          <h3 class="font-medium mb-3">{{ $t('security.passwordRequirements') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.passwordRequirements") }}</h3>
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.minimumLength') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.minimumLengthDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.minimumLength") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.minimumLengthDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.minLength"
                 class="px-3 py-2 text-sm border border-input rounded-md"
               >
-                <option value="8">{{ $t('security.characters', { count: 8 }) }}</option>
-                <option value="10">{{ $t('security.characters', { count: 10 }) }}</option>
-                <option value="12">{{ $t('security.characters', { count: 12 }) }}</option>
-                <option value="16">{{ $t('security.characters', { count: 16 }) }}</option>
+                <option value="8">{{ $t("security.characters", { count: 8 }) }}</option>
+                <option value="10">{{ $t("security.characters", { count: 10 }) }}</option>
+                <option value="12">{{ $t("security.characters", { count: 12 }) }}</option>
+                <option value="16">{{ $t("security.characters", { count: 16 }) }}</option>
               </select>
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.requireUppercase') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.requireUppercaseDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.requireUppercase") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.requireUppercaseDescription") }}
+                </p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireUppercase" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.requireNumbers') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.requireNumbersDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.requireNumbers") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.requireNumbersDescription") }}
+                </p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireNumbers" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.requireSpecialChars') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.requireSpecialCharsDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.requireSpecialChars") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.requireSpecialCharsDescription") }}
+                </p>
               </div>
               <Checkbox v-model="settings.authentication.passwordPolicy.requireSpecialChars" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.passwordExpiration') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.passwordExpirationDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.passwordExpiration") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.passwordExpirationDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.passwordPolicy.expirationDays"
                 class="px-3 py-2 text-sm border border-input rounded-md"
               >
-                <option value="0">{{ $t('security.expirationNever') }}</option>
-                <option value="30">{{ $t('security.expirationDays', { days: 30 }) }}</option>
-                <option value="60">{{ $t('security.expirationDays', { days: 60 }) }}</option>
-                <option value="90">{{ $t('security.expirationDays', { days: 90 }) }}</option>
-                <option value="180">{{ $t('security.expirationDays', { days: 180 }) }}</option>
+                <option value="0">{{ $t("security.expirationNever") }}</option>
+                <option value="30">{{ $t("security.expirationDays", { days: 30 }) }}</option>
+                <option value="60">{{ $t("security.expirationDays", { days: 60 }) }}</option>
+                <option value="90">{{ $t("security.expirationDays", { days: 90 }) }}</option>
+                <option value="180">{{ $t("security.expirationDays", { days: 180 }) }}</option>
               </select>
             </div>
           </div>
@@ -162,56 +172,62 @@
 
         <!-- Session Management -->
         <div>
-          <h3 class="font-medium mb-3">{{ $t('security.sessionManagement') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.sessionManagement") }}</h3>
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.sessionTimeout') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.sessionTimeoutDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.sessionTimeout") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.sessionTimeoutDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.sessionTimeout"
                 class="px-3 py-2 text-sm border border-input rounded-md"
               >
-                <option value="15">{{ $t('security.timeout15min') }}</option>
-                <option value="30">{{ $t('security.timeout30min') }}</option>
-                <option value="60">{{ $t('security.timeout1h') }}</option>
-                <option value="240">{{ $t('security.timeout4h') }}</option>
-                <option value="480">{{ $t('security.timeout8h') }}</option>
-                <option value="1440">{{ $t('security.timeout24h') }}</option>
+                <option value="15">{{ $t("security.timeout15min") }}</option>
+                <option value="30">{{ $t("security.timeout30min") }}</option>
+                <option value="60">{{ $t("security.timeout1h") }}</option>
+                <option value="240">{{ $t("security.timeout4h") }}</option>
+                <option value="480">{{ $t("security.timeout8h") }}</option>
+                <option value="1440">{{ $t("security.timeout24h") }}</option>
               </select>
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.concurrentSessions') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.concurrentSessionsDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.concurrentSessions") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.concurrentSessionsDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.maxConcurrentSessions"
                 class="px-3 py-2 text-sm border border-input rounded-md"
               >
-                <option value="1">{{ $t('security.session1') }}</option>
-                <option value="3">{{ $t('security.sessions', { count: 3 }) }}</option>
-                <option value="5">{{ $t('security.sessions', { count: 5 }) }}</option>
-                <option value="10">{{ $t('security.sessions', { count: 10 }) }}</option>
-                <option value="-1">{{ $t('security.sessionsUnlimited') }}</option>
+                <option value="1">{{ $t("security.session1") }}</option>
+                <option value="3">{{ $t("security.sessions", { count: 3 }) }}</option>
+                <option value="5">{{ $t("security.sessions", { count: 5 }) }}</option>
+                <option value="10">{{ $t("security.sessions", { count: 10 }) }}</option>
+                <option value="-1">{{ $t("security.sessionsUnlimited") }}</option>
               </select>
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.rememberMeDuration') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.rememberMeDurationDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.rememberMeDuration") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.rememberMeDurationDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.rememberMeDuration"
                 class="px-3 py-2 text-sm border border-input rounded-md"
               >
-                <option value="7">{{ $t('security.days', { count: 7 }) }}</option>
-                <option value="14">{{ $t('security.days', { count: 14 }) }}</option>
-                <option value="30">{{ $t('security.days', { count: 30 }) }}</option>
-                <option value="90">{{ $t('security.days', { count: 90 }) }}</option>
+                <option value="7">{{ $t("security.days", { count: 7 }) }}</option>
+                <option value="14">{{ $t("security.days", { count: 14 }) }}</option>
+                <option value="30">{{ $t("security.days", { count: 30 }) }}</option>
+                <option value="90">{{ $t("security.days", { count: 90 }) }}</option>
               </select>
             </div>
           </div>
@@ -219,37 +235,41 @@
 
         <!-- Two-Factor Authentication -->
         <div>
-          <h3 class="font-medium mb-3">{{ $t('security.twoFactorAuth') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.twoFactorAuth") }}</h3>
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.require2FA') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.require2FADescription') }}</p>
+                <Label class="font-normal">{{ $t("security.require2FA") }}</Label>
+                <p class="text-xs text-neutral-muted">{{ $t("security.require2FADescription") }}</p>
               </div>
               <Checkbox v-model="settings.authentication.require2FA" />
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.gracePeriod') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.gracePeriodDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.gracePeriod") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.gracePeriodDescription") }}
+                </p>
               </div>
               <select
                 v-model="settings.authentication.twoFAGracePeriod"
                 class="px-3 py-2 text-sm border border-input rounded-md"
                 :disabled="!settings.authentication.require2FA"
               >
-                <option value="0">{{ $t('security.immediate') }}</option>
-                <option value="3">{{ $t('security.days', { count: 3 }) }}</option>
-                <option value="7">{{ $t('security.days', { count: 7 }) }}</option>
-                <option value="14">{{ $t('security.days', { count: 14 }) }}</option>
+                <option value="0">{{ $t("security.immediate") }}</option>
+                <option value="3">{{ $t("security.days", { count: 3 }) }}</option>
+                <option value="7">{{ $t("security.days", { count: 7 }) }}</option>
+                <option value="14">{{ $t("security.days", { count: 14 }) }}</option>
               </select>
             </div>
 
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.allowed2FAMethods') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.allowed2FAMethodsDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.allowed2FAMethods") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.allowed2FAMethodsDescription") }}
+                </p>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center space-x-2">
@@ -258,7 +278,7 @@
                     :checked="settings.authentication.allowedTwoFAMethods.includes('totp')"
                     @update:checked="toggleTwoFAMethod('totp')"
                   />
-                  <Label for="totp" class="text-sm">{{ $t('security.totpApps') }}</Label>
+                  <Label for="totp" class="text-sm">{{ $t("security.totpApps") }}</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
@@ -266,7 +286,7 @@
                     :checked="settings.authentication.allowedTwoFAMethods.includes('sms')"
                     @update:checked="toggleTwoFAMethod('sms')"
                   />
-                  <Label for="sms" class="text-sm">{{ $t('security.smsCodes') }}</Label>
+                  <Label for="sms" class="text-sm">{{ $t("security.smsCodes") }}</Label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <Checkbox
@@ -274,7 +294,7 @@
                     :checked="settings.authentication.allowedTwoFAMethods.includes('backup')"
                     @update:checked="toggleTwoFAMethod('backup')"
                   />
-                  <Label for="backup" class="text-sm">{{ $t('security.backupCodes') }}</Label>
+                  <Label for="backup" class="text-sm">{{ $t("security.backupCodes") }}</Label>
                 </div>
               </div>
             </div>
@@ -286,17 +306,17 @@
     <!-- API Security -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('security.apiSecurity') }}</CardTitle>
-        <CardDescription>{{ $t('security.apiSecurityDescription') }}</CardDescription>
+        <CardTitle>{{ $t("security.apiSecurity") }}</CardTitle>
+        <CardDescription>{{ $t("security.apiSecurityDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <!-- API Keys -->
         <div>
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-medium">{{ $t('security.apiKeys') }}</h3>
+            <h3 class="font-medium">{{ $t("security.apiKeys") }}</h3>
             <Button size="sm" @click="createAPIKey">
               <Plus class="h-4 w-4 mr-2" />
-              {{ $t('security.createApiKey') }}
+              {{ $t("security.createApiKey") }}
             </Button>
           </div>
 
@@ -305,7 +325,7 @@
             class="text-center py-8 border-2 border-dashed border-muted rounded-lg"
           >
             <Key class="h-8 w-8 text-neutral-muted mx-auto mb-2" />
-            <p class="text-sm text-neutral-muted">{{ $t('security.noApiKeys') }}</p>
+            <p class="text-sm text-neutral-muted">{{ $t("security.noApiKeys") }}</p>
           </div>
 
           <div v-else class="space-y-3">
@@ -331,7 +351,7 @@
                   {{ key.status }}
                 </Badge>
                 <Button variant="ghost" size="sm" @click="toggleAPIKey(key.id)">
-                  {{ key.status === "active" ? $t('security.disable') : $t('security.enable') }}
+                  {{ key.status === "active" ? $t("security.disable") : $t("security.enable") }}
                 </Button>
                 <Button variant="ghost" size="sm" @click="openDeleteKeyDialog(key.id)">
                   <Trash2 class="h-4 w-4" />
@@ -343,10 +363,10 @@
 
         <!-- Rate Limiting -->
         <div>
-          <h3 class="font-medium mb-3">{{ $t('security.rateLimiting') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.rateLimiting") }}</h3>
           <div class="grid gap-4 md:grid-cols-2">
             <div>
-              <Label for="rate-limit-requests">{{ $t('security.requestsPerMinute') }}</Label>
+              <Label for="rate-limit-requests">{{ $t("security.requestsPerMinute") }}</Label>
               <Input
                 id="rate-limit-requests"
                 v-model="settings.apiSecurity.rateLimiting.requestsPerMinute"
@@ -356,12 +376,12 @@
                 class="mt-1"
               />
               <p class="text-xs text-neutral-muted mt-1">
-                {{ $t('security.requestsPerMinuteDescription') }}
+                {{ $t("security.requestsPerMinuteDescription") }}
               </p>
             </div>
 
             <div>
-              <Label for="rate-limit-burst">{{ $t('security.burstLimit') }}</Label>
+              <Label for="rate-limit-burst">{{ $t("security.burstLimit") }}</Label>
               <Input
                 id="rate-limit-burst"
                 v-model="settings.apiSecurity.rateLimiting.burstLimit"
@@ -370,25 +390,29 @@
                 max="1000"
                 class="mt-1"
               />
-              <p class="text-xs text-neutral-muted mt-1">{{ $t('security.burstLimitDescription') }}</p>
+              <p class="text-xs text-neutral-muted mt-1">
+                {{ $t("security.burstLimitDescription") }}
+              </p>
             </div>
           </div>
         </div>
 
         <!-- IP Whitelist -->
         <div>
-          <h3 class="font-medium mb-3">{{ $t('security.ipWhitelist') }}</h3>
+          <h3 class="font-medium mb-3">{{ $t("security.ipWhitelist") }}</h3>
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <Label class="font-normal">{{ $t('security.enableIpWhitelist') }}</Label>
-                <p class="text-xs text-neutral-muted">{{ $t('security.enableIpWhitelistDescription') }}</p>
+                <Label class="font-normal">{{ $t("security.enableIpWhitelist") }}</Label>
+                <p class="text-xs text-neutral-muted">
+                  {{ $t("security.enableIpWhitelistDescription") }}
+                </p>
               </div>
               <Checkbox v-model="settings.apiSecurity.ipWhitelist.enabled" />
             </div>
 
             <div v-if="settings.apiSecurity.ipWhitelist.enabled">
-              <Label for="ip-addresses">{{ $t('security.allowedIpAddresses') }}</Label>
+              <Label for="ip-addresses">{{ $t("security.allowedIpAddresses") }}</Label>
               <div class="space-y-2 mt-1">
                 <div
                   v-for="(ip, index) in settings.apiSecurity.ipWhitelist.addresses"
@@ -406,7 +430,7 @@
                 </div>
                 <Button variant="outline" size="sm" @click="addIPAddress">
                   <Plus class="h-4 w-4 mr-2" />
-                  {{ $t('security.addIpAddress') }}
+                  {{ $t("security.addIpAddress") }}
                 </Button>
               </div>
             </div>
@@ -420,8 +444,8 @@
       <!-- Recent Login Attempts -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('security.recentLoginAttempts') }}</CardTitle>
-          <CardDescription>{{ $t('security.recentLoginAttemptsDescription') }}</CardDescription>
+          <CardTitle>{{ $t("security.recentLoginAttempts") }}</CardTitle>
+          <CardDescription>{{ $t("security.recentLoginAttemptsDescription") }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="space-y-3">
@@ -445,7 +469,7 @@
                 </div>
               </div>
               <Badge :variant="attempt.success ? 'success' : 'destructive'">
-                {{ attempt.success ? $t('security.success') : $t('security.failed') }}
+                {{ attempt.success ? $t("security.success") : $t("security.failed") }}
               </Badge>
             </div>
           </div>
@@ -455,8 +479,8 @@
       <!-- Security Events -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('security.securityEvents') }}</CardTitle>
-          <CardDescription>{{ $t('security.securityEventsDescription') }}</CardDescription>
+          <CardTitle>{{ $t("security.securityEvents") }}</CardTitle>
+          <CardDescription>{{ $t("security.securityEventsDescription") }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="space-y-3">
@@ -513,6 +537,7 @@ import {
 } from "lucide-vue-next";
 
 const { t } = useI18n();
+const { formatDate } = useOrgDateTime();
 
 // Reactive state
 const originalSettings = ref({});
@@ -641,22 +666,6 @@ const hasChanges = computed(() => {
 });
 
 // Methods
-const formatDate = (date: Date) => {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) {
-    return "Today";
-  } else if (days === 1) {
-    return "Yesterday";
-  } else if (days < 7) {
-    return `${days} days ago`;
-  } else {
-    return date.toLocaleDateString();
-  }
-};
-
 const getEventIcon = (type: string) => {
   const icons = {
     failed_login: UserX,
@@ -776,11 +785,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: t('security.headTitle'),
+  title: t("security.headTitle"),
   meta: [
     {
       name: "description",
-      content: t('security.headDescription'),
+      content: t("security.headDescription"),
     },
   ],
 });

@@ -1,8 +1,10 @@
 <template>
   <div :class="['page', 'page-' + width]">
-    <div v-if="title || description || $slots.header" class="page-header">
+    <div v-if="title || description || $slots.header || $slots.title" class="page-header">
       <div class="page-header-start">
-        <h1 class="page-title">{{ title }}</h1>
+        <h1 class="page-title">
+          <slot name="title">{{ title }}</slot>
+        </h1>
         <p class="page-description">{{ description }}</p>
       </div>
       <div class="page-header-end">

@@ -559,13 +559,10 @@ watch(
   },
 );
 
+const { formatTime } = useOrgDateTime();
+
 const formattedTime = computed(() => {
-  const date = new Date(props.message.created_at);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  return formatTime(props.message.created_at);
 });
 
 const avatarIcon = computed(() => {

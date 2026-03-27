@@ -151,7 +151,7 @@
                     {{ getSourceName(feedback.message?.source?.id) }}
                   </Badge>
                   <span class="text-xs text-neutral-muted">
-                    {{ formatDate(feedback.createdAt) }}
+                    {{ formatDateTime(feedback.createdAt) }}
                   </span>
                 </div>
 
@@ -220,6 +220,7 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const { sources, loadSources } = useSources();
+const { formatDateTime } = useOrgDateTime();
 
 // State
 const loading = ref(false);
@@ -372,16 +373,6 @@ const getSourceName = (sourceId: string | undefined) => {
   if (!sourceId) return "Unknown";
   const source = sources.value.find((s: any) => s.id === sourceId);
   return source?.name || sourceId;
-};
-
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
 };
 
 const viewMessage = (messageId: string) => {

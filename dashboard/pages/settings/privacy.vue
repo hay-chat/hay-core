@@ -1,14 +1,11 @@
 <template>
-  <Page
-    :title="$t('privacy.title')"
-    :description="$t('privacy.description')"
-  >
+  <Page :title="$t('privacy.title')" :description="$t('privacy.description')">
     <!-- Privacy Overview -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('privacy.yourRights') }}</CardTitle>
+        <CardTitle>{{ $t("privacy.yourRights") }}</CardTitle>
         <CardDescription>
-          {{ $t('privacy.yourRightsDescription') }}
+          {{ $t("privacy.yourRightsDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -18,8 +15,8 @@
               <Download class="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('privacy.dataExport') }}</div>
-              <div class="text-sm text-neutral-muted">{{ $t('privacy.downloadYourData') }}</div>
+              <div class="font-medium">{{ $t("privacy.dataExport") }}</div>
+              <div class="text-sm text-neutral-muted">{{ $t("privacy.downloadYourData") }}</div>
             </div>
           </div>
 
@@ -28,8 +25,8 @@
               <Trash2 class="h-5 w-5 text-orange-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('privacy.dataDeletion') }}</div>
-              <div class="text-sm text-neutral-muted">{{ $t('privacy.deleteYourAccount') }}</div>
+              <div class="font-medium">{{ $t("privacy.dataDeletion") }}</div>
+              <div class="text-sm text-neutral-muted">{{ $t("privacy.deleteYourAccount") }}</div>
             </div>
           </div>
 
@@ -38,8 +35,8 @@
               <Shield class="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <div class="font-medium">{{ $t('privacy.privacyProtected') }}</div>
-              <div class="text-sm text-neutral-muted">{{ $t('privacy.gdprCompliant') }}</div>
+              <div class="font-medium">{{ $t("privacy.privacyProtected") }}</div>
+              <div class="text-sm text-neutral-muted">{{ $t("privacy.gdprCompliant") }}</div>
             </div>
           </div>
         </div>
@@ -49,8 +46,8 @@
     <!-- Active Privacy Requests -->
     <Card v-if="activeRequests.length > 0">
       <CardHeader>
-        <CardTitle>{{ $t('privacy.activeRequests') }}</CardTitle>
-        <CardDescription>{{ $t('privacy.activeRequestsDescription') }}</CardDescription>
+        <CardTitle>{{ $t("privacy.activeRequests") }}</CardTitle>
+        <CardDescription>{{ $t("privacy.activeRequestsDescription") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="space-y-3">
@@ -72,7 +69,11 @@
               </div>
               <div>
                 <div class="font-medium capitalize">
-                  {{ request.type === 'export' ? $t('privacy.exportRequest') : $t('privacy.deletionRequest') }}
+                  {{
+                    request.type === "export"
+                      ? $t("privacy.exportRequest")
+                      : $t("privacy.deletionRequest")
+                  }}
                 </div>
                 <div class="text-sm text-neutral-muted">
                   {{ formatStatus(request.status) }} •
@@ -91,7 +92,7 @@
                 @click="downloadExport(request.id)"
               >
                 <Download class="h-4 w-4 mr-2" />
-                {{ $t('privacy.download') }}
+                {{ $t("privacy.download") }}
               </Button>
             </div>
           </div>
@@ -102,15 +103,15 @@
     <!-- Error Alert -->
     <Alert v-if="errorState.type" variant="destructive" class="mb-6">
       <AlertTitle>
-        {{ errorState.type === "rate_limit" ? $t('privacy.tooManyRequests') : $t('privacy.error') }}
+        {{ errorState.type === "rate_limit" ? $t("privacy.tooManyRequests") : $t("privacy.error") }}
       </AlertTitle>
       <AlertDescription>
         {{ errorState.message }}
         <div v-if="errorState.retryAfter" class="mt-2 font-medium">
-          {{ $t('privacy.tryAgainAfter', { time: formatTime(errorState.retryAfter) }) }}
+          {{ $t("privacy.tryAgainAfter", { time: formatTime(errorState.retryAfter) }) }}
         </div>
         <div v-if="errorState.type === 'email_failed'" class="mt-2">
-          {{ $t('privacy.checkSpamFolder') }}
+          {{ $t("privacy.checkSpamFolder") }}
         </div>
       </AlertDescription>
       <Button
@@ -120,34 +121,34 @@
         class="mt-2"
         @click="errorState = { type: null, message: '' }"
       >
-        {{ $t('privacy.dismiss') }}
+        {{ $t("privacy.dismiss") }}
       </Button>
     </Alert>
 
     <!-- Data Export Section -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('privacy.exportYourData') }}</CardTitle>
+        <CardTitle>{{ $t("privacy.exportYourData") }}</CardTitle>
         <CardDescription>
-          {{ $t('privacy.exportYourDataDescription') }}
+          {{ $t("privacy.exportYourDataDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="space-y-2">
-          <h4 class="font-medium">{{ $t('privacy.exportIncluded') }}</h4>
+          <h4 class="font-medium">{{ $t("privacy.exportIncluded") }}</h4>
           <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-            <li>{{ $t('privacy.exportItem1') }}</li>
-            <li>{{ $t('privacy.exportItem2') }}</li>
-            <li>{{ $t('privacy.exportItem3') }}</li>
-            <li>{{ $t('privacy.exportItem4') }}</li>
-            <li>{{ $t('privacy.exportItem5') }}</li>
+            <li>{{ $t("privacy.exportItem1") }}</li>
+            <li>{{ $t("privacy.exportItem2") }}</li>
+            <li>{{ $t("privacy.exportItem3") }}</li>
+            <li>{{ $t("privacy.exportItem4") }}</li>
+            <li>{{ $t("privacy.exportItem5") }}</li>
           </ul>
         </div>
 
         <Alert>
-          <AlertTitle>{{ $t('privacy.processingTime') }}</AlertTitle>
+          <AlertTitle>{{ $t("privacy.processingTime") }}</AlertTitle>
           <AlertDescription>
-            {{ $t('privacy.processingTimeDescription') }}
+            {{ $t("privacy.processingTimeDescription") }}
           </AlertDescription>
         </Alert>
 
@@ -158,7 +159,7 @@
           @click="requestExport"
         >
           <Download class="h-4 w-4 mr-2" />
-          {{ $t('privacy.requestDataExport') }}
+          {{ $t("privacy.requestDataExport") }}
         </Button>
       </CardContent>
     </Card>
@@ -166,24 +167,24 @@
     <!-- Data Deletion Section -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('privacy.deleteYourAccountTitle') }}</CardTitle>
-        <CardDescription>{{ $t('privacy.deleteYourAccountDescription') }}</CardDescription>
+        <CardTitle>{{ $t("privacy.deleteYourAccountTitle") }}</CardTitle>
+        <CardDescription>{{ $t("privacy.deleteYourAccountDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <Alert variant="destructive">
-          <AlertTitle>{{ $t('privacy.warningIrreversible') }}</AlertTitle>
+          <AlertTitle>{{ $t("privacy.warningIrreversible") }}</AlertTitle>
           <AlertDescription>
-            {{ $t('privacy.deleteWarningDescription') }}
+            {{ $t("privacy.deleteWarningDescription") }}
           </AlertDescription>
         </Alert>
 
         <div class="space-y-2">
-          <h4 class="font-medium">{{ $t('privacy.whatWillBeDeleted') }}</h4>
+          <h4 class="font-medium">{{ $t("privacy.whatWillBeDeleted") }}</h4>
           <ul class="list-disc list-inside text-sm text-neutral-muted space-y-1">
-            <li>{{ $t('privacy.deleteItem1') }}</li>
-            <li>{{ $t('privacy.deleteItem2') }}</li>
-            <li>{{ $t('privacy.deleteItem3') }}</li>
-            <li>{{ $t('privacy.deleteItem4') }}</li>
+            <li>{{ $t("privacy.deleteItem1") }}</li>
+            <li>{{ $t("privacy.deleteItem2") }}</li>
+            <li>{{ $t("privacy.deleteItem3") }}</li>
+            <li>{{ $t("privacy.deleteItem4") }}</li>
           </ul>
         </div>
 
@@ -194,7 +195,7 @@
           @click="showDeleteConfirmation = true"
         >
           <Trash2 class="h-4 w-4 mr-2" />
-          {{ $t('privacy.deleteMyAccount') }}
+          {{ $t("privacy.deleteMyAccount") }}
         </Button>
       </CardContent>
     </Card>
@@ -202,17 +203,17 @@
     <!-- Privacy Policy Link -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('privacy.privacyInformation') }}</CardTitle>
-        <CardDescription>{{ $t('privacy.privacyInformationDescription') }}</CardDescription>
+        <CardTitle>{{ $t("privacy.privacyInformation") }}</CardTitle>
+        <CardDescription>{{ $t("privacy.privacyInformationDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-3">
         <div class="flex items-center justify-between p-3 border rounded-lg">
           <div class="flex items-center space-x-3">
             <FileText class="h-5 w-5 text-neutral-muted" />
             <div>
-              <div class="font-medium">{{ $t('privacy.privacyPolicy') }}</div>
+              <div class="font-medium">{{ $t("privacy.privacyPolicy") }}</div>
               <div class="text-sm text-neutral-muted">
-                {{ $t('privacy.privacyPolicyDescription') }}
+                {{ $t("privacy.privacyPolicyDescription") }}
               </div>
             </div>
           </div>
@@ -225,8 +226,10 @@
           <div class="flex items-center space-x-3">
             <Shield class="h-5 w-5 text-neutral-muted" />
             <div>
-              <div class="font-medium">{{ $t('privacy.dataRetentionPolicy') }}</div>
-              <div class="text-sm text-neutral-muted">{{ $t('privacy.dataRetentionPolicyDescription') }}</div>
+              <div class="font-medium">{{ $t("privacy.dataRetentionPolicy") }}</div>
+              <div class="text-sm text-neutral-muted">
+                {{ $t("privacy.dataRetentionPolicyDescription") }}
+              </div>
             </div>
           </div>
           <Button variant="ghost" size="sm" as="a" href="/retention-policy" target="_blank">
@@ -240,35 +243,37 @@
     <Dialog v-model:open="showDeleteConfirmation">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('privacy.deleteConfirmTitle') }}</DialogTitle>
+          <DialogTitle>{{ $t("privacy.deleteConfirmTitle") }}</DialogTitle>
           <DialogDescription>
-            {{ $t('privacy.deleteConfirmDescription') }}
+            {{ $t("privacy.deleteConfirmDescription") }}
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <Alert variant="destructive" :icon="AlertTriangle">
-            <AlertTitle>{{ $t('privacy.finalWarning') }}</AlertTitle>
+            <AlertTitle>{{ $t("privacy.finalWarning") }}</AlertTitle>
             <AlertDescription>
-              {{ $t('privacy.finalWarningDescription') }}
+              {{ $t("privacy.finalWarningDescription") }}
             </AlertDescription>
           </Alert>
 
           <div class="space-y-2">
-            <Label>{{ $t('privacy.typeDeleteConfirm') }}</Label>
+            <Label>{{ $t("privacy.typeDeleteConfirm") }}</Label>
             <Input v-model="deleteConfirmation" placeholder="DELETE" />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showDeleteConfirmation = false">{{ $t('users.cancel') }}</Button>
+          <Button variant="outline" @click="showDeleteConfirmation = false">{{
+            $t("users.cancel")
+          }}</Button>
           <Button
             variant="destructive"
             :disabled="deleteConfirmation !== 'DELETE'"
             :loading="deleteLoading"
             @click="confirmDelete"
           >
-            {{ $t('privacy.yesDeleteMyAccount') }}
+            {{ $t("privacy.yesDeleteMyAccount") }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -283,14 +288,14 @@
         </DialogHeader>
 
         <Alert :icon="Mail">
-          <AlertTitle>{{ $t('privacy.checkYourEmail') }}</AlertTitle>
+          <AlertTitle>{{ $t("privacy.checkYourEmail") }}</AlertTitle>
           <AlertDescription>
-            {{ $t('privacy.checkYourEmailDescription', { email: user?.email }) }}
+            {{ $t("privacy.checkYourEmailDescription", { email: user?.email }) }}
           </AlertDescription>
         </Alert>
 
         <DialogFooter>
-          <Button @click="showSuccessDialog = false">{{ $t('privacy.ok') }}</Button>
+          <Button @click="showSuccessDialog = false">{{ $t("privacy.ok") }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -317,6 +322,7 @@ import { useToast } from "@/composables/useToast";
 const { t } = useI18n();
 const userStore = useUserStore();
 const { toast } = useToast();
+const { formatDate, formatTime } = useOrgDateTime();
 
 const user = computed(() => userStore.user);
 const exportLoading = ref(false);
@@ -355,14 +361,7 @@ const extractRetryTime = (message: string): Date | undefined => {
   return undefined;
 };
 
-// Format retry time
-const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-};
+// formatTime is provided by useOrgDateTime()
 
 // Handle API errors
 const handleApiError = (error: unknown): void => {
@@ -422,7 +421,7 @@ const handleApiError = (error: unknown): void => {
 // Request data export
 const requestExport = async () => {
   if (!user.value?.email) {
-    toast.error(t('privacy.error'), t('privacy.userEmailNotFound'));
+    toast.error(t("privacy.error"), t("privacy.userEmailNotFound"));
     return;
   }
 
@@ -434,7 +433,7 @@ const requestExport = async () => {
       email: user.value.email,
     });
 
-    successTitle.value = t('privacy.dataExportRequested');
+    successTitle.value = t("privacy.dataExportRequested");
     successMessage.value = result.message;
     showSuccessDialog.value = true;
 
@@ -464,7 +463,7 @@ const confirmDelete = async () => {
     showDeleteConfirmation.value = false;
     deleteConfirmation.value = "";
 
-    successTitle.value = t('privacy.accountDeletionRequested');
+    successTitle.value = t("privacy.accountDeletionRequested");
     successMessage.value = result.message;
     showSuccessDialog.value = true;
 
@@ -483,10 +482,10 @@ const downloadExport = async (_requestId: string) => {
   try {
     // In a real implementation, you would get the download token from the email
     // For now, we'll show a message
-    toast.info(t('privacy.downloadReady'), t('privacy.downloadReadyDescription'));
+    toast.info(t("privacy.downloadReady"), t("privacy.downloadReadyDescription"));
   } catch (error: unknown) {
     const err = error as { message?: string };
-    toast.error(t('privacy.error'), err.message || "Failed to download export");
+    toast.error(t("privacy.error"), err.message || "Failed to download export");
   }
 };
 
@@ -516,14 +515,7 @@ const getStatusVariant = (status: string) => {
   }
 };
 
-// Format date
-const formatDate = (date: string | Date) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
+// formatDate is provided by useOrgDateTime()
 
 onMounted(() => {
   loadActiveRequests();

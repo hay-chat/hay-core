@@ -112,7 +112,9 @@
         >
           <option value="">{{ $t("queue.filters.allTypes") }}</option>
           <option value="document_upload">{{ $t("queue.filters.typeDocumentUpload") }}</option>
-          <option value="document_processing">{{ $t("queue.filters.typeDocumentProcessing") }}</option>
+          <option value="document_processing">
+            {{ $t("queue.filters.typeDocumentProcessing") }}
+          </option>
           <option value="email">{{ $t("queue.filters.typeEmail") }}</option>
           <option value="export">{{ $t("queue.filters.typeExport") }}</option>
           <option value="import">{{ $t("queue.filters.typeImport") }}</option>
@@ -131,7 +133,9 @@
         <div v-else-if="!jobs.length" class="p-8 text-center">
           <Inbox class="mx-auto h-12 w-12 text-neutral-muted" />
           <h3 class="mt-2 text-sm text-foreground">{{ $t("queue.table.noJobsFound") }}</h3>
-          <p class="mt-1 text-sm text-neutral-muted">{{ $t("queue.table.noJobsMatchingFilters") }}</p>
+          <p class="mt-1 text-sm text-neutral-muted">
+            {{ $t("queue.table.noJobsMatchingFilters") }}
+          </p>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -270,7 +274,13 @@
         <div v-if="totalPages > 1" class="px-6 py-4 border-t">
           <div class="flex items-center justify-between">
             <p class="text-sm text-neutral-muted">
-              {{ $t("queue.pagination.showingJobs", { from: (currentPage - 1) * pageSize + 1, to: Math.min(currentPage * pageSize, totalJobs), total: totalJobs }) }}
+              {{
+                $t("queue.pagination.showingJobs", {
+                  from: (currentPage - 1) * pageSize + 1,
+                  to: Math.min(currentPage * pageSize, totalJobs),
+                  total: totalJobs,
+                })
+              }}
             </p>
             <div class="flex space-x-2">
               <Button
@@ -322,31 +332,41 @@
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.priority") }}</p>
+              <p class="text-sm font-medium text-neutral-muted">
+                {{ $t("queue.details.priority") }}
+              </p>
               <Badge :variant="getPriorityVariant(selectedJob.priority)">
                 {{ getPriorityLabel(selectedJob.priority) }}
               </Badge>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.attempts") }}</p>
+              <p class="text-sm font-medium text-neutral-muted">
+                {{ $t("queue.details.attempts") }}
+              </p>
               <p class="text-sm">{{ selectedJob.attempts }} / {{ selectedJob.max_attempts }}</p>
             </div>
             <div>
-              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.created") }}</p>
+              <p class="text-sm font-medium text-neutral-muted">
+                {{ $t("queue.details.created") }}
+              </p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.created_at, true) }}
+                {{ formatDateTime(selectedJob.created_at) }}
               </p>
             </div>
             <div v-if="selectedJob.started_at">
-              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.started") }}</p>
+              <p class="text-sm font-medium text-neutral-muted">
+                {{ $t("queue.details.started") }}
+              </p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.started_at, true) }}
+                {{ formatDateTime(selectedJob.started_at) }}
               </p>
             </div>
             <div v-if="selectedJob.completed_at">
-              <p class="text-sm font-medium text-neutral-muted">{{ $t("queue.details.completed") }}</p>
+              <p class="text-sm font-medium text-neutral-muted">
+                {{ $t("queue.details.completed") }}
+              </p>
               <p class="text-sm">
-                {{ formatDate(selectedJob.completed_at, true) }}
+                {{ formatDateTime(selectedJob.completed_at) }}
               </p>
             </div>
           </div>
@@ -411,6 +431,7 @@ import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/web
 import type { Job } from "~/types/job";
 
 const { t } = useI18n();
+const { formatDate, formatDateTime } = useOrgDateTime();
 
 // State
 const loading = ref(false);
@@ -507,15 +528,6 @@ const getPriorityVariant = (
     "destructive",
   ];
   return variants[priority] || "default";
-};
-
-const formatDate = (date: string, includeTime = false) => {
-  if (!date) return "-";
-  const d = new Date(date);
-  if (includeTime) {
-    return d.toLocaleString();
-  }
-  return d.toLocaleDateString();
 };
 
 const formatDuration = (duration: number | null) => {

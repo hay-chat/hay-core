@@ -247,15 +247,11 @@ const httpStatusText = computed(() => {
   return statusMessages[props.httpStatus] || "Unknown Status";
 });
 
+const { formatTime } = useOrgDateTime();
+
 const formattedExecutedAt = computed(() => {
   if (!props.executedAt) return "";
-  const date = new Date(props.executedAt);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+  return formatTime(props.executedAt);
 });
 </script>
 

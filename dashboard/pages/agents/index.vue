@@ -216,7 +216,7 @@
             <!-- Last Activity -->
             <div class="pt-2 border-t text-xs text-neutral-muted">
               <p>Last active: {{ formatTimeAgo(agent.lastActivity) }}</p>
-              <p>Created: {{ formatDate(agent.createdAt) }}</p>
+              <p>Created: {{ formatDateTime(agent.createdAt) }}</p>
             </div>
 
             <!-- Quick Actions -->
@@ -358,6 +358,7 @@ const selectedAgents = ref<string[]>([]);
 const router = useRouter();
 const toast = useToast();
 const organizationStore = useOrganizationStore();
+const { formatDateTime } = useOrgDateTime();
 const currentPage = ref(1);
 const pageSize = ref(10);
 
@@ -424,14 +425,6 @@ const formatTimeAgo = (date: Date) => {
     const days = Math.floor(diffInSeconds / 86400);
     return `${days}d ago`;
   }
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
 };
 
 const refreshData = async () => {

@@ -29,11 +29,17 @@
               {{ organization.description }}
             </p>
             <div class="mt-3 flex items-center space-x-4 text-sm text-neutral-muted">
-              <span>{{ $t("organizations.header.created", { date: formatDate(organization.createdAt) }) }}</span>
+              <span>{{
+                $t("organizations.header.created", { date: formatDateTime(organization.createdAt) })
+              }}</span>
               <span>•</span>
-              <span>{{ $t("organizations.header.members", { count: organization.memberCount }) }}</span>
+              <span>{{
+                $t("organizations.header.members", { count: organization.memberCount })
+              }}</span>
               <span>•</span>
-              <span>{{ $t("organizations.header.agents", { count: organization.agentCount }) }}</span>
+              <span>{{
+                $t("organizations.header.agents", { count: organization.agentCount })
+              }}</span>
             </div>
           </div>
         </div>
@@ -78,7 +84,9 @@
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.totalMembers") }} </CardTitle>
+              <CardTitle class="text-sm font-medium">
+                {{ $t("organizations.overview.totalMembers") }}
+              </CardTitle>
               <Users class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -86,14 +94,18 @@
                 {{ organization.memberCount }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">{{ $t("organizations.overview.thisMonth", { count: 2 }) }}</span>
+                <span class="text-green-600">{{
+                  $t("organizations.overview.thisMonth", { count: 2 })
+                }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.activeAgents") }} </CardTitle>
+              <CardTitle class="text-sm font-medium">
+                {{ $t("organizations.overview.activeAgents") }}
+              </CardTitle>
               <Bot class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -101,14 +113,18 @@
                 {{ organization.agentCount }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">{{ $t("organizations.overview.thisWeek", { count: 1 }) }}</span>
+                <span class="text-green-600">{{
+                  $t("organizations.overview.thisWeek", { count: 1 })
+                }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.conversations") }} </CardTitle>
+              <CardTitle class="text-sm font-medium">
+                {{ $t("organizations.overview.conversations") }}
+              </CardTitle>
               <MessageSquare class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
@@ -116,19 +132,25 @@
                 {{ organization.totalConversations }}
               </div>
               <p class="text-xs text-neutral-muted">
-                <span class="text-green-600">{{ $t("organizations.overview.fromLastMonth", { percent: 12 }) }}</span>
+                <span class="text-green-600">{{
+                  $t("organizations.overview.fromLastMonth", { percent: 12 })
+                }}</span>
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle class="text-sm font-medium"> {{ $t("organizations.overview.storageUsed") }} </CardTitle>
+              <CardTitle class="text-sm font-medium">
+                {{ $t("organizations.overview.storageUsed") }}
+              </CardTitle>
               <HardDrive class="h-4 w-4 text-neutral-muted" />
             </CardHeader>
             <CardContent>
               <div class="text-2xl font-bold">{{ organization.storageUsed }}GB</div>
-              <p class="text-xs text-neutral-muted">{{ $t("organizations.overview.ofLimit", { limit: organization.storageLimit }) }}</p>
+              <p class="text-xs text-neutral-muted">
+                {{ $t("organizations.overview.ofLimit", { limit: organization.storageLimit }) }}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -181,7 +203,9 @@
           <Card>
             <CardHeader>
               <CardTitle>{{ $t("organizations.overview.resourceUsage") }}</CardTitle>
-              <CardDescription>{{ $t("organizations.overview.currentMonthUsage") }}</CardDescription>
+              <CardDescription>{{
+                $t("organizations.overview.currentMonthUsage")
+              }}</CardDescription>
             </CardHeader>
             <CardContent>
               <div class="space-y-4">
@@ -244,7 +268,9 @@
       <div v-if="activeTab === 'members'" class="space-y-6">
         <div class="flex justify-between items-center">
           <div>
-            <h3 class="text-lg font-medium text-foreground">{{ $t("organizations.members.title") }}</h3>
+            <h3 class="text-lg font-medium text-foreground">
+              {{ $t("organizations.members.title") }}
+            </h3>
             <p class="text-sm text-neutral-muted">{{ $t("organizations.members.description") }}</p>
           </div>
           <Button @click="inviteMember">
@@ -303,7 +329,9 @@
         <Card>
           <CardHeader>
             <CardTitle>{{ $t("organizations.settings.generalTitle") }}</CardTitle>
-            <CardDescription> {{ $t("organizations.settings.generalDescription") }} </CardDescription>
+            <CardDescription>
+              {{ $t("organizations.settings.generalDescription") }}
+            </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div>
@@ -315,7 +343,9 @@
               />
             </div>
             <div>
-              <Label html-for="orgDescription">{{ $t("organizations.settings.descriptionLabel") }}</Label>
+              <Label html-for="orgDescription">{{
+                $t("organizations.settings.descriptionLabel")
+              }}</Label>
               <Input
                 id="orgDescription"
                 v-model="organizationForm.description"
@@ -336,7 +366,9 @@
               </select>
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSettings"> {{ $t("organizations.settings.saveChanges") }} </Button>
+              <Button @click="saveSettings">
+                {{ $t("organizations.settings.saveChanges") }}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -344,25 +376,33 @@
         <Card>
           <CardHeader>
             <CardTitle>{{ $t("organizations.settings.securityTitle") }}</CardTitle>
-            <CardDescription> {{ $t("organizations.settings.securityDescription") }} </CardDescription>
+            <CardDescription>
+              {{ $t("organizations.settings.securityDescription") }}
+            </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">{{ $t("organizations.settings.twoFactor") }}</p>
-                <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.twoFactorDescription") }}</p>
+                <p class="text-sm text-neutral-muted">
+                  {{ $t("organizations.settings.twoFactorDescription") }}
+                </p>
               </div>
               <Checkbox v-model:checked="organizationForm.require2FA" />
             </div>
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium">{{ $t("organizations.settings.sso") }}</p>
-                <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.ssoDescription") }}</p>
+                <p class="text-sm text-neutral-muted">
+                  {{ $t("organizations.settings.ssoDescription") }}
+                </p>
               </div>
               <Checkbox v-model:checked="organizationForm.ssoEnabled" />
             </div>
             <div class="flex justify-end">
-              <Button @click="saveSecuritySettings"> {{ $t("organizations.settings.saveSecuritySettings") }} </Button>
+              <Button @click="saveSecuritySettings">
+                {{ $t("organizations.settings.saveSecuritySettings") }}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -370,14 +410,18 @@
         <Card>
           <CardHeader>
             <CardTitle>{{ $t("organizations.settings.apiKeys") }}</CardTitle>
-            <CardDescription> {{ $t("organizations.settings.apiKeysDescription") }} </CardDescription>
+            <CardDescription>
+              {{ $t("organizations.settings.apiKeysDescription") }}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div class="space-y-4">
               <div class="flex justify-between items-center">
                 <div>
                   <h4 class="font-medium">{{ $t("organizations.settings.primaryApiKey") }}</h4>
-                  <p class="text-sm text-neutral-muted">{{ $t("organizations.settings.usedForApiAccess") }}</p>
+                  <p class="text-sm text-neutral-muted">
+                    {{ $t("organizations.settings.usedForApiAccess") }}
+                  </p>
                 </div>
                 <div class="flex space-x-2">
                   <Button variant="outline" size="sm" @click="regenerateApiKey">
@@ -422,7 +466,9 @@
       {{ $t("organizations.notFoundDescription") }}
     </p>
     <div class="mt-6">
-      <Button @click="router.push('/organizations')"> {{ $t("organizations.backToOrganizations") }} </Button>
+      <Button @click="router.push('/organizations')">
+        {{ $t("organizations.backToOrganizations") }}
+      </Button>
     </div>
   </div>
 </template>
@@ -448,6 +494,7 @@ import {
 
 const { t } = useI18n();
 const router = useRouter();
+const { formatDateTime } = useOrgDateTime();
 
 definePageMeta({
   // TODO: Add authentication middleware
@@ -571,14 +618,6 @@ const recentActivity = ref([
 ]);
 
 // Methods
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(date);
-};
-
 const formatTimeAgo = (date: Date) => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);

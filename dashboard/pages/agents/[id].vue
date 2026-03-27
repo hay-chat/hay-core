@@ -127,8 +127,10 @@
 
             <!-- Metadata (only in edit mode) -->
             <div v-if="isEditMode && agent" class="space-y-2 text-sm text-neutral-muted">
-              <div v-if="agent.created_at">Created: {{ formatDate(agent.created_at) }}</div>
-              <div v-if="agent.updated_at">Last updated: {{ formatDate(agent.updated_at) }}</div>
+              <div v-if="agent.created_at">Created: {{ formatDateTime(agent.created_at) }}</div>
+              <div v-if="agent.updated_at">
+                Last updated: {{ formatDateTime(agent.updated_at) }}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -283,6 +285,7 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const organizationStore = useOrganizationStore();
+const { formatDateTime } = useOrgDateTime();
 const loadingInstructions = ref(false);
 const settingAsDefault = ref(false);
 
@@ -394,17 +397,6 @@ const {
   form,
   computed(() => !loading.value && !isSubmitting.value),
 );
-
-// Format date
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-};
 
 // Load data on mount
 onMounted(async () => {

@@ -191,14 +191,12 @@ const handleDisconnect = async () => {
   }
 };
 
+const { formatDate: orgFormatDate } = useOrgDateTime();
+
 // Format date helper
 const formatDate = (timestamp: number) => {
   const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return orgFormatDate(date);
 };
 
 // Load status on mount

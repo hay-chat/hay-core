@@ -3,16 +3,16 @@
     <template #header>
       <Button variant="default" size="sm" @click="openCreateDialog">
         <Plus class="h-4 w-4 mr-2" />
-        {{ $t('apiTokens.createToken') }}
+        {{ $t("apiTokens.createToken") }}
       </Button>
     </template>
 
     <!-- Tokens List -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('apiTokens.apiTokens') }}</CardTitle>
+        <CardTitle>{{ $t("apiTokens.apiTokens") }}</CardTitle>
         <CardDescription>
-          {{ $t('apiTokens.apiTokensDescription') }}
+          {{ $t("apiTokens.apiTokensDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -22,13 +22,13 @@
           class="text-center py-12 border-2 border-dashed border-muted rounded-lg"
         >
           <Key class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-          <h3 class="text-lg font-medium mb-2">{{ $t('apiTokens.noTokensTitle') }}</h3>
+          <h3 class="text-lg font-medium mb-2">{{ $t("apiTokens.noTokensTitle") }}</h3>
           <p class="text-sm text-neutral-muted mb-4">
-            {{ $t('apiTokens.noTokensDescription') }}
+            {{ $t("apiTokens.noTokensDescription") }}
           </p>
           <Button @click="openCreateDialog">
             <Plus class="h-4 w-4 mr-2" />
-            {{ $t('apiTokens.createToken') }}
+            {{ $t("apiTokens.createToken") }}
           </Button>
         </div>
 
@@ -43,29 +43,42 @@
               <div class="flex items-center gap-3 mb-2">
                 <h4 class="font-medium">{{ token.name }}</h4>
                 <Badge :variant="token.isActive ? 'success' : 'secondary'">
-                  {{ token.isActive ? $t('apiTokens.active') : $t('apiTokens.inactive') }}
+                  {{ token.isActive ? $t("apiTokens.active") : $t("apiTokens.inactive") }}
                 </Badge>
-                <Badge v-if="isExpired(token)" variant="destructive">{{ $t('apiTokens.expired') }}</Badge>
+                <Badge v-if="isExpired(token)" variant="destructive">{{
+                  $t("apiTokens.expired")
+                }}</Badge>
               </div>
 
-              <div class="font-mono text-xs bg-background-tertiary px-3 py-1.5 rounded inline-block mb-2">
+              <div
+                class="font-mono text-xs bg-background-tertiary px-3 py-1.5 rounded inline-block mb-2"
+              >
                 {{ token.maskedKey }}
               </div>
 
               <div class="flex items-center gap-4 text-sm text-neutral-muted">
-                <span>{{ $t('apiTokens.created', { date: formatDate(token.createdAt) }) }}</span>
-                <span v-if="token.lastUsedAt">{{ $t('apiTokens.lastUsed', { date: formatDate(token.lastUsedAt) }) }}</span>
-                <span v-else>{{ $t('apiTokens.neverUsed') }}</span>
-                <span v-if="token.expiresAt">{{ $t('apiTokens.expires', { date: formatDate(token.expiresAt) }) }}</span>
+                <span>{{ $t("apiTokens.created", { date: formatDate(token.createdAt) }) }}</span>
+                <span v-if="token.lastUsedAt">{{
+                  $t("apiTokens.lastUsed", { date: formatDate(token.lastUsedAt) })
+                }}</span>
+                <span v-else>{{ $t("apiTokens.neverUsed") }}</span>
+                <span v-if="token.expiresAt">{{
+                  $t("apiTokens.expires", { date: formatDate(token.expiresAt) })
+                }}</span>
               </div>
 
               <!-- Scopes -->
               <div v-if="token.scopes && token.scopes.length > 0" class="mt-2 flex flex-wrap gap-1">
-                <Badge v-for="scope in token.scopes.slice(0, 5)" :key="scope" variant="outline" class="text-xs">
+                <Badge
+                  v-for="scope in token.scopes.slice(0, 5)"
+                  :key="scope"
+                  variant="outline"
+                  class="text-xs"
+                >
                   {{ scope }}
                 </Badge>
                 <Badge v-if="token.scopes.length > 5" variant="outline" class="text-xs">
-                  {{ $t('apiTokens.moreScopes', { count: token.scopes.length - 5 }) }}
+                  {{ $t("apiTokens.moreScopes", { count: token.scopes.length - 5 }) }}
                 </Badge>
               </div>
             </div>
@@ -96,16 +109,16 @@
     <Dialog v-model:open="createDialogOpen">
       <DialogContent class="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('apiTokens.createDialogTitle') }}</DialogTitle>
+          <DialogTitle>{{ $t("apiTokens.createDialogTitle") }}</DialogTitle>
           <DialogDescription>
-            {{ $t('apiTokens.createDialogDescription') }}
+            {{ $t("apiTokens.createDialogDescription") }}
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <!-- Token Name -->
           <div>
-            <Label for="token-name">{{ $t('apiTokens.tokenName') }}</Label>
+            <Label for="token-name">{{ $t("apiTokens.tokenName") }}</Label>
             <Input
               id="token-name"
               v-model="newToken.name"
@@ -116,21 +129,16 @@
 
           <!-- Expiration Date (Optional) -->
           <div>
-            <Label for="token-expiry">{{ $t('apiTokens.expirationDate') }}</Label>
-            <Input
-              id="token-expiry"
-              v-model="newToken.expiresAt"
-              type="date"
-              class="mt-1"
-            />
-            <p class="text-xs text-neutral-muted mt-1">{{ $t('apiTokens.noExpiration') }}</p>
+            <Label for="token-expiry">{{ $t("apiTokens.expirationDate") }}</Label>
+            <Input id="token-expiry" v-model="newToken.expiresAt" type="date" class="mt-1" />
+            <p class="text-xs text-neutral-muted mt-1">{{ $t("apiTokens.noExpiration") }}</p>
           </div>
 
           <!-- Scopes -->
           <div>
-            <Label>{{ $t('apiTokens.scopes') }}</Label>
+            <Label>{{ $t("apiTokens.scopes") }}</Label>
             <p class="text-xs text-neutral-muted mb-3">
-              {{ $t('apiTokens.scopesDescription') }}
+              {{ $t("apiTokens.scopesDescription") }}
             </p>
 
             <div class="space-y-4">
@@ -156,13 +164,11 @@
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="createDialogOpen = false">{{ $t('apiTokens.cancel') }}</Button>
-          <Button
-            :loading="creating"
-            :disabled="!newToken.name || creating"
-            @click="createToken"
-          >
-            {{ $t('apiTokens.generateToken') }}
+          <Button variant="outline" @click="createDialogOpen = false">{{
+            $t("apiTokens.cancel")
+          }}</Button>
+          <Button :loading="creating" :disabled="!newToken.name || creating" @click="createToken">
+            {{ $t("apiTokens.generateToken") }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -172,18 +178,18 @@
     <Dialog v-model:open="showTokenDialogOpen">
       <DialogContent class="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('apiTokens.yourApiToken') }}</DialogTitle>
+          <DialogTitle>{{ $t("apiTokens.yourApiToken") }}</DialogTitle>
           <DialogDescription>
-            {{ $t('apiTokens.copyTokenWarning') }}
+            {{ $t("apiTokens.copyTokenWarning") }}
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <Alert variant="warning">
             <AlertTriangle class="h-4 w-4" />
-            <AlertTitle>{{ $t('apiTokens.importantWarning') }}</AlertTitle>
+            <AlertTitle>{{ $t("apiTokens.importantWarning") }}</AlertTitle>
             <AlertDescription>
-              {{ $t('apiTokens.importantWarningDescription') }}
+              {{ $t("apiTokens.importantWarningDescription") }}
             </AlertDescription>
           </Alert>
 
@@ -195,19 +201,14 @@
               class="font-mono pr-20"
               @click="selectToken"
             />
-            <Button
-              variant="ghost"
-              size="sm"
-              class="absolute right-1 top-1"
-              @click="copyToken"
-            >
+            <Button variant="ghost" size="sm" class="absolute right-1 top-1" @click="copyToken">
               <Copy class="h-4 w-4" />
-              {{ copied ? $t('apiTokens.copied') : $t('apiTokens.copy') }}
+              {{ copied ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
             </Button>
           </div>
 
           <div v-if="createdTokenScopes.length > 0" class="space-y-2">
-            <Label>{{ $t('apiTokens.tokenScopes') }}</Label>
+            <Label>{{ $t("apiTokens.tokenScopes") }}</Label>
             <div class="flex flex-wrap gap-1">
               <Badge v-for="scope in createdTokenScopes" :key="scope" variant="outline">
                 {{ scope }}
@@ -217,7 +218,7 @@
         </div>
 
         <DialogFooter>
-          <Button @click="closeTokenDialog">{{ $t('apiTokens.done') }}</Button>
+          <Button @click="closeTokenDialog">{{ $t("apiTokens.done") }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -226,13 +227,13 @@
     <Dialog v-model:open="editDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('apiTokens.editDialogTitle') }}</DialogTitle>
-          <DialogDescription>{{ $t('apiTokens.editDialogDescription') }}</DialogDescription>
+          <DialogTitle>{{ $t("apiTokens.editDialogTitle") }}</DialogTitle>
+          <DialogDescription>{{ $t("apiTokens.editDialogDescription") }}</DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <div>
-            <Label for="edit-token-name">{{ $t('apiTokens.tokenNameLabel') }}</Label>
+            <Label for="edit-token-name">{{ $t("apiTokens.tokenNameLabel") }}</Label>
             <Input
               id="edit-token-name"
               v-model="editingToken.name"
@@ -243,7 +244,7 @@
 
           <!-- Scopes -->
           <div>
-            <Label>{{ $t('apiTokens.scopes') }}</Label>
+            <Label>{{ $t("apiTokens.scopes") }}</Label>
             <div class="space-y-4 mt-2">
               <div v-for="(scopes, group) in scopeGroups" :key="group" class="space-y-2">
                 <h4 class="font-medium text-sm">{{ group }}</h4>
@@ -267,8 +268,12 @@
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="editDialogOpen = false">{{ $t('apiTokens.cancel') }}</Button>
-          <Button :loading="updating" @click="updateToken">{{ $t('apiTokens.saveChanges') }}</Button>
+          <Button variant="outline" @click="editDialogOpen = false">{{
+            $t("apiTokens.cancel")
+          }}</Button>
+          <Button :loading="updating" @click="updateToken">{{
+            $t("apiTokens.saveChanges")
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -280,6 +285,7 @@ import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-ne
 import { Hay } from "@/utils/api";
 
 const { t } = useI18n();
+const { formatDate } = useOrgDateTime();
 
 // State
 const loading = ref(false);
@@ -454,7 +460,7 @@ const updateToken = async () => {
 };
 
 const revokeToken = async (id: string) => {
-  if (!confirm(t('apiTokens.revokeConfirm'))) {
+  if (!confirm(t("apiTokens.revokeConfirm"))) {
     return;
   }
 
@@ -467,7 +473,7 @@ const revokeToken = async (id: string) => {
 };
 
 const deleteToken = async (id: string) => {
-  if (!confirm(t('apiTokens.deleteConfirm'))) {
+  if (!confirm(t("apiTokens.deleteConfirm"))) {
     return;
   }
 
@@ -477,21 +483,6 @@ const deleteToken = async (id: string) => {
   } catch (error) {
     console.error("Failed to delete token:", error);
   }
-};
-
-const formatDate = (date: Date | string) => {
-  const d = new Date(date);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-
-  return d.toLocaleDateString();
 };
 
 const isExpired = (token: any) => {
@@ -511,11 +502,11 @@ definePageMeta({
 
 // Head
 useHead({
-  title: t('apiTokens.headTitle'),
+  title: t("apiTokens.headTitle"),
   meta: [
     {
       name: "description",
-      content: t('apiTokens.headDescription'),
+      content: t("apiTokens.headDescription"),
     },
   ],
 });

@@ -1,170 +1,164 @@
 <template>
-  <Page
-    :title="$t('users.title')"
-    :description="$t('users.description')"
-    width="max"
-  >
+  <Page :title="$t('users.title')" :description="$t('users.description')" width="max">
     <!-- Organization Members -->
     <Card>
       <CardHeader>
         <div class="flex items-center justify-between">
           <div>
-            <CardTitle>{{ $t('users.teamMembers') }}</CardTitle>
+            <CardTitle>{{ $t("users.teamMembers") }}</CardTitle>
             <CardDescription>{{
-              $t('users.manageAccess', { name: userStore.activeOrganization?.name })
+              $t("users.manageAccess", { name: userStore.activeOrganization?.name })
             }}</CardDescription>
           </div>
           <Button v-if="userStore.isAdmin" @click="inviteDialogOpen = true">
             <UserPlus class="h-4 w-4 mr-2" />
-            {{ $t('users.inviteMember') }}
+            {{ $t("users.inviteMember") }}
           </Button>
         </div>
       </CardHeader>
-          <CardContent>
-            <!-- Search and Filter Bar -->
-            <div class="flex gap-3 mb-4">
-              <Input
-                v-model="searchQuery"
-                type="text"
-                :icon-start="Search"
-                :placeholder="$t('users.searchPlaceholder')"
-                class="flex-1"
-                @input="debouncedSearch"
+      <CardContent>
+        <!-- Search and Filter Bar -->
+        <div class="flex gap-3 mb-4">
+          <Input
+            v-model="searchQuery"
+            type="text"
+            :icon-start="Search"
+            :placeholder="$t('users.searchPlaceholder')"
+            class="flex-1"
+            @input="debouncedSearch"
+          />
+
+          <Input
+            v-model="roleFilter"
+            type="select"
+            class="w-[180px]"
+            :placeholder="$t('users.allRoles')"
+            :options="[
+              { label: $t('users.allRoles'), value: '' },
+              { label: $t('users.roles.owner'), value: 'owner' },
+              { label: $t('users.roles.admin'), value: 'admin' },
+              { label: $t('users.roles.contributor'), value: 'contributor' },
+              { label: $t('users.roles.member'), value: 'member' },
+              { label: $t('users.roles.viewer'), value: 'viewer' },
+            ]"
+            @update:model-value="loadMembers(true)"
+          />
+        </div>
+
+        <div v-if="loading" class="py-8">
+          <Loading />
+        </div>
+
+        <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
+          {{ searchQuery || roleFilter ? $t("users.noMembersFiltered") : $t("users.noMembers") }}
+        </div>
+
+        <div v-else class="space-y-2">
+          <div
+            v-for="member in members"
+            :key="member.id"
+            class="flex items-center justify-between p-4 rounded-lg border"
+          >
+            <div class="flex items-center gap-3">
+              <Avatar
+                :name="
+                  member.firstName || member.lastName
+                    ? `${member.firstName || ''} ${member.lastName || ''}`.trim()
+                    : member.email
+                "
+                :url="member.avatarUrl"
+                size="md"
               />
-
-              <Input
-                v-model="roleFilter"
-                type="select"
-                class="w-[180px]"
-                :placeholder="$t('users.allRoles')"
-                :options="[
-                  { label: $t('users.allRoles'), value: '' },
-                  { label: $t('users.roles.owner'), value: 'owner' },
-                  { label: $t('users.roles.admin'), value: 'admin' },
-                  { label: $t('users.roles.contributor'), value: 'contributor' },
-                  { label: $t('users.roles.member'), value: 'member' },
-                  { label: $t('users.roles.viewer'), value: 'viewer' },
-                ]"
-                @update:model-value="loadMembers(true)"
-              />
-            </div>
-
-            <div v-if="loading" class="py-8">
-              <Loading />
-            </div>
-
-            <div v-else-if="members.length === 0" class="text-center py-8 text-muted-foreground">
-              {{
-                searchQuery || roleFilter
-                  ? $t('users.noMembersFiltered')
-                  : $t('users.noMembers')
-              }}
-            </div>
-
-            <div v-else class="space-y-2">
-              <div
-                v-for="member in members"
-                :key="member.id"
-                class="flex items-center justify-between p-4 rounded-lg border"
-              >
-                <div class="flex items-center gap-3">
-                  <Avatar
-                    :name="
-                      member.firstName || member.lastName
-                        ? `${member.firstName || ''} ${member.lastName || ''}`.trim()
-                        : member.email
-                    "
-                    :url="member.avatarUrl"
-                    size="md"
-                  />
-                  <div>
-                    <p class="font-medium">
-                      {{
-                        member.firstName || member.lastName
-                          ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
-                          : member.email
-                      }}
-                    </p>
-                    <p class="text-sm text-muted-foreground">{{ member.email }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <Badge variant="secondary" class="capitalize">{{ member.role }}</Badge>
-                  <DropdownMenu v-if="userStore.isOwner && member.userId !== userStore.user?.id">
-                    <DropdownMenuTrigger as-child>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical class="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem @click="openRoleDialog(member)">
-                        <Shield class="h-4 w-4 mr-2" />
-                        {{ $t('users.changeRole') }}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        class="text-destructive"
-                        @click="openRemoveMemberDialog(member)"
-                      >
-                        <Trash2 class="h-4 w-4 mr-2" />
-                        {{ $t('users.removeMember') }}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+              <div>
+                <p class="font-medium">
+                  {{
+                    member.firstName || member.lastName
+                      ? `${member.firstName || ""} ${member.lastName || ""}`.trim()
+                      : member.email
+                  }}
+                </p>
+                <p class="text-sm text-muted-foreground">{{ member.email }}</p>
               </div>
             </div>
-
-            <!-- Pagination Controls -->
-            <div
-              v-if="!loading && totalPages > 1"
-              class="flex items-center justify-between mt-4 pt-4 border-t"
-            >
-              <div class="text-sm text-muted-foreground">
-                {{ $t('users.showingPagination', {
-                  from: (currentPage - 1) * pageSize + 1,
-                  to: Math.min(currentPage * pageSize, totalItems),
-                  total: totalItems
-                }) }}
-              </div>
-              <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
-                  <ChevronLeft class="h-4 w-4 mr-1" />
-                  {{ $t('users.previous') }}
-                </Button>
-
-                <div class="flex items-center gap-1">
-                  <Button
-                    v-for="page in getPaginationPages()"
-                    :key="page"
-                    :variant="page === currentPage ? 'default' : 'outline'"
-                    size="sm"
-                    class="min-w-[40px]"
-                    @click="goToPage(page)"
-                  >
-                    {{ page }}
+            <div class="flex items-center gap-2">
+              <Badge variant="secondary" class="capitalize">{{ member.role }}</Badge>
+              <DropdownMenu v-if="userStore.isOwner && member.userId !== userStore.user?.id">
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical class="h-4 w-4" />
                   </Button>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="currentPage === totalPages"
-                  @click="nextPage"
-                >
-                  {{ $t('users.next') }}
-                  <ChevronRight class="h-4 w-4 ml-1" />
-                </Button>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="openRoleDialog(member)">
+                    <Shield class="h-4 w-4 mr-2" />
+                    {{ $t("users.changeRole") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    class="text-destructive"
+                    @click="openRemoveMemberDialog(member)"
+                  >
+                    <Trash2 class="h-4 w-4 mr-2" />
+                    {{ $t("users.removeMember") }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+          </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div
+          v-if="!loading && totalPages > 1"
+          class="flex items-center justify-between mt-4 pt-4 border-t"
+        >
+          <div class="text-sm text-muted-foreground">
+            {{
+              $t("users.showingPagination", {
+                from: (currentPage - 1) * pageSize + 1,
+                to: Math.min(currentPage * pageSize, totalItems),
+                total: totalItems,
+              })
+            }}
+          </div>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" :disabled="currentPage === 1" @click="prevPage">
+              <ChevronLeft class="h-4 w-4 mr-1" />
+              {{ $t("users.previous") }}
+            </Button>
+
+            <div class="flex items-center gap-1">
+              <Button
+                v-for="page in getPaginationPages()"
+                :key="page"
+                :variant="page === currentPage ? 'default' : 'outline'"
+                size="sm"
+                class="min-w-[40px]"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="currentPage === totalPages"
+              @click="nextPage"
+            >
+              {{ $t("users.next") }}
+              <ChevronRight class="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
 
     <!-- Pending Invitations -->
     <Card v-if="userStore.isAdmin">
       <CardHeader>
-        <CardTitle>{{ $t('users.pendingInvitations') }}</CardTitle>
-        <CardDescription>{{ $t('users.pendingInvitationsDescription') }}</CardDescription>
+        <CardTitle>{{ $t("users.pendingInvitations") }}</CardTitle>
+        <CardDescription>{{ $t("users.pendingInvitationsDescription") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div v-if="loadingInvitations" class="py-8">
@@ -175,7 +169,7 @@
           v-else-if="invitations.filter((inv) => inv.status === 'pending').length === 0"
           class="text-center py-8 text-muted-foreground"
         >
-          {{ $t('users.noPendingInvitations') }}
+          {{ $t("users.noPendingInvitations") }}
         </div>
 
         <div v-else class="space-y-2">
@@ -187,8 +181,10 @@
             <div>
               <p class="font-medium">{{ invitation.email }}</p>
               <p class="text-sm text-muted-foreground">
-                {{ $t('users.invited', { date: formatDate(invitation.createdAt) }) }}
-                <span v-if="invitation.invitedBy">{{ $t('users.invitedBy', { name: invitation.invitedBy.name }) }}</span>
+                {{ $t("users.invited", { date: formatDate(invitation.createdAt) }) }}
+                <span v-if="invitation.invitedBy">{{
+                  $t("users.invitedBy", { name: invitation.invitedBy.name })
+                }}</span>
               </p>
             </div>
             <div class="flex items-center gap-2">
@@ -200,7 +196,7 @@
                 :title="$t('users.resendInvitation')"
                 @click="resendInvitation(invitation.id)"
               >
-                {{ $t('users.resendInvitation') }}
+                {{ $t("users.resendInvitation") }}
               </Button>
               <Button
                 v-if="invitation.status === 'pending'"
@@ -209,7 +205,7 @@
                 :title="$t('users.cancelInvitation')"
                 @click="cancelInvitation(invitation.id)"
               >
-                {{ $t('users.cancelInvitation') }}
+                {{ $t("users.cancelInvitation") }}
               </Button>
             </div>
           </div>
@@ -221,9 +217,9 @@
     <Dialog v-model:open="inviteDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('users.inviteDialogTitle') }}</DialogTitle>
+          <DialogTitle>{{ $t("users.inviteDialogTitle") }}</DialogTitle>
           <DialogDescription>
-            {{ $t('users.inviteDialogDescription', { name: userStore.activeOrganization?.name }) }}
+            {{ $t("users.inviteDialogDescription", { name: userStore.activeOrganization?.name }) }}
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
@@ -234,18 +230,18 @@
             :placeholder="$t('users.emailPlaceholder')"
           />
           <div>
-            <label class="text-sm font-medium mb-2 block">{{ $t('users.role') }}</label>
+            <label class="text-sm font-medium mb-2 block">{{ $t("users.role") }}</label>
             <Select v-model="inviteForm.role">
               <SelectTrigger>
                 <SelectValue :placeholder="$t('users.selectRole')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">{{ $t('users.roles.owner') }}</SelectItem>
-                <SelectItem value="admin">{{ $t('users.roles.admin') }}</SelectItem>
-                <SelectItem value="contributor">{{ $t('users.roles.contributor') }}</SelectItem>
-                <SelectItem value="member">{{ $t('users.roles.member') }}</SelectItem>
-                <SelectItem value="viewer">{{ $t('users.roles.viewer') }}</SelectItem>
-                <SelectItem value="agent">{{ $t('users.roles.agent') }}</SelectItem>
+                <SelectItem value="owner">{{ $t("users.roles.owner") }}</SelectItem>
+                <SelectItem value="admin">{{ $t("users.roles.admin") }}</SelectItem>
+                <SelectItem value="contributor">{{ $t("users.roles.contributor") }}</SelectItem>
+                <SelectItem value="member">{{ $t("users.roles.member") }}</SelectItem>
+                <SelectItem value="viewer">{{ $t("users.roles.viewer") }}</SelectItem>
+                <SelectItem value="agent">{{ $t("users.roles.agent") }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -257,8 +253,12 @@
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="inviteDialogOpen = false">{{ $t('users.cancel') }}</Button>
-          <Button :loading="sendingInvite" @click="sendInvitation">{{ $t('users.sendInvitation') }}</Button>
+          <Button variant="outline" @click="inviteDialogOpen = false">{{
+            $t("users.cancel")
+          }}</Button>
+          <Button :loading="sendingInvite" @click="sendInvitation">{{
+            $t("users.sendInvitation")
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -267,30 +267,36 @@
     <Dialog v-model:open="roleDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('users.changeRoleDialogTitle') }}</DialogTitle>
-          <DialogDescription>{{ $t('users.changeRoleDialogDescription', { email: selectedMember?.email }) }}</DialogDescription>
+          <DialogTitle>{{ $t("users.changeRoleDialogTitle") }}</DialogTitle>
+          <DialogDescription>{{
+            $t("users.changeRoleDialogDescription", { email: selectedMember?.email })
+          }}</DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-4">
           <div>
-            <label class="text-sm font-medium mb-2 block">{{ $t('users.role') }}</label>
+            <label class="text-sm font-medium mb-2 block">{{ $t("users.role") }}</label>
             <Select v-model="roleForm.role">
               <SelectTrigger>
                 <SelectValue :placeholder="$t('users.selectRole')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="owner">{{ $t('users.roles.owner') }}</SelectItem>
-                <SelectItem value="admin">{{ $t('users.roles.admin') }}</SelectItem>
-                <SelectItem value="contributor">{{ $t('users.roles.contributor') }}</SelectItem>
-                <SelectItem value="member">{{ $t('users.roles.member') }}</SelectItem>
-                <SelectItem value="viewer">{{ $t('users.roles.viewer') }}</SelectItem>
-                <SelectItem value="agent">{{ $t('users.roles.agent') }}</SelectItem>
+                <SelectItem value="owner">{{ $t("users.roles.owner") }}</SelectItem>
+                <SelectItem value="admin">{{ $t("users.roles.admin") }}</SelectItem>
+                <SelectItem value="contributor">{{ $t("users.roles.contributor") }}</SelectItem>
+                <SelectItem value="member">{{ $t("users.roles.member") }}</SelectItem>
+                <SelectItem value="viewer">{{ $t("users.roles.viewer") }}</SelectItem>
+                <SelectItem value="agent">{{ $t("users.roles.agent") }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="roleDialogOpen = false">{{ $t('users.cancel') }}</Button>
-          <Button :loading="updatingRole" @click="updateMemberRole">{{ $t('users.updateRole') }}</Button>
+          <Button variant="outline" @click="roleDialogOpen = false">{{
+            $t("users.cancel")
+          }}</Button>
+          <Button :loading="updatingRole" @click="updateMemberRole">{{
+            $t("users.updateRole")
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -327,6 +333,7 @@ import Avatar from "@/components/ui/Avatar.vue";
 const { t } = useI18n();
 const userStore = useUserStore();
 const toastService = useToast();
+const { formatDate } = useOrgDateTime();
 
 const loading = ref(false);
 const loadingInvitations = ref(false);
@@ -383,8 +390,8 @@ const loadMembers = async (resetPage = false) => {
     totalPages.value = response.pagination.totalPages;
   } catch (error: any) {
     toastService.error(
-      t('users.loadMembersFailed'),
-      error.message || t('users.loadMembersFailedDescription'),
+      t("users.loadMembersFailed"),
+      error.message || t("users.loadMembersFailedDescription"),
     );
   } finally {
     loading.value = false;
@@ -466,8 +473,8 @@ const loadInvitations = async () => {
     invitations.value = response;
   } catch (error: any) {
     toastService.error(
-      t('users.loadInvitationsFailed'),
-      error.message || t('users.loadInvitationsFailedDescription'),
+      t("users.loadInvitationsFailed"),
+      error.message || t("users.loadInvitationsFailedDescription"),
     );
   } finally {
     loadingInvitations.value = false;
@@ -476,7 +483,7 @@ const loadInvitations = async () => {
 
 const sendInvitation = async () => {
   if (!inviteForm.value.email) {
-    toastService.error(t('users.emailRequired'), t('users.emailRequiredDescription'));
+    toastService.error(t("users.emailRequired"), t("users.emailRequiredDescription"));
     return;
   }
 
@@ -489,8 +496,8 @@ const sendInvitation = async () => {
     });
 
     toastService.success(
-      t('users.invitationSent'),
-      t('users.invitationSentDescription', { email: inviteForm.value.email }),
+      t("users.invitationSent"),
+      t("users.invitationSentDescription", { email: inviteForm.value.email }),
     );
 
     inviteDialogOpen.value = false;
@@ -498,8 +505,8 @@ const sendInvitation = async () => {
     await loadInvitations();
   } catch (error: any) {
     toastService.error(
-      t('users.sendInvitationFailed'),
-      error.message || t('users.sendInvitationFailedDescription'),
+      t("users.sendInvitationFailed"),
+      error.message || t("users.sendInvitationFailedDescription"),
     );
   } finally {
     sendingInvite.value = false;
@@ -509,15 +516,12 @@ const sendInvitation = async () => {
 const cancelInvitation = async (invitationId: string) => {
   try {
     await Hay.invitations.cancelInvitation.mutate({ invitationId });
-    toastService.success(
-      t('users.invitationCancelled'),
-      t('users.invitationCancelledDescription'),
-    );
+    toastService.success(t("users.invitationCancelled"), t("users.invitationCancelledDescription"));
     await loadInvitations();
   } catch (error: any) {
     toastService.error(
-      t('users.cancelInvitationFailed'),
-      error.message || t('users.cancelInvitationFailedDescription'),
+      t("users.cancelInvitationFailed"),
+      error.message || t("users.cancelInvitationFailedDescription"),
     );
   }
 };
@@ -526,15 +530,12 @@ const resendInvitation = async (invitationId: string) => {
   resendingInvitation.value = invitationId;
   try {
     await Hay.invitations.resendInvitation.mutate({ invitationId });
-    toastService.success(
-      t('users.invitationResent'),
-      t('users.invitationResentDescription'),
-    );
+    toastService.success(t("users.invitationResent"), t("users.invitationResentDescription"));
     await loadInvitations();
   } catch (error: any) {
     toastService.error(
-      t('users.resendInvitationFailed'),
-      error.message || t('users.resendInvitationFailedDescription'),
+      t("users.resendInvitationFailed"),
+      error.message || t("users.resendInvitationFailedDescription"),
     );
   } finally {
     resendingInvitation.value = null;
@@ -558,16 +559,19 @@ const updateMemberRole = async () => {
     });
 
     toastService.success(
-      t('users.roleUpdated'),
-      t('users.roleUpdatedDescription', { email: selectedMember.value.email, role: roleForm.value.role }),
+      t("users.roleUpdated"),
+      t("users.roleUpdatedDescription", {
+        email: selectedMember.value.email,
+        role: roleForm.value.role,
+      }),
     );
 
     roleDialogOpen.value = false;
     await loadMembers();
   } catch (error: any) {
     toastService.error(
-      t('users.updateRoleFailed'),
-      error.message || t('users.updateRoleFailedDescription'),
+      t("users.updateRoleFailed"),
+      error.message || t("users.updateRoleFailedDescription"),
     );
   } finally {
     updatingRole.value = false;
@@ -585,27 +589,21 @@ const confirmRemoveMember = async () => {
   try {
     await Hay.organizations.removeMember.mutate({ userId: memberToRemove.value.userId });
     toastService.success(
-      t('users.memberRemoved'),
-      t('users.memberRemovedDescription', { email: memberToRemove.value.email }),
+      t("users.memberRemoved"),
+      t("users.memberRemovedDescription", { email: memberToRemove.value.email }),
     );
     await loadMembers();
   } catch (error: any) {
     toastService.error(
-      t('users.removeMemberFailed'),
-      error.message || t('users.removeMemberFailedDescription'),
+      t("users.removeMemberFailed"),
+      error.message || t("users.removeMemberFailedDescription"),
     );
   } finally {
     memberToRemove.value = null;
   }
 };
 
-const formatDate = (date: string | Date) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
+// formatDate is provided by useOrgDateTime()
 
 onMounted(() => {
   loadMembers();

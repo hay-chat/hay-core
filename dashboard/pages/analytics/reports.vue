@@ -342,7 +342,7 @@
                   {{ report.name }}
                 </div>
                 <div class="text-xs text-neutral-muted">
-                  Generated {{ formatDate(report.createdAt) }}
+                  Generated {{ formatDateTime(report.createdAt) }}
                 </div>
                 <div class="flex items-center justify-between mt-2">
                   <Badge variant="outline" class="text-xs">
@@ -377,6 +377,8 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-vue-next";
+
+const { formatDateTime } = useOrgDateTime();
 
 // Reactive state
 const reportConfig = ref({
@@ -645,15 +647,6 @@ const viewReport = (reportId: string) => {
 const downloadReport = (reportId: string) => {
   // TODO: Download report
   console.log("Download report:", reportId);
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 };
 
 // Set page meta

@@ -1,14 +1,10 @@
 <template>
-  <Page
-    :title="$t('profile.title')"
-    :description="$t('profile.description')"
-    width="max"
-  >
+  <Page :title="$t('profile.title')" :description="$t('profile.description')" width="max">
     <!-- Profile Picture -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('profile.profilePicture') }}</CardTitle>
-        <CardDescription>{{ $t('profile.profilePictureDescription') }}</CardDescription>
+        <CardTitle>{{ $t("profile.profilePicture") }}</CardTitle>
+        <CardDescription>{{ $t("profile.profilePictureDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <!-- Avatar Preview -->
@@ -26,7 +22,7 @@
               @click="triggerFileInput"
             >
               <Save class="h-4 w-4 mr-2" />
-              {{ $t('profile.changePhoto') }}
+              {{ $t("profile.changePhoto") }}
             </Button>
             <Button
               v-if="avatarUpload.preview.value || currentUser?.avatarUrl"
@@ -36,7 +32,7 @@
               @click="removeAvatar"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              {{ $t('profile.removePhoto') }}
+              {{ $t("profile.removePhoto") }}
             </Button>
           </div>
         </div>
@@ -51,13 +47,13 @@
         />
 
         <p class="text-sm text-muted-foreground">
-          {{ $t('profile.photoRecommended') }}
+          {{ $t("profile.photoRecommended") }}
         </p>
         <p v-if="avatarUpload.error.value" class="text-sm text-destructive">
           {{ avatarUpload.error.value }}
         </p>
         <p v-if="avatarUpload.isUploading.value" class="text-sm text-blue-600">
-          {{ $t('profile.uploadingAvatar') }}
+          {{ $t("profile.uploadingAvatar") }}
         </p>
       </CardContent>
     </Card>
@@ -65,8 +61,8 @@
     <!-- Profile Information -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('profile.profileInformation') }}</CardTitle>
-        <CardDescription>{{ $t('profile.profileInformationDescription') }}</CardDescription>
+        <CardTitle>{{ $t("profile.profileInformation") }}</CardTitle>
+        <CardDescription>{{ $t("profile.profileInformationDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
@@ -86,7 +82,7 @@
         </div>
         <Button :loading="isSavingProfile" :disabled="!hasProfileChanges" @click="saveProfile">
           <Save class="h-4 w-4 mr-2" />
-          {{ $t('profile.saveChanges') }}
+          {{ $t("profile.saveChanges") }}
         </Button>
       </CardContent>
     </Card>
@@ -94,9 +90,9 @@
     <!-- Email Management -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('profile.emailAddress') }}</CardTitle>
+        <CardTitle>{{ $t("profile.emailAddress") }}</CardTitle>
         <CardDescription>
-          {{ $t('profile.emailDescription') }}
+          {{ $t("profile.emailDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -108,7 +104,7 @@
             disabled
             class="flex-1"
           />
-          <Badge variant="secondary" class="mt-6">{{ $t('profile.verified') }}</Badge>
+          <Badge variant="secondary" class="mt-6">{{ $t("profile.verified") }}</Badge>
         </div>
 
         <!-- Pending Email -->
@@ -121,7 +117,7 @@
               disabled
               class="flex-1"
             />
-            <Badge variant="destructive" class="mt-6">{{ $t('profile.pending') }}</Badge>
+            <Badge variant="destructive" class="mt-6">{{ $t("profile.pending") }}</Badge>
           </div>
           <div class="flex items-center space-x-2">
             <Button
@@ -131,12 +127,14 @@
               @click="resendVerificationEmail"
             >
               <Mail class="h-4 w-4 mr-2" />
-              {{ $t('profile.resendVerification') }}
+              {{ $t("profile.resendVerification") }}
             </Button>
-            <Button variant="outline" size="sm" @click="cancelEmailChange">{{ $t('profile.cancelChange') }}</Button>
+            <Button variant="outline" size="sm" @click="cancelEmailChange">{{
+              $t("profile.cancelChange")
+            }}</Button>
           </div>
           <p class="text-sm text-muted-foreground">
-            {{ $t('profile.pendingEmailHelp') }}
+            {{ $t("profile.pendingEmailHelp") }}
           </p>
         </div>
 
@@ -156,9 +154,9 @@
           v-if="emailForm.newEmail && !emailError && !currentUser?.pendingEmail"
           variant="default"
         >
-          <AlertTitle>{{ $t('profile.verificationRequired') }}</AlertTitle>
+          <AlertTitle>{{ $t("profile.verificationRequired") }}</AlertTitle>
           <AlertDescription>
-            {{ $t('profile.verificationRequiredDescription') }}
+            {{ $t("profile.verificationRequiredDescription") }}
           </AlertDescription>
         </Alert>
 
@@ -171,7 +169,7 @@
           @click="initiateEmailChange"
         >
           <Mail class="h-4 w-4 mr-2" />
-          {{ $t('profile.changeEmail') }}
+          {{ $t("profile.changeEmail") }}
         </Button>
       </CardContent>
     </Card>
@@ -179,8 +177,8 @@
     <!-- Password Management -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('profile.changePassword') }}</CardTitle>
-        <CardDescription>{{ $t('profile.changePasswordDescription') }}</CardDescription>
+        <CardTitle>{{ $t("profile.changePassword") }}</CardTitle>
+        <CardDescription>{{ $t("profile.changePasswordDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <Input
@@ -219,9 +217,9 @@
         />
 
         <Alert variant="info" :icon="Shield">
-          <AlertTitle>{{ $t('profile.passwordRequirementsTitle') }}</AlertTitle>
+          <AlertTitle>{{ $t("profile.passwordRequirementsTitle") }}</AlertTitle>
           <AlertDescription>
-            {{ $t('profile.passwordRequirementsDescription') }}
+            {{ $t("profile.passwordRequirementsDescription") }}
           </AlertDescription>
         </Alert>
 
@@ -231,7 +229,7 @@
           @click="changePassword"
         >
           <Lock class="h-4 w-4 mr-2" />
-          {{ $t('profile.updatePassword') }}
+          {{ $t("profile.updatePassword") }}
         </Button>
       </CardContent>
     </Card>
@@ -239,15 +237,15 @@
     <!-- Recent Security Activity -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('profile.recentSecurityActivity') }}</CardTitle>
-        <CardDescription>{{ $t('profile.recentSecurityActivityDescription') }}</CardDescription>
+        <CardTitle>{{ $t("profile.recentSecurityActivity") }}</CardTitle>
+        <CardDescription>{{ $t("profile.recentSecurityActivityDescription") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div v-if="loadingEvents" class="text-center py-8 text-neutral-muted">
-          {{ $t('profile.loadingSecurityEvents') }}
+          {{ $t("profile.loadingSecurityEvents") }}
         </div>
         <div v-else-if="securityEvents.length === 0" class="text-center py-8 text-neutral-muted">
-          {{ $t('profile.noSecurityEvents') }}
+          {{ $t("profile.noSecurityEvents") }}
         </div>
         <div v-else class="space-y-3">
           <div
@@ -295,6 +293,7 @@ import Avatar from "@/components/ui/Avatar.vue";
 const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
+const { formatDateTime } = useOrgDateTime();
 const currentUser = computed(() => userStore.user);
 
 // Avatar upload
@@ -338,7 +337,7 @@ const validateEmail = () => {
   }
 
   if (!validateEmailUtil(emailForm.newEmail)) {
-    emailError.value = t('profile.invalidEmail');
+    emailError.value = t("profile.invalidEmail");
     return;
   }
 
@@ -385,7 +384,7 @@ const refreshUserData = async () => {
       ...userData,
       lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
       lastLoginAt: userData.lastLoginAt ? new Date(userData.lastLoginAt) : undefined,
-      organizations: userData.organizations?.map(org => ({
+      organizations: userData.organizations?.map((org) => ({
         ...org,
         joinedAt: org.joinedAt ? new Date(org.joinedAt) : undefined,
         lastAccessedAt: org.lastAccessedAt ? new Date(org.lastAccessedAt) : undefined,
@@ -439,14 +438,14 @@ const handleAvatarSelect = async (event: Event) => {
     // Reload user data to get the new avatar URL
     await refreshUserData();
 
-    toast.success(t('profile.profileUploaded'));
+    toast.success(t("profile.profileUploaded"));
 
     // Clear the file input so the same file can be selected again if needed
     target.value = "";
   } catch (error) {
     console.error("Failed to upload avatar:", error);
-    toast.error(t('profile.profileUploadFailed'));
-    avatarUpload.error.value = t('profile.profileUploadFailed');
+    toast.error(t("profile.profileUploadFailed"));
+    avatarUpload.error.value = t("profile.profileUploadFailed");
   } finally {
     avatarUpload.isUploading.value = false;
   }
@@ -455,14 +454,14 @@ const handleAvatarSelect = async (event: Event) => {
 const removeAvatar = async () => {
   try {
     await Hay.auth.deleteAvatar.mutate();
-    toast.success(t('profile.profileRemoved'));
+    toast.success(t("profile.profileRemoved"));
     avatarUpload.reset();
 
     // Reload user data to clear the avatar URL
     await refreshUserData();
   } catch (error) {
     console.error("Failed to remove avatar:", error);
-    toast.error(t('profile.profileRemoveFailed'));
+    toast.error(t("profile.profileRemoveFailed"));
   }
 };
 
@@ -496,11 +495,11 @@ const saveProfile = async () => {
       originalProfile.firstName = profileForm.firstName;
       originalProfile.lastName = profileForm.lastName;
 
-      toast.success(t('profile.profileUpdated'));
+      toast.success(t("profile.profileUpdated"));
     }
   } catch (error: any) {
     console.error("Failed to update profile:", error);
-    toast.error(error.message || t('profile.profileUpdateFailed'));
+    toast.error(error.message || t("profile.profileUpdateFailed"));
   } finally {
     isSavingProfile.value = false;
   }
@@ -544,11 +543,11 @@ const executeEmailChange = async (password: string) => {
       }
       emailForm.newEmail = "";
 
-      toast.success(response.message || t('profile.verificationEmailSent'));
+      toast.success(response.message || t("profile.verificationEmailSent"));
     }
   } catch (error: any) {
     console.error("Failed to update email:", error);
-    toast.error(error.message || t('profile.verificationEmailFailed'));
+    toast.error(error.message || t("profile.verificationEmailFailed"));
   } finally {
     isChangingEmail.value = false;
   }
@@ -568,11 +567,11 @@ const cancelEmailChange = async () => {
         });
       }
 
-      toast.success(t('profile.emailChangeCancelled'));
+      toast.success(t("profile.emailChangeCancelled"));
     }
   } catch (error: any) {
     console.error("Failed to cancel email change:", error);
-    toast.error(error.message || t('profile.emailChangeCancelFailed'));
+    toast.error(error.message || t("profile.emailChangeCancelFailed"));
   }
 };
 
@@ -583,11 +582,11 @@ const resendVerificationEmail = async () => {
     const response = await Hay.auth.resendEmailChangeVerification.mutate();
 
     if (response.success) {
-      toast.success(t('profile.verificationResent'));
+      toast.success(t("profile.verificationResent"));
     }
   } catch (error: any) {
     console.error("Failed to resend verification email:", error);
-    toast.error(error.message || t('profile.verificationResendFailed'));
+    toast.error(error.message || t("profile.verificationResendFailed"));
   } finally {
     resendingEmail.value = false;
   }
@@ -609,13 +608,13 @@ const changePassword = async () => {
     passwordForm.newPassword = "";
     passwordForm.confirmPassword = "";
 
-    toast.success(t('profile.passwordChanged'));
+    toast.success(t("profile.passwordChanged"));
 
     // Reload security events
     await loadSecurityEvents();
   } catch (error: any) {
     console.error("Failed to change password:", error);
-    toast.error(error.message || t('profile.passwordChangeFailed'));
+    toast.error(error.message || t("profile.passwordChangeFailed"));
   } finally {
     isChangingPassword.value = false;
   }
@@ -658,37 +657,17 @@ const getEventColor = (action: string) => {
 
 const formatEventAction = (action: string) => {
   const labels: Record<string, string> = {
-    "profile.update": t('profile.eventProfileUpdate'),
-    "email.change": t('profile.eventEmailChange'),
-    "password.change": t('profile.eventPasswordChange'),
-    "user.login": t('profile.eventUserLogin'),
-    "apikey.create": t('profile.eventApiKeyCreate'),
-    "apikey.revoke": t('profile.eventApiKeyRevoke'),
+    "profile.update": t("profile.eventProfileUpdate"),
+    "email.change": t("profile.eventEmailChange"),
+    "password.change": t("profile.eventPasswordChange"),
+    "user.login": t("profile.eventUserLogin"),
+    "apikey.create": t("profile.eventApiKeyCreate"),
+    "apikey.revoke": t("profile.eventApiKeyRevoke"),
   };
   return labels[action] || action;
 };
 
-const formatDate = (date: string | Date) => {
-  const d = new Date(date);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) {
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours === 0) {
-      const minutes = Math.floor(diff / (1000 * 60));
-      return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
-    }
-    return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
-  } else if (days === 1) {
-    return "Yesterday";
-  } else if (days < 7) {
-    return `${days} days ago`;
-  } else {
-    return d.toLocaleDateString();
-  }
-};
+const formatDate = (date: string | Date) => formatDateTime(date);
 
 // Set page meta
 definePageMeta({
@@ -698,11 +677,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: t('profile.headTitle'),
+  title: t("profile.headTitle"),
   meta: [
     {
       name: "description",
-      content: t('profile.headDescription'),
+      content: t("profile.headDescription"),
     },
   ],
 });

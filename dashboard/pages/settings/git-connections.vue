@@ -223,6 +223,7 @@ import { Hay } from "@/utils/api";
 
 const { t } = useI18n();
 const toast = useToast();
+const { formatDate } = useOrgDateTime();
 
 // State
 const loading = ref(true);
@@ -360,19 +361,6 @@ const syncPlugin = async (plugin: any) => {
   } finally {
     syncingPlugins.value[plugin.id] = false;
   }
-};
-
-const formatDate = (date: Date | string) => {
-  const d = new Date(date);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) return t("gitConnections.dateToday");
-  if (days === 1) return t("gitConnections.dateYesterday");
-  if (days < 7) return t("gitConnections.dateDaysAgo", { days });
-  if (days < 30) return t("gitConnections.dateWeeksAgo", { weeks: Math.floor(days / 7) });
-  return d.toLocaleDateString();
 };
 
 // Handle GitHub callback redirect — complete the installation via authenticated tRPC call

@@ -1,10 +1,10 @@
 <template>
-  <Page :title="document?.title || $t('documents.detail.documentPreview')" :description="document?.description || ''">
+  <Page :title="$t('documents.detail.documentPreview')">
     <template #header>
       <div class="flex items-center gap-3">
         <Button variant="ghost" @click="router.push('/documents')">
           <ArrowLeft class="h-4 w-4 mr-2" />
-          {{ $t('documents.detail.backToDocuments') }}
+          {{ $t("documents.detail.backToDocuments") }}
         </Button>
 
         <template v-if="document">
@@ -15,7 +15,7 @@
             @click="visitSource"
           >
             <ExternalLink class="h-4 w-4 mr-2" />
-            {{ $t('documents.detail.visitSource') }}
+            {{ $t("documents.detail.visitSource") }}
           </Button>
         </template>
       </div>
@@ -29,21 +29,54 @@
     <!-- Error State -->
     <div v-else-if="error" class="flex flex-col items-center justify-center py-24 text-center">
       <AlertCircle class="h-12 w-12 text-red-500 mb-4" />
-      <p class="text-lg font-medium text-foreground">{{ $t('documents.detail.failedToLoad') }}</p>
+      <p class="text-lg font-medium text-foreground">{{ $t("documents.detail.failedToLoad") }}</p>
       <p class="text-sm text-neutral-muted mt-1">{{ error }}</p>
       <div class="flex gap-3 mt-6">
-        <Button variant="outline" @click="router.push('/documents')">{{ $t('documents.detail.backButton') }}</Button>
-        <Button @click="fetchDocument">{{ $t('documents.detail.tryAgain') }}</Button>
+        <Button variant="outline" @click="router.push('/documents')">{{
+          $t("documents.detail.backButton")
+        }}</Button>
+        <Button @click="fetchDocument">{{ $t("documents.detail.tryAgain") }}</Button>
       </div>
     </div>
 
     <!-- Document Content -->
     <template v-else-if="document">
+      <!-- Document Title (editable) -->
+      <div class="flex items-center gap-2">
+        <template v-if="editingTitle">
+          <input
+            ref="titleInputRef"
+            v-model="editTitleValue"
+            class="bg-transparent border-b border-primary outline-none text-lg font-semibold w-full"
+            @keydown.enter="saveTitle"
+            @keydown.escape="cancelEditTitle"
+            @blur="saveTitle"
+          />
+          <Button v-if="savingTitle" variant="ghost" size="sm" :loading="true" />
+        </template>
+        <span
+          v-else
+          class="text-lg font-semibold cursor-pointer hover:text-primary transition-colors group"
+          :title="$t('documents.detail.clickToEditTitle')"
+          @click="startEditTitle"
+        >
+          {{ document.title }}
+          <Pencil
+            class="inline h-3.5 w-3.5 ml-1 text-neutral-muted opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </span>
+      </div>
+
+      <!-- Description -->
+      <p v-if="document.description" class="text-sm text-neutral-muted -mt-2">
+        {{ document.description }}
+      </p>
+
       <!-- Metadata -->
       <div class="flex flex-wrap items-center gap-2">
         <Badge variant="outline">
           <component :is="getFileIcon(document.type)" class="h-3 w-3 mr-1" />
-          {{ document.type?.toUpperCase() || "DOC" }}
+          {{ document.type ? $t(`documents.filters.${document.type}`) : "DOC" }}
         </Badge>
         <Badge
           :variant="
@@ -56,24 +89,24 @@
                   : 'secondary'
           "
         >
-          {{ document.status }}
+          {{ $t(`documents.filters.${document.status}`) }}
         </Badge>
         <Badge v-if="document.visibility" variant="outline">
-          {{ document.visibility }}
+          {{ $t(`documents.import.metadata.${document.visibility}`) }}
         </Badge>
         <Badge v-if="document.sourceUrl" variant="outline" class="gap-1">
           <Globe class="h-3 w-3" />
-          {{ $t('documents.detail.webImport') }}
+          {{ $t("documents.detail.webImport") }}
         </Badge>
 
         <span v-if="document.updatedAt" class="text-xs text-neutral-muted ml-auto">
-          {{ $t('documents.detail.lastUpdated', { date: formatDate(document.updatedAt) }) }}
+          {{ $t("documents.detail.lastUpdated", { date: formatDateTime(document.updatedAt) }) }}
         </span>
       </div>
 
       <!-- Source URL -->
       <div v-if="document.sourceUrl" class="text-sm">
-        <span class="text-neutral-muted">{{ $t('documents.detail.source') }}</span>
+        <span class="text-neutral-muted">{{ $t("documents.detail.source") }}</span>
         <a
           :href="document.sourceUrl"
           target="_blank"
@@ -97,7 +130,7 @@
           <div class="document-page-content">
             <div v-if="document.content" v-html="renderedContent" />
             <div v-else class="text-neutral-muted italic py-8 text-center">
-              {{ $t('documents.detail.noContent') }}
+              {{ $t("documents.detail.noContent") }}
             </div>
           </div>
         </CardContent>
@@ -107,10 +140,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { HayApi } from "@/utils/api";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { useToast } from "@/composables/useToast";
 import {
   ArrowLeft,
   FileText,
@@ -120,6 +154,7 @@ import {
   AlertCircle,
   Globe,
   ExternalLink,
+  Pencil,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -143,9 +178,58 @@ interface DocumentDetail {
 const router = useRouter();
 const route = useRoute();
 
+const toast = useToast();
+const { formatDateTime } = useOrgDateTime();
+
 const loading = ref(false);
 const error = ref<string | null>(null);
 const document = ref<DocumentDetail | null>(null);
+
+// Title editing
+const editingTitle = ref(false);
+const editTitleValue = ref("");
+const savingTitle = ref(false);
+const titleInputRef = ref<HTMLInputElement | null>(null);
+
+const startEditTitle = () => {
+  if (!document.value) return;
+  editTitleValue.value = document.value.title;
+  editingTitle.value = true;
+  nextTick(() => {
+    titleInputRef.value?.focus();
+    titleInputRef.value?.select();
+  });
+};
+
+const cancelEditTitle = () => {
+  editingTitle.value = false;
+};
+
+const saveTitle = async () => {
+  if (!document.value || savingTitle.value) return;
+
+  const newTitle = editTitleValue.value.trim();
+  if (!newTitle || newTitle === document.value.title) {
+    editingTitle.value = false;
+    return;
+  }
+
+  savingTitle.value = true;
+  try {
+    await HayApi.documents.update.mutate({
+      id: document.value.id,
+      title: newTitle,
+    });
+    document.value.title = newTitle;
+    toast.success(t("documents.toast.titleUpdated"));
+  } catch (err) {
+    console.error("Failed to update title:", err);
+    toast.error(t("documents.toast.titleUpdateFailed"));
+  } finally {
+    savingTitle.value = false;
+    editingTitle.value = false;
+  }
+};
 
 const documentId = computed(() => {
   const id = route.params.id;
@@ -171,16 +255,6 @@ const getFileIcon = (type: string | undefined) => {
     default:
       return File;
   }
-};
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
 };
 
 const visitSource = () => {

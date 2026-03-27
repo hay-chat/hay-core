@@ -1,290 +1,293 @@
 {
   "documents": {
     "page": {
-    "title": "Documentos",
-    "description": "Gerencie os documentos da sua base de conhecimento para agentes de IA.",
-    "seoTitle": "Documentos - Hay Dashboard",
-    "seoDescription": "Gerencie os documentos da sua base de conhecimento"
-  },
-  "actions": {
-    "refresh": "Atualizar",
-    "importDocument": "Importar Documento",
-    "search": "Buscar",
-    "searching": "Buscando...",
-    "archive": "Arquivar",
-    "unarchive": "Desarquivar",
-    "download": "Baixar",
-    "delete": "Excluir",
-    "view": "Visualizar",
-    "visitPage": "Visitar Página",
-    "edit": "Editar",
-    "updateFromSource": "Atualizar da Fonte",
-    "retryProcessing": "Tentar Novamente",
-    "viewFailed": "Ver Falhas",
-    "retryAll": "Tentar Todos",
-    "retrying": "Tentando...",
-    "clearFilters": "Limpar Filtros"
-  },
-  "search": {
-    "placeholder": "Buscar documentos por palavra-chave ou linguagem natural..."
-  },
-  "filters": {
-    "allTypes": "Todos os Tipos",
-    "allStatus": "Todos os Status",
-    "article": "Artigo",
-    "guide": "Guia",
-    "faq": "FAQ",
-    "tutorial": "Tutorial",
-    "reference": "Referência",
-    "policy": "Política",
-    "published": "Publicado",
-    "processing": "Processando",
-    "draft": "Rascunho",
-    "archived": "Arquivado",
-    "error": "Erro"
-  },
-  "errorBanner": {
-    "failedToProcess": "{count} documento falhou ao processar | {count} documentos falharam ao processar",
-    "needsAttention": "Esses documentos encontraram erros durante a importação e podem precisar de atenção."
-  },
-  "bulk": {
-    "selected": "{count} documento selecionado | {count} documentos selecionados"
-  },
-  "table": {
-    "name": "Nome",
-    "type": "Tipo",
-    "status": "Status",
-    "lastModified": "Última Modificação"
-  },
-  "empty": {
-    "noDocumentsFound": "Nenhum documento encontrado",
-    "noDocumentsYet": "Nenhum documento ainda",
-    "adjustFilters": "Tente ajustar sua busca ou filtros.",
-    "getStarted": "Comece enviando seu primeiro documento."
-  },
-  "deleteDialog": {
-    "title": "Excluir Documento",
-    "titlePlural": "Excluir Documentos",
-    "confirmSingle": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados.",
-    "confirmBulk": "Tem certeza que deseja excluir {count} documento? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados. | Tem certeza que deseja excluir {count} documentos? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados."
-  },
-  "uploadDialog": {
-    "title": "Enviar Documento",
-    "description": "Envie um documento para criar embeddings para busca semântica",
-    "titleLabel": "Título",
-    "titlePlaceholder": "Digite o título do documento",
-    "contentLabel": "Conteúdo",
-    "contentPlaceholder": "Digite ou cole o conteúdo do documento",
-    "orUploadFile": "Ou Enviar Arquivo",
-    "supportedFormats": "Formatos suportados: .txt, .md, .pdf",
-    "uploading": "Enviando...",
-    "upload": "Enviar"
-  },
-  "toast": {
-    "downloadStarted": "Download iniciado",
-    "downloadFailed": "Falha ao baixar documento",
-    "updateStarted": "Atualização iniciada para {name}. Verifique a fila de tarefas para acompanhar o progresso.",
-    "updateFailed": "Falha ao iniciar atualização do documento",
-    "archiveSuccess": "Documento arquivado com sucesso",
-    "unarchiveSuccess": "Documento desarquivado com sucesso",
-    "archiveFailed": "Falha ao arquivar documento",
-    "bulkArchiveSuccess": "Documentos arquivados com sucesso",
-    "bulkArchiveFailed": "Falha ao arquivar documentos",
-    "bulkDownloadStarted": "Download iniciado",
-    "bulkDownloadFailed": "Falha ao baixar documentos",
-    "deleteSuccess": "Documento excluído com sucesso",
-    "deleteFailed": "Falha ao excluir documento. Por favor, tente novamente.",
-    "bulkDeleteProgress": "Excluindo documentos... {current}/{total}",
-    "bulkDeletePartial": "{success} documento(s) excluído(s) com sucesso. Falha ao excluir {failed} documento(s).",
-    "bulkDeleteSuccess": "{count} documento(s) excluído(s) com sucesso",
-    "bulkDeleteFailed": "Falha ao excluir documentos. Por favor, tente novamente.",
-    "retryFailed": "Falha ao reprocessar documento",
-    "retryProgress": "Reprocessando documentos... {current}/{total}",
-    "retryPartial": "Reprocessamento iniciado para {success} documento(s). Falha ao reprocessar {failed} documento(s).",
-    "retrySuccess": "Reprocessamento iniciado para {count} documento(s)",
-    "retryAllFailed": "Falha ao reprocessar documentos. Por favor, tente novamente.",
-    "processedSuccess": "Documento \"{name}\" processado com sucesso",
-    "processedError": "Documento \"{name}\" falhou ao processar"
-  },
-  "detail": {
-    "documentPreview": "Pré-visualização do Documento",
-    "backToDocuments": "Voltar para Documentos",
-    "visitSource": "Visitar Fonte",
-    "loadingDocument": "Carregando documento...",
-    "failedToLoad": "Falha ao carregar documento",
-    "backButton": "Voltar para Documentos",
-    "tryAgain": "Tentar Novamente",
-    "webImport": "Importação Web",
-    "lastUpdated": "Última atualização {date}",
-    "source": "Fonte:",
-    "noContent": "Nenhum conteúdo disponível para este documento.",
-    "seoTitle": "{title} - Documentos - Hay Dashboard",
-    "seoTitleDefault": "Documento - Hay Dashboard",
-    "seoDescription": "Ver detalhes do documento"
-  },
-  "import": {
-    "page": {
-      "title": "Importar Documento",
-      "description": "Adicione novos documentos à sua base de conhecimento de várias fontes.",
-      "seoTitle": "Importar Documentos - Hay Dashboard",
-      "seoDescription": "Importe documentos para sua base de conhecimento"
+      "title": "Documentos",
+      "description": "Gerencie os documentos da sua base de conhecimento para agentes de IA.",
+      "seoTitle": "Documentos - Hay Dashboard",
+      "seoDescription": "Gerencie os documentos da sua base de conhecimento"
     },
-    "tutorial": "Tutorial",
-    "dropOverlay": {
-      "title": "Solte os arquivos para enviar",
-      "description": "Solte para começar a importar seus documentos"
+    "actions": {
+      "refresh": "Atualizar",
+      "importDocument": "Importar Documento",
+      "search": "Buscar",
+      "searching": "Buscando...",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "download": "Baixar",
+      "delete": "Excluir",
+      "view": "Visualizar",
+      "visitPage": "Visitar Página",
+      "edit": "Editar",
+      "updateFromSource": "Atualizar da Fonte",
+      "retryProcessing": "Tentar Novamente",
+      "viewFailed": "Ver Falhas",
+      "retryAll": "Tentar Todos",
+      "retrying": "Tentando...",
+      "clearFilters": "Limpar Filtros"
     },
-    "steps": {
-      "selectSource": "Selecionar Fonte",
-      "enterUrl": "Inserir URL",
-      "selectPages": "Selecionar Páginas",
-      "addMetadata": "Adicionar Metadados",
+    "search": {
+      "placeholder": "Buscar documentos por palavra-chave ou linguagem natural..."
+    },
+    "filters": {
+      "allTypes": "Todos os Tipos",
+      "allStatus": "Todos os Status",
+      "article": "Artigo",
+      "guide": "Guia",
+      "faq": "FAQ",
+      "tutorial": "Tutorial",
+      "reference": "Referência",
+      "policy": "Política",
+      "published": "Publicado",
       "processing": "Processando",
-      "selectFiles": "Selecionar Arquivos",
-      "addDetails": "Adicionar Detalhes",
+      "draft": "Rascunho",
+      "archived": "Arquivado",
+      "error": "Erro"
+    },
+    "errorBanner": {
+      "failedToProcess": "{count} documento falhou ao processar | {count} documentos falharam ao processar",
+      "needsAttention": "Esses documentos encontraram erros durante a importação e podem precisar de atenção."
+    },
+    "bulk": {
+      "selected": "{count} documento selecionado | {count} documentos selecionados"
+    },
+    "table": {
+      "name": "Nome",
+      "type": "Tipo",
+      "status": "Status",
+      "lastModified": "Última Modificação"
+    },
+    "empty": {
+      "noDocumentsFound": "Nenhum documento encontrado",
+      "noDocumentsYet": "Nenhum documento ainda",
+      "adjustFilters": "Tente ajustar sua busca ou filtros.",
+      "getStarted": "Comece enviando seu primeiro documento."
+    },
+    "deleteDialog": {
+      "title": "Excluir Documento",
+      "titlePlural": "Excluir Documentos",
+      "confirmSingle": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados.",
+      "confirmBulk": "Tem certeza que deseja excluir {count} documento? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados. | Tem certeza que deseja excluir {count} documentos? Esta ação não pode ser desfeita e também excluirá todos os embeddings associados."
+    },
+    "uploadDialog": {
+      "title": "Enviar Documento",
+      "description": "Envie um documento para criar embeddings para busca semântica",
+      "titleLabel": "Título",
+      "titlePlaceholder": "Digite o título do documento",
+      "contentLabel": "Conteúdo",
+      "contentPlaceholder": "Digite ou cole o conteúdo do documento",
+      "orUploadFile": "Ou Enviar Arquivo",
+      "supportedFormats": "Formatos suportados: .txt, .md, .pdf",
+      "uploading": "Enviando...",
       "upload": "Enviar"
     },
-    "source": {
-      "title": "Selecionar Fonte de Importação",
-      "description": "Escolha como deseja importar documentos para sua base de conhecimento.",
-      "uploadFiles": "Enviar Arquivos",
-      "uploadFilesDesc": "Envie documentos do seu computador",
-      "importFromWebsite": "Importar de Website",
-      "importFromWebsiteDesc": "Rastreie e importe documentação de qualquer website",
-      "autoCrawl": "Rastreamento automático",
-      "sitemap": "Sitemap",
-      "plugin": "Integração",
-      "next": "Próximo"
-    },
-    "fileSelection": {
-      "title": "Selecionar Arquivos",
-      "description": "Escolha um ou mais documentos para enviar. Formatos suportados: PDF, TXT, MD, DOC, DOCX, PPT, PPTX, HTML, JSON, CSV",
-      "dropHere": "Solte os arquivos aqui",
-      "clickToUpload": "Clique para enviar ou arraste e solte",
-      "fileSizeLimit": "Suporte para múltiplos arquivos de até 10MB cada",
-      "browseFiles": "Procurar Arquivos",
-      "selectedFiles": "Arquivos Selecionados ({count})",
-      "back": "Voltar",
-      "nextAddDetails": "Próximo: Adicionar Detalhes"
-    },
-    "webUrl": {
-      "title": "Inserir URL do Website",
-      "description": "Forneça a URL do website de documentação que deseja importar.",
-      "label": "URL da Documentação",
-      "placeholder": "https://docs.exemplo.com",
-      "hint": "Vamos rastrear este website e importar todas as páginas de documentação automaticamente.",
-      "howItWorks": "Como funciona",
-      "howItWorksList": {
-        "sitemap": "Verificaremos primeiro um arquivo sitemap.xml",
-        "crawl": "Se não houver sitemap, rastrearemos todos os links internos",
-        "sameDomain": "Apenas páginas do mesmo domínio serão importadas",
-        "markdown": "O conteúdo será convertido para formato markdown limpo"
-      },
-      "discoverPages": "Descobrir Páginas"
-    },
-    "discovery": {
-      "titleDiscovering": "Descobrindo Páginas",
-      "titleSelect": "Selecionar Páginas para Importar",
-      "descriptionDiscovering": "Verificando o website em busca de páginas de documentação. Isso pode levar alguns minutos...",
-      "descriptionSelect": "{count} páginas encontradas. Selecione quais importar para sua base de conhecimento.",
-      "foundUrls": "{count} URLs encontradas",
-      "startingDiscovery": "Iniciando descoberta...",
-      "pagesValidated": "{count} páginas validadas",
-      "scanning": "Verificando: {url}",
-      "pleaseWait": "Por favor, aguarde",
-      "pleaseWaitList": {
-        "stayOnPage": "Permaneça nesta página enquanto descobrimos toda a documentação",
-        "typicalTime": "Este processo normalmente leva de 1 a 3 minutos",
-        "checkingSitemaps": "Estamos verificando sitemaps e rastreando links internos"
-      },
-      "cancelDiscovery": "Cancelar Descoberta",
-      "selectAll": "Selecionar Todos ({count} selecionados)",
-      "pagesCount": "{selected} / {total} páginas",
-      "untitledPage": "Página sem Título",
-      "tip": "Dica",
-      "tipDescription": "Revise as páginas com atenção. Você pode desmarcar páginas que não são documentação relevante.",
-      "nextAddMetadata": "Próximo: Adicionar Metadados",
-      "statusMessages": {
-        "initializing": "Inicializando...",
-        "discovering": "Descobrindo páginas...",
-        "scanning": "Verificando estrutura do website...",
-        "following": "Seguindo links internos...",
-        "analyzing": "Analisando conteúdo...",
-        "building": "Construindo índice de páginas..."
-      }
-    },
-    "metadata": {
-      "title": "Metadados do Documento",
-      "description": "Configure como essas {count} páginas serão armazenadas na sua base de conhecimento.",
-      "documentType": "Tipo de Documento",
-      "status": "Status",
-      "underReview": "Em Revisão",
-      "visibility": "Visibilidade",
-      "private": "Privado",
-      "internal": "Interno",
-      "public": "Público",
-      "selectedPagesSummary": "Resumo das Páginas Selecionadas",
-      "pagesWillBeImported": "{count} páginas serão importadas",
-      "convertedToMarkdown": "Cada página será convertida para formato markdown",
-      "chunkedAndVectorized": "O conteúdo será fragmentado e vetorizado para busca por IA",
-      "startImport": "Iniciar Importação"
-    },
-    "details": {
-      "title": "Detalhes do Documento",
-      "description": "Forneça metadados para seus documentos para ajudar na organização e buscabilidade.",
-      "documentName": "Nome do Documento",
-      "documentNamePlaceholder": "Digite um nome descritivo",
-      "category": "Categoria",
-      "selectCategory": "Selecione uma categoria",
-      "categories": {
-        "product": "Documentação do Produto",
-        "api": "Referência de API",
-        "faq": "Perguntas Frequentes",
-        "legal": "Documentos Legais",
-        "training": "Materiais de Treinamento",
-        "technical": "Especificações Técnicas",
-        "other": "Outros"
-      },
-      "descriptionLabel": "Descrição",
-      "descriptionPlaceholder": "Breve descrição do conteúdo do documento",
-      "makeAvailable": "Disponibilizar este documento imediatamente para agentes de IA",
-      "startUpload": "Iniciar Envio"
-    },
-    "processing": {
-      "importingFromWebsite": "Importando do Website",
-      "uploadingDocuments": "Enviando Documentos",
-      "websiteBeingCrawled": "Seu website está sendo rastreado e processado.",
-      "documentsBeingProcessed": "Seus documentos estão sendo processados e adicionados à base de conhecimento.",
-      "importStatus": "Status da Importação",
-      "completed": "Concluído",
-      "failed": "Falhou",
-      "queued": "Na Fila",
-      "progress": "Progresso",
-      "pages": "{processed}/{total} páginas",
-      "processingUrl": "Processando: {url}",
-      "successful": "{count} com sucesso",
-      "failedCount": "{count} com falha",
-      "processingInProgress": "Processamento em Andamento",
-      "processingMessage": "Isso pode levar um tempo dependendo do número de páginas. Fique à vontade para sair desta página agora - você verá todos os documentos na sua página de Documentos assim que estiverem totalmente processados. Os documentos aparecerão com status \"Processando\" inicialmente e mudarão para \"Publicado\" quando estiverem prontos.",
-      "cancelImport": "Cancelar Importação",
-      "overallProgress": "Progresso Geral",
-      "files": "{uploaded}/{total} arquivos",
-      "uploading": "Enviando",
-      "pending": "Pendente",
-      "uploadFailed": "Falha no envio. Por favor, tente novamente.",
-      "importMoreDocuments": "Importar Mais Documentos",
-      "continue": "Continuar",
-      "viewDocuments": "Ver Documentos"
-    },
     "toast": {
-      "uploadSuccess": "{count} documento enviado com sucesso | {count} documentos enviados com sucesso",
-      "uploadPartial": "{success} documento enviado com sucesso, {failed} com falha | {success} documentos enviados com sucesso, {failed} com falha",
-      "uploadFailed": "Falha ao enviar {count} documento | Falha ao enviar {count} documentos",
-      "cancelSuccess": "Importação cancelada",
-      "cancelSuccessMessage": "O trabalho de importação foi cancelado com sucesso.",
-      "cancelFailed": "Falha ao cancelar importação",
-      "cancelFailedMessage": "Por favor, tente novamente."
+      "downloadStarted": "Download iniciado",
+      "downloadFailed": "Falha ao baixar documento",
+      "updateStarted": "Atualização iniciada para {name}. Verifique a fila de tarefas para acompanhar o progresso.",
+      "updateFailed": "Falha ao iniciar atualização do documento",
+      "archiveSuccess": "Documento arquivado com sucesso",
+      "unarchiveSuccess": "Documento desarquivado com sucesso",
+      "archiveFailed": "Falha ao arquivar documento",
+      "bulkArchiveSuccess": "Documentos arquivados com sucesso",
+      "bulkArchiveFailed": "Falha ao arquivar documentos",
+      "bulkDownloadStarted": "Download iniciado",
+      "bulkDownloadFailed": "Falha ao baixar documentos",
+      "deleteSuccess": "Documento excluído com sucesso",
+      "deleteFailed": "Falha ao excluir documento. Por favor, tente novamente.",
+      "bulkDeleteProgress": "Excluindo documentos... {current}/{total}",
+      "bulkDeletePartial": "{success} documento(s) excluído(s) com sucesso. Falha ao excluir {failed} documento(s).",
+      "bulkDeleteSuccess": "{count} documento(s) excluído(s) com sucesso",
+      "bulkDeleteFailed": "Falha ao excluir documentos. Por favor, tente novamente.",
+      "retryFailed": "Falha ao reprocessar documento",
+      "retryProgress": "Reprocessando documentos... {current}/{total}",
+      "retryPartial": "Reprocessamento iniciado para {success} documento(s). Falha ao reprocessar {failed} documento(s).",
+      "retrySuccess": "Reprocessamento iniciado para {count} documento(s)",
+      "retryAllFailed": "Falha ao reprocessar documentos. Por favor, tente novamente.",
+      "processedSuccess": "Documento \"{name}\" processado com sucesso",
+      "processedError": "Documento \"{name}\" falhou ao processar",
+      "titleUpdated": "Título do documento atualizado",
+      "titleUpdateFailed": "Falha ao atualizar título do documento"
+    },
+    "detail": {
+      "documentPreview": "Pré-visualização do Documento",
+      "clickToEditTitle": "Clique para editar o título",
+      "backToDocuments": "Voltar para Documentos",
+      "visitSource": "Visitar Fonte",
+      "loadingDocument": "Carregando documento...",
+      "failedToLoad": "Falha ao carregar documento",
+      "backButton": "Voltar para Documentos",
+      "tryAgain": "Tentar Novamente",
+      "webImport": "Importação Web",
+      "lastUpdated": "Última atualização {date}",
+      "source": "Fonte:",
+      "noContent": "Nenhum conteúdo disponível para este documento.",
+      "seoTitle": "{title} - Documentos - Hay Dashboard",
+      "seoTitleDefault": "Documento - Hay Dashboard",
+      "seoDescription": "Ver detalhes do documento"
+    },
+    "import": {
+      "page": {
+        "title": "Importar Documento",
+        "description": "Adicione novos documentos à sua base de conhecimento de várias fontes.",
+        "seoTitle": "Importar Documentos - Hay Dashboard",
+        "seoDescription": "Importe documentos para sua base de conhecimento"
+      },
+      "tutorial": "Tutorial",
+      "dropOverlay": {
+        "title": "Solte os arquivos para enviar",
+        "description": "Solte para começar a importar seus documentos"
+      },
+      "steps": {
+        "selectSource": "Selecionar Fonte",
+        "enterUrl": "Inserir URL",
+        "selectPages": "Selecionar Páginas",
+        "addMetadata": "Adicionar Metadados",
+        "processing": "Processando",
+        "selectFiles": "Selecionar Arquivos",
+        "addDetails": "Adicionar Detalhes",
+        "upload": "Enviar"
+      },
+      "source": {
+        "title": "Selecionar Fonte de Importação",
+        "description": "Escolha como deseja importar documentos para sua base de conhecimento.",
+        "uploadFiles": "Enviar Arquivos",
+        "uploadFilesDesc": "Envie documentos do seu computador",
+        "importFromWebsite": "Importar de Website",
+        "importFromWebsiteDesc": "Rastreie e importe documentação de qualquer website",
+        "autoCrawl": "Rastreamento automático",
+        "sitemap": "Sitemap",
+        "plugin": "Integração",
+        "next": "Próximo"
+      },
+      "fileSelection": {
+        "title": "Selecionar Arquivos",
+        "description": "Escolha um ou mais documentos para enviar. Formatos suportados: PDF, TXT, MD, DOC, DOCX, PPT, PPTX, HTML, JSON, CSV",
+        "dropHere": "Solte os arquivos aqui",
+        "clickToUpload": "Clique para enviar ou arraste e solte",
+        "fileSizeLimit": "Suporte para múltiplos arquivos de até 10MB cada",
+        "browseFiles": "Procurar Arquivos",
+        "selectedFiles": "Arquivos Selecionados ({count})",
+        "back": "Voltar",
+        "nextAddDetails": "Próximo: Adicionar Detalhes"
+      },
+      "webUrl": {
+        "title": "Inserir URL do Website",
+        "description": "Forneça a URL do website de documentação que deseja importar.",
+        "label": "URL da Documentação",
+        "placeholder": "https://docs.exemplo.com",
+        "hint": "Vamos rastrear este website e importar todas as páginas de documentação automaticamente.",
+        "howItWorks": "Como funciona",
+        "howItWorksList": {
+          "sitemap": "Verificaremos primeiro um arquivo sitemap.xml",
+          "crawl": "Se não houver sitemap, rastrearemos todos os links internos",
+          "sameDomain": "Apenas páginas do mesmo domínio serão importadas",
+          "markdown": "O conteúdo será convertido para formato markdown limpo"
+        },
+        "discoverPages": "Descobrir Páginas"
+      },
+      "discovery": {
+        "titleDiscovering": "Descobrindo Páginas",
+        "titleSelect": "Selecionar Páginas para Importar",
+        "descriptionDiscovering": "Verificando o website em busca de páginas de documentação. Isso pode levar alguns minutos...",
+        "descriptionSelect": "{count} páginas encontradas. Selecione quais importar para sua base de conhecimento.",
+        "foundUrls": "{count} URLs encontradas",
+        "startingDiscovery": "Iniciando descoberta...",
+        "pagesValidated": "{count} páginas validadas",
+        "scanning": "Verificando: {url}",
+        "pleaseWait": "Por favor, aguarde",
+        "pleaseWaitList": {
+          "stayOnPage": "Permaneça nesta página enquanto descobrimos toda a documentação",
+          "typicalTime": "Este processo normalmente leva de 1 a 3 minutos",
+          "checkingSitemaps": "Estamos verificando sitemaps e rastreando links internos"
+        },
+        "cancelDiscovery": "Cancelar Descoberta",
+        "selectAll": "Selecionar Todos ({count} selecionados)",
+        "pagesCount": "{selected} / {total} páginas",
+        "untitledPage": "Página sem Título",
+        "tip": "Dica",
+        "tipDescription": "Revise as páginas com atenção. Você pode desmarcar páginas que não são documentação relevante.",
+        "nextAddMetadata": "Próximo: Adicionar Metadados",
+        "statusMessages": {
+          "initializing": "Inicializando...",
+          "discovering": "Descobrindo páginas...",
+          "scanning": "Verificando estrutura do website...",
+          "following": "Seguindo links internos...",
+          "analyzing": "Analisando conteúdo...",
+          "building": "Construindo índice de páginas..."
+        }
+      },
+      "metadata": {
+        "title": "Metadados do Documento",
+        "description": "Configure como essas {count} páginas serão armazenadas na sua base de conhecimento.",
+        "documentType": "Tipo de Documento",
+        "status": "Status",
+        "underReview": "Em Revisão",
+        "visibility": "Visibilidade",
+        "private": "Privado",
+        "internal": "Interno",
+        "public": "Público",
+        "selectedPagesSummary": "Resumo das Páginas Selecionadas",
+        "pagesWillBeImported": "{count} páginas serão importadas",
+        "convertedToMarkdown": "Cada página será convertida para formato markdown",
+        "chunkedAndVectorized": "O conteúdo será fragmentado e vetorizado para busca por IA",
+        "startImport": "Iniciar Importação"
+      },
+      "details": {
+        "title": "Detalhes do Documento",
+        "description": "Forneça metadados para seus documentos para ajudar na organização e buscabilidade.",
+        "documentName": "Nome do Documento",
+        "documentNamePlaceholder": "Digite um nome descritivo",
+        "category": "Categoria",
+        "selectCategory": "Selecione uma categoria",
+        "categories": {
+          "product": "Documentação do Produto",
+          "api": "Referência de API",
+          "faq": "Perguntas Frequentes",
+          "legal": "Documentos Legais",
+          "training": "Materiais de Treinamento",
+          "technical": "Especificações Técnicas",
+          "other": "Outros"
+        },
+        "descriptionLabel": "Descrição",
+        "descriptionPlaceholder": "Breve descrição do conteúdo do documento",
+        "makeAvailable": "Disponibilizar este documento imediatamente para agentes de IA",
+        "startUpload": "Iniciar Envio"
+      },
+      "processing": {
+        "importingFromWebsite": "Importando do Website",
+        "uploadingDocuments": "Enviando Documentos",
+        "websiteBeingCrawled": "Seu website está sendo rastreado e processado.",
+        "documentsBeingProcessed": "Seus documentos estão sendo processados e adicionados à base de conhecimento.",
+        "importStatus": "Status da Importação",
+        "completed": "Concluído",
+        "failed": "Falhou",
+        "queued": "Na Fila",
+        "progress": "Progresso",
+        "pages": "{processed}/{total} páginas",
+        "processingUrl": "Processando: {url}",
+        "successful": "{count} com sucesso",
+        "failedCount": "{count} com falha",
+        "processingInProgress": "Processamento em Andamento",
+        "processingMessage": "Isso pode levar um tempo dependendo do número de páginas. Fique à vontade para sair desta página agora - você verá todos os documentos na sua página de Documentos assim que estiverem totalmente processados. Os documentos aparecerão com status \"Processando\" inicialmente e mudarão para \"Publicado\" quando estiverem prontos.",
+        "cancelImport": "Cancelar Importação",
+        "overallProgress": "Progresso Geral",
+        "files": "{uploaded}/{total} arquivos",
+        "uploading": "Enviando",
+        "pending": "Pendente",
+        "uploadFailed": "Falha no envio. Por favor, tente novamente.",
+        "importMoreDocuments": "Importar Mais Documentos",
+        "continue": "Continuar",
+        "viewDocuments": "Ver Documentos"
+      },
+      "toast": {
+        "uploadSuccess": "{count} documento enviado com sucesso | {count} documentos enviados com sucesso",
+        "uploadPartial": "{success} documento enviado com sucesso, {failed} com falha | {success} documentos enviados com sucesso, {failed} com falha",
+        "uploadFailed": "Falha ao enviar {count} documento | Falha ao enviar {count} documentos",
+        "cancelSuccess": "Importação cancelada",
+        "cancelSuccessMessage": "O trabalho de importação foi cancelado com sucesso.",
+        "cancelFailed": "Falha ao cancelar importação",
+        "cancelFailedMessage": "Por favor, tente novamente."
+      }
     }
-  }
   }
 }

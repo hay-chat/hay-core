@@ -67,55 +67,33 @@ export function formatRelativeTime(date: Date | string | null | undefined): stri
 }
 
 /**
- * Format a date as absolute time in local timezone
+ * Format a date as absolute date+time respecting org settings
  * @param date - Date to format
- * @param options - Intl.DateTimeFormatOptions
  * @returns Formatted string
  */
-export function formatLocalDateTime(
-  date: Date | string | null | undefined,
-  options: Intl.DateTimeFormatOptions = {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  },
-): string {
-  const parsedDate = parseUTCDate(date);
-  if (!parsedDate) return "Unknown";
-
-  return parsedDate.toLocaleString(undefined, options);
+export function formatLocalDateTime(date: Date | string | null | undefined): string {
+  const { formatDateTime } = useOrgDateTime();
+  return formatDateTime(date);
 }
 
 /**
- * Format a date as short date (e.g., "Jan 15")
+ * Format a date as short date (e.g., "Jan 15") respecting org timezone
  * @param date - Date to format
  * @returns Formatted string
  */
 export function formatShortDate(date: Date | string | null | undefined): string {
-  const parsedDate = parseUTCDate(date);
-  if (!parsedDate) return "Unknown";
-
-  return parsedDate.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  const { formatShortDate: orgFormatShortDate } = useOrgDateTime();
+  return orgFormatShortDate(date);
 }
 
 /**
- * Format a date as time only (e.g., "2:30 PM")
+ * Format a date as time only respecting org settings
  * @param date - Date to format
  * @returns Formatted string
  */
 export function formatTime(date: Date | string | null | undefined): string {
-  const parsedDate = parseUTCDate(date);
-  if (!parsedDate) return "Unknown";
-
-  return parsedDate.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const { formatTime: orgFormatTime } = useOrgDateTime();
+  return orgFormatTime(date);
 }
 
 /**

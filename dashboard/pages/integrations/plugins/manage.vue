@@ -102,7 +102,7 @@
                   <span>{{ $t("manage.table.version", { version: plugin.version }) }}</span>
                   <span>{{ $t("manage.table.id", { id: plugin.id }) }}</span>
                   <span v-if="plugin.uploadedAt">
-                    {{ $t("manage.table.uploaded", { date: formatDate(plugin.uploadedAt) }) }}
+                    {{ $t("manage.table.uploaded", { date: formatDateTime(plugin.uploadedAt) }) }}
                   </span>
                 </div>
               </div>
@@ -190,6 +190,7 @@ import { useDomain } from "@/composables/useDomain";
 
 const { t } = useI18n();
 const router = useRouter();
+const { formatDateTime } = useOrgDateTime();
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const userStore = useUserStore();
@@ -228,15 +229,6 @@ const handleThumbnailError = (event: Event) => {
   if (fallbackElement) {
     fallbackElement.style.display = "flex";
   }
-};
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 };
 
 const formatTotalSize = (bytes: number): string => {

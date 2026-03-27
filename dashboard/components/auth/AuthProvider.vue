@@ -90,8 +90,15 @@ const initializeAuth = async () => {
           if (orgSettings.defaultLanguage) {
             await setLocaleFromBackend(orgSettings.defaultLanguage);
           }
+          // Initialize date/time formatting with org preferences
+          const { setOrgDateTimeSettings } = useOrgDateTime();
+          setOrgDateTimeSettings({
+            dateFormat: orgSettings.dateFormat,
+            timeFormat: orgSettings.timeFormat,
+            timezone: orgSettings.timezone,
+          });
         } catch (e) {
-          // Non-critical: locale stays at default if fetch fails
+          // Non-critical: locale and date format stay at defaults if fetch fails
           console.warn("[AuthProvider] Failed to sync locale from org settings:", e);
         }
       }

@@ -45,7 +45,7 @@
             </div>
             <div>
               <p class="text-sm text-gray-600">Expires</p>
-              <p class="text-sm">{{ formatDate(invitation.expiresAt) }}</p>
+              <p class="text-sm">{{ formatDateTime(invitation.expiresAt) }}</p>
             </div>
           </div>
         </div>
@@ -145,6 +145,7 @@ const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const userStore = useUserStore();
+const { formatDateTime } = useOrgDateTime();
 
 const token = computed(() => route.query.token as string);
 const loading = ref(true);
@@ -175,14 +176,6 @@ interface Invitation {
 }
 
 const invitation = ref<Invitation | null>(null);
-
-// Format date helper
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "full",
-    timeStyle: "short",
-  }).format(new Date(dateString));
-};
 
 // Load invitation details
 const loadInvitation = async () => {

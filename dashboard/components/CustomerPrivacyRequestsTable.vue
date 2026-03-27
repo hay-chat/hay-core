@@ -45,10 +45,7 @@
                   }"
                   class="w-8 h-8 rounded-full flex items-center justify-center"
                 >
-                  <Download
-                    v-if="request.type === 'export'"
-                    class="h-4 w-4 text-blue-600"
-                  />
+                  <Download v-if="request.type === 'export'" class="h-4 w-4 text-blue-600" />
                   <Trash2 v-else-if="request.type === 'deletion'" class="h-4 w-4 text-red-600" />
                   <Edit v-else class="h-4 w-4 text-yellow-600" />
                 </div>
@@ -59,7 +56,7 @@
             <!-- Customer -->
             <TableCell>
               <div>
-                <div class="font-medium">{{ request.customerName || 'Unknown' }}</div>
+                <div class="font-medium">{{ request.customerName || "Unknown" }}</div>
                 <div class="text-sm text-neutral-muted">{{ request.email }}</div>
               </div>
             </TableCell>
@@ -67,8 +64,8 @@
             <!-- Identifier -->
             <TableCell>
               <div class="text-sm">
-                <div class="font-medium capitalize">{{ request.identifierType || 'N/A' }}</div>
-                <div class="text-neutral-muted">{{ request.identifierValue || 'N/A' }}</div>
+                <div class="font-medium capitalize">{{ request.identifierType || "N/A" }}</div>
+                <div class="text-neutral-muted">{{ request.identifierValue || "N/A" }}</div>
               </div>
             </TableCell>
 
@@ -90,7 +87,7 @@
             <!-- Completed -->
             <TableCell>
               <div class="text-sm">
-                {{ request.completedAt ? formatDate(request.completedAt) : '-' }}
+                {{ request.completedAt ? formatDate(request.completedAt) : "-" }}
               </div>
             </TableCell>
 
@@ -127,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { Loader2, Shield, Download, Trash2, Edit, Eye, Clock } from 'lucide-vue-next';
+import { Loader2, Shield, Download, Trash2, Edit, Eye, Clock } from "lucide-vue-next";
 
 // Props
 interface Props {
@@ -145,47 +142,38 @@ const emit = defineEmits<{
 }>();
 
 // Methods
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
-    case 'completed':
-      return 'default';
-    case 'processing':
-      return 'secondary';
-    case 'failed':
-    case 'expired':
-      return 'destructive';
-    case 'pending_verification':
-    case 'verified':
-      return 'outline';
+    case "completed":
+      return "default";
+    case "processing":
+      return "secondary";
+    case "failed":
+    case "expired":
+      return "destructive";
+    case "pending_verification":
+    case "verified":
+      return "outline";
     default:
-      return 'secondary';
+      return "secondary";
   }
 };
 
 const formatStatus = (status: string): string => {
   return status
-    .split('_')
+    .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .join(" ");
 };
 
+const { formatDateTime } = useOrgDateTime();
+
 const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return dateString;
-  }
+  return formatDateTime(dateString);
 };
 
 const viewDetails = (requestId: string) => {
   // TODO: Implement details modal or navigation
-  console.log('View details for request:', requestId);
+  console.log("View details for request:", requestId);
 };
 </script>

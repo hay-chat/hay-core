@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useOrgDateTime } from "~/composables/useOrgDateTime";
 
 export interface ConversationPdfOptions {
   conversationTitle?: string;
@@ -38,6 +39,8 @@ export async function exportConversationToPdf(
     pdfContainer.style.padding = "20mm";
     document.body.appendChild(pdfContainer);
 
+    const { formatDateTime } = useOrgDateTime();
+
     // Create header with conversation metadata
     const header = document.createElement("div");
     header.style.marginBottom = "20px";
@@ -50,8 +53,8 @@ export async function exportConversationToPdf(
       <div style="font-size: 14px; color: #6b7280;">
         ${conversationId ? `<div>ID: ${conversationId}</div>` : ""}
         ${status ? `<div>Status: ${status}</div>` : ""}
-        ${createdAt ? `<div>Date: ${new Date(createdAt).toLocaleString()}</div>` : ""}
-        <div>Exported: ${new Date().toLocaleString()}</div>
+        ${createdAt ? `<div>Date: ${formatDateTime(createdAt)}</div>` : ""}
+        <div>Exported: ${formatDateTime(new Date())}</div>
       </div>
     `;
     pdfContainer.appendChild(header);
@@ -90,11 +93,12 @@ export async function exportConversationToPdf(
       const border = computedStyle.border;
 
       // Remove all classes
-      el.className = '';
+      el.className = "";
 
       // Apply stored styles as inline styles (skip oklch values)
-      if (color && !color.includes('oklch')) el.style.color = color;
-      if (backgroundColor && !backgroundColor.includes('oklch')) el.style.backgroundColor = backgroundColor;
+      if (color && !color.includes("oklch")) el.style.color = color;
+      if (backgroundColor && !backgroundColor.includes("oklch"))
+        el.style.backgroundColor = backgroundColor;
       el.style.fontSize = fontSize;
       el.style.fontWeight = fontWeight;
       el.style.padding = padding;
@@ -103,10 +107,10 @@ export async function exportConversationToPdf(
       el.style.flexDirection = flexDirection;
       el.style.gap = gap;
       el.style.borderRadius = borderRadius;
-      if (border && !border.includes('oklch')) el.style.border = border;
+      if (border && !border.includes("oklch")) el.style.border = border;
 
       // Process children
-      Array.from(el.children).forEach(child => {
+      Array.from(el.children).forEach((child) => {
         removeClasses(child as HTMLElement);
       });
     };
@@ -125,12 +129,14 @@ export async function exportConversationToPdf(
         const clonedContainer = clonedDoc.body.querySelector('[style*="position: absolute"]');
         if (clonedContainer) {
           // Remove any remaining oklch from inline styles
-          const allElements = clonedContainer.querySelectorAll('*');
+          const allElements = clonedContainer.querySelectorAll("*");
           allElements.forEach((el) => {
             const htmlEl = el as HTMLElement;
-            if (htmlEl.style.color?.includes('oklch')) htmlEl.style.color = '#000000';
-            if (htmlEl.style.backgroundColor?.includes('oklch')) htmlEl.style.backgroundColor = 'transparent';
-            if (htmlEl.style.borderColor?.includes('oklch')) htmlEl.style.borderColor = 'transparent';
+            if (htmlEl.style.color?.includes("oklch")) htmlEl.style.color = "#000000";
+            if (htmlEl.style.backgroundColor?.includes("oklch"))
+              htmlEl.style.backgroundColor = "transparent";
+            if (htmlEl.style.borderColor?.includes("oklch"))
+              htmlEl.style.borderColor = "transparent";
           });
         }
       },

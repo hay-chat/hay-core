@@ -5,12 +5,12 @@
       <div class="mt-4 sm:mt-0 flex space-x-3">
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
-          {{ $t('documents.actions.refresh') }}
+          {{ $t("documents.actions.refresh") }}
         </Button>
         <NuxtLink to="/documents/import">
           <Button>
             <Upload class="mr-2 h-4 w-4" />
-            {{ $t('documents.actions.importDocument') }}
+            {{ $t("documents.actions.importDocument") }}
           </Button>
         </NuxtLink>
       </div>
@@ -32,7 +32,7 @@
         </div>
       </div>
       <Button :disabled="!searchQuery || searching" @click="searchDocuments">
-        {{ searching ? $t('documents.actions.searching') : $t('documents.actions.search') }}
+        {{ searching ? $t("documents.actions.searching") : $t("documents.actions.search") }}
       </Button>
       <div class="flex gap-2">
         <select
@@ -40,25 +40,25 @@
           class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           @change="applyFilters"
         >
-          <option value="">{{ $t('documents.filters.allTypes') }}</option>
-          <option value="article">{{ $t('documents.filters.article') }}</option>
-          <option value="guide">{{ $t('documents.filters.guide') }}</option>
-          <option value="faq">{{ $t('documents.filters.faq') }}</option>
-          <option value="tutorial">{{ $t('documents.filters.tutorial') }}</option>
-          <option value="reference">{{ $t('documents.filters.reference') }}</option>
-          <option value="policy">{{ $t('documents.filters.policy') }}</option>
+          <option value="">{{ $t("documents.filters.allTypes") }}</option>
+          <option value="article">{{ $t("documents.filters.article") }}</option>
+          <option value="guide">{{ $t("documents.filters.guide") }}</option>
+          <option value="faq">{{ $t("documents.filters.faq") }}</option>
+          <option value="tutorial">{{ $t("documents.filters.tutorial") }}</option>
+          <option value="reference">{{ $t("documents.filters.reference") }}</option>
+          <option value="policy">{{ $t("documents.filters.policy") }}</option>
         </select>
         <select
           v-model="statusFilter"
           class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           @change="applyFilters"
         >
-          <option value="">{{ $t('documents.filters.allStatus') }}</option>
-          <option value="published">{{ $t('documents.filters.published') }}</option>
-          <option value="processing">{{ $t('documents.filters.processing') }}</option>
-          <option value="draft">{{ $t('documents.filters.draft') }}</option>
-          <option value="archived">{{ $t('documents.filters.archived') }}</option>
-          <option value="error">{{ $t('documents.filters.error') }}</option>
+          <option value="">{{ $t("documents.filters.allStatus") }}</option>
+          <option value="published">{{ $t("documents.filters.published") }}</option>
+          <option value="processing">{{ $t("documents.filters.processing") }}</option>
+          <option value="draft">{{ $t("documents.filters.draft") }}</option>
+          <option value="archived">{{ $t("documents.filters.archived") }}</option>
+          <option value="error">{{ $t("documents.filters.error") }}</option>
         </select>
       </div>
     </div>
@@ -73,18 +73,26 @@
           <AlertCircle class="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0" />
           <div>
             <p class="text-sm font-medium text-red-900 dark:text-red-300">
-              {{ $t('documents.errorBanner.failedToProcess', { count: errorDocumentsCount }, errorDocumentsCount) }}
+              {{
+                $t(
+                  "documents.errorBanner.failedToProcess",
+                  { count: errorDocumentsCount },
+                  errorDocumentsCount,
+                )
+              }}
             </p>
             <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">
-              {{ $t('documents.errorBanner.needsAttention') }}
+              {{ $t("documents.errorBanner.needsAttention") }}
             </p>
           </div>
         </div>
         <div class="flex space-x-2">
-          <Button variant="outline" size="sm" @click="viewFailedDocuments"> {{ $t('documents.actions.viewFailed') }} </Button>
+          <Button variant="outline" size="sm" @click="viewFailedDocuments">
+            {{ $t("documents.actions.viewFailed") }}
+          </Button>
           <Button size="sm" :disabled="retryingAll" @click="retryAllFailed">
             <RotateCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': retryingAll }" />
-            {{ retryingAll ? $t('documents.actions.retrying') : $t('documents.actions.retryAll') }}
+            {{ retryingAll ? $t("documents.actions.retrying") : $t("documents.actions.retryAll") }}
           </Button>
         </div>
       </div>
@@ -94,20 +102,26 @@
     <div v-if="selectedDocuments.length > 0" class="bg-background-tertiary p-4 rounded-lg">
       <div class="flex items-center justify-between">
         <p class="text-sm text-foreground">
-          {{ $t('documents.bulk.selected', { count: selectedDocuments.length }, selectedDocuments.length) }}
+          {{
+            $t(
+              "documents.bulk.selected",
+              { count: selectedDocuments.length },
+              selectedDocuments.length,
+            )
+          }}
         </p>
         <div class="flex space-x-2">
           <Button variant="outline" size="sm" @click="bulkArchive">
             <Archive class="mr-2 h-4 w-4" />
-            {{ $t('documents.actions.archive') }}
+            {{ $t("documents.actions.archive") }}
           </Button>
           <Button variant="outline" size="sm" @click="bulkDownload">
             <Download class="mr-2 h-4 w-4" />
-            {{ $t('documents.actions.download') }}
+            {{ $t("documents.actions.download") }}
           </Button>
           <Button variant="destructive" size="sm" @click="bulkDelete">
             <Trash2 class="mr-2 h-4 w-4" />
-            {{ $t('documents.actions.delete') }}
+            {{ $t("documents.actions.delete") }}
           </Button>
         </div>
       </div>
@@ -124,10 +138,10 @@
             <TableHead class="w-12">
               <Checkbox :checked="allSelected" @update:checked="toggleAllSelection" />
             </TableHead>
-            <TableHead class="w-auto">{{ $t('documents.table.name') }}</TableHead>
-            <TableHead class="w-24">{{ $t('documents.table.type') }}</TableHead>
-            <TableHead class="w-32">{{ $t('documents.table.status') }}</TableHead>
-            <TableHead class="w-44">{{ $t('documents.table.lastModified') }}</TableHead>
+            <TableHead class="w-auto">{{ $t("documents.table.name") }}</TableHead>
+            <TableHead class="w-24">{{ $t("documents.table.type") }}</TableHead>
+            <TableHead class="w-32">{{ $t("documents.table.status") }}</TableHead>
+            <TableHead class="w-44">{{ $t("documents.table.lastModified") }}</TableHead>
             <TableHead class="w-12 text-right" />
           </TableRow>
         </TableHeader>
@@ -161,7 +175,7 @@
               <span
                 class="inline-flex items-center px-2 py-1 rounded-md bg-background-tertiary text-xs whitespace-nowrap"
               >
-                {{ document.type ? document.type.toUpperCase() : "DOC" }}
+                {{ document.type ? $t(`documents.filters.${document.type}`) : "DOC" }}
               </span>
             </TableCell>
             <TableCell>
@@ -193,17 +207,11 @@
                             : 'bg-red-600',
                   ]"
                 />
-                {{
-                  document.status === "draft"
-                    ? $t('documents.filters.processing')
-                    : document.status === "error"
-                      ? $t('documents.filters.error')
-                      : document.status
-                }}
+                {{ $t(`documents.filters.${document.status}`) }}
               </div>
             </TableCell>
             <TableCell class="whitespace-nowrap">
-              {{ formatDate(document.updatedAt) }}
+              {{ formatDateTime(document.updatedAt) }}
             </TableCell>
             <TableCell class="text-right">
               <DropdownMenu>
@@ -215,51 +223,55 @@
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem @click="$router.push(`/documents/${document.id}`)">
                     <Eye class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.view') }}
+                    {{ $t("documents.actions.view") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="document.importMethod === 'web' && document.sourceUrl"
                     @click="visitSourcePage(document)"
                   >
                     <ExternalLink class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.visitPage') }}
+                    {{ $t("documents.actions.visitPage") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-else-if="document.hasAttachment"
                     @click="downloadDocument(document)"
                   >
                     <Download class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.download') }}
+                    {{ $t("documents.actions.download") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="editDocument(document)">
                     <Edit class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.edit') }}
+                    {{ $t("documents.actions.edit") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="document.sourceUrl && document.importMethod === 'web'"
                     @click="recrawlDocument(document)"
                   >
                     <RefreshCw class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.updateFromSource') }}
+                    {{ $t("documents.actions.updateFromSource") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="document.status === 'error'"
                     @click="retryDocument(document)"
                   >
                     <RotateCw class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.retryProcessing') }}
+                    {{ $t("documents.actions.retryProcessing") }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="archiveDocument(document)">
                     <Archive class="mr-2 h-4 w-4" />
-                    {{ document.status === "archived" ? $t('documents.actions.unarchive') : $t('documents.actions.archive') }}
+                    {{
+                      document.status === "archived"
+                        ? $t("documents.actions.unarchive")
+                        : $t("documents.actions.archive")
+                    }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="text-destructive"
                     @click="() => deleteDocument(document)"
                   >
                     <Trash2 class="mr-2 h-4 w-4" />
-                    {{ $t('documents.actions.delete') }}
+                    {{ $t("documents.actions.delete") }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -272,14 +284,22 @@
     <!-- Empty State -->
     <EmptyState
       v-else-if="!loading && documents.length === 0"
-      :title="searchQuery || typeFilter || statusFilter ? $t('documents.empty.noDocumentsFound') : $t('documents.empty.noDocumentsYet')"
+      :title="
+        searchQuery || typeFilter || statusFilter
+          ? $t('documents.empty.noDocumentsFound')
+          : $t('documents.empty.noDocumentsYet')
+      "
       :description="
         searchQuery || typeFilter || statusFilter
           ? $t('documents.empty.adjustFilters')
           : $t('documents.empty.getStarted')
       "
       illustration="/bale/document.svg"
-      :action="searchQuery || typeFilter || statusFilter ? $t('documents.actions.clearFilters') : $t('documents.actions.importDocument')"
+      :action="
+        searchQuery || typeFilter || statusFilter
+          ? $t('documents.actions.clearFilters')
+          : $t('documents.actions.importDocument')
+      "
       @click="
         searchQuery || typeFilter || statusFilter
           ? clearFilters()
@@ -325,19 +345,23 @@
     <Dialog v-model:open="showUploadDialog">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('documents.uploadDialog.title') }}</DialogTitle>
+          <DialogTitle>{{ $t("documents.uploadDialog.title") }}</DialogTitle>
           <DialogDescription>
-            {{ $t('documents.uploadDialog.description') }}
+            {{ $t("documents.uploadDialog.description") }}
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4">
           <div>
-            <Label for="title">{{ $t('documents.uploadDialog.titleLabel') }}</Label>
-            <Input id="title" v-model="uploadForm.title" :placeholder="$t('documents.uploadDialog.titlePlaceholder')" />
+            <Label for="title">{{ $t("documents.uploadDialog.titleLabel") }}</Label>
+            <Input
+              id="title"
+              v-model="uploadForm.title"
+              :placeholder="$t('documents.uploadDialog.titlePlaceholder')"
+            />
           </div>
 
           <div>
-            <Label for="content">{{ $t('documents.uploadDialog.contentLabel') }}</Label>
+            <Label for="content">{{ $t("documents.uploadDialog.contentLabel") }}</Label>
             <Textarea
               id="content"
               v-model="uploadForm.content"
@@ -347,7 +371,7 @@
           </div>
 
           <div>
-            <Label>{{ $t('documents.uploadDialog.orUploadFile') }}</Label>
+            <Label>{{ $t("documents.uploadDialog.orUploadFile") }}</Label>
             <div class="mt-2">
               <input
                 type="file"
@@ -355,14 +379,22 @@
                 class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                 @change="handleFileUpload"
               />
-              <p class="text-xs text-neutral-muted mt-2">{{ $t('documents.uploadDialog.supportedFormats') }}</p>
+              <p class="text-xs text-neutral-muted mt-2">
+                {{ $t("documents.uploadDialog.supportedFormats") }}
+              </p>
             </div>
           </div>
 
           <div class="flex justify-end space-x-2">
-            <Button variant="outline" @click="showUploadDialog = false"> {{ $t('common.cancel') }} </Button>
+            <Button variant="outline" @click="showUploadDialog = false">
+              {{ $t("common.cancel") }}
+            </Button>
             <Button :disabled="uploading" @click="uploadDocument">
-              {{ uploading ? $t('documents.uploadDialog.uploading') : $t('documents.uploadDialog.upload') }}
+              {{
+                uploading
+                  ? $t("documents.uploadDialog.uploading")
+                  : $t("documents.uploadDialog.upload")
+              }}
             </Button>
           </div>
         </div>
@@ -396,6 +428,8 @@ import {
 } from "lucide-vue-next";
 
 const { t } = useI18n();
+const router = useRouter();
+const { formatDateTime } = useOrgDateTime();
 
 // State
 const loading = ref(false);
@@ -493,16 +527,6 @@ const _formatFileSize = (bytes: number) => {
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 };
 
 const refreshData = async () => {
@@ -682,8 +706,7 @@ const downloadDocument = async (document: Document) => {
 };
 
 const editDocument = (document: Document) => {
-  // TODO: Open edit dialog
-  console.log("Edit document:", document);
+  router.push(`/documents/${document.id}`);
 };
 
 const recrawlDocument = async (document: Document) => {
@@ -692,9 +715,7 @@ const recrawlDocument = async (document: Document) => {
       documentId: document.id,
     });
 
-    toast.success(
-      t("documents.toast.updateStarted", { name: document.title || document.name }),
-    );
+    toast.success(t("documents.toast.updateStarted", { name: document.title || document.name }));
 
     // Optionally redirect to job queue
     // router.push('/queue');
@@ -709,7 +730,9 @@ const archiveDocument = async (document: Document) => {
     // TODO: Archive/unarchive via API
     document.status = document.status === "archived" ? "active" : "archived";
     toast.success(
-      document.status === "archived" ? t("documents.toast.archiveSuccess") : t("documents.toast.unarchiveSuccess"),
+      document.status === "archived"
+        ? t("documents.toast.archiveSuccess")
+        : t("documents.toast.unarchiveSuccess"),
     );
   } catch (error) {
     console.error("Error archiving document:", error);
@@ -721,7 +744,9 @@ const deleteDocument = (document: Document) => {
   documentToDelete.value = document;
   isBulkDelete.value = false;
   deleteDialogTitle.value = t("documents.deleteDialog.title");
-  deleteDialogDescription.value = t("documents.deleteDialog.confirmSingle", { name: document.name });
+  deleteDialogDescription.value = t("documents.deleteDialog.confirmSingle", {
+    name: document.name,
+  });
 
   // Use nextTick to ensure state is settled before opening dialog
   nextTick(() => {
@@ -757,7 +782,11 @@ const bulkDelete = () => {
 
   isBulkDelete.value = true;
   deleteDialogTitle.value = t("documents.deleteDialog.titlePlural");
-  deleteDialogDescription.value = t("documents.deleteDialog.confirmBulk", { count: selectedDocuments.value.length }, selectedDocuments.value.length);
+  deleteDialogDescription.value = t(
+    "documents.deleteDialog.confirmBulk",
+    { count: selectedDocuments.value.length },
+    selectedDocuments.value.length,
+  );
   showDeleteDialog.value = true;
 };
 
@@ -799,7 +828,11 @@ const performBulkDelete = async () => {
   const totalCount = selectedDocuments.value.length;
 
   // Show initial progress toast with no auto-dismiss
-  const progressToastId = toast.info(t("documents.toast.bulkDeleteProgress", { current: 0, total: totalCount }), undefined, 0);
+  const progressToastId = toast.info(
+    t("documents.toast.bulkDeleteProgress", { current: 0, total: totalCount }),
+    undefined,
+    0,
+  );
 
   try {
     let deletedCount = 0;
@@ -815,7 +848,10 @@ const performBulkDelete = async () => {
           deletedCount++;
 
           // Update progress toast
-          toast.update(progressToastId, t("documents.toast.bulkDeleteProgress", { current: deletedCount, total: totalCount }));
+          toast.update(
+            progressToastId,
+            t("documents.toast.bulkDeleteProgress", { current: deletedCount, total: totalCount }),
+          );
         }
       } catch (error) {
         errors.push(documentId);
@@ -836,7 +872,10 @@ const performBulkDelete = async () => {
 
     if (errors.length > 0) {
       toast.warning(
-        t("documents.toast.bulkDeletePartial", { success: successfulDeletes.length, failed: errors.length }),
+        t("documents.toast.bulkDeletePartial", {
+          success: successfulDeletes.length,
+          failed: errors.length,
+        }),
       );
     } else {
       toast.success(t("documents.toast.bulkDeleteSuccess", { count: successfulDeletes.length }));
@@ -908,7 +947,11 @@ const retryAllFailed = async () => {
   let successCount = 0;
   let failureCount = 0;
 
-  const progressToastId = toast.info(t("documents.toast.retryProgress", { current: 0, total: totalCount }), undefined, 0);
+  const progressToastId = toast.info(
+    t("documents.toast.retryProgress", { current: 0, total: totalCount }),
+    undefined,
+    0,
+  );
 
   try {
     for (const document of errorDocuments.value) {
@@ -921,14 +964,20 @@ const retryAllFailed = async () => {
         successCount++;
         toast.update(
           progressToastId,
-          t("documents.toast.retryProgress", { current: successCount + failureCount, total: totalCount }),
+          t("documents.toast.retryProgress", {
+            current: successCount + failureCount,
+            total: totalCount,
+          }),
         );
       } catch (error) {
         console.error(`Failed to retry document ${document.id}:`, error);
         failureCount++;
         toast.update(
           progressToastId,
-          t("documents.toast.retryProgress", { current: successCount + failureCount, total: totalCount }),
+          t("documents.toast.retryProgress", {
+            current: successCount + failureCount,
+            total: totalCount,
+          }),
         );
       }
     }
@@ -983,9 +1032,13 @@ onMounted(async () => {
       // Show toast notification for status changes (skip during batch retry)
       if (!retryingAll.value) {
         if (data.status === "published") {
-          toast.success(t("documents.toast.processedSuccess", { name: document.title || document.name }));
+          toast.success(
+            t("documents.toast.processedSuccess", { name: document.title || document.name }),
+          );
         } else if (data.status === "error") {
-          toast.error(t("documents.toast.processedError", { name: document.title || document.name }));
+          toast.error(
+            t("documents.toast.processedError", { name: document.title || document.name }),
+          );
         }
       }
     }

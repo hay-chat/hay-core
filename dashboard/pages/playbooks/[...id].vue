@@ -1,17 +1,13 @@
 <template>
   <Page
     :title="isEditMode ? t('edit.title', { name: playbook?.title }) : t('create.title')"
-    :description="
-      isEditMode
-        ? t('edit.description')
-        : t('create.description')
-    "
+    :description="isEditMode ? t('edit.description') : t('create.description')"
     width="max"
   >
     <template #header>
       <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        {{ t('actions.backToList') }}
+        {{ t("actions.backToList") }}
       </Button>
     </template>
 
@@ -94,14 +90,14 @@
 
           <!-- Agent Selection -->
           <div class="space-y-2">
-            <label class="text-sm font-medium"
-              >{{ isEditMode ? t('form.assignedAgents') : t('form.assignAgents') }}</label
-            >
+            <label class="text-sm font-medium">{{
+              isEditMode ? t("form.assignedAgents") : t("form.assignAgents")
+            }}</label>
             <div v-if="loadingAgents" class="p-4 text-center text-neutral-muted">
-              {{ t('form.loadingAgents') }}
+              {{ t("form.loadingAgents") }}
             </div>
             <div v-else-if="agents.length === 0" class="p-4 text-center text-neutral-muted">
-              {{ t('form.noAgentsAvailable') }}
+              {{ t("form.noAgentsAvailable") }}
             </div>
             <div v-else class="space-y-2 border rounded-md p-4">
               <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
@@ -124,9 +120,11 @@
 
           <!-- Metadata (only in edit mode) -->
           <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-neutral-muted">
-            <div v-if="playbook.created_at">{{ t('form.createdDate', { date: formatDate(playbook.created_at) }) }}</div>
+            <div v-if="playbook.created_at">
+              {{ t("form.createdDate", { date: formatDateTime(playbook.created_at) }) }}
+            </div>
             <div v-if="playbook.updated_at">
-              {{ t('form.lastUpdated', { date: formatDate(playbook.updated_at) }) }}
+              {{ t("form.lastUpdated", { date: formatDateTime(playbook.updated_at) }) }}
             </div>
           </div>
 
@@ -140,7 +138,7 @@
               @click="handleDelete"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              {{ t('actions.deletePlaybook') }}
+              {{ t("actions.deletePlaybook") }}
             </Button>
 
             <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
@@ -150,14 +148,14 @@
                 :disabled="isSubmitting"
                 @click="handleCancel"
               >
-                {{ $t('common.cancel') }}
+                {{ $t("common.cancel") }}
               </Button>
               <Button
                 type="submit"
                 :loading="isSubmitting"
                 :disabled="!form.title || !form.trigger"
               >
-                {{ isEditMode ? t('actions.saveChanges') : t('actions.createPlaybook') }}
+                {{ isEditMode ? t("actions.saveChanges") : t("actions.createPlaybook") }}
               </Button>
             </div>
           </div>
@@ -212,6 +210,7 @@ const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const { formatDateTime } = useOrgDateTime();
 const loadingInstructions = ref(false);
 
 // Track initial form state for unsaved changes detection
@@ -288,17 +287,6 @@ const {
   computed(() => !loading.value && !isSubmitting.value),
 );
 
-// Format date
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-};
-
 // Load data on mount
 onMounted(async () => {
   try {
@@ -316,7 +304,7 @@ onMounted(async () => {
       });
 
       if (!playbookResponse) {
-        toast.error(t('toast.playbookNotFound'));
+        toast.error(t("toast.playbookNotFound"));
         await router.push("/playbooks");
         return;
       }
@@ -342,10 +330,10 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load data:", error);
     if (isEditMode.value) {
-      toast.error(t('toast.playbookNotFound'));
+      toast.error(t("toast.playbookNotFound"));
       await router.push("/playbooks");
     } else {
-      toast.error(t('toast.loadAgentsFailed'));
+      toast.error(t("toast.loadAgentsFailed"));
     }
   } finally {
     loading.value = false;
@@ -358,22 +346,22 @@ const validateForm = () => {
   errors.value = {};
 
   if (!form.value.title || form.value.title.trim().length === 0) {
-    errors.value.title = t('validation.titleRequired');
+    errors.value.title = t("validation.titleRequired");
     return false;
   }
 
   if (form.value.title.length > 255) {
-    errors.value.title = t('validation.titleMaxLength');
+    errors.value.title = t("validation.titleMaxLength");
     return false;
   }
 
   if (!form.value.trigger || form.value.trigger.trim().length === 0) {
-    errors.value.trigger = t('validation.triggerRequired');
+    errors.value.trigger = t("validation.triggerRequired");
     return false;
   }
 
   if (form.value.trigger.length > 255) {
-    errors.value.trigger = t('validation.triggerMaxLength');
+    errors.value.trigger = t("validation.triggerMaxLength");
     return false;
   }
 
@@ -407,12 +395,12 @@ const handleSubmit = async () => {
         id: playbookId.value,
         data: payload,
       });
-      toast.success(t('toast.updateSuccess'));
+      toast.success(t("toast.updateSuccess"));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
     } else {
       // Create new playbook
       const response = await HayApi.playbooks.create.mutate(payload);
-      toast.success(t('toast.createSuccess'));
+      toast.success(t("toast.createSuccess"));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
       // Check if there's a redirect parameter
@@ -430,8 +418,10 @@ const handleSubmit = async () => {
     await router.push("/playbooks");
   } catch (error) {
     console.error("Failed to save playbook:", error);
-    const action = isEditMode.value ? t('toast.updateSuccess').split(' ')[0].toLowerCase() : t('toast.createSuccess').split(' ')[0].toLowerCase();
-    toast.error(t('toast.saveFailed', { action: isEditMode.value ? 'update' : 'create' }));
+    const action = isEditMode.value
+      ? t("toast.updateSuccess").split(" ")[0].toLowerCase()
+      : t("toast.createSuccess").split(" ")[0].toLowerCase();
+    toast.error(t("toast.saveFailed", { action: isEditMode.value ? "update" : "create" }));
   } finally {
     isSubmitting.value = false;
   }
@@ -439,13 +429,13 @@ const handleSubmit = async () => {
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
-const deleteDialogTitle = ref(t('delete.title'));
+const deleteDialogTitle = ref(t("delete.title"));
 const deleteDialogDescription = ref("");
 
 // Handle delete
 const handleDelete = () => {
   if (!playbook.value) return;
-  deleteDialogDescription.value = t('delete.confirmMessage', { name: playbook.value.title });
+  deleteDialogDescription.value = t("delete.confirmMessage", { name: playbook.value.title });
   showDeleteDialog.value = true;
 };
 
@@ -457,13 +447,13 @@ const confirmDelete = async () => {
 
     await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
-    toast.success(t('toast.deleteSuccess'));
+    toast.success(t("toast.deleteSuccess"));
     markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
     await router.push("/playbooks");
   } catch (error) {
     console.error("Failed to delete playbook:", error);
-    toast.error(t('toast.deleteFailed'));
+    toast.error(t("toast.deleteFailed"));
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
@@ -485,14 +475,12 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => isEditMode.value ? t('edit.headTitle') : t('create.headTitle')),
+  title: computed(() => (isEditMode.value ? t("edit.headTitle") : t("create.headTitle"))),
   meta: [
     {
       name: "description",
       content: computed(() =>
-        isEditMode.value
-          ? t('create.editHeadDescription')
-          : t('create.headDescription'),
+        isEditMode.value ? t("create.editHeadDescription") : t("create.headDescription"),
       ),
     },
   ],

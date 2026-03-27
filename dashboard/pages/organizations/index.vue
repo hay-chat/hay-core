@@ -123,7 +123,7 @@
                 Last activity: {{ formatTimeAgo(org.lastActivity) }}
               </p>
               <p class="text-xs text-neutral-muted mt-1">
-                Created: {{ formatDate(org.createdAt) }}
+                Created: {{ formatDateTime(org.createdAt) }}
               </p>
             </div>
 
@@ -218,6 +218,8 @@ definePageMeta({
   // TODO: Add authentication middleware
   // // middleware: 'auth'
 });
+
+const { formatDateTime } = useOrgDateTime();
 
 // State
 const loading = ref(false);
@@ -328,14 +330,6 @@ const formatTimeAgo = (date: Date) => {
     const days = Math.floor(diffInSeconds / 86400);
     return `${days}d ago`;
   }
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
 };
 
 const refreshData = async () => {

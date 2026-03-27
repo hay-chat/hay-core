@@ -8,7 +8,7 @@
         </Button>
         <Button @click="router.push('/playbooks/wizard')">
           <Sparkles class="h-4 w-4 mr-2" />
-          {{ t('actions.generatePlaybook') }}
+          {{ t("actions.generatePlaybook") }}
         </Button>
       </div>
     </template>
@@ -24,9 +24,11 @@
       <MetricCard
         :title="t('stats.active')"
         :metric="stats.active"
-        :subtitle="t('stats.percentOfTotal', {
-          percent: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
-        })"
+        :subtitle="
+          t('stats.percentOfTotal', {
+            percent: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0,
+          })
+        "
         :icon="Play"
       />
       <MetricCard
@@ -103,11 +105,7 @@
     <EmptyState
       v-else-if="filteredPlaybooks.length === 0"
       :title="searchQuery ? t('empty.noPlaybooksFound') : t('empty.noPlaybooksCreated')"
-      :description="
-        searchQuery
-          ? t('empty.adjustSearch')
-          : t('empty.createFirst')
-      "
+      :description="searchQuery ? t('empty.adjustSearch') : t('empty.createFirst')"
       illustration="/bale/playbook.svg"
       :action="searchQuery ? undefined : t('actions.createFirstPlaybook')"
       @click="router.push('/playbooks/new')"
@@ -144,12 +142,12 @@
         <CardContent>
           <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">{{ t('table.agents') }}:</span>
+              <span class="text-neutral-muted">{{ t("table.agents") }}:</span>
               <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
             </div>
             <div v-if="playbook.created_at" class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">{{ t('table.created') }}:</span>
-              <span class="font-medium">{{ formatDate(new Date(playbook.created_at)) }}</span>
+              <span class="text-neutral-muted">{{ t("table.created") }}:</span>
+              <span class="font-medium">{{ formatDateTime(new Date(playbook.created_at)) }}</span>
             </div>
           </div>
         </CardContent>
@@ -159,18 +157,18 @@
     <!-- Playbooks Table View -->
     <Card v-else>
       <CardHeader>
-        <h3 class="text-lg font-medium">{{ t('table.playbooks') }}</h3>
+        <h3 class="text-lg font-medium">{{ t("table.playbooks") }}</h3>
       </CardHeader>
       <CardContent>
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead>
               <tr class="border-b">
-                <th class="text-left py-3 px-4 font-medium">{{ t('table.name') }}</th>
-                <th class="text-left py-3 px-4 font-medium">{{ t('table.agents') }}</th>
-                <th class="text-left py-3 px-4 font-medium">{{ t('table.status') }}</th>
-                <th class="text-left py-3 px-4 font-medium">{{ t('table.created') }}</th>
-                <th class="text-left py-3 px-4 font-medium">{{ t('table.actions') }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t("table.name") }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t("table.agents") }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t("table.status") }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t("table.created") }}</th>
+                <th class="text-left py-3 px-4 font-medium">{{ t("table.actions") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -190,14 +188,16 @@
                     </div>
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm">{{ t('table.agentsCount', { count: playbook.agents?.length || 0 }) }}</td>
+                <td class="py-3 px-4 text-sm">
+                  {{ t("table.agentsCount", { count: playbook.agents?.length || 0 }) }}
+                </td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status || 'draft')">
                     {{ playbook.status }}
                   </Badge>
                 </td>
                 <td class="py-3 px-4 text-sm">
-                  {{ playbook.created_at ? formatDate(new Date(playbook.created_at)) : "-" }}
+                  {{ playbook.created_at ? formatDateTime(new Date(playbook.created_at)) : "-" }}
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center space-x-2">
@@ -264,6 +264,7 @@ import MetricCard from "@/components/MetricCard.vue";
 const { t } = useI18n();
 const toast = useToast();
 const router = useRouter();
+const { formatDateTime } = useOrgDateTime();
 
 // Reactive state
 const loading = ref(true);
@@ -342,13 +343,6 @@ const getStatusVariant = (
   return variants[status as keyof typeof variants] || "default";
 };
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(date);
-};
-
 const toggleView = () => {
   viewMode.value = viewMode.value === "grid" ? "table" : "grid";
 };
@@ -365,7 +359,7 @@ const duplicatePlaybook = (id: string) => {
 // Delete dialog state
 const showDeleteDialog = ref(false);
 const playbookToDelete = ref<Playbook | null>(null);
-const deleteDialogTitle = ref(t('delete.title'));
+const deleteDialogTitle = ref(t("delete.title"));
 const deleteDialogDescription = ref("");
 
 const deletePlaybook = (id: string) => {
@@ -373,7 +367,7 @@ const deletePlaybook = (id: string) => {
   if (!playbook) return;
 
   playbookToDelete.value = playbook;
-  deleteDialogDescription.value = t('delete.confirmMessage', { name: playbook.title });
+  deleteDialogDescription.value = t("delete.confirmMessage", { name: playbook.title });
   showDeleteDialog.value = true;
 };
 
@@ -386,10 +380,10 @@ const confirmDelete = async () => {
     // Remove from local list
     playbooks.value = playbooks.value.filter((p) => p.id !== playbookToDelete.value!.id);
 
-    toast.success(t('toast.deleteSuccess'));
+    toast.success(t("toast.deleteSuccess"));
   } catch (error) {
     console.error("Failed to delete playbook:", error);
-    toast.error(t('toast.deleteFailed'));
+    toast.error(t("toast.deleteFailed"));
   } finally {
     playbookToDelete.value = null;
     showDeleteDialog.value = false;
@@ -410,7 +404,7 @@ const fetchPlaybooks = async () => {
     playbooks.value = (response || []) as Playbook[];
   } catch (error) {
     console.error("Failed to fetch playbooks:", error);
-    toast.error(t('toast.loadFailed'));
+    toast.error(t("toast.loadFailed"));
   } finally {
     loading.value = false;
   }
@@ -439,11 +433,11 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: t('page.headTitle'),
+  title: t("page.headTitle"),
   meta: [
     {
       name: "description",
-      content: t('page.description'),
+      content: t("page.description"),
     },
   ],
 });

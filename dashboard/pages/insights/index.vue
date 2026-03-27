@@ -104,7 +104,7 @@
                     {{ getInsightTypeLabel(insight.type) }}
                   </Badge>
                   <span class="text-sm text-neutral-muted">
-                    {{ formatDate(insight.createdAt) }}
+                    {{ formatDateTime(insight.createdAt) }}
                   </span>
                 </div>
                 <h3 class="text-lg font-medium">
@@ -190,8 +190,8 @@
                   <span class="font-medium">{{ insight.title }}</span>
                 </div>
                 <p class="text-sm text-neutral-muted">
-                  Implemented {{ formatDate(insight.implementedAt) }} • {{ insight.performance }}%
-                  improvement achieved
+                  Implemented {{ formatDateTime(insight.implementedAt) }} •
+                  {{ insight.performance }}% improvement achieved
                 </p>
               </div>
               <div class="flex items-center space-x-2">
@@ -227,6 +227,8 @@
 </template>
 
 <script setup lang="ts">
+const { formatDateTime } = useOrgDateTime();
+
 // Reactive state
 const loading = ref(true);
 const selectedType = ref("");
@@ -344,24 +346,14 @@ const getInsightTypeLabel = (type: string) => {
 const getInsightTypeVariant = (
   type: string,
 ): "default" | "destructive" | "outline" | "secondary" | "success" => {
-  const variants: Record<
-    string,
-    "default" | "destructive" | "outline" | "secondary" | "success"
-  > = {
-    "new-playbook": "default",
-    improvement: "secondary",
-    pattern: "success",
-    performance: "destructive",
-  };
+  const variants: Record<string, "default" | "destructive" | "outline" | "secondary" | "success"> =
+    {
+      "new-playbook": "default",
+      improvement: "secondary",
+      pattern: "success",
+      performance: "destructive",
+    };
   return variants[type as keyof typeof variants] || "default";
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
 };
 
 const previewInsight = (insight: PendingInsight) => {
