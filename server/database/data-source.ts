@@ -10,6 +10,7 @@ import { Session } from "../entities/session.entity";
 import { Embedding } from "../entities/embedding.entity";
 import { Agent } from "./entities/agent.entity";
 import { Playbook } from "./entities/playbook.entity";
+import { PlaybookVersion } from "./entities/playbook-version.entity";
 import { Conversation } from "./entities/conversation.entity";
 import { Message } from "./entities/message.entity";
 import { Customer } from "./entities/customer.entity";
@@ -54,6 +55,7 @@ export const AppDataSource = new DataSource({
     Embedding,
     Agent,
     Playbook,
+    PlaybookVersion,
     Conversation,
     Message,
     Customer,

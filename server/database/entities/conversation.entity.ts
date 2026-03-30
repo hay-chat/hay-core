@@ -86,6 +86,9 @@ export class Conversation {
   @Column({ type: "uuid", nullable: true })
   playbook_id!: string | null;
 
+  @Column({ type: "uuid", nullable: true })
+  playbook_version_id!: string | null;
+
   @Column({ type: "jsonb", nullable: true })
   metadata!: Record<string, unknown> | null;
 
@@ -230,9 +233,28 @@ export class Conversation {
     // Initialize enabled tools array
     const enabledToolIds: string[] = [];
     const { playbookRepository } = await import("../../repositories/playbook.repository");
-    const playbook = await playbookRepository.findById(playbookId);
+    const playbook = await playbookRepository.findByIdAndOrganization(
+      playbookId,
+      this.organization_id,
+    );
     if (!playbook) {
       return;
+    }
+
+    // Resolve versioned fields: prefer active version, fall back to playbook row
+    let instructions = playbook.instructions;
+    let requiredFields = playbook.required_fields;
+    let activeVersionId: string | null = null;
+
+    if (playbook.active_version_id) {
+      const { playbookVersionRepository } =
+        await import("../../repositories/playbook-version.repository");
+      const activeVersion = await playbookVersionRepository.findById(playbook.active_version_id);
+      if (activeVersion) {
+        instructions = activeVersion.instructions;
+        requiredFields = activeVersion.required_fields;
+        activeVersionId = activeVersion.id;
+      }
     }
 
     // Analyze Editor.js instructions
@@ -240,8 +262,8 @@ export class Conversation {
     let referencedActions: string[] = [];
     let referencedDocuments: string[] = [];
 
-    if (playbook.instructions) {
-      const analysis = analyzeTiptapInstructions(playbook.instructions as any);
+    if (instructions) {
+      const analysis = analyzeTiptapInstructions(instructions as any);
       instructionText = analysis.formattedText;
       referencedActions = analysis.actions;
       referencedDocuments = analysis.documents;
@@ -319,7 +341,7 @@ export class Conversation {
         ${instructionText}
 
         **Required Fields:**
-        ${playbook.required_fields?.length ? playbook.required_fields.join(", ") : "None"}
+        ${requiredFields?.length ? requiredFields.join(", ") : "None"}
 
         **Trigger:** ${playbook.trigger}`;
 
@@ -476,10 +498,12 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
+      playbook_version_id: activeVersionId,
       enabled_tools: enabledToolIds.length > 0 ? enabledToolIds : null,
     });
 
     this.playbook_id = playbookId;
+    this.playbook_version_id = activeVersionId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
 
     logger.debug(

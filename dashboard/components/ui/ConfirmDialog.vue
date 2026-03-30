@@ -7,9 +7,14 @@
           {{ description }}
         </DialogDescription>
       </DialogHeader>
+      <slot />
       <DialogFooter>
-        <Button variant="outline" @click="handleCancel"> Cancel </Button>
-        <Button :variant="destructive ? 'destructive' : 'default'" @click="handleConfirm">
+        <Button variant="outline" :disabled="loading" @click="handleCancel"> Cancel </Button>
+        <Button
+          :variant="destructive ? 'destructive' : 'default'"
+          :loading="loading"
+          @click="handleConfirm"
+        >
           {{ confirmText }}
         </Button>
       </DialogFooter>
@@ -24,6 +29,12 @@ interface Props {
   description: string;
   confirmText?: string;
   destructive?: boolean;
+  /**
+   * When provided, shows a loading spinner on the confirm button and prevents
+   * the dialog from auto-closing on confirm. The parent is responsible for
+   * closing the dialog by setting `open` to `false`.
+   */
+  loading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -42,13 +53,19 @@ const isOpen = computed({
     return props.open;
   },
   set(value) {
+    // Prevent closing while loading
+    if (props.loading && !value) return;
     emit("update:open", value);
   },
 });
 
 const handleConfirm = () => {
   emit("confirm");
-  isOpen.value = false;
+  // Only auto-close if the parent is NOT using the loading prop.
+  // When loading is undefined (not bound), auto-close for backward compat.
+  if (props.loading === undefined) {
+    isOpen.value = false;
+  }
 };
 
 const handleCancel = () => {

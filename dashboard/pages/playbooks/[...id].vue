@@ -5,10 +5,21 @@
     width="max"
   >
     <template #header>
-      <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
-        <ArrowLeft class="h-4 w-4 mr-2" />
-        {{ t("actions.backToList") }}
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
+          <ArrowLeft class="h-4 w-4 mr-2" />
+          {{ t("actions.backToList") }}
+        </Button>
+        <Button
+          v-if="isEditMode && playbook"
+          variant="outline"
+          size="sm"
+          @click="showVersionHistory = true"
+        >
+          <History class="h-4 w-4 mr-2" />
+          {{ t("versioning.history.button") }}
+        </Button>
+      </div>
     </template>
 
     <div v-if="loading" class="text-center py-12">
@@ -64,16 +75,47 @@
           </div>
 
           <!-- Instructions Field -->
-          <InstructionsTiptap
-            ref="instructionsEditorRef"
-            :initial-data="form.instructions"
-            :label="t('form.instructionsLabel')"
-            :hint="t('form.instructionsHint')"
-            :error="errors.instructions"
-          />
+          <div class="space-y-1.5">
+            <InstructionsTiptap
+              ref="instructionsEditorRef"
+              :initial-data="form.instructions"
+              :label="t('form.instructionsLabel')"
+              :hint="isEditMode ? undefined : t('form.instructionsHint')"
+              :error="errors.instructions"
+              @update="handleInstructionsUpdate"
+            />
 
-          <!-- Status Field -->
-          <div class="space-y-2">
+            <!-- Auto-save status (shown right below the editor in edit mode) -->
+            <div v-if="isEditMode && draftVersion" class="flex items-center gap-1.5 text-xs h-5">
+              <template v-if="autoSaveStatus === 'pending'">
+                <Circle class="h-3 w-3 text-amber-500" />
+                <span class="text-neutral-muted">{{ t("versioning.unsavedChanges") }}</span>
+              </template>
+              <template v-else-if="autoSaveStatus === 'saving'">
+                <Loader2 class="h-3 w-3 animate-spin text-neutral-muted" />
+                <span class="text-neutral-muted">{{ t("versioning.saving") }}</span>
+              </template>
+              <template v-else-if="autoSaveStatus === 'saved'">
+                <Check class="h-3 w-3 text-green-500" />
+                <span class="text-neutral-muted">
+                  {{ t("versioning.saved") }}
+                  <span v-if="lastSavedAt" class="ml-1">{{
+                    formatDateTime(lastSavedAt.toISOString())
+                  }}</span>
+                </span>
+              </template>
+              <template v-else-if="autoSaveStatus === 'error'">
+                <AlertCircle class="h-3 w-3 text-red-500" />
+                <span class="text-red-500">{{ t("versioning.saveError") }}</span>
+                <button class="underline text-red-500 ml-1" @click="retryAutoSave">
+                  {{ t("versioning.retry") }}
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Status Field (create mode only) -->
+          <div v-if="!isEditMode" class="space-y-2">
             <Input
               id="status"
               v-model="form.status"
@@ -150,12 +192,36 @@
               >
                 {{ $t("common.cancel") }}
               </Button>
+
+              <!-- Edit mode: Save (identity) + Publish -->
+              <template v-if="isEditMode">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  :loading="isSubmitting"
+                  :disabled="!form.title || !form.trigger"
+                >
+                  {{ t("actions.saveChanges") }}
+                </Button>
+                <Button
+                  type="button"
+                  :loading="isPublishing"
+                  :disabled="!draftVersion"
+                  @click="showPublishDialog = true"
+                >
+                  <Upload class="h-4 w-4 mr-2" />
+                  {{ t("versioning.publish") }}
+                </Button>
+              </template>
+
+              <!-- Create mode: single Create button -->
               <Button
+                v-else
                 type="submit"
                 :loading="isSubmitting"
                 :disabled="!form.title || !form.trigger"
               >
-                {{ isEditMode ? t("actions.saveChanges") : t("actions.createPlaybook") }}
+                {{ t("actions.createPlaybook") }}
               </Button>
             </div>
           </div>
@@ -188,22 +254,53 @@
       @confirm="confirmDialogConfig.onConfirm"
       @cancel="handleDialogCancel"
     />
+
+    <!-- Publish Confirmation Dialog -->
+    <ConfirmDialog
+      v-model:open="showPublishDialog"
+      :title="t('versioning.publishTitle')"
+      :description="t('versioning.publishDescription')"
+      :confirm-text="t('versioning.publishConfirm')"
+      @confirm="handlePublish"
+    >
+      <div class="mt-4">
+        <Input
+          v-model="publishNote"
+          :label="t('versioning.publishNoteLabel')"
+          type="textarea"
+          :rows="2"
+          :placeholder="t('versioning.publishNotePlaceholder')"
+        />
+      </div>
+    </ConfirmDialog>
+
+    <!-- Version History Sheet -->
+    <VersionHistory
+      v-if="isEditMode && playbookId"
+      v-model:open="showVersionHistory"
+      :playbook-id="playbookId"
+      @rollback="handleRollback"
+    />
   </Page>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ArrowLeft, Trash2 } from "lucide-vue-next";
-import type { PlaybookStatus, Agent, Playbook } from "~/types/playbook";
-
-type InstructionData = {
-  id: string;
-  level: number;
-  instructions: string;
-};
+import {
+  ArrowLeft,
+  Trash2,
+  Upload,
+  Loader2,
+  Check,
+  AlertCircle,
+  Circle,
+  History,
+} from "lucide-vue-next";
+import type { PlaybookStatus, Agent, Playbook, PlaybookVersion } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
+import { useAutoSave } from "~/composables/useAutoSave";
 import { HayApi } from "@/utils/api";
 
 const { t } = useI18n();
@@ -211,17 +308,6 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const { formatDateTime } = useOrgDateTime();
-const loadingInstructions = ref(false);
-
-// Track initial form state for unsaved changes detection
-const initialForm = ref({
-  title: "",
-  trigger: "",
-  description: "",
-  instructions: [] as InstructionData[],
-  status: "draft" as PlaybookStatus,
-  agentIds: [] as string[],
-});
 
 // Determine if we're in edit mode based on route
 const isEditMode = computed(() => {
@@ -237,7 +323,15 @@ const playbookId = computed(() => {
   return id === "new" ? null : id;
 });
 
-// Form state
+// Form state — identity fields tracked for unsaved changes
+const initialForm = ref({
+  title: "",
+  trigger: "",
+  description: "",
+  status: "draft" as PlaybookStatus,
+  agentIds: [] as string[],
+});
+
 const form = ref({
   title: "",
   trigger: "",
@@ -250,32 +344,47 @@ const form = ref({
 // UI state
 const loading = ref(false);
 const isSubmitting = ref(false);
+const isPublishing = ref(false);
 
 // Editor refs
-const instructionsEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
+const instructionsEditorRef = ref<{ save: () => Promise<unknown>; getJSON: () => unknown } | null>(
+  null,
+);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
-const playbook = ref<
-  | Playbook
-  | {
-      id: string;
-      title: string;
-      trigger: string;
-      description?: string | null;
-      instructions?: string | { id: string; level: number; instructions: string }[] | null;
-      status: PlaybookStatus;
-      organization_id: string | null;
-      agents?: Agent[];
-      created_at: string;
-      updated_at: string;
-    }
-  | null
->(null);
+const playbook = ref<Playbook | null>(null);
 const errors = ref<Record<string, string>>({});
 
-// Unsaved changes detection
+// Version state
+const draftVersion = ref<PlaybookVersion | null>(null);
+const showPublishDialog = ref(false);
+const publishNote = ref("");
+const showVersionHistory = ref(false);
+
+// Auto-save setup — only active in edit mode
 const {
-  hasUnsavedChanges,
+  status: autoSaveStatus,
+  lastSavedAt,
+  triggerSave: triggerAutoSave,
+  flush: flushAutoSave,
+  retry: retryAutoSave,
+} = useAutoSave({
+  saveFn: async () => {
+    if (!playbookId.value || !isEditMode.value) return;
+    const content = instructionsEditorRef.value?.getJSON();
+    if (!content) return;
+
+    const result = await HayApi.playbooks.versions.saveDraft.mutate({
+      playbookId: playbookId.value,
+      instructions: content,
+    });
+    draftVersion.value = result;
+  },
+  debounceMs: 1500,
+});
+
+// Unsaved changes — only tracks identity fields (instructions auto-save separately)
+const {
   confirmNavigation,
   markAsSaved,
   showConfirmDialog,
@@ -283,9 +392,22 @@ const {
   handleDialogCancel,
 } = useUnsavedChanges(
   initialForm,
-  form,
+  computed(() => ({
+    title: form.value.title,
+    trigger: form.value.trigger,
+    description: form.value.description,
+    status: form.value.status,
+    agentIds: form.value.agentIds,
+  })),
   computed(() => !loading.value && !isSubmitting.value),
 );
+
+// Handle instructions editor update — trigger auto-save in edit mode
+const handleInstructionsUpdate = () => {
+  if (isEditMode.value && playbookId.value) {
+    triggerAutoSave();
+  }
+};
 
 // Load data on mount
 onMounted(async () => {
@@ -298,7 +420,6 @@ onMounted(async () => {
     // Load playbook if in edit mode
     if (isEditMode.value && playbookId.value) {
       loading.value = true;
-      loadingInstructions.value = true;
       const playbookResponse = await HayApi.playbooks.get.query({
         id: playbookId.value,
       });
@@ -311,21 +432,35 @@ onMounted(async () => {
 
       playbook.value = playbookResponse;
 
-      // Populate form
-      const formData = {
+      // Load or create draft version
+      let draft = await HayApi.playbooks.versions.getDraft.query({
+        playbookId: playbookId.value,
+      });
+
+      if (!draft) {
+        draft = await HayApi.playbooks.versions.createDraft.mutate({
+          playbookId: playbookId.value,
+        });
+      }
+
+      draftVersion.value = draft;
+
+      // Populate form — instructions come from draft, identity from playbook
+      const identityData = {
         title: playbookResponse.title,
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
-        instructions: playbookResponse.instructions || { blocks: [] },
         status: playbookResponse.status,
-        agentIds: playbookResponse.agents?.map((a) => a.id) || [],
+        agentIds: playbookResponse.agents?.map((a: Agent) => a.id) || [],
       };
 
-      form.value = { ...formData };
-      // Set initial form state for unsaved changes detection
-      initialForm.value = JSON.parse(JSON.stringify(formData));
+      form.value = {
+        ...identityData,
+        instructions: draft?.instructions || playbookResponse.instructions || { blocks: [] },
+      };
 
-      loadingInstructions.value = false;
+      // Set initial form state for unsaved changes detection (identity fields only)
+      initialForm.value = JSON.parse(JSON.stringify(identityData));
     }
   } catch (error) {
     console.error("Failed to load data:", error);
@@ -377,31 +512,38 @@ const handleSubmit = async () => {
   try {
     isSubmitting.value = true;
 
-    // Save editor data before submitting
-    const savedInstructions = await instructionsEditorRef.value?.save();
-
-    const payload = {
-      title: form.value.title,
-      trigger: form.value.trigger,
-      description: form.value.description || undefined,
-      instructions: savedInstructions || { blocks: [] },
-      status: form.value.status,
-      agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
-    };
-
     if (isEditMode.value && playbookId.value) {
-      // Update existing playbook
+      // Flush any pending auto-save first
+      await flushAutoSave();
+
+      // Update identity fields only
       await HayApi.playbooks.update.mutate({
         id: playbookId.value,
-        data: payload,
+        data: {
+          title: form.value.title,
+          trigger: form.value.trigger,
+          description: form.value.description || undefined,
+          agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
+        },
       });
       toast.success(t("toast.updateSuccess"));
-      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
+      markAsSaved();
     } else {
-      // Create new playbook
+      // Create new playbook (includes instructions — backend creates initial version)
+      const savedInstructions = await instructionsEditorRef.value?.save();
+
+      const payload = {
+        title: form.value.title,
+        trigger: form.value.trigger,
+        description: form.value.description || undefined,
+        instructions: savedInstructions || { blocks: [] },
+        status: form.value.status,
+        agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
+      };
+
       const response = await HayApi.playbooks.create.mutate(payload);
       toast.success(t("toast.createSuccess"));
-      markAsSaved(); // Mark as saved to prevent unsaved changes prompt
+      markAsSaved();
 
       // Check if there's a redirect parameter
       const redirectPath = route.query.redirect as string;
@@ -414,16 +556,69 @@ const handleSubmit = async () => {
       await router.push(`/playbooks/${response.id}`);
       return;
     }
-
-    await router.push("/playbooks");
   } catch (error) {
     console.error("Failed to save playbook:", error);
-    const action = isEditMode.value
-      ? t("toast.updateSuccess").split(" ")[0].toLowerCase()
-      : t("toast.createSuccess").split(" ")[0].toLowerCase();
     toast.error(t("toast.saveFailed", { action: isEditMode.value ? "update" : "create" }));
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+// Handle publish
+const handlePublish = async () => {
+  if (!playbookId.value) return;
+
+  try {
+    isPublishing.value = true;
+
+    // Flush any pending auto-save first
+    await flushAutoSave();
+
+    await HayApi.playbooks.versions.publish.mutate({
+      playbookId: playbookId.value,
+      note: publishNote.value || undefined,
+    });
+
+    toast.success(t("versioning.publishSuccess"));
+    publishNote.value = "";
+    showPublishDialog.value = false;
+
+    // Draft is cleared after publish — reset state
+    draftVersion.value = null;
+
+    // Reload the playbook to get updated state
+    const updated = await HayApi.playbooks.get.query({ id: playbookId.value });
+    if (updated) {
+      playbook.value = updated;
+    }
+  } catch (error) {
+    console.error("Failed to publish:", error);
+    toast.error(t("versioning.publishFailed"));
+  } finally {
+    isPublishing.value = false;
+  }
+};
+
+// Handle rollback (triggered from VersionHistory component)
+const handleRollback = async () => {
+  if (!playbookId.value) return;
+
+  // Reload playbook and reset draft state
+  const updated = await HayApi.playbooks.get.query({ id: playbookId.value });
+  if (updated) {
+    playbook.value = updated;
+    form.value.instructions = updated.instructions || { blocks: [] };
+    // Draft was deleted by rollback — reset
+    draftVersion.value = null;
+    initialForm.value = JSON.parse(
+      JSON.stringify({
+        title: updated.title,
+        trigger: updated.trigger,
+        description: updated.description || "",
+        status: updated.status,
+        agentIds: updated.agents?.map((a: Agent) => a.id) || [],
+      }),
+    );
   }
 };
 
@@ -448,7 +643,7 @@ const confirmDelete = async () => {
     await HayApi.playbooks.delete.mutate({ id: playbookId.value });
 
     toast.success(t("toast.deleteSuccess"));
-    markAsSaved(); // Mark as saved to prevent unsaved changes prompt
+    markAsSaved();
 
     await router.push("/playbooks");
   } catch (error) {
@@ -462,6 +657,10 @@ const confirmDelete = async () => {
 
 // Handle cancel
 const handleCancel = async () => {
+  // Flush auto-save before checking unsaved changes
+  if (isEditMode.value) {
+    await flushAutoSave();
+  }
   const confirmed = await confirmNavigation();
   if (confirmed) {
     router.push("/playbooks");

@@ -124,7 +124,7 @@
             <div class="space-y-2">
               <div class="flex items-center space-x-2">
                 <Badge :variant="getStatusVariant(playbook.status || 'draft')">
-                  {{ playbook.status }}
+                  {{ getStatusLabel(playbook.status || "draft") }}
                 </Badge>
               </div>
               <h3 class="font-semibold">
@@ -193,7 +193,7 @@
                 </td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status || 'draft')">
-                    {{ playbook.status }}
+                    {{ getStatusLabel(playbook.status || "draft") }}
                   </Badge>
                 </td>
                 <td class="py-3 px-4 text-sm">
@@ -341,6 +341,11 @@ const getStatusVariant = (
       draft: "outline",
     };
   return variants[status as keyof typeof variants] || "default";
+};
+
+const getStatusLabel = (status: string): string => {
+  const key = `filters.status${status.charAt(0).toUpperCase()}${status.slice(1)}`;
+  return t(key);
 };
 
 const toggleView = () => {

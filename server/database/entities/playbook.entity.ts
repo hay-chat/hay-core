@@ -6,11 +6,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   ManyToMany,
+  OneToMany,
   JoinColumn,
   JoinTable,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { Agent } from "./agent.entity";
+import { PlaybookVersion } from "./playbook-version.entity";
 
 export enum PlaybookStatus {
   DRAFT = "draft",
@@ -77,6 +79,12 @@ export class Playbook {
   @JoinColumn()
   organization!: Organization;
 
+  @Column({ type: "uuid", nullable: true })
+  active_version_id!: string | null;
+
+  @Column({ type: "uuid", nullable: true })
+  draft_version_id!: string | null;
+
   @ManyToMany(() => Agent, (agent) => agent.playbooks)
   @JoinTable({
     name: "playbook_agents",
@@ -90,6 +98,9 @@ export class Playbook {
     },
   })
   agents!: Agent[];
+
+  @OneToMany(() => PlaybookVersion, (version) => version.playbook)
+  versions!: PlaybookVersion[];
 
   @CreateDateColumn()
   created_at!: Date;

@@ -6,11 +6,11 @@
       </label>
       <div class="text-xs text-neutral-muted">
         <kbd class="px-1.5 py-0.5 text-xs bg-background-tertiary rounded">@</kbd>
-        for Actions/Documents •
+        {{ $t("form.editorHintMention") }} •
         <kbd class="px-1.5 py-0.5 text-xs bg-background-tertiary rounded">/</kbd>
-        for blocks •
-        <kbd class="px-1.5 py-0.5 text-xs bg-background-tertiary rounded">Cmd+Z</kbd>
-        to undo
+        {{ $t("form.editorHintBlocks") }} •
+        <kbd class="px-1.5 py-0.5 text-xs bg-background-tertiary rounded">{{ modifierKey }}+Z</kbd>
+        {{ $t("form.editorHintUndo") }}
       </div>
     </div>
     <div
@@ -64,6 +64,12 @@ const props = withDefaults(defineProps<Props>(), {
   label: "Instructions",
   disableApi: false,
 });
+
+const modifierKey = computed(() =>
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? "Cmd"
+    : "Ctrl",
+);
 
 const editorId = `editor-${Math.random().toString(36).substring(2, 11)}`;
 const editorRef = ref<InstanceType<typeof BaseTiptap> | null>(null);
@@ -152,8 +158,13 @@ const editorExtensions = computed(() => [
   }),
 ]);
 
+const emit = defineEmits<{
+  (e: "update", content: JSONContent): void;
+}>();
+
 const handleUpdate = (content: JSONContent) => {
   currentContent.value = content;
+  emit("update", content);
 };
 
 // Initialize

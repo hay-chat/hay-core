@@ -64,6 +64,9 @@
     "descriptionPlaceholder": "Descreva o que este playbook faz...",
     "instructionsLabel": "Instruções",
     "instructionsHint": "Crie instruções passo a passo numeradas que os agentes seguirão ao executar este playbook",
+    "editorHintMention": "para Ações/Documentos",
+    "editorHintBlocks": "para blocos",
+    "editorHintUndo": "para desfazer",
     "statusLabel": "Status",
     "assignAgents": "Atribuir Agentes",
     "assignedAgents": "Agentes Atribuídos",
@@ -105,6 +108,42 @@
   "delete": {
     "title": "Excluir Playbook",
     "confirmMessage": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita."
+  },
+  "versioning": {
+    "unsavedChanges": "Alterações não salvas",
+    "saving": "Salvando...",
+    "saved": "Todas as alterações salvas",
+    "saveError": "Não foi possível salvar",
+    "retry": "Tentar novamente",
+    "publish": "Publicar",
+    "publishTitle": "Publicar Playbook",
+    "publishDescription": "Isso atualizará o comportamento do assistente para todos os agentes vinculados. O rascunho atual se tornará a versão ativa.",
+    "publishConfirm": "Publicar Agora",
+    "publishNoteLabel": "O que mudou? (opcional)",
+    "publishNotePlaceholder": "ex: Atualizei os passos da política de reembolso...",
+    "publishSuccess": "Playbook publicado com sucesso",
+    "publishFailed": "Falha ao publicar playbook",
+    "history": {
+      "button": "Histórico de Versões",
+      "title": "Histórico de Versões",
+      "description": "Visualize todas as versões deste playbook",
+      "empty": "Nenhuma versão ainda",
+      "loadFailed": "Falha ao carregar histórico de versões",
+      "status": {
+        "active": "Ativa",
+        "draft": "Rascunho",
+        "archived": "Arquivada"
+      },
+      "rollback": "Restaurar",
+      "rollbackTitle": "Restaurar Versão",
+      "rollbackDescription": "Isso criará uma nova versão ativa baseada na v{version}. A versão ativa atual será arquivada.",
+      "rollbackConfirm": "Restaurar Versão",
+      "rollbackReasonLabel": "Motivo (opcional)",
+      "rollbackReasonPlaceholder": "ex: Revertendo devido a instruções incorretas...",
+      "restoring": "Restaurando versão...",
+      "rollbackSuccess": "Versão restaurada com sucesso",
+      "rollbackFailed": "Falha ao restaurar versão"
+    }
   },
   "loading": {
     "loadingPlaybook": "Carregando playbook...",

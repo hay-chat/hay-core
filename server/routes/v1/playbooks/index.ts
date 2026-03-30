@@ -182,6 +182,162 @@ export const playbooksRouter = t.router({
       return playbook;
     }),
 
+  versions: t.router({
+    list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await playbookService.getVersions(ctx.organizationId!, input.playbookId);
+        } catch {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
+    get: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          versionId: z.string().uuid(),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          const version = await playbookService.getVersion(
+            ctx.organizationId!,
+            input.playbookId,
+            input.versionId,
+          );
+          if (!version) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
+          }
+          return version;
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
+    getDraft: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await playbookService.getDraft(ctx.organizationId!, input.playbookId);
+        } catch {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
+    createDraft: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await playbookService.createDraft(
+            ctx.organizationId!,
+            input.playbookId,
+            ctx.user!.id,
+          );
+        } catch {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
+    saveDraft: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          instructions: z.any().optional(),
+          promptTemplate: z.string().optional(),
+          requiredFields: z.array(z.string()).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { playbookId, ...data } = input;
+        try {
+          return await playbookService.saveDraft(
+            ctx.organizationId!,
+            playbookId,
+            data,
+            ctx.user!.id,
+          );
+        } catch (error) {
+          if (error instanceof Error && error.message === "Playbook not found") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+          }
+          throw error;
+        }
+      }),
+
+    publish: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          note: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await playbookService.publishDraft(
+            ctx.organizationId!,
+            input.playbookId,
+            ctx.user!.id,
+            input.note,
+          );
+        } catch (error) {
+          if (error instanceof Error) {
+            if (error.message === "Playbook not found") {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+            }
+            if (error.message === "No draft to publish") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "No draft to publish" });
+            }
+          }
+          throw error;
+        }
+      }),
+
+    rollback: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          versionId: z.string().uuid(),
+          reason: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await playbookService.rollbackToVersion(
+            ctx.organizationId!,
+            input.playbookId,
+            input.versionId,
+            ctx.user!.id,
+            input.reason,
+          );
+        } catch (error) {
+          if (error instanceof Error) {
+            if (error.message === "Playbook not found") {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+            }
+            if (error.message === "Version not found") {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
+            }
+          }
+          throw error;
+        }
+      }),
+  }),
+
   generateInstructions: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
     .input(
       z.object({

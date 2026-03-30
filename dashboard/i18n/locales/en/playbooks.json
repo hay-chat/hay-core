@@ -64,6 +64,9 @@
     "descriptionPlaceholder": "Describe what this playbook does...",
     "instructionsLabel": "Instructions",
     "instructionsHint": "Create numbered step-by-step instructions that agents will follow when executing this playbook",
+    "editorHintMention": "for Actions/Documents",
+    "editorHintBlocks": "for blocks",
+    "editorHintUndo": "to undo",
     "statusLabel": "Status",
     "assignAgents": "Assign Agents",
     "assignedAgents": "Assigned Agents",
@@ -105,6 +108,42 @@
   "delete": {
     "title": "Delete Playbook",
     "confirmMessage": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
+  },
+  "versioning": {
+    "unsavedChanges": "Unsaved changes",
+    "saving": "Saving...",
+    "saved": "All changes saved",
+    "saveError": "Couldn't save",
+    "retry": "Retry",
+    "publish": "Publish",
+    "publishTitle": "Publish Playbook",
+    "publishDescription": "This will update the live assistant behavior for all linked agents. The current draft will become the active version.",
+    "publishConfirm": "Publish Now",
+    "publishNoteLabel": "What changed? (optional)",
+    "publishNotePlaceholder": "e.g., Updated refund policy steps...",
+    "publishSuccess": "Playbook published successfully",
+    "publishFailed": "Failed to publish playbook",
+    "history": {
+      "button": "Version History",
+      "title": "Version History",
+      "description": "View all versions of this playbook",
+      "empty": "No versions yet",
+      "loadFailed": "Failed to load version history",
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "rollback": "Restore",
+      "rollbackTitle": "Restore Version",
+      "rollbackDescription": "This will create a new active version based on v{version}. The current active version will be archived.",
+      "rollbackConfirm": "Restore Version",
+      "rollbackReasonLabel": "Reason (optional)",
+      "rollbackReasonPlaceholder": "e.g., Reverting due to incorrect instructions...",
+      "restoring": "Restoring version...",
+      "rollbackSuccess": "Version restored successfully",
+      "rollbackFailed": "Failed to restore version"
+    }
   },
   "loading": {
     "loadingPlaybook": "Loading playbook...",
