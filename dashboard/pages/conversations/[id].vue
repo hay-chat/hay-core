@@ -76,10 +76,24 @@
                 })
               }}
             </Badge>
-            <Button variant="outline" size="sm" @click="exportConversation">
-              <Download class="h-4 w-4 mr-2" />
-              {{ $t("conversations.detail.export") }}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="outline" size="sm" :loading="isExporting">
+                  <Download class="h-4 w-4 mr-2" />
+                  {{ $t("conversations.detail.export") }}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem @click="exportConversation('pdf')">
+                  <FileText class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.exportPdf") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="exportConversation('csv')">
+                  <FileSpreadsheet class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.exportCsv") }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               v-if="conversation?.status === 'open'"
               variant="outline"
@@ -717,6 +731,8 @@ import {
   ThumbsDown,
   BookOpen,
   Lock,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { MessageType } from "~/types/message";
@@ -790,6 +806,7 @@ const messagesContainer = ref<HTMLElement>();
 
 // Playground-specific state
 const isResetting = ref(false);
+const isExporting = ref(false);
 const messagesLoading = ref(false);
 const isAgentTyping = ref(false);
 const orchestratorStatus = ref("idle");
@@ -1221,9 +1238,39 @@ const rejectMessage = (messageId: string) => {
   console.log("Reject message:", messageId);
 };
 
-const exportConversation = () => {
-  // TODO: Export conversation
-  console.log("Export conversation");
+const exportConversation = async (format: "pdf" | "csv") => {
+  if (!conversation.value?.id) return;
+
+  isExporting.value = true;
+  try {
+    const result = await HayApi.conversations.export.query({
+      conversationId: conversation.value.id,
+      format,
+    });
+
+    const binaryString = atob(result.base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: result.mimeType });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = result.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Failed to export conversation:", error);
+    const { useToast } = await import("@/composables/useToast");
+    const toast = useToast();
+    toast.error(t("common.error"), t("conversations.detail.exportFailed"));
+  } finally {
+    isExporting.value = false;
+  }
 };
 
 const viewConversation = (id: string) => {

@@ -96,6 +96,7 @@
     "openai": "^4.62.1",
     "oxc-parser": "^0.86.0",
     "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.18.0",
     "pg": "^8.16.3",
     "pgvector": "^0.2.1",
     "pinia": "^3.0.3",
@@ -133,6 +134,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
+    "@types/pdfkit": "^0.17.5",
     "pino-pretty": "^13.1.3"
   }
 }

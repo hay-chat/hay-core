@@ -12,8 +12,10 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { MessageRepository } from "@server/repositories/message.repository";
 import { DeliveryState } from "@server/types/message-feedback.types";
 import { createLogger } from "@server/lib/logger";
+import { ConversationExportService } from "../../../services/conversation-export.service";
 
 const logger = createLogger("conversations");
+const conversationExportService = new ConversationExportService();
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
@@ -762,5 +764,58 @@ export const conversationsRouter = t.router({
       const merged = { ...(conversation.context ?? {}), ...input.context };
       await conversationRepository.updateById(input.id, { context: merged });
       return { success: true };
+    }),
+
+  export: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        format: z.enum(["pdf", "csv"]),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Organization context required",
+        });
+      }
+
+      const conversation = await conversationService.getConversation(
+        input.conversationId,
+        organizationId,
+      );
+
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      const titleSlug = (conversation.title || "conversation")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 50);
+      const timestamp = new Date().toISOString().slice(0, 10);
+
+      if (input.format === "pdf") {
+        const pdfBuffer = await conversationExportService.generatePdf(conversation);
+        return {
+          base64Data: pdfBuffer.toString("base64"),
+          fileName: `${titleSlug}-${timestamp}.pdf`,
+          mimeType: "application/pdf",
+        };
+      }
+
+      const csvContent = conversationExportService.generateCsv(conversation);
+      const csvBuffer = Buffer.from(csvContent, "utf-8");
+      return {
+        base64Data: csvBuffer.toString("base64"),
+        fileName: `${titleSlug}-${timestamp}.csv`,
+        mimeType: "text/csv",
+      };
     }),
 });
