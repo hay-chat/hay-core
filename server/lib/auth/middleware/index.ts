@@ -46,6 +46,19 @@ async function enhanceWithOrgContext(
     return baseAuthUser;
   }
 
+  // API key auth already carries organization context — the key is scoped to an org.
+  // Skip UserOrganization lookup since the synthetic user has no real user record.
+  if (baseAuthUser.authMethod === "apikey") {
+    // Verify the requested org matches the API key's org
+    if (baseAuthUser.organizationId && baseAuthUser.organizationId !== organizationId) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "API key does not belong to the specified organization",
+      });
+    }
+    return baseAuthUser;
+  }
+
   // Load UserOrganization relationship
   const userOrg = await loadUserOrganization(baseAuthUser.id, organizationId);
 
