@@ -22,6 +22,7 @@ import { webchatRouter } from "./webchat";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 import { pluginApiTrpcRouter } from "./plugin-api/trpc";
 import { gitConnectionsRouter } from "./git-connections";
+import { docsAuditRouter } from "./docs-audit";
 
 // Core routers - always available
 const coreRouters = {
@@ -47,6 +48,7 @@ const coreRouters = {
   webchat: webchatRouter,
   pluginApi: pluginApiTrpcRouter,
   gitConnections: gitConnectionsRouter,
+  docsAudit: docsAuditRouter,
 };
 
 // Create v1Router with core + plugin routers

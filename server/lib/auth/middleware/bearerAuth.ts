@@ -18,6 +18,11 @@ export async function authenticateBearerAuth(authHeader?: string): Promise<AuthU
     throw new Error("Invalid Bearer token format");
   }
 
+  // Skip API key tokens — they use a different auth flow (authenticateApiKeyAuth)
+  if (token.startsWith("hay_")) {
+    return null;
+  }
+
   // Check if token is expired first (quick check)
   if (isTokenExpired(token)) {
     throw new Error("Token has expired");
