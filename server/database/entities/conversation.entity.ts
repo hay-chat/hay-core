@@ -928,6 +928,7 @@ The following tools are available for you to use. You MUST return only valid JSO
               metadata: message.metadata,
               status: message.status,
               deliveryState: message.deliveryState,
+              isPlayground: this.metadata?.isPlayground === true,
             },
           };
 

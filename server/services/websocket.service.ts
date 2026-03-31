@@ -149,19 +149,20 @@ export class WebSocketService {
       // Define public message types (visible to customers via webchat)
       const publicMessageTypes = ["Customer", "BotAgent", "HumanAgent"];
       const isPublicMessage = publicMessageTypes.includes(payload.type);
+      const isPlayground = payload.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility
       const orgSent = this.sendToOrganization(organizationId, messagePayload);
 
-      // Only send to webchat (conversation clients) if:
-      // 1. It's a public-facing message type (Customer, BotAgent, HumanAgent)
-      // 2. AND deliveryState is SENT (not QUEUED for approval)
-      if (isPublicMessage && payload.deliveryState === "sent") {
+      // Send to conversation clients (webchat) if:
+      // 1. Public message type with SENT delivery state (normal webchat), OR
+      // 2. ANY message type for playground conversations (demo mode shows all internal events)
+      if ((isPublicMessage && payload.deliveryState === "sent") || isPlayground) {
         const conversationSent = this.sendToConversation(conversationId, messagePayload);
 
         logger.debug(
-          { messageType: payload.type, conversationSent, orgSent },
-          "Broadcasted SENT message to conversation and org clients",
+          { messageType: payload.type, conversationSent, orgSent, isPlayground },
+          "Broadcasted message to conversation and org clients",
         );
       } else if (!isPublicMessage) {
         logger.debug(

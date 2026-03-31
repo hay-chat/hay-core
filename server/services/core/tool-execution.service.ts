@@ -249,10 +249,7 @@ export class ToolExecutionService {
         } else if (manifest.capabilities?.mcp?.tools) {
           // Legacy plugin with static tool definitions in manifest
           const mcpTools = manifest.capabilities.mcp.tools;
-          logger.debug(
-            { tools: mcpTools.map((t) => t.name) },
-            "Available tools in plugin",
-          );
+          logger.debug({ tools: mcpTools.map((t) => t.name) }, "Available tools in plugin");
           const tool = mcpTools.find((t) => t.name === actualToolName);
           if (tool) {
             matchingPlugin = plugin;
@@ -468,6 +465,7 @@ export class ToolExecutionService {
           metadata: updates.metadata,
           status: message.status,
           deliveryState: message.deliveryState,
+          isPlayground: conversation.metadata?.isPlayground === true,
         },
       };
 

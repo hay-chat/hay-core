@@ -6,11 +6,13 @@ import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
 import { CustomerRepository } from "../../../repositories/customer.repository";
+import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("public-conversations");
 
 const customerRepository = new CustomerRepository();
+const organizationRepository = new OrganizationRepository();
 
 const conversationService = new ConversationService();
 
@@ -31,6 +33,7 @@ const createPublicConversationSchema = z.object({
   language: z.string().optional(),
   context: z.record(z.any()).optional(),
   customerExternalId: z.string().optional(),
+  isPlayground: z.boolean().optional().default(false),
 });
 
 // Schema for sending messages
@@ -67,6 +70,17 @@ export const publicConversationsRouter = t.router({
         });
       }
 
+      // Validate playground mode is allowed for this organization
+      if (input.isPlayground) {
+        const organization = await organizationRepository.findById(organizationId);
+        if (!organization?.settings?.isPlayground) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Playground mode is not enabled for this organization",
+          });
+        }
+      }
+
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
         status: "open",
@@ -75,6 +89,7 @@ export const publicConversationsRouter = t.router({
           ...input.metadata,
           channel: "web",
           createdAt: new Date().toISOString(),
+          ...(input.isPlayground ? { isPlayground: true } : {}),
         },
       });
 
@@ -156,8 +171,11 @@ export const publicConversationsRouter = t.router({
           conversation.needs_processing === true
         : false;
 
-      // Get messages for the conversation
-      const messages = await conversationRepository.getPublicMessages(input.conversationId);
+      // Get messages — playground conversations receive all types (including Tool, Document, etc.)
+      const isPlayground = conversation?.metadata?.isPlayground === true;
+      const messages = isPlayground
+        ? await conversationRepository.getMessages(input.conversationId)
+        : await conversationRepository.getPublicMessages(input.conversationId);
 
       // Filter to only return customer-facing messages
       const filteredMessages = messages

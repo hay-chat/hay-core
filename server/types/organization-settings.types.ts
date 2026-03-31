@@ -307,5 +307,6 @@ export interface OrganizationSettings {
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   channelAgents?: Record<string, string>; // Channel-specific agent assignments (channel -> agentId)
   retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
+  isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   [key: string]: unknown;
 }
