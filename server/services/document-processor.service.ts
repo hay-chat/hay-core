@@ -1,9 +1,12 @@
 import { HtmlProcessor } from "@server/processors/html.processor";
 import { vectorStoreService } from "./vector-store.service";
+import { headlessBrowserService } from "./headless-browser.service";
 import { documentRepository } from "@server/repositories/document.repository";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
+import { isExtractionPoor } from "@server/utils/extraction-quality";
 import { DocumentationStatus, DocumentationType } from "@server/entities/document.entity";
 import type { Document } from "@server/entities/document.entity";
+import { documentSummaryService } from "./document-summary.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("document-processor");
@@ -82,6 +85,53 @@ export class DocumentProcessorService {
           error: errorMessage,
           stage: "html_to_markdown",
         };
+      }
+
+      // Step 1b: Check extraction quality — fallback to headless browser if poor
+      if (isExtractionPoor(processed.content, htmlContent)) {
+        logger.info(
+          { pageUrl, contentLength: processed.content.length, htmlLength: htmlContent.length },
+          "Poor extraction detected, attempting headless browser fallback",
+        );
+
+        try {
+          const renderedHtml = await headlessBrowserService.renderPage(pageUrl);
+          const reprocessed = await this.htmlProcessor.process(
+            Buffer.from(renderedHtml),
+            pageTitle,
+          );
+
+          if (!isExtractionPoor(reprocessed.content, renderedHtml)) {
+            processed = {
+              content: reprocessed.content,
+              metadata: {
+                ...reprocessed.metadata,
+                processingMethod: "readability-turndown-puppeteer",
+              },
+            };
+            logger.info({ pageUrl }, "Headless browser fallback produced better content");
+          } else {
+            logger.warn(
+              { pageUrl },
+              "Headless browser fallback still produced poor content, using best available",
+            );
+            // Use whichever result is longer
+            if (reprocessed.content.length > processed.content.length) {
+              processed = {
+                content: reprocessed.content,
+                metadata: {
+                  ...reprocessed.metadata,
+                  processingMethod: "readability-turndown-puppeteer",
+                },
+              };
+            }
+          }
+        } catch (fallbackError) {
+          logger.warn(
+            { pageUrl, err: fallbackError },
+            "Headless browser fallback failed, proceeding with basic extraction",
+          );
+        }
       }
 
       // Step 2: Update document with processed content
@@ -165,9 +215,17 @@ export class DocumentProcessorService {
 
         logger.info({ documentId, pageUrl }, "Successfully processed document");
 
+        // Step 4: Generate summary (fire-and-forget, non-blocking)
+        const docToSummarize = updatedDocument || document;
+        if (docToSummarize && !docToSummarize.description) {
+          documentSummaryService.summarizeDocument(docToSummarize).catch((err) => {
+            logger.warn({ documentId, err }, "Failed to generate document summary");
+          });
+        }
+
         return {
           success: true,
-          document: updatedDocument || document,
+          document: docToSummarize,
         };
       } catch (embeddingError) {
         const errorMessage =

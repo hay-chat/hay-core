@@ -15,7 +15,6 @@ import {
 import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { WebScraperService, type DiscoveredPage } from "@server/services/web-scraper.service";
-import { HtmlProcessor } from "@server/processors/html.processor";
 import { jobRepository } from "@server/repositories/job.repository";
 import { JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Document } from "@server/entities/document.entity";
@@ -850,7 +849,6 @@ async function processWebImport(
 
     // Initialize scraper
     const scraper = new WebScraperService();
-    const htmlProcessor = new HtmlProcessor();
 
     // Track progress
     scraper.on("progress", async (progress) => {
@@ -972,7 +970,12 @@ async function processWebImport(
 }
 
 // Async function to process page discovery
-async function processPageDiscovery(organizationId: string, jobId: string, url: string, autoImport = false) {
+async function processPageDiscovery(
+  organizationId: string,
+  jobId: string,
+  url: string,
+  autoImport = false,
+) {
   try {
     // Update job status to processing
     await jobQueueService.updateJobStatus(jobId, organizationId, {
@@ -1037,7 +1040,10 @@ async function processPageDiscovery(organizationId: string, jobId: string, url: 
 
     // Auto-import all discovered pages if requested
     if (autoImport && pages.length > 0) {
-      logger.info({ organizationId, url, pageCount: pages.length }, "Auto-importing discovered pages");
+      logger.info(
+        { organizationId, url, pageCount: pages.length },
+        "Auto-importing discovered pages",
+      );
 
       const selectedPages = pages.map((p) => ({ ...p, selected: true }));
 
@@ -1076,14 +1082,12 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
       status: JobStatus.PROCESSING,
     });
 
-    // Initialize scraper and processor
-    const scraper = new WebScraperService();
-    const htmlProcessor = new HtmlProcessor();
-
     // Scrape only the single document URL (not the entire site)
     if (!document.sourceUrl) {
       throw new Error("Document has no source URL to recrawl");
     }
+
+    const scraper = new WebScraperService();
     const pages = await scraper.scrapeSelectedPages([
       {
         url: document.sourceUrl,
@@ -1099,51 +1103,33 @@ async function processWebRecrawl(organizationId: string, jobId: string, document
 
     const page = pages[0];
 
-    // Convert HTML to markdown
-    const processed = await htmlProcessor.process(Buffer.from(page.html), page.title);
-
-    // Update document content and mark as published
-    await documentRepository.update(document.id, organizationId, {
-      content: processed.content,
-      lastCrawledAt: new Date(),
-      status: DocumentationStatus.PUBLISHED,
-    });
-
-    // Regenerate embeddings
+    // Delete old embeddings before reprocessing
     if (!vectorStoreService.initialized) {
       await vectorStoreService.initialize();
     }
-
-    // Delete old embeddings
     await vectorStoreService.deleteByDocumentId(organizationId, document.id);
 
-    // Create new embeddings
-    const chunks = splitTextIntoChunks(processed.content, {
-      chunkSize: 1000,
-      chunkOverlap: 200,
+    // Process document using the shared service (includes Puppeteer fallback)
+    const result = await documentProcessorService.processWebDocument({
+      documentId: document.id,
+      organizationId,
+      pageUrl: page.url,
+      htmlContent: page.html,
+      pageTitle: page.title || document.title,
+      metadata: {
+        type: document.type,
+        status: DocumentationStatus.PUBLISHED,
+      },
+      jobId,
     });
 
-    const vectorChunks = chunks.map((content, index) => ({
-      content,
-      metadata: createChunkMetadata(index, chunks.length, {
-        documentId: document.id,
-        documentTitle: document.title,
-        documentType: document.type,
-        sourceUrl: document.sourceUrl,
-      }),
-    }));
-
-    const embeddingIds = await vectorStoreService.addChunks(
-      organizationId,
-      document.id,
-      vectorChunks,
-    );
+    if (!result.success) {
+      throw new Error(result.error || "Failed to process recrawled content");
+    }
 
     // Update job as completed
     await jobQueueService.completeJob(jobId, organizationId, {
       documentId: document.id,
-      embeddingsCreated: embeddingIds.length,
-      chunksCreated: chunks.length,
     });
 
     // Notify frontend of status change

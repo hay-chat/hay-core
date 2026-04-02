@@ -218,6 +218,12 @@ export const config = {
     webhookSecret: process.env.GITHUB_APP_WEBHOOK_SECRET || "",
   },
 
+  scraper: {
+    chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || "",
+    puppeteerMaxConcurrent: parseInt(process.env.PUPPETEER_MAX_CONCURRENT || "3", 10),
+    puppeteerTimeout: parseInt(process.env.PUPPETEER_TIMEOUT || "30000", 10),
+  },
+
   customMenu: {
     items: (() => {
       const raw = process.env.CUSTOM_MENU;

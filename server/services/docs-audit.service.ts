@@ -14,7 +14,10 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { jobRepository } from "@server/repositories/job.repository";
 import { JobStatus } from "@server/entities/job.entity";
 import { Document } from "@server/entities/document.entity";
+import { Organization } from "@server/entities/organization.entity";
 import { LLMService } from "@server/services/core/llm.service";
+import { documentSummaryService } from "@server/services/document-summary.service";
+import { AppDataSource } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("docs-audit");
@@ -42,6 +45,7 @@ export interface AuditResult {
   dimensions: DimensionResult[];
   summary: string;
   documentCount: number;
+  companyContext?: CompanyContext;
   auditedAt: string;
 }
 
@@ -56,6 +60,73 @@ const DIMENSION_WEIGHTS = {
   freshness: 0.07,
   readability: 0.05,
 };
+
+// ─── Vertical-Specific Required Topics ───────────────────────────────────────
+
+const VERTICAL_REQUIRED_TOPICS: Record<string, string[]> = {
+  E_COMMERCE: [
+    "Return/refund policy",
+    "Shipping information",
+    "Order tracking",
+    "Payment methods",
+    "Product catalog or search help",
+    "Account management",
+  ],
+  SAAS: [
+    "Getting started / Quick start",
+    "Pricing and billing",
+    "User management / Team setup",
+    "Privacy policy / Data handling",
+    "API documentation or integrations",
+    "Account settings",
+  ],
+  INSURANCE: [
+    "Claims process",
+    "Policy details / Coverage explanation",
+    "Contact information",
+    "Renewal process",
+  ],
+  HEALTH: [
+    "Appointment booking",
+    "Patient portal guide",
+    "Insurance/billing information",
+    "Privacy (HIPAA) information",
+  ],
+  MANUFACTURING: [
+    "Product specifications",
+    "Safety data sheets",
+    "Warranty information",
+    "Order/quote process",
+  ],
+  PROFESSIONAL_SERVICES: [
+    "Service offerings",
+    "Engagement process",
+    "Pricing/rates information",
+  ],
+  AI_CUSTOMER_SUPPORT_OR_CHATBOTS: [
+    "Setup / Installation guide",
+    "Configuration / Customization",
+    "Integration guides",
+    "Analytics / Reporting",
+  ],
+  MEDIA: [
+    "Content guidelines",
+    "Subscription information",
+    "Advertising / Partnership info",
+  ],
+  _ALL: [
+    "FAQ or Troubleshooting",
+    "Contact / Support information",
+  ],
+};
+
+// ─── Company Context Type ────────────────────────────────────────────────────
+
+interface CompanyContext {
+  productDescription: string;
+  vertical: string;
+  capabilities: string[];
+}
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
@@ -72,8 +143,12 @@ class DocsAuditService {
    */
   async runAudit(organizationId: string, jobId: string): Promise<AuditResult> {
     try {
+      // Fetch organization for context
+      const orgRepo = AppDataSource.getRepository(Organization);
+      const organization = await orgRepo.findOne({ where: { id: organizationId } });
+
       // Fetch all documents for the org
-      const documents = await documentRepository.findByOrganization(organizationId);
+      let documents = await documentRepository.findByOrganization(organizationId);
 
       if (documents.length === 0) {
         const emptyResult: AuditResult = {
@@ -90,14 +165,27 @@ class DocsAuditService {
         return emptyResult;
       }
 
+      // Step 1: Ensure all documents have summaries
+      await jobRepository.update(jobId, organizationId, {
+        data: { stage: "summarizing", documentCount: documents.length },
+      });
+
+      await documentSummaryService.summarizeAllForOrg(organizationId);
+
+      // Re-fetch documents to get the newly generated descriptions
+      documents = await documentRepository.findByOrganization(organizationId);
+
       // Update job: analyzing
       await jobRepository.update(jobId, organizationId, {
         data: { stage: "analyzing", documentCount: documents.length },
       });
 
-      // Run Phase 1 dimensions in parallel
+      // Step 2: Extract company context from summaries
+      const companyContext = await this.extractCompanyContext(documents, organization || undefined);
+
+      // Step 3: Run dimensions — coverage uses context, others run in parallel
       const [coverage, contentQuality, infoArch] = await Promise.all([
-        this.analyzeCoverage(documents),
+        this.analyzeCoverage(documents, companyContext),
         this.analyzeContentQuality(documents),
         this.analyzeInformationArchitecture(documents),
       ]);
@@ -115,6 +203,7 @@ class DocsAuditService {
         dimensions,
         summary: this.generateSummary(overallScore, dimensions),
         documentCount: documents.length,
+        companyContext,
         auditedAt: new Date().toISOString(),
       };
 
@@ -139,77 +228,54 @@ class DocsAuditService {
     }
   }
 
-  // ─── Coverage & Gaps ─────────────────────────────────────────────────────
+  // ─── Company Context Extraction ──────────────────────────────────────────
 
-  async analyzeCoverage(documents: Document[]): Promise<DimensionResult> {
-    const docSummaries = documents.map((d) => ({
-      title: d.title || "Untitled",
-      url: d.sourceUrl || "",
-      snippet: (d.content || "").slice(0, 200),
-      type: d.type,
-    }));
+  private async extractCompanyContext(
+    documents: Document[],
+    organization?: Organization,
+  ): Promise<CompanyContext> {
+    const summaryList = documents
+      .map((d) => `- "${d.title || "Untitled"}" — ${d.description || "(no summary)"}`)
+      .join("\n");
 
-    const prompt = `You are a documentation quality analyst. Analyze this set of documentation pages and evaluate coverage completeness.
+    const orgInfo = [
+      organization?.name ? `Organization: ${organization.name}` : "",
+      organization?.about ? `About: ${organization.about}` : "",
+      organization?.description ? `Description: ${organization.description}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-Here are the ${documents.length} pages found:
-${JSON.stringify(docSummaries, null, 2)}
+    const prompt = `Based on the document summaries below, determine what this company/product is, its business vertical, and its specific capabilities.
 
-Evaluate against these common documentation patterns:
-- Getting Started / Quick Start guide
-- Installation / Setup instructions
-- API Reference / Technical Reference
-- Tutorials / How-to guides
-- FAQ / Troubleshooting
-- Changelog / Release Notes
-- Migration / Upgrade guides
-- Configuration / Settings reference
-- Architecture / Overview explanation
-- Contributing guide
-- Authentication / Security documentation
-- Error handling / Status codes
+${orgInfo}
 
-Return a JSON response with this exact structure.`;
+Document summaries (${documents.length} total):
+${summaryList}
+
+Verticals: E_COMMERCE, SAAS, MANUFACTURING, INSURANCE, HEALTH, PROFESSIONAL_SERVICES, AI_CUSTOMER_SUPPORT_OR_CHATBOTS, MEDIA, OTHER`;
 
     const schema = {
       type: "object" as const,
       properties: {
-        score: { type: "number" as const, description: "Coverage score 0-100" },
-        presentCategories: {
+        productDescription: {
+          type: "string" as const,
+          description: "1-2 sentence description of what this product/company does",
+        },
+        vertical: {
+          type: "string" as const,
+          enum: [
+            "E_COMMERCE", "SAAS", "MANUFACTURING", "INSURANCE", "HEALTH",
+            "PROFESSIONAL_SERVICES", "AI_CUSTOMER_SUPPORT_OR_CHATBOTS", "MEDIA", "OTHER",
+          ],
+        },
+        capabilities: {
           type: "array" as const,
           items: { type: "string" as const },
-          description: "Documentation categories that ARE covered",
-        },
-        missingCategories: {
-          type: "array" as const,
-          items: { type: "string" as const },
-          description: "Important documentation categories that are MISSING",
-        },
-        gaps: {
-          type: "array" as const,
-          items: {
-            type: "object" as const,
-            properties: {
-              title: { type: "string" as const },
-              detail: { type: "string" as const },
-            },
-            required: ["title", "detail"] as const,
-            additionalProperties: false,
-          },
-          description: "Specific content gaps found",
-        },
-        recommendations: {
-          type: "array" as const,
-          items: { type: "string" as const },
-          description: "Actionable recommendations to improve coverage",
+          description: "Specific product capabilities/features inferred from the documentation",
         },
       },
-      required: [
-        "score",
-        "presentCategories",
-        "missingCategories",
-        "gaps",
-        "recommendations",
-      ] as const,
+      required: ["productDescription", "vertical", "capabilities"] as const,
       additionalProperties: false,
     };
 
@@ -219,26 +285,136 @@ Return a JSON response with this exact structure.`;
         jsonSchema: schema,
         model: "gpt-4o-mini",
         temperature: 0.3,
-        max_tokens: 2000,
+        max_tokens: 1000,
+      });
+
+      const result = JSON.parse(responseText as string);
+      logger.info(
+        { vertical: result.vertical, capabilities: result.capabilities.length },
+        "Company context extracted",
+      );
+      return result;
+    } catch (error) {
+      logger.error({ error }, "Company context extraction failed, using defaults");
+      return {
+        productDescription: organization?.about || organization?.name || "Unknown product",
+        vertical: "OTHER",
+        capabilities: [],
+      };
+    }
+  }
+
+  // ─── Coverage & Gaps (Context-Aware) ────────────────────────────────────
+
+  async analyzeCoverage(
+    documents: Document[],
+    companyContext: CompanyContext,
+  ): Promise<DimensionResult> {
+    // Build required topics from vertical rules + universal rules
+    const verticalTopics = VERTICAL_REQUIRED_TOPICS[companyContext.vertical] || [];
+    const universalTopics = VERTICAL_REQUIRED_TOPICS._ALL;
+    const requiredTopics = [...verticalTopics, ...universalTopics];
+
+    // Build summary list for the prompt
+    const summaryList = documents
+      .map((d) => `- "${d.title || "Untitled"}" — ${d.description || "(no summary)"}`)
+      .join("\n");
+
+    const prompt = `You are a documentation quality analyst. Given a product's capabilities and actual documentation, identify coverage gaps.
+
+Product: ${companyContext.productDescription}
+Vertical: ${companyContext.vertical}
+
+Product capabilities (inferred from documentation):
+${companyContext.capabilities.map((c) => `- ${c}`).join("\n")}
+
+Required topics for this type of product:
+${requiredTopics.map((t) => `- ${t}`).join("\n")}
+
+Existing documentation (${documents.length} pages):
+${summaryList}
+
+For each product capability, determine if there is adequate documentation covering it.
+For each required topic, determine if it is covered by any existing page.
+Also identify any additional topics that SHOULD be documented given this specific product's nature but are currently missing.
+
+Score from 0-100 based on how well the documentation covers the product's features and expected topics.`;
+
+    const schema = {
+      type: "object" as const,
+      properties: {
+        score: { type: "number" as const, description: "Coverage score 0-100" },
+        coveredTopics: {
+          type: "array" as const,
+          items: {
+            type: "object" as const,
+            properties: {
+              topic: { type: "string" as const },
+              coveredBy: {
+                type: "array" as const,
+                items: { type: "string" as const },
+                description: "Titles of docs that cover this topic",
+              },
+              adequacy: {
+                type: "string" as const,
+                enum: ["well_covered", "partially_covered"],
+              },
+            },
+            required: ["topic", "coveredBy", "adequacy"] as const,
+            additionalProperties: false,
+          },
+        },
+        missingTopics: {
+          type: "array" as const,
+          items: {
+            type: "object" as const,
+            properties: {
+              topic: { type: "string" as const },
+              importance: {
+                type: "string" as const,
+                enum: ["critical", "important", "nice_to_have"],
+              },
+              reason: { type: "string" as const },
+            },
+            required: ["topic", "importance", "reason"] as const,
+            additionalProperties: false,
+          },
+        },
+        recommendations: {
+          type: "array" as const,
+          items: { type: "string" as const },
+        },
+      },
+      required: ["score", "coveredTopics", "missingTopics", "recommendations"] as const,
+      additionalProperties: false,
+    };
+
+    try {
+      const responseText = await this.llm.invoke({
+        prompt,
+        jsonSchema: schema,
+        model: "gpt-4o-mini",
+        temperature: 0.3,
+        max_tokens: 3000,
       });
 
       const response = JSON.parse(responseText as string);
 
       const findings: Finding[] = [
-        ...response.presentCategories.map((cat: string) => ({
-          type: "positive" as const,
-          title: `${cat} documented`,
-          detail: `Your documentation covers ${cat}.`,
+        // Covered topics
+        ...response.coveredTopics.map((t: { topic: string; coveredBy: string[]; adequacy: string }) => ({
+          type: (t.adequacy === "well_covered" ? "positive" : "suggestion") as "positive" | "suggestion",
+          title: t.adequacy === "well_covered" ? `${t.topic}` : `${t.topic} (partial)`,
+          detail: t.adequacy === "well_covered"
+            ? `Well documented across ${t.coveredBy.length} page(s).`
+            : `Partially covered. Consider expanding coverage.`,
+          affectedDocs: t.coveredBy,
         })),
-        ...response.missingCategories.map((cat: string) => ({
+        // Missing topics
+        ...response.missingTopics.map((t: { topic: string; importance: string; reason: string }) => ({
           type: "negative" as const,
-          title: `Missing: ${cat}`,
-          detail: `No documentation found for ${cat}. This is a common documentation category that users expect.`,
-        })),
-        ...response.gaps.map((gap: { title: string; detail: string }) => ({
-          type: "suggestion" as const,
-          title: gap.title,
-          detail: gap.detail,
+          title: `Missing: ${t.topic}`,
+          detail: `${t.reason} (${t.importance})`,
         })),
       ];
 
@@ -446,12 +622,23 @@ Return a JSON response with this exact structure.`;
     );
 
     // 3. Cross-linking density — count how many docs reference other doc URLs
-    const allUrls = new Set(docsWithUrls.map((d) => d.sourceUrl!));
+    // Build a set of URL paths (without protocol/host) for flexible matching,
+    // since content may use relative links, omit trailing slashes, etc.
+    const docPathMap = new Map<string, string>(); // path → sourceUrl
+    for (const d of docsWithUrls) {
+      try {
+        const path = new URL(d.sourceUrl!).pathname.replace(/\/$/, "");
+        if (path) docPathMap.set(path, d.sourceUrl!);
+      } catch { /* skip invalid URLs */ }
+    }
+
     let crossLinkCount = 0;
     for (const doc of documents) {
       if (!doc.content) continue;
-      for (const url of allUrls) {
-        if (url !== doc.sourceUrl && doc.content.includes(url)) {
+      for (const [path, sourceUrl] of docPathMap) {
+        if (sourceUrl === doc.sourceUrl) continue; // skip self-references
+        // Check for full URL, path-only, or relative link
+        if (doc.content.includes(sourceUrl) || doc.content.includes(path)) {
           crossLinkCount++;
         }
       }
