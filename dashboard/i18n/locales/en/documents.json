@@ -194,6 +194,10 @@
         "startingDiscovery": "Starting discovery...",
         "pagesValidated": "{count} pages validated",
         "scanning": "Scanning: {url}",
+        "eta": {
+          "seconds": "~{seconds}s remaining",
+          "minutes": "~{minutes}min remaining"
+        },
         "pleaseWait": "Please wait",
         "pleaseWaitList": {
           "stayOnPage": "Stay on this page while we discover all documentation",
@@ -204,6 +208,20 @@
         "selectAll": "Select All ({count} selected)",
         "pagesCount": "{selected} / {total} pages",
         "untitledPage": "Untitled Page",
+        "noPagesFound": "No pages found",
+        "noPagesFoundDescription": "We couldn't discover any pages from this website. The site may be blocking automated requests or requires JavaScript to render its content. You can try a different URL or import documents manually instead.",
+        "tryDifferentUrl": "Try a different URL",
+        "filter": {
+          "contains": "URL contains",
+          "notContains": "URL does not contain",
+          "startsWith": "Path starts with",
+          "notStartsWith": "Path does not start with",
+          "endsWith": "URL ends with",
+          "notEndsWith": "URL does not end with",
+          "placeholder": "Filter by URL...",
+          "showing": "{filtered} of {total}",
+          "noResults": "No pages match this filter."
+        },
         "tip": "Tip",
         "tipDescription": "Review the pages carefully. You can deselect any pages that aren't relevant documentation.",
         "nextAddMetadata": "Next: Add Metadata",

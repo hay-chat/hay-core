@@ -31,13 +31,17 @@ export interface ScrapedPage {
   crawledAt: Date;
 }
 
+const HAY_USER_AGENT = "Mozilla/5.0 (compatible; HayDocumentImporter/1.0)";
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 export class WebScraperService extends EventEmitter {
   private visitedUrls = new Set<string>();
   private urlQueue: string[] = [];
   private scrapedPages: ScrapedPage[] = [];
   private discoveredPages: DiscoveredPage[] = [];
   private baseUrl!: URL;
-  private maxPages = 500; // Safety limit
+  private maxPages = 1500; // Safety limit
   private totalUrlsDiscovered = 0; // Track total URLs found (sitemap + crawled)
   private hasSitemap = false; // Track if we found a sitemap
 
@@ -85,6 +89,13 @@ export class WebScraperService extends EventEmitter {
 
       // Step 3: Discover all URLs with basic metadata
       await this.discoverPages();
+
+      if (this.discoveredPages.length === 0) {
+        logger.warn(
+          { url, visitedUrls: this.visitedUrls.size },
+          "Discovery completed with no pages found. The site may be blocking automated requests or requires JavaScript rendering.",
+        );
+      }
 
       this.emitProgress("completed", this.discoveredPages.length, this.discoveredPages.length);
       return this.discoveredPages;
@@ -188,10 +199,23 @@ export class WebScraperService extends EventEmitter {
       try {
         const sitemapUrl = new URL(path, this.baseUrl).href;
         await validateUrlForSSRF(sitemapUrl);
-        const response = await axios.get(sitemapUrl, {
+
+        const fetchConfig = {
           timeout: 10000,
           maxContentLength: 5 * 1024 * 1024, // 5MB limit
-        });
+          headers: { "User-Agent": HAY_USER_AGENT },
+        };
+
+        let response = await axios.get(sitemapUrl, fetchConfig);
+
+        // Retry with browser User-Agent on 403
+        if (response.status === 403) {
+          logger.debug({ sitemapUrl }, "Sitemap returned 403, retrying with browser User-Agent");
+          response = await axios.get(sitemapUrl, {
+            ...fetchConfig,
+            headers: { "User-Agent": BROWSER_USER_AGENT },
+          });
+        }
 
         if (response.status === 200) {
           const urls = await this.parseSitemap(response.data, sitemapUrl);
@@ -240,6 +264,7 @@ export class WebScraperService extends EventEmitter {
             const response = await axios.get(subSitemapUrl, {
               timeout: 10000,
               maxContentLength: 5 * 1024 * 1024,
+              headers: { "User-Agent": HAY_USER_AGENT },
             });
 
             if (response.status === 200) {
@@ -258,17 +283,12 @@ export class WebScraperService extends EventEmitter {
         for (const subUrls of batchResults) {
           urls.push(...subUrls);
         }
-
-        // Stop if we've already found enough URLs
-        if (urls.length >= this.maxPages) {
-          break;
-        }
       }
 
-      // If this was a sitemap index and we found URLs, return them
+      // If this was a sitemap index and we found URLs, return them prioritized
       if (urls.length > 0) {
         logger.info({ count: urls.length }, "Total URLs from sitemap index");
-        return urls.slice(0, this.maxPages);
+        return this.prioritizeUrls(urls, this.maxPages);
       }
     }
 
@@ -297,7 +317,7 @@ export class WebScraperService extends EventEmitter {
     }
 
     logger.debug({ count: urls.length, sitemapUrl }, "Returning URLs from sitemap");
-    return urls.slice(0, this.maxPages);
+    return this.prioritizeUrls(urls, this.maxPages);
   }
 
   private async crawlUrls(): Promise<void> {
@@ -349,7 +369,7 @@ export class WebScraperService extends EventEmitter {
         timeout: 15000,
         maxContentLength: 10 * 1024 * 1024, // 10MB limit
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; HayDocumentImporter/1.0)",
+          "User-Agent": HAY_USER_AGENT,
         },
       });
 
@@ -423,7 +443,78 @@ export class WebScraperService extends EventEmitter {
       response = await axios.get(url, fetchConfig);
     }
 
+    // Handle 403 by retrying with a browser-like User-Agent (bot protection fallback)
+    if (response.status === 403) {
+      const currentUA = (config.headers as Record<string, string>)?.["User-Agent"] ?? "";
+      if (currentUA !== BROWSER_USER_AGENT) {
+        logger.debug({ url }, "Got 403, retrying with browser User-Agent");
+        const fallbackConfig = {
+          ...fetchConfig,
+          headers: {
+            ...((config.headers as Record<string, string>) || {}),
+            "User-Agent": BROWSER_USER_AGENT,
+          },
+        };
+        response = await axios.get(url, fallbackConfig);
+      }
+    }
+
     return response;
+  }
+
+  /**
+   * Score a URL for priority sorting. Lower score = higher priority.
+   * Prioritizes root locale, shorter paths, and non-blog content.
+   */
+  private scoreUrl(url: string): number {
+    try {
+      const parsed = new URL(url);
+      const pathSegments = parsed.pathname.split("/").filter(Boolean);
+      let score = 0;
+
+      // Locale-prefixed paths are lower priority (e.g., /en-be/, /de-ch/)
+      // These are typically duplicates of the default locale content
+      const localePattern = /^[a-z]{2}(-[a-z]{2})?$/i;
+      if (pathSegments.length > 0 && localePattern.test(pathSegments[0])) {
+        score += 100;
+      }
+
+      // Blog/article pages are lower priority (high volume, less useful for knowledge bases)
+      const lowPriorityPatterns =
+        /\/(blog|blogs|articles?|news|press|tag|tags|category|categories)\//i;
+      if (lowPriorityPatterns.test(parsed.pathname)) {
+        score += 50;
+      }
+
+      // Prefer shallower pages (depth penalty)
+      score += pathSegments.length * 2;
+
+      return score;
+    } catch {
+      return 1000; // Invalid URLs go last
+    }
+  }
+
+  /**
+   * Sort URLs by priority and return the top N.
+   * Keeps higher-value pages (root locale, products, collections) over
+   * lower-value ones (locale duplicates, blog posts).
+   */
+  private prioritizeUrls(urls: string[], limit: number): string[] {
+    if (urls.length <= limit) {
+      return urls;
+    }
+
+    const sorted = [...urls].sort((a, b) => this.scoreUrl(a) - this.scoreUrl(b));
+    const result = sorted.slice(0, limit);
+
+    const dropped = urls.length - limit;
+    logger.info(
+      { total: urls.length, kept: limit, dropped },
+      "Prioritized URLs: dropped lowest-priority pages to stay within limit",
+    );
+
+    return result;
   }
 
   private extractUrls(html: string, baseUrl: string): string[] {
@@ -578,15 +669,15 @@ export class WebScraperService extends EventEmitter {
         // Fetch page to get title and discover more URLs
         const response = await this.fetchWithRetryAfter(url, {
           timeout: 10000,
-          maxContentLength: 1 * 1024 * 1024, // 1MB for discovery
+          maxContentLength: 5 * 1024 * 1024, // 5MB for discovery
           headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; HayDocumentImporter/1.0)",
+            "User-Agent": HAY_USER_AGENT,
           },
         });
 
         // Skip error pages (4xx, 5xx)
         if (response.status >= 400) {
-          logger.debug({ url, status: response.status }, "Skipping URL: error status");
+          logger.warn({ url, status: response.status }, "Skipping URL: error status");
           continue;
         }
 

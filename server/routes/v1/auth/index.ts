@@ -203,23 +203,14 @@ export const authRouter = t.router({
         where: { email: email.toLowerCase() },
       });
 
-      if (existingUser) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "User already exists",
-        });
-      }
+      // Helper to create an organization
+      const createOrg = async () => {
+        if (!organizationName) return null;
 
-      let organization: Organization | null = null;
-
-      // Create organization if name provided
-      if (organizationName) {
-        // Use organizationService to generate a unique slug
         const { organizationService } = await import("@server/services/organization.service");
 
         let orgSlug: string;
         if (organizationSlug) {
-          // User provided a custom slug, check if it's available
           const existingOrg = await organizationService.findBySlug(organizationSlug);
           if (existingOrg) {
             throw new TRPCError({
@@ -229,11 +220,10 @@ export const authRouter = t.router({
           }
           orgSlug = organizationSlug;
         } else {
-          // Generate a unique slug automatically
           orgSlug = await organizationService.generateUniqueSlug(organizationName);
         }
 
-        organization = organizationRepository.create({
+        const org = organizationRepository.create({
           name: organizationName,
           slug: orgSlug,
           isActive: true,
@@ -246,8 +236,55 @@ export const authRouter = t.router({
           },
         });
 
-        await organizationRepository.save(organization);
+        await organizationRepository.save(org);
+        return org;
+      };
+
+      if (existingUser) {
+        // User already exists — verify password, create a new org, and link them
+        const isValidPassword = await verifyPassword(password, existingUser.password);
+        if (!isValidPassword) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "User already exists. Please log in with the correct password.",
+          });
+        }
+
+        const organization = await createOrg();
+
+        if (organization) {
+          const userOrgRepository = manager.getRepository(UserOrganization);
+          const userOrg = userOrgRepository.create({
+            userId: existingUser.id,
+            organizationId: organization.id,
+            role: "owner",
+            isActive: true,
+            joinedAt: new Date(),
+          });
+          await userOrgRepository.save(userOrg);
+
+          // Update user's active organization to the new one
+          existingUser.organizationId = organization.id;
+          existingUser.updateLastSeen();
+          await userRepository.save(existingUser);
+        }
+
+        const sessionId = generateSessionId();
+        const tokens = generateTokens(existingUser, sessionId);
+        const organizations = await getUserOrganizations(existingUser.id);
+
+        return {
+          user: {
+            ...existingUser.toJSON(),
+            organizations,
+            activeOrganizationId: organization?.id || existingUser.organizationId,
+            onlineStatus: existingUser.getOnlineStatus(),
+          },
+          ...tokens,
+        };
       }
+
+      const organization = await createOrg();
 
       // Hash password
       const hashedPassword = await hashPassword(password, "argon2");

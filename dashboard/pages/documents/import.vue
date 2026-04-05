@@ -15,8 +15,8 @@
         class="bg-primary/10 border-4 border-dashed border-primary rounded-lg p-12 max-w-lg text-center pointer-events-none"
       >
         <Upload class="mx-auto h-20 w-20 text-primary mb-4 animate-pulse" />
-        <h3 class="text-2xl font-bold mb-2">{{ $t('documents.import.dropOverlay.title') }}</h3>
-        <p class="text-neutral-muted">{{ $t('documents.import.dropOverlay.description') }}</p>
+        <h3 class="text-2xl font-bold mb-2">{{ $t("documents.import.dropOverlay.title") }}</h3>
+        <p class="text-neutral-muted">{{ $t("documents.import.dropOverlay.description") }}</p>
       </div>
     </div>
 
@@ -24,7 +24,7 @@
     <template #header>
       <Button variant="outline" size="sm" @click="startTutorial">
         <HelpCircle class="h-4 w-4 mr-2" />
-        {{ $t('documents.import.tutorial') }}
+        {{ $t("documents.import.tutorial") }}
       </Button>
     </template>
 
@@ -53,9 +53,9 @@
     <!-- Step 1: Select Import Source -->
     <Card v-if="currentStep === 1">
       <CardHeader>
-        <CardTitle>{{ $t('documents.import.source.title') }}</CardTitle>
+        <CardTitle>{{ $t("documents.import.source.title") }}</CardTitle>
         <CardDescription>
-          {{ $t('documents.import.source.description') }}
+          {{ $t("documents.import.source.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -75,8 +75,10 @@
                 <Upload class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
-                <h3 class="mb-1">{{ $t('documents.import.source.uploadFiles') }}</h3>
-                <p class="text-sm text-neutral-muted mb-2">{{ $t('documents.import.source.uploadFilesDesc') }}</p>
+                <h3 class="mb-1">{{ $t("documents.import.source.uploadFiles") }}</h3>
+                <p class="text-sm text-neutral-muted mb-2">
+                  {{ $t("documents.import.source.uploadFilesDesc") }}
+                </p>
                 <div class="flex flex-wrap gap-2">
                   <Badge v-for="format in uploadFormats" :key="format" variant="outline">
                     {{ format }}
@@ -101,14 +103,14 @@
                 <Globe class="h-6 w-6 text-neutral-muted" />
               </div>
               <div class="flex-1">
-                <h3 class="mb-1">{{ $t('documents.import.source.importFromWebsite') }}</h3>
+                <h3 class="mb-1">{{ $t("documents.import.source.importFromWebsite") }}</h3>
                 <p class="text-sm text-neutral-muted mb-2">
-                  {{ $t('documents.import.source.importFromWebsiteDesc') }}
+                  {{ $t("documents.import.source.importFromWebsiteDesc") }}
                 </p>
                 <div class="flex flex-wrap gap-2">
                   <Badge variant="outline"> HTML </Badge>
-                  <Badge variant="outline"> {{ $t('documents.import.source.autoCrawl') }} </Badge>
-                  <Badge variant="outline"> {{ $t('documents.import.source.sitemap') }} </Badge>
+                  <Badge variant="outline"> {{ $t("documents.import.source.autoCrawl") }} </Badge>
+                  <Badge variant="outline"> {{ $t("documents.import.source.sitemap") }} </Badge>
                 </div>
               </div>
             </div>
@@ -142,7 +144,7 @@
                     {{ plugin.description }}
                   </p>
                   <div class="flex items-center gap-2">
-                    <Badge variant="secondary"> {{ $t('documents.import.source.plugin') }} </Badge>
+                    <Badge variant="secondary"> {{ $t("documents.import.source.plugin") }} </Badge>
                     <template v-if="plugin.supportedFormats">
                       <Badge
                         v-for="format in plugin.supportedFormats"
@@ -161,7 +163,7 @@
 
         <div class="mt-6 flex justify-end">
           <Button :disabled="!importType" @click="proceedToNextStep">
-            {{ $t('documents.import.source.next') }}
+            {{ $t("documents.import.source.next") }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -171,9 +173,9 @@
     <!-- Step 2a: File Selection (for Upload) -->
     <Card v-if="currentStep === 2 && importType === 'upload'">
       <CardHeader>
-        <CardTitle>{{ $t('documents.import.fileSelection.title') }}</CardTitle>
+        <CardTitle>{{ $t("documents.import.fileSelection.title") }}</CardTitle>
         <CardDescription>
-          {{ $t('documents.import.fileSelection.description') }}
+          {{ $t("documents.import.fileSelection.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -188,18 +190,28 @@
         >
           <Upload class="mx-auto h-16 w-16 text-neutral-muted mb-4" />
           <h3 class="text-lg mb-2">
-            {{ isDragging ? $t('documents.import.fileSelection.dropHere') : $t('documents.import.fileSelection.clickToUpload') }}
+            {{
+              isDragging
+                ? $t("documents.import.fileSelection.dropHere")
+                : $t("documents.import.fileSelection.clickToUpload")
+            }}
           </h3>
-          <p class="text-sm text-neutral-muted mb-4">{{ $t('documents.import.fileSelection.fileSizeLimit') }}</p>
+          <p class="text-sm text-neutral-muted mb-4">
+            {{ $t("documents.import.fileSelection.fileSizeLimit") }}
+          </p>
           <Button variant="outline">
             <Upload class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.browseFiles') }}
+            {{ $t("documents.import.fileSelection.browseFiles") }}
           </Button>
         </div>
 
         <!-- Selected Files List -->
         <div v-if="selectedFiles.length > 0" class="mt-6 space-y-2">
-          <h4 class="font-medium mb-2">{{ $t('documents.import.fileSelection.selectedFiles', { count: selectedFiles.length }) }}</h4>
+          <h4 class="font-medium mb-2">
+            {{
+              $t("documents.import.fileSelection.selectedFiles", { count: selectedFiles.length })
+            }}
+          </h4>
           <div
             v-for="(file, index) in selectedFiles"
             :key="index"
@@ -229,10 +241,10 @@
         <div class="mt-6 flex justify-between">
           <Button variant="outline" @click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.back') }}
+            {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button :disabled="selectedFiles.length === 0" @click="proceedToNextStep">
-            {{ $t('documents.import.fileSelection.nextAddDetails') }}
+            {{ $t("documents.import.fileSelection.nextAddDetails") }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -242,35 +254,36 @@
     <!-- Step 2b: URL Input (for Web Import) -->
     <Card v-if="currentStep === 2 && importType === 'web'">
       <CardHeader>
-        <CardTitle>{{ $t('documents.import.webUrl.title') }}</CardTitle>
+        <CardTitle>{{ $t("documents.import.webUrl.title") }}</CardTitle>
         <CardDescription>
-          {{ $t('documents.import.webUrl.description') }}
+          {{ $t("documents.import.webUrl.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="space-y-4">
           <div>
-            <Label for="website-url">{{ $t('documents.import.webUrl.label') }}</Label>
+            <Label for="website-url">{{ $t("documents.import.webUrl.label") }}</Label>
             <Input
               id="website-url"
               v-model="websiteUrl"
               type="url"
               :placeholder="$t('documents.import.webUrl.placeholder')"
               class="mt-2"
+              @blur="normalizeWebsiteUrl"
             />
             <p class="text-xs text-neutral-muted mt-2">
-              {{ $t('documents.import.webUrl.hint') }}
+              {{ $t("documents.import.webUrl.hint") }}
             </p>
           </div>
 
           <Alert>
-            <AlertTitle>{{ $t('documents.import.webUrl.howItWorks') }}</AlertTitle>
+            <AlertTitle>{{ $t("documents.import.webUrl.howItWorks") }}</AlertTitle>
             <AlertDescription>
               <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
-                <li>{{ $t('documents.import.webUrl.howItWorksList.sitemap') }}</li>
-                <li>{{ $t('documents.import.webUrl.howItWorksList.crawl') }}</li>
-                <li>{{ $t('documents.import.webUrl.howItWorksList.sameDomain') }}</li>
-                <li>{{ $t('documents.import.webUrl.howItWorksList.markdown') }}</li>
+                <li>{{ $t("documents.import.webUrl.howItWorksList.sitemap") }}</li>
+                <li>{{ $t("documents.import.webUrl.howItWorksList.crawl") }}</li>
+                <li>{{ $t("documents.import.webUrl.howItWorksList.sameDomain") }}</li>
+                <li>{{ $t("documents.import.webUrl.howItWorksList.markdown") }}</li>
               </ul>
             </AlertDescription>
           </Alert>
@@ -279,14 +292,14 @@
         <div class="mt-6 flex justify-between">
           <Button variant="outline" @click="currentStep = 1">
             <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.back') }}
+            {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button
             :loading="isDiscovering"
             :disabled="!isValidUrl(websiteUrl)"
             @click="discoverPages"
           >
-            {{ $t('documents.import.webUrl.discoverPages') }}
+            {{ $t("documents.import.webUrl.discoverPages") }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -297,13 +310,19 @@
     <Card v-if="currentStep === 3 && importType === 'web'">
       <CardHeader>
         <CardTitle>
-          {{ isDiscovering ? $t('documents.import.discovery.titleDiscovering') : $t('documents.import.discovery.titleSelect') }}
+          {{
+            isDiscovering
+              ? $t("documents.import.discovery.titleDiscovering")
+              : $t("documents.import.discovery.titleSelect")
+          }}
         </CardTitle>
         <CardDescription>
           {{
             isDiscovering
-              ? $t('documents.import.discovery.descriptionDiscovering')
-              : $t('documents.import.discovery.descriptionSelect', { count: discoveredPages.length })
+              ? $t("documents.import.discovery.descriptionDiscovering")
+              : $t("documents.import.discovery.descriptionSelect", {
+                  count: discoveredPages.length,
+                })
           }}
         </CardDescription>
       </CardHeader>
@@ -335,8 +354,8 @@
               <p class="text-base font-medium text-foreground">
                 {{
                   discoveryProgress && discoveryProgress.found > 0
-                    ? $t('documents.import.discovery.foundUrls', { count: discoveryProgress.found })
-                    : $t('documents.import.discovery.startingDiscovery')
+                    ? $t("documents.import.discovery.foundUrls", { count: discoveryProgress.found })
+                    : $t("documents.import.discovery.startingDiscovery")
                 }}
               </p>
 
@@ -346,9 +365,11 @@
                 class="flex items-center justify-center gap-1 mt-2"
               >
                 <CheckCircle class="h-4 w-4 text-green-600" />
-                <span class="text-sm text-green-600 font-medium"
-                  >{{ $t('documents.import.discovery.pagesValidated', { count: discoveryProgress.processed }) }}</span
-                >
+                <span class="text-sm text-green-600 font-medium">{{
+                  $t("documents.import.discovery.pagesValidated", {
+                    count: discoveryProgress.processed,
+                  })
+                }}</span>
               </div>
             </div>
 
@@ -361,29 +382,55 @@
                 "
                 class="h-2"
               />
-              <p
-                v-if="discoveryProgress?.currentUrl"
-                class="mt-2 text-xs text-neutral-muted text-center truncate"
-              >
-                {{ $t('documents.import.discovery.scanning', { url: discoveryProgress.currentUrl }) }}
-              </p>
+              <div class="mt-2 flex items-center justify-between text-xs text-neutral-muted">
+                <p v-if="discoveryProgress?.currentUrl" class="truncate flex-1 text-center">
+                  {{
+                    $t("documents.import.discovery.scanning", {
+                      url: discoveryProgress.currentUrl,
+                    })
+                  }}
+                </p>
+                <p v-if="discoveryEta" class="shrink-0 ml-2 font-medium">
+                  {{ discoveryEta }}
+                </p>
+              </div>
             </div>
 
             <Alert class="mt-6 max-w-md">
-              <AlertTitle>{{ $t('documents.import.discovery.pleaseWait') }}</AlertTitle>
+              <AlertTitle>{{ $t("documents.import.discovery.pleaseWait") }}</AlertTitle>
               <AlertDescription>
                 <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
-                  <li>{{ $t('documents.import.discovery.pleaseWaitList.stayOnPage') }}</li>
-                  <li>{{ $t('documents.import.discovery.pleaseWaitList.typicalTime') }}</li>
-                  <li>{{ $t('documents.import.discovery.pleaseWaitList.checkingSitemaps') }}</li>
+                  <li>{{ $t("documents.import.discovery.pleaseWaitList.stayOnPage") }}</li>
+                  <li>{{ $t("documents.import.discovery.pleaseWaitList.typicalTime") }}</li>
+                  <li>{{ $t("documents.import.discovery.pleaseWaitList.checkingSitemaps") }}</li>
                 </ul>
               </AlertDescription>
             </Alert>
 
             <Button variant="outline" class="mt-4" @click="cancelDiscovery">
-              {{ $t('documents.import.discovery.cancelDiscovery') }}
+              {{ $t("documents.import.discovery.cancelDiscovery") }}
             </Button>
           </div>
+        </div>
+
+        <!-- Empty State (no pages found) -->
+        <div
+          v-else-if="discoveredPages.length === 0"
+          class="flex flex-col items-center justify-center py-12 space-y-4"
+        >
+          <div class="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <Globe class="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div class="text-center space-y-2 max-w-md">
+            <p class="text-lg font-medium">{{ $t("documents.import.discovery.noPagesFound") }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ $t("documents.import.discovery.noPagesFoundDescription") }}
+            </p>
+          </div>
+          <Button variant="outline" @click="currentStep = 2">
+            <ChevronLeft class="mr-2 h-4 w-4" />
+            {{ $t("documents.import.discovery.tryDifferentUrl") }}
+          </Button>
         </div>
 
         <!-- Page Selection (shown after discovery) -->
@@ -392,33 +439,82 @@
           <div class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg">
             <div class="flex items-center space-x-2">
               <Checkbox
-                :checked="discoveredPages.every((p) => p.selected)"
+                :checked="filteredDiscoveredPages.every((p) => p.selected)"
                 @update:checked="toggleSelectAll"
               />
               <Label class="text-sm font-medium">
-                {{ $t('documents.import.discovery.selectAll', { count: discoveredPages.filter((p) => p.selected).length }) }}
+                {{
+                  $t("documents.import.discovery.selectAll", {
+                    count: filteredDiscoveredPages.filter((p) => p.selected).length,
+                  })
+                }}
               </Label>
             </div>
             <Badge variant="outline">
-              {{ $t('documents.import.discovery.pagesCount', { selected: discoveredPages.filter((p) => p.selected).length, total: discoveredPages.length }) }}
+              {{
+                $t("documents.import.discovery.pagesCount", {
+                  selected: discoveredPages.filter((p) => p.selected).length,
+                  total: discoveredPages.length,
+                })
+              }}
+            </Badge>
+          </div>
+
+          <!-- URL Filter -->
+          <div class="flex items-center gap-2">
+            <Input
+              type="select"
+              v-model="pageFilterType"
+              :options="[
+                { label: $t('documents.import.discovery.filter.contains'), value: 'contains' },
+                {
+                  label: $t('documents.import.discovery.filter.notContains'),
+                  value: 'not_contains',
+                },
+                { label: $t('documents.import.discovery.filter.startsWith'), value: 'starts_with' },
+                {
+                  label: $t('documents.import.discovery.filter.notStartsWith'),
+                  value: 'not_starts_with',
+                },
+                { label: $t('documents.import.discovery.filter.endsWith'), value: 'ends_with' },
+                {
+                  label: $t('documents.import.discovery.filter.notEndsWith'),
+                  value: 'not_ends_with',
+                },
+              ]"
+              class="w-52 shrink-0"
+            />
+            <Input
+              v-model="pageFilterValue"
+              type="search"
+              :placeholder="$t('documents.import.discovery.filter.placeholder')"
+              class="flex-1"
+            />
+            <Badge v-if="pageFilterValue.trim()" variant="secondary">
+              {{
+                $t("documents.import.discovery.filter.showing", {
+                  filtered: filteredDiscoveredPages.length,
+                  total: discoveredPages.length,
+                })
+              }}
             </Badge>
           </div>
 
           <!-- Page List -->
           <div class="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-2">
             <div
-              v-for="(page, index) in discoveredPages"
-              :key="index"
+              v-for="page in filteredDiscoveredPages"
+              :key="page.url"
               class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
             >
               <Checkbox
                 :checked="page.selected"
-                @update:checked="(checked: boolean) => togglePageSelection(index, checked)"
+                @update:checked="(checked: boolean) => togglePageSelection(page.url, checked)"
                 class="mt-1"
               />
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate max-w-[100ch]">
-                  {{ page.title || $t('documents.import.discovery.untitledPage') }}
+                  {{ page.title || $t("documents.import.discovery.untitledPage") }}
                 </p>
                 <p class="text-xs text-neutral-muted truncate max-w-[100ch]">
                   {{ page.url }}
@@ -434,12 +530,22 @@
                 <ExternalLink class="h-3 w-3" />
               </Button>
             </div>
+
+            <!-- Empty filter result -->
+            <div
+              v-if="filteredDiscoveredPages.length === 0 && pageFilterValue.trim()"
+              class="flex flex-col items-center justify-center py-8 text-center"
+            >
+              <p class="text-sm text-muted-foreground">
+                {{ $t("documents.import.discovery.filter.noResults") }}
+              </p>
+            </div>
           </div>
 
           <Alert>
-            <AlertTitle>{{ $t('documents.import.discovery.tip') }}</AlertTitle>
+            <AlertTitle>{{ $t("documents.import.discovery.tip") }}</AlertTitle>
             <AlertDescription>
-              {{ $t('documents.import.discovery.tipDescription') }}
+              {{ $t("documents.import.discovery.tipDescription") }}
             </AlertDescription>
           </Alert>
         </div>
@@ -448,10 +554,10 @@
         <div class="mt-6 flex justify-between">
           <Button variant="outline" @click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.back') }}
+            {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button :disabled="!discoveredPages.some((p) => p.selected)" @click="currentStep = 4">
-            {{ $t('documents.import.discovery.nextAddMetadata') }}
+            {{ $t("documents.import.discovery.nextAddMetadata") }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -461,62 +567,76 @@
     <!-- Step 4: Metadata (for Web Import) -->
     <Card v-if="currentStep === 4 && importType === 'web'">
       <CardHeader>
-        <CardTitle>{{ $t('documents.import.metadata.title') }}</CardTitle>
+        <CardTitle>{{ $t("documents.import.metadata.title") }}</CardTitle>
         <CardDescription>
-          {{ $t('documents.import.metadata.description', { count: discoveredPages.filter((p) => p.selected).length }) }}
+          {{
+            $t("documents.import.metadata.description", {
+              count: discoveredPages.filter((p) => p.selected).length,
+            })
+          }}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div class="space-y-6">
           <div>
-            <Label for="web-doc-type">{{ $t('documents.import.metadata.documentType') }}</Label>
+            <Label for="web-doc-type">{{ $t("documents.import.metadata.documentType") }}</Label>
             <select
               id="web-doc-type"
               v-model="webMetadata.type"
               class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="article">{{ $t('documents.filters.article') }}</option>
-              <option value="guide">{{ $t('documents.filters.guide') }}</option>
-              <option value="faq">{{ $t('documents.filters.faq') }}</option>
-              <option value="tutorial">{{ $t('documents.filters.tutorial') }}</option>
-              <option value="reference">{{ $t('documents.filters.reference') }}</option>
-              <option value="policy">{{ $t('documents.filters.policy') }}</option>
+              <option value="article">{{ $t("documents.filters.article") }}</option>
+              <option value="guide">{{ $t("documents.filters.guide") }}</option>
+              <option value="faq">{{ $t("documents.filters.faq") }}</option>
+              <option value="tutorial">{{ $t("documents.filters.tutorial") }}</option>
+              <option value="reference">{{ $t("documents.filters.reference") }}</option>
+              <option value="policy">{{ $t("documents.filters.policy") }}</option>
             </select>
           </div>
 
           <div>
-            <Label for="web-doc-status">{{ $t('documents.import.metadata.status') }}</Label>
+            <Label for="web-doc-status">{{ $t("documents.import.metadata.status") }}</Label>
             <select
               id="web-doc-status"
               v-model="webMetadata.status"
               class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="published">{{ $t('documents.filters.published') }}</option>
-              <option value="draft">{{ $t('documents.filters.draft') }}</option>
-              <option value="under_review">{{ $t('documents.import.metadata.underReview') }}</option>
+              <option value="published">{{ $t("documents.filters.published") }}</option>
+              <option value="draft">{{ $t("documents.filters.draft") }}</option>
+              <option value="under_review">
+                {{ $t("documents.import.metadata.underReview") }}
+              </option>
             </select>
           </div>
 
           <div>
-            <Label for="web-doc-visibility">{{ $t('documents.import.metadata.visibility') }}</Label>
+            <Label for="web-doc-visibility">{{ $t("documents.import.metadata.visibility") }}</Label>
             <select
               id="web-doc-visibility"
               v-model="webMetadata.visibility"
               class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="private">{{ $t('documents.import.metadata.private') }}</option>
-              <option value="internal">{{ $t('documents.import.metadata.internal') }}</option>
-              <option value="public">{{ $t('documents.import.metadata.public') }}</option>
+              <option value="private">{{ $t("documents.import.metadata.private") }}</option>
+              <option value="internal">{{ $t("documents.import.metadata.internal") }}</option>
+              <option value="public">{{ $t("documents.import.metadata.public") }}</option>
             </select>
           </div>
 
           <!-- Preview of selected pages -->
           <div class="border-t pt-4">
-            <h4 class="text-sm font-medium mb-2">{{ $t('documents.import.metadata.selectedPagesSummary') }}</h4>
+            <h4 class="text-sm font-medium mb-2">
+              {{ $t("documents.import.metadata.selectedPagesSummary") }}
+            </h4>
             <div class="text-sm text-neutral-muted space-y-1">
-              <p>{{ $t('documents.import.metadata.pagesWillBeImported', { count: discoveredPages.filter((p) => p.selected).length }) }}</p>
-              <p>{{ $t('documents.import.metadata.convertedToMarkdown') }}</p>
-              <p>{{ $t('documents.import.metadata.chunkedAndVectorized') }}</p>
+              <p>
+                {{
+                  $t("documents.import.metadata.pagesWillBeImported", {
+                    count: discoveredPages.filter((p) => p.selected).length,
+                  })
+                }}
+              </p>
+              <p>{{ $t("documents.import.metadata.convertedToMarkdown") }}</p>
+              <p>{{ $t("documents.import.metadata.chunkedAndVectorized") }}</p>
             </div>
           </div>
         </div>
@@ -524,11 +644,11 @@
         <div class="mt-6 flex justify-between">
           <Button variant="outline" @click="currentStep = 3">
             <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.back') }}
+            {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button :loading="isProcessing" @click="startWebImport">
             <Upload class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.metadata.startImport') }}
+            {{ $t("documents.import.metadata.startImport") }}
           </Button>
         </div>
       </CardContent>
@@ -537,9 +657,9 @@
     <!-- Step 3: Document Details (for Upload) -->
     <Card v-if="currentStep === 3 && importType === 'upload'">
       <CardHeader>
-        <CardTitle>{{ $t('documents.import.details.title') }}</CardTitle>
+        <CardTitle>{{ $t("documents.import.details.title") }}</CardTitle>
         <CardDescription>
-          {{ $t('documents.import.details.description') }}
+          {{ $t("documents.import.details.description") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -560,7 +680,9 @@
 
             <div class="grid gap-4">
               <div>
-                <Label :for="`name-${index}`">{{ $t('documents.import.details.documentName') }}</Label>
+                <Label :for="`name-${index}`">{{
+                  $t("documents.import.details.documentName")
+                }}</Label>
                 <Input
                   :id="`name-${index}`"
                   v-model="file.documentName"
@@ -569,25 +691,39 @@
               </div>
 
               <div>
-                <Label :for="`category-${index}`">{{ $t('documents.import.details.category') }}</Label>
+                <Label :for="`category-${index}`">{{
+                  $t("documents.import.details.category")
+                }}</Label>
                 <select
                   :id="`category-${index}`"
                   v-model="file.category"
                   class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="">{{ $t('documents.import.details.selectCategory') }}</option>
-                  <option value="product">{{ $t('documents.import.details.categories.product') }}</option>
-                  <option value="api">{{ $t('documents.import.details.categories.api') }}</option>
-                  <option value="faq">{{ $t('documents.import.details.categories.faq') }}</option>
-                  <option value="legal">{{ $t('documents.import.details.categories.legal') }}</option>
-                  <option value="training">{{ $t('documents.import.details.categories.training') }}</option>
-                  <option value="technical">{{ $t('documents.import.details.categories.technical') }}</option>
-                  <option value="other">{{ $t('documents.import.details.categories.other') }}</option>
+                  <option value="">{{ $t("documents.import.details.selectCategory") }}</option>
+                  <option value="product">
+                    {{ $t("documents.import.details.categories.product") }}
+                  </option>
+                  <option value="api">{{ $t("documents.import.details.categories.api") }}</option>
+                  <option value="faq">{{ $t("documents.import.details.categories.faq") }}</option>
+                  <option value="legal">
+                    {{ $t("documents.import.details.categories.legal") }}
+                  </option>
+                  <option value="training">
+                    {{ $t("documents.import.details.categories.training") }}
+                  </option>
+                  <option value="technical">
+                    {{ $t("documents.import.details.categories.technical") }}
+                  </option>
+                  <option value="other">
+                    {{ $t("documents.import.details.categories.other") }}
+                  </option>
                 </select>
               </div>
 
               <div>
-                <Label :for="`description-${index}`">{{ $t('documents.import.details.descriptionLabel') }}</Label>
+                <Label :for="`description-${index}`">{{
+                  $t("documents.import.details.descriptionLabel")
+                }}</Label>
                 <Textarea
                   :id="`description-${index}`"
                   :model-value="file.description || ''"
@@ -600,7 +736,7 @@
               <div class="flex items-center space-x-2">
                 <Checkbox :id="`active-${index}`" v-model="file.isActive" />
                 <Label :for="`active-${index}`" class="text-sm font-normal">
-                  {{ $t('documents.import.details.makeAvailable') }}
+                  {{ $t("documents.import.details.makeAvailable") }}
                 </Label>
               </div>
             </div>
@@ -610,11 +746,11 @@
         <div class="mt-6 flex justify-between">
           <Button variant="outline" @click="currentStep = 2">
             <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.fileSelection.back') }}
+            {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button :loading="isProcessing" @click="startUpload">
             <Upload class="mr-2 h-4 w-4" />
-            {{ $t('documents.import.details.startUpload') }}
+            {{ $t("documents.import.details.startUpload") }}
           </Button>
         </div>
       </CardContent>
@@ -629,13 +765,17 @@
     >
       <CardHeader>
         <CardTitle>
-          {{ importType === "web" ? $t('documents.import.processing.importingFromWebsite') : $t('documents.import.processing.uploadingDocuments') }}
+          {{
+            importType === "web"
+              ? $t("documents.import.processing.importingFromWebsite")
+              : $t("documents.import.processing.uploadingDocuments")
+          }}
         </CardTitle>
         <CardDescription>
           {{
             importType === "web"
-              ? $t('documents.import.processing.websiteBeingCrawled')
-              : $t('documents.import.processing.documentsBeingProcessed')
+              ? $t("documents.import.processing.websiteBeingCrawled")
+              : $t("documents.import.processing.documentsBeingProcessed")
           }}
         </CardDescription>
       </CardHeader>
@@ -644,32 +784,39 @@
         <div v-if="importType === 'web' && webImportJob" class="space-y-4">
           <div class="p-4 bg-background-tertiary rounded-lg">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium">{{ $t('documents.import.processing.importStatus') }}</span>
+              <span class="text-sm font-medium">{{
+                $t("documents.import.processing.importStatus")
+              }}</span>
               <Badge
                 v-if="webImportJob.status === 'completed'"
                 variant="default"
                 class="bg-green-600"
               >
                 <CheckCircle class="mr-1 h-3 w-3" />
-                {{ $t('documents.import.processing.completed') }}
+                {{ $t("documents.import.processing.completed") }}
               </Badge>
               <Badge v-else-if="webImportJob.status === 'processing'" variant="secondary">
                 <Loader2 class="mr-1 h-3 w-3 animate-spin" />
-                {{ $t('documents.filters.processing') }}
+                {{ $t("documents.filters.processing") }}
               </Badge>
               <Badge v-else-if="webImportJob.status === 'failed'" variant="destructive">
                 <AlertCircle class="mr-1 h-3 w-3" />
-                {{ $t('documents.import.processing.failed') }}
+                {{ $t("documents.import.processing.failed") }}
               </Badge>
-              <Badge v-else variant="outline"> {{ $t('documents.import.processing.queued') }} </Badge>
+              <Badge v-else variant="outline">
+                {{ $t("documents.import.processing.queued") }}
+              </Badge>
             </div>
 
             <div v-if="webImportProgress" class="space-y-2">
               <div class="flex justify-between text-sm">
-                <span>{{ $t('documents.import.processing.progress') }}</span>
-                <span
-                  >{{ $t('documents.import.processing.pages', { processed: webImportProgress?.processedPages, total: webImportProgress?.totalPages }) }}</span
-                >
+                <span>{{ $t("documents.import.processing.progress") }}</span>
+                <span>{{
+                  $t("documents.import.processing.pages", {
+                    processed: webImportProgress?.processedPages,
+                    total: webImportProgress?.totalPages,
+                  })
+                }}</span>
               </div>
               <Progress
                 :value="
@@ -680,7 +827,11 @@
                 class="h-2"
               />
               <p v-if="webImportProgress?.currentUrl" class="text-xs text-neutral-muted truncate">
-                {{ $t('documents.import.processing.processingUrl', { url: webImportProgress.currentUrl }) }}
+                {{
+                  $t("documents.import.processing.processingUrl", {
+                    url: webImportProgress.currentUrl,
+                  })
+                }}
               </p>
               <!-- Show success/failure stats if available -->
               <div
@@ -691,10 +842,20 @@
                 class="flex gap-4 text-xs mt-2"
               >
                 <span v-if="webImportProgress.successfulPages" class="text-green-600">
-                  ✓ {{ $t('documents.import.processing.successful', { count: webImportProgress.successfulPages }) }}
+                  ✓
+                  {{
+                    $t("documents.import.processing.successful", {
+                      count: webImportProgress.successfulPages,
+                    })
+                  }}
                 </span>
                 <span v-if="webImportProgress.failedPages" class="text-red-600">
-                  ✗ {{ $t('documents.import.processing.failedCount', { count: webImportProgress.failedPages }) }}
+                  ✗
+                  {{
+                    $t("documents.import.processing.failedCount", {
+                      count: webImportProgress.failedPages,
+                    })
+                  }}
                 </span>
               </div>
             </div>
@@ -704,11 +865,11 @@
           <Alert v-if="webImportJob.status === 'processing'">
             <AlertTitle class="flex items-center gap-2">
               <Loader2 class="h-4 w-4 animate-spin" />
-              {{ $t('documents.import.processing.processingInProgress') }}
+              {{ $t("documents.import.processing.processingInProgress") }}
             </AlertTitle>
             <AlertDescription class="space-y-3">
               <p>
-                {{ $t('documents.import.processing.processingMessage') }}
+                {{ $t("documents.import.processing.processingMessage") }}
               </p>
               <div>
                 <Button
@@ -717,7 +878,7 @@
                   class="text-destructive hover:text-destructive"
                   @click="cancelImport"
                 >
-                  {{ $t('documents.import.processing.cancelImport') }}
+                  {{ $t("documents.import.processing.cancelImport") }}
                 </Button>
               </div>
             </AlertDescription>
@@ -729,8 +890,13 @@
           <!-- Overall Progress -->
           <div class="mb-6">
             <div class="flex justify-between text-sm mb-2">
-              <span>{{ $t('documents.import.processing.overallProgress') }}</span>
-              <span>{{ $t('documents.import.processing.files', { uploaded: uploadedCount, total: selectedFiles.length }) }}</span>
+              <span>{{ $t("documents.import.processing.overallProgress") }}</span>
+              <span>{{
+                $t("documents.import.processing.files", {
+                  uploaded: uploadedCount,
+                  total: selectedFiles.length,
+                })
+              }}</span>
             </div>
             <Progress :value="(uploadedCount / selectedFiles.length) * 100" class="h-2" />
           </div>
@@ -749,21 +915,23 @@
                   class="bg-green-600"
                 >
                   <CheckCircle class="mr-1 h-3 w-3" />
-                  {{ $t('documents.import.processing.completed') }}
+                  {{ $t("documents.import.processing.completed") }}
                 </Badge>
                 <Badge v-else-if="file.uploadStatus === 'uploading'" variant="secondary">
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
-                  {{ $t('documents.import.processing.uploading') }}
+                  {{ $t("documents.import.processing.uploading") }}
                 </Badge>
                 <Badge v-else-if="file.uploadStatus === 'processing'" variant="secondary">
                   <Loader2 class="mr-1 h-3 w-3 animate-spin" />
-                  {{ $t('documents.filters.processing') }}
+                  {{ $t("documents.filters.processing") }}
                 </Badge>
                 <Badge v-else-if="file.uploadStatus === 'error'" variant="destructive">
                   <AlertCircle class="mr-1 h-3 w-3" />
-                  {{ $t('documents.filters.error') }}
+                  {{ $t("documents.filters.error") }}
                 </Badge>
-                <Badge v-else variant="outline"> {{ $t('documents.import.processing.pending') }} </Badge>
+                <Badge v-else variant="outline">
+                  {{ $t("documents.import.processing.pending") }}
+                </Badge>
               </div>
             </div>
 
@@ -784,14 +952,14 @@
               v-if="file.uploadStatus === 'error'"
               class="mt-2 p-2 bg-destructive/10 rounded text-sm text-destructive"
             >
-              {{ file.errorMessage || $t('documents.import.processing.uploadFailed') }}
+              {{ file.errorMessage || $t("documents.import.processing.uploadFailed") }}
             </div>
           </div>
         </div>
 
         <div class="mt-6 flex justify-between">
           <Button variant="outline" :disabled="isProcessing" @click="resetImport">
-            {{ $t('documents.import.processing.importMoreDocuments') }}
+            {{ $t("documents.import.processing.importMoreDocuments") }}
           </Button>
           <Button
             :disabled="isProcessing"
@@ -803,7 +971,11 @@
             "
           >
             <CheckCircle class="mr-2 h-4 w-4" />
-            {{ route.query.redirect ? $t('documents.import.processing.continue') : $t('documents.import.processing.viewDocuments') }}
+            {{
+              route.query.redirect
+                ? $t("documents.import.processing.continue")
+                : $t("documents.import.processing.viewDocuments")
+            }}
           </Button>
         </div>
       </CardContent>
@@ -893,7 +1065,36 @@ const webImportJob = ref<WebImportJob | null>(null);
 const webImportProgress = ref<WebImportProgress | null>(null);
 const pluginImporters = ref<PluginImporter[]>([]);
 const discoveredPages = ref<DiscoveredPage[]>([]);
+const pageFilterType = ref<
+  "contains" | "not_contains" | "starts_with" | "not_starts_with" | "ends_with" | "not_ends_with"
+>("contains");
+const pageFilterValue = ref("");
+const filteredDiscoveredPages = computed(() => {
+  const query = pageFilterValue.value.trim().toLowerCase();
+  if (!query) return discoveredPages.value;
+
+  return discoveredPages.value.filter((page) => {
+    const url = page.url.toLowerCase();
+    switch (pageFilterType.value) {
+      case "contains":
+        return url.includes(query);
+      case "not_contains":
+        return !url.includes(query);
+      case "starts_with":
+        return new URL(url).pathname.startsWith(query);
+      case "not_starts_with":
+        return !new URL(url).pathname.startsWith(query);
+      case "ends_with":
+        return url.endsWith(query);
+      case "not_ends_with":
+        return !url.endsWith(query);
+      default:
+        return true;
+    }
+  });
+});
 const isDiscovering = ref(false);
+const discoveryStartedAt = ref<number | null>(null);
 const discoveryProgress = ref<{
   status?: string;
   found: number;
@@ -901,6 +1102,26 @@ const discoveryProgress = ref<{
   total: number;
   currentUrl?: string;
 } | null>(null);
+const discoveryEta = computed(() => {
+  if (!discoveryProgress.value || !discoveryStartedAt.value) return null;
+  const { processed, total } = discoveryProgress.value;
+  if (processed < 3 || total <= 0) return null; // Need a few samples for a reliable estimate
+
+  const elapsedMs = Date.now() - discoveryStartedAt.value;
+  const rate = processed / elapsedMs; // pages per ms
+  const remaining = total - processed;
+  if (remaining <= 0) return null;
+
+  const remainingMs = remaining / rate;
+  const remainingSec = Math.ceil(remainingMs / 1000);
+
+  if (remainingSec < 5) return null; // Don't show for very short times
+  if (remainingSec < 60) {
+    return t("documents.import.discovery.eta.seconds", { seconds: remainingSec });
+  }
+  const minutes = Math.ceil(remainingSec / 60);
+  return t("documents.import.discovery.eta.minutes", { minutes });
+});
 // Import from server types (these would normally come from generated tRPC types)
 enum DocumentationType {
   ARTICLE = "article",
@@ -943,9 +1164,20 @@ const pollInterval = ref<ReturnType<typeof setInterval> | null>(null);
 // Computed steps based on import type
 const steps = computed(() => {
   if (importType.value === "web") {
-    return [t("documents.import.steps.selectSource"), t("documents.import.steps.enterUrl"), t("documents.import.steps.selectPages"), t("documents.import.steps.addMetadata"), t("documents.import.steps.processing")];
+    return [
+      t("documents.import.steps.selectSource"),
+      t("documents.import.steps.enterUrl"),
+      t("documents.import.steps.selectPages"),
+      t("documents.import.steps.addMetadata"),
+      t("documents.import.steps.processing"),
+    ];
   } else if (importType.value === "upload") {
-    return [t("documents.import.steps.selectSource"), t("documents.import.steps.selectFiles"), t("documents.import.steps.addDetails"), t("documents.import.steps.upload")];
+    return [
+      t("documents.import.steps.selectSource"),
+      t("documents.import.steps.selectFiles"),
+      t("documents.import.steps.addDetails"),
+      t("documents.import.steps.upload"),
+    ];
   } else {
     return [t("documents.import.steps.selectSource")];
   }
@@ -1205,10 +1437,18 @@ const isValidUrl = (url: string) => {
   }
 };
 
+const normalizeWebsiteUrl = () => {
+  const value = websiteUrl.value.trim();
+  if (value && !/^https?:\/\//i.test(value)) {
+    websiteUrl.value = `https://${value}`;
+  }
+};
+
 const discoverPages = async () => {
   if (!isValidUrl(websiteUrl.value)) return;
 
   isDiscovering.value = true;
+  discoveryStartedAt.value = Date.now();
   currentStep.value = 3;
   discoveryProgress.value = {
     found: 0,
@@ -1318,7 +1558,10 @@ const cancelImport = async () => {
     }
 
     // Show success message
-    toast.success(t("documents.import.toast.cancelSuccess"), t("documents.import.toast.cancelSuccessMessage"));
+    toast.success(
+      t("documents.import.toast.cancelSuccess"),
+      t("documents.import.toast.cancelSuccessMessage"),
+    );
 
     // Navigate back to documents
     setTimeout(() => {
@@ -1326,7 +1569,10 @@ const cancelImport = async () => {
     }, 2000);
   } catch (error) {
     console.error("Failed to cancel import:", error);
-    toast.error(t("documents.import.toast.cancelFailed"), t("documents.import.toast.cancelFailedMessage"));
+    toast.error(
+      t("documents.import.toast.cancelFailed"),
+      t("documents.import.toast.cancelFailedMessage"),
+    );
   }
 };
 
@@ -1513,7 +1759,11 @@ const startUpload = async () => {
     if (allSuccess) {
       console.log(`Successfully uploaded ${uploadedCount.value} document(s)`);
       toast.success(
-        t("documents.import.toast.uploadSuccess", { count: uploadedCount.value }, uploadedCount.value),
+        t(
+          "documents.import.toast.uploadSuccess",
+          { count: uploadedCount.value },
+          uploadedCount.value,
+        ),
       );
     } else {
       const failedCount = selectedFiles.value.filter((f) => f.uploadStatus === "error").length;
@@ -1522,10 +1772,16 @@ const startUpload = async () => {
         console.log(`${uploadedCount.value} succeeded, ${failedCount} failed`);
         if (uploadedCount.value > 0) {
           toast.warning(
-            t("documents.import.toast.uploadPartial", { success: uploadedCount.value, failed: failedCount }, uploadedCount.value),
+            t(
+              "documents.import.toast.uploadPartial",
+              { success: uploadedCount.value, failed: failedCount },
+              uploadedCount.value,
+            ),
           );
         } else {
-          toast.error(t("documents.import.toast.uploadFailed", { count: failedCount }, failedCount));
+          toast.error(
+            t("documents.import.toast.uploadFailed", { count: failedCount }, failedCount),
+          );
         }
       }
     }
@@ -1612,17 +1868,20 @@ const resetImport = () => {
 };
 
 const toggleSelectAll = (checked: boolean) => {
+  const filteredUrls = new Set(filteredDiscoveredPages.value.map((p) => p.url));
   discoveredPages.value = discoveredPages.value.map((page) => ({
     ...page,
-    selected: checked,
+    selected: filteredUrls.has(page.url) ? checked : page.selected,
   }));
 };
 
-const togglePageSelection = (index: number, checked: boolean) => {
+const togglePageSelection = (url: string, checked: boolean) => {
+  const idx = discoveredPages.value.findIndex((p) => p.url === url);
+  if (idx === -1) return;
   discoveredPages.value = [
-    ...discoveredPages.value.slice(0, index),
-    { ...discoveredPages.value[index], selected: checked },
-    ...discoveredPages.value.slice(index + 1),
+    ...discoveredPages.value.slice(0, idx),
+    { ...discoveredPages.value[idx], selected: checked },
+    ...discoveredPages.value.slice(idx + 1),
   ];
 };
 
