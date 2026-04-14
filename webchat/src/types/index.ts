@@ -1,12 +1,6 @@
 export interface HayChatConfig {
   organizationId: string;
   baseUrl: string;
-  /**
-   * ePrivacy / consent mode.
-   * - "strict": do not read/write cookies or web storage before the first user interaction.
-   * - undefined: current default behavior.
-   */
-  consent?: "strict";
   widgetTitle?: string;
   widgetSubtitle?: string;
   position?: "left" | "right";
@@ -30,6 +24,17 @@ export interface HayChatConfig {
   agentAvatarUrl?: string;
   /** Organization logo URL (relative path). Used as fallback for agent avatar. */
   organizationLogoUrl?: string;
+  /**
+   * ePrivacy consent mode for device storage.
+   * - `'implicit'` (default): persistent storage (localStorage, IndexedDB) is
+   *   enabled automatically once the visitor sends their first message, unless
+   *   the host calls `window.HayChat.revokeConsent()`.
+   * - `'strict'`: persistent storage is only enabled after the host calls
+   *   `window.HayChat.grantConsent()` (e.g. from a cookie banner's Accept).
+   * In both modes, no device storage is touched before the first user message,
+   * unless `grantConsent()` is called earlier in the page lifecycle.
+   */
+  consent?: "strict" | "implicit";
 }
 
 export interface Message {
@@ -81,6 +86,10 @@ declare global {
     HayChat?: {
       config?: HayChatConfig;
       addContext?: (key: string, value: unknown) => void;
+      /** Signal visitor consent (typically from a host-site cookie banner). Unlocks persistent storage. */
+      grantConsent?: () => void;
+      /** Withdraw visitor consent. Wipes persistent `hay-*` storage; session state stays until tab close. */
+      revokeConsent?: () => void;
     };
   }
 }

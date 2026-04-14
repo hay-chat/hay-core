@@ -1,4 +1,5 @@
-import { ref } from 'vue';
+import { ref, watch } from "vue";
+import { safeStorage, useConsent } from "./useConsent";
 
 interface QueuedMessage {
   id: string;
@@ -9,59 +10,55 @@ interface QueuedMessage {
 }
 
 /**
- * Message queue for offline/failed message handling
- * Stores messages locally and retries them with exponential backoff
+ * Message queue for offline/failed message handling.
+ * Stores messages locally and retries them with exponential backoff.
+ *
+ * Storage is gated by the ePrivacy consent model (see useConsent.ts): the
+ * queue stays in-memory until the persistent-storage gate opens, at which
+ * point it is hydrated from — and persisted back to — localStorage.
  */
-export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
+export function useMessageQueue() {
+  const { canUseLocal } = useConsent();
   const queue = ref<QueuedMessage[]>([]);
-  const STORAGE_KEY = 'hay-message-queue';
+  const STORAGE_KEY = "hay-message-queue";
   const MAX_RETRIES = 3;
-  let persistenceEnabled = options?.persistenceEnabled ?? true;
 
-  // Load queue from localStorage on init
+  // Load queue from localStorage
   const loadQueue = () => {
-    if (!persistenceEnabled) return;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = safeStorage.local.getItem(STORAGE_KEY);
       if (stored) {
         queue.value = JSON.parse(stored);
       }
     } catch (error) {
-      console.error('[MessageQueue] Failed to load queue:', error);
+      console.error("[MessageQueue] Failed to load queue:", error);
     }
   };
 
-  // Save queue to localStorage
+  // Save queue to localStorage (no-op when gate is closed — queue stays in memory)
   const saveQueue = () => {
-    if (!persistenceEnabled) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(queue.value));
+      safeStorage.local.setItem(STORAGE_KEY, JSON.stringify(queue.value));
     } catch (error) {
-      console.error('[MessageQueue] Failed to save queue:', error);
+      console.error("[MessageQueue] Failed to save queue:", error);
     }
-  };
-
-  const enablePersistence = () => {
-    if (persistenceEnabled) return;
-    persistenceEnabled = true;
-    loadQueue();
   };
 
   // Add message to queue
-  const enqueue = (message: Omit<QueuedMessage, 'retryCount'>) => {
+  const enqueue = (message: Omit<QueuedMessage, "retryCount">) => {
     queue.value.push({
       ...message,
       retryCount: 0,
     });
     saveQueue();
-    console.log('[MessageQueue] Message queued:', message.id);
+    console.log("[MessageQueue] Message queued:", message.id);
   };
 
   // Remove message from queue
   const dequeue = (messageId: string) => {
     queue.value = queue.value.filter((msg) => msg.id !== messageId);
     saveQueue();
-    console.log('[MessageQueue] Message dequeued:', messageId);
+    console.log("[MessageQueue] Message dequeued:", messageId);
   };
 
   // Get next message to retry with exponential backoff
@@ -71,7 +68,7 @@ export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
     for (const msg of queue.value) {
       // Skip if max retries reached
       if (msg.retryCount >= MAX_RETRIES) {
-        console.log('[MessageQueue] Max retries reached for:', msg.id);
+        console.log("[MessageQueue] Max retries reached for:", msg.id);
         continue;
       }
 
@@ -101,10 +98,8 @@ export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
   // Clear all messages from queue
   const clearQueue = () => {
     queue.value = [];
-    if (persistenceEnabled) {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    console.log('[MessageQueue] Queue cleared');
+    safeStorage.local.removeItem(STORAGE_KEY);
+    console.log("[MessageQueue] Queue cleared");
   };
 
   // Get messages for specific conversation
@@ -123,8 +118,31 @@ export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
     }
   };
 
-  // Initialize
+  // Initial load: only has effect if the persistent-storage gate is already
+  // open (e.g. implicit mode with a prior interaction already simulated, or
+  // strict mode with a pre-mount grantConsent()).
   loadQueue();
+
+  // When the gate opens later, hydrate any previously-persisted queue into
+  // memory and then flush the current in-memory queue back to storage so the
+  // two stay consistent. If the gate closes again (revoke), the in-memory
+  // queue keeps working but writes will no-op.
+  watch(canUseLocal, (allowed) => {
+    if (!allowed) return;
+    try {
+      const stored = safeStorage.local.getItem(STORAGE_KEY);
+      if (stored) {
+        const persisted: QueuedMessage[] = JSON.parse(stored);
+        // Merge by id — in-memory entries take precedence over stale persisted ones
+        const inMemoryIds = new Set(queue.value.map((m) => m.id));
+        const merged = [...queue.value, ...persisted.filter((m) => !inMemoryIds.has(m.id))];
+        queue.value = merged;
+      }
+    } catch (error) {
+      console.error("[MessageQueue] Failed to hydrate queue after consent:", error);
+    }
+    saveQueue();
+  });
 
   return {
     queue,
@@ -135,6 +153,5 @@ export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
     clearQueue,
     getQueueForConversation,
     clearFailedMessages,
-    enablePersistence,
   };
 }

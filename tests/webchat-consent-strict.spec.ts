@@ -11,17 +11,16 @@ test.describe("Webchat ePrivacy consent strict", () => {
       return {
         local: Object.keys(window.localStorage),
         session: Object.keys(window.sessionStorage),
-        orgId:
-          (() => {
-            try {
-              const raw = window.localStorage.getItem("pinia:user");
-              if (!raw) return null;
-              const parsed = JSON.parse(raw);
-              return parsed?.user?.activeOrganizationId ?? null;
-            } catch {
-              return null;
-            }
-          })() as string | null,
+        orgId: (() => {
+          try {
+            const raw = window.localStorage.getItem("pinia:user");
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed?.user?.activeOrganizationId ?? null;
+          } catch {
+            return null;
+          }
+        })() as string | null,
       };
     });
 
@@ -65,15 +64,42 @@ test.describe("Webchat ePrivacy consent strict", () => {
     const newHaySession = newSession.filter((k) => k.startsWith("hay-"));
 
     expect(newHayLocal, `Unexpected new localStorage keys: ${newLocal.join(", ")}`).toEqual([]);
-    expect(newHaySession, `Unexpected new sessionStorage keys: ${newSession.join(", ")}`).toEqual([]);
+    expect(newHaySession, `Unexpected new sessionStorage keys: ${newSession.join(", ")}`).toEqual(
+      [],
+    );
 
-    // First user interaction: click the minimized widget button to open.
+    // Opening the launcher must NOT unlock storage under the first-message gate.
+    // The ePrivacy "service explicitly requested" signal is the first message, not the click.
     await page.locator("button.hay-chat-button").click();
+    await page.waitForSelector("#hay-webchat-root", { state: "visible" });
 
-    // Now storage usage is allowed; expect at least session storage to be used for conversation tracking.
+    const afterOpen = await page.evaluate(() => ({
+      local: Object.keys(window.localStorage),
+      session: Object.keys(window.sessionStorage),
+    }));
+    const newLocalAfterOpen = afterOpen.local
+      .filter((k) => !before.local.includes(k))
+      .filter((k) => k.startsWith("hay-"));
+    const newSessionAfterOpen = afterOpen.session
+      .filter((k) => !before.session.includes(k))
+      .filter((k) => k.startsWith("hay-"));
+    expect(
+      newLocalAfterOpen,
+      `Opening the launcher must not write localStorage: ${newLocalAfterOpen.join(", ")}`,
+    ).toEqual([]);
+    expect(
+      newSessionAfterOpen,
+      `Opening the launcher must not write sessionStorage: ${newSessionAfterOpen.join(", ")}`,
+    ).toEqual([]);
+
+    // First user interaction proper: type a message and send it.
+    await page.locator("textarea, input[type='text']").first().fill("hello");
+    await page.keyboard.press("Enter");
+
+    // Now storage usage is allowed; expect at least session storage to be used
+    // for conversation tracking once the first message lands.
     await page.waitForFunction(() => {
       return Object.keys(window.sessionStorage).some((k) => k.startsWith("hay-"));
     });
   });
 });
-
