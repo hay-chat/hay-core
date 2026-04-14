@@ -1,4 +1,19 @@
 {
+  "channels": {
+    "title": "Canais",
+    "description": "Canais de comunicação ativos conectando seus clientes ao Hay",
+    "headTitle": "Canais - Hay Dashboard",
+    "browseMarketplace": "Ver Marketplace",
+    "loading": "Carregando canais...",
+    "empty": {
+      "title": "Nenhum canal ativo",
+      "description": "Instale uma integração de canal no marketplace para começar a receber conversas.",
+      "action": "Ver Marketplace"
+    },
+    "actions": {
+      "configure": "Configurar"
+    }
+  },
   "marketplace": {
     "title": "Marketplace de Integrações",
     "description": "Descubra e instale integrações para ampliar as capacidades da sua plataforma",

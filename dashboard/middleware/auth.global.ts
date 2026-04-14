@@ -33,6 +33,7 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/integrations/marketplace": ["owner", "admin"],
   "/integrations/plugins": ["owner", "admin"],
   "/plugins": ["owner", "admin"],
+  "/channels": ["owner", "admin"],
 };
 
 /**

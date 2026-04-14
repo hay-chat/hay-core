@@ -355,7 +355,7 @@
       </div>
 
       <!-- Right Side: Context Panel -->
-      <div class="w-80 border-l bg-background-tertiary">
+      <div class="w-80 border-l bg-background-tertiary overflow-y-auto">
         <div class="p-6 space-y-6">
           <!-- Playground Mode Panels -->
           <template v-if="isPlaygroundMode">
@@ -616,18 +616,16 @@
               </CardHeader>
               <CardContent>
                 <div class="space-y-2">
-                  <div
+                  <NuxtLink
                     v-for="article in relatedArticles"
                     :key="article.id"
-                    class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
+                    :to="`/documents/${article.id}`"
+                    class="block p-2 border rounded text-sm hover:bg-background-secondary"
                   >
-                    <div class="font-medium">
+                    <div class="font-medium truncate">
                       {{ article.title }}
                     </div>
-                    <div class="text-xs text-neutral-muted">
-                      {{ article.category || $t("conversations.relatedArticles.defaultCategory") }}
-                    </div>
-                  </div>
+                  </NuxtLink>
                 </div>
               </CardContent>
             </Card>
@@ -1318,6 +1316,28 @@ const fetchConversation = async () => {
     previousMessageCount.value = currentMessageCount;
 
     conversation.value = result;
+
+    // Populate related articles from conversation's linked documents
+    const documentIds = (result as any).document_ids as string[] | null | undefined;
+    if (documentIds && documentIds.length > 0) {
+      try {
+        const docs = await Promise.all(
+          documentIds.map((id) => HayApi.documents.getById.query({ id })),
+        );
+        relatedArticles.value = docs.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          url: doc.sourceUrl || "",
+          snippet: doc.description || "",
+          category: doc.categories?.[0],
+        }));
+      } catch (err) {
+        console.error("Failed to fetch related documents:", err);
+        relatedArticles.value = [];
+      }
+    } else {
+      relatedArticles.value = [];
+    }
 
     // Playground mode: Transform messages for display
     if (isPlaygroundMode.value) {
