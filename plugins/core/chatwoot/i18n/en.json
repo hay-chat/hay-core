@@ -1,0 +1,27 @@
+{
+  "name": "Chatwoot",
+  "description": "Connect Chatwoot as a communication channel — route conversations through Hay's AI orchestrator and escalate back to Chatwoot human agents",
+  "tools": {},
+  "config": {
+    "baseUrl": {
+      "label": "Chatwoot Base URL",
+      "description": "Your Chatwoot instance URL (e.g., https://app.chatwoot.com for cloud, or your self-hosted URL)"
+    },
+    "accountId": {
+      "label": "Account ID",
+      "description": "Your Chatwoot account ID (the number in your Chatwoot dashboard URL)"
+    },
+    "botAccessToken": {
+      "label": "Agent Bot Access Token",
+      "description": "The access_token returned when you created the Agent Bot in Chatwoot"
+    },
+    "webhookSecret": {
+      "label": "Webhook Secret",
+      "description": "A random string used to authenticate inbound webhooks from Chatwoot"
+    },
+    "defaultEscalationTeamId": {
+      "label": "Escalation Team ID (optional)",
+      "description": "When the AI hands off to a human, assign the Chatwoot conversation to this team"
+    }
+  }
+}
