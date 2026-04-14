@@ -167,14 +167,23 @@
       "takenOver": "Conversation taken over",
       "takenOverMessage": "You are now handling this conversation",
       "takeoverFailed": "Takeover failed",
+      "takeoverFailedMessage": "Failed to take over conversation",
       "released": "Conversation released",
       "releasedToAi": "Conversation returned to AI",
       "releasedToQueue": "Conversation returned to queue",
       "releaseFailed": "Release failed",
+      "releaseFailedMessage": "Failed to release conversation",
       "closed": "Conversation closed",
       "closedMessage": "This conversation has been marked as closed",
       "closeFailed": "Close failed",
       "legalHoldFailed": "Failed to update legal hold"
+    },
+    "notifications": {
+      "humanAttentionNeeded": {
+        "title": "Human Attention Needed",
+        "bodyWithTitle": "Conversation \"{title}\" requires human assistance",
+        "bodyDefault": "New conversation requires human assistance"
+      }
     }
   }
 }

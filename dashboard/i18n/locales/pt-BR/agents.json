@@ -3,5 +3,24 @@
     "label": "Idioma de Resposta",
     "placeholder": "Herdar da Organização",
     "helperText": "O idioma que o agente usará para responder. Se não definido, herda o idioma padrão da organização."
+  },
+  "toast": {
+    "setAsDefaultSuccess": "Agente definido como padrão com sucesso",
+    "setAsDefaultFailed": "Falha ao definir o agente como padrão. Tente novamente.",
+    "enabledSuccess": "Agente ativado com sucesso",
+    "disabledSuccess": "Agente desativado com sucesso",
+    "toggleStatusFailed": "Falha ao alternar o status do agente",
+    "deletedSuccess": "Agente excluído com sucesso",
+    "deleteFailed": "Falha ao excluir o agente. Tente novamente.",
+    "bulkDeleteSuccess": "{count} agente(s) excluído(s) com sucesso",
+    "bulkDeletePartial": "{success} agente(s) excluído(s) com sucesso. Falha ao excluir {failed} agente(s).",
+    "bulkDeleteFailed": "Falha ao excluir os agentes. Tente novamente.",
+    "updatedSuccess": "Agente atualizado com sucesso",
+    "createdSuccess": "Agente criado com sucesso",
+    "updateFailed": "Falha ao atualizar o agente. Tente novamente.",
+    "createFailed": "Falha ao criar o agente. Tente novamente.",
+    "notFound": "Agente não encontrado",
+    "loadFailed": "Falha ao carregar o agente",
+    "loadListFailed": "Falha ao carregar os agentes"
   }
 }

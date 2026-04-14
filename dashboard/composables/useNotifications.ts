@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useRouter } from "vue-router";
 
@@ -21,6 +22,7 @@ const NOTIFICATION_DEDUPE_WINDOW = 5000; // 5 seconds
 export function useNotifications() {
   const toast = useToast();
   const router = useRouter();
+  const { t } = useI18n();
 
   /**
    * Request browser notification permission
@@ -196,10 +198,12 @@ export function useNotifications() {
       }
     }
 
-    const title = "Human Attention Needed";
+    const title = t("conversations.notifications.humanAttentionNeeded.title");
     const body = conversation.title
-      ? `Conversation "${conversation.title}" requires human assistance`
-      : `New conversation requires human assistance`;
+      ? t("conversations.notifications.humanAttentionNeeded.bodyWithTitle", {
+          title: conversation.title,
+        })
+      : t("conversations.notifications.humanAttentionNeeded.bodyDefault");
 
     await notify({
       title,

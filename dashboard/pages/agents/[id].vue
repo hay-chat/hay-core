@@ -274,6 +274,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { ArrowLeft, Trash2, Star, FastForward, Hand, CornerDownRight } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
@@ -284,6 +285,7 @@ import { useOrganizationStore } from "~/stores/organization";
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const { t } = useI18n();
 const organizationStore = useOrganizationStore();
 const { formatDateTime } = useOrgDateTime();
 const loadingInstructions = ref(false);
@@ -410,7 +412,7 @@ onMounted(async () => {
       });
 
       if (!agentResponse) {
-        toast.error("Agent not found");
+        toast.error(t("agents.toast.notFound"));
         await router.push("/agents");
         return;
       }
@@ -465,7 +467,7 @@ onMounted(async () => {
   } catch (error) {
     console.error("Failed to load data:", error);
     if (isEditMode.value) {
-      toast.error("Failed to load agent");
+      toast.error(t("agents.toast.loadFailed"));
       await router.push("/agents");
     }
   } finally {
@@ -536,12 +538,12 @@ const handleSubmit = async () => {
         id: agentId.value,
         data: payload,
       });
-      toast.success("Agent updated successfully");
+      toast.success(t("agents.toast.updatedSuccess"));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
     } else {
       // Create new agent
       const response = await HayApi.agents.create.mutate(payload);
-      toast.success("Agent created successfully");
+      toast.success(t("agents.toast.createdSuccess"));
       markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
       // Check if there's a redirect parameter
@@ -559,7 +561,7 @@ const handleSubmit = async () => {
     await router.push("/agents");
   } catch (error) {
     console.error("Failed to save agent:", error);
-    toast.error(`Failed to ${isEditMode.value ? "update" : "create"} agent. Please try again.`);
+    toast.error(isEditMode.value ? t("agents.toast.updateFailed") : t("agents.toast.createFailed"));
   } finally {
     isSubmitting.value = false;
   }
@@ -585,13 +587,13 @@ const confirmDelete = async () => {
 
     await HayApi.agents.delete.mutate({ id: agentId.value });
 
-    toast.success("Agent deleted successfully");
+    toast.success(t("agents.toast.deletedSuccess"));
     markAsSaved(); // Mark as saved to prevent unsaved changes prompt
 
     await router.push("/agents");
   } catch (error) {
     console.error("Failed to delete agent:", error);
-    toast.error("Failed to delete agent. Please try again.");
+    toast.error(t("agents.toast.deleteFailed"));
   } finally {
     isSubmitting.value = false;
     showDeleteDialog.value = false;
@@ -613,10 +615,10 @@ const setAsDefaultAgent = async () => {
       organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
     }
 
-    toast.success("Agent set as default successfully");
+    toast.success(t("agents.toast.setAsDefaultSuccess"));
   } catch (error) {
     console.error("Failed to set agent as default:", error);
-    toast.error("Failed to set agent as default. Please try again.");
+    toast.error(t("agents.toast.setAsDefaultFailed"));
   } finally {
     settingAsDefault.value = false;
   }
