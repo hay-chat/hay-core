@@ -3,13 +3,13 @@
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
-        <Button size="sm" @click="openPlayground">
+        <Button @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
-          {{ $t('conversations.actions.playground') }}
+          {{ $t("conversations.actions.playground") }}
         </Button>
-        <Button variant="outline" size="sm" @click="refreshConversations">
+        <Button variant="outline" @click="refreshConversations">
           <RefreshCcw class="h-4 w-4 mr-2" />
-          {{ $t('conversations.actions.refresh') }}
+          {{ $t("conversations.actions.refresh") }}
         </Button>
       </div>
     </template>
@@ -53,7 +53,11 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <div class="min-w-[300px]">
-          <Input v-model="searchQuery" :placeholder="$t('conversations.filters.searchPlaceholder')" :icon-start="Search" />
+          <Input
+            v-model="searchQuery"
+            :placeholder="$t('conversations.filters.searchPlaceholder')"
+            :icon-start="Search"
+          />
         </div>
 
         <Input
@@ -69,11 +73,11 @@
       <div class="flex items-center space-x-2">
         <Button variant="outline" size="sm" @click="toggleBulkMode">
           <CheckSquare class="h-4 w-4 mr-2" />
-          {{ bulkMode ? $t('conversations.actions.exit') : $t('conversations.actions.select') }}
+          {{ bulkMode ? $t("conversations.actions.exit") : $t("conversations.actions.select") }}
         </Button>
         <Button v-if="selectedConversations.length > 0" variant="outline" size="sm">
           <Archive class="h-4 w-4 mr-2" />
-          {{ $t('conversations.actions.archive', { count: selectedConversations.length }) }}
+          {{ $t("conversations.actions.archive", { count: selectedConversations.length }) }}
         </Button>
       </div>
     </div>
@@ -104,18 +108,20 @@
       </p>
       <Button variant="outline" @click="fetchConversations">
         <RefreshCcw class="h-4 w-4 mr-2" />
-        {{ $t('conversations.actions.tryAgain') }}
+        {{ $t("conversations.actions.tryAgain") }}
       </Button>
     </div>
 
     <!-- Empty State -->
     <EmptyState
       v-else-if="filteredConversations.length === 0"
-      :title="searchQuery ? $t('conversations.empty.noConversationsFound') : $t('conversations.empty.noConversationsYet')"
-      :description="
+      :title="
         searchQuery
-          ? $t('conversations.empty.adjustSearch')
-          : $t('conversations.empty.startFirst')
+          ? $t('conversations.empty.noConversationsFound')
+          : $t('conversations.empty.noConversationsYet')
+      "
+      :description="
+        searchQuery ? $t('conversations.empty.adjustSearch') : $t('conversations.empty.startFirst')
       "
       illustration="/bale/conversation.svg"
       :action="searchQuery ? undefined : $t('conversations.actions.startPlayground')"
@@ -137,12 +143,12 @@
                   @update:checked="toggleSelectAll"
                 />
               </TableHead>
-              <TableHead>{{ $t('conversations.table.conversation') }}</TableHead>
-              <TableHead>{{ $t('conversations.table.status') }}</TableHead>
-              <TableHead>{{ $t('conversations.table.assignedTo') }}</TableHead>
-              <TableHead>{{ $t('conversations.table.duration') }}</TableHead>
-              <TableHead>{{ $t('conversations.table.satisfaction') }}</TableHead>
-              <TableHead>{{ $t('conversations.table.updated') }}</TableHead>
+              <TableHead>{{ $t("conversations.table.conversation") }}</TableHead>
+              <TableHead>{{ $t("conversations.table.status") }}</TableHead>
+              <TableHead>{{ $t("conversations.table.assignedTo") }}</TableHead>
+              <TableHead>{{ $t("conversations.table.duration") }}</TableHead>
+              <TableHead>{{ $t("conversations.table.satisfaction") }}</TableHead>
+              <TableHead>{{ $t("conversations.table.updated") }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,13 +168,17 @@
                 <div class="flex items-center space-x-3">
                   <div>
                     <div class="font-medium">
-                      {{ conversation.title || $t('conversations.table.newConversation') }}
+                      {{ conversation.title || $t("conversations.table.newConversation") }}
                     </div>
                     <div class="text-xs text-neutral-muted">
                       {{ conversation.id.slice(0, 8) }}...
                     </div>
                     <div v-if="getWaitTime(conversation)" class="text-xs font-medium mt-1">
-                      {{ $t('conversations.table.waiting', { time: formatWaitTime(getWaitTime(conversation)!) }) }}
+                      {{
+                        $t("conversations.table.waiting", {
+                          time: formatWaitTime(getWaitTime(conversation)!),
+                        })
+                      }}
                     </div>
                   </div>
                 </div>
@@ -198,7 +208,9 @@
                   <Star class="h-4 w-4 text-yellow-500 fill-current" />
                   <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
                 </div>
-                <span v-else class="text-xs text-neutral-muted">{{ $t('conversations.table.notRated') }}</span>
+                <span v-else class="text-xs text-neutral-muted">{{
+                  $t("conversations.table.notRated")
+                }}</span>
               </TableCell>
               <TableCell class="text-sm text-neutral-muted">
                 {{ formatRelativeTime(conversation.updated_at) }}
