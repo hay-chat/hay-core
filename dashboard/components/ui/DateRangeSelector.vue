@@ -5,7 +5,7 @@
     <!-- Preset Options Dropdown -->
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" class="w-auto">
+        <Button variant="outline" class="w-auto">
           {{ displayText }}
           <ChevronDown class="ml-2 h-4 w-4" />
         </Button>
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 
 type PresetType = "last7" | "last30" | "last90" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 
-const selectedPreset = ref<PresetType>("last7");
+const selectedPreset = ref<PresetType>("last30");
 const customDates = ref<DateRange>({
   startDate: "",
   endDate: "",
@@ -145,12 +145,11 @@ const updateCustomDate = (field: "startDate" | "endDate", value: string) => {
   }
 };
 
-// Initialize with last 7 days
+// Initialize with last 30 days by default
 onMounted(() => {
-  if (!props.modelValue) {
-    selectPreset("last7");
+  if (!props.modelValue || (!props.modelValue.startDate && !props.modelValue.endDate)) {
+    selectPreset("last30");
   } else {
-    // Try to detect which preset matches the current dates
     customDates.value = props.modelValue;
     selectedPreset.value = "custom";
   }

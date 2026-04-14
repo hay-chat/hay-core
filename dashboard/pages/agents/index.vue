@@ -315,6 +315,7 @@ import {
 } from "lucide-vue-next";
 
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useOrganizationStore } from "@/stores/organization";
 import { HayApi, Hay } from "@/utils/api";
@@ -357,6 +358,7 @@ const typeFilter = ref("");
 const selectedAgents = ref<string[]>([]);
 const router = useRouter();
 const toast = useToast();
+const { t } = useI18n();
 const organizationStore = useOrganizationStore();
 const { formatDateTime } = useOrgDateTime();
 const currentPage = ref(1);
@@ -448,7 +450,7 @@ const refreshData = async () => {
     }));
   } catch (error) {
     console.error("Error refreshing data:", error);
-    toast.error((error as Error).message || "Failed to load agents");
+    toast.error((error as Error).message || t("agents.toast.loadListFailed"));
   } finally {
     loading.value = false;
   }
@@ -504,10 +506,10 @@ const setAgentAsDefault = async (agentId: string) => {
       organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
     }
 
-    toast.success("Agent set as default successfully");
+    toast.success(t("agents.toast.setAsDefaultSuccess"));
   } catch (error) {
     console.error("Failed to set agent as default:", error);
-    toast.error("Failed to set agent as default. Please try again.");
+    toast.error(t("agents.toast.setAsDefaultFailed"));
   }
 };
 
@@ -526,10 +528,12 @@ const toggleAgentStatus = async (agent: AgentData) => {
     agent.status = newEnabledState ? "active" : "inactive";
     agent.enabled = newEnabledState;
 
-    toast.success(`Agent ${newEnabledState ? "enabled" : "disabled"} successfully`);
+    toast.success(
+      newEnabledState ? t("agents.toast.enabledSuccess") : t("agents.toast.disabledSuccess"),
+    );
   } catch (error) {
     console.error("Error toggling agent status:", error);
-    toast.error((error as Error).message || "Failed to toggle agent status");
+    toast.error((error as Error).message || t("agents.toast.toggleStatusFailed"));
   }
 };
 
@@ -609,11 +613,11 @@ const performSingleDelete = async () => {
 
       console.log("Agent deleted successfully");
 
-      toast.success("Agent deleted successfully");
+      toast.success(t("agents.toast.deletedSuccess"));
     }
   } catch (error) {
     console.error("Error deleting agent:", error);
-    toast.error((error as Error).message || "Failed to delete agent. Please try again.");
+    toast.error((error as Error).message || t("agents.toast.deleteFailed"));
   } finally {
     agentToDelete.value = null;
   }
@@ -645,14 +649,17 @@ const performBulkDelete = async () => {
 
     if (errors.length > 0) {
       toast.warning(
-        `Successfully deleted ${successfulDeletes.length} agent(s). Failed to delete ${errors.length} agent(s).`,
+        t("agents.toast.bulkDeletePartial", {
+          success: successfulDeletes.length,
+          failed: errors.length,
+        }),
       );
     } else {
-      toast.success(`Successfully deleted ${successfulDeletes.length} agent(s)`);
+      toast.success(t("agents.toast.bulkDeleteSuccess", { count: successfulDeletes.length }));
     }
   } catch (error) {
     console.error("Error deleting agents:", error);
-    toast.error((error as Error).message || "Failed to delete agents. Please try again.");
+    toast.error((error as Error).message || t("agents.toast.bulkDeleteFailed"));
   }
 };
 

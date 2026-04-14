@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { HayApi } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useRouter } from "vue-router";
@@ -13,6 +14,7 @@ export interface AssignedUser {
 export function useConversationTakeover() {
   const toast = useToast();
   const router = useRouter();
+  const { t } = useI18n();
 
   const loading = ref(false);
   const showTakeoverDialog = ref(false);
@@ -31,7 +33,7 @@ export function useConversationTakeover() {
         force,
       });
 
-      toast.success("Conversation taken over", "You are now handling this conversation");
+      toast.success(t("conversations.toast.takenOver"), t("conversations.toast.takenOverMessage"));
       return true;
     } catch (error: any) {
       // Handle conflict - another user has already taken over
@@ -45,8 +47,8 @@ export function useConversationTakeover() {
       }
 
       // Handle other errors
-      const errorMessage = error?.message || "Failed to take over conversation";
-      toast.error("Takeover failed", errorMessage);
+      const errorMessage = error?.message || t("conversations.toast.takeoverFailedMessage");
+      toast.error(t("conversations.toast.takeoverFailed"), errorMessage);
       return false;
     } finally {
       loading.value = false;
@@ -89,18 +91,18 @@ export function useConversationTakeover() {
 
       const message =
         mode === "ai"
-          ? "Conversation returned to AI"
-          : "Conversation returned to queue";
+          ? t("conversations.toast.releasedToAi")
+          : t("conversations.toast.releasedToQueue");
 
-      toast.success("Conversation released", message);
+      toast.success(t("conversations.toast.released"), message);
       showReleaseDialog.value = false;
 
       // Navigate back to conversations list
       router.push("/conversations");
       return true;
     } catch (error: any) {
-      const errorMessage = error?.message || "Failed to release conversation";
-      toast.error("Release failed", errorMessage);
+      const errorMessage = error?.message || t("conversations.toast.releaseFailedMessage");
+      toast.error(t("conversations.toast.releaseFailed"), errorMessage);
       return false;
     } finally {
       loading.value = false;

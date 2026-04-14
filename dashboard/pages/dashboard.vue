@@ -238,6 +238,10 @@
           </div>
         </CardContent>
       </Card>
+      <!-- Active Conversations (Live) -->
+      <ActiveConversationsWidget />
+      <!-- Escalations -->
+      <EscalationsWidget />
       <!-- Attention Needed Conversations -->
       <AttentionNeededWidget />
 

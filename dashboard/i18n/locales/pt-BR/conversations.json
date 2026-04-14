@@ -167,14 +167,23 @@
       "takenOver": "Conversa assumida",
       "takenOverMessage": "Você agora está gerenciando esta conversa",
       "takeoverFailed": "Falha ao assumir",
+      "takeoverFailedMessage": "Falha ao assumir a conversa",
       "released": "Conversa liberada",
       "releasedToAi": "Conversa devolvida para a IA",
       "releasedToQueue": "Conversa devolvida para a fila",
       "releaseFailed": "Falha ao liberar",
+      "releaseFailedMessage": "Falha ao liberar a conversa",
       "closed": "Conversa encerrada",
       "closedMessage": "Esta conversa foi marcada como encerrada",
       "closeFailed": "Falha ao encerrar",
       "legalHoldFailed": "Falha ao atualizar retenção legal"
+    },
+    "notifications": {
+      "humanAttentionNeeded": {
+        "title": "Atenção Humana Necessária",
+        "bodyWithTitle": "A conversa \"{title}\" precisa de atendimento humano",
+        "bodyDefault": "Uma nova conversa precisa de atendimento humano"
+      }
     }
   }
 }

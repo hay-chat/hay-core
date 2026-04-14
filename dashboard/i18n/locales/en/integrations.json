@@ -233,7 +233,11 @@
       "oauthSuccess": "OAuth connection established successfully",
       "oauthFailed": "OAuth connection failed. Please try again.",
       "connectionEstablished": "Connection established successfully",
-      "connectionCheckFailed": "Failed to establish connection. Please check your configuration."
+      "connectionCheckFailed": "Failed to establish connection. Please check your configuration.",
+      "oauthConnectFailed": "Failed to connect to {name}",
+      "oauthConnectedTo": "Successfully connected to {name}!",
+      "oauthDisconnectedFrom": "Disconnected from {name}",
+      "oauthDisconnectFailed": "Failed to disconnect"
     }
   }
 }

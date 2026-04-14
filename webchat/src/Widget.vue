@@ -18,7 +18,7 @@
         :agent-avatar-url="resolvedAvatarUrl"
         :organization-logo-url="resolvedLogoUrl"
         :current-agent-type="currentAgentType"
-        :current-agent-name="currentAgentName"
+        :current-agent-name="currentAgentName || undefined"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
@@ -129,9 +129,7 @@ const {
   isConversationClosed,
   currentAgentType,
   currentAgentName,
-  initialize,
   toggleChat,
-  openChat,
   closeChat,
   sendMessage,
   startTyping,

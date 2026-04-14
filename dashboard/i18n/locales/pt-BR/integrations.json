@@ -233,7 +233,11 @@
       "oauthSuccess": "Conexão OAuth estabelecida com sucesso",
       "oauthFailed": "Conexão OAuth falhou. Por favor, tente novamente.",
       "connectionEstablished": "Conexão estabelecida com sucesso",
-      "connectionCheckFailed": "Falha ao estabelecer conexão. Por favor, verifique sua configuração."
+      "connectionCheckFailed": "Falha ao estabelecer conexão. Por favor, verifique sua configuração.",
+      "oauthConnectFailed": "Falha ao conectar ao {name}",
+      "oauthConnectedTo": "Conectado com sucesso ao {name}!",
+      "oauthDisconnectedFrom": "Desconectado do {name}",
+      "oauthDisconnectFailed": "Falha ao desconectar"
     }
   }
 }

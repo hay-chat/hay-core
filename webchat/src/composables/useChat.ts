@@ -51,9 +51,7 @@ export function useChat(config: HayChatConfig) {
     isTyping,
     connect,
     identify,
-    sendMessage: wsSendMessage, // Note: No longer used - we send via HTTP instead
     sendTypingIndicator,
-    loadHistory: wsLoadHistory,
     disconnect,
     setNonceUpdateCallback,
     setStatusChangeCallback,
@@ -398,7 +396,7 @@ export function useChat(config: HayChatConfig) {
   });
 
   // Set status change callback for conversation status updates
-  setStatusChangeCallback((status: string, payload: any) => {
+  setStatusChangeCallback((status: string, _payload: any) => {
     // Handle conversation closure
     if (status === "closed" || status === "resolved") {
       isConversationClosed.value = true;
@@ -432,11 +430,7 @@ export function useChat(config: HayChatConfig) {
       if (nextMessage) {
         try {
           // Try to send the message again via HTTP
-          await sendMessageInternal(
-            nextMessage.content,
-            nextMessage.conversationId,
-            0, // Don't increment retry count in sendMessage itself
-          );
+          await sendMessageInternal(nextMessage.content, nextMessage.conversationId);
 
           // Success - remove from queue
           messageQueue.dequeue(nextMessage.id);
@@ -673,11 +667,7 @@ export function useChat(config: HayChatConfig) {
   };
 
   // Internal send function (used by both public sendMessage and retry loop)
-  const sendMessageInternal = async (
-    text: string,
-    convId: string,
-    retryCount: number = 0,
-  ): Promise<void> => {
+  const sendMessageInternal = async (text: string, convId: string): Promise<void> => {
     if (!keypair.value) {
       throw new Error("No keypair available");
     }
@@ -765,7 +755,7 @@ export function useChat(config: HayChatConfig) {
 
       isSending.value = true;
 
-      await sendMessageInternal(text.trim(), conversationId.value!, retryCount);
+      await sendMessageInternal(text.trim(), conversationId.value!);
 
       // Don't call refreshMessages() here — the bot hasn't responded yet so it's
       // wasted work. The 10-second polling loop and WebSocket handle new messages.

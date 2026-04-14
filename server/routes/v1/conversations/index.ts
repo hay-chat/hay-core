@@ -4,6 +4,7 @@ import { conversationSecretService } from "../../../services/conversation-secret
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageStatus } from "../../../database/entities/message.entity";
+import { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
 import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
@@ -13,6 +14,7 @@ import { MessageRepository } from "@server/repositories/message.repository";
 import { DeliveryState } from "@server/types/message-feedback.types";
 import { createLogger } from "@server/lib/logger";
 import { ConversationExportService } from "../../../services/conversation-export.service";
+import { AppDataSource } from "../../../database/data-source";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -61,6 +63,205 @@ const sendMessageSchema = z.object({
 
 export const conversationsRouter = t.router({
   list: createListProcedure(conversationListInputSchema, conversationRepository),
+
+  /**
+   * Active conversations for dashboard widgets.
+   * Includes conversations handled by Hay or a human.
+   */
+  active: authenticatedProcedure.query(async ({ ctx }) => {
+    const organizationId = ctx.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
+    }
+
+    const statuses = ["open", "processing", "pending-human", "human-took-over"];
+
+    const rows = await AppDataSource.query(
+      `
+        SELECT
+          c.id,
+          c.title,
+          c.status,
+          c.assigned_user_id,
+          c.updated_at,
+          cust.name AS customer_name,
+          cust.external_id AS customer_external_id,
+          u.first_name AS handler_first_name,
+          u.last_name AS handler_last_name,
+          (
+            SELECT MAX(m.created_at)
+            FROM messages m
+            WHERE m.conversation_id = c.id
+          ) AS last_message_at
+        FROM conversations c
+        LEFT JOIN customers cust ON cust.id = c.customer_id
+        LEFT JOIN users u ON u.id = c.assigned_user_id
+        WHERE c.organization_id = $1
+          AND c.deleted_at IS NULL
+          AND c.status = ANY($2)
+        ORDER BY last_message_at DESC NULLS LAST, c.updated_at DESC
+        LIMIT 5
+      `,
+      [organizationId, statuses],
+    );
+
+    return (rows || []).map((r: any) => {
+      const handlerName =
+        r.handler_first_name || r.handler_last_name
+          ? `${r.handler_first_name || ""} ${r.handler_last_name || ""}`.trim()
+          : null;
+
+      const isHuman = r.status === "human-took-over" && !!r.assigned_user_id;
+
+      return {
+        id: r.id,
+        title: r.title || null,
+        customer: {
+          name: r.customer_name || null,
+          externalId: r.customer_external_id || null,
+        },
+        status: r.status,
+        handler: isHuman
+          ? { type: "human" as const, name: handlerName, userId: r.assigned_user_id }
+          : { type: "hay" as const, name: "Hay", userId: null },
+        lastMessageAt: r.last_message_at ? new Date(r.last_message_at).toISOString() : null,
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+        canJoin: !["closed", "resolved"].includes(r.status),
+      };
+    });
+  }),
+
+  /**
+   * Escalation (takeover) counts for dashboard widgets.
+   */
+  escalations: authenticatedProcedure
+    .input(z.object({ period: z.enum(["today", "week"]) }))
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
+      }
+
+      const now = new Date();
+      let start: Date;
+      if (input.period === "today") {
+        start = new Date(now);
+        start.setUTCHours(0, 0, 0, 0);
+      } else {
+        // ISO week starting Monday in UTC
+        start = new Date(now);
+        const day = start.getUTCDay(); // 0(Sun)..6
+        const diffToMonday = (day + 6) % 7;
+        start.setUTCDate(start.getUTCDate() - diffToMonday);
+        start.setUTCHours(0, 0, 0, 0);
+      }
+
+      const [escalationsRow] = await AppDataSource.query(
+        `
+          SELECT COUNT(*)::int AS count
+          FROM conversation_takeover_events e
+          WHERE e.organization_id = $1
+            AND e.started_at >= $2
+            AND e.started_at <= $3
+        `,
+        [organizationId, start.toISOString(), now.toISOString()],
+      );
+
+      const [conversationsRow] = await AppDataSource.query(
+        `
+          SELECT COUNT(*)::int AS count
+          FROM conversations c
+          WHERE c.organization_id = $1
+            AND c.deleted_at IS NULL
+            AND c.created_at >= $2
+            AND c.created_at <= $3
+        `,
+        [organizationId, start.toISOString(), now.toISOString()],
+      );
+
+      const totalEscalations = escalationsRow?.count ?? 0;
+      const totalConversations = conversationsRow?.count ?? 0;
+
+      // Percentage of conversations in period that had at least one takeover event
+      const [uniqueConversationsRow] = await AppDataSource.query(
+        `
+          SELECT COUNT(DISTINCT e.conversation_id)::int AS count
+          FROM conversation_takeover_events e
+          WHERE e.organization_id = $1
+            AND e.started_at >= $2
+            AND e.started_at <= $3
+        `,
+        [organizationId, start.toISOString(), now.toISOString()],
+      );
+
+      const conversationsWithEscalation = uniqueConversationsRow?.count ?? 0;
+      const percentage =
+        totalConversations > 0 ? (conversationsWithEscalation / totalConversations) * 100 : null;
+
+      return {
+        period: input.period,
+        totalEscalations,
+        totalConversations,
+        conversationsWithEscalation,
+        percentage,
+        window: { start: start.toISOString(), end: now.toISOString() },
+      };
+    }),
+
+  escalatedConversations: authenticatedProcedure
+    .input(
+      z.object({ period: z.enum(["today", "week"]), limit: z.number().optional().default(50) }),
+    )
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
+      }
+
+      const now = new Date();
+      let start: Date;
+      if (input.period === "today") {
+        start = new Date(now);
+        start.setUTCHours(0, 0, 0, 0);
+      } else {
+        start = new Date(now);
+        const day = start.getUTCDay();
+        const diffToMonday = (day + 6) % 7;
+        start.setUTCDate(start.getUTCDate() - diffToMonday);
+        start.setUTCHours(0, 0, 0, 0);
+      }
+
+      const idsRows = await AppDataSource.query(
+        `
+          SELECT DISTINCT e.conversation_id AS id
+          FROM conversation_takeover_events e
+          WHERE e.organization_id = $1
+            AND e.started_at >= $2
+            AND e.started_at <= $3
+          ORDER BY e.conversation_id
+          LIMIT $4
+        `,
+        [organizationId, start.toISOString(), now.toISOString(), input.limit],
+      );
+
+      const ids = (idsRows || []).map((r: any) => r.id).filter(Boolean);
+      if (ids.length === 0) return [];
+
+      // Return full conversation objects so the existing conversations table can render.
+      const repo = AppDataSource.getRepository(Conversation);
+      const conversations = await repo
+        .createQueryBuilder("conversation")
+        .where("conversation.organization_id = :organizationId", { organizationId })
+        .andWhere("conversation.deleted_at IS NULL")
+        .andWhere("conversation.id IN (:...ids)", { ids })
+        .leftJoinAndSelect("conversation.assignedUser", "assignedUser")
+        .leftJoinAndSelect("conversation.customer", "customer")
+        .leftJoinAndSelect("conversation.messages", "messages")
+        .orderBy("conversation.updated_at", "DESC")
+        .getMany();
+
+      return conversations;
+    }),
 
   dailyStats: authenticatedProcedure
     .input(
@@ -334,6 +535,19 @@ export const conversationsRouter = t.router({
       // Assign to current user
       await conversation.assignToUser(ctx.user!.id);
 
+      // Log escalation/takeover event (best effort)
+      try {
+        const { conversationTakeoverEventRepository } =
+          await import("../../../repositories/conversation-takeover-event.repository");
+        await conversationTakeoverEventRepository.startTakeover({
+          organizationId: ctx.organizationId!,
+          conversationId: conversation.id,
+          userId: ctx.user!.id,
+        });
+      } catch (error) {
+        logger.error({ err: error }, "Failed to log takeover event");
+      }
+
       // Add system message
       const { userRepository } = await import("../../../repositories/user.repository");
       const user = await userRepository.findById(ctx.user!.id);
@@ -397,6 +611,18 @@ export const conversationsRouter = t.router({
 
       // Release conversation
       await conversation.releaseFromUser(input.returnToMode);
+
+      // Close the most recent open takeover event (best effort)
+      try {
+        const { conversationTakeoverEventRepository } =
+          await import("../../../repositories/conversation-takeover-event.repository");
+        await conversationTakeoverEventRepository.endMostRecentOpenTakeover({
+          organizationId: ctx.organizationId!,
+          conversationId: conversation.id,
+        });
+      } catch (error) {
+        logger.error({ err: error }, "Failed to close takeover event");
+      }
 
       // Add system message
       const { userRepository } = await import("../../../repositories/user.repository");

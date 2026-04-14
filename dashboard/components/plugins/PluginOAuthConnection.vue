@@ -98,6 +98,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { CheckCircle, Link2, Info } from "lucide-vue-next";
 import type { PluginDisplay, PluginConfig } from "@/types/plugin.types";
 
@@ -119,6 +120,8 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const { t } = useI18n();
 
 const oauthStatus = ref<OAuthStatus | null>(null);
 const connecting = ref(false);
@@ -162,7 +165,9 @@ const handleConnect = async () => {
     const { useToast } = await import("@/composables/useToast");
     const toast = useToast();
     const errorMessage =
-      error instanceof Error ? error.message : `Failed to connect to ${pluginName.value}`;
+      error instanceof Error
+        ? error.message
+        : t("integrations.pluginSettings.toast.oauthConnectFailed", { name: pluginName.value });
     toast.error(errorMessage);
     connecting.value = false;
   }
@@ -179,13 +184,15 @@ const handleDisconnect = async () => {
 
     await Hay.plugins.oauth.revoke.mutate({ pluginId: props.plugin.id });
 
-    toast.success(`Disconnected from ${pluginName.value}`);
+    toast.success(
+      t("integrations.pluginSettings.toast.oauthDisconnectedFrom", { name: pluginName.value }),
+    );
     await fetchOAuthStatus();
   } catch (error) {
     console.error("Failed to revoke OAuth:", error);
     const { useToast } = await import("@/composables/useToast");
     const toast = useToast();
-    toast.error("Failed to disconnect");
+    toast.error(t("integrations.pluginSettings.toast.oauthDisconnectFailed"));
   } finally {
     disconnecting.value = false;
   }
@@ -213,7 +220,9 @@ onMounted(async () => {
     if (oauthParam === "success" && pluginIdParam === props.plugin.id) {
       const { useToast } = await import("@/composables/useToast");
       const toast = useToast();
-      toast.success(`Successfully connected to ${pluginName.value}!`);
+      toast.success(
+        t("integrations.pluginSettings.toast.oauthConnectedTo", { name: pluginName.value }),
+      );
 
       // Clean up URL
       window.history.replaceState({}, "", window.location.pathname);

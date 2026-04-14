@@ -138,11 +138,15 @@ export default defineNuxtRouteMiddleware(
 
         // Show error to user
         if (process.client) {
-          const { $toast } = useNuxtApp() as {
+          const nuxtApp = useNuxtApp() as {
             $toast?: { error: (msg: string) => void };
+            $i18n?: { t: (key: string) => string };
           };
-          if ($toast) {
-            $toast.error("Invalid authentication token. Please login.");
+          const message =
+            nuxtApp.$i18n?.t("auth.session.invalidToken") ??
+            "Invalid authentication token. Please login.";
+          if (nuxtApp.$toast) {
+            nuxtApp.$toast.error(message);
           }
         }
 
