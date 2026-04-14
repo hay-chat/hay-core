@@ -59,3 +59,4 @@ plugins/custom/
 
 # Plugin ZIP uploads
 server/uploads/plugin-zips/
+.dual-graph/

@@ -12,13 +12,15 @@ interface QueuedMessage {
  * Message queue for offline/failed message handling
  * Stores messages locally and retries them with exponential backoff
  */
-export function useMessageQueue() {
+export function useMessageQueue(options?: { persistenceEnabled?: boolean }) {
   const queue = ref<QueuedMessage[]>([]);
   const STORAGE_KEY = 'hay-message-queue';
   const MAX_RETRIES = 3;
+  let persistenceEnabled = options?.persistenceEnabled ?? true;
 
   // Load queue from localStorage on init
   const loadQueue = () => {
+    if (!persistenceEnabled) return;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -31,11 +33,18 @@ export function useMessageQueue() {
 
   // Save queue to localStorage
   const saveQueue = () => {
+    if (!persistenceEnabled) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(queue.value));
     } catch (error) {
       console.error('[MessageQueue] Failed to save queue:', error);
     }
+  };
+
+  const enablePersistence = () => {
+    if (persistenceEnabled) return;
+    persistenceEnabled = true;
+    loadQueue();
   };
 
   // Add message to queue
@@ -92,7 +101,9 @@ export function useMessageQueue() {
   // Clear all messages from queue
   const clearQueue = () => {
     queue.value = [];
-    localStorage.removeItem(STORAGE_KEY);
+    if (persistenceEnabled) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
     console.log('[MessageQueue] Queue cleared');
   };
 
@@ -124,5 +135,6 @@ export function useMessageQueue() {
     clearQueue,
     getQueueForConversation,
     clearFailedMessages,
+    enablePersistence,
   };
 }

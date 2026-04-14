@@ -172,6 +172,8 @@ Embed the chat widget on any website:
     config: {
       organizationId: "your-org-id",
       baseUrl: "https://your-api-domain.com",
+      // ePrivacy consent mode: no cookies/storage until the first user interaction
+      consent: "strict",
       position: "right",
       theme: "blue",
       greetingMessage: "Hi! How can we help?",
@@ -179,6 +181,25 @@ Embed the chat widget on any website:
   };
 </script>
 <script src="https://your-cdn/webchat.js" async></script>
+```
+
+If you use a cookie banner, set `window.HayChat.config` only after the user accepts:
+
+```html
+<script>
+  function onConsentAccepted() {
+    window.HayChat = window.HayChat || {};
+    window.HayChat.config = {
+      organizationId: "your-org-id",
+      baseUrl: "https://your-api-domain.com",
+      consent: "strict",
+    };
+    const s = document.createElement("script");
+    s.src = "https://your-cdn/webchat.js";
+    s.async = true;
+    document.head.appendChild(s);
+  }
+</script>
 ```
 
 Features: real-time messaging, typing indicators, agent avatars, unread badge, i18n support, and custom context injection via `window.HayChat.addContext()`.

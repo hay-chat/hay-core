@@ -298,6 +298,9 @@ interface Conversation {
 const conversations = ref<Conversation[]>([]);
 const totalConversations = ref(0);
 
+// Optional: show only conversations that had a takeover event in the selected period
+const escalationsPeriod = ref<"today" | "week" | null>(null);
+
 // Computed total pages
 const totalPages = computed(() => Math.ceil(totalConversations.value / pageSize.value));
 
@@ -497,14 +500,25 @@ const fetchConversations = async () => {
     loading.value = true;
     error.value = null;
 
-    const response = await HayApi.conversations.list.query({
-      pagination: { page: currentPage.value, limit: pageSize.value },
-      sorting: { orderBy: "created_at", orderDirection: "desc" },
-      include: ["assignedUser", "messages"],
-    });
+    if (escalationsPeriod.value) {
+      // Fetch conversations by takeover-event filter (no pagination)
+      const response = await HayApi.conversations.escalatedConversations.query({
+        period: escalationsPeriod.value,
+        limit: 200,
+      });
+      conversations.value = response as any;
+      totalConversations.value = conversations.value.length;
+      currentPage.value = 1;
+    } else {
+      const response = await HayApi.conversations.list.query({
+        pagination: { page: currentPage.value, limit: pageSize.value },
+        sorting: { orderBy: "created_at", orderDirection: "desc" },
+        include: ["assignedUser", "messages"],
+      });
 
-    conversations.value = response.items as any;
-    totalConversations.value = response.pagination.total;
+      conversations.value = response.items as any;
+      totalConversations.value = response.pagination.total;
+    }
   } catch (err) {
     console.error("Failed to fetch conversations:", err);
     error.value = t("conversations.error.failedToLoad");
@@ -547,6 +561,12 @@ onMounted(async () => {
       selectedStatus.value = "pending-human";
     } else if (statusParam.includes("human-took-over")) {
       selectedStatus.value = "human-took-over";
+    }
+  }
+  if (route.query.escalationsPeriod) {
+    const period = route.query.escalationsPeriod as string;
+    if (period === "today" || period === "week") {
+      escalationsPeriod.value = period;
     }
   }
 

@@ -1,4 +1,4 @@
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useWebSocket } from "./useWebSocket";
 import { useConversation } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
@@ -26,12 +26,14 @@ export function useChat(config: HayChatConfig) {
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
   const isSending = ref(false);
-  const lastReadMessageId = ref<string | null>(sessionStorage.getItem("hay-last-read-message-id"));
+  const consentStrict = config.consent === "strict";
+  const hasUserInteracted = ref(!consentStrict);
+  const lastReadMessageId = ref<string | null>(null);
   const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
   const currentAgentName = ref<string | null>(null);
 
   // Get existing conversation ID from session storage
-  const existingConversationId = ref<string | null>(sessionStorage.getItem("hay-conversation-id"));
+  const existingConversationId = ref<string | null>(null);
 
   // Initialize conversation HTTP service (used for all message sending and loading)
   const conversation = useConversation(config);
@@ -44,16 +46,31 @@ export function useChat(config: HayChatConfig) {
     isTyping,
     connect,
     identify,
-    sendMessage: wsSendMessage, // Note: No longer used - we send via HTTP instead
     sendTypingIndicator,
-    loadHistory: wsLoadHistory,
     disconnect,
     setNonceUpdateCallback,
     setStatusChangeCallback,
   } = useWebSocket(config.baseUrl, config.organizationId);
 
   // Initialize message queue for offline/retry handling
-  const messageQueue = useMessageQueue();
+  const messageQueue = useMessageQueue({ persistenceEnabled: !consentStrict });
+
+  const hydrateFromStorageIfAllowed = () => {
+    if (!hasUserInteracted.value) return;
+    try {
+      existingConversationId.value = sessionStorage.getItem("hay-conversation-id");
+      lastReadMessageId.value = sessionStorage.getItem("hay-last-read-message-id");
+    } catch (error) {
+      console.warn("[Webchat] Failed to hydrate from sessionStorage:", error);
+    }
+    messageQueue.enablePersistence();
+  };
+
+  const allowStorageAndHydrateOnce = () => {
+    if (hasUserInteracted.value) return;
+    hasUserInteracted.value = true;
+    hydrateFromStorageIfAllowed();
+  };
 
   // Check WebCrypto availability
   const isWebCryptoAvailable = (): boolean => {
@@ -260,6 +277,11 @@ export function useChat(config: HayChatConfig) {
     if (isInitialized.value) return;
 
     try {
+      if (consentStrict && !hasUserInteracted.value) {
+        // In strict mode, we must not use storage before the first user interaction.
+        return;
+      }
+
       // Check WebCrypto availability
       if (!isWebCryptoAvailable()) {
         console.error("[Webchat] WebCrypto API not available");
@@ -272,12 +294,20 @@ export function useChat(config: HayChatConfig) {
       }
 
       // Generate or retrieve customer ID
-      let storedCustomerId = localStorage.getItem("hay-customer-id");
-      if (!storedCustomerId) {
-        storedCustomerId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        localStorage.setItem("hay-customer-id", storedCustomerId);
+      if (!consentStrict || hasUserInteracted.value) {
+        let storedCustomerId = "";
+        try {
+          storedCustomerId = localStorage.getItem("hay-customer-id") || "";
+          if (!storedCustomerId) {
+            storedCustomerId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            localStorage.setItem("hay-customer-id", storedCustomerId);
+          }
+        } catch (error) {
+          console.warn("[Webchat] Failed to access localStorage for customer id:", error);
+          storedCustomerId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        }
+        customerId.value = storedCustomerId;
       }
-      customerId.value = storedCustomerId;
 
       // Check for existing conversation (HTTP operations don't need WebSocket)
       const existingConvId = existingConversationId.value;
@@ -342,7 +372,7 @@ export function useChat(config: HayChatConfig) {
   });
 
   // Set status change callback for conversation status updates
-  setStatusChangeCallback((status: string, payload: any) => {
+  setStatusChangeCallback((status: string, _payload: any) => {
     // Handle conversation closure
     if (status === "closed" || status === "resolved") {
       isConversationClosed.value = true;
@@ -379,7 +409,6 @@ export function useChat(config: HayChatConfig) {
           await sendMessageInternal(
             nextMessage.content,
             nextMessage.conversationId,
-            0, // Don't increment retry count in sendMessage itself
           );
 
           // Success - remove from queue
@@ -443,6 +472,9 @@ export function useChat(config: HayChatConfig) {
 
   // Toggle chat window
   const toggleChat = () => {
+    if (consentStrict && !hasUserInteracted.value) {
+      allowStorageAndHydrateOnce();
+    }
     isOpen.value = !isOpen.value;
     // Initialize in background if not already initialized
     if (!isInitialized.value && isOpen.value) {
@@ -456,6 +488,9 @@ export function useChat(config: HayChatConfig) {
 
   // Open chat
   const openChat = () => {
+    if (consentStrict && !hasUserInteracted.value) {
+      allowStorageAndHydrateOnce();
+    }
     isOpen.value = true;
     // Initialize in background if not already initialized
     if (!isInitialized.value) {
@@ -620,7 +655,6 @@ export function useChat(config: HayChatConfig) {
   const sendMessageInternal = async (
     text: string,
     convId: string,
-    retryCount: number = 0,
   ): Promise<void> => {
     if (!keypair.value) {
       throw new Error("No keypair available");
@@ -702,7 +736,7 @@ export function useChat(config: HayChatConfig) {
 
       isSending.value = true;
 
-      await sendMessageInternal(text.trim(), conversationId.value!, retryCount);
+      await sendMessageInternal(text.trim(), conversationId.value!);
 
       // Don't call refreshMessages() here — the bot hasn't responded yet so it's
       // wasted work. The 10-second polling loop and WebSocket handle new messages.

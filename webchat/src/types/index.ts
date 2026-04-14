@@ -1,6 +1,12 @@
 export interface HayChatConfig {
   organizationId: string;
   baseUrl: string;
+  /**
+   * ePrivacy / consent mode.
+   * - "strict": do not read/write cookies or web storage before the first user interaction.
+   * - undefined: current default behavior.
+   */
+  consent?: "strict";
   widgetTitle?: string;
   widgetSubtitle?: string;
   position?: "left" | "right";

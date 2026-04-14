@@ -43,3 +43,11 @@ The following values are explicitly rejected as known insecure defaults:
 ## Reporting Vulnerabilities
 
 If you discover a security vulnerability, please report it responsibly by emailing the maintainers directly. Do not open a public issue.
+
+## Webhook Replay Protection
+
+Where Hay receives third-party webhooks (e.g. email and billing providers), inbound webhook requests must be protected against replay attacks.
+
+- **Timestamp tolerance**: Requests must include a provider timestamp and it must be within **5 minutes** of server time.
+- **Nonce deduplication**: Requests must include a provider nonce/request id; Hay records that nonce in **Redis** with a 5-minute TTL and rejects any subsequent reuse.
+- **Logging**: Missing headers or rejected requests are logged (for tracking legacy senders and investigating abuse).
