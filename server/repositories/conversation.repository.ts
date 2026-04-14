@@ -429,6 +429,30 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .getOne();
   }
 
+  /**
+   * Find a conversation by the provider-side conversation id stored in
+   * metadata[channel].conversationId. Used by channel plugins to locate the
+   * Hay conversation that corresponds to an external event (e.g. a Chatwoot
+   * conversation_resolved webhook).
+   */
+  async findByExternalConversationId(
+    channel: string,
+    externalConversationId: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.channel = :channel", { channel })
+      .andWhere("conversation.metadata -> :channel ->> 'conversationId' = :externalId", {
+        channel,
+        externalId: externalConversationId,
+      })
+      .andWhere("conversation.deleted_at IS NULL")
+      .orderBy("conversation.created_at", "DESC")
+      .getOne();
+  }
+
   async findReadyForProcessing(): Promise<Conversation[]> {
     const query = this.getRepository()
       .createQueryBuilder("conversation")

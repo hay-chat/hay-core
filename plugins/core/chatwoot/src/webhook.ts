@@ -92,6 +92,16 @@ export async function webhookHandler(
   const { logger } = ctx;
 
   try {
+    logger.info("Chatwoot webhook entered", {
+      hasRawBodyHeader: typeof req.headers["x-original-body-base64"] === "string",
+      hasTsHeader: typeof req.headers["x-chatwoot-timestamp"] === "string",
+      hasSigHeader: typeof req.headers["x-chatwoot-signature"] === "string",
+      event: (req.body ?? {}).event,
+      messageType: (req.body ?? {}).message_type,
+      senderType: (req.body ?? {}).sender?.type,
+      isPrivate: (req.body ?? {}).private,
+    });
+
     const expectedSecret = ctx.getWebhookSecret();
     if (!expectedSecret) {
       logger.error("Chatwoot webhook received but webhook secret not configured");
@@ -133,18 +143,109 @@ export async function webhookHandler(
     const body = req.body ?? {};
     const event = body.event;
 
-    // We only care about new messages. Chatwoot fires many other events
-    // (conversation_created, conversation_updated, contact_created, …) that we
-    // don't need for the orchestrator loop.
+    // Conversation lifecycle events — propagate status changes back to Hay so
+    // a ticket resolved / reopened in Chatwoot is mirrored on the Hay side.
+    //
+    // Chatwoot fires `conversation_updated` with a `changed_attributes` array
+    // on every field change (assignee, status, priority, etc.). We only care
+    // about status transitions — the payload has the conversation id at the
+    // top level and the new status in `status`, plus `changed_attributes`
+    // containing a `status` entry with previous/current values.
+    if (event === "conversation_updated") {
+      const changedAttributes: Array<Record<string, any>> = Array.isArray(body.changed_attributes)
+        ? body.changed_attributes
+        : [];
+      const statusChange = changedAttributes.find(
+        (attr) => attr && typeof attr === "object" && "status" in attr,
+      );
+
+      if (!statusChange) {
+        // Some other field (assignee, priority, …) — not our concern.
+        res.status(200).json({ received: true, ignored: "non_status_update" });
+        return;
+      }
+
+      const chatwootConvId = body.id ?? body.conversation?.id;
+      const chatwootStatus: string = body.status ?? statusChange.status?.current_value ?? "";
+
+      if (!chatwootConvId || !chatwootStatus) {
+        res.status(200).json({ received: true, ignored: "missing_conv_status" });
+        return;
+      }
+
+      // Map Chatwoot status → Hay status. Chatwoot statuses:
+      //   open | resolved | pending | snoozed
+      // We don't model snoozed; treat it as human-took-over so the orchestrator
+      // stays off the conversation.
+      const hayStatus =
+        chatwootStatus === "resolved"
+          ? "resolved"
+          : chatwootStatus === "open"
+            ? "open"
+            : chatwootStatus === "pending"
+              ? "open"
+              : chatwootStatus === "snoozed"
+                ? "human-took-over"
+                : null;
+
+      if (!hayStatus) {
+        res.status(200).json({ received: true, ignored: `unknown_status=${chatwootStatus}` });
+        return;
+      }
+
+      const apiClient = new PluginApiClient(logger);
+      try {
+        const result = await apiClient.mutation<{ updated: boolean; conversationId?: string }>(
+          "conversations.updateStatusByExternalId",
+          {
+            channel: "chatwoot",
+            externalConversationId: String(chatwootConvId),
+            status: hayStatus,
+          },
+        );
+        logger.info("Chatwoot conversation status synced to Hay", {
+          chatwootConvId,
+          chatwootStatus,
+          hayStatus,
+          updated: result.updated,
+          conversationId: result.conversationId,
+        });
+        res.status(200).json({ received: true, ...result });
+      } catch (error: any) {
+        logger.error("Failed to sync Chatwoot conversation status to Hay", {
+          error: error.message,
+          chatwootConvId,
+        });
+        res.status(500).json({ error: "Failed to sync status" });
+      }
+      return;
+    }
+
+    // We only care about new messages for everything else. Chatwoot fires many
+    // other events (conversation_created, contact_created, …) that we don't
+    // need for the orchestrator loop.
     if (event !== "message_created") {
       res.status(200).json({ received: true, ignored: `event=${event}` });
       return;
     }
 
-    const messageType = body.message_type; // 0=incoming, 1=outgoing, 2=template
+    // Chatwoot sends message_type as either a number (0/1/2) or a string
+    // ("incoming"/"outgoing"/"template") depending on the event and version.
+    // Normalize to a stable enum.
+    const rawMessageType = body.message_type;
+    const messageKind: "incoming" | "outgoing" | "template" | "unknown" =
+      rawMessageType === 0 || rawMessageType === "incoming"
+        ? "incoming"
+        : rawMessageType === 1 || rawMessageType === "outgoing"
+          ? "outgoing"
+          : rawMessageType === 2 || rawMessageType === "template"
+            ? "template"
+            : "unknown";
+
     const isPrivate = body.private === true;
     const content: string = body.content ?? "";
-    const senderType: string | undefined = body.sender?.type; // "Contact" | "User" | "AgentBot"
+    // sender.type comes through lowercase ("contact"/"user"/"agent_bot").
+    const senderType: string = String(body.sender?.type ?? "").toLowerCase();
     const conversation = body.conversation ?? {};
     const chatwootConversationId =
       conversation.id ?? body.conversation_id ?? body.additional_attributes?.conversation_id;
@@ -170,14 +271,14 @@ export async function webhookHandler(
 
     // Drop template messages (WhatsApp HSMs etc.) — we don't want the AI to
     // respond to a canned template as if it were a customer prompt.
-    if (messageType === 2) {
+    if (messageKind === "template") {
       res.status(200).json({ received: true, ignored: "template" });
       return;
     }
 
     // Drop our own outgoing bot messages (the echo Chatwoot sends after we POST
-    // to /messages). We identify them as outgoing + sender.type === AgentBot.
-    if (messageType === 1 && senderType === "AgentBot") {
+    // to /messages). We identify them as outgoing + sender.type === agent_bot.
+    if (messageKind === "outgoing" && senderType === "agent_bot") {
       res.status(200).json({ received: true, ignored: "bot_echo" });
       return;
     }
@@ -190,15 +291,19 @@ export async function webhookHandler(
     }
 
     // Determine whether this is a customer message or a human-agent reply.
-    //   message_type === 0 && sender === Contact   → customer
-    //   message_type === 1 && sender === User      → human agent reply
+    //   incoming  + sender=contact   → customer
+    //   outgoing  + sender=user      → human agent reply
     let hayRole: "customer" | "human_agent";
-    if (messageType === 0) {
+    if (messageKind === "incoming") {
       hayRole = "customer";
-    } else if (messageType === 1 && senderType === "User") {
+    } else if (messageKind === "outgoing" && senderType === "user") {
       hayRole = "human_agent";
     } else {
-      // Anything else (outgoing + non-User, unknown combinations) — drop.
+      logger.info("Chatwoot webhook ignored — unhandled type", {
+        messageKind,
+        senderType,
+        rawMessageType,
+      });
       res.status(200).json({ received: true, ignored: "unhandled_type" });
       return;
     }

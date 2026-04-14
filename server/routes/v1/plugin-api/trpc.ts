@@ -171,10 +171,17 @@ export const pluginApiTrpcRouter = router({
         const messageType =
           senderType === "human_agent" ? MessageType.HUMAN_AGENT : MessageType.CUSTOMER;
 
+        // Tag human-agent messages that originated from the external channel
+        // so the ChannelDeliveryService does not echo them back to the same
+        // channel (which would produce a feedback loop — the agent's own reply
+        // getting re-sent to themselves).
+        const enrichedMetadata =
+          senderType === "human_agent" ? { ...(metadata ?? {}), externalOrigin: true } : metadata;
+
         const message = await conversation.addMessage({
           content,
           type: messageType,
-          metadata,
+          metadata: enrichedMetadata,
         });
 
         // When a human agent replies on the external system, flip Hay's
@@ -312,6 +319,47 @@ export const pluginApiTrpcRouter = router({
           message: error instanceof Error ? error.message : "Failed to send message",
         });
       }
+    }),
+
+  /**
+   * Conversations Capability - Update status by external conversation id.
+   *
+   * Used by channel plugins to reflect lifecycle changes that happen on the
+   * external system (e.g. a Chatwoot agent resolves / reopens a ticket) back
+   * into Hay. Looks up the Hay conversation via metadata[channel].conversationId.
+   */
+  "conversations.updateStatusByExternalId": pluginProcedure
+    .input(
+      z.object({
+        channel: z.string().min(1).max(64),
+        externalConversationId: z.string().min(1),
+        status: z.enum(["open", "pending-human", "human-took-over", "resolved", "closed"]),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const organizationId = ctx.pluginAuth.organizationId;
+      const conversation = await conversationRepository.findByExternalConversationId(
+        input.channel,
+        input.externalConversationId,
+        organizationId,
+      );
+
+      if (!conversation) {
+        return { updated: false, reason: "conversation_not_found" as const };
+      }
+
+      if (conversation.status === input.status) {
+        return { updated: false, reason: "already_in_status" as const };
+      }
+
+      await conversationRepository.update(conversation.id, organizationId, {
+        status: input.status,
+        needs_processing: input.status === "open" ? conversation.needs_processing : false,
+      });
+
+      return { updated: true, conversationId: conversation.id };
     }),
 
   /**

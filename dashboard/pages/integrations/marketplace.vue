@@ -53,7 +53,7 @@
     </div>
 
     <!-- Categories -->
-    <div class="flex items-center space-x-2">
+    <!-- <div class="flex items-center space-x-2">
       <span class="text-sm font-medium">{{ $t("marketplace.categories.label") }}</span>
       <div class="flex space-x-2 flex-wrap gap-2">
         <Button
@@ -67,15 +67,15 @@
           {{ category.name }}
         </Button>
       </div>
-    </div>
+    </div> -->
 
     <!-- Search -->
-    <div class="flex items-center space-x-4">
+    <!-- <div class="flex items-center space-x-4">
       <div class="relative flex-1 max-w-sm">
         <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
         <Input v-model="searchQuery" :placeholder="$t('marketplace.search')" class="pl-8" />
       </div>
-    </div>
+    </div> -->
 
     <!-- Loading State -->
     <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -76,6 +76,11 @@ class ChannelDeliveryService {
     const outboundTypes = ["BotAgent", "HumanAgent"];
     if (!outboundTypes.includes(payload?.type)) return;
 
+    // Skip messages that originated from the external channel itself — these
+    // arrive via the plugin webhook (e.g. a Chatwoot agent replies) and must
+    // not be echoed back to the same channel, which would loop indefinitely.
+    if (payload?.metadata?.externalOrigin === true) return;
+
     // Only deliver messages with "sent" delivery state (skip "queued" in test mode)
     if (payload?.deliveryState !== "sent") return;
 
