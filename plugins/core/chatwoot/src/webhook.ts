@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import { PluginApiClient } from "./plugin-api.js";
@@ -7,12 +8,69 @@ export interface WebhookContext {
   logger: HayLogger;
 }
 
+// Reject requests whose timestamp is older than this window (in seconds).
+// Matches Chatwoot's own recommendation and defeats trivial replay attacks.
+const REPLAY_WINDOW_SECONDS = 300;
+
+/**
+ * Verify Chatwoot's HMAC signature headers against the raw request body.
+ *
+ * Chatwoot sends three headers on every Agent Bot webhook (as of PR
+ * chatwoot/chatwoot#13892, merged April 2026):
+ *
+ *   X-Chatwoot-Signature: sha256=<hex>
+ *   X-Chatwoot-Timestamp: <unix seconds>
+ *   X-Chatwoot-Delivery:  <uuid>
+ *
+ * The signature is HMAC-SHA256(webhookSecret, `${timestamp}.${rawBody}`)
+ * — Stripe's convention, which blocks replay attacks that swap timestamps.
+ *
+ * We must verify against the *exact* original bytes Chatwoot signed. Hay's
+ * plugin proxy parses and re-serializes JSON bodies, so we rely on the
+ * `x-original-body-base64` header the proxy forwards for this purpose.
+ */
+function verifyChatwootSignature(
+  secret: string,
+  rawBody: string,
+  timestampHeader: string | undefined,
+  signatureHeader: string | undefined,
+): { ok: true } | { ok: false; reason: string } {
+  if (!timestampHeader || !signatureHeader) {
+    return { ok: false, reason: "missing_signature_headers" };
+  }
+
+  const ts = parseInt(timestampHeader, 10);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return { ok: false, reason: "invalid_timestamp" };
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - ts) > REPLAY_WINDOW_SECONDS) {
+    return { ok: false, reason: "stale_timestamp" };
+  }
+
+  const expected =
+    "sha256=" + crypto.createHmac("sha256", secret).update(`${ts}.${rawBody}`).digest("hex");
+
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const actualBuf = Buffer.from(signatureHeader, "utf8");
+  if (expectedBuf.length !== actualBuf.length) {
+    return { ok: false, reason: "signature_mismatch" };
+  }
+  if (!crypto.timingSafeEqual(expectedBuf, actualBuf)) {
+    return { ok: false, reason: "signature_mismatch" };
+  }
+
+  return { ok: true };
+}
+
 /**
  * Inbound Chatwoot webhook handler.
  *
- * Chatwoot does not sign webhooks, so we authenticate via a shared secret
- * passed in the `?secret=` query param. The customer puts this secret in the
- * `outgoing_url` when creating the Agent Bot, and we reject requests without it.
+ * Authentication: Chatwoot signs every Agent Bot webhook with HMAC-SHA256
+ * over `${timestamp}.${rawBody}` using the bot's Webhook Secret (shown in the
+ * Chatwoot bot Edit page with a Reset button). We verify the signature here;
+ * requests without valid headers are rejected.
  *
  * Filters (all necessary — without them the AI would respond to itself, leak
  * internal notes, or re-process template messages):
@@ -41,15 +99,34 @@ export async function webhookHandler(
       return;
     }
 
-    // Secret can come from query param or from an x-chatwoot-signature header
-    // (we accept either for operator convenience).
-    const providedSecret =
-      (req.query?.secret as string | undefined) ??
-      (req.headers["x-chatwoot-signature"] as string | undefined);
+    // The plugin proxy forwards the exact original request body as a
+    // base64-encoded header so we can verify HMAC against the bytes Chatwoot
+    // actually signed (re-serializing the parsed body loses whitespace and
+    // key order).
+    const rawBodyB64 = req.headers["x-original-body-base64"];
+    const rawBody =
+      typeof rawBodyB64 === "string" ? Buffer.from(rawBodyB64, "base64").toString("utf8") : "";
 
-    if (!providedSecret || providedSecret !== expectedSecret) {
-      logger.warn("Chatwoot webhook rejected — missing or invalid secret");
-      res.status(403).json({ error: "Invalid webhook secret" });
+    if (!rawBody) {
+      logger.warn("Chatwoot webhook rejected — missing x-original-body-base64 header");
+      res.status(400).json({ error: "Missing raw body for signature verification" });
+      return;
+    }
+
+    const timestampHeader = req.headers["x-chatwoot-timestamp"];
+    const signatureHeader = req.headers["x-chatwoot-signature"];
+
+    const verify = verifyChatwootSignature(
+      expectedSecret,
+      rawBody,
+      typeof timestampHeader === "string" ? timestampHeader : undefined,
+      typeof signatureHeader === "string" ? signatureHeader : undefined,
+    );
+
+    if (!verify.ok) {
+      const reason = (verify as { ok: false; reason: string }).reason;
+      logger.warn("Chatwoot webhook rejected — HMAC verification failed", { reason });
+      res.status(403).json({ error: "Invalid signature", reason });
       return;
     }
 

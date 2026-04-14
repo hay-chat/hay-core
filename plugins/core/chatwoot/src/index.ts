@@ -63,7 +63,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Webhook Secret",
           description:
-            "A random string included in the webhook URL query param to authenticate inbound requests from your Chatwoot instance",
+            "The Webhook Secret shown on the Agent Bot's Edit page in Chatwoot. Hay uses it to verify the HMAC signature on every incoming webhook from Chatwoot.",
           required: true,
           encrypted: true,
         },

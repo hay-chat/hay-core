@@ -17,7 +17,7 @@
     },
     "webhookSecret": {
       "label": "Webhook Secret",
-      "description": "A random string used to authenticate inbound webhooks from Chatwoot"
+      "description": "The Webhook Secret shown on the Agent Bot's Edit page in Chatwoot — used to verify the HMAC-SHA256 signature on every inbound webhook"
     },
     "defaultEscalationTeamId": {
       "label": "Escalation Team ID (optional)",

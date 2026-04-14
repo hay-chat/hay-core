@@ -10,24 +10,10 @@
     </div>
 
     <div class="tutorial-steps">
-      <!-- Step 1: Generate a webhook secret -->
+      <!-- Step 1: Create an Agent Bot in Chatwoot -->
       <div class="tutorial-step">
         <div class="step-header">
           <span class="step-number">1</span>
-          <h4>Choose a Webhook Secret</h4>
-        </div>
-        <p>
-          Generate a random string (20+ characters) and paste it in the
-          <strong>Webhook Secret</strong> field above. This is what authenticates inbound webhooks
-          from your Chatwoot instance — anyone who knows this secret can push messages into your Hay
-          workspace, so treat it like a password.
-        </p>
-      </div>
-
-      <!-- Step 2: Create an Agent Bot in Chatwoot -->
-      <div class="tutorial-step">
-        <div class="step-header">
-          <span class="step-number">2</span>
           <h4>Create an Agent Bot in Chatwoot</h4>
         </div>
         <p>
@@ -71,9 +57,32 @@
           </button>
         </div>
         <p class="hint">
-          After saving the bot, Chatwoot shows an <code>access_token</code>. Copy it and paste it in
-          the <strong>Agent Bot Access Token</strong> field above. This token is the bot's
-          credential — store it safely.
+          After saving the bot, Chatwoot shows two values in the bot's Edit page: an
+          <strong>Access Token</strong> and a <strong>Webhook Secret</strong>. You'll paste both
+          into the form above — the access token is how Hay calls Chatwoot's API, and the webhook
+          secret is what Chatwoot uses to cryptographically sign every webhook it sends you.
+        </p>
+      </div>
+
+      <!-- Step 2: Copy credentials from Chatwoot -->
+      <div class="tutorial-step">
+        <div class="step-header">
+          <span class="step-number">2</span>
+          <h4>Copy Credentials from Chatwoot</h4>
+        </div>
+        <p>
+          Open the bot you just created in Chatwoot (<strong
+            >Settings &rarr; Agent Bots &rarr; your bot</strong
+          >). Copy the two values Chatwoot shows there and paste them into the form fields above:
+        </p>
+        <ul class="cred-list">
+          <li><strong>Access Token</strong> &rarr; <code>Agent Bot Access Token</code></li>
+          <li><strong>Webhook Secret</strong> &rarr; <code>Webhook Secret</code></li>
+        </ul>
+        <p class="hint">
+          Hay uses the Webhook Secret to verify that every incoming webhook was genuinely sent by
+          Chatwoot (via an HMAC-SHA256 signature in the <code>X-Chatwoot-Signature</code> header).
+          Requests without a valid signature are rejected.
         </p>
       </div>
 
@@ -196,13 +205,13 @@ export default defineComponent({
     const copyLabel = computed(() => (copied.value ? "Copied!" : "Copy to clipboard"));
 
     // Matches the generic plugin proxy route: /v1/plugins/{pluginId}/{path}?organizationId=...
-    // We append &secret=... so the plugin's /messages handler can verify inbound requests.
+    // Authentication is via HMAC headers (X-Chatwoot-Signature) signed with the
+    // bot's Webhook Secret — so the URL itself carries no credential.
     const webhookUrl = computed(() => {
       const base = props.apiBaseUrl || "http://localhost:3001";
       const pluginId = props.plugin?.id || "hay-channel-chatwoot";
       const orgId = props.config?.organizationId || "YOUR_ORG_ID";
-      const secret = props.config?.webhookSecret || "YOUR_WEBHOOK_SECRET";
-      return `${base}/v1/plugins/${encodeURIComponent(pluginId)}/messages?organizationId=${orgId}&secret=${encodeURIComponent(secret)}`;
+      return `${base}/v1/plugins/${encodeURIComponent(pluginId)}/messages?organizationId=${orgId}`;
     });
 
     const copyWebhookUrl = async () => {
@@ -301,6 +310,19 @@ export default defineComponent({
   padding: 0.125rem 0.375rem;
   border-radius: 4px;
   font-size: 0.8125rem;
+}
+
+.cred-list {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--color-neutral-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.cred-list li {
+  margin-bottom: 0.25rem;
 }
 
 .hint {
