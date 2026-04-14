@@ -18,7 +18,7 @@ export const useAuthStore = defineStore("auth", {
       lastActivity: Date.now(),
       isLoading: false,
     };
-    console.log('[Auth Store] Initial state:', { hasTokens: !!initialState.tokens });
+    console.log("[Auth Store] Initial state:", { hasTokens: !!initialState.tokens });
     return initialState;
   },
   getters: {
@@ -58,10 +58,10 @@ export const useAuthStore = defineStore("auth", {
           refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
-        console.log('[Auth Store] Tokens set after login:', {
+        console.log("[Auth Store] Tokens set after login:", {
           hasAccessToken: !!this.tokens.accessToken,
           hasRefreshToken: !!this.tokens.refreshToken,
-          expiresAt: new Date(this.tokens.expiresAt).toISOString()
+          expiresAt: new Date(this.tokens.expiresAt).toISOString(),
         });
         const userStore = useUserStore();
         userStore.setUser(result.user as User);
@@ -98,9 +98,15 @@ export const useAuthStore = defineStore("auth", {
 
       // Show notification if there's a reason
       if (reason === "token_expired" && process.client) {
-        const { $toast } = useNuxtApp() as { $toast?: { error: (msg: string) => void } };
-        if ($toast) {
-          $toast.error("Your session has expired. Please login again.");
+        const nuxtApp = useNuxtApp() as {
+          $toast?: { error: (msg: string) => void };
+          $i18n?: { t: (key: string) => string };
+        };
+        const message =
+          nuxtApp.$i18n?.t("auth.session.expired") ??
+          "Your session has expired. Please login again.";
+        if (nuxtApp.$toast) {
+          nuxtApp.$toast.error(message);
         }
       }
 

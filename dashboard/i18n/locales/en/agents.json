@@ -3,5 +3,24 @@
     "label": "Response Language",
     "placeholder": "Inherit from Organization",
     "helperText": "The language the agent will use to respond. If not set, it inherits from the organization's default language."
+  },
+  "toast": {
+    "setAsDefaultSuccess": "Agent set as default successfully",
+    "setAsDefaultFailed": "Failed to set agent as default. Please try again.",
+    "enabledSuccess": "Agent enabled successfully",
+    "disabledSuccess": "Agent disabled successfully",
+    "toggleStatusFailed": "Failed to toggle agent status",
+    "deletedSuccess": "Agent deleted successfully",
+    "deleteFailed": "Failed to delete agent. Please try again.",
+    "bulkDeleteSuccess": "Successfully deleted {count} agent(s)",
+    "bulkDeletePartial": "Successfully deleted {success} agent(s). Failed to delete {failed} agent(s).",
+    "bulkDeleteFailed": "Failed to delete agents. Please try again.",
+    "updatedSuccess": "Agent updated successfully",
+    "createdSuccess": "Agent created successfully",
+    "updateFailed": "Failed to update agent. Please try again.",
+    "createFailed": "Failed to create agent. Please try again.",
+    "notFound": "Agent not found",
+    "loadFailed": "Failed to load agent",
+    "loadListFailed": "Failed to load agents"
   }
 }
