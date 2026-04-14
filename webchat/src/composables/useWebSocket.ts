@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from "vue";
+import { safeStorage } from "./useConsent";
 import type { Message } from "@/types";
 
 export function useWebSocket(baseUrl: string, organizationId: string) {
@@ -73,7 +74,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
       case "identified":
         conversationId.value = data.conversationId;
-        sessionStorage.setItem("hay-conversation-id", data.conversationId);
+        safeStorage.session.setItem("hay-conversation-id", data.conversationId);
         break;
 
       case "message":

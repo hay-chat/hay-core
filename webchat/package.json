@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "vue": "^3.4.21"
@@ -16,8 +18,11 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
     "@vue/tsconfig": "^0.5.1",
+    "fake-indexeddb": "^6.0.0",
+    "jsdom": "^24.0.0",
     "typescript": "^5.4.2",
     "vite": "^5.1.6",
+    "vitest": "^1.6.0",
     "vue-tsc": "^2.0.6"
   }
 }

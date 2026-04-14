@@ -10,6 +10,7 @@ import {
   createDPoPProof,
   clearKeypair,
 } from "./useDPoP";
+import { safeStorage, useConsent } from "./useConsent";
 import type { HayChatConfig, Message } from "@/types";
 
 interface Keypair {
@@ -19,6 +20,8 @@ interface Keypair {
 }
 
 export function useChat(config: HayChatConfig) {
+  const { canUseSession, canUseLocal, markInteraction } = useConsent();
+
   const isOpen = ref(false);
   const isInitialized = ref(false);
   const customerId = ref<string>("");
@@ -26,12 +29,16 @@ export function useChat(config: HayChatConfig) {
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
   const isSending = ref(false);
-  const lastReadMessageId = ref<string | null>(sessionStorage.getItem("hay-last-read-message-id"));
+  // These start as null and are populated inside initialize() via safeStorage.
+  // This matters because consent state may change between useChat() being
+  // called (at widget mount) and initialize() running (on first open), e.g.
+  // when the host site calls grantConsent() from its cookie banner.
+  const lastReadMessageId = ref<string | null>(null);
   const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
   const currentAgentName = ref<string | null>(null);
 
-  // Get existing conversation ID from session storage
-  const existingConversationId = ref<string | null>(sessionStorage.getItem("hay-conversation-id"));
+  // Populated inside initialize() via safeStorage — see comment above.
+  const existingConversationId = ref<string | null>(null);
 
   // Initialize conversation HTTP service (used for all message sending and loading)
   const conversation = useConversation(config);
@@ -54,6 +61,42 @@ export function useChat(config: HayChatConfig) {
 
   // Initialize message queue for offline/retry handling
   const messageQueue = useMessageQueue();
+
+  // When the session gate opens (first message or pre-interaction grant),
+  // flush the current conversation's in-memory state to sessionStorage so a
+  // reload can resume it. This handles the case where initialize() ran
+  // pre-interaction and wrote nothing.
+  watch(canUseSession, (allowed) => {
+    if (!allowed) return;
+    if (conversationId.value) {
+      safeStorage.session.setItem("hay-conversation-id", conversationId.value);
+    }
+    if (lastReadMessageId.value) {
+      safeStorage.session.setItem("hay-last-read-message-id", lastReadMessageId.value);
+    }
+  });
+
+  // When the persistent-storage gate opens, flush the customer ID and the
+  // DPoP keypair to their respective stores. Without this, strict-mode chats
+  // that start before grantConsent() would lose their persistent identifiers.
+  watch(canUseLocal, async (allowed) => {
+    if (!allowed) return;
+    if (customerId.value) {
+      safeStorage.local.setItem("hay-customer-id", customerId.value);
+    }
+    if (keypair.value && conversationId.value) {
+      try {
+        await storeKeypair(
+          conversationId.value,
+          keypair.value.privateKey,
+          keypair.value.publicKey,
+          keypair.value.publicJwk,
+        );
+      } catch (error) {
+        console.error("[Webchat] Failed to persist keypair after consent:", error);
+      }
+    }
+  });
 
   // Check WebCrypto availability
   const isWebCryptoAvailable = (): boolean => {
@@ -95,14 +138,19 @@ export function useChat(config: HayChatConfig) {
         }
       }
 
-      // Store keypair and conversation data
-      await storeKeypair(
-        conversationData.id,
-        newKeypair.privateKey,
-        newKeypair.publicKey,
-        newKeypair.publicJwk,
-      );
-      sessionStorage.setItem("hay-conversation-id", conversationData.id);
+      // Persist keypair only when the persistent-storage gate is open.
+      // If the gate is closed, the keypair stays in-memory in `keypair.value`
+      // and will be flushed to IndexedDB by the canUseLocal watcher when the
+      // user interacts or the host grants consent.
+      if (canUseLocal.value) {
+        await storeKeypair(
+          conversationData.id,
+          newKeypair.privateKey,
+          newKeypair.publicKey,
+          newKeypair.publicJwk,
+        );
+      }
+      safeStorage.session.setItem("hay-conversation-id", conversationData.id);
 
       keypair.value = newKeypair;
       nonce.value = conversationData.nonce;
@@ -136,11 +184,12 @@ export function useChat(config: HayChatConfig) {
     try {
       console.log("[Webchat] Loading existing conversation:", convId);
 
-      // Get keypair from IndexedDB
-      const storedKeypair = await getKeypair(convId);
+      // Get keypair from IndexedDB. Only attempted when the persistent-storage
+      // gate is open — otherwise we can't have stored it, so treat as missing.
+      const storedKeypair = canUseLocal.value ? await getKeypair(convId) : null;
       if (!storedKeypair) {
         console.log("[Webchat] No keypair found, clearing conversation");
-        sessionStorage.removeItem("hay-conversation-id");
+        safeStorage.session.removeItem("hay-conversation-id");
         existingConversationId.value = null;
         return false;
       }
@@ -219,7 +268,7 @@ export function useChat(config: HayChatConfig) {
     } catch (error) {
       console.error("[Webchat] Failed to load existing conversation:", error);
       // Clear invalid conversation
-      sessionStorage.removeItem("hay-conversation-id");
+      safeStorage.session.removeItem("hay-conversation-id");
       existingConversationId.value = null;
       return false;
     }
@@ -271,11 +320,18 @@ export function useChat(config: HayChatConfig) {
         initContext(config.context);
       }
 
-      // Generate or retrieve customer ID
-      let storedCustomerId = localStorage.getItem("hay-customer-id");
+      // Populate any cached state from storage — only returns data when the
+      // consent gate is open (pre-granted or post-interaction).
+      lastReadMessageId.value = safeStorage.session.getItem("hay-last-read-message-id");
+      existingConversationId.value = safeStorage.session.getItem("hay-conversation-id");
+
+      // Generate or retrieve customer ID. When the persistent-storage gate is
+      // closed, the ID lives only in memory and the canUseLocal watcher will
+      // flush it to localStorage once the gate opens.
+      let storedCustomerId = safeStorage.local.getItem("hay-customer-id");
       if (!storedCustomerId) {
         storedCustomerId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        localStorage.setItem("hay-customer-id", storedCustomerId);
+        safeStorage.local.setItem("hay-customer-id", storedCustomerId);
       }
       customerId.value = storedCustomerId;
 
@@ -437,7 +493,7 @@ export function useChat(config: HayChatConfig) {
     if (agentMessages.length > 0) {
       const lastAgentMessage = agentMessages[agentMessages.length - 1];
       lastReadMessageId.value = lastAgentMessage.id;
-      sessionStorage.setItem("hay-last-read-message-id", lastAgentMessage.id);
+      safeStorage.session.setItem("hay-last-read-message-id", lastAgentMessage.id);
     }
   };
 
@@ -475,8 +531,8 @@ export function useChat(config: HayChatConfig) {
     if (conversationId.value) {
       await clearKeypair(conversationId.value);
     }
-    sessionStorage.removeItem("hay-conversation-id");
-    sessionStorage.removeItem("hay-last-read-message-id");
+    safeStorage.session.removeItem("hay-conversation-id");
+    safeStorage.session.removeItem("hay-last-read-message-id");
     existingConversationId.value = null;
     conversationId.value = null;
     keypair.value = null;
@@ -671,6 +727,13 @@ export function useChat(config: HayChatConfig) {
   // Send a message
   const sendMessage = async (text: string, retryCount: number = 0) => {
     if (!text.trim() || isSending.value) return;
+
+    // Sending a message is the ePrivacy "service explicitly requested" signal.
+    // Mark interaction BEFORE any persistence runs so session/local storage
+    // writes in the conversation lifecycle below are permitted.
+    if (retryCount === 0) {
+      markInteraction();
+    }
 
     const tempMessageId = `temp-${Date.now()}`;
 
