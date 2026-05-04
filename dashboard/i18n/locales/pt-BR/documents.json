@@ -9,6 +9,7 @@
     "actions": {
       "refresh": "Atualizar",
       "importDocument": "Importar Documento",
+      "writeDocument": "Escrever Documento",
       "search": "Buscar",
       "searching": "Buscando...",
       "archive": "Arquivar",
@@ -106,7 +107,11 @@
       "processedSuccess": "Documento \"{name}\" processado com sucesso",
       "processedError": "Documento \"{name}\" falhou ao processar",
       "titleUpdated": "Título do documento atualizado",
-      "titleUpdateFailed": "Falha ao atualizar título do documento"
+      "titleUpdateFailed": "Falha ao atualizar título do documento",
+      "statusUpdated": "Status do documento atualizado",
+      "statusUpdateFailed": "Falha ao atualizar status do documento",
+      "contentUpdated": "Documento atualizado",
+      "contentUpdateFailed": "Falha ao atualizar documento"
     },
     "detail": {
       "documentPreview": "Pré-visualização do Documento",
@@ -118,12 +123,37 @@
       "backButton": "Voltar para Documentos",
       "tryAgain": "Tentar Novamente",
       "webImport": "Importação Web",
+      "statusLabel": "Status",
       "lastUpdated": "Última atualização {date}",
       "source": "Fonte:",
       "noContent": "Nenhum conteúdo disponível para este documento.",
+      "edit": "Editar",
+      "save": "Salvar",
+      "cancel": "Cancelar",
       "seoTitle": "{title} - Documentos - Hay Dashboard",
       "seoTitleDefault": "Documento - Hay Dashboard",
       "seoDescription": "Ver detalhes do documento"
+    },
+    "new": {
+      "pageTitle": "Novo Documento",
+      "titlePlaceholder": "Sem título",
+      "contentPlaceholder": "Comece a escrever seu documento...",
+      "save": "Salvar",
+      "created": "Documento criado",
+      "createFailed": "Falha ao criar documento"
+    },
+    "editor": {
+      "bold": "Negrito",
+      "italic": "Itálico",
+      "bulletList": "Lista com marcadores",
+      "orderedList": "Lista numerada",
+      "quote": "Citação",
+      "externalLink": "Link",
+      "internalLink": "Link para documento",
+      "image": "Inserir imagem",
+      "linkToDocument": "Vincular a um documento",
+      "searchDocuments": "Buscar documentos…",
+      "noResults": "Nenhum documento encontrado"
     },
     "import": {
       "page": {

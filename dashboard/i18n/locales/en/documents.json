@@ -9,6 +9,7 @@
     "actions": {
       "refresh": "Refresh",
       "importDocument": "Import Document",
+      "writeDocument": "Write Document",
       "search": "Search",
       "searching": "Searching...",
       "archive": "Archive",
@@ -106,7 +107,11 @@
       "processedSuccess": "Document \"{name}\" processed successfully",
       "processedError": "Document \"{name}\" failed to process",
       "titleUpdated": "Document title updated",
-      "titleUpdateFailed": "Failed to update document title"
+      "titleUpdateFailed": "Failed to update document title",
+      "statusUpdated": "Document status updated",
+      "statusUpdateFailed": "Failed to update document status",
+      "contentUpdated": "Document updated",
+      "contentUpdateFailed": "Failed to update document"
     },
     "detail": {
       "documentPreview": "Document Preview",
@@ -118,12 +123,37 @@
       "backButton": "Back to Documents",
       "tryAgain": "Try Again",
       "webImport": "Web Import",
+      "statusLabel": "Status",
       "lastUpdated": "Last updated {date}",
       "source": "Source:",
       "noContent": "No content available for this document.",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
       "seoTitle": "{title} - Documents - Hay Dashboard",
       "seoTitleDefault": "Document - Hay Dashboard",
       "seoDescription": "View document details"
+    },
+    "new": {
+      "pageTitle": "New Document",
+      "titlePlaceholder": "Untitled",
+      "contentPlaceholder": "Start writing your document...",
+      "save": "Save",
+      "created": "Document created",
+      "createFailed": "Failed to create document"
+    },
+    "editor": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "bulletList": "Bullet list",
+      "orderedList": "Numbered list",
+      "quote": "Quote",
+      "externalLink": "Link",
+      "internalLink": "Link to document",
+      "image": "Insert image",
+      "linkToDocument": "Link to document",
+      "searchDocuments": "Search documents…",
+      "noResults": "No documents found"
     },
     "import": {
       "page": {

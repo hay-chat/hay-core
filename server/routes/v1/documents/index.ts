@@ -6,6 +6,7 @@ import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
 import { sanitizeContent } from "@server/utils/sanitize";
+import { sanitizeEditorHtml } from "@server/utils/sanitize-html";
 import {
   DocumentationType,
   DocumentationStatus,
@@ -48,6 +49,7 @@ export const documentsRouter = t.router({
         title: document.title,
         description: document.description,
         content: document.content,
+        contentJson: document.contentJson,
         type: document.type,
         status: document.status,
         visibility: document.visibility,
@@ -179,6 +181,8 @@ export const documentsRouter = t.router({
       z.object({
         title: z.string(),
         content: z.string(),
+        contentJson: z.record(z.string(), z.unknown()).optional(),
+        contentHtml: z.string().optional(),
         fileBuffer: z.string().optional(), // Base64 encoded file
         mimeType: z.string().optional(),
         fileName: z.string().optional(),
@@ -196,6 +200,11 @@ export const documentsRouter = t.router({
       let attachments:
         | Array<{ type: string; url: string; name: string; size?: number }>
         | undefined;
+
+      const isEditorAuthored = !!input.contentJson;
+      if (isEditorAuthored && input.contentHtml) {
+        processedContent = sanitizeEditorHtml(input.contentHtml);
+      }
 
       // Process file if provided
       if (input.fileBuffer && input.mimeType) {
@@ -233,15 +242,18 @@ export const documentsRouter = t.router({
       // Sanitize content to remove null bytes before saving
       const sanitizedContent = sanitizeContent(processedContent);
 
+      const importMethod = isEditorAuthored ? ImportMethod.EDITOR : ImportMethod.UPLOAD;
+
       // Save document to database first
       const document = await documentRepository.create({
         title: sanitizeContent(input.title),
         content: sanitizedContent,
+        contentJson: input.contentJson,
         type: input.type || DocumentationType.ARTICLE,
         status: input.status || DocumentationStatus.DRAFT,
         visibility: input.visibility || DocumentVisibility.PRIVATE,
         organizationId: ctx.organizationId,
-        importMethod: input.fileBuffer ? ImportMethod.UPLOAD : ImportMethod.UPLOAD,
+        importMethod,
         attachments,
       });
 
@@ -288,6 +300,9 @@ export const documentsRouter = t.router({
         id: z.string(),
         title: z.string().optional(),
         content: z.string().optional(),
+        contentJson: z.record(z.string(), z.unknown()).optional(),
+        contentHtml: z.string().optional(),
+        status: z.nativeEnum(DocumentationStatus).optional(),
         regenerateEmbeddings: z.boolean().optional().default(false),
       }),
     )
@@ -298,10 +313,15 @@ export const documentsRouter = t.router({
         throw new Error("Document not found");
       }
 
+      const sanitizedHtml = input.contentHtml ? sanitizeEditorHtml(input.contentHtml) : undefined;
+      const nextContent = sanitizedHtml ?? input.content;
+
       // Update document
       const updatedDocument = await documentRepository.update(document.id, ctx.organizationId!, {
         ...(input.title && { title: input.title }),
-        ...(input.content && { content: input.content }),
+        ...(nextContent !== undefined && { content: nextContent }),
+        ...(input.contentJson && { contentJson: input.contentJson }),
+        ...(input.status && { status: input.status }),
       });
 
       if (!updatedDocument) {
@@ -309,7 +329,10 @@ export const documentsRouter = t.router({
       }
 
       // Regenerate embeddings if content changed or explicitly requested
-      if ((input.content && input.content !== document.content) || input.regenerateEmbeddings) {
+      if (
+        (nextContent !== undefined && nextContent !== document.content) ||
+        input.regenerateEmbeddings
+      ) {
         // Ensure vector store is initialized
         if (!vectorStoreService.initialized) {
           await vectorStoreService.initialize();
@@ -319,7 +342,7 @@ export const documentsRouter = t.router({
         await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
 
         // Split new content into chunks
-        const contentToEmbed = input.content || document.content || "";
+        const contentToEmbed = nextContent || document.content || "";
         const chunks = splitTextIntoChunks(contentToEmbed, {
           chunkSize: 1000,
           chunkOverlap: 200,
@@ -389,6 +412,41 @@ export const documentsRouter = t.router({
         deletedEmbeddings,
         message: `Document and ${deletedEmbeddings} embeddings deleted successfully`,
       };
+    }),
+
+  uploadImage: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.CREATE)
+    .input(
+      z.object({
+        fileBuffer: z.string(),
+        mimeType: z.string(),
+        fileName: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.organizationId) {
+        throw new Error("Organization ID is required");
+      }
+      if (!input.mimeType.startsWith("image/")) {
+        throw new Error("Only image uploads are allowed");
+      }
+
+      const buffer = Buffer.from(input.fileBuffer, "base64");
+      const maxSize = 10 * 1024 * 1024;
+      if (buffer.length > maxSize) {
+        throw new Error("Image too large (max 10MB)");
+      }
+
+      const result = await storageService.upload({
+        buffer,
+        originalName: input.fileName,
+        mimeType: input.mimeType,
+        folder: "document-images",
+        organizationId: ctx.organizationId,
+        uploadedById: ctx.user.id,
+        maxSize,
+      });
+
+      return { url: result.url };
     }),
 
   regenerateEmbeddings: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)

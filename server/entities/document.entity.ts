@@ -30,6 +30,7 @@ export enum ImportMethod {
   UPLOAD = "upload",
   WEB = "web",
   PLUGIN = "plugin",
+  EDITOR = "editor",
 }
 
 @Entity("documents")
@@ -77,6 +78,9 @@ export class Document extends OrganizationScopedEntity {
 
   @Column({ type: "text", nullable: true })
   content?: string;
+
+  @Column({ type: "jsonb", nullable: true })
+  contentJson?: Record<string, unknown>;
 
   @Column({ type: "jsonb", nullable: true })
   embeddingMetadata?: {

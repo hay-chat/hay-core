@@ -7,6 +7,12 @@
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           {{ $t("documents.actions.refresh") }}
         </Button>
+        <NuxtLink to="/documents/new">
+          <Button variant="outline">
+            <FilePlus class="mr-2 h-4 w-4" />
+            {{ $t("documents.actions.writeDocument") }}
+          </Button>
+        </NuxtLink>
         <NuxtLink to="/documents/import">
           <Button>
             <Upload class="mr-2 h-4 w-4" />
@@ -425,6 +431,7 @@ import {
   RotateCw,
   AlertCircle,
   ExternalLink,
+  FilePlus,
 } from "lucide-vue-next";
 
 const { t } = useI18n();

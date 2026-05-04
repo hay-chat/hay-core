@@ -123,6 +123,9 @@ const isOpen = computed({
 
 const renderedContent = computed(() => {
   if (!document.value?.content) return "";
+  if (document.value.importMethod === "editor") {
+    return document.value.content;
+  }
   return markdownToHtml(document.value.content);
 });
 

@@ -12,10 +12,41 @@
             v-if="document.sourceUrl && document.importMethod === 'web'"
             variant="outline"
             size="sm"
+            :loading="recrawling"
+            :disabled="recrawling"
+            @click="recrawlFromSource"
+          >
+            <RefreshCw v-if="!recrawling" class="h-4 w-4 mr-2" />
+            {{ $t("documents.actions.updateFromSource") }}
+          </Button>
+          <Button
+            v-if="document.sourceUrl && document.importMethod === 'web'"
+            variant="outline"
+            size="sm"
             @click="visitSource"
           >
             <ExternalLink class="h-4 w-4 mr-2" />
             {{ $t("documents.detail.visitSource") }}
+          </Button>
+          <Button
+            v-if="isEditorAuthored && !isEditing"
+            variant="default"
+            size="sm"
+            @click="startEditContent"
+          >
+            <Pencil class="h-4 w-4 mr-2" />
+            {{ $t("documents.detail.edit") }}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="text-destructive hover:text-destructive"
+            :disabled="deleting"
+            :loading="deleting"
+            @click="showDeleteDialog = true"
+          >
+            <Trash2 v-if="!deleting" class="h-4 w-4 mr-2" />
+            {{ $t("documents.actions.delete") }}
           </Button>
         </template>
       </div>
@@ -67,6 +98,11 @@
         </span>
       </div>
 
+      <!-- Last updated -->
+      <span v-if="document.updatedAt" class="text-xs text-neutral-muted -mt-2">
+        {{ $t("documents.detail.lastUpdated", { date: formatDateTime(document.updatedAt) }) }}
+      </span>
+
       <!-- Description -->
       <p v-if="document.description" class="text-sm text-neutral-muted -mt-2">
         {{ document.description }}
@@ -98,10 +134,17 @@
           <Globe class="h-3 w-3" />
           {{ $t("documents.detail.webImport") }}
         </Badge>
-
-        <span v-if="document.updatedAt" class="text-xs text-neutral-muted ml-auto">
-          {{ $t("documents.detail.lastUpdated", { date: formatDateTime(document.updatedAt) }) }}
-        </span>
+        <div class="flex items-center gap-2 ml-auto">
+          <span class="text-xs text-neutral-muted">{{ $t("documents.detail.statusLabel") }}</span>
+          <Input
+            v-model="selectedStatus"
+            type="select"
+            :options="statusOptions"
+            class="w-36"
+            :disabled="updatingStatus"
+            @update:model-value="onStatusChange"
+          />
+        </div>
       </div>
 
       <!-- Source URL -->
@@ -124,8 +167,21 @@
         </Badge>
       </div>
 
+      <!-- Editor (no surrounding card) -->
+      <template v-if="isEditing">
+        <DocumentTiptap ref="editorRef" :content="editorInitialContent" @update="onContentUpdate" />
+        <div class="flex justify-end gap-2 mt-3">
+          <Button variant="ghost" :disabled="savingContent" @click="cancelEditContent">
+            {{ $t("documents.detail.cancel") }}
+          </Button>
+          <Button :loading="savingContent" :disabled="savingContent" @click="saveContent">
+            {{ $t("documents.detail.save") }}
+          </Button>
+        </div>
+      </template>
+
       <!-- Content Card -->
-      <Card>
+      <Card v-else>
         <CardContent class="pt-6">
           <div class="document-page-content">
             <div v-if="document.content" v-html="renderedContent" />
@@ -136,6 +192,15 @@
         </CardContent>
       </Card>
     </template>
+
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      :title="$t('documents.deleteDialog.title')"
+      :description="$t('documents.deleteDialog.confirmSingle', { name: document?.title || '' })"
+      :confirm-text="$t('documents.actions.delete')"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
   </Page>
 </template>
 
@@ -145,6 +210,7 @@ import { useRouter, useRoute } from "vue-router";
 import { HayApi } from "@/utils/api";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { useToast } from "@/composables/useToast";
+import type { JSONContent } from "@tiptap/vue-3";
 import {
   ArrowLeft,
   FileText,
@@ -155,6 +221,8 @@ import {
   Globe,
   ExternalLink,
   Pencil,
+  RefreshCw,
+  Trash2,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -164,6 +232,7 @@ interface DocumentDetail {
   title: string;
   description?: string;
   content?: string;
+  contentJson?: Record<string, unknown> | null;
   type: string;
   status: string;
   visibility?: string;
@@ -175,6 +244,12 @@ interface DocumentDetail {
   updatedAt: string;
 }
 
+enum DocumentationStatus {
+  DRAFT = "draft",
+  PUBLISHED = "published",
+  ARCHIVED = "archived",
+}
+
 const router = useRouter();
 const route = useRoute();
 
@@ -184,6 +259,8 @@ const { formatDateTime } = useOrgDateTime();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const document = ref<DocumentDetail | null>(null);
+const updatingStatus = ref(false);
+const selectedStatus = ref<DocumentationStatus>(DocumentationStatus.DRAFT);
 
 // Title editing
 const editingTitle = ref(false);
@@ -236,10 +313,73 @@ const documentId = computed(() => {
   return Array.isArray(id) ? id[0] : id;
 });
 
+const isEditorAuthored = computed(() => document.value?.importMethod === "editor");
+const statusOptions = computed(() => [
+  { label: t("documents.filters.draft"), value: "draft" },
+  { label: t("documents.filters.published"), value: "published" },
+  { label: t("documents.filters.archived"), value: "archived" },
+]);
+
+const editorInitialContent = computed<JSONContent | undefined>(() => {
+  const json = document.value?.contentJson;
+  return json ? (json as JSONContent) : undefined;
+});
+
 const renderedContent = computed(() => {
   if (!document.value?.content) return "";
+  if (isEditorAuthored.value) {
+    return document.value.content;
+  }
   return markdownToHtml(document.value.content);
 });
+
+const isEditing = ref(false);
+const savingContent = ref(false);
+const editorRef = ref<{
+  getJSON: () => Record<string, unknown> | null;
+  getHTML: () => string;
+} | null>(null);
+const editorJson = ref<Record<string, unknown> | null>(null);
+const editorHtml = ref("");
+
+const startEditContent = () => {
+  if (!isEditorAuthored.value || !document.value) return;
+  editorJson.value = (document.value.contentJson as Record<string, unknown>) || null;
+  editorHtml.value = document.value.content || "";
+  isEditing.value = true;
+};
+
+const cancelEditContent = () => {
+  isEditing.value = false;
+};
+
+const onContentUpdate = (payload: { json: Record<string, unknown>; html: string }) => {
+  editorJson.value = payload.json;
+  editorHtml.value = payload.html;
+};
+
+const saveContent = async () => {
+  if (!document.value || savingContent.value) return;
+  savingContent.value = true;
+  try {
+    const json = editorJson.value || editorRef.value?.getJSON() || { type: "doc", content: [] };
+    const html = editorHtml.value || editorRef.value?.getHTML() || "";
+    await HayApi.documents.update.mutate({
+      id: document.value.id,
+      contentJson: json,
+      contentHtml: html,
+    });
+    document.value.content = html;
+    document.value.contentJson = json;
+    isEditing.value = false;
+    toast.success(t("documents.toast.contentUpdated"));
+  } catch (err) {
+    console.error("Failed to update document content:", err);
+    toast.error(t("documents.toast.contentUpdateFailed"));
+  } finally {
+    savingContent.value = false;
+  }
+};
 
 const getFileIcon = (type: string | undefined) => {
   switch (type) {
@@ -263,6 +403,65 @@ const visitSource = () => {
   }
 };
 
+const recrawling = ref(false);
+const deleting = ref(false);
+const showDeleteDialog = ref(false);
+
+const confirmDelete = async () => {
+  if (!document.value || deleting.value) return;
+  deleting.value = true;
+  try {
+    const result = await HayApi.documents.delete.mutate({ id: document.value.id });
+    if (result.success) {
+      toast.success(result.message || t("documents.toast.deleteSuccess"));
+      router.push("/documents");
+    }
+  } catch (err) {
+    console.error("Error deleting document:", err);
+    toast.error(t("documents.toast.deleteFailed"));
+  } finally {
+    deleting.value = false;
+    showDeleteDialog.value = false;
+  }
+};
+
+const recrawlFromSource = async () => {
+  if (!document.value || recrawling.value) return;
+  recrawling.value = true;
+  try {
+    await HayApi.documents.recrawl.mutate({ documentId: document.value.id });
+    toast.success(t("documents.toast.updateStarted", { name: document.value.title }));
+  } catch (err) {
+    console.error("Recrawl error:", err);
+    toast.error(t("documents.toast.updateFailed"));
+  } finally {
+    recrawling.value = false;
+  }
+};
+
+const onStatusChange = async (status: string | number | boolean) => {
+  if (!document.value || updatingStatus.value || typeof status !== "string") return;
+  if (status === document.value.status) return;
+
+  updatingStatus.value = true;
+  try {
+    await HayApi.documents.update.mutate({
+      id: document.value.id,
+      status: status as DocumentationStatus,
+    });
+    document.value.status = status;
+    selectedStatus.value = status as DocumentationStatus;
+    toast.success(t("documents.toast.statusUpdated"));
+  } catch (err) {
+    console.error("Failed to update status:", err);
+    selectedStatus.value =
+      (document.value.status as DocumentationStatus) || DocumentationStatus.DRAFT;
+    toast.error(t("documents.toast.statusUpdateFailed"));
+  } finally {
+    updatingStatus.value = false;
+  }
+};
+
 const fetchDocument = async () => {
   if (!documentId.value) return;
 
@@ -274,6 +473,7 @@ const fetchDocument = async () => {
       id: documentId.value,
     });
     document.value = result as DocumentDetail;
+    selectedStatus.value = (result.status as DocumentationStatus) || DocumentationStatus.DRAFT;
   } catch (err) {
     console.error("Failed to fetch document:", err);
     error.value = err instanceof Error ? err.message : t("documents.detail.failedToLoad");
