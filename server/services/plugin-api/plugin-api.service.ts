@@ -40,11 +40,7 @@ export class PluginAPIService {
    * @param capabilities - List of capabilities the plugin can access
    * @returns JWT token string
    */
-  generateToken(
-    pluginId: string,
-    organizationId: string,
-    capabilities: string[],
-  ): string {
+  generateToken(pluginId: string, organizationId: string, capabilities: string[]): string {
     const payload: PluginAPITokenPayload = {
       pluginId,
       organizationId,
@@ -96,10 +92,7 @@ export class PluginAPIService {
    * @param requiredCapability - Capability to check
    * @returns True if plugin has capability
    */
-  hasCapability(
-    tokenPayload: PluginAPITokenPayload,
-    requiredCapability: string,
-  ): boolean {
+  hasCapability(tokenPayload: PluginAPITokenPayload, requiredCapability: string): boolean {
     return tokenPayload.capabilities.includes(requiredCapability);
   }
 

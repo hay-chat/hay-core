@@ -242,7 +242,7 @@ export class PluginManagerService {
    */
   private parseDisplayName(packageName: string): string {
     // Remove hay-plugin- prefix
-    let name = packageName.replace(/^hay-plugin-/, "");
+    const name = packageName.replace(/^hay-plugin-/, "");
 
     // Convert kebab-case to Title Case
     return name

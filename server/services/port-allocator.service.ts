@@ -59,7 +59,7 @@ export class PortAllocatorService {
 
     throw new Error(
       `Failed to allocate port after ${maxAttempts} attempts. ` +
-      `Current allocated: ${this.allocatedPorts.size}, Range: ${this.basePort}-${this.maxPort}`
+        `Current allocated: ${this.allocatedPorts.size}, Range: ${this.basePort}-${this.maxPort}`,
     );
   }
 

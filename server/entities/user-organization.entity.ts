@@ -79,10 +79,7 @@ export class UserOrganization extends BaseEntity {
     const defaultScopes = getDefaultScopesForRole(this.role);
 
     // Combine default role scopes with custom permissions
-    const allScopes = [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    const allScopes = [...defaultScopes, ...(this.permissions || [])];
 
     // Check if any of the user's scopes match the required permission
     return hasRequiredScope(resource as Resource, action as Action, allScopes);
@@ -93,10 +90,7 @@ export class UserOrganization extends BaseEntity {
    */
   getScopes(): string[] {
     const defaultScopes = getDefaultScopesForRole(this.role);
-    return [
-      ...defaultScopes,
-      ...(this.permissions || []),
-    ];
+    return [...defaultScopes, ...(this.permissions || [])];
   }
 
   /**

@@ -90,14 +90,20 @@ export class VectorStoreService {
     }
 
     const totalChars = texts.reduce((sum, t) => sum + t.length, 0);
-    logger.debug({ textCount: texts.length, totalChars, batchCount: batches.length }, "Embedding texts");
+    logger.debug(
+      { textCount: texts.length, totalChars, batchCount: batches.length },
+      "Embedding texts",
+    );
 
     const allVectors: number[][] = [];
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       const batchChars = batch.reduce((sum, t) => sum + t.length, 0);
-      logger.debug({ batch: i + 1, totalBatches: batches.length, textCount: batch.length, batchChars }, "Processing batch");
+      logger.debug(
+        { batch: i + 1, totalBatches: batches.length, textCount: batch.length, batchChars },
+        "Processing batch",
+      );
       const response = await this.openai.embeddings.create({
         model: this.model,
         input: batch,

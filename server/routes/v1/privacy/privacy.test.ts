@@ -51,7 +51,7 @@ describe("Privacy DSAR Integration Tests", () => {
     if (existingOrg) {
       // Find all users in this organization BEFORE deleting anything
       const existingUsers = await userRepo.find({ where: { organizationId: existingOrg.id } });
-      const userIds = existingUsers.map(u => u.id);
+      const userIds = existingUsers.map((u) => u.id);
 
       // Delete in correct order to respect foreign key constraints:
       // 1. Privacy requests (references users)
@@ -640,9 +640,9 @@ describe("Privacy DSAR Integration Tests", () => {
       await privacyRequestRepo.save(request);
 
       // Try to cancel
-      await expect(
-        privacyService.cancelRequest(request.id, testToken, testIp),
-      ).rejects.toThrow("Cannot cancel");
+      await expect(privacyService.cancelRequest(request.id, testToken, testIp)).rejects.toThrow(
+        "Cannot cancel",
+      );
     });
 
     it("should handle invalid download tokens", async () => {

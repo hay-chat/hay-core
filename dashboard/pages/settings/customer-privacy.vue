@@ -2,24 +2,28 @@
   <Page :title="$t('customerPrivacy.title')" :description="$t('customerPrivacy.description')">
     <!-- Info Alert -->
     <Alert class="mb-6">
-      <AlertTitle>{{ $t('customerPrivacy.infoTitle') }}</AlertTitle>
+      <AlertTitle>{{ $t("customerPrivacy.infoTitle") }}</AlertTitle>
       <AlertDescription>
-        {{ $t('customerPrivacy.infoDescription') }}
+        {{ $t("customerPrivacy.infoDescription") }}
       </AlertDescription>
     </Alert>
 
     <!-- Error Alert -->
     <Alert v-if="errorState.type" variant="destructive" class="mb-6">
       <AlertTitle>
-        {{ errorState.type === "rate_limit" ? $t('customerPrivacy.tooManyRequests') : $t('customerPrivacy.error') }}
+        {{
+          errorState.type === "rate_limit"
+            ? $t("customerPrivacy.tooManyRequests")
+            : $t("customerPrivacy.error")
+        }}
       </AlertTitle>
       <AlertDescription>
         {{ errorState.message }}
         <div v-if="errorState.retryAfter" class="mt-2 font-medium">
-          {{ $t('customerPrivacy.tryAgainAfter', { time: formatTime(errorState.retryAfter) }) }}
+          {{ $t("customerPrivacy.tryAgainAfter", { time: formatTime(errorState.retryAfter) }) }}
         </div>
         <div v-if="errorState.type === 'email_failed'" class="mt-2">
-          {{ $t('customerPrivacy.checkSpamFolder') }}
+          {{ $t("customerPrivacy.checkSpamFolder") }}
         </div>
       </AlertDescription>
       <Button
@@ -29,36 +33,44 @@
         class="mt-2"
         @click="errorState = { type: null, message: '' }"
       >
-        {{ $t('customerPrivacy.dismiss') }}
+        {{ $t("customerPrivacy.dismiss") }}
       </Button>
     </Alert>
 
     <!-- Data Retention Policy -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('customerPrivacy.dataRetentionPolicy') }}</CardTitle>
+        <CardTitle>{{ $t("customerPrivacy.dataRetentionPolicy") }}</CardTitle>
         <CardDescription>
-          {{ $t('customerPrivacy.dataRetentionPolicyDescription') }}
+          {{ $t("customerPrivacy.dataRetentionPolicyDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="space-y-2">
-          <Label for="retentionDays">{{ $t('customerPrivacy.retentionPeriod') }}</Label>
-          <Select v-model="retentionDays" id="retentionDays">
+          <Label for="retentionDays">{{ $t("customerPrivacy.retentionPeriod") }}</Label>
+          <Select id="retentionDays" v-model="retentionDays">
             <SelectTrigger>
               <SelectValue :placeholder="$t('customerPrivacy.selectRetentionPeriod')" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem :value="null">{{ $t('customerPrivacy.retentionDisabled') }}</SelectItem>
-              <SelectItem :value="30">{{ $t('customerPrivacy.retentionDays', { days: 30 }) }}</SelectItem>
-              <SelectItem :value="60">{{ $t('customerPrivacy.retentionDays', { days: 60 }) }}</SelectItem>
-              <SelectItem :value="90">{{ $t('customerPrivacy.retentionDays', { days: 90 }) }}</SelectItem>
-              <SelectItem :value="180">{{ $t('customerPrivacy.retentionDays', { days: 180 }) }}</SelectItem>
-              <SelectItem :value="365">{{ $t('customerPrivacy.retentionYear') }}</SelectItem>
+              <SelectItem :value="null">{{ $t("customerPrivacy.retentionDisabled") }}</SelectItem>
+              <SelectItem :value="30">{{
+                $t("customerPrivacy.retentionDays", { days: 30 })
+              }}</SelectItem>
+              <SelectItem :value="60">{{
+                $t("customerPrivacy.retentionDays", { days: 60 })
+              }}</SelectItem>
+              <SelectItem :value="90">{{
+                $t("customerPrivacy.retentionDays", { days: 90 })
+              }}</SelectItem>
+              <SelectItem :value="180">{{
+                $t("customerPrivacy.retentionDays", { days: 180 })
+              }}</SelectItem>
+              <SelectItem :value="365">{{ $t("customerPrivacy.retentionYear") }}</SelectItem>
             </SelectContent>
           </Select>
           <p class="text-sm text-muted-foreground">
-            {{ $t('customerPrivacy.retentionHelp') }}
+            {{ $t("customerPrivacy.retentionHelp") }}
           </p>
         </div>
 
@@ -68,17 +80,23 @@
           <div class="flex items-start space-x-2">
             <AlertTriangle class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <div class="text-sm">
-              <p class="font-medium text-amber-800 dark:text-amber-200">{{ $t('customerPrivacy.retentionImportant') }}</p>
+              <p class="font-medium text-amber-800 dark:text-amber-200">
+                {{ $t("customerPrivacy.retentionImportant") }}
+              </p>
               <p class="text-amber-700 dark:text-amber-300">
-                {{ $t('customerPrivacy.retentionWarning') }}
+                {{ $t("customerPrivacy.retentionWarning") }}
               </p>
             </div>
           </div>
         </div>
 
-        <Button @click="saveRetentionPolicy" :disabled="isSavingRetention">
+        <Button :disabled="isSavingRetention" @click="saveRetentionPolicy">
           <Save class="h-4 w-4 mr-2" />
-          {{ isSavingRetention ? $t('customerPrivacy.saving') : $t('customerPrivacy.saveRetentionPolicy') }}
+          {{
+            isSavingRetention
+              ? $t("customerPrivacy.saving")
+              : $t("customerPrivacy.saveRetentionPolicy")
+          }}
         </Button>
       </CardContent>
     </Card>
@@ -86,24 +104,26 @@
     <!-- Initiate Request Form -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('customerPrivacy.initiateRequest') }}</CardTitle>
+        <CardTitle>{{ $t("customerPrivacy.initiateRequest") }}</CardTitle>
         <CardDescription>
-          {{ $t('customerPrivacy.initiateRequestDescription') }}
+          {{ $t("customerPrivacy.initiateRequestDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form @submit.prevent="initiateRequest" class="space-y-4">
+        <form class="space-y-4" @submit.prevent="initiateRequest">
           <!-- Identifier Type Selector -->
           <div class="space-y-2">
-            <Label for="identifierType">{{ $t('customerPrivacy.identifyCustomerBy') }}</Label>
-            <Select v-model="identifierType" id="identifierType">
+            <Label for="identifierType">{{ $t("customerPrivacy.identifyCustomerBy") }}</Label>
+            <Select id="identifierType" v-model="identifierType">
               <SelectTrigger>
                 <SelectValue :placeholder="$t('customerPrivacy.selectIdentifierType')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="email">{{ $t('customerPrivacy.identifierEmail') }}</SelectItem>
-                <SelectItem value="phone">{{ $t('customerPrivacy.identifierPhone') }}</SelectItem>
-                <SelectItem value="externalId">{{ $t('customerPrivacy.identifierExternalId') }}</SelectItem>
+                <SelectItem value="email">{{ $t("customerPrivacy.identifierEmail") }}</SelectItem>
+                <SelectItem value="phone">{{ $t("customerPrivacy.identifierPhone") }}</SelectItem>
+                <SelectItem value="externalId">{{
+                  $t("customerPrivacy.identifierExternalId")
+                }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -125,28 +145,30 @@
             <Button
               type="submit"
               :disabled="isLoading || !identifierValue"
-              @click="requestType = 'export'"
               class="flex-1"
+              @click="requestType = 'export'"
             >
               <Download class="h-4 w-4 mr-2" />
-              {{ $t('customerPrivacy.requestDataExport') }}
+              {{ $t("customerPrivacy.requestDataExport") }}
             </Button>
             <Button
               type="submit"
               variant="destructive"
               :disabled="isLoading || !identifierValue"
-              @click="requestType = 'deletion'"
               class="flex-1"
+              @click="requestType = 'deletion'"
             >
               <Trash2 class="h-4 w-4 mr-2" />
-              {{ $t('customerPrivacy.requestDataDeletion') }}
+              {{ $t("customerPrivacy.requestDataDeletion") }}
             </Button>
           </div>
 
           <!-- Loading State -->
           <div v-if="isLoading" class="flex items-center justify-center py-4">
             <Loader2 class="h-6 w-6 animate-spin text-neutral-muted" />
-            <span class="ml-2 text-sm text-neutral-muted">{{ $t('customerPrivacy.processingRequest') }}</span>
+            <span class="ml-2 text-sm text-neutral-muted">{{
+              $t("customerPrivacy.processingRequest")
+            }}</span>
           </div>
 
           <!-- Success/Error Messages -->
@@ -168,9 +190,9 @@
     <!-- Request History -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('customerPrivacy.requestHistory') }}</CardTitle>
+        <CardTitle>{{ $t("customerPrivacy.requestHistory") }}</CardTitle>
         <CardDescription>
-          {{ $t('customerPrivacy.requestHistoryDescription') }}
+          {{ $t("customerPrivacy.requestHistoryDescription") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -190,7 +212,6 @@ import { Hay } from "@/utils/api";
 import {
   Download,
   Trash2,
-  InfoIcon,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -259,26 +280,26 @@ const formatTime = (date: Date): string => {
 const identifierLabel = computed(() => {
   switch (identifierType.value) {
     case "email":
-      return t('customerPrivacy.customerEmailAddress');
+      return t("customerPrivacy.customerEmailAddress");
     case "phone":
-      return t('customerPrivacy.customerPhoneNumber');
+      return t("customerPrivacy.customerPhoneNumber");
     case "externalId":
-      return t('customerPrivacy.externalCustomerId');
+      return t("customerPrivacy.externalCustomerId");
     default:
-      return t('customerPrivacy.customerIdentifier');
+      return t("customerPrivacy.customerIdentifier");
   }
 });
 
 const identifierPlaceholder = computed(() => {
   switch (identifierType.value) {
     case "email":
-      return t('customerPrivacy.emailPlaceholder');
+      return t("customerPrivacy.emailPlaceholder");
     case "phone":
-      return t('customerPrivacy.phonePlaceholder');
+      return t("customerPrivacy.phonePlaceholder");
     case "externalId":
-      return t('customerPrivacy.externalIdPlaceholder');
+      return t("customerPrivacy.externalIdPlaceholder");
     default:
-      return t('customerPrivacy.identifierPlaceholder');
+      return t("customerPrivacy.identifierPlaceholder");
   }
 });
 
@@ -408,10 +429,10 @@ const saveRetentionPolicy = async () => {
     await Hay.organizations.updateSettings.mutate({
       retentionDays: retentionDays.value,
     });
-    toast.success(t('customerPrivacy.retentionSaveSuccess'));
+    toast.success(t("customerPrivacy.retentionSaveSuccess"));
   } catch (error) {
     console.error("Failed to save retention policy:", error);
-    toast.error(t('customerPrivacy.retentionSaveFailed'));
+    toast.error(t("customerPrivacy.retentionSaveFailed"));
   } finally {
     isSavingRetention.value = false;
   }

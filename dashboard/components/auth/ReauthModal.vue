@@ -8,7 +8,7 @@
         </DialogDescription>
       </DialogHeader>
 
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-2">
           <Label for="password">{{ $t("reauth.passwordLabel") }}</Label>
           <Input
@@ -25,12 +25,7 @@
         </div>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            @click="handleCancel"
-            :disabled="loading"
-          >
+          <Button type="button" variant="outline" :disabled="loading" @click="handleCancel">
             {{ $t("common.cancel") }}
           </Button>
           <Button type="submit" :disabled="loading || !password">
@@ -46,7 +41,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { Hay } from "@/utils/api";
-import { useToast } from "@/composables/useToast";
 
 interface ReauthModalProps {
   open: boolean;
@@ -61,19 +55,21 @@ const props = defineProps<ReauthModalProps>();
 const emit = defineEmits<ReauthModalEmits>();
 
 const { t } = useI18n();
-const toast = useToast();
 
 const password = ref("");
 const loading = ref(false);
 const error = ref("");
 
 // Reset form when dialog opens/closes
-watch(() => props.open, (newVal) => {
-  if (newVal) {
-    password.value = "";
-    error.value = "";
-  }
-});
+watch(
+  () => props.open,
+  (newVal) => {
+    if (newVal) {
+      password.value = "";
+      error.value = "";
+    }
+  },
+);
 
 const handleSubmit = async () => {
   if (!password.value) {

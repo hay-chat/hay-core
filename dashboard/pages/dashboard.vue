@@ -92,7 +92,7 @@
         <CardContent>
           <div class="space-y-4">
             <div
-              v-for="activity in recentActivity"
+              v-for="activity in _recentActivity"
               :key="activity.id"
               class="flex items-start space-x-3"
             >
@@ -321,8 +321,6 @@ import {
   User,
   RefreshCw,
   ChevronRight,
-  AlertCircle,
-  Zap,
   MessageCircle,
   Smile,
   Meh,
@@ -428,41 +426,6 @@ const metrics = computed(() => {
   };
 });
 
-const recentActivity = ref([
-  {
-    id: 1,
-    type: "success",
-    icon: Bot,
-    title: "New agent created",
-    description: "Support Bot v2 was successfully created and deployed",
-    timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-  },
-  {
-    id: 2,
-    type: "info",
-    icon: MessageSquare,
-    title: "High conversation volume",
-    description: "250 conversations handled in the last hour",
-    timestamp: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
-  },
-  {
-    id: 3,
-    type: "warning",
-    icon: AlertCircle,
-    title: "Agent needs attention",
-    description: "Customer Support Bot has a low resolution rate today",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-  },
-  {
-    id: 4,
-    type: "success",
-    icon: Zap,
-    title: "New insight generated",
-    description: "AI identified 3 potential playbook improvements",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-  },
-]);
-
 // Computed property for top agents based on conversation count
 const topAgents = computed(() => {
   // Group conversations by agent and count them
@@ -493,14 +456,6 @@ const topAgents = computed(() => {
   }
 
   return agentsWithStats;
-});
-
-// Computed properties for sentiment visualization
-const formattedSentimentData = computed(() => {
-  return sentimentData.value.map((item) => ({
-    label: item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1),
-    value: item.count,
-  }));
 });
 
 // Computed property for sentiment gauge counts
@@ -722,26 +677,6 @@ const viewConversation = (id: string) => {
 const viewInsights = () => {
   router.push("/insights");
 };
-
-const managePlaybooks = () => {
-  router.push("/playbooks");
-};
-
-const scrollToTop = () => {
-  if (typeof window !== "undefined") {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-};
-
-// Computed property to check if any data is being loaded
-const isAnyDataLoading = computed(() => {
-  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetLoading(key));
-});
-
-// Computed property to check if any data is being refreshed
-const isAnyDataRefreshing = computed(() => {
-  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetRefreshing(key));
-});
 
 // Lifecycle
 onMounted(async () => {

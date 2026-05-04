@@ -17,7 +17,6 @@ import {
 import type { ChartOptions, ChartData } from "chart.js";
 import { Bar } from "vue-chartjs";
 import {
-  getChartColor,
   getTooltipConfig,
   getScaleConfig,
   getLegendConfig,
@@ -67,11 +66,11 @@ const chartData = computed<ChartData<"bar">>(() => ({
     {
       label: props.title || "Data",
       data: props.data.map((item) => item.value),
-      backgroundColor: props.data.map((item, index) =>
-        item.color || chartColors.value[index % chartColors.value.length]
+      backgroundColor: props.data.map(
+        (item, index) => item.color || chartColors.value[index % chartColors.value.length],
       ),
-      borderColor: props.data.map((item, index) =>
-        item.color || chartColors.value[index % chartColors.value.length]
+      borderColor: props.data.map(
+        (item, index) => item.color || chartColors.value[index % chartColors.value.length],
       ),
       borderWidth: 0,
       borderRadius: 4,

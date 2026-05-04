@@ -159,10 +159,7 @@ export async function fetchMetadataFromWorker(
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-      logger.debug(
-        { pluginId, attempt, maxRetries, port },
-        "Fetching metadata",
-      );
+      logger.debug({ pluginId, attempt, maxRetries, port }, "Fetching metadata");
 
       const response = await fetch(`http://localhost:${port}/metadata`, {
         signal: abortController.signal,
@@ -190,7 +187,12 @@ export async function fetchMetadataFromWorker(
         logger.warn({ pluginId, attempt, maxRetries }, "Metadata fetch timeout");
       } else {
         logger.warn(
-          { pluginId, attempt, maxRetries, error: error instanceof Error ? error.message : String(error) },
+          {
+            pluginId,
+            attempt,
+            maxRetries,
+            error: error instanceof Error ? error.message : String(error),
+          },
           "Metadata fetch failed",
         );
       }

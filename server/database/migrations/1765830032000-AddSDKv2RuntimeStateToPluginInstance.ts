@@ -40,7 +40,9 @@ export class AddSDKv2RuntimeStateToPluginInstance1765830032000 implements Migrat
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_plugin_instances_org_plugin_runtime"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."idx_plugin_instances_org_plugin_runtime"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_plugin_instances_runtime_state"`);
 
     // Drop columns

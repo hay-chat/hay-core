@@ -3,7 +3,7 @@ import type {
   TooltipOptions,
   LegendOptions,
   CartesianScaleOptions,
-  ChartType
+  ChartType,
 } from "chart.js";
 
 // Chart color palette based on your design system
@@ -88,14 +88,14 @@ export const getTooltipConfig = (options?: {
 
       // Add percentage if requested
       if (options?.showPercentage && context.dataset.data) {
-        const numericData = context.dataset.data.map(d => {
-          if (typeof d === 'number') return d;
+        const numericData = context.dataset.data.map((d) => {
+          if (typeof d === "number") return d;
           if (d === null) return 0;
-          if (typeof d === 'object' && 'y' in d) return (d as any).y;
+          if (typeof d === "object" && "y" in d) return (d as any).y;
           return 0;
         });
         const total = numericData.reduce((a, b) => a + b, 0);
-        if (total > 0 && typeof value === 'number') {
+        if (total > 0 && typeof value === "number") {
           const percentage = ((value / total) * 100).toFixed(1);
           return `${label}: ${formattedValue} (${percentage}%)`;
         }
@@ -173,10 +173,7 @@ export const getChartColor = (index: number): string => {
 };
 
 // Get color array for a specific theme
-export const getThemeColors = (
-  theme: keyof typeof CHART_COLORS,
-  count: number
-): string[] => {
+export const getThemeColors = (theme: keyof typeof CHART_COLORS, count: number): string[] => {
   const colors = CHART_COLORS[theme];
   const result: string[] = [];
 
@@ -191,7 +188,7 @@ export const getThemeColors = (
 export const createGradient = (
   ctx: CanvasRenderingContext2D,
   color: string,
-  height: number
+  height: number,
 ): CanvasGradient => {
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, color + "40"); // 25% opacity

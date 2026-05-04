@@ -106,10 +106,7 @@ export class DocumentRetryService {
       // Check if document is eligible for retry
       const retryCount = document.processingMetadata?.retryCount || 0;
       if (retryCount >= this.MAX_RETRY_COUNT) {
-        logger.warn(
-          { documentId, retryCount },
-          "Document has exceeded max retry count",
-        );
+        logger.warn({ documentId, retryCount }, "Document has exceeded max retry count");
 
         // Mark as ERROR if not already
         if (document.status !== DocumentationStatus.ERROR) {
@@ -142,7 +139,12 @@ export class DocumentRetryService {
       }
 
       logger.info(
-        { documentId, sourceUrl: document.sourceUrl, attempt: retryCount + 1, maxRetries: this.MAX_RETRY_COUNT },
+        {
+          documentId,
+          sourceUrl: document.sourceUrl,
+          attempt: retryCount + 1,
+          maxRetries: this.MAX_RETRY_COUNT,
+        },
         "Retrying document",
       );
 

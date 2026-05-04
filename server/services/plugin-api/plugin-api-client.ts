@@ -75,11 +75,13 @@ export class PluginAPIClient {
   /**
    * Health check - verify API connectivity and token validity
    */
-  async health(): Promise<PluginAPIHttpResponse<{
-    pluginId: string;
-    organizationId: string;
-    capabilities: string[];
-  }>> {
+  async health(): Promise<
+    PluginAPIHttpResponse<{
+      pluginId: string;
+      organizationId: string;
+      capabilities: string[];
+    }>
+  > {
     return this.request("/health", { method: "GET" });
   }
 
@@ -145,9 +147,7 @@ export function createPluginAPIClient(): PluginAPIClient {
   if (!process.env.PLUGIN_API_TOKEN) missing.push("PLUGIN_API_TOKEN");
 
   if (missing.length > 0) {
-    throw new Error(
-      `Missing required environment variables for Plugin API: ${missing.join(", ")}`,
-    );
+    throw new Error(`Missing required environment variables for Plugin API: ${missing.join(", ")}`);
   }
 
   // Now we can safely assert non-null since we validated above

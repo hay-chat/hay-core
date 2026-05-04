@@ -24,7 +24,10 @@ export class RedisService {
       return;
     }
 
-    logger.debug({ host: config.redis.host, port: config.redis.port, db: config.redis.db }, "Initializing Redis service");
+    logger.debug(
+      { host: config.redis.host, port: config.redis.port, db: config.redis.db },
+      "Initializing Redis service",
+    );
 
     try {
       // Create publisher connection
@@ -114,7 +117,10 @@ export class RedisService {
 
     try {
       const message = JSON.stringify(data);
-      logger.debug({ channel, dataType: data.type, dataKeys: Object.keys(data) }, "Publishing message to channel");
+      logger.debug(
+        { channel, dataType: data.type, dataKeys: Object.keys(data) },
+        "Publishing message to channel",
+      );
       await this.publisher.publish(channel, message);
       logger.debug({ channel }, "Message published successfully");
     } catch (error) {
@@ -145,7 +151,10 @@ export class RedisService {
       }
 
       this.eventHandlers.get(channel)!.add(handler);
-      logger.debug({ channel, totalHandlers: this.eventHandlers.get(channel)!.size }, "Handler added for channel");
+      logger.debug(
+        { channel, totalHandlers: this.eventHandlers.get(channel)!.size },
+        "Handler added for channel",
+      );
     } catch (error) {
       logger.error({ err: error, channel }, "Failed to subscribe");
       throw error;
@@ -198,7 +207,10 @@ export class RedisService {
       const handlers = this.eventHandlers.get(channel);
 
       if (handlers) {
-        logger.debug({ channel, handlerCount: handlers.size, dataType: data.type }, "Dispatching to handlers");
+        logger.debug(
+          { channel, handlerCount: handlers.size, dataType: data.type },
+          "Dispatching to handlers",
+        );
 
         handlers.forEach((handler) => {
           try {

@@ -133,7 +133,10 @@ export class StaleMessageDetectorService {
       });
 
       if (staleConversations.length > 0) {
-        logger.debug({ total: staleConversations.length, byReason: this.groupByReason(staleConversations) }, "Found stale conversations");
+        logger.debug(
+          { total: staleConversations.length, byReason: this.groupByReason(staleConversations) },
+          "Found stale conversations",
+        );
       }
 
       return staleConversations;
@@ -194,10 +197,13 @@ export class StaleMessageDetectorService {
    * Groups stale conversations by their stuck reason
    */
   private groupByReason(conversations: StaleConversation[]): Record<string, number> {
-    return conversations.reduce((acc, conv) => {
-      acc[conv.stuckReason] = (acc[conv.stuckReason] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    return conversations.reduce(
+      (acc, conv) => {
+        acc[conv.stuckReason] = (acc[conv.stuckReason] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
   }
 
   /**

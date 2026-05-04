@@ -86,7 +86,7 @@ const calculateDatesForPreset = (preset: PresetType): DateRange => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let startDate: Date;
-  let endDate: Date = today;
+  const endDate: Date = today;
 
   switch (preset) {
     case "last7":
@@ -101,12 +101,13 @@ const calculateDatesForPreset = (preset: PresetType): DateRange => {
       startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 89);
       break;
-    case "thisWeek":
+    case "thisWeek": {
       const dayOfWeek = today.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       startDate = new Date(today);
       startDate.setDate(today.getDate() - daysToMonday);
       break;
+    }
     case "thisMonth":
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       break;

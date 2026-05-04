@@ -63,7 +63,7 @@ const props = withDefaults(
   {
     side: "right",
     size: "md",
-  }
+  },
 );
 
 defineEmits<{

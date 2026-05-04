@@ -27,21 +27,25 @@ export class VariableEngine {
    */
   private static processConditionals(
     template: string,
-    variables: Record<string, PromptVariableType>
+    variables: Record<string, PromptVariableType>,
   ): string {
-    const conditionalPattern = /\{\{#if\s+([^}]+?)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g;
+    const conditionalPattern =
+      /\{\{#if\s+([^}]+?)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g;
 
-    return template.replace(conditionalPattern, (_match, condition, truthyBlock, falsyBlock = "") => {
-      const conditionValue = this.evaluateCondition(condition.trim(), variables);
-      
-      if (conditionValue) {
-        return this.render(truthyBlock, variables);
-      } else if (falsyBlock) {
-        return this.render(falsyBlock, variables);
-      }
-      
-      return "";
-    });
+    return template.replace(
+      conditionalPattern,
+      (_match, condition, truthyBlock, falsyBlock = "") => {
+        const conditionValue = this.evaluateCondition(condition.trim(), variables);
+
+        if (conditionValue) {
+          return this.render(truthyBlock, variables);
+        } else if (falsyBlock) {
+          return this.render(falsyBlock, variables);
+        }
+
+        return "";
+      },
+    );
   }
 
   /**
@@ -49,7 +53,7 @@ export class VariableEngine {
    */
   private static processLoops(
     template: string,
-    variables: Record<string, PromptVariableType>
+    variables: Record<string, PromptVariableType>,
   ): string {
     const loopPattern = /\{\{#each\s+([^}]+?)\}\}([\s\S]*?)\{\{\/each\}\}/g;
 
@@ -80,14 +84,14 @@ export class VariableEngine {
    */
   private static replaceVariables(
     template: string,
-    variables: Record<string, PromptVariableType>
+    variables: Record<string, PromptVariableType>,
   ): string {
     // Match {{variable}}, {{variable|default:"value"}}, or {{object.property}}
     const variablePattern = /\{\{([^}#/]+?)\}\}/g;
 
     return template.replace(variablePattern, (_match, varExpression) => {
       const trimmed = varExpression.trim();
-      
+
       // Check for default value syntax
       const pipeIndex = trimmed.indexOf("|");
       let varPath: string;
@@ -104,11 +108,11 @@ export class VariableEngine {
       }
 
       const value = this.getNestedValue(variables, varPath);
-      
+
       if (value !== undefined && value !== null) {
         return this.formatValue(value);
       }
-      
+
       return defaultValue;
     });
   }
@@ -118,7 +122,7 @@ export class VariableEngine {
    */
   private static evaluateCondition(
     condition: string,
-    variables: Record<string, PromptVariableType>
+    variables: Record<string, PromptVariableType>,
   ): boolean {
     // Handle negation ({{#if not variable}})
     if (condition.startsWith("not ")) {
@@ -145,15 +149,15 @@ export class VariableEngine {
     if (value === undefined || value === null || value === false || value === 0 || value === "") {
       return false;
     }
-    
+
     if (Array.isArray(value)) {
       return value.length > 0;
     }
-    
+
     if (typeof value === "object") {
       return Object.keys(value).length > 0;
     }
-    
+
     return true;
   }
 
@@ -162,7 +166,7 @@ export class VariableEngine {
    */
   private static getNestedValue(
     obj: Record<string, PromptVariableType>,
-    path: string
+    path: string,
   ): PromptVariableType | undefined {
     const keys = path.split(".");
     let current: any = obj;

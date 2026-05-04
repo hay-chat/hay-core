@@ -70,21 +70,27 @@ export class OAuthAuthStrategy {
 
         if (expiresAt - now < bufferSeconds) {
           // Token is expired or expiring soon, try to refresh
-          logger.debug({
-            pluginId,
-            organizationId,
-            expiresAt,
-            now,
-          }, "Token expiring soon, refreshing");
+          logger.debug(
+            {
+              pluginId,
+              organizationId,
+              expiresAt,
+              now,
+            },
+            "Token expiring soon, refreshing",
+          );
 
           try {
             const newTokens = await oauthService.refreshToken(organizationId, pluginId);
             return newTokens || tokens; // Fall back to old tokens if refresh fails
           } catch (error) {
-            logger.warn({
-              err: error,
-              pluginId,
-            }, "Token refresh failed, using existing token");
+            logger.warn(
+              {
+                err: error,
+                pluginId,
+              },
+              "Token refresh failed, using existing token",
+            );
             // If refresh fails but token hasn't expired yet, use it anyway
             if (expiresAt - now > 0) {
               return tokens;
@@ -97,10 +103,13 @@ export class OAuthAuthStrategy {
 
       return tokens;
     } catch (error) {
-      logger.error({
-        err: error,
-        pluginId,
-      }, "Failed to get OAuth tokens");
+      logger.error(
+        {
+          err: error,
+          pluginId,
+        },
+        "Failed to get OAuth tokens",
+      );
       return null;
     }
   }

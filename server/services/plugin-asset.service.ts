@@ -265,7 +265,17 @@ export class PluginAssetService {
     const cacheKey = `${pluginName}/ui/${assetPath}`;
 
     // Security: Whitelist allowed file types
-    const allowedExtensions = ['.js', '.mjs', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+    const allowedExtensions = [
+      ".js",
+      ".mjs",
+      ".css",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".svg",
+      ".webp",
+    ];
     const ext = path.extname(assetPath).toLowerCase();
     if (!allowedExtensions.includes(ext)) {
       res.status(403).json({ error: "File type not allowed" });
@@ -302,12 +312,7 @@ export class PluginAssetService {
     const sanitizedPath = assetPath.replace(/\.\./g, "");
 
     // Build path to plugin dist directory
-    const pluginDir = path.join(
-      process.cwd(),
-      "..",
-      "plugins",
-      plugin.pluginPath,
-    );
+    const pluginDir = path.join(process.cwd(), "..", "plugins", plugin.pluginPath);
     const distDir = path.join(pluginDir, "dist");
     const fullPath = path.join(distDir, sanitizedPath);
 

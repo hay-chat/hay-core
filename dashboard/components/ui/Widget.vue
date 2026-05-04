@@ -27,7 +27,7 @@
                 :key="item.label"
                 @click="item.action"
               >
-                <component v-if="item.icon" :is="item.icon" class="mr-2 h-4 w-4" />
+                <component :is="item.icon" v-if="item.icon" class="mr-2 h-4 w-4" />
                 {{ item.label }}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -67,9 +67,19 @@
 
       <!-- Empty state -->
       <div v-else-if="isEmpty && !isLoading" class="py-8 text-center">
-        <component v-if="emptyStateIcon" :is="emptyStateIcon" class="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+        <component
+          :is="emptyStateIcon"
+          v-if="emptyStateIcon"
+          class="mx-auto h-12 w-12 text-muted-foreground mb-3"
+        />
         <p class="text-sm text-muted-foreground">{{ emptyStateMessage }}</p>
-        <Button v-if="showRefreshOnEmpty" variant="outline" size="sm" class="mt-4" @click="handleRefresh">
+        <Button
+          v-if="showRefreshOnEmpty"
+          variant="outline"
+          size="sm"
+          class="mt-4"
+          @click="handleRefresh"
+        >
           <RefreshCw class="mr-2 h-4 w-4" />
           Refresh
         </Button>
@@ -108,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type Component } from "vue";
+import { computed, onMounted, onUnmounted, watch, type Component } from "vue";
 import { MoreVertical, RefreshCw } from "lucide-vue-next";
 import { useAnalyticsStore } from "@/stores/analytics";
 import { cn } from "@/lib/utils";
@@ -165,8 +175,8 @@ const props = withDefaults(defineProps<WidgetProps>(), {
 
 const emit = defineEmits<{
   "data-fetched": [data: any];
-  "error": [error: Error];
-  "refresh": [];
+  error: [error: Error];
+  refresh: [];
 }>();
 
 const analyticsStore = useAnalyticsStore();
@@ -214,11 +224,10 @@ const fetchData = async (forceRefresh = false) => {
   if (!props.dataFetcher) return;
 
   try {
-    const data = await analyticsStore.fetchData(
-      props.widgetId,
-      props.dataFetcher,
-      { ttl: props.ttl, forceRefresh }
-    );
+    const data = await analyticsStore.fetchData(props.widgetId, props.dataFetcher, {
+      ttl: props.ttl,
+      forceRefresh,
+    });
     emit("data-fetched", data);
   } catch (err) {
     console.error(`Error fetching data for widget ${props.widgetId}:`, err);
@@ -248,10 +257,13 @@ const clearRefreshInterval = () => {
 };
 
 // Watch for changes in refresh interval
-watch(() => props.refreshInterval, () => {
-  clearRefreshInterval();
-  setupRefreshInterval();
-});
+watch(
+  () => props.refreshInterval,
+  () => {
+    clearRefreshInterval();
+    setupRefreshInterval();
+  },
+);
 
 // Lifecycle hooks
 onMounted(async () => {

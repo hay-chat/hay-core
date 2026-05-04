@@ -35,6 +35,9 @@ switch_to_local() {
     echo "✅ Switched to local development environment"
     echo "Database: localhost:5432"
     echo "Redis: localhost:6379"
+    echo "RabbitMQ: localhost:5672 (mgmt UI: http://localhost:15672)"
+    echo ""
+    echo "Make sure local services are up: docker compose up -d"
 }
 
 switch_to_cloud() {

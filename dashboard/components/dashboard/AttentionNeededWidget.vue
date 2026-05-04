@@ -30,10 +30,7 @@
       </div>
 
       <!-- Empty State -->
-      <div
-        v-else-if="attentionConversations.length === 0"
-        class="text-center py-8"
-      >
+      <div v-else-if="attentionConversations.length === 0" class="text-center py-8">
         <CheckCircle class="h-12 w-12 mx-auto mb-2 opacity-50 text-green-500" />
         <p class="font-medium text-foreground">All caught up!</p>
         <p class="text-sm mt-2 text-neutral-muted">No conversations need attention</p>
@@ -95,7 +92,12 @@ import { useRouter } from "vue-router";
 import { HayApi } from "@/utils/api";
 import { useAnalyticsStore } from "@/stores/analytics";
 import { useWebSocket } from "@/composables/useWebSocket";
-import { getWaitTime, formatWaitTime, getWaitTimeBadgeVariant, getFullName } from "@/utils/conversation";
+import {
+  getWaitTime,
+  formatWaitTime,
+  getWaitTimeBadgeVariant,
+  getFullName,
+} from "@/utils/conversation";
 import {
   MessageCircle,
   Globe,
@@ -189,11 +191,9 @@ const fetchAttentionConversations = async (forceRefresh = false) => {
           .filter((conv): conv is AttentionConversation => conv !== null);
 
         // Sort by longest wait time first and take top 10
-        return withWaitTimes
-          .sort((a, b) => b.waitTime - a.waitTime)
-          .slice(0, 10);
+        return withWaitTimes.sort((a, b) => b.waitTime - a.waitTime).slice(0, 10);
       },
-      { ttl: CACHE_TTL, forceRefresh }
+      { ttl: CACHE_TTL, forceRefresh },
     );
 
     attentionConversations.value = data || [];

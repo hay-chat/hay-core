@@ -1,14 +1,10 @@
 <template>
-  <Page
-    :title="$t('webchat.title')"
-    :description="$t('webchat.description')"
-    width="max"
-  >
+  <Page :title="$t('webchat.title')" :description="$t('webchat.description')" width="max">
     <!-- Appearance -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('webchat.widgetAppearance') }}</CardTitle>
-        <CardDescription>{{ $t('webchat.widgetAppearanceDescription') }}</CardDescription>
+        <CardTitle>{{ $t("webchat.widgetAppearance") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.widgetAppearanceDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
@@ -29,29 +25,29 @@
 
         <div class="grid gap-4 md:grid-cols-2">
           <div class="space-y-2">
-            <Label for="position">{{ $t('webchat.position') }}</Label>
+            <Label for="position">{{ $t("webchat.position") }}</Label>
             <Select v-model="settingsForm.position">
               <SelectTrigger id="position">
                 <SelectValue :placeholder="$t('webchat.selectPosition')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="right">{{ $t('webchat.positionRight') }}</SelectItem>
-                <SelectItem value="left">{{ $t('webchat.positionLeft') }}</SelectItem>
+                <SelectItem value="right">{{ $t("webchat.positionRight") }}</SelectItem>
+                <SelectItem value="left">{{ $t("webchat.positionLeft") }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div class="space-y-2">
-            <Label for="theme">{{ $t('webchat.theme') }}</Label>
+            <Label for="theme">{{ $t("webchat.theme") }}</Label>
             <Select v-model="settingsForm.theme">
               <SelectTrigger id="theme">
                 <SelectValue :placeholder="$t('webchat.selectTheme')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="blue">{{ $t('webchat.themeBlue') }}</SelectItem>
-                <SelectItem value="green">{{ $t('webchat.themeGreen') }}</SelectItem>
-                <SelectItem value="purple">{{ $t('webchat.themePurple') }}</SelectItem>
-                <SelectItem value="black">{{ $t('webchat.themeBlack') }}</SelectItem>
+                <SelectItem value="blue">{{ $t("webchat.themeBlue") }}</SelectItem>
+                <SelectItem value="green">{{ $t("webchat.themeGreen") }}</SelectItem>
+                <SelectItem value="purple">{{ $t("webchat.themePurple") }}</SelectItem>
+                <SelectItem value="black">{{ $t("webchat.themeBlack") }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -62,13 +58,13 @@
     <!-- Behavior -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('webchat.widgetBehavior') }}</CardTitle>
-        <CardDescription>{{ $t('webchat.widgetBehaviorDescription') }}</CardDescription>
+        <CardTitle>{{ $t("webchat.widgetBehavior") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.widgetBehaviorDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="flex items-center space-x-2">
           <Switch id="showGreeting" v-model:checked="settingsForm.showGreeting" />
-          <Label for="showGreeting">{{ $t('webchat.showGreeting') }}</Label>
+          <Label for="showGreeting">{{ $t("webchat.showGreeting") }}</Label>
         </div>
 
         <Textarea
@@ -85,8 +81,8 @@
     <!-- Security -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('webchat.securityAccess') }}</CardTitle>
-        <CardDescription>{{ $t('webchat.securityAccessDescription') }}</CardDescription>
+        <CardTitle>{{ $t("webchat.securityAccess") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.securityAccessDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <Textarea
@@ -100,7 +96,7 @@
 
         <div class="flex items-center space-x-2">
           <Switch id="isEnabled" v-model:checked="settingsForm.isEnabled" />
-          <Label for="isEnabled">{{ $t('webchat.enableWebchat') }}</Label>
+          <Label for="isEnabled">{{ $t("webchat.enableWebchat") }}</Label>
         </div>
       </CardContent>
     </Card>
@@ -108,19 +104,19 @@
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
       <Button variant="outline" :disabled="!hasChanges || isSaving" @click="resetForm">
-        {{ $t('webchat.reset') }}
+        {{ $t("webchat.reset") }}
       </Button>
       <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
         <Save class="h-4 w-4 mr-2" />
-        {{ $t('webchat.saveChanges') }}
+        {{ $t("webchat.saveChanges") }}
       </Button>
     </div>
 
     <!-- Installation -->
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('webchat.installationCode') }}</CardTitle>
-        <CardDescription>{{ $t('webchat.installationCodeDescription') }}</CardDescription>
+        <CardTitle>{{ $t("webchat.installationCode") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.installationCodeDescription") }}</CardDescription>
       </CardHeader>
       <CardContent>
         <div class="relative">
@@ -135,7 +131,7 @@
           >
             <Copy v-if="!copied" class="h-3 w-3 mr-1" />
             <Check v-else class="h-3 w-3 mr-1" />
-            {{ copied ? $t('apiTokens.copied') : $t('apiTokens.copy') }}
+            {{ copied ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
           </Button>
         </div>
       </CardContent>
@@ -226,7 +222,7 @@ async function loadSettings() {
     originalSettings.value = { ...settingsForm.value, allowedDomains: settings.allowedDomains };
   } catch (error) {
     console.error("Failed to load webchat settings:", error);
-    toast.error(t('webchat.loadFailed'));
+    toast.error(t("webchat.loadFailed"));
   }
 }
 
@@ -247,10 +243,10 @@ async function saveSettings() {
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
 
-    toast.success(t('webchat.saveSuccess'));
+    toast.success(t("webchat.saveSuccess"));
   } catch (error) {
     console.error("Failed to save webchat settings:", error);
-    toast.error(t('webchat.saveFailed'));
+    toast.error(t("webchat.saveFailed"));
   } finally {
     isSaving.value = false;
   }

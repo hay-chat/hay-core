@@ -231,34 +231,30 @@ describe("VectorStore Integration Tests", () => {
 
     it("should delete embeddings by conversation ID", async () => {
       // Verify embeddings exist before deletion
-      const beforeResults = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversationId1],
-      );
+      const beforeResults = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversationId1,
+      ]);
       expect(beforeResults.length).toBeGreaterThan(0);
 
       // Delete embeddings for conversation 1
-      const deletedCount = await vectorStoreService.deleteByConversationIds(
-        testOrgId,
-        [testConversationId1],
-      );
+      const deletedCount = await vectorStoreService.deleteByConversationIds(testOrgId, [
+        testConversationId1,
+      ]);
 
       expect(deletedCount).toBeGreaterThan(0);
 
       // Verify embeddings are deleted (post-delete search returns 0)
-      const afterResults = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversationId1],
-      );
+      const afterResults = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversationId1,
+      ]);
       expect(afterResults.length).toBe(0);
     });
 
     it("should not delete embeddings from other conversations", async () => {
       // Conversation 2 embeddings should still exist
-      const results = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversationId2],
-      );
+      const results = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversationId2,
+      ]);
       expect(results.length).toBeGreaterThan(0);
     });
 
@@ -327,24 +323,15 @@ describe("VectorStore Integration Tests", () => {
 
     it("should delete embeddings by message ID", async () => {
       // Verify embeddings exist
-      const beforeResults = await vectorStoreService.findByMessageIds(
-        testOrgId,
-        [testMessageId1],
-      );
+      const beforeResults = await vectorStoreService.findByMessageIds(testOrgId, [testMessageId1]);
       expect(beforeResults.length).toBeGreaterThan(0);
 
       // Delete
-      const deletedCount = await vectorStoreService.deleteByMessageIds(
-        testOrgId,
-        [testMessageId1],
-      );
+      const deletedCount = await vectorStoreService.deleteByMessageIds(testOrgId, [testMessageId1]);
       expect(deletedCount).toBeGreaterThan(0);
 
       // Verify deletion (post-delete search returns 0)
-      const afterResults = await vectorStoreService.findByMessageIds(
-        testOrgId,
-        [testMessageId1],
-      );
+      const afterResults = await vectorStoreService.findByMessageIds(testOrgId, [testMessageId1]);
       expect(afterResults.length).toBe(0);
     });
   });
@@ -364,10 +351,7 @@ describe("VectorStore Integration Tests", () => {
     });
 
     it("should find embeddings by conversation IDs for export", async () => {
-      const results = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [findTestConvId],
-      );
+      const results = await vectorStoreService.findByConversationIds(testOrgId, [findTestConvId]);
 
       expect(results.length).toBe(1);
       expect(results[0].pageContent).toBe("Find test embedding content");
@@ -376,10 +360,9 @@ describe("VectorStore Integration Tests", () => {
     });
 
     it("should return empty array for non-existent conversations", async () => {
-      const results = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        ["d0000000-e89b-12d3-a456-426614174000"],
-      );
+      const results = await vectorStoreService.findByConversationIds(testOrgId, [
+        "d0000000-e89b-12d3-a456-426614174000",
+      ]);
       expect(results.length).toBe(0);
     });
 
@@ -433,10 +416,7 @@ describe("VectorStore Integration Tests", () => {
     });
 
     it("should find customer embeddings before deletion", async () => {
-      const results = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [customerConvId],
-      );
+      const results = await vectorStoreService.findByConversationIds(testOrgId, [customerConvId]);
       expect(results.length).toBe(2);
     });
 
@@ -447,19 +427,17 @@ describe("VectorStore Integration Tests", () => {
 
     it("should delete all customer embeddings", async () => {
       // Delete by conversation
-      const deletedByConv = await vectorStoreService.deleteByConversationIds(
-        testOrgId,
-        [customerConvId],
-      );
+      const deletedByConv = await vectorStoreService.deleteByConversationIds(testOrgId, [
+        customerConvId,
+      ]);
       expect(deletedByConv).toBe(2);
     });
 
     it("should return 0 results after deletion (GDPR compliance)", async () => {
       // This is the key acceptance criteria: "post-delete search returns 0"
-      const conversationResults = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [customerConvId],
-      );
+      const conversationResults = await vectorStoreService.findByConversationIds(testOrgId, [
+        customerConvId,
+      ]);
       expect(conversationResults.length).toBe(0);
 
       const messageResults = await vectorStoreService.findByMessageIds(

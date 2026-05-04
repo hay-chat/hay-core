@@ -164,9 +164,7 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
 
   canVerify(): boolean {
     return (
-      this.status === "pending_verification" &&
-      !!this.verificationTokenHash &&
-      !this.isExpired()
+      this.status === "pending_verification" && !!this.verificationTokenHash && !this.isExpired()
     );
   }
 

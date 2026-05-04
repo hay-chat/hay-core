@@ -14,7 +14,7 @@ class OrganizationService {
     });
   }
 
-  async findOneWithUrls(id: string): Promise<Organization & { logoUrl?: string } | null> {
+  async findOneWithUrls(id: string): Promise<(Organization & { logoUrl?: string }) | null> {
     const org = await this.findOne(id);
     if (!org) return null;
 

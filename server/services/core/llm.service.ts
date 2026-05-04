@@ -63,23 +63,23 @@ export class LLMService {
         messages: preparedMessages,
         temperature,
         max_tokens,
-        ...(jsonSchema && (strictSchema
-          ? {
-              // Structured Outputs with strict schema validation
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "structured_response",
-                  schema: jsonSchema as Record<string, unknown>,
-                  strict: true,
+        ...(jsonSchema &&
+          (strictSchema
+            ? {
+                // Structured Outputs with strict schema validation
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "structured_response",
+                    schema: jsonSchema as Record<string, unknown>,
+                    strict: true,
+                  },
                 },
-              },
-            }
-          : {
-              // JSON mode without strict validation (schema in prompt only)
-              response_format: { type: "json_object" },
-            }
-        )),
+              }
+            : {
+                // JSON mode without strict validation (schema in prompt only)
+                response_format: { type: "json_object" },
+              })),
       };
 
       if (stream) {
@@ -88,14 +88,14 @@ export class LLMService {
             ...requestConfig,
             stream: true,
           }),
-          60000 // 60 second timeout for streaming
+          60000, // 60 second timeout for streaming
         );
         return this.streamToAsyncIterable(streamResponse) as T;
       }
 
       const response = await this.executeWithTimeout(
         this.openai.chat.completions.create(requestConfig),
-        30000 // 30 second timeout for non-streaming
+        30000, // 30 second timeout for non-streaming
       );
       const content = response.choices[0]?.message?.content;
 
@@ -123,7 +123,7 @@ export class LLMService {
           model,
           input: text,
         }),
-        30000 // 30 second timeout for embeddings
+        30000, // 30 second timeout for embeddings
       );
 
       return response.data[0]?.embedding || [];
@@ -146,10 +146,7 @@ export class LLMService {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Operation timeout after ${timeoutMs}ms`)),
-          timeoutMs
-        )
+        setTimeout(() => reject(new Error(`Operation timeout after ${timeoutMs}ms`)), timeoutMs),
       ),
     ]);
   }

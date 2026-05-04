@@ -1,9 +1,5 @@
 import { emailService } from "@server/services/email.service";
-import type {
-  EmailAPI,
-  EmailSendOptions,
-  EmailResult,
-} from "@server/types/plugin-api.types";
+import type { EmailAPI, EmailSendOptions, EmailResult } from "@server/types/plugin-api.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-email-api");
@@ -39,11 +35,7 @@ export class EmailAPIImpl implements EmailAPI {
   private organizationId: string;
   private defaultRecipients: string[];
 
-  constructor(
-    pluginId: string,
-    organizationId: string,
-    config: Record<string, any>
-  ) {
+  constructor(pluginId: string, organizationId: string, config: Record<string, any>) {
     this.pluginId = pluginId;
     this.organizationId = organizationId;
 
@@ -84,10 +76,13 @@ export class EmailAPIImpl implements EmailAPI {
       });
 
       // Log successful send for auditing
-      logger.info({
-        pluginId: this.pluginId,
-        recipients: Array.isArray(recipients) ? recipients : [recipients],
-      }, "Email sent via plugin API");
+      logger.info(
+        {
+          pluginId: this.pluginId,
+          recipients: Array.isArray(recipients) ? recipients : [recipients],
+        },
+        "Email sent via plugin API",
+      );
 
       return {
         success: true,

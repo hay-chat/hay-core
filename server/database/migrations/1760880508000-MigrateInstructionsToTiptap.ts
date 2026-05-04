@@ -103,11 +103,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
     }
 
     // If it's Editor.js format (has blocks array)
-    if (
-      instructions &&
-      typeof instructions === "object" &&
-      Array.isArray(instructions.blocks)
-    ) {
+    if (instructions && typeof instructions === "object" && Array.isArray(instructions.blocks)) {
       const content: any[] = [];
 
       for (const block of instructions.blocks) {
@@ -148,7 +144,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
       for (const item of instructions) {
         if (!item.instructions) continue;
 
-        let text = item.instructions;
+        const text = item.instructions;
 
         // Convert [action](id) to action merge field
         const actionMatches = text.matchAll(/\[action\]\(([^)]+)\)/g);

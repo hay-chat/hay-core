@@ -71,7 +71,7 @@ async function sendPasswordResetEmail(
     ip: string;
     browser: string;
     location: string;
-  }
+  },
 ) {
   await emailService.initialize();
 
@@ -112,7 +112,7 @@ async function sendPasswordResetEmail(
 async function sendNotificationEmail(
   userEmail: string,
   notificationType: string,
-  details: Record<string, any>
+  details: Record<string, any>,
 ) {
   await emailService.initialize();
 
@@ -128,10 +128,12 @@ async function sendNotificationEmail(
       userName: details.userName,
       actionRequired: details.actionRequired || false,
       actionMessage: details.actionMessage,
-      actionButton: details.actionUrl ? {
-        text: "View Details",
-        url: details.actionUrl,
-      } : undefined,
+      actionButton: details.actionUrl
+        ? {
+            text: "View Details",
+            url: details.actionUrl,
+          }
+        : undefined,
       details: details.items?.map((item: any) => ({
         label: item.label,
         value: item.value,
@@ -161,21 +163,21 @@ async function sendNotificationEmail(
  */
 async function checkEmailQueueStatus() {
   const status = emailService.getQueueStatus();
-  
+
   console.log("Email Queue Status:");
   console.log(`- Pending: ${status.pending}`);
   console.log(`- Retry: ${status.retry}`);
   console.log(`- Failed: ${status.failed}`);
-  
+
   if (status.failed > 0) {
     console.log("\nFailed emails:");
     status.items
-      .filter(item => item.status === "failed")
-      .forEach(item => {
+      .filter((item) => item.status === "failed")
+      .forEach((item) => {
         console.log(`  - ID: ${item.id}, Error: ${item.error}`);
       });
   }
-  
+
   return status;
 }
 
@@ -184,8 +186,8 @@ async function checkEmailQueueStatus() {
  */
 async function retryFailedEmails() {
   const status = emailService.getQueueStatus();
-  const failedEmails = status.items.filter(item => item.status === "failed");
-  
+  const failedEmails = status.items.filter((item) => item.status === "failed");
+
   for (const email of failedEmails) {
     const success = emailService.retryEmail(email.id);
     if (success) {
@@ -197,11 +199,7 @@ async function retryFailedEmails() {
 /**
  * Example 7: Integration with user registration
  */
-export async function onUserRegistration(user: {
-  id: string;
-  email: string;
-  name: string;
-}) {
+export async function onUserRegistration(user: { id: string; email: string; name: string }) {
   try {
     const result = await sendWelcomeEmail(user.name, user.email);
     if (result.success) {
@@ -220,16 +218,11 @@ export async function onUserRegistration(user: {
 export async function onPasswordResetRequest(
   user: { id: string; email: string; name: string },
   resetToken: string,
-  requestDetails: { ip: string; browser: string; location: string }
+  requestDetails: { ip: string; browser: string; location: string },
 ) {
   try {
-    const result = await sendPasswordResetEmail(
-      user.name,
-      user.email,
-      resetToken,
-      requestDetails
-    );
-    
+    const result = await sendPasswordResetEmail(user.name, user.email, resetToken, requestDetails);
+
     if (result.success) {
       console.log(`Password reset email sent to ${user.email}`);
     } else {
@@ -243,14 +236,16 @@ export async function onPasswordResetRequest(
 /**
  * Example 9: Batch email sending
  */
-export async function sendBatchEmails(recipients: Array<{
-  email: string;
-  name: string;
-  type: "welcome" | "notification";
-  data: any;
-}>) {
+export async function sendBatchEmails(
+  recipients: Array<{
+    email: string;
+    name: string;
+    type: "welcome" | "notification";
+    data: any;
+  }>,
+) {
   await emailService.initialize();
-  
+
   const results = await Promise.allSettled(
     recipients.map(async (recipient) => {
       if (recipient.type === "welcome") {
@@ -259,14 +254,14 @@ export async function sendBatchEmails(recipients: Array<{
         return sendNotificationEmail(recipient.email, "Update", recipient.data);
       }
       throw new Error(`Unknown recipient type: ${recipient.type}`);
-    })
+    }),
   );
-  
-  const successful = results.filter(r => r.status === "fulfilled").length;
-  const failed = results.filter(r => r.status === "rejected").length;
-  
+
+  const successful = results.filter((r) => r.status === "fulfilled").length;
+  const failed = results.filter((r) => r.status === "rejected").length;
+
   console.log(`Batch email results: ${successful} sent, ${failed} failed`);
-  
+
   return { successful, failed, total: recipients.length };
 }
 

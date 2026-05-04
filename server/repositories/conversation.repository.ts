@@ -209,7 +209,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .select(["conversation.id", "conversation.organization_id"])
         .getMany();
     } catch (error) {
-      console.error("[ConversationRepository] Error getting stale unprocessed:", error);
+      logger.error({ err: error }, "Error getting stale unprocessed");
       return [];
     }
   }

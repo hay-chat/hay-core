@@ -5,7 +5,7 @@ async function runMigration() {
     await AppDataSource.initialize();
     console.log("✅ Database connected");
 
-    await AppDataSource.query('ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL');
+    await AppDataSource.query("ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL");
     console.log("✅ Migration successful: user_id column is now nullable");
 
     await AppDataSource.destroy();

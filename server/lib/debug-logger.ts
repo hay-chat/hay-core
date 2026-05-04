@@ -80,7 +80,11 @@ function getModuleLogger(moduleName: string): pino.Logger {
 /**
  * @deprecated Use `createLogger(module)` from `@server/lib/logger` instead.
  */
-export function debugLog(moduleName: string, message: string, options?: LogOptions | unknown): void {
+export function debugLog(
+  moduleName: string,
+  message: string,
+  options?: LogOptions | unknown,
+): void {
   const debugModulesSet = process.env.DEBUG_MODULES && process.env.DEBUG_MODULES !== "*";
   const debugEnabled = config.logging.debug || debugModulesSet;
 
@@ -96,7 +100,8 @@ export function debugLog(moduleName: string, message: string, options?: LogOptio
 
   const opts = options as LogOptions | Record<string, unknown> | undefined;
   const level: LogLevel =
-    (opts && typeof opts === "object" && "level" in opts ? (opts.level as LogLevel) : "debug") || "debug";
+    (opts && typeof opts === "object" && "level" in opts ? (opts.level as LogLevel) : "debug") ||
+    "debug";
   const data =
     opts && typeof opts === "object" && "data" in opts
       ? opts.data

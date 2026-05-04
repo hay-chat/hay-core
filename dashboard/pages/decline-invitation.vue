@@ -9,9 +9,7 @@
       <!-- Success State -->
       <div v-else-if="success" class="space-y-4">
         <div class="text-center">
-          <CardTitle class="text-2xl text-green-600">{{
-            $t("declineInvitation.title")
-          }}</CardTitle>
+          <CardTitle class="text-2xl text-green-600">{{ $t("declineInvitation.title") }}</CardTitle>
           <CardDescription class="mt-2">
             {{ $t("declineInvitation.description") }}
           </CardDescription>
@@ -91,8 +89,7 @@ const handleDecline = async () => {
     }
   } catch (err) {
     console.error("Failed to decline invitation:", err);
-    error.value =
-      err instanceof Error ? err.message : t("declineInvitation.declineFailed");
+    error.value = err instanceof Error ? err.message : t("declineInvitation.declineFailed");
   } finally {
     loading.value = false;
   }

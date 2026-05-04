@@ -388,7 +388,7 @@ const isDefaultAgent = computed(() => {
 
 // Unsaved changes detection
 const {
-  hasUnsavedChanges,
+  hasUnsavedChanges: _hasUnsavedChanges,
   confirmNavigation,
   markAsSaved,
   showConfirmDialog,

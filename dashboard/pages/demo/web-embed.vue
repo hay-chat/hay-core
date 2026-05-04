@@ -107,7 +107,7 @@
               </div>
 
               <div class="flex gap-2 pt-2">
-                <Button @click="clearSession" variant="outline" size="sm">
+                <Button variant="outline" size="sm" @click="clearSession">
                   <Trash2 class="w-4 h-4 mr-2" />
                   Clear Session
                 </Button>

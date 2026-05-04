@@ -314,7 +314,6 @@ import {
   FileText,
   ExternalLink,
   Mail,
-  AlertCircle,
 } from "lucide-vue-next";
 
 import { useToast } from "@/composables/useToast";

@@ -112,8 +112,7 @@ const selectItem = (index: number) => {
 const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
   if (event.key === "ArrowUp") {
     event.preventDefault();
-    selectedIndex.value =
-      (selectedIndex.value + props.items.length - 1) % props.items.length;
+    selectedIndex.value = (selectedIndex.value + props.items.length - 1) % props.items.length;
     return true;
   }
 

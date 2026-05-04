@@ -177,7 +177,8 @@ export class PromptService {
         const agentRepo = AppDataSource.getRepository(Agent);
         const agent = await agentRepo.findOne({
           where: { id: agentId },
-          select: ["language"],
+          select: ["id", "language"],
+          loadEagerRelations: false,
         });
 
         if (agent?.language && this.isValidLanguage(agent.language)) {
@@ -194,6 +195,7 @@ export class PromptService {
         const org = await organizationRepo.findOne({
           where: { id: options.organizationId },
           select: ["id", "defaultLanguage"],
+          loadEagerRelations: false,
         });
 
         if (org?.defaultLanguage) {

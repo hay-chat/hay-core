@@ -79,7 +79,10 @@ export class PluginUIService {
         this.templateCache.set(cacheKey, template);
         return content;
       } catch (error) {
-        logger.error({ err: error, pluginName: plugin.name }, "Failed to load configuration template");
+        logger.error(
+          { err: error, pluginName: plugin.name },
+          "Failed to load configuration template",
+        );
       }
     }
 
@@ -373,7 +376,10 @@ const saveConfiguration = async () => {
             type: this.detectTemplateType(filePath as string),
           };
         } catch (error) {
-          logger.error({ err: error, templateName: name, pluginName: plugin.name }, "Failed to load template");
+          logger.error(
+            { err: error, templateName: name, pluginName: plugin.name },
+            "Failed to load template",
+          );
         }
       }
     }
@@ -454,7 +460,10 @@ const saveConfiguration = async () => {
         const content = await fs.readFile(fullPath, "utf-8");
         return content;
       } catch (fallbackError) {
-        logger.error({ err: fallbackError, componentPath, pluginName: plugin.name }, "Failed to load component");
+        logger.error(
+          { err: fallbackError, componentPath, pluginName: plugin.name },
+          "Failed to load component",
+        );
         return null;
       }
     }

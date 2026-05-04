@@ -1,7 +1,11 @@
 import { v1Router } from "../routes/v1";
 import { isAuthed, scopedProcedure as scopedProcedureFactory } from "@server/trpc/middleware/auth";
 import { withPagination } from "@server/trpc/middleware/pagination";
-import { rateLimitMiddleware, rateLimitedProcedure, RateLimits } from "@server/trpc/middleware/rate-limit";
+import {
+  rateLimitMiddleware,
+  rateLimitedProcedure,
+  RateLimits,
+} from "@server/trpc/middleware/rate-limit";
 import { t, router, publicProcedure } from "./init";
 import { createContext } from "./context";
 

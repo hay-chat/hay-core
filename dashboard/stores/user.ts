@@ -98,77 +98,107 @@ export const useUserStore = defineStore("user", {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "agents:create" || p === "agents:*" || p === "*:*" || p === "*:create");
+      return permissions.some(
+        (p) => p === "agents:create" || p === "agents:*" || p === "*:*" || p === "*:create",
+      );
     },
 
     canEditAgents: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "agents:update" || p === "agents:*" || p === "*:*" || p === "*:update");
+      return permissions.some(
+        (p) => p === "agents:update" || p === "agents:*" || p === "*:*" || p === "*:update",
+      );
     },
 
     canDeleteAgents: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "agents:delete" || p === "agents:*" || p === "*:*" || p === "*:delete");
+      return permissions.some(
+        (p) => p === "agents:delete" || p === "agents:*" || p === "*:*" || p === "*:delete",
+      );
     },
 
     canCreatePlaybooks: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "playbooks:create" || p === "playbooks:*" || p === "*:*" || p === "*:create");
+      return permissions.some(
+        (p) => p === "playbooks:create" || p === "playbooks:*" || p === "*:*" || p === "*:create",
+      );
     },
 
     canEditPlaybooks: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "playbooks:update" || p === "playbooks:*" || p === "*:*" || p === "*:update");
+      return permissions.some(
+        (p) => p === "playbooks:update" || p === "playbooks:*" || p === "*:*" || p === "*:update",
+      );
     },
 
     canDeletePlaybooks: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "playbooks:delete" || p === "playbooks:*" || p === "*:*" || p === "*:delete");
+      return permissions.some(
+        (p) => p === "playbooks:delete" || p === "playbooks:*" || p === "*:*" || p === "*:delete",
+      );
     },
 
     canPublishPlaybooks: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "playbooks:publish" || p === "playbooks:*" || p === "*:*" || p === "*:publish");
+      return permissions.some(
+        (p) => p === "playbooks:publish" || p === "playbooks:*" || p === "*:*" || p === "*:publish",
+      );
     },
 
     canAccessAnalytics: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "analytics:read" || p === "analytics:*" || p === "*:*" || p === "*:read");
+      return permissions.some(
+        (p) => p === "analytics:read" || p === "analytics:*" || p === "*:*" || p === "*:read",
+      );
     },
 
     canManageUsers: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "organization_members:update" || p === "organization_members:*" || p === "*:*" || p === "*:update");
+      return permissions.some(
+        (p) =>
+          p === "organization_members:update" ||
+          p === "organization_members:*" ||
+          p === "*:*" ||
+          p === "*:update",
+      );
     },
 
     canManageApiKeys: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "api_keys:create" || p === "api_keys:*" || p === "*:*" || p === "*:create");
+      return permissions.some(
+        (p) => p === "api_keys:create" || p === "api_keys:*" || p === "*:*" || p === "*:create",
+      );
     },
 
     canManageOrganization: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "organizations:update" || p === "organizations:*" || p === "*:*" || p === "*:update");
+      return permissions.some(
+        (p) =>
+          p === "organizations:update" ||
+          p === "organizations:*" ||
+          p === "*:*" ||
+          p === "*:update",
+      );
     },
 
     canExportData: (state) => {
@@ -176,7 +206,9 @@ export const useUserStore = defineStore("user", {
       // Only owners can export audit logs
       if (activeOrg?.role === "owner") return true;
       const permissions = activeOrg?.permissions || [];
-      return permissions.some(p => p === "audit_logs:export" || p === "audit_logs:*" || p === "*:*" || p === "*:export");
+      return permissions.some(
+        (p) => p === "audit_logs:export" || p === "audit_logs:*" || p === "*:*" || p === "*:export",
+      );
     },
   },
   actions: {

@@ -3,7 +3,7 @@
     <template #header>
       <Button variant="ghost" @click="handleCancel">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        {{ t('actions.backToList') }}
+        {{ t("actions.backToList") }}
       </Button>
     </template>
 
@@ -78,16 +78,16 @@
     <!-- Navigation Bar -->
     <div class="flex items-center justify-between">
       <Button v-if="!stepper.isFirst.value" variant="outline" @click="stepper.goToPrevious()">
-        {{ t('actions.previous') }}
+        {{ t("actions.previous") }}
       </Button>
       <div v-else />
 
       <Button v-if="!stepper.isLast.value" :disabled="!canProceed" @click="stepper.goToNext()">
-        {{ t('actions.continue') }}
+        {{ t("actions.continue") }}
       </Button>
 
       <Button v-else :disabled="!canProceed" :loading="creating" @click="handleCreate">
-        {{ t('actions.createPlaybookOpenEditor') }}
+        {{ t("actions.createPlaybookOpenEditor") }}
       </Button>
     </div>
 
@@ -106,14 +106,16 @@
       <DialogContent :hide-close="true">
         <DialogHeader>
           <img src="/bale/rocket.png" alt="Playbook Created" class="w-96 h-96 m-auto" />
-          <DialogTitle>{{ t('wizard.successDialog.title') }}</DialogTitle>
+          <DialogTitle>{{ t("wizard.successDialog.title") }}</DialogTitle>
           <DialogDescription>
-            {{ t('wizard.successDialog.description') }}
+            {{ t("wizard.successDialog.description") }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter class="flex-col sm:flex-row gap-2">
-          <Button variant="outline" @click="goToPlaybooks">{{ t('actions.viewAllPlaybooks') }}</Button>
-          <Button @click="goToEditor">{{ t('actions.continueEditing') }}</Button>
+          <Button variant="outline" @click="goToPlaybooks">{{
+            t("actions.viewAllPlaybooks")
+          }}</Button>
+          <Button @click="goToEditor">{{ t("actions.continueEditing") }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -138,11 +140,11 @@ const toast = useToast();
 
 // --- Stepper ---
 const stepsMeta = computed(() => [
-  { id: "purpose" as const, label: t('wizard.steps.purpose') },
-  { id: "actions" as const, label: t('wizard.steps.actions') },
-  { id: "documents" as const, label: t('wizard.steps.documents') },
-  { id: "boundaries" as const, label: t('wizard.steps.boundaries') },
-  { id: "generate" as const, label: t('wizard.steps.generate') },
+  { id: "purpose" as const, label: t("wizard.steps.purpose") },
+  { id: "actions" as const, label: t("wizard.steps.actions") },
+  { id: "documents" as const, label: t("wizard.steps.documents") },
+  { id: "boundaries" as const, label: t("wizard.steps.boundaries") },
+  { id: "generate" as const, label: t("wizard.steps.generate") },
 ]);
 
 const stepper = useStepper(["purpose", "actions", "documents", "boundaries", "generate"]);
@@ -224,7 +226,7 @@ async function handleGenerate() {
     generatedResult.value = result as GeneratedResult;
   } catch (error) {
     console.error("Failed to generate instructions:", error);
-    toast.error(t('toast.generateFailed'));
+    toast.error(t("toast.generateFailed"));
   } finally {
     generating.value = false;
   }
@@ -251,7 +253,7 @@ async function handleCreate() {
     showSuccessDialog.value = true;
   } catch (error) {
     console.error("Failed to create playbook:", error);
-    toast.error(t('toast.createFailed'));
+    toast.error(t("toast.createFailed"));
   } finally {
     creating.value = false;
   }
@@ -333,6 +335,6 @@ definePageMeta({
 });
 
 useHead({
-  title: t('wizard.headTitle'),
+  title: t("wizard.headTitle"),
 });
 </script>

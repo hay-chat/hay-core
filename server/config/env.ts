@@ -118,7 +118,7 @@ export const config = {
   },
 
   rabbitmq: {
-    url: process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672/",
+    url: process.env.RABBITMQ_URL || "amqp://hay:hay_password@localhost:5672/",
   },
 
   jwt: {
@@ -250,6 +250,7 @@ export const config = {
           roles?: string[];
         }>;
       } catch {
+        // eslint-disable-next-line no-console
         console.warn("CUSTOM_MENU env var contains invalid JSON, ignoring");
         return [];
       }

@@ -37,8 +37,8 @@ export class HookManager {
       handlers.map((handler) =>
         handler(payload).catch((error) => {
           logger.error({ err: error, event }, "Hook handler error");
-        })
-      )
+        }),
+      ),
     );
   }
 

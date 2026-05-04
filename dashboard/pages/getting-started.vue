@@ -9,15 +9,24 @@
       <!-- Progress Overview -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('dashboard.gettingStarted.progress.title') }}</CardTitle>
+          <CardTitle>{{ $t("dashboard.gettingStarted.progress.title") }}</CardTitle>
           <CardDescription>
-            {{ $t('dashboard.gettingStarted.progress.stepsCompleted', { completed: progress.completedSteps, total: progress.totalSteps }) }}
+            {{
+              $t("dashboard.gettingStarted.progress.stepsCompleted", {
+                completed: progress.completedSteps,
+                total: progress.totalSteps,
+              })
+            }}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div class="space-y-2">
             <div class="flex items-center justify-between text-sm">
-              <span>{{ $t('dashboard.gettingStarted.progress.percentComplete', { percent: progress.progressPercentage }) }}</span>
+              <span>{{
+                $t("dashboard.gettingStarted.progress.percentComplete", {
+                  percent: progress.progressPercentage,
+                })
+              }}</span>
             </div>
             <div class="w-full bg-muted rounded-full h-2.5">
               <div
@@ -34,7 +43,7 @@
             <div class="flex items-center gap-2 text-green-700 dark:text-green-300">
               <CheckCircle2 class="w-5 h-5" />
               <span class="font-medium">
-                {{ $t('dashboard.gettingStarted.progress.allCompleted') }}
+                {{ $t("dashboard.gettingStarted.progress.allCompleted") }}
               </span>
             </div>
           </div>
@@ -52,10 +61,10 @@
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg" :class="{ 'line-through': integrations?.completed }">
-                  {{ $t('dashboard.gettingStarted.integrations.title') }}
+                  {{ $t("dashboard.gettingStarted.integrations.title") }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  {{ $t('dashboard.gettingStarted.integrations.subtitle') }}
+                  {{ $t("dashboard.gettingStarted.integrations.subtitle") }}
                 </p>
               </div>
             </div>
@@ -71,7 +80,9 @@
               </p>
 
               <div v-if="integrations && integrations.count > 0" class="text-sm">
-                {{ $t('dashboard.gettingStarted.integrations.count', { count: integrations.count }) }}
+                {{
+                  $t("dashboard.gettingStarted.integrations.count", { count: integrations.count })
+                }}
               </div>
 
               <!-- Integration List -->
@@ -109,12 +120,12 @@
                   :variant="!integrations?.completed ? 'default' : 'outline'"
                   @click="navigateTo('/integrations/marketplace')"
                 >
-                  {{ $t('dashboard.gettingStarted.integrations.browseAll') }}
+                  {{ $t("dashboard.gettingStarted.integrations.browseAll") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <Button href="https://hay.canny.io/" target="_blank" variant="outline">
                   <Lightbulb class="w-3 h-3 mr-2" />
-                  {{ $t('dashboard.gettingStarted.integrations.suggest') }}
+                  {{ $t("dashboard.gettingStarted.integrations.suggest") }}
                 </Button>
               </div>
             </div>
@@ -130,31 +141,37 @@
               </div>
               <div class="flex-1">
                 <CardTitle class="text-lg" :class="{ 'line-through': agent?.completed }">
-                  {{ $t('dashboard.gettingStarted.agent.title') }}
+                  {{ $t("dashboard.gettingStarted.agent.title") }}
                 </CardTitle>
-                <p class="text-sm text-neutral-muted">{{ $t('dashboard.gettingStarted.agent.subtitle') }}</p>
+                <p class="text-sm text-neutral-muted">
+                  {{ $t("dashboard.gettingStarted.agent.subtitle") }}
+                </p>
               </div>
             </div>
           </CardHeader>
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                {{ $t('dashboard.gettingStarted.agent.description') }}
+                {{ $t("dashboard.gettingStarted.agent.description") }}
               </p>
 
               <div v-if="agent && agent.count > 0" class="text-sm">
-                {{ agent.count === 1 ? $t('dashboard.gettingStarted.agent.countOne', { count: agent.count }) : $t('dashboard.gettingStarted.agent.countOther', { count: agent.count }) }}
+                {{
+                  agent.count === 1
+                    ? $t("dashboard.gettingStarted.agent.countOne", { count: agent.count })
+                    : $t("dashboard.gettingStarted.agent.countOther", { count: agent.count })
+                }}
               </div>
 
               <div v-if="!agent?.completed">
                 <Button @click="navigateTo('/agents/new?redirect=/getting-started')">
-                  {{ $t('dashboard.gettingStarted.agent.createAgent') }}
+                  {{ $t("dashboard.gettingStarted.agent.createAgent") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/agents')">
-                  {{ $t('dashboard.gettingStarted.agent.viewAgents') }}
+                  {{ $t("dashboard.gettingStarted.agent.viewAgents") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -180,10 +197,10 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('documents') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': documents?.completed }">
-                  {{ $t('dashboard.gettingStarted.documents.title') }}
+                  {{ $t("dashboard.gettingStarted.documents.title") }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  {{ $t('dashboard.gettingStarted.documents.subtitle') }}
+                  {{ $t("dashboard.gettingStarted.documents.subtitle") }}
                 </p>
               </div>
             </div>
@@ -191,11 +208,17 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                {{ $t('dashboard.gettingStarted.documents.description') }}
+                {{ $t("dashboard.gettingStarted.documents.description") }}
               </p>
 
               <div v-if="documents && documents.count > 0" class="text-sm">
-                {{ documents.count === 1 ? $t('dashboard.gettingStarted.documents.countOne', { count: documents.count }) : $t('dashboard.gettingStarted.documents.countOther', { count: documents.count }) }}
+                {{
+                  documents.count === 1
+                    ? $t("dashboard.gettingStarted.documents.countOne", { count: documents.count })
+                    : $t("dashboard.gettingStarted.documents.countOther", {
+                        count: documents.count,
+                      })
+                }}
               </div>
 
               <div v-if="!documents?.completed">
@@ -203,16 +226,16 @@
                   :disabled="isStepLocked('documents')"
                   @click="navigateTo('/documents/import?redirect=/getting-started')"
                 >
-                  {{ $t('dashboard.gettingStarted.documents.uploadDocuments') }}
+                  {{ $t("dashboard.gettingStarted.documents.uploadDocuments") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('documents')" class="text-sm text-neutral-muted mt-2">
-                  {{ $t('dashboard.gettingStarted.documents.locked') }}
+                  {{ $t("dashboard.gettingStarted.documents.locked") }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/documents')">
-                  {{ $t('dashboard.gettingStarted.documents.viewDocuments') }}
+                  {{ $t("dashboard.gettingStarted.documents.viewDocuments") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -238,20 +261,26 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('playbook') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': playbook?.completed }">
-                  {{ $t('dashboard.gettingStarted.playbook.title') }}
+                  {{ $t("dashboard.gettingStarted.playbook.title") }}
                 </CardTitle>
-                <p class="text-sm text-neutral-muted">{{ $t('dashboard.gettingStarted.playbook.subtitle') }}</p>
+                <p class="text-sm text-neutral-muted">
+                  {{ $t("dashboard.gettingStarted.playbook.subtitle") }}
+                </p>
               </div>
             </div>
           </CardHeader>
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                {{ $t('dashboard.gettingStarted.playbook.description') }}
+                {{ $t("dashboard.gettingStarted.playbook.description") }}
               </p>
 
               <div v-if="playbook && playbook.count > 0" class="text-sm">
-                {{ playbook.count === 1 ? $t('dashboard.gettingStarted.playbook.countOne', { count: playbook.count }) : $t('dashboard.gettingStarted.playbook.countOther', { count: playbook.count }) }}
+                {{
+                  playbook.count === 1
+                    ? $t("dashboard.gettingStarted.playbook.countOne", { count: playbook.count })
+                    : $t("dashboard.gettingStarted.playbook.countOther", { count: playbook.count })
+                }}
               </div>
 
               <div v-if="!playbook?.completed">
@@ -259,16 +288,16 @@
                   :disabled="isStepLocked('playbook')"
                   @click="navigateTo('/playbooks/new?redirect=/getting-started')"
                 >
-                  {{ $t('dashboard.gettingStarted.playbook.createPlaybook') }}
+                  {{ $t("dashboard.gettingStarted.playbook.createPlaybook") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('playbook')" class="text-sm text-neutral-muted mt-2">
-                  {{ $t('dashboard.gettingStarted.playbook.locked') }}
+                  {{ $t("dashboard.gettingStarted.playbook.locked") }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/playbooks')">
-                  {{ $t('dashboard.gettingStarted.playbook.viewPlaybooks') }}
+                  {{ $t("dashboard.gettingStarted.playbook.viewPlaybooks") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -294,10 +323,10 @@
               </div>
               <div class="flex-1" :class="{ 'opacity-70': isStepLocked('playground') }">
                 <CardTitle class="text-lg" :class="{ 'line-through': playground?.completed }">
-                  {{ $t('dashboard.gettingStarted.playground.title') }}
+                  {{ $t("dashboard.gettingStarted.playground.title") }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  {{ $t('dashboard.gettingStarted.playground.subtitle') }}
+                  {{ $t("dashboard.gettingStarted.playground.subtitle") }}
                 </p>
               </div>
             </div>
@@ -305,11 +334,19 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                {{ $t('dashboard.gettingStarted.playground.description') }}
+                {{ $t("dashboard.gettingStarted.playground.description") }}
               </p>
 
               <div v-if="playground && playground.count > 0" class="text-sm">
-                {{ playground.count === 1 ? $t('dashboard.gettingStarted.playground.countOne', { count: playground.count }) : $t('dashboard.gettingStarted.playground.countOther', { count: playground.count }) }}
+                {{
+                  playground.count === 1
+                    ? $t("dashboard.gettingStarted.playground.countOne", {
+                        count: playground.count,
+                      })
+                    : $t("dashboard.gettingStarted.playground.countOther", {
+                        count: playground.count,
+                      })
+                }}
               </div>
 
               <div v-if="!playground?.completed">
@@ -317,16 +354,16 @@
                   :disabled="isStepLocked('playground')"
                   @click="navigateTo('/conversations')"
                 >
-                  {{ $t('dashboard.gettingStarted.playground.startChat') }}
+                  {{ $t("dashboard.gettingStarted.playground.startChat") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
                 <p v-if="isStepLocked('playground')" class="text-sm text-neutral-muted mt-2">
-                  {{ $t('dashboard.gettingStarted.playground.locked') }}
+                  {{ $t("dashboard.gettingStarted.playground.locked") }}
                 </p>
               </div>
               <div v-else>
                 <Button variant="outline" @click="navigateTo('/conversations')">
-                  {{ $t('dashboard.gettingStarted.playground.viewConversations') }}
+                  {{ $t("dashboard.gettingStarted.playground.viewConversations") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>

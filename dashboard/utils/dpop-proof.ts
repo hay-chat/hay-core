@@ -17,7 +17,7 @@ export async function generateDPoPProof(
   conversationId: string,
   method: string,
   url: string,
-  nonce: string
+  nonce: string,
 ): Promise<string> {
   // Get the stored keypair for this conversation
   const keypair = await getKeypair(conversationId);
@@ -43,12 +43,8 @@ export async function generateDPoPProof(
   };
 
   // Encode header and payload
-  const encodedHeader = arrayBufferToBase64Url(
-    stringToArrayBuffer(JSON.stringify(header))
-  );
-  const encodedPayload = arrayBufferToBase64Url(
-    stringToArrayBuffer(JSON.stringify(payload))
-  );
+  const encodedHeader = arrayBufferToBase64Url(stringToArrayBuffer(JSON.stringify(header)));
+  const encodedPayload = arrayBufferToBase64Url(stringToArrayBuffer(JSON.stringify(payload)));
 
   // Create the signing input
   const signingInput = `${encodedHeader}.${encodedPayload}`;
@@ -60,7 +56,7 @@ export async function generateDPoPProof(
       hash: "SHA-256",
     },
     keypair.privateKey,
-    stringToArrayBuffer(signingInput)
+    stringToArrayBuffer(signingInput),
   );
 
   // Convert ECDSA signature from DER to raw format (required for JWT)
@@ -132,13 +128,13 @@ function derToRaw(derSignature: Uint8Array): ArrayBuffer {
   // Copy r component (right-aligned in first 32 bytes)
   rawSignature.set(
     derSignature.slice(rStart, rStart + Math.min(rBytes, 32)),
-    Math.max(0, 32 - rBytes)
+    Math.max(0, 32 - rBytes),
   );
 
   // Copy s component (right-aligned in last 32 bytes)
   rawSignature.set(
     derSignature.slice(sStart, sStart + Math.min(sBytes, 32)),
-    32 + Math.max(0, 32 - sBytes)
+    32 + Math.max(0, 32 - sBytes),
   );
 
   return rawSignature.buffer;
@@ -176,7 +172,7 @@ export class DPoPClient {
    */
   async request<T = any>(
     path: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<{ data: T; nonce: string }> {
     if (!this.currentNonce) {
       throw new Error("No nonce available. Initialize the client first.");
@@ -186,12 +182,7 @@ export class DPoPClient {
     const method = options.method || "GET";
 
     // Generate DPoP proof
-    const proof = await generateDPoPProof(
-      this.conversationId,
-      method,
-      url,
-      this.currentNonce
-    );
+    const proof = await generateDPoPProof(this.conversationId, method, url, this.currentNonce);
 
     // Add DPoP authorization header
     const headers = new Headers(options.headers);
@@ -222,7 +213,7 @@ export class DPoPClient {
       throw new DPoPError(
         error.error || "request_failed",
         error.error_description || response.statusText,
-        response.status
+        response.status,
       );
     }
 
@@ -256,7 +247,7 @@ export class DPoPError extends Error {
   constructor(
     public code: string,
     public description: string,
-    public status: number = 401
+    public status: number = 401,
   ) {
     super(`${code}: ${description}`);
     this.name = "DPoPError";
@@ -293,7 +284,7 @@ export const defaultRetryConfig: RetryConfig = {
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  config: RetryConfig = defaultRetryConfig
+  config: RetryConfig = defaultRetryConfig,
 ): Promise<T> {
   let lastError: Error | undefined;
   let delay = config.retryDelay;

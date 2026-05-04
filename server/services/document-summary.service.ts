@@ -108,10 +108,7 @@ ${content}`;
       return { summarized: 0, skipped: 0, failed: 0 };
     }
 
-    logger.info(
-      { organizationId, count: documents.length },
-      "Starting batch summarization",
-    );
+    logger.info({ organizationId, count: documents.length }, "Starting batch summarization");
 
     let summarized = 0;
     let failed = 0;
@@ -134,10 +131,7 @@ ${content}`;
 
     const skipped = documents.length - summarized - failed;
 
-    logger.info(
-      { organizationId, summarized, skipped, failed },
-      "Batch summarization complete",
-    );
+    logger.info({ organizationId, summarized, skipped, failed }, "Batch summarization complete");
 
     return { summarized, skipped, failed };
   }

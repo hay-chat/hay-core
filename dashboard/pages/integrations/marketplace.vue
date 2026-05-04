@@ -205,11 +205,6 @@ import {
   Settings,
   Plug,
   Power,
-  Search,
-  Globe,
-  FileText,
-  Zap,
-  Database,
   Upload,
   Trash2,
 } from "lucide-vue-next";
@@ -256,16 +251,6 @@ const stats = computed(() => {
   };
 });
 
-// Categories
-const categories = computed(() => [
-  { id: "all", name: t("marketplace.categories.all"), icon: Globe },
-  { id: "channel", name: t("marketplace.categories.channels"), icon: MessageSquare },
-  { id: "mcp-connector", name: t("marketplace.categories.mcpConnectors"), icon: Cpu },
-  { id: "document_importer", name: t("marketplace.categories.documentImporters"), icon: FileText },
-  { id: "retriever", name: t("marketplace.categories.retrievers"), icon: Database },
-  { id: "playbook", name: t("marketplace.categories.playbooks"), icon: Zap },
-]);
-
 // Computed filtered plugins (only show available/non-enabled plugins)
 const filteredPlugins = computed(() => {
   let filtered = availablePlugins.value || [];
@@ -288,18 +273,6 @@ const filteredPlugins = computed(() => {
 
   return filtered;
 });
-
-const pluginTypeKeys: Record<string, string> = {
-  channel: "marketplace.pluginTypes.channel",
-  "mcp-connector": "marketplace.pluginTypes.mcpConnector",
-  document_importer: "marketplace.pluginTypes.documentImporter",
-  retriever: "marketplace.pluginTypes.retriever",
-  playbook: "marketplace.pluginTypes.playbook",
-};
-
-const formatPluginType = (type: string) => {
-  return t(pluginTypeKeys[type] || type);
-};
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();

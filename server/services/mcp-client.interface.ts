@@ -40,5 +40,3 @@ export interface MCPClient {
    */
   close(): Promise<void>;
 }
-
-

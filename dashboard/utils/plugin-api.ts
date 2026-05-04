@@ -1,7 +1,7 @@
 // Plugin API helper for dynamic access to plugin routers
 // This maintains plugin independence while providing a cleaner API
 
-import { Hay } from './api';
+import { Hay } from "./api";
 
 /**
  * Get a plugin's router dynamically
@@ -18,8 +18,8 @@ export function getPluginRouter(pluginId: string): any {
 export async function callPluginApi<T>(
   pluginId: string,
   path: string[],
-  method: 'query' | 'mutate',
-  params?: any
+  method: "query" | "mutate",
+  params?: any,
 ): Promise<T> {
   try {
     let current: any = getPluginRouter(pluginId);
@@ -32,13 +32,13 @@ export async function callPluginApi<T>(
     for (const segment of path) {
       current = current[segment];
       if (!current) {
-        throw new Error(`API path "${pluginId}.${path.join('.')}" is not available`);
+        throw new Error(`API path "${pluginId}.${path.join(".")}" is not available`);
       }
     }
 
     // Call the method
-    if (typeof current[method] !== 'function') {
-      throw new Error(`Method "${method}" is not available on "${pluginId}.${path.join('.')}"`);
+    if (typeof current[method] !== "function") {
+      throw new Error(`Method "${method}" is not available on "${pluginId}.${path.join(".")}"`);
     }
 
     return params ? await current[method](params) : await current[method]();

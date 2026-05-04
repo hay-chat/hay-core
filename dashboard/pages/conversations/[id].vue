@@ -330,7 +330,7 @@
           v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
           class="border-t p-4 bg-background"
         >
-          <form @submit.prevent="sendMessage" class="flex space-x-3">
+          <form class="flex space-x-3" @submit.prevent="sendMessage">
             <Input
               v-model="newMessage"
               :placeholder="
@@ -567,8 +567,8 @@
                   </div>
                   <Switch
                     :model-value="conversation?.legal_hold ?? false"
-                    @update:model-value="toggleLegalHold"
                     :disabled="isUpdatingLegalHold"
+                    @update:model-value="toggleLegalHold"
                   />
                 </div>
                 <p v-if="conversation?.legal_hold" class="text-xs text-amber-600">
@@ -607,17 +607,17 @@
               </CardContent>
             </Card>
 
-            <!-- Knowledge Base Articles -->
+            <!-- Related Documents -->
             <Card>
               <CardHeader>
                 <CardTitle class="text-base">
-                  {{ $t("conversations.relatedArticles.title") }}
+                  {{ $t("conversations.relatedDocuments.title") }}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div class="space-y-2">
                   <NuxtLink
-                    v-for="article in relatedArticles"
+                    v-for="article in relatedDocuments"
                     :key="article.id"
                     :to="`/documents/${article.id}`"
                     class="block p-2 border rounded text-sm hover:bg-background-secondary"
@@ -709,10 +709,6 @@ import {
   Send,
   AlertTriangle,
   AlertCircle,
-  Star,
-  Ticket,
-  Mail,
-  Phone,
   Circle,
   CheckCircle,
   XCircle,
@@ -739,34 +735,6 @@ import { MessageType } from "~/types/message";
 const { t } = useI18n();
 const { formatDateTime } = useOrgDateTime();
 
-interface Message {
-  id: string;
-  type: MessageType | string;
-  content: string;
-  metadata?: Record<string, unknown> | null;
-  needsApproval?: boolean;
-  created_at: string;
-  conversation_id: string;
-  updated_at: string;
-  status: string;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-}
-
-interface ConversationData {
-  id: string;
-  title?: string | null;
-  status: string;
-  cooldown_until?: string | null;
-  created_at: string;
-  updated_at: string;
-  messages?: Message[];
-  agent?: Agent;
-}
-
 interface PreviousConversation {
   id: string;
   title: string;
@@ -776,7 +744,7 @@ interface PreviousConversation {
   status?: string;
 }
 
-interface RelatedArticle {
+interface RelatedDocument {
   id: string;
   title: string;
   url: string;
@@ -816,7 +784,7 @@ const messages = ref<any[]>([]);
 const conversation = ref<any>(null);
 
 const previousConversations = ref<PreviousConversation[]>([]);
-const relatedArticles = ref<RelatedArticle[]>([]);
+const relatedDocuments = ref<RelatedDocument[]>([]);
 
 // Takeover state
 const { useUserStore } = await import("@/stores/user");
@@ -1002,21 +970,6 @@ const formatStatus = (status: string | undefined) => {
   };
   return keys[status] ? t(keys[status]) : status;
 };
-
-const formatCountdown = (cooldownUntil: Date | string) => {
-  const target = new Date(cooldownUntil);
-  const now = new Date();
-  const seconds = Math.floor((target.getTime() - now.getTime()) / 1000);
-
-  if (seconds <= 0) return "0s";
-  if (seconds < 60) return `${seconds}s`;
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
-};
-
-// formatDuration function removed - was unused
 
 const toggleSupervisionMode = () => {
   supervisionMode.value = !supervisionMode.value;
@@ -1217,25 +1170,6 @@ const retryMessage = async (messageId: string) => {
   await sendMessage();
 };
 
-const approveMessage = (messageId: string) => {
-  // TODO: Approve agent message
-  console.log("Approve message:", messageId);
-  // const message = conversation.value.messages.find((m) => m.id === messageId);
-  // if (message) {
-  //   message.needsApproval = false;
-  // }
-};
-
-const editMessage = (messageId: string) => {
-  // TODO: Open message editor
-  console.log("Edit message:", messageId);
-};
-
-const rejectMessage = (messageId: string) => {
-  // TODO: Reject agent message
-  console.log("Reject message:", messageId);
-};
-
 const exportConversation = async (format: "pdf" | "csv") => {
   if (!conversation.value?.id) return;
 
@@ -1324,7 +1258,7 @@ const fetchConversation = async () => {
         const docs = await Promise.all(
           documentIds.map((id) => HayApi.documents.getById.query({ id })),
         );
-        relatedArticles.value = docs.map((doc) => ({
+        relatedDocuments.value = docs.map((doc) => ({
           id: doc.id,
           title: doc.title,
           url: doc.sourceUrl || "",
@@ -1333,10 +1267,10 @@ const fetchConversation = async () => {
         }));
       } catch (err) {
         console.error("Failed to fetch related documents:", err);
-        relatedArticles.value = [];
+        relatedDocuments.value = [];
       }
     } else {
-      relatedArticles.value = [];
+      relatedDocuments.value = [];
     }
 
     // Playground mode: Transform messages for display

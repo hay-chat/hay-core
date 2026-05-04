@@ -291,7 +291,10 @@ export class AuthStateEncryptedTransformer {
           } catch (error) {
             // Decryption failed - this is legacy plaintext data from before encryption
             // Return as-is for backwards compatibility (will be encrypted on next save)
-            logger.warn({ err: error, key }, "Failed to decrypt credential, using as-is (legacy data?)");
+            logger.warn(
+              { err: error, key },
+              "Failed to decrypt credential, using as-is (legacy data?)",
+            );
             decryptedCredentials[key] = val;
           }
         } else {

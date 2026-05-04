@@ -46,6 +46,7 @@ async function startServer() {
       await import("@server/services/orchestrator-queue.service");
     await orchestratorQueueService.declareQueues();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.warn("⚠️  Starting server without RabbitMQ connection");
   }
 

@@ -39,7 +39,7 @@ export const RESOURCES = {
   ALL: "*",
 } as const;
 
-export type Resource = typeof RESOURCES[keyof typeof RESOURCES];
+export type Resource = (typeof RESOURCES)[keyof typeof RESOURCES];
 
 // ============================================================================
 // ACTIONS
@@ -53,18 +53,18 @@ export const ACTIONS = {
   DELETE: "delete",
 
   // Extended operations
-  MANAGE: "manage",      // Full control (create, read, update, delete)
-  EXECUTE: "execute",    // Run or trigger (for agents, playbooks, etc.)
-  PUBLISH: "publish",    // Publish content (playbooks, etc.)
-  INVITE: "invite",      // Invite users
-  EXPORT: "export",      // Export data
-  IMPORT: "import",      // Import data
+  MANAGE: "manage", // Full control (create, read, update, delete)
+  EXECUTE: "execute", // Run or trigger (for agents, playbooks, etc.)
+  PUBLISH: "publish", // Publish content (playbooks, etc.)
+  INVITE: "invite", // Invite users
+  EXPORT: "export", // Export data
+  IMPORT: "import", // Import data
 
   // Wildcards
   ALL: "*",
 } as const;
 
-export type Action = typeof ACTIONS[keyof typeof ACTIONS];
+export type Action = (typeof ACTIONS)[keyof typeof ACTIONS];
 
 // ============================================================================
 // SCOPE HELPERS
@@ -88,24 +88,17 @@ export function parseScope(scope: string): { resource: string; action: string } 
 /**
  * Check if a scope matches a required scope (with wildcard support)
  */
-export function matchesScope(
-  requiredScope: string,
-  availableScopes: string[],
-): boolean {
+export function matchesScope(requiredScope: string, availableScopes: string[]): boolean {
   const { resource: reqResource, action: reqAction } = parseScope(requiredScope);
 
   return availableScopes.some((availableScope) => {
     const { resource: availResource, action: availAction } = parseScope(availableScope);
 
     // Check resource match (exact or wildcard)
-    const resourceMatches =
-      availResource === reqResource ||
-      availResource === RESOURCES.ALL;
+    const resourceMatches = availResource === reqResource || availResource === RESOURCES.ALL;
 
     // Check action match (exact or wildcard)
-    const actionMatches =
-      availAction === reqAction ||
-      availAction === ACTIONS.ALL;
+    const actionMatches = availAction === reqAction || availAction === ACTIONS.ALL;
 
     return resourceMatches && actionMatches;
   });
