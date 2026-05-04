@@ -153,8 +153,7 @@ describe("Rate Limiting Middleware", () => {
 
   describe("Request ID Generation", () => {
     it("should generate unique request IDs", () => {
-      const generateId = (now: number) =>
-        `${now}-${Math.random().toString(36).substring(7)}`;
+      const generateId = (now: number) => `${now}-${Math.random().toString(36).substring(7)}`;
 
       const now = Date.now();
       const id1 = generateId(now);

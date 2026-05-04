@@ -73,7 +73,7 @@ const props = withDefaults(defineProps<SimpleGaugeProps>(), {
   size: 240,
 });
 
-const emit = defineEmits<{
+defineEmits<{
   "view-report": [];
 }>();
 

@@ -51,14 +51,24 @@ export const pluginApiTrpcRouter = router({
       z.object({
         from: z.string().min(1, "from is required"),
         content: z.string(),
-        channel: z.enum(["web", "whatsapp", "instagram", "telegram", "sms", "email"]),
+        channel: z.string().min(1).max(64),
         metadata: z.record(z.any()).optional(),
+        // Optional sender type — defaults to customer. "human_agent" is used when
+        // an external system (e.g. Chatwoot) forwards a message written by a
+        // human agent so Hay flips the conversation to human-took-over and the
+        // orchestrator stops running.
+        senderType: z.enum(["customer", "human_agent"]).optional(),
+        // Optional provider-side conversation id (e.g. Chatwoot conversation id).
+        // Stored in conversation.metadata[channel].conversationId so outbound
+        // delivery can reuse it without extra lookups.
+        externalConversationId: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "messages");
 
-      const { from, content, channel, metadata } = input;
+      const { from, content, channel, metadata, externalConversationId } = input;
+      const senderType = input.senderType ?? "customer";
       const organizationId = ctx.pluginAuth.organizationId;
 
       try {
@@ -123,6 +133,13 @@ export const pluginApiTrpcRouter = router({
           organizationId,
         );
 
+        // Seed channel-specific metadata on brand-new conversations so outbound
+        // delivery can look up provider-side IDs (e.g. Chatwoot conversation id)
+        // without a second round-trip.
+        const channelMetadata: Record<string, unknown> = {
+          ...(externalConversationId ? { conversationId: externalConversationId } : {}),
+        };
+
         if (!conversation) {
           conversation = await conversationRepository.create({
             organization_id: organizationId,
@@ -131,15 +148,56 @@ export const pluginApiTrpcRouter = router({
             channel,
             status: "open",
             title: "",
+            metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
           });
+        } else if (externalConversationId) {
+          // Conversation already exists — merge the externalConversationId into
+          // its metadata if it's not already stored there. We intentionally do
+          // not broadcast this metadata-only change because it's internal state.
+          const existing = (conversation.metadata ?? {}) as Record<string, any>;
+          const existingChannel = (existing[channel] ?? {}) as Record<string, unknown>;
+          if (existingChannel.conversationId !== externalConversationId) {
+            const merged = {
+              ...existing,
+              [channel]: { ...existingChannel, ...channelMetadata },
+            };
+            await conversationRepository.updateById(conversation.id, { metadata: merged });
+            conversation.metadata = merged;
+          }
         }
 
-        // Add customer message using entity method which handles cooldown and needs_processing
+        // Determine Hay MessageType based on whether the forwarded message came
+        // from the customer or from a human agent on the external system.
+        const messageType =
+          senderType === "human_agent" ? MessageType.HUMAN_AGENT : MessageType.CUSTOMER;
+
+        // Tag human-agent messages that originated from the external channel
+        // so the ChannelDeliveryService does not echo them back to the same
+        // channel (which would produce a feedback loop — the agent's own reply
+        // getting re-sent to themselves).
+        const enrichedMetadata =
+          senderType === "human_agent" ? { ...(metadata ?? {}), externalOrigin: true } : metadata;
+
         const message = await conversation.addMessage({
           content,
-          type: MessageType.CUSTOMER,
-          metadata,
+          type: messageType,
+          metadata: enrichedMetadata,
         });
+
+        // When a human agent replies on the external system, flip Hay's
+        // conversation to "human-took-over" so the orchestrator skips it.
+        // Mirrors the dashboard takeover path.
+        if (
+          senderType === "human_agent" &&
+          conversation.status !== "human-took-over" &&
+          conversation.status !== "resolved" &&
+          conversation.status !== "closed"
+        ) {
+          await conversationRepository.update(conversation.id, organizationId, {
+            status: "human-took-over",
+            needs_processing: false,
+          });
+        }
 
         return {
           messageId: message.id,
@@ -168,7 +226,7 @@ export const pluginApiTrpcRouter = router({
       z.object({
         to: z.string().min(1, "to is required"),
         content: z.string().min(1, "content is required"),
-        channel: z.enum(["web", "whatsapp", "instagram", "telegram", "sms", "email"]),
+        channel: z.string().min(1).max(64),
         conversationId: z.string().uuid().optional(),
         metadata: z.record(z.any()).optional(),
       }),
@@ -261,6 +319,47 @@ export const pluginApiTrpcRouter = router({
           message: error instanceof Error ? error.message : "Failed to send message",
         });
       }
+    }),
+
+  /**
+   * Conversations Capability - Update status by external conversation id.
+   *
+   * Used by channel plugins to reflect lifecycle changes that happen on the
+   * external system (e.g. a Chatwoot agent resolves / reopens a ticket) back
+   * into Hay. Looks up the Hay conversation via metadata[channel].conversationId.
+   */
+  "conversations.updateStatusByExternalId": pluginProcedure
+    .input(
+      z.object({
+        channel: z.string().min(1).max(64),
+        externalConversationId: z.string().min(1),
+        status: z.enum(["open", "pending-human", "human-took-over", "resolved", "closed"]),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const organizationId = ctx.pluginAuth.organizationId;
+      const conversation = await conversationRepository.findByExternalConversationId(
+        input.channel,
+        input.externalConversationId,
+        organizationId,
+      );
+
+      if (!conversation) {
+        return { updated: false, reason: "conversation_not_found" as const };
+      }
+
+      if (conversation.status === input.status) {
+        return { updated: false, reason: "already_in_status" as const };
+      }
+
+      await conversationRepository.update(conversation.id, organizationId, {
+        status: input.status,
+        needs_processing: input.status === "open" ? conversation.needs_processing : false,
+      });
+
+      return { updated: true, conversationId: conversation.id };
     }),
 
   /**

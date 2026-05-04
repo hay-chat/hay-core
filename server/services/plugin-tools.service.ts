@@ -60,7 +60,10 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
 
       clearTimeout(timeoutId);
 
-      logger.debug({ pluginId, status: response.status, statusText: response.statusText }, "Tools response received");
+      logger.debug(
+        { pluginId, status: response.status, statusText: response.statusText },
+        "Tools response received",
+      );
 
       if (!response.ok) {
         const errorBody = await response.text();
@@ -88,12 +91,15 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
       if (error instanceof Error && error.name === "AbortError") {
         logger.warn({ pluginId, attempt, maxRetries }, "Tool fetch timeout");
       } else {
-        logger.warn({
-          pluginId,
-          attempt,
-          maxRetries,
-          error: error instanceof Error ? error.message : String(error),
-        }, "Tool fetch failed");
+        logger.warn(
+          {
+            pluginId,
+            attempt,
+            maxRetries,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Tool fetch failed",
+        );
       }
 
       // Exponential backoff between retries
@@ -172,7 +178,10 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
   // Persist updated config
   await pluginInstanceRepository.updateConfig(instanceId, config);
 
-  logger.info({ instanceId, toolCount: tools.length, serverCount: toolsByServer.size }, "Stored tools for instance");
+  logger.info(
+    { instanceId, toolCount: tools.length, serverCount: toolsByServer.size },
+    "Stored tools for instance",
+  );
 }
 
 /**
@@ -213,11 +222,14 @@ export async function fetchAndStoreTools(
 
     logger.info({ pluginId, orgId, toolCount: tools.length }, "Successfully stored tools");
   } catch (error) {
-    logger.error({
-      pluginId,
-      orgId,
-      error: error instanceof Error ? error.message : String(error),
-    }, "Failed to fetch and store tools");
+    logger.error(
+      {
+        pluginId,
+        orgId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to fetch and store tools",
+    );
     // Don't throw - this is non-blocking
   }
 }

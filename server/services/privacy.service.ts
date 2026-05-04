@@ -203,7 +203,10 @@ export class PrivacyService {
         logger.error({ err: error }, "Export job failed");
       });
 
-      logger.debug({ email: request.email, requestId: request.id, jobId: job.id }, "Export confirmed");
+      logger.debug(
+        { email: request.email, requestId: request.id, jobId: job.id },
+        "Export confirmed",
+      );
 
       return {
         requestId: request.id,
@@ -376,7 +379,10 @@ export class PrivacyService {
       logger.error({ err: error }, "Deletion job failed");
     });
 
-    logger.debug({ email: request.email, requestId: request.id, jobId: job.id }, "Deletion confirmed");
+    logger.debug(
+      { email: request.email, requestId: request.id, jobId: job.id },
+      "Deletion confirmed",
+    );
 
     return {
       requestId: request.id,
@@ -478,7 +484,10 @@ export class PrivacyService {
       ipAddress,
     });
 
-    logger.debug({ requestId, type: request.type, email: request.email }, "Privacy request cancelled");
+    logger.debug(
+      { requestId, type: request.type, email: request.email },
+      "Privacy request cancelled",
+    );
   }
 
   /**
@@ -532,7 +541,10 @@ export class PrivacyService {
       request.downloadIpAddress &&
       request.downloadIpAddress !== ipAddress
     ) {
-      logger.debug({ requestId, originalIp: request.downloadIpAddress, currentIp: ipAddress }, "Download attempt from different IP");
+      logger.debug(
+        { requestId, originalIp: request.downloadIpAddress, currentIp: ipAddress },
+        "Download attempt from different IP",
+      );
 
       // Log security event
       await this.logPrivacyAction("privacy.download.ip_mismatch", request.email, request.userId, {
@@ -568,7 +580,10 @@ export class PrivacyService {
       ipAddress,
     });
 
-    logger.debug({ email: request.email, requestId: request.id, downloadCount: request.downloadCount }, "Export downloaded");
+    logger.debug(
+      { email: request.email, requestId: request.id, downloadCount: request.downloadCount },
+      "Export downloaded",
+    );
 
     // Check if it's a ZIP file (new format) or JSON (legacy)
     const isZip = exportUrl.endsWith(".zip") || request.metadata?.exportFormat === "zip";
@@ -1029,7 +1044,10 @@ export class PrivacyService {
     const customer = await this.findCustomer(organizationId, identifier);
 
     if (!customer) {
-      logger.debug({ organizationId, identifierType: identifier.type, identifierValue: identifier.value }, "Customer not found for export request");
+      logger.debug(
+        { organizationId, identifierType: identifier.type, identifierValue: identifier.value },
+        "Customer not found for export request",
+      );
     }
 
     // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
@@ -1086,7 +1104,15 @@ export class PrivacyService {
       customer?.name,
     );
 
-    logger.debug({ requestId: request.id, organizationId, hasCustomer: !!customer, identifierType: identifier.type }, "Customer export request created");
+    logger.debug(
+      {
+        requestId: request.id,
+        organizationId,
+        hasCustomer: !!customer,
+        identifierType: identifier.type,
+      },
+      "Customer export request created",
+    );
 
     return {
       requestId: request.id,
@@ -1166,7 +1192,10 @@ export class PrivacyService {
       logger.error({ err: error }, "Customer export job failed");
     });
 
-    logger.debug({ requestId: request.id, jobId: job.id, organizationId: request.organizationId }, "Customer export confirmed");
+    logger.debug(
+      { requestId: request.id, jobId: job.id, organizationId: request.organizationId },
+      "Customer export confirmed",
+    );
 
     return {
       requestId: request.id,
@@ -1242,7 +1271,10 @@ export class PrivacyService {
       customer.name,
     );
 
-    logger.debug({ requestId: request.id, organizationId, customerId: customer.id }, "Customer deletion request created");
+    logger.debug(
+      { requestId: request.id, organizationId, customerId: customer.id },
+      "Customer deletion request created",
+    );
 
     return {
       requestId: request.id,
@@ -1321,7 +1353,10 @@ export class PrivacyService {
       logger.error({ err: error }, "Customer deletion job failed");
     });
 
-    logger.debug({ requestId: request.id, jobId: job.id, organizationId: request.organizationId }, "Customer deletion confirmed");
+    logger.debug(
+      { requestId: request.id, jobId: job.id, organizationId: request.organizationId },
+      "Customer deletion confirmed",
+    );
 
     return {
       requestId: request.id,
@@ -1451,7 +1486,7 @@ export class PrivacyService {
 
     // Collect embeddings associated with conversations and messages
     // These contain vectorized representations of customer message content
-    let embeddings: Array<{
+    const embeddings: Array<{
       id: string;
       content: string;
       metadata: Record<string, unknown>;
@@ -1604,7 +1639,16 @@ export class PrivacyService {
         request.organizationId!,
       );
 
-      logger.debug({ requestId, jobId, customerId: request.customerId, organizationId: request.organizationId, exportFormat: "zip" }, "Customer export completed");
+      logger.debug(
+        {
+          requestId,
+          jobId,
+          customerId: request.customerId,
+          organizationId: request.organizationId,
+          exportFormat: "zip",
+        },
+        "Customer export completed",
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error({ err: error }, "Customer export job failed");
@@ -2041,7 +2085,15 @@ please contact ${supportContact}.
       // Send confirmation email
       await this.sendCustomerDeletionCompleteEmail(request.email, request.organizationId);
 
-      logger.debug({ requestId, jobId, customerId: request.customerId, organizationId: request.organizationId }, "Customer deletion completed");
+      logger.debug(
+        {
+          requestId,
+          jobId,
+          customerId: request.customerId,
+          organizationId: request.organizationId,
+        },
+        "Customer deletion completed",
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error({ err: error }, "Customer deletion job failed");
@@ -2105,7 +2157,10 @@ please contact ${supportContact}.
               await fs.unlink(fullPath);
               deleted++;
 
-              logger.debug({ messageId: message.id, attachmentId: attachment.id, filePath }, "Deleted attachment file");
+              logger.debug(
+                { messageId: message.id, attachmentId: attachment.id, filePath },
+                "Deleted attachment file",
+              );
             }
           }
         } catch (error) {
@@ -2119,7 +2174,10 @@ please contact ${supportContact}.
           });
 
           // Log but don't fail transaction - file might already be deleted
-          logger.debug({ messageId: message.id, attachmentId: attachment.id, error: errorMessage }, "Failed to delete attachment file (continuing)");
+          logger.debug(
+            { messageId: message.id, attachmentId: attachment.id, error: errorMessage },
+            "Failed to delete attachment file (continuing)",
+          );
         }
       }
     }
@@ -2165,15 +2223,29 @@ please contact ${supportContact}.
       }
 
       // Delete message attachment files from storage
-      logger.debug({ customerId, messageCount: allMessageIds.length }, "Deleting message attachment files");
+      logger.debug(
+        { customerId, messageCount: allMessageIds.length },
+        "Deleting message attachment files",
+      );
 
       const attachmentDeletionResult = await this.deleteMessageAttachments(allMessageIds, manager);
 
-      logger.debug({ customerId, deleted: attachmentDeletionResult.deleted, failed: attachmentDeletionResult.failed, errors: attachmentDeletionResult.errors.length }, "Attachment deletion completed");
+      logger.debug(
+        {
+          customerId,
+          deleted: attachmentDeletionResult.deleted,
+          failed: attachmentDeletionResult.failed,
+          errors: attachmentDeletionResult.errors.length,
+        },
+        "Attachment deletion completed",
+      );
 
       // Log errors if any
       if (attachmentDeletionResult.errors.length > 0) {
-        logger.debug({ customerId, errors: attachmentDeletionResult.errors }, "Attachment deletion errors");
+        logger.debug(
+          { customerId, errors: attachmentDeletionResult.errors },
+          "Attachment deletion errors",
+        );
       }
 
       // Delete embeddings associated with conversations and messages
@@ -2198,10 +2270,22 @@ please contact ${supportContact}.
           embeddingsDeleted += deletedByMessage;
         }
 
-        logger.debug({ customerId, organizationId, embeddingsDeleted, conversationIds: conversationIds.length, messageIds: allMessageIds.length }, "Deleted embeddings for customer");
+        logger.debug(
+          {
+            customerId,
+            organizationId,
+            embeddingsDeleted,
+            conversationIds: conversationIds.length,
+            messageIds: allMessageIds.length,
+          },
+          "Deleted embeddings for customer",
+        );
       } catch (error) {
         // Log but don't fail the transaction - embeddings might not exist
-        logger.debug({ customerId, error: error instanceof Error ? error.message : "Unknown error" }, "Error deleting embeddings (continuing)");
+        logger.debug(
+          { customerId, error: error instanceof Error ? error.message : "Unknown error" },
+          "Error deleting embeddings (continuing)",
+        );
       }
 
       // Anonymize messages in all conversations
@@ -2239,7 +2323,15 @@ please contact ${supportContact}.
       // Hard delete the customer record
       await customerRepository.delete({ id: customerId, organization_id: organizationId });
 
-      logger.debug({ customerId, organizationId, conversationsAffected: conversations.length, embeddingsDeleted }, "Customer data deleted");
+      logger.debug(
+        {
+          customerId,
+          organizationId,
+          conversationsAffected: conversations.length,
+          embeddingsDeleted,
+        },
+        "Customer data deleted",
+      );
     });
   }
 

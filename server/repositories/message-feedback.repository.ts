@@ -13,7 +13,7 @@ export class MessageFeedbackRepository {
   async create(
     organizationId: string,
     reviewerId: string,
-    data: CreateFeedbackInput
+    data: CreateFeedbackInput,
   ): Promise<MessageFeedback> {
     const feedback = this.repository.create({
       messageId: data.messageId,
@@ -43,7 +43,7 @@ export class MessageFeedbackRepository {
 
   async findByOrganization(
     organizationId: string,
-    filter?: FeedbackFilter
+    filter?: FeedbackFilter,
   ): Promise<MessageFeedback[]> {
     const query = this.repository
       .createQueryBuilder("feedback")

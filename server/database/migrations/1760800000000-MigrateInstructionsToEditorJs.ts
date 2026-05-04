@@ -18,7 +18,9 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // This migration is not reversible since we're removing the legacy format
-    console.log("WARNING: This migration cannot be reversed. Legacy format is no longer supported.");
+    console.log(
+      "WARNING: This migration cannot be reversed. Legacy format is no longer supported.",
+    );
   }
 
   private async convertPlaybookInstructions(queryRunner: QueryRunner): Promise<void> {
@@ -31,10 +33,10 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
       const convertedInstructions = this.convertToEditorJs(playbook.instructions);
 
       if (convertedInstructions) {
-        await queryRunner.query(
-          `UPDATE playbooks SET instructions = $1 WHERE id = $2`,
-          [JSON.stringify(convertedInstructions), playbook.id],
-        );
+        await queryRunner.query(`UPDATE playbooks SET instructions = $1 WHERE id = $2`, [
+          JSON.stringify(convertedInstructions),
+          playbook.id,
+        ]);
       }
     }
 
@@ -94,11 +96,7 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
 
   private convertToEditorJs(instructions: any): any | null {
     // If it's already Editor.js format (has blocks array), return as-is
-    if (
-      instructions &&
-      typeof instructions === "object" &&
-      Array.isArray(instructions.blocks)
-    ) {
+    if (instructions && typeof instructions === "object" && Array.isArray(instructions.blocks)) {
       return instructions;
     }
 

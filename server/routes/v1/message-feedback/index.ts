@@ -21,16 +21,10 @@ const listFeedbackSchema = z.object({
 });
 
 export const messageFeedbackRouter = t.router({
-  create: authenticatedProcedure
-    .input(createFeedbackSchema)
-    .mutation(async ({ ctx, input }) => {
-      const feedback = await feedbackService.createFeedback(
-        ctx.organizationId!,
-        ctx.user!.id,
-        input
-      );
-      return feedback;
-    }),
+  create: authenticatedProcedure.input(createFeedbackSchema).mutation(async ({ ctx, input }) => {
+    const feedback = await feedbackService.createFeedback(ctx.organizationId!, ctx.user!.id, input);
+    return feedback;
+  }),
 
   get: authenticatedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -64,10 +58,7 @@ export const messageFeedbackRouter = t.router({
       endDate: input.endDate ? new Date(input.endDate) : undefined,
     };
 
-    const feedback = await feedbackService.getFeedbackByOrganization(
-      ctx.organizationId!,
-      filter
-    );
+    const feedback = await feedbackService.getFeedbackByOrganization(ctx.organizationId!, filter);
 
     return feedback;
   }),

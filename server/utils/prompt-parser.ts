@@ -61,10 +61,10 @@ export class PromptParser {
       if (colonIndex > 0) {
         const key = line.substring(0, colonIndex).trim();
         const value = line.substring(colonIndex + 1).trim();
-        
+
         // Remove quotes if present
         const cleanValue = value.replace(/^["']|["']$/g, "");
-        
+
         switch (key) {
           case "id":
             metadata.id = cleanValue;
@@ -90,11 +90,11 @@ export class PromptParser {
    */
   private static extractVariables(content: string): string[] {
     const variables = new Set<string>();
-    
+
     // Match simple variables: {{variable}}
     const simpleVarPattern = /\{\{([^}#/]+?)\}\}/g;
     let match;
-    
+
     while ((match = simpleVarPattern.exec(content)) !== null) {
       const varName = match[1].trim();
       // Skip if it's a helper or special syntax
@@ -128,9 +128,7 @@ export class PromptParser {
    * Convert ID to human-readable name
    */
   private static idToName(id: string): string {
-    return id
-      .replace(/[-_]/g, " ")
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+    return id.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   /**

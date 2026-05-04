@@ -2,23 +2,26 @@
  * Channel Delivery Service
  *
  * Subscribes to Redis "websocket:events" channel and delivers outbound
- * bot/agent messages to external channel plugins (WhatsApp, etc.).
+ * bot/agent messages to external channel plugins (WhatsApp, Chatwoot, etc.).
  *
- * This is the bridge between the orchestrator generating a response and
- * that response being sent to the customer via Twilio/etc. Web channel
- * is skipped (already handled by WebSocket service).
+ * Two responsibilities:
+ *   1. message_received events → POST to plugin /deliver for outbound send
+ *   2. conversation_status_changed → pending-human → POST to plugin /escalate
+ *      for channel-side handoff (e.g. Chatwoot toggle_status + assign team)
+ *
+ * Web channel is skipped for both (dashboard handles it directly).
+ * /escalate is best-effort — plugins that don't implement it return 404 which
+ * is silently tolerated so channel plugins aren't forced to implement it.
  */
 
 import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { CustomerRepository } from "@server/repositories/customer.repository";
 
 const logger = createLogger("channel-delivery");
 const messageRepository = new MessageRepository();
 const conversationRepository = new ConversationRepository();
-const customerRepository = new CustomerRepository();
 
 class ChannelDeliveryService {
   private initialized = false;
@@ -46,18 +49,37 @@ class ChannelDeliveryService {
   }
 
   /**
-   * Handle an event from the websocket:events Redis channel.
-   * Only processes outbound bot/agent messages on non-web channels.
+   * Dispatch Redis events to the right handler.
    */
   private async handleRedisEvent(event: any): Promise<void> {
-    const { type, conversationId, payload } = event;
+    const { type, conversationId } = event;
+    if (!conversationId) return;
 
-    // Only handle message_received events
-    if (type !== "message_received" || !conversationId) return;
+    if (type === "message_received") {
+      await this.handleOutboundMessage(event);
+      return;
+    }
+
+    if (type === "conversation_status_changed") {
+      await this.handleStatusChange(event);
+      return;
+    }
+  }
+
+  /**
+   * Outbound message path — only processes bot/agent messages on non-web channels.
+   */
+  private async handleOutboundMessage(event: any): Promise<void> {
+    const { conversationId, payload } = event;
 
     // Only deliver bot or human-agent messages (not customer messages, system, etc.)
     const outboundTypes = ["BotAgent", "HumanAgent"];
     if (!outboundTypes.includes(payload?.type)) return;
+
+    // Skip messages that originated from the external channel itself — these
+    // arrive via the plugin webhook (e.g. a Chatwoot agent replies) and must
+    // not be echoed back to the same channel, which would loop indefinitely.
+    if (payload?.metadata?.externalOrigin === true) return;
 
     // Only deliver messages with "sent" delivery state (skip "queued" in test mode)
     if (payload?.deliveryState !== "sent") return;
@@ -76,7 +98,7 @@ class ChannelDeliveryService {
       const channel = conversation.channel;
       const organizationId = conversation.organization_id;
 
-      // Get the customer's external_id (phone number for WhatsApp)
+      // Get the customer's external_id (phone number for WhatsApp, contact id for Chatwoot, etc.)
       const customer = conversation.customer;
       if (!customer?.external_id) {
         logger.warn({ conversationId, channel }, "No customer external_id for delivery");
@@ -93,16 +115,94 @@ class ChannelDeliveryService {
         "Delivering message via channel plugin",
       );
 
-      await this.deliverViaPlugin(
+      await this.deliverViaPlugin({
         organizationId,
         channel,
-        customer.external_id,
-        payload.content,
-        payload.id,
+        to: customer.external_id,
+        content: payload.content,
+        messageId: payload.id,
         conversationId,
-      );
+        conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
+        messageMetadata: (payload.metadata ?? null) as Record<string, unknown> | null,
+      });
     } catch (error) {
       logger.error({ err: error, conversationId }, "Channel delivery failed");
+    }
+  }
+
+  /**
+   * Escalation path — when the orchestrator flips a conversation to pending-human
+   * on a non-web channel, notify the owning plugin so it can perform provider-side
+   * handoff (Chatwoot: toggle_status=open + optional assign + private note).
+   */
+  private async handleStatusChange(event: any): Promise<void> {
+    const { conversationId, payload } = event;
+    if (payload?.status !== "pending-human") return;
+
+    try {
+      const conversation = await conversationRepository.findById(conversationId);
+      if (!conversation) return;
+      if (conversation.channel === "web") return;
+
+      const pluginId = pluginManagerService.findPluginIdByChannel(conversation.channel);
+      if (!pluginId) return;
+
+      logger.info(
+        { conversationId, channel: conversation.channel, pluginId },
+        "Dispatching /escalate to channel plugin",
+      );
+
+      let worker;
+      try {
+        worker = await pluginManagerService.getOrStartWorker(
+          conversation.organization_id,
+          pluginId,
+        );
+      } catch (error) {
+        logger.error(
+          { err: error, pluginId, organizationId: conversation.organization_id },
+          "Failed to get/start channel plugin worker for escalation",
+        );
+        return;
+      }
+
+      const escalateUrl = `http://localhost:${worker.port}/escalate`;
+
+      try {
+        const response = await fetch(escalateUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            conversationMetadata: conversation.metadata ?? null,
+            reason: "orchestrator_handoff",
+          }),
+        });
+
+        // 404 = plugin doesn't implement /escalate — that's fine.
+        if (response.status === 404) {
+          logger.debug(
+            { pluginId, channel: conversation.channel },
+            "Channel plugin does not implement /escalate — skipping",
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          const text = await response.text();
+          logger.warn(
+            { pluginId, status: response.status, body: text },
+            "Plugin /escalate returned non-OK",
+          );
+        }
+      } catch (error) {
+        logger.error(
+          { err: error, escalateUrl, conversationId },
+          "Failed to call plugin /escalate",
+        );
+      }
+    } catch (error) {
+      logger.error({ err: error, conversationId }, "handleStatusChange failed");
     }
   }
 
@@ -112,14 +212,27 @@ class ChannelDeliveryService {
    * Looks up which plugin handles the given channel via the plugin registry's
    * manifest `channel` field (set in the plugin's package.json `hay-plugin.channel`).
    */
-  private async deliverViaPlugin(
-    organizationId: string,
-    channel: string,
-    to: string,
-    content: string,
-    messageId: string,
-    conversationId: string,
-  ): Promise<void> {
+  private async deliverViaPlugin(args: {
+    organizationId: string;
+    channel: string;
+    to: string;
+    content: string;
+    messageId: string;
+    conversationId: string;
+    conversationMetadata: Record<string, unknown> | null;
+    messageMetadata: Record<string, unknown> | null;
+  }): Promise<void> {
+    const {
+      organizationId,
+      channel,
+      to,
+      content,
+      messageId,
+      conversationId,
+      conversationMetadata,
+      messageMetadata,
+    } = args;
+
     const pluginId = pluginManagerService.findPluginIdByChannel(channel);
 
     if (!pluginId) {
@@ -144,13 +257,20 @@ class ChannelDeliveryService {
       const response = await fetch(deliverUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, content, messageId, conversationId }),
+        body: JSON.stringify({
+          to,
+          content,
+          messageId,
+          conversationId,
+          conversationMetadata,
+          messageMetadata,
+        }),
       });
 
       const result: any = await response.json();
 
       if (result.success && result.providerMessageId) {
-        // Store the provider's message ID (e.g., Twilio SID)
+        // Store the provider's message ID (e.g., Twilio SID, Chatwoot message id)
         await messageRepository.updateProviderMessageId(messageId, result.providerMessageId);
         logger.info(
           {

@@ -108,14 +108,17 @@ export class ExecutionLayer {
     customerLanguage?: string,
   ): Promise<ExecutionResult | null> {
     try {
-      logger.debug({
-        conversationId: conversation.id,
-        organizationId: conversation.organization_id,
-        agentId: conversation.agent_id,
-        playbookId: conversation.playbook_id,
-        enabledTools: conversation.enabled_tools,
-        customerLanguage
-      }, "Starting execution for conversation");
+      logger.debug(
+        {
+          conversationId: conversation.id,
+          organizationId: conversation.organization_id,
+          agentId: conversation.agent_id,
+          playbookId: conversation.playbook_id,
+          enabledTools: conversation.enabled_tools,
+          customerLanguage,
+        },
+        "Starting execution for conversation",
+      );
 
       const messages = await conversation.getMessages();
 
@@ -165,11 +168,14 @@ export class ExecutionLayer {
         finalPrompt = finalPrompt + contextBlock;
       }
 
-      logger.debug({
-        promptLength: finalPrompt.length,
-        hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
-        tools: conversation.enabled_tools
-      }, "Retrieved execution planner prompt");
+      logger.debug(
+        {
+          promptLength: finalPrompt.length,
+          hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
+          tools: conversation.enabled_tools,
+        },
+        "Retrieved execution planner prompt",
+      );
 
       logger.debug("Invoking LLM for execution planning");
 
@@ -188,9 +194,13 @@ export class ExecutionLayer {
         try {
           parsedArgs = JSON.parse(result.toolArgs);
         } catch (error) {
-          logger.error({            toolArgs: result.toolArgs,
-            error: error instanceof Error ? error.message : String(error)
-          }, "Failed to parse toolArgs JSON");
+          logger.error(
+            {
+              toolArgs: result.toolArgs,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to parse toolArgs JSON",
+          );
         }
 
         result.tool = {
@@ -211,20 +221,29 @@ export class ExecutionLayer {
 
       // Detect and auto-correct missing step when tool is present
       if (!result.step && result.tool) {
-        logger.warn({ toolName: result.tool.name }, "Auto-correcting: Missing step with tool present -> CALL_TOOL");
+        logger.warn(
+          { toolName: result.tool.name },
+          "Auto-correcting: Missing step with tool present -> CALL_TOOL",
+        );
         result.step = "CALL_TOOL";
       }
 
       // Detect and auto-correct step/field mismatch
       if (result.step === "RESPOND" && result.tool && !result.userMessage) {
-        logger.warn({ toolName: result.tool.name, originalStep: result.step }, "Auto-correcting: RESPOND with tool but no userMessage -> CALL_TOOL");
+        logger.warn(
+          { toolName: result.tool.name, originalStep: result.step },
+          "Auto-correcting: RESPOND with tool but no userMessage -> CALL_TOOL",
+        );
         result.step = "CALL_TOOL";
       }
 
       // Validate CALL_TOOL steps have required tool field
       if (result.step === "CALL_TOOL") {
         if (!result.tool || !result.tool.name) {
-          logger.warn({ hasTool: !!result.tool, toolName: result.tool?.name }, "Invalid CALL_TOOL: missing tool or tool.name");
+          logger.warn(
+            { hasTool: !!result.tool, toolName: result.tool?.name },
+            "Invalid CALL_TOOL: missing tool or tool.name",
+          );
           return null; // Trigger retry
         }
 
@@ -237,22 +256,28 @@ export class ExecutionLayer {
 
       // Validate that ASK and RESPOND steps have userMessage
       if ((result.step === "ASK" || result.step === "RESPOND") && !result.userMessage) {
-        logger.warn({ step: result.step, rationale: result.rationale }, "Invalid response: ASK/RESPOND without userMessage");
+        logger.warn(
+          { step: result.step, rationale: result.rationale },
+          "Invalid response: ASK/RESPOND without userMessage",
+        );
         // Return null to trigger retry in orchestrator
         return null;
       }
 
-      logger.debug({
-        step: result.step,
-        hasUserMessage: !!result.userMessage,
-        userMessagePreview: result.userMessage?.substring(0, 100),
-        hasTool: !!result.tool,
-        toolName: result.tool?.name,
-        hasHandoff: !!result.handoff,
-        hasClose: !!result.close,
-        rationale: result.rationale,
-        fullResult: JSON.stringify(result)
-      }, "Execution planning complete");
+      logger.debug(
+        {
+          step: result.step,
+          hasUserMessage: !!result.userMessage,
+          userMessagePreview: result.userMessage?.substring(0, 100),
+          hasTool: !!result.tool,
+          toolName: result.tool?.name,
+          hasHandoff: !!result.handoff,
+          hasClose: !!result.close,
+          rationale: result.rationale,
+          fullResult: JSON.stringify(result),
+        },
+        "Execution planning complete",
+      );
 
       // Apply confidence guardrails to RESPOND steps
       if (result.step === "RESPOND" && result.userMessage) {
@@ -295,10 +320,13 @@ export class ExecutionLayer {
       ];
 
       if (exemptIntents.includes(intent)) {
-        logger.debug({
-          intent: lastCustomerMessage.intent,
-          messageContent: lastCustomerMessage.content
-        }, "Skipping guardrails - conversational intent detected");
+        logger.debug(
+          {
+            intent: lastCustomerMessage.intent,
+            messageContent: lastCustomerMessage.content,
+          },
+          "Skipping guardrails - conversational intent detected",
+        );
         return result;
       }
     }
@@ -312,20 +340,26 @@ export class ExecutionLayer {
 
     result.companyInterest = companyInterestAssessment;
 
-    logger.debug({
-      passed: companyInterestAssessment.passed,
-      violationType: companyInterestAssessment.violationType,
-      severity: companyInterestAssessment.severity,
-      shouldBlock: companyInterestAssessment.shouldBlock,
-      requiresFactCheck: companyInterestAssessment.requiresFactCheck
-    }, "Company interest assessment complete");
+    logger.debug(
+      {
+        passed: companyInterestAssessment.passed,
+        violationType: companyInterestAssessment.violationType,
+        severity: companyInterestAssessment.severity,
+        shouldBlock: companyInterestAssessment.shouldBlock,
+        requiresFactCheck: companyInterestAssessment.requiresFactCheck,
+      },
+      "Company interest assessment complete",
+    );
 
     // If Stage 1 blocks response, escalate immediately
     if (companyInterestAssessment.shouldBlock) {
-      logger.debug({
-        violationType: companyInterestAssessment.violationType,
-        reasoning: companyInterestAssessment.reasoning
-      }, "Stage 1 BLOCKED: Response violates company interests");
+      logger.debug(
+        {
+          violationType: companyInterestAssessment.violationType,
+          reasoning: companyInterestAssessment.reasoning,
+        },
+        "Stage 1 BLOCKED: Response violates company interests",
+      );
 
       const config = await this.getConfidenceConfig(conversation);
       const fallbackMessage = await this.getTranslatedFallbackMessage(
@@ -365,12 +399,15 @@ export class ExecutionLayer {
       result.recheckAttempted = false;
       result.recheckCount = 0;
 
-      logger.debug({
-        score: confidenceAssessment.score,
-        tier: confidenceAssessment.tier,
-        shouldRecheck: confidenceAssessment.shouldRecheck,
-        shouldEscalate: confidenceAssessment.shouldEscalate
-      }, "Fact grounding assessment complete");
+      logger.debug(
+        {
+          score: confidenceAssessment.score,
+          tier: confidenceAssessment.tier,
+          shouldRecheck: confidenceAssessment.shouldRecheck,
+          shouldEscalate: confidenceAssessment.shouldEscalate,
+        },
+        "Fact grounding assessment complete",
+      );
 
       // Handle medium confidence - trigger recheck
       if (confidenceAssessment.shouldRecheck) {
@@ -384,10 +421,13 @@ export class ExecutionLayer {
           result.recheckAttempted = true;
           result.recheckCount = 1;
 
-          logger.debug({
-            newScore: recheckResult.confidence?.score,
-            newTier: recheckResult.confidence?.tier
-          }, "Recheck complete");
+          logger.debug(
+            {
+              newScore: recheckResult.confidence?.score,
+              newTier: recheckResult.confidence?.tier,
+            },
+            "Recheck complete",
+          );
         }
       }
 
@@ -524,10 +564,13 @@ export class ExecutionLayer {
 
     // Add tool results as synthetic documents with high similarity (they're authoritative)
     if (recentToolMessages.length > 0) {
-      logger.debug({
-        toolMessageCount: recentToolMessages.length,
-        toolNames: recentToolMessages.map((msg) => msg.metadata?.toolName || "Unknown")
-      }, "Including tool results in confidence assessment");
+      logger.debug(
+        {
+          toolMessageCount: recentToolMessages.length,
+          toolNames: recentToolMessages.map((msg) => msg.metadata?.toolName || "Unknown"),
+        },
+        "Including tool results in confidence assessment",
+      );
     }
 
     for (const toolMsg of recentToolMessages) {
@@ -612,10 +655,13 @@ export class ExecutionLayer {
       // Add new documents temporarily
       for (const doc of moreDocuments) {
         if (!originalDocIds.includes(doc.id)) {
-          logger.debug({
-            documentId: doc.id,
-            similarity: doc.similarity
-          }, "Adding additional document for recheck");
+          logger.debug(
+            {
+              documentId: doc.id,
+              similarity: doc.similarity,
+            },
+            "Adding additional document for recheck",
+          );
           await conversation.addDocument(doc.id);
         }
       }
@@ -635,10 +681,13 @@ export class ExecutionLayer {
         recheckResult.confidence ||
         (await this.assessResponseConfidence(conversation, recheckResult.userMessage));
 
-      logger.debug({
-        newScore: recheckAssessment.score,
-        improved: recheckAssessment.score > (originalResult.confidence?.score || 0)
-      }, "Recheck assessment complete");
+      logger.debug(
+        {
+          newScore: recheckAssessment.score,
+          improved: recheckAssessment.score > (originalResult.confidence?.score || 0),
+        },
+        "Recheck assessment complete",
+      );
 
       // If recheck improved confidence, keep the new response and documents
       if (recheckAssessment.score > (originalResult.confidence?.score || 0)) {
@@ -693,10 +742,13 @@ export class ExecutionLayer {
         await vectorStoreService.initialize();
       }
 
-      logger.debug({
-        maxDocuments,
-        similarityThreshold
-      }, "Retrieving documents with relaxed threshold");
+      logger.debug(
+        {
+          maxDocuments,
+          similarityThreshold,
+        },
+        "Retrieving documents with relaxed threshold",
+      );
 
       const searchResults = await vectorStoreService.search(organizationId, query, maxDocuments);
       if (!searchResults || searchResults.length === 0) {

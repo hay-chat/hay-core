@@ -42,7 +42,7 @@ export async function handleUpload(
   folder: string,
   organizationId: string,
   uploadedById?: string,
-  options?: { maxSize?: number }
+  options?: { maxSize?: number },
 ): Promise<UploadResult> {
   const parsed = parseBase64Upload(dataUri);
   const storageService = new StorageService();

@@ -37,7 +37,7 @@ export const useAnalyticsStore = defineStore("analytics", {
     async fetchData(
       widgetId: string,
       fetcher: () => Promise<any>,
-      options?: { ttl?: number; forceRefresh?: boolean }
+      options?: { ttl?: number; forceRefresh?: boolean },
     ) {
       const { ttl = 5 * 60 * 1000, forceRefresh = false } = options || {}; // Default TTL: 5 minutes
 

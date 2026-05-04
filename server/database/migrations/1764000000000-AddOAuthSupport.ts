@@ -12,10 +12,6 @@ export class AddOAuthSupport1764000000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove auth_method column
-    await queryRunner.query(
-      `ALTER TABLE "plugin_instances" DROP COLUMN "auth_method"`,
-    );
+    await queryRunner.query(`ALTER TABLE "plugin_instances" DROP COLUMN "auth_method"`);
   }
 }
-
-

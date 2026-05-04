@@ -54,14 +54,15 @@
           </div>
 
           <div class="flex justify-center pt-4">
-            <Button :loading="downloading" @click="startDownload" size="lg">
+            <Button :loading="downloading" size="lg" @click="startDownload">
               <Download class="h-4 w-4 mr-2" />
               {{ $t("privacyDownload.downloadMyData") }}
             </Button>
           </div>
 
           <p class="text-xs text-neutral-muted text-center">
-            {{ $t("privacyDownload.fileSize", { size: fileSize }) }} • {{ $t("privacyDownload.format", { format: exportFormat }) }}
+            {{ $t("privacyDownload.fileSize", { size: fileSize }) }} •
+            {{ $t("privacyDownload.format", { format: exportFormat }) }}
           </p>
         </div>
 

@@ -55,15 +55,33 @@ export class CreatePrivacyRequestsAndUserDeletion1761000000000 implements Migrat
     `);
 
     // Create indexes for efficient queries
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_email" ON "privacy_requests" ("email")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_status" ON "privacy_requests" ("status")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_type" ON "privacy_requests" ("type")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_created_at" ON "privacy_requests" ("created_at")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_verification_expires" ON "privacy_requests" ("verification_expires_at")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_subject_type" ON "privacy_requests" ("subject_type")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_customer_id" ON "privacy_requests" ("customer_id")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_organization_id" ON "privacy_requests" ("organization_id")`);
-    await queryRunner.query(`CREATE INDEX "idx_privacy_requests_identifier" ON "privacy_requests" ("identifier_type", "identifier_value")`);
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_email" ON "privacy_requests" ("email")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_status" ON "privacy_requests" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_type" ON "privacy_requests" ("type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_created_at" ON "privacy_requests" ("created_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_verification_expires" ON "privacy_requests" ("verification_expires_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_subject_type" ON "privacy_requests" ("subject_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_customer_id" ON "privacy_requests" ("customer_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_organization_id" ON "privacy_requests" ("organization_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_privacy_requests_identifier" ON "privacy_requests" ("identifier_type", "identifier_value")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

@@ -53,7 +53,7 @@
     </div>
 
     <!-- Categories -->
-    <div class="flex items-center space-x-2">
+    <!-- <div class="flex items-center space-x-2">
       <span class="text-sm font-medium">{{ $t("marketplace.categories.label") }}</span>
       <div class="flex space-x-2 flex-wrap gap-2">
         <Button
@@ -67,15 +67,15 @@
           {{ category.name }}
         </Button>
       </div>
-    </div>
+    </div> -->
 
     <!-- Search -->
-    <div class="flex items-center space-x-4">
+    <!-- <div class="flex items-center space-x-4">
       <div class="relative flex-1 max-w-sm">
         <Search class="absolute left-2 top-2.5 h-4 w-4 text-neutral-muted" />
         <Input v-model="searchQuery" :placeholder="$t('marketplace.search')" class="pl-8" />
       </div>
-    </div>
+    </div> -->
 
     <!-- Loading State -->
     <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -112,8 +112,8 @@
         class="hover:shadow-md transition-shadow"
       >
         <CardHeader>
-          <div class="flex items-start justify-between">
-            <div class="flex items-center space-x-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center space-x-3 min-w-0">
               <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden">
                 <img
                   :src="getPluginThumbnail(plugin.id)"
@@ -126,9 +126,9 @@
                   @error="handleThumbnailError($event)"
                 />
               </div>
-              <div>
-                <div class="flex items-center space-x-2">
-                  <CardTitle class="text-lg">
+              <div class="min-w-0">
+                <div class="flex items-center space-x-2 min-w-0">
+                  <CardTitle class="text-lg truncate">
                     {{ plugin.name }}
                   </CardTitle>
                   <Badge v-if="plugin.isCustom" variant="outline" class="text-xs">
@@ -137,19 +137,7 @@
                 </div>
               </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-4">
-            <!-- Plugin Type Badges -->
-            <div class="flex flex-wrap gap-1">
-              <Badge v-for="type in plugin.type" :key="type" variant="outline" class="text-xs">
-                {{ formatPluginType(type) }}
-              </Badge>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex space-x-2">
+            <div class="flex space-x-2 shrink-0">
               <Button
                 v-if="!plugin.enabled"
                 size="sm"
@@ -201,7 +189,7 @@
               </Button>
             </div>
           </div>
-        </CardContent>
+        </CardHeader>
       </Card>
     </div>
   </Page>
@@ -217,11 +205,6 @@ import {
   Settings,
   Plug,
   Power,
-  Search,
-  Globe,
-  FileText,
-  Zap,
-  Database,
   Upload,
   Trash2,
 } from "lucide-vue-next";
@@ -268,16 +251,6 @@ const stats = computed(() => {
   };
 });
 
-// Categories
-const categories = computed(() => [
-  { id: "all", name: t("marketplace.categories.all"), icon: Globe },
-  { id: "channel", name: t("marketplace.categories.channels"), icon: MessageSquare },
-  { id: "mcp-connector", name: t("marketplace.categories.mcpConnectors"), icon: Cpu },
-  { id: "document_importer", name: t("marketplace.categories.documentImporters"), icon: FileText },
-  { id: "retriever", name: t("marketplace.categories.retrievers"), icon: Database },
-  { id: "playbook", name: t("marketplace.categories.playbooks"), icon: Zap },
-]);
-
 // Computed filtered plugins (only show available/non-enabled plugins)
 const filteredPlugins = computed(() => {
   let filtered = availablePlugins.value || [];
@@ -300,18 +273,6 @@ const filteredPlugins = computed(() => {
 
   return filtered;
 });
-
-const pluginTypeKeys: Record<string, string> = {
-  channel: "marketplace.pluginTypes.channel",
-  "mcp-connector": "marketplace.pluginTypes.mcpConnector",
-  document_importer: "marketplace.pluginTypes.documentImporter",
-  retriever: "marketplace.pluginTypes.retriever",
-  playbook: "marketplace.pluginTypes.playbook",
-};
-
-const formatPluginType = (type: string) => {
-  return t(pluginTypeKeys[type] || type);
-};
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();

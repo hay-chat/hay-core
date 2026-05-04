@@ -463,8 +463,8 @@
           <!-- URL Filter -->
           <div class="flex items-center gap-2">
             <Input
-              type="select"
               v-model="pageFilterType"
+              type="select"
               :options="[
                 { label: $t('documents.import.discovery.filter.contains'), value: 'contains' },
                 {
@@ -509,8 +509,8 @@
             >
               <Checkbox
                 :checked="page.selected"
-                @update:checked="(checked: boolean) => togglePageSelection(page.url, checked)"
                 class="mt-1"
+                @update:checked="(checked: boolean) => togglePageSelection(page.url, checked)"
               />
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate max-w-[100ch]">

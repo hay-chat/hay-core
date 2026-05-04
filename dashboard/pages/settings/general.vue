@@ -72,8 +72,8 @@
               <Input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
-                @change="handleLogoSelect"
                 :disabled="logoUpload.isUploading.value"
+                @change="handleLogoSelect"
               />
               <p class="text-sm text-muted-foreground">
                 {{ $t("organization.logoRecommended") }}
@@ -569,15 +569,6 @@ const settings = ref<PlatformSettings>({
 // Agents data
 const agents = ref<any[]>([]);
 
-const webhookEvents = [
-  { id: "conversation.started", name: "Conversation Started" },
-  { id: "conversation.ended", name: "Conversation Ended" },
-  { id: "conversation.escalated", name: "Conversation Escalated" },
-  { id: "agent.performance.alert", name: "Agent Performance Alert" },
-  { id: "system.error", name: "System Error" },
-  { id: "user.feedback", name: "User Feedback Received" },
-];
-
 // Computed properties
 const hasChanges = computed(() => {
   return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
@@ -639,15 +630,6 @@ const formatTimePreview = () => {
       minute: "2-digit",
       hour12: false,
     });
-  }
-};
-
-const toggleWebhookEvent = (eventId: string) => {
-  const index = settings.value.webhooks.events.indexOf(eventId);
-  if (index > -1) {
-    settings.value.webhooks.events.splice(index, 1);
-  } else {
-    settings.value.webhooks.events.push(eventId);
   }
 };
 
@@ -861,23 +843,6 @@ const resetToDefaults = () => {
       },
     };
   }
-};
-
-const testWebhook = async () => {
-  try {
-    // TODO: Send test webhook
-    console.log("Testing webhook:", settings.value.webhooks.url);
-
-    // TODO: Show result toast
-    console.log("Webhook test sent successfully");
-  } catch (error) {
-    console.error("Webhook test failed:", error);
-  }
-};
-
-const viewWebhookLogs = () => {
-  // TODO: Navigate to webhook logs page
-  console.log("View webhook logs");
 };
 
 const onOrganizationDeleted = () => {

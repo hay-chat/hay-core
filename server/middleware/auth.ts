@@ -4,6 +4,7 @@ import { AuthUser } from "@server/lib/auth/AuthUser";
 
 // Extend Express Request type
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: AuthUser;
@@ -16,11 +17,7 @@ declare global {
  * Express middleware for authenticated endpoints
  * Reuses tRPC's authentication logic
  */
-export const withAuth = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
+export const withAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Reuse existing requireAuth function
     const user = await requireAuth(req);

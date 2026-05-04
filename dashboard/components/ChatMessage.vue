@@ -222,8 +222,8 @@
             v-if="hasDebugData"
             variant="ghost"
             size="sm"
-            @click="showDebugDialog = true"
             class="ml-auto"
+            @click="showDebugDialog = true"
           >
             <MoreVertical class="h-4 w-4" />
           </Button>

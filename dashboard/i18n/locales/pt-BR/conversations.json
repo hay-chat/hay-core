@@ -145,8 +145,8 @@
       "title": "Conversas Anteriores",
       "none": "Nenhuma conversa anterior"
     },
-    "relatedArticles": {
-      "title": "Artigos Relacionados",
+    "relatedDocuments": {
+      "title": "Documentos Relacionados",
       "defaultCategory": "Geral"
     },
     "releaseDialog": {

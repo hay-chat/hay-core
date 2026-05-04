@@ -5,7 +5,7 @@
         <DateRangeSelector v-model="dateRange" @change="refreshData" />
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
-          {{ $t('dashboard.actions.refresh') }}
+          {{ $t("dashboard.actions.refresh") }}
         </Button>
       </div>
     </template>
@@ -63,8 +63,8 @@
       <!-- Activity Chart -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('dashboard.activity.title') }}</CardTitle>
-          <CardDescription>{{ $t('dashboard.activity.description') }}</CardDescription>
+          <CardTitle>{{ $t("dashboard.activity.title") }}</CardTitle>
+          <CardDescription>{{ $t("dashboard.activity.description") }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="">
@@ -92,7 +92,7 @@
         <CardContent>
           <div class="space-y-4">
             <div
-              v-for="activity in recentActivity"
+              v-for="activity in _recentActivity"
               :key="activity.id"
               class="flex items-start space-x-3"
             >
@@ -132,11 +132,11 @@
         <CardHeader>
           <div class="flex items-center justify-between">
             <div>
-              <CardTitle>{{ $t('dashboard.topAgents.title') }}</CardTitle>
-              <CardDescription>{{ $t('dashboard.topAgents.description') }}</CardDescription>
+              <CardTitle>{{ $t("dashboard.topAgents.title") }}</CardTitle>
+              <CardDescription>{{ $t("dashboard.topAgents.description") }}</CardDescription>
             </div>
             <Button variant="ghost" size="sm" @click="viewAllAgents">
-              {{ $t('dashboard.actions.viewAll') }}
+              {{ $t("dashboard.actions.viewAll") }}
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
@@ -156,20 +156,24 @@
                   <p class="font-medium text-foreground">
                     {{ agent.name }}
                   </p>
-                  <p class="text-sm text-neutral-muted">{{ $t('dashboard.topAgents.conversations', { count: agent.conversations }) }}</p>
+                  <p class="text-sm text-neutral-muted">
+                    {{ $t("dashboard.topAgents.conversations", { count: agent.conversations }) }}
+                  </p>
                 </div>
               </div>
               <div class="text-right">
                 <div class="text-sm font-medium text-foreground">{{ agent.resolutionRate }}%</div>
-                <div class="text-xs text-neutral-muted">{{ $t('dashboard.topAgents.resolutionRate') }}</div>
+                <div class="text-xs text-neutral-muted">
+                  {{ $t("dashboard.topAgents.resolutionRate") }}
+                </div>
               </div>
             </div>
           </div>
           <div v-else class="text-center py-8 text-neutral-muted">
             <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>{{ $t('dashboard.topAgents.emptyTitle') }}</p>
+            <p>{{ $t("dashboard.topAgents.emptyTitle") }}</p>
             <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
-              {{ $t('dashboard.actions.createFirstAgent') }}
+              {{ $t("dashboard.actions.createFirstAgent") }}
             </Button>
           </div>
         </CardContent>
@@ -180,11 +184,13 @@
         <CardHeader>
           <div class="flex items-center justify-between">
             <div>
-              <CardTitle>{{ $t('dashboard.recentConversations.title') }}</CardTitle>
-              <CardDescription>{{ $t('dashboard.recentConversations.description') }}</CardDescription>
+              <CardTitle>{{ $t("dashboard.recentConversations.title") }}</CardTitle>
+              <CardDescription>{{
+                $t("dashboard.recentConversations.description")
+              }}</CardDescription>
             </div>
             <Button variant="ghost" size="sm" @click="viewAllConversations">
-              {{ $t('dashboard.actions.viewAll') }}
+              {{ $t("dashboard.actions.viewAll") }}
               <ChevronRight class="ml-1 h-4 w-4" />
             </Button>
           </div>
@@ -233,8 +239,8 @@
           </div>
           <div v-else class="text-center py-8 text-neutral-muted">
             <MessageSquare class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>{{ $t('dashboard.recentConversations.emptyTitle') }}</p>
-            <p class="text-sm mt-2">{{ $t('dashboard.recentConversations.emptyDescription') }}</p>
+            <p>{{ $t("dashboard.recentConversations.emptyTitle") }}</p>
+            <p class="text-sm mt-2">{{ $t("dashboard.recentConversations.emptyDescription") }}</p>
           </div>
         </CardContent>
       </Card>
@@ -248,8 +254,8 @@
       <!-- Sentiment Score Gauge -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('dashboard.sentiment.scoreTitle') }}</CardTitle>
-          <CardDescription>{{ $t('dashboard.sentiment.scorePeriod') }}</CardDescription>
+          <CardTitle>{{ $t("dashboard.sentiment.scoreTitle") }}</CardTitle>
+          <CardDescription>{{ $t("dashboard.sentiment.scorePeriod") }}</CardDescription>
         </CardHeader>
         <CardContent class="flex align-center justify-center">
           <SimpleGauge
@@ -266,8 +272,8 @@
       <!-- Sentiment Breakdown -->
       <Card>
         <CardHeader>
-          <CardTitle>{{ $t('dashboard.sentiment.breakdownTitle') }}</CardTitle>
-          <CardDescription>{{ $t('dashboard.sentiment.breakdownDescription') }}</CardDescription>
+          <CardTitle>{{ $t("dashboard.sentiment.breakdownTitle") }}</CardTitle>
+          <CardDescription>{{ $t("dashboard.sentiment.breakdownDescription") }}</CardDescription>
         </CardHeader>
         <CardContent>
           <div v-if="sentimentBreakdown.length > 0" class="space-y-4">
@@ -281,7 +287,9 @@
                 <component :is="sentiment.icon" :class="['h-8 w-8', sentiment.iconClass]" />
                 <div>
                   <p class="font-medium text-foreground capitalize">{{ sentiment.type }}</p>
-                  <p class="text-sm text-muted-foreground">{{ $t('dashboard.sentiment.messages', { count: sentiment.count }) }}</p>
+                  <p class="text-sm text-muted-foreground">
+                    {{ $t("dashboard.sentiment.messages", { count: sentiment.count }) }}
+                  </p>
                 </div>
               </div>
               <div class="text-right">
@@ -293,8 +301,8 @@
           </div>
           <div v-else class="text-center py-8 text-muted-foreground">
             <Smile class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>{{ $t('dashboard.sentiment.emptyTitle') }}</p>
-            <p class="text-sm mt-2">{{ $t('dashboard.sentiment.emptyDescription') }}</p>
+            <p>{{ $t("dashboard.sentiment.emptyTitle") }}</p>
+            <p class="text-sm mt-2">{{ $t("dashboard.sentiment.emptyDescription") }}</p>
           </div>
         </CardContent>
       </Card>
@@ -313,8 +321,6 @@ import {
   User,
   RefreshCw,
   ChevronRight,
-  AlertCircle,
-  Zap,
   MessageCircle,
   Smile,
   Meh,
@@ -373,7 +379,7 @@ interface Conversation {
   agent_id?: string;
   created_at: string;
   updated_at: string;
-  messages?: Array<{ content: string }>;
+  messages?: Array<{ content: string; created_at: string }>;
   organization?: any;
   metadata?: Record<string, unknown> | null;
 }
@@ -420,41 +426,6 @@ const metrics = computed(() => {
   };
 });
 
-const recentActivity = ref([
-  {
-    id: 1,
-    type: "success",
-    icon: Bot,
-    title: "New agent created",
-    description: "Support Bot v2 was successfully created and deployed",
-    timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-  },
-  {
-    id: 2,
-    type: "info",
-    icon: MessageSquare,
-    title: "High conversation volume",
-    description: "250 conversations handled in the last hour",
-    timestamp: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
-  },
-  {
-    id: 3,
-    type: "warning",
-    icon: AlertCircle,
-    title: "Agent needs attention",
-    description: "Customer Support Bot has a low resolution rate today",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-  },
-  {
-    id: 4,
-    type: "success",
-    icon: Zap,
-    title: "New insight generated",
-    description: "AI identified 3 potential playbook improvements",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-  },
-]);
-
 // Computed property for top agents based on conversation count
 const topAgents = computed(() => {
   // Group conversations by agent and count them
@@ -485,14 +456,6 @@ const topAgents = computed(() => {
   }
 
   return agentsWithStats;
-});
-
-// Computed properties for sentiment visualization
-const formattedSentimentData = computed(() => {
-  return sentimentData.value.map((item) => ({
-    label: item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1),
-    value: item.count,
-  }));
 });
 
 // Computed property for sentiment gauge counts
@@ -546,9 +509,13 @@ const recentConversations = computed(() => {
   return conversations.value
     .slice(0, 4) // Get 4 most recent
     .map((conv) => {
-      // Get the last message if available
+      // Get the last message by created_at (join order is not guaranteed)
       const lastMessage =
-        conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1] : null;
+        conv.messages && conv.messages.length > 0
+          ? [...conv.messages].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+            )[conv.messages.length - 1]
+          : null;
 
       return {
         id: conv.id,
@@ -604,6 +571,7 @@ const fetchDashboardData = async (forceRefresh = false) => {
           () =>
             HayApi.conversations.list.query({
               pagination: { page: 1, limit: 10 },
+              include: ["messages"],
             }),
           { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh },
         ),
@@ -709,26 +677,6 @@ const viewConversation = (id: string) => {
 const viewInsights = () => {
   router.push("/insights");
 };
-
-const managePlaybooks = () => {
-  router.push("/playbooks");
-};
-
-const scrollToTop = () => {
-  if (typeof window !== "undefined") {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-};
-
-// Computed property to check if any data is being loaded
-const isAnyDataLoading = computed(() => {
-  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetLoading(key));
-});
-
-// Computed property to check if any data is being refreshed
-const isAnyDataRefreshing = computed(() => {
-  return Object.values(CACHE_KEYS).some((key) => analyticsStore.isWidgetRefreshing(key));
-});
 
 // Lifecycle
 onMounted(async () => {

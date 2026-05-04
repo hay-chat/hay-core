@@ -1,4 +1,12 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, PrimaryGeneratedColumn, CreateDateColumn } from "typeorm";
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  Index,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+} from "typeorm";
 import { Document } from "./document.entity";
 import { Organization } from "./organization.entity";
 

@@ -27,11 +27,14 @@ export class RetrievalLayer {
     playbooks: Playbook[],
     organizationId?: string,
   ): Promise<Playbook | null> {
-    logger.debug({
-      messagesCount: messages.length,
-      playbooksCount: playbooks.length,
-      organizationId
-    }, "Starting playbook candidate selection");
+    logger.debug(
+      {
+        messagesCount: messages.length,
+        playbooksCount: playbooks.length,
+        organizationId,
+      },
+      "Starting playbook candidate selection",
+    );
 
     if (playbooks.length === 0) {
       logger.debug("No playbooks available, returning null");
@@ -87,14 +90,17 @@ export class RetrievalLayer {
       candidates: Array<{ id: string; score: number; rationale: string }>;
     };
 
-    logger.debug({
-      candidatesCount: parsed.candidates.length,
-      candidates: parsed.candidates.map((c) => ({
-        id: c.id,
-        score: c.score,
-        rationale: c.rationale.substring(0, 100)
-      }))
-    }, "Playbook candidate analysis complete");
+    logger.debug(
+      {
+        candidatesCount: parsed.candidates.length,
+        candidates: parsed.candidates.map((c) => ({
+          id: c.id,
+          score: c.score,
+          rationale: c.rationale.substring(0, 100),
+        })),
+      },
+      "Playbook candidate analysis complete",
+    );
 
     const topCandidate = parsed.candidates
       .filter((c) => c.score > 0.7)
@@ -108,16 +114,22 @@ export class RetrievalLayer {
     const selectedPlaybook = playbooks.find((p) => p.id === topCandidate.id) || null;
 
     if (selectedPlaybook) {
-      logger.debug({
-        playbookId: selectedPlaybook.id,
-        playbookTitle: selectedPlaybook.title,
-        score: topCandidate.score,
-        rationale: topCandidate.rationale
-      }, "Playbook selected");
+      logger.debug(
+        {
+          playbookId: selectedPlaybook.id,
+          playbookTitle: selectedPlaybook.title,
+          score: topCandidate.score,
+          rationale: topCandidate.rationale,
+        },
+        "Playbook selected",
+      );
     } else {
-      logger.debug({
-        candidateId: topCandidate.id
-      }, "Playbook candidate ID not found in available playbooks");
+      logger.debug(
+        {
+          candidateId: topCandidate.id,
+        },
+        "Playbook candidate ID not found in available playbooks",
+      );
     }
 
     return selectedPlaybook;
@@ -125,18 +137,24 @@ export class RetrievalLayer {
 
   async getRelevantDocuments(messages: Message[], organizationId: string): Promise<Document[]> {
     try {
-      logger.debug({
-        messagesCount: messages.length,
-        organizationId
-      }, "Starting document retrieval");
+      logger.debug(
+        {
+          messagesCount: messages.length,
+          organizationId,
+        },
+        "Starting document retrieval",
+      );
 
       // Get customer messages for context
       const customerMessages = messages.filter((msg) => msg.type === "Customer").slice(-3);
 
-      logger.debug({
-        customerMessagesCount: customerMessages.length,
-        totalMessagesCount: messages.length
-      }, "Filtered customer messages");
+      logger.debug(
+        {
+          customerMessagesCount: customerMessages.length,
+          totalMessagesCount: messages.length,
+        },
+        "Filtered customer messages",
+      );
 
       if (customerMessages.length === 0) {
         logger.debug("No customer messages found, skipping document retrieval");
@@ -148,10 +166,13 @@ export class RetrievalLayer {
         .join(" ")
         .trim();
 
-      logger.debug({
-        queryLength: query.length,
-        queryPreview: query.substring(0, 150)
-      }, "Built search query");
+      logger.debug(
+        {
+          queryLength: query.length,
+          queryPreview: query.substring(0, 150),
+        },
+        "Built search query",
+      );
 
       if (!query) {
         logger.debug("Empty query after trimming, skipping document retrieval");
@@ -163,10 +184,13 @@ export class RetrievalLayer {
         await vectorStoreService.initialize();
       }
 
-      logger.debug({
-        organizationId,
-        topK: 5
-      }, "Searching vector store");
+      logger.debug(
+        {
+          organizationId,
+          topK: 5,
+        },
+        "Searching vector store",
+      );
 
       const searchResults = await vectorStoreService.search(
         organizationId,
@@ -174,14 +198,17 @@ export class RetrievalLayer {
         5, // Get top 5 most relevant chunks
       );
 
-      logger.debug({
-        resultsCount: searchResults?.length || 0,
-        results: searchResults?.map((r) => ({
-          documentId: r.documentId,
-          similarity: r.similarity,
-          contentPreview: r.content?.substring(0, 100)
-        }))
-      }, "Vector store search complete");
+      logger.debug(
+        {
+          resultsCount: searchResults?.length || 0,
+          results: searchResults?.map((r) => ({
+            documentId: r.documentId,
+            similarity: r.similarity,
+            contentPreview: r.content?.substring(0, 100),
+          })),
+        },
+        "Vector store search complete",
+      );
 
       if (!searchResults || searchResults.length === 0) {
         logger.debug("No search results found");
@@ -191,25 +218,31 @@ export class RetrievalLayer {
       // Filter out low relevance results
       const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.4);
 
-      logger.debug({
-        threshold: 0.4,
-        beforeCount: searchResults.length,
-        afterCount: filteredResults.length,
-        filtered: filteredResults.map((r) => ({
-          documentId: r.documentId,
-          similarity: r.similarity
-        }))
-      }, "Filtered documents by similarity threshold");
+      logger.debug(
+        {
+          threshold: 0.4,
+          beforeCount: searchResults.length,
+          afterCount: filteredResults.length,
+          filtered: filteredResults.map((r) => ({
+            documentId: r.documentId,
+            similarity: r.similarity,
+          })),
+        },
+        "Filtered documents by similarity threshold",
+      );
 
       const documents = filteredResults.map((result) => ({
         id: result.documentId,
         similarity: result.similarity || 0,
       }));
 
-      logger.debug({
-        documentsCount: documents.length,
-        documents
-      }, "Document retrieval complete");
+      logger.debug(
+        {
+          documentsCount: documents.length,
+          documents,
+        },
+        "Document retrieval complete",
+      );
 
       return documents;
     } catch (error) {

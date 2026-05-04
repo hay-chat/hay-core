@@ -12,7 +12,7 @@ export class MessageFeedbackService {
   async createFeedback(
     organizationId: string,
     reviewerId: string,
-    data: CreateFeedbackInput
+    data: CreateFeedbackInput,
   ): Promise<MessageFeedback> {
     return this.feedbackRepository.create(organizationId, reviewerId, data);
   }
@@ -27,7 +27,7 @@ export class MessageFeedbackService {
 
   async getFeedbackByOrganization(
     organizationId: string,
-    filter?: FeedbackFilter
+    filter?: FeedbackFilter,
   ): Promise<MessageFeedback[]> {
     return this.feedbackRepository.findByOrganization(organizationId, filter);
   }
@@ -58,25 +58,11 @@ export class MessageFeedbackService {
     return this.feedbackRepository.delete(id);
   }
 
-  async exportFeedbackToCSV(
-    organizationId: string,
-    filter?: FeedbackFilter
-  ): Promise<string> {
-    const feedback = await this.feedbackRepository.findByOrganization(
-      organizationId,
-      filter
-    );
+  async exportFeedbackToCSV(organizationId: string, filter?: FeedbackFilter): Promise<string> {
+    const feedback = await this.feedbackRepository.findByOrganization(organizationId, filter);
 
     // CSV headers
-    const headers = [
-      "ID",
-      "Message ID",
-      "Rating",
-      "Comment",
-      "Source",
-      "Reviewer",
-      "Created At",
-    ];
+    const headers = ["ID", "Message ID", "Rating", "Comment", "Source", "Reviewer", "Created At"];
 
     // CSV rows
     const rows = feedback.map((f) => [
@@ -92,9 +78,7 @@ export class MessageFeedbackService {
     // Convert to CSV format
     const csvContent = [
       headers.join(","),
-      ...rows.map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-      ),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
 
     return csvContent;

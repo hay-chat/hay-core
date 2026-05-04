@@ -63,4 +63,3 @@ export class CreateConversationTakeoverEvents1781000000000 implements MigrationI
     await queryRunner.query(`DROP TABLE IF EXISTS "conversation_takeover_events"`);
   }
 }
-

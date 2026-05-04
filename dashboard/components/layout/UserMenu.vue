@@ -13,7 +13,9 @@
         <span class="absolute -inset-1.5" />
         <span class="sr-only">Open user menu</span>
         <Avatar
-          :name="userStore.user?.firstName || userStore.user?.lastName || userStore.user?.email || 'User'"
+          :name="
+            userStore.user?.firstName || userStore.user?.lastName || userStore.user?.email || 'User'
+          "
           :url="userStore.user?.avatarUrl"
           size="sm"
         />
@@ -146,20 +148,6 @@ const userMenuItems = [
   { name: "Preferences", href: "/settings/preferences", icon: Settings },
   { name: "Help & Support", href: "/help", icon: HelpCircle },
 ];
-
-// Computed user initials for avatar
-const userInitials = computed(() => {
-  if (!userStore.user?.firstName) return "U";
-
-  const names = userStore.user.firstName.split(" ");
-  if (names.length === 1) {
-    return names[0]?.charAt(0).toUpperCase() || "U";
-  }
-
-  const firstInitial = names[0]?.charAt(0) || "";
-  const lastInitial = names[names.length - 1]?.charAt(0) || "";
-  return (firstInitial + lastInitial).toUpperCase();
-});
 
 // Methods
 const handleSignOut = async () => {

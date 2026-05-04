@@ -24,7 +24,7 @@ export class DPoPError extends Error {
   constructor(
     public code: string,
     public description: string,
-    public statusCode: number = 401
+    public statusCode: number = 401,
   ) {
     super(description);
     this.name = "DPoPError";
@@ -38,12 +38,12 @@ export async function verifyDPoPProof(
   token: string,
   conversationId: string,
   method: string,
-  url: string
+  url: string,
 ): Promise<{ publicJwk: any; newNonce: string }> {
   try {
     // Dynamically import jose using Function constructor to avoid static analysis
-    const importDynamic = new Function('specifier', 'return import(specifier)');
-    const jose = await importDynamic('jose');
+    const importDynamic = new Function("specifier", "return import(specifier)");
+    const jose = await importDynamic("jose");
 
     // Parse the JWT to get header and payload
     const payload = jose.decodeJwt(token) as DPoPPayload;
@@ -70,7 +70,11 @@ export async function verifyDPoPProof(
 
     // Verify this is a web channel conversation
     if (conversation.channel !== "web") {
-      throw new DPoPError("invalid_token", "DPoP authentication only supported for web channel", 403);
+      throw new DPoPError(
+        "invalid_token",
+        "DPoP authentication only supported for web channel",
+        403,
+      );
     }
 
     // Check if conversation has a registered public key
@@ -88,10 +92,10 @@ export async function verifyDPoPProof(
     const publicKey = await jose.importJWK(protectedHeader.jwk, "ES256");
 
     // Verify the JWT signature
-    const { payload: verifiedPayload } = await jose.jwtVerify(token, publicKey, {
+    const { payload: verifiedPayload } = (await jose.jwtVerify(token, publicKey, {
       typ: "dpop+jwt",
       algorithms: ["ES256"],
-    }) as { payload: DPoPPayload };
+    })) as { payload: DPoPPayload };
 
     // Verify the claims
     if (!verifiedPayload.htm || verifiedPayload.htm !== method.toUpperCase()) {
@@ -130,7 +134,7 @@ export async function verifyDPoPProof(
     // Verify and rotate nonce
     const newNonce = await dpopCacheService.verifyAndRotateNonce(
       conversationId,
-      verifiedPayload.nonce
+      verifiedPayload.nonce,
     );
 
     if (!newNonce) {
@@ -151,7 +155,7 @@ export async function verifyDPoPProof(
       throw error;
     }
 
-    if (error instanceof Error && error.message.includes('JWTVerification')) {
+    if (error instanceof Error && error.message.includes("JWTVerification")) {
       throw new DPoPError("invalid_token", "Token verification failed");
     }
 
@@ -184,8 +188,9 @@ export function dpopAuthMiddleware(requireAuth: boolean = true) {
       if (!authHeader || !authHeader.startsWith("DPoP ")) {
         if (requireAuth) {
           // Get or generate nonce for the conversation
-          const nonce = await dpopCacheService.getCurrentNonce(conversationId) ||
-                        await dpopCacheService.generateNonce(conversationId);
+          const nonce =
+            (await dpopCacheService.getCurrentNonce(conversationId)) ||
+            (await dpopCacheService.generateNonce(conversationId));
 
           res.setHeader("WWW-Authenticate", `DPoP error="missing_dpop_proof"`);
           res.setHeader("DPoP-Nonce", nonce);
@@ -206,12 +211,7 @@ export function dpopAuthMiddleware(requireAuth: boolean = true) {
       const url = `${protocol}://${host}${req.originalUrl}`;
 
       // Verify the DPoP proof
-      const { publicJwk, newNonce } = await verifyDPoPProof(
-        token,
-        conversationId,
-        req.method,
-        url
-      );
+      const { publicJwk, newNonce } = await verifyDPoPProof(token, conversationId, req.method, url);
 
       // Set the new nonce in response header
       res.setHeader("DPoP-Nonce", newNonce);
@@ -234,7 +234,7 @@ export function dpopAuthMiddleware(requireAuth: boolean = true) {
 
         res.setHeader(
           "WWW-Authenticate",
-          `DPoP error="${error.code}", error_description="${error.description}"`
+          `DPoP error="${error.code}", error_description="${error.description}"`,
         );
 
         return res.status(error.statusCode).json({
@@ -269,4 +269,3 @@ function isUrlMatch(url1: string, url2: string): boolean {
     return false;
   }
 }
-

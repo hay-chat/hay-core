@@ -182,10 +182,10 @@ describe("Customer Privacy DSAR Integration Tests", () => {
   describe("Customer Data Export Flow", () => {
     it("should complete end-to-end customer export request", async () => {
       // Step 1: Request export
-      const requestResult = await privacyService.requestCustomerExport(
-        testOrgId,
-        { type: "email", value: testEmail },
-      );
+      const requestResult = await privacyService.requestCustomerExport(testOrgId, {
+        type: "email",
+        value: testEmail,
+      });
 
       expect(requestResult.requestId).toBeDefined();
       expect(requestResult.expiresAt).toBeInstanceOf(Date);
@@ -252,28 +252,28 @@ describe("Customer Privacy DSAR Integration Tests", () => {
     it("should handle customer not found gracefully", async () => {
       // When customer not found, the service throws an error
       await expect(
-        privacyService.requestCustomerExport(
-          testOrgId,
-          { type: "email", value: "nonexistent@example.com" },
-        )
+        privacyService.requestCustomerExport(testOrgId, {
+          type: "email",
+          value: "nonexistent@example.com",
+        }),
       ).rejects.toThrow();
     }, 10000);
 
     it("should support phone number identifier", async () => {
-      const requestResult = await privacyService.requestCustomerExport(
-        testOrgId,
-        { type: "phone", value: "+1234567890" },
-      );
+      const requestResult = await privacyService.requestCustomerExport(testOrgId, {
+        type: "phone",
+        value: "+1234567890",
+      });
 
       expect(requestResult.requestId).toBeDefined();
       expect(requestResult.customerFound).toBe(true);
     }, 10000);
 
     it("should support external ID identifier", async () => {
-      const requestResult = await privacyService.requestCustomerExport(
-        testOrgId,
-        { type: "externalId", value: "test-customer-123" },
-      );
+      const requestResult = await privacyService.requestCustomerExport(testOrgId, {
+        type: "externalId",
+        value: "test-customer-123",
+      });
 
       expect(requestResult.requestId).toBeDefined();
       expect(requestResult.customerFound).toBe(true);
@@ -283,10 +283,10 @@ describe("Customer Privacy DSAR Integration Tests", () => {
   describe("Customer Data Deletion Flow", () => {
     it("should complete end-to-end customer deletion request", async () => {
       // Step 1: Request deletion
-      const requestResult = await privacyService.requestCustomerDeletion(
-        testOrgId,
-        { type: "email", value: testEmail },
-      );
+      const requestResult = await privacyService.requestCustomerDeletion(testOrgId, {
+        type: "email",
+        value: testEmail,
+      });
 
       expect(requestResult.requestId).toBeDefined();
       expect(requestResult.expiresAt).toBeInstanceOf(Date);
@@ -307,10 +307,9 @@ describe("Customer Privacy DSAR Integration Tests", () => {
 
     it("should properly delete customer data including embeddings", async () => {
       // Verify embeddings exist before deletion
-      const embeddingsBeforeDeletion = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversation.id],
-      );
+      const embeddingsBeforeDeletion = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversation.id,
+      ]);
       expect(embeddingsBeforeDeletion.length).toBeGreaterThan(0);
 
       // Execute deletion
@@ -346,26 +345,23 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       });
 
       // Verify embeddings were deleted (CRITICAL GDPR TEST)
-      const embeddingsAfterDeletion = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversation.id],
-      );
+      const embeddingsAfterDeletion = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversation.id,
+      ]);
       expect(embeddingsAfterDeletion.length).toBe(0);
 
       // Verify semantic search returns nothing
       const searchResults = await vectorStoreService.search(testOrgId, "order #12345", 10);
-      const hasCustomerData = searchResults.some((r) =>
-        r.content.includes("order #12345"),
-      );
+      const hasCustomerData = searchResults.some((r) => r.content.includes("order #12345"));
       expect(hasCustomerData).toBe(false);
     }, 20000);
 
     it("should fail deletion request for non-existent customer", async () => {
       await expect(
-        privacyService.requestCustomerDeletion(
-          testOrgId,
-          { type: "email", value: "nonexistent@example.com" },
-        ),
+        privacyService.requestCustomerDeletion(testOrgId, {
+          type: "email",
+          value: "nonexistent@example.com",
+        }),
       ).rejects.toThrow("No customer found with this identifier");
     }, 10000);
   });
@@ -448,10 +444,9 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       await (privacyService as any).executeCustomerDeletion(customerId, testOrgId);
 
       // Verify no embeddings by conversation ID
-      const embeddingsByConv = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [conversationId],
-      );
+      const embeddingsByConv = await vectorStoreService.findByConversationIds(testOrgId, [
+        conversationId,
+      ]);
       expect(embeddingsByConv.length).toBe(0);
 
       // Verify no embeddings in search results
@@ -464,10 +459,9 @@ describe("Customer Privacy DSAR Integration Tests", () => {
 
     it("should verify embeddings count matches deletion count", async () => {
       // Count embeddings before deletion
-      const embeddingsBefore = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversation.id],
-      );
+      const embeddingsBefore = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversation.id,
+      ]);
       const countBefore = embeddingsBefore.length;
       expect(countBefore).toBeGreaterThan(0);
 
@@ -475,10 +469,9 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       await (privacyService as any).executeCustomerDeletion(testCustomer.id, testOrgId);
 
       // Count embeddings after deletion
-      const embeddingsAfter = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [testConversation.id],
-      );
+      const embeddingsAfter = await vectorStoreService.findByConversationIds(testOrgId, [
+        testConversation.id,
+      ]);
       const countAfter = embeddingsAfter.length;
 
       expect(countAfter).toBe(0);

@@ -103,14 +103,10 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       });
 
       // Add a message to the conversation
-      const message = await conversationService.addMessage(
-        conversation.id,
-        testOrgId,
-        {
-          content: "Hello, I need help with my account",
-          type: MessageType.CUSTOMER,
-        },
-      );
+      const message = await conversationService.addMessage(conversation.id, testOrgId, {
+        content: "Hello, I need help with my account",
+        type: MessageType.CUSTOMER,
+      });
 
       // Add embeddings linked to the conversation via metadata
       const chunks: VectorChunk[] = [
@@ -135,16 +131,14 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       await vectorStoreService.addChunks(testOrgId, null, messageChunks);
 
       // Verify embeddings exist before deletion
-      const convEmbeddingsBefore = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [conversation.id],
-      );
+      const convEmbeddingsBefore = await vectorStoreService.findByConversationIds(testOrgId, [
+        conversation.id,
+      ]);
       expect(convEmbeddingsBefore.length).toBe(2);
 
-      const msgEmbeddingsBefore = await vectorStoreService.findByMessageIds(
-        testOrgId,
-        [message.id],
-      );
+      const msgEmbeddingsBefore = await vectorStoreService.findByMessageIds(testOrgId, [
+        message.id,
+      ]);
       expect(msgEmbeddingsBefore.length).toBe(1);
 
       // Delete the conversation
@@ -152,16 +146,12 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       expect(deleted).toBe(true);
 
       // Verify embeddings are deleted
-      const convEmbeddingsAfter = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [conversation.id],
-      );
+      const convEmbeddingsAfter = await vectorStoreService.findByConversationIds(testOrgId, [
+        conversation.id,
+      ]);
       expect(convEmbeddingsAfter.length).toBe(0);
 
-      const msgEmbeddingsAfter = await vectorStoreService.findByMessageIds(
-        testOrgId,
-        [message.id],
-      );
+      const msgEmbeddingsAfter = await vectorStoreService.findByMessageIds(testOrgId, [message.id]);
       expect(msgEmbeddingsAfter.length).toBe(0);
     });
 
@@ -214,21 +204,18 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       });
 
       // Add multiple messages
-      const message1 = await conversationService.addMessage(
-        conversation.id,
-        testOrgId,
-        { content: "First message", type: MessageType.CUSTOMER },
-      );
-      const message2 = await conversationService.addMessage(
-        conversation.id,
-        testOrgId,
-        { content: "Second message", type: MessageType.BOT_AGENT },
-      );
-      const message3 = await conversationService.addMessage(
-        conversation.id,
-        testOrgId,
-        { content: "Third message", type: MessageType.CUSTOMER },
-      );
+      const message1 = await conversationService.addMessage(conversation.id, testOrgId, {
+        content: "First message",
+        type: MessageType.CUSTOMER,
+      });
+      const message2 = await conversationService.addMessage(conversation.id, testOrgId, {
+        content: "Second message",
+        type: MessageType.BOT_AGENT,
+      });
+      const message3 = await conversationService.addMessage(conversation.id, testOrgId, {
+        content: "Third message",
+        type: MessageType.CUSTOMER,
+      });
 
       // Add embeddings for each message
       for (const msg of [message1, message2, message3]) {
@@ -239,7 +226,7 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
           },
         ]);
       }
-      
+
       // Add embeddings linked only to the conversation (not messages)
       await vectorStoreService.addChunks(testOrgId, null, [
         {
@@ -261,10 +248,9 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       const embeddingsAfter = await vectorStoreService.findByMessageIds(testOrgId, allMessageIds);
       expect(embeddingsAfter.length).toBe(0);
 
-      const convEmbeddingsAfter = await vectorStoreService.findByConversationIds(
-        testOrgId,
-        [conversation.id],
-      );
+      const convEmbeddingsAfter = await vectorStoreService.findByConversationIds(testOrgId, [
+        conversation.id,
+      ]);
       expect(convEmbeddingsAfter.length).toBe(0);
     });
   });

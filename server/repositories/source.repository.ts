@@ -63,18 +63,12 @@ export class SourceRepository {
   }
 
   async deactivate(id: string): Promise<boolean> {
-    const result = await this.repository.update(
-      { id },
-      { isActive: false }
-    );
+    const result = await this.repository.update({ id }, { isActive: false });
     return (result.affected || 0) > 0;
   }
 
   async activate(id: string): Promise<boolean> {
-    const result = await this.repository.update(
-      { id },
-      { isActive: true }
-    );
+    const result = await this.repository.update({ id }, { isActive: true });
     return (result.affected || 0) > 0;
   }
 }

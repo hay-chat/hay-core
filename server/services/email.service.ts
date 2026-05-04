@@ -93,19 +93,25 @@ export class EmailService {
    * Send an email
    */
   async sendEmail(options: EmailOptions): Promise<EmailResult> {
-    logger.debug({
-      to: options.to,
-      subject: options.subject,
-      hasFromProperty: "from" in options,
-      smtpEnabled: config.smtp.enabled,
-    }, "sendEmail called");
-
-    if (!config.smtp.enabled) {
-      logger.debug({
+    logger.debug(
+      {
         to: options.to,
         subject: options.subject,
-        preview: options.html?.substring(0, 200),
-      }, "SMTP disabled, email not sent");
+        hasFromProperty: "from" in options,
+        smtpEnabled: config.smtp.enabled,
+      },
+      "sendEmail called",
+    );
+
+    if (!config.smtp.enabled) {
+      logger.debug(
+        {
+          to: options.to,
+          subject: options.subject,
+          preview: options.html?.substring(0, 200),
+        },
+        "SMTP disabled, email not sent",
+      );
       return {
         success: true,
         messageId: `mock-${uuidv4()}`,
@@ -123,10 +129,13 @@ export class EmailService {
       ? `"${options.from.name || options.from.email}" <${options.from.email}>`
       : `"${config.smtp.from.name}" <${config.smtp.from.email}>`;
 
-    logger.debug({
-      hasOptionsFrom: !!options.from,
-      finalFromAddress: fromAddress,
-    }, "Building from address");
+    logger.debug(
+      {
+        hasOptionsFrom: !!options.from,
+        finalFromAddress: fromAddress,
+      },
+      "Building from address",
+    );
 
     const mailOptions = {
       from: fromAddress,
@@ -147,17 +156,23 @@ export class EmailService {
     };
 
     try {
-      logger.debug({
-        from: mailOptions.from,
-        to: mailOptions.to,
-        subject: mailOptions.subject,
-      }, "Sending email via SMTP");
+      logger.debug(
+        {
+          from: mailOptions.from,
+          to: mailOptions.to,
+          subject: mailOptions.subject,
+        },
+        "Sending email via SMTP",
+      );
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info({
-        messageId: info.messageId,
-        to: options.to,
-        subject: options.subject,
-      }, "Email sent successfully");
+      logger.info(
+        {
+          messageId: info.messageId,
+          to: options.to,
+          subject: options.subject,
+        },
+        "Email sent successfully",
+      );
       return {
         success: true,
         messageId: info.messageId,
@@ -165,11 +180,14 @@ export class EmailService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({
-        err: error,
-        to: options.to,
-        subject: options.subject,
-      }, "Failed to send email");
+      logger.error(
+        {
+          err: error,
+          to: options.to,
+          subject: options.subject,
+        },
+        "Failed to send email",
+      );
 
       // Add to retry queue
       const queueItem = this.addToQueue(options);
@@ -186,11 +204,14 @@ export class EmailService {
    * Send an email using a template
    */
   async sendTemplateEmail(options: EmailTemplateOptions): Promise<EmailResult> {
-    logger.debug({
-      template: options.template,
-      to: options.to,
-      subject: options.subject,
-    }, "sendTemplateEmail called");
+    logger.debug(
+      {
+        template: options.template,
+        to: options.to,
+        subject: options.subject,
+      },
+      "sendTemplateEmail called",
+    );
 
     try {
       logger.debug({ template: options.template }, "Rendering template");
@@ -206,10 +227,14 @@ export class EmailService {
       // Resolve subject early so we can inject emailTitle/emailPreview before rendering
       let subject = options.subject;
       if (!subject) {
-        subject = this.templateService.getTranslatedSubject(options.template, options.locale) ?? undefined;
+        subject =
+          this.templateService.getTranslatedSubject(options.template, options.locale) ?? undefined;
         if (subject && options.variables) {
           for (const [key, value] of Object.entries(options.variables)) {
-            subject = subject!.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), String(value));
+            subject = subject!.replace(
+              new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"),
+              String(value),
+            );
           }
         }
       }
@@ -250,19 +275,25 @@ export class EmailService {
         ...(options.priority && { priority: options.priority }),
       };
 
-      logger.debug({
-        to: emailOptions.to,
-        subject: emailOptions.subject,
-        hasFrom: !!emailOptions.from,
-      }, "Built emailOptions");
+      logger.debug(
+        {
+          to: emailOptions.to,
+          subject: emailOptions.subject,
+          hasFrom: !!emailOptions.from,
+        },
+        "Built emailOptions",
+      );
 
       return await this.sendEmail(emailOptions);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({
-        err: error,
-        template: options.template,
-      }, "Template email failed");
+      logger.error(
+        {
+          err: error,
+          template: options.template,
+        },
+        "Template email failed",
+      );
       return {
         success: false,
         error: `Template email failed: ${errorMessage}`,
@@ -429,6 +460,7 @@ export async function getOrganizationLocale(organizationId?: string | null): Pro
     const org = await orgRepo.findOne({
       where: { id: organizationId },
       select: ["id", "defaultLanguage"],
+      loadEagerRelations: false,
     });
     return org?.defaultLanguage || DEFAULT_LANGUAGE;
   } catch {

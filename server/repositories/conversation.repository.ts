@@ -209,7 +209,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .select(["conversation.id", "conversation.organization_id"])
         .getMany();
     } catch (error) {
-      console.error("[ConversationRepository] Error getting stale unprocessed:", error);
+      logger.error({ err: error }, "Error getting stale unprocessed");
       return [];
     }
   }
@@ -423,6 +423,30 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .andWhere("conversation.organization_id = :organizationId", { organizationId })
       .andWhere("conversation.status IN (:...statuses)", {
         statuses: ["open", "processing", "pending-human", "human-took-over"],
+      })
+      .andWhere("conversation.deleted_at IS NULL")
+      .orderBy("conversation.created_at", "DESC")
+      .getOne();
+  }
+
+  /**
+   * Find a conversation by the provider-side conversation id stored in
+   * metadata[channel].conversationId. Used by channel plugins to locate the
+   * Hay conversation that corresponds to an external event (e.g. a Chatwoot
+   * conversation_resolved webhook).
+   */
+  async findByExternalConversationId(
+    channel: string,
+    externalConversationId: string,
+    organizationId: string,
+  ): Promise<Conversation | null> {
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.channel = :channel", { channel })
+      .andWhere("conversation.metadata -> :channel ->> 'conversationId' = :externalId", {
+        channel,
+        externalId: externalConversationId,
       })
       .andWhere("conversation.deleted_at IS NULL")
       .orderBy("conversation.created_at", "DESC")

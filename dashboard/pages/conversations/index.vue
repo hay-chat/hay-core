@@ -239,7 +239,6 @@ import {
   MessageSquare,
   Activity,
   Clock,
-  Heart,
   Search,
   RefreshCcw,
   CheckSquare,
@@ -255,7 +254,6 @@ import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
-import { useConversationTakeover } from "@/composables/useConversationTakeover";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
 import Avatar from "@/components/ui/Avatar.vue";
 
@@ -344,13 +342,6 @@ const stats = computed(() => {
   };
 });
 
-// Mock agents for now - TODO: fetch from API
-const agents = ref([
-  { id: "1", name: "Customer Support Agent" },
-  { id: "2", name: "Sales Assistant" },
-  { id: "3", name: "Technical Support" },
-]);
-
 // Select options
 const statusOptions = computed(() => [
   { label: t("conversations.filters.allStatus"), value: "" },
@@ -358,11 +349,6 @@ const statusOptions = computed(() => [
   { label: t("conversations.filters.resolved"), value: "resolved" },
   { label: t("conversations.filters.escalated"), value: "escalated" },
   { label: t("conversations.filters.closed"), value: "closed" },
-]);
-
-const agentOptions = computed(() => [
-  { label: t("conversations.filters.allAgents"), value: "" },
-  ...agents.value.map((agent) => ({ label: agent.name, value: agent.id })),
 ]);
 
 const timeframeOptions = computed(() => [
@@ -442,20 +428,6 @@ const getFullName = (user: any) => {
   return user.firstName || user.lastName || user.email || "Unknown";
 };
 
-const getInitials = (user: any) => {
-  if (!user) return "";
-  if (user.firstName && user.lastName) {
-    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
-  }
-  if (user.firstName) {
-    return user.firstName[0].toUpperCase();
-  }
-  if (user.email) {
-    return user.email[0].toUpperCase();
-  }
-  return "?";
-};
-
 // Wait time utilities imported from @/utils/conversation
 // - getWaitTime(conversation): Calculate wait time in seconds
 // - formatWaitTime(seconds): Format as "2m 30s"
@@ -487,20 +459,6 @@ const toggleConversationSelection = (id: string) => {
 
 const viewConversation = (id: string) => {
   router.push(`/conversations/${id}`);
-};
-
-const takeOverConversation = async (id: string) => {
-  const { takeover } = useConversationTakeover();
-  const success = await takeover(id);
-  if (success) {
-    // Refresh conversations list to show updated assigned user
-    await fetchConversations();
-  }
-};
-
-const showMoreActions = (id: string) => {
-  // TODO: Show more actions menu
-  console.log("Show more actions for conversation:", id);
 };
 
 const openPlayground = () => {

@@ -257,22 +257,24 @@ const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
 
   if (event.key === "ArrowUp") {
     event.preventDefault();
-    const totalItems = showSubmenu.value === "action"
-      ? props.mcpTools.length
-      : showSubmenu.value === "document"
-      ? props.documents.length
-      : props.items.length;
+    const totalItems =
+      showSubmenu.value === "action"
+        ? props.mcpTools.length
+        : showSubmenu.value === "document"
+          ? props.documents.length
+          : props.items.length;
     selectedIndex.value = (selectedIndex.value + totalItems - 1) % totalItems;
     return true;
   }
 
   if (event.key === "ArrowDown") {
     event.preventDefault();
-    const totalItems = showSubmenu.value === "action"
-      ? props.mcpTools.length
-      : showSubmenu.value === "document"
-      ? props.documents.length
-      : props.items.length;
+    const totalItems =
+      showSubmenu.value === "action"
+        ? props.mcpTools.length
+        : showSubmenu.value === "document"
+          ? props.documents.length
+          : props.items.length;
     selectedIndex.value = (selectedIndex.value + 1) % totalItems;
     return true;
   }

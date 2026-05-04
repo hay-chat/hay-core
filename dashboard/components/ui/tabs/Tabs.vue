@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { provide, ref, readonly, computed } from 'vue';
+import { provide, ref, readonly } from "vue";
 
 const props = defineProps<{
   modelValue?: string;
@@ -13,17 +13,17 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string];
+  "update:modelValue": [value: string];
 }>();
 
-const activeTab = ref(props.modelValue || props.defaultValue || '');
+const activeTab = ref(props.modelValue || props.defaultValue || "");
 
 const setActiveTab = (value: string) => {
   activeTab.value = value;
-  emit('update:modelValue', value);
+  emit("update:modelValue", value);
 };
 
-provide('tabs', {
+provide("tabs", {
   activeTab: readonly(activeTab),
   setActiveTab,
 });

@@ -14,9 +14,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         const oldRole: string = "owner";
         const newRole: string = "admin";
@@ -46,9 +44,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         const oldRole: string = "owner";
         const newRole: string = "admin";
@@ -75,9 +71,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         expect(ownerCount).toBe(1); // Only 1 active owner
       });
@@ -92,9 +86,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         // Changing admin to member doesn't affect owner count
         const oldRole: string = "admin";
@@ -117,9 +109,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         const memberToRemove = owners[0];
         const isLastOwner = memberToRemove.role === "owner" && ownerCount <= 1;
@@ -145,9 +135,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = owners.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = owners.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         const memberToRemove = owners[0];
         const isLastOwner = memberToRemove.role === "owner" && ownerCount <= 1;
@@ -172,9 +160,7 @@ describe("Organization Management", () => {
           } as UserOrganization,
         ];
 
-        const ownerCount = members.filter(
-          (uo) => uo.role === "owner" && uo.isActive,
-        ).length;
+        const ownerCount = members.filter((uo) => uo.role === "owner" && uo.isActive).length;
 
         const memberToRemove = members[1]; // Remove member, not owner
         const isLastOwner = memberToRemove.role === "owner" && ownerCount <= 1;
@@ -247,9 +233,7 @@ describe("Organization Management", () => {
         { role: "member", isActive: true } as UserOrganization,
       ];
 
-      const ownerCount = members.filter(
-        (m) => m.role === "owner" && m.isActive,
-      ).length;
+      const ownerCount = members.filter((m) => m.role === "owner" && m.isActive).length;
 
       expect(ownerCount).toBe(1);
     });
@@ -260,9 +244,7 @@ describe("Organization Management", () => {
         { role: "admin", isActive: true } as UserOrganization,
       ];
 
-      const ownerCount = members.filter(
-        (m) => m.role === "owner" && m.isActive,
-      ).length;
+      const ownerCount = members.filter((m) => m.role === "owner" && m.isActive).length;
 
       expect(ownerCount).toBe(0);
     });
@@ -270,9 +252,7 @@ describe("Organization Management", () => {
     it("should handle empty member list", () => {
       const members: UserOrganization[] = [];
 
-      const ownerCount = members.filter(
-        (m) => m.role === "owner" && m.isActive,
-      ).length;
+      const ownerCount = members.filter((m) => m.role === "owner" && m.isActive).length;
 
       expect(ownerCount).toBe(0);
     });
@@ -287,12 +267,7 @@ describe("Organization Management", () => {
       // 3. Audit log
       // All happen atomically
 
-      const operations = [
-        "countOwners",
-        "checkLastOwner",
-        "updateRole",
-        "logAudit",
-      ];
+      const operations = ["countOwners", "checkLastOwner", "updateRole", "logAudit"];
 
       // In a transaction, all operations should succeed or all should fail
       const allOrNothing = true;
@@ -321,12 +296,7 @@ describe("Organization Management", () => {
 
   describe("Permission Validation", () => {
     it("should validate custom permissions format", () => {
-      const validPermissions = [
-        "conversations:read",
-        "documents:create",
-        "agents:*",
-        "*:read",
-      ];
+      const validPermissions = ["conversations:read", "documents:create", "agents:*", "*:read"];
 
       const isValid = (perm: string) => {
         const parts = perm.split(":");

@@ -1,3 +1,32 @@
+<template>
+  <SelectPortal>
+    <SelectContent
+      v-bind="{ ...forwarded, ...$attrs }"
+      :class="
+        cn(
+          'relative z-50 min-w-32 overflow-y-auto rounded-md border border-input bg-background shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          position === 'popper' &&
+            'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
+          props.class,
+        )
+      "
+      style="max-height: min(24rem, calc(100vh - var(--dropdown-top, 100px) - 16px))"
+    >
+      <SelectViewport
+        :class="
+          cn(
+            'p-1',
+            position === 'popper' &&
+              'h-[--reka-select-trigger-height] w-full min-w-[--reka-select-trigger-width]',
+          )
+        "
+      >
+        <slot />
+      </SelectViewport>
+    </SelectContent>
+  </SelectPortal>
+</template>
+
 <script setup lang="ts">
 import type { SelectContentEmits, SelectContentProps } from "reka-ui";
 import type { HTMLAttributes } from "vue";
@@ -29,11 +58,11 @@ const updatePosition = () => {
 
   // Get the actual DOM element (contentRef might be a component wrapper)
   const el = (contentRef.value as any)?.$el || contentRef.value;
-  if (!el || typeof el.getBoundingClientRect !== 'function') return;
+  if (!el || typeof el.getBoundingClientRect !== "function") return;
 
   const rect = el.getBoundingClientRect();
   // Set CSS variable with the top position
-  el.style.setProperty('--dropdown-top', `${rect.top}px`);
+  el.style.setProperty("--dropdown-top", `${rect.top}px`);
 };
 
 onMounted(() => {
@@ -44,8 +73,8 @@ onMounted(() => {
 
   if (contentRef.value) {
     const el = (contentRef.value as any)?.$el || contentRef.value;
-    if (el && typeof el.observe !== 'undefined') {
-      observer.observe(el, { attributes: true, attributeFilter: ['style'] });
+    if (el && typeof el.observe !== "undefined") {
+      observer.observe(el, { attributes: true, attributeFilter: ["style"] });
       // Initial update
       setTimeout(updatePosition, 0);
     }
@@ -54,32 +83,3 @@ onMounted(() => {
   onBeforeUnmount(() => observer.disconnect());
 });
 </script>
-
-<template>
-  <SelectPortal>
-    <SelectContent
-      v-bind="{ ...forwarded, ...$attrs }"
-      :class="
-        cn(
-          'relative z-50 min-w-32 overflow-y-auto rounded-md border border-input bg-background shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
-          position === 'popper' &&
-            'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
-          props.class,
-        )
-      "
-      style="max-height: min(24rem, calc(100vh - var(--dropdown-top, 100px) - 16px))"
-    >
-      <SelectViewport
-        :class="
-          cn(
-            'p-1',
-            position === 'popper' &&
-              'h-[--reka-select-trigger-height] w-full min-w-[--reka-select-trigger-width]',
-          )
-        "
-      >
-        <slot />
-      </SelectViewport>
-    </SelectContent>
-  </SelectPortal>
-</template>

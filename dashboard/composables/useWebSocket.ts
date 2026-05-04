@@ -106,7 +106,7 @@ export function useWebSocket() {
         try {
           console.log(`[Dashboard WebSocket] Calling handler for ${message.type}`);
           // For 'message' events, the payload is in message.data, for others it's in message.payload
-          const payload = message.type === 'message' ? message : message.payload;
+          const payload = message.type === "message" ? message : message.payload;
           handler(payload);
         } catch (error) {
           console.error(`[Dashboard WebSocket] Handler error for ${message.type}:`, error);
@@ -230,7 +230,10 @@ export function useWebSocket() {
       eventHandlers.set(eventType, new Set());
     }
     eventHandlers.get(eventType)!.add(handler);
-    console.log(`[Dashboard WebSocket] Total handlers for ${eventType}:`, eventHandlers.get(eventType)!.size);
+    console.log(
+      `[Dashboard WebSocket] Total handlers for ${eventType}:`,
+      eventHandlers.get(eventType)!.size,
+    );
 
     // Return unsubscribe function
     return () => {

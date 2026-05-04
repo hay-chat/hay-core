@@ -72,17 +72,11 @@ const isAdmin = t.middleware(async ({ ctx, next }) => {
   if (!ctx.user.hasScope("*", "*")) {
     // Log permission denial
     try {
-      await auditLogService.logPermissionDenied(
-        ctx.user.id,
-        ctx.organizationId || "",
-        "*",
-        "*",
-        {
-          userRole: ctx.user.getRole(),
-          requestedResource: "*",
-          requestedAction: "*",
-        }
-      );
+      await auditLogService.logPermissionDenied(ctx.user.id, ctx.organizationId || "", "*", "*", {
+        userRole: ctx.user.getRole(),
+        requestedResource: "*",
+        requestedAction: "*",
+      });
     } catch (error) {
       logger.error({ err: error }, "Failed to log permission denial");
     }
@@ -125,7 +119,7 @@ const hasScope = (resource: string, action: string) => {
             userRole: ctx.user.getRole(),
             requestedResource: resource,
             requestedAction: action,
-          }
+          },
         );
       } catch (error) {
         logger.error({ err: error }, "Failed to log permission denial");

@@ -95,7 +95,7 @@ export class MessageService {
   shouldRequireApproval(
     sourceId: string,
     agent: Agent | null,
-    organization: Organization
+    organization: Organization,
   ): boolean {
     // Playground always bypasses approval
     if (sourceId === "playground") {
@@ -125,7 +125,7 @@ export class MessageService {
     agent: Agent | null,
     organization: Organization,
     metadata: Record<string, unknown> = {},
-    usageMetadata: Record<string, unknown> | null = null
+    usageMetadata: Record<string, unknown> | null = null,
   ): Promise<Message> {
     const reviewRequired = this.shouldRequireApproval(sourceId, agent, organization);
     const deliveryState = this.getDeliveryState(reviewRequired);
