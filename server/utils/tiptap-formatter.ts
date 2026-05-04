@@ -271,9 +271,7 @@ export function analyzeTiptapInstructions(
  * @param instructions - Instructions in Tiptap format or null
  * @returns Formatted markdown string ready for display
  */
-export function formatTiptapInstructions(
-  instructions: TiptapDocument | null | undefined,
-): string {
+export function formatTiptapInstructions(instructions: TiptapDocument | null | undefined): string {
   if (!instructions) {
     return "No specific instructions provided.";
   }

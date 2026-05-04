@@ -330,7 +330,7 @@
           v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
           class="border-t p-4 bg-background"
         >
-          <form @submit.prevent="sendMessage" class="flex space-x-3">
+          <form class="flex space-x-3" @submit.prevent="sendMessage">
             <Input
               v-model="newMessage"
               :placeholder="
@@ -355,7 +355,7 @@
       </div>
 
       <!-- Right Side: Context Panel -->
-      <div class="w-80 border-l bg-background-tertiary">
+      <div class="w-80 border-l bg-background-tertiary overflow-y-auto">
         <div class="p-6 space-y-6">
           <!-- Playground Mode Panels -->
           <template v-if="isPlaygroundMode">
@@ -567,8 +567,8 @@
                   </div>
                   <Switch
                     :model-value="conversation?.legal_hold ?? false"
-                    @update:model-value="toggleLegalHold"
                     :disabled="isUpdatingLegalHold"
+                    @update:model-value="toggleLegalHold"
                   />
                 </div>
                 <p v-if="conversation?.legal_hold" class="text-xs text-amber-600">
@@ -607,27 +607,25 @@
               </CardContent>
             </Card>
 
-            <!-- Knowledge Base Articles -->
+            <!-- Related Documents -->
             <Card>
               <CardHeader>
                 <CardTitle class="text-base">
-                  {{ $t("conversations.relatedArticles.title") }}
+                  {{ $t("conversations.relatedDocuments.title") }}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div class="space-y-2">
-                  <div
-                    v-for="article in relatedArticles"
+                  <NuxtLink
+                    v-for="article in relatedDocuments"
                     :key="article.id"
-                    class="p-2 border rounded text-sm hover:bg-background-secondary cursor-pointer"
+                    :to="`/documents/${article.id}`"
+                    class="block p-2 border rounded text-sm hover:bg-background-secondary"
                   >
-                    <div class="font-medium">
+                    <div class="font-medium truncate">
                       {{ article.title }}
                     </div>
-                    <div class="text-xs text-neutral-muted">
-                      {{ article.category || $t("conversations.relatedArticles.defaultCategory") }}
-                    </div>
-                  </div>
+                  </NuxtLink>
                 </div>
               </CardContent>
             </Card>
@@ -711,10 +709,6 @@ import {
   Send,
   AlertTriangle,
   AlertCircle,
-  Star,
-  Ticket,
-  Mail,
-  Phone,
   Circle,
   CheckCircle,
   XCircle,
@@ -741,34 +735,6 @@ import { MessageType } from "~/types/message";
 const { t } = useI18n();
 const { formatDateTime } = useOrgDateTime();
 
-interface Message {
-  id: string;
-  type: MessageType | string;
-  content: string;
-  metadata?: Record<string, unknown> | null;
-  needsApproval?: boolean;
-  created_at: string;
-  conversation_id: string;
-  updated_at: string;
-  status: string;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-}
-
-interface ConversationData {
-  id: string;
-  title?: string | null;
-  status: string;
-  cooldown_until?: string | null;
-  created_at: string;
-  updated_at: string;
-  messages?: Message[];
-  agent?: Agent;
-}
-
 interface PreviousConversation {
   id: string;
   title: string;
@@ -778,7 +744,7 @@ interface PreviousConversation {
   status?: string;
 }
 
-interface RelatedArticle {
+interface RelatedDocument {
   id: string;
   title: string;
   url: string;
@@ -818,7 +784,7 @@ const messages = ref<any[]>([]);
 const conversation = ref<any>(null);
 
 const previousConversations = ref<PreviousConversation[]>([]);
-const relatedArticles = ref<RelatedArticle[]>([]);
+const relatedDocuments = ref<RelatedDocument[]>([]);
 
 // Takeover state
 const { useUserStore } = await import("@/stores/user");
@@ -1004,21 +970,6 @@ const formatStatus = (status: string | undefined) => {
   };
   return keys[status] ? t(keys[status]) : status;
 };
-
-const formatCountdown = (cooldownUntil: Date | string) => {
-  const target = new Date(cooldownUntil);
-  const now = new Date();
-  const seconds = Math.floor((target.getTime() - now.getTime()) / 1000);
-
-  if (seconds <= 0) return "0s";
-  if (seconds < 60) return `${seconds}s`;
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
-};
-
-// formatDuration function removed - was unused
 
 const toggleSupervisionMode = () => {
   supervisionMode.value = !supervisionMode.value;
@@ -1219,25 +1170,6 @@ const retryMessage = async (messageId: string) => {
   await sendMessage();
 };
 
-const approveMessage = (messageId: string) => {
-  // TODO: Approve agent message
-  console.log("Approve message:", messageId);
-  // const message = conversation.value.messages.find((m) => m.id === messageId);
-  // if (message) {
-  //   message.needsApproval = false;
-  // }
-};
-
-const editMessage = (messageId: string) => {
-  // TODO: Open message editor
-  console.log("Edit message:", messageId);
-};
-
-const rejectMessage = (messageId: string) => {
-  // TODO: Reject agent message
-  console.log("Reject message:", messageId);
-};
-
 const exportConversation = async (format: "pdf" | "csv") => {
   if (!conversation.value?.id) return;
 
@@ -1318,6 +1250,28 @@ const fetchConversation = async () => {
     previousMessageCount.value = currentMessageCount;
 
     conversation.value = result;
+
+    // Populate related articles from conversation's linked documents
+    const documentIds = (result as any).document_ids as string[] | null | undefined;
+    if (documentIds && documentIds.length > 0) {
+      try {
+        const docs = await Promise.all(
+          documentIds.map((id) => HayApi.documents.getById.query({ id })),
+        );
+        relatedDocuments.value = docs.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          url: doc.sourceUrl || "",
+          snippet: doc.description || "",
+          category: doc.categories?.[0],
+        }));
+      } catch (err) {
+        console.error("Failed to fetch related documents:", err);
+        relatedDocuments.value = [];
+      }
+    } else {
+      relatedDocuments.value = [];
+    }
 
     // Playground mode: Transform messages for display
     if (isPlaygroundMode.value) {

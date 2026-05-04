@@ -29,7 +29,9 @@ export class CreateUploadEntityAndUpdateOrganization1763216000000 implements Mig
     // Create indexes
     await queryRunner.query(`CREATE INDEX "idx_uploads_created_at" ON "uploads" ("created_at")`);
     await queryRunner.query(`CREATE INDEX "idx_uploads_folder" ON "uploads" ("folder")`);
-    await queryRunner.query(`CREATE INDEX "idx_uploads_organization_id" ON "uploads" ("organization_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "idx_uploads_organization_id" ON "uploads" ("organization_id")`,
+    );
 
     // Add foreign key constraints
     await queryRunner.query(`
@@ -60,10 +62,18 @@ export class CreateUploadEntityAndUpdateOrganization1763216000000 implements Mig
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove foreign key constraints
-    await queryRunner.query(`ALTER TABLE "organizations" DROP CONSTRAINT IF EXISTS "FK_organizations_logo_upload"`);
-    await queryRunner.query(`ALTER TABLE "organizations" DROP CONSTRAINT IF EXISTS "UQ_organizations_logo_upload_id"`);
-    await queryRunner.query(`ALTER TABLE "uploads" DROP CONSTRAINT IF EXISTS "FK_uploads_uploaded_by"`);
-    await queryRunner.query(`ALTER TABLE "uploads" DROP CONSTRAINT IF EXISTS "FK_uploads_organization"`);
+    await queryRunner.query(
+      `ALTER TABLE "organizations" DROP CONSTRAINT IF EXISTS "FK_organizations_logo_upload"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "organizations" DROP CONSTRAINT IF EXISTS "UQ_organizations_logo_upload_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "uploads" DROP CONSTRAINT IF EXISTS "FK_uploads_uploaded_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "uploads" DROP CONSTRAINT IF EXISTS "FK_uploads_organization"`,
+    );
 
     // Remove logo_upload_id column and restore logo column
     await queryRunner.query(`ALTER TABLE "organizations" DROP COLUMN "logo_upload_id"`);

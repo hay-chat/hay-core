@@ -32,7 +32,9 @@
     <template v-else>
       <!-- Suggested documents -->
       <div v-if="suggestedDocuments.length > 0" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">{{ $t("wizard.documents.suggestedTitle") }}</p>
+        <p class="text-sm font-medium text-foreground">
+          {{ $t("wizard.documents.suggestedTitle") }}
+        </p>
         <p class="text-xs text-neutral-muted">{{ $t("wizard.documents.suggestedHint") }}</p>
         <div class="grid grid-cols-1 gap-2">
           <div v-for="doc in suggestedDocuments" :key="doc.id" class="flex items-center gap-1">
@@ -54,7 +56,9 @@
 
       <!-- All documents -->
       <div v-if="remainingDocuments.length > 0" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">{{ $t("wizard.documents.allDocumentsTitle") }}</p>
+        <p class="text-sm font-medium text-foreground">
+          {{ $t("wizard.documents.allDocumentsTitle") }}
+        </p>
         <Input
           v-if="remainingDocuments.length > 5"
           v-model="searchQuery"

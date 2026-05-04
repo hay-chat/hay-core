@@ -317,7 +317,6 @@
 import { ref, onMounted } from "vue";
 import {
   UserPlus,
-  User,
   MoreVertical,
   Shield,
   Trash2,

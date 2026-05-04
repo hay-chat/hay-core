@@ -1,6 +1,6 @@
 export function markdownToHtml(markdown: string): string {
   // Basic markdown to HTML conversion
-  let html = markdown;
+  let html = markdown.replace(/\s+$/, "");
 
   // Escape HTML entities first (for security)
   html = html.replace(/&/g, "&amp;");

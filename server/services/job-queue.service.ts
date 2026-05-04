@@ -59,11 +59,14 @@ export class JobQueueService {
    * Handle incoming job update from Redis
    */
   private handleJobUpdate(event: any): void {
-    logger.debug({
-      jobId: event.jobId,
-      status: event.status,
-      hasProgress: !!event.progress,
-    }, "Job update received");
+    logger.debug(
+      {
+        jobId: event.jobId,
+        status: event.status,
+        hasProgress: !!event.progress,
+      },
+      "Job update received",
+    );
   }
 
   /**

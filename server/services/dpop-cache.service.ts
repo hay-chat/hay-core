@@ -34,7 +34,10 @@ export class DPoPCacheService {
    * Verify and rotate a nonce for a conversation
    * Returns the new nonce if verification succeeds, null otherwise
    */
-  async verifyAndRotateNonce(conversationId: string, providedNonce: string): Promise<string | null> {
+  async verifyAndRotateNonce(
+    conversationId: string,
+    providedNonce: string,
+  ): Promise<string | null> {
     const key = `${this.NONCE_PREFIX}${conversationId}`;
     const stored = this.nonces.get(key);
 

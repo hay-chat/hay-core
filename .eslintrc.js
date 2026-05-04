@@ -54,6 +54,17 @@ module.exports = {
       extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended", "prettier"],
       plugins: ["vue"],
       rules: {
+        // Match base config: any is allowed but discouraged (consistent with server files)
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          {
+            argsIgnorePattern: "^_",
+            varsIgnorePattern: "^_",
+            caughtErrorsIgnorePattern: "^_",
+          },
+        ],
+
         // Disable ALL Vue formatting rules - let Prettier handle formatting
         "vue/max-attributes-per-line": "off",
         "vue/first-attribute-linebreak": "off",
@@ -192,6 +203,11 @@ module.exports = {
         defineI18nRoute: "readonly",
         // Global utilities
         $fetch: "readonly",
+        // Project composables (auto-imported by Nuxt from dashboard/composables)
+        useOrgDateTime: "readonly",
+        useToast: "readonly",
+        // Node.js types
+        NodeJS: "readonly",
       },
     },
     // TypeScript files in dashboard

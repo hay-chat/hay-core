@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue';
+import { ref, onUnmounted } from "vue";
 
 interface Message {
   id: string;
@@ -40,7 +40,7 @@ export function useMessageSync(options: SyncOptions) {
 
     try {
       isSyncing.value = true;
-      console.log('[Dashboard MessageSync] Starting sync for conversation:', conversationId);
+      console.log("[Dashboard MessageSync] Starting sync for conversation:", conversationId);
 
       // Fetch messages from server
       const serverMessages = await fetchMessages();
@@ -61,8 +61,7 @@ export function useMessageSync(options: SyncOptions) {
         );
         // Merge missing messages into current messages, maintaining chronological order
         const merged = [...currentMessages, ...missingMessages].sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
         onMessagesUpdated(merged);
       }
@@ -76,9 +75,9 @@ export function useMessageSync(options: SyncOptions) {
       }
 
       lastSyncTime.value = Date.now();
-      console.log('[Dashboard MessageSync] Sync completed successfully');
+      console.log("[Dashboard MessageSync] Sync completed successfully");
     } catch (error) {
-      console.error('[Dashboard MessageSync] Sync failed:', error);
+      console.error("[Dashboard MessageSync] Sync failed:", error);
     } finally {
       isSyncing.value = false;
     }
@@ -100,7 +99,7 @@ export function useMessageSync(options: SyncOptions) {
     if (syncTimer) {
       clearInterval(syncTimer);
       syncTimer = null;
-      console.log('[Dashboard MessageSync] Periodic sync stopped');
+      console.log("[Dashboard MessageSync] Periodic sync stopped");
     }
   };
 

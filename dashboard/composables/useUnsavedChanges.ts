@@ -13,7 +13,7 @@ import { useRouter } from "vue-router";
 export function useUnsavedChanges<T>(
   initialData: Ref<T>,
   currentData: Ref<T>,
-  enabled: Ref<boolean> = ref(true)
+  enabled: Ref<boolean> = ref(true),
 ) {
   const router = useRouter();
   const hasUnsavedChanges = ref(false);
@@ -38,7 +38,7 @@ export function useUnsavedChanges<T>(
     () => {
       hasUnsavedChanges.value = hasChanges();
     },
-    { deep: true }
+    { deep: true },
   );
 
   // Browser beforeunload event handler

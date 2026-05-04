@@ -23,11 +23,7 @@ interface AuthenticatedRequest extends Request {
   pluginAuth?: PluginAPITokenPayload;
 }
 
-const authenticatePlugin = (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-): void => {
+const authenticatePlugin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -50,7 +46,10 @@ const authenticatePlugin = (
   }
 
   req.pluginAuth = payload;
-  logger.debug({ pluginId: payload.pluginId, organizationId: payload.organizationId }, "Plugin API auth token validated");
+  logger.debug(
+    { pluginId: payload.pluginId, organizationId: payload.organizationId },
+    "Plugin API auth token validated",
+  );
   next();
 };
 
@@ -62,99 +61,97 @@ const authenticatePlugin = (
  * - Valid JWT token in Authorization header
  * - Plugin must have "email" capability
  */
-router.post(
-  "/send-email",
-  authenticatePlugin,
-  async (req: AuthenticatedRequest, res: Response) => {
-    const pluginAuth = req.pluginAuth!; // Safe because authenticatePlugin middleware guarantees this
-    const emailRequest = req.body as SendEmailHttpRequest;
+router.post("/send-email", authenticatePlugin, async (req: AuthenticatedRequest, res: Response) => {
+  const pluginAuth = req.pluginAuth!; // Safe because authenticatePlugin middleware guarantees this
+  const emailRequest = req.body as SendEmailHttpRequest;
 
-    // Validate request body
-    if (!emailRequest.subject) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: subject",
-      } as PluginAPIHttpResponse);
-    }
+  // Validate request body
+  if (!emailRequest.subject) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing required field: subject",
+    } as PluginAPIHttpResponse);
+  }
 
-    if (!emailRequest.body && !emailRequest.html) {
-      return res.status(400).json({
-        success: false,
-        error: "Must provide either body (text) or html",
-      } as PluginAPIHttpResponse);
-    }
+  if (!emailRequest.body && !emailRequest.html) {
+    return res.status(400).json({
+      success: false,
+      error: "Must provide either body (text) or html",
+    } as PluginAPIHttpResponse);
+  }
 
-    try {
-      logger.debug({
+  try {
+    logger.debug(
+      {
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
         subject: emailRequest.subject,
         hasTo: !!emailRequest.to,
         hasText: !!emailRequest.body,
         hasHtml: !!emailRequest.html,
-      }, "Received send-email request");
+      },
+      "Received send-email request",
+    );
 
-      // Call service to send email
-      const result = await pluginAPIService.sendEmail(pluginAuth, {
-        to: emailRequest.to,
-        subject: emailRequest.subject,
-        text: emailRequest.body,
-        html: emailRequest.html,
-        cc: emailRequest.cc,
-        bcc: emailRequest.bcc,
-      });
+    // Call service to send email
+    const result = await pluginAPIService.sendEmail(pluginAuth, {
+      to: emailRequest.to,
+      subject: emailRequest.subject,
+      text: emailRequest.body,
+      html: emailRequest.html,
+      cc: emailRequest.cc,
+      bcc: emailRequest.bcc,
+    });
 
-      if (!result.success) {
-        return res.status(500).json({
-          success: false,
-          error: result.error || "Failed to send email",
-        } as PluginAPIHttpResponse);
-      }
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || "Failed to send email",
+      } as PluginAPIHttpResponse);
+    }
 
-      return res.status(200).json({
-        success: true,
-        data: {
-          messageId: result.messageId,
-          recipients: Array.isArray(emailRequest.to)
-            ? emailRequest.to
-            : emailRequest.to
-              ? [emailRequest.to]
-              : [],
-        } as SendEmailHttpResponse,
-      } as PluginAPIHttpResponse<SendEmailHttpResponse>);
-    } catch (error) {
-      logger.error({
+    return res.status(200).json({
+      success: true,
+      data: {
+        messageId: result.messageId,
+        recipients: Array.isArray(emailRequest.to)
+          ? emailRequest.to
+          : emailRequest.to
+            ? [emailRequest.to]
+            : [],
+      } as SendEmailHttpResponse,
+    } as PluginAPIHttpResponse<SendEmailHttpResponse>);
+  } catch (error) {
+    logger.error(
+      {
         err: error,
         pluginId: pluginAuth.pluginId,
         organizationId: pluginAuth.organizationId,
-      }, "Error in send-email endpoint");
+      },
+      "Error in send-email endpoint",
+    );
 
-      return res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Internal server error",
-      } as PluginAPIHttpResponse);
-    }
-  },
-);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Internal server error",
+    } as PluginAPIHttpResponse);
+  }
+});
 
 /**
  * GET /v1/plugin-api/health
  * Health check endpoint for plugins to verify API connectivity
  */
-router.get(
-  "/health",
-  authenticatePlugin,
-  (req: AuthenticatedRequest, res: Response) => {
-    res.status(200).json({
-      success: true,
-      data: {
-        pluginId: req.pluginAuth!.pluginId,
-        organizationId: req.pluginAuth!.organizationId,
-        capabilities: req.pluginAuth!.capabilities,
-      },
-    } as PluginAPIHttpResponse);
-  },
-);
+router.get("/health", authenticatePlugin, (req: AuthenticatedRequest, res: Response) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      pluginId: req.pluginAuth!.pluginId,
+      organizationId: req.pluginAuth!.organizationId,
+      capabilities: req.pluginAuth!.capabilities,
+    },
+  } as PluginAPIHttpResponse);
+});
 
 /**
  * POST /v1/plugin-api/mcp/register-local
@@ -178,7 +175,8 @@ router.post(
       } as PluginAPIHttpResponse);
     }
 
-    const { serverPath, startCommand, installCommand, buildCommand, tools, env, serverId } = req.body;
+    const { serverPath, startCommand, installCommand, buildCommand, tools, env, serverId } =
+      req.body;
 
     // Validate required fields (tools is optional - will be discovered from MCP server)
     if (!serverPath || !startCommand) {
@@ -201,13 +199,16 @@ router.post(
       const pluginId = pluginAuth.pluginId;
       const finalServerId = serverId || `mcp-${Date.now()}`;
 
-      logger.debug({
-        organizationId,
-        pluginId,
-        serverId: finalServerId,
-        toolCount: tools?.length || 0,
-        toolsProvided: !!tools,
-      }, "Registering local MCP server");
+      logger.debug(
+        {
+          organizationId,
+          pluginId,
+          serverId: finalServerId,
+          toolCount: tools?.length || 0,
+          toolsProvided: !!tools,
+        },
+        "Registering local MCP server",
+      );
 
       // Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -254,12 +255,15 @@ router.post(
         await mcpRegistryService.registerTools(organizationId, pluginId, finalServerId, tools);
       }
 
-      logger.info({
-        organizationId,
-        pluginId,
-        serverId: finalServerId,
-        toolsRegistered: tools.length,
-      }, "Local MCP server registered successfully");
+      logger.info(
+        {
+          organizationId,
+          pluginId,
+          serverId: finalServerId,
+          toolsRegistered: tools.length,
+        },
+        "Local MCP server registered successfully",
+      );
 
       return res.status(200).json({
         success: true,
@@ -269,11 +273,14 @@ router.post(
         },
       } as PluginAPIHttpResponse);
     } catch (error) {
-      logger.error({
-        err: error,
-        pluginId: pluginAuth.pluginId,
-        organizationId: pluginAuth.organizationId,
-      }, "Error registering local MCP server");
+      logger.error(
+        {
+          err: error,
+          pluginId: pluginAuth.pluginId,
+          organizationId: pluginAuth.organizationId,
+        },
+        "Error registering local MCP server",
+      );
 
       return res.status(500).json({
         success: false,
@@ -328,16 +335,19 @@ router.post(
       const pluginId = pluginAuth.pluginId;
       const finalServerId = serverId || `mcp-remote-${Date.now()}`;
 
-      logger.debug({
-        organizationId,
-        pluginId,
-        serverId: finalServerId,
-        url,
-        transport,
-        hasAuth: !!auth,
-        toolCount: tools?.length || 0,
-        toolsProvided: !!tools,
-      }, "Registering remote MCP server");
+      logger.debug(
+        {
+          organizationId,
+          pluginId,
+          serverId: finalServerId,
+          url,
+          transport,
+          hasAuth: !!auth,
+          toolCount: tools?.length || 0,
+          toolsProvided: !!tools,
+        },
+        "Registering remote MCP server",
+      );
 
       // Get plugin instance
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -386,12 +396,15 @@ router.post(
         logger.debug("No tools provided - will be discovered from MCP server");
       }
 
-      logger.info({
-        organizationId,
-        pluginId,
-        serverId: finalServerId,
-        toolsRegistered: tools?.length || 0,
-      }, "Remote MCP server registered successfully");
+      logger.info(
+        {
+          organizationId,
+          pluginId,
+          serverId: finalServerId,
+          toolsRegistered: tools?.length || 0,
+        },
+        "Remote MCP server registered successfully",
+      );
 
       return res.status(200).json({
         success: true,
@@ -401,11 +414,14 @@ router.post(
         },
       } as PluginAPIHttpResponse);
     } catch (error) {
-      logger.error({
-        err: error,
-        pluginId: pluginAuth.pluginId,
-        organizationId: pluginAuth.organizationId,
-      }, "Error registering remote MCP server");
+      logger.error(
+        {
+          err: error,
+          pluginId: pluginAuth.pluginId,
+          organizationId: pluginAuth.organizationId,
+        },
+        "Error registering remote MCP server",
+      );
 
       return res.status(500).json({
         success: false,

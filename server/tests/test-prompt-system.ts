@@ -4,10 +4,10 @@ import { VariableEngine } from "../utils/variable-engine";
 import { PromptParser } from "../utils/prompt-parser";
 
 // Test colors for console output
-const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
-const RESET = '\x1b[0m';
-const BLUE = '\x1b[34m';
+const GREEN = "\x1b[32m";
+const RED = "\x1b[31m";
+const RESET = "\x1b[0m";
+const BLUE = "\x1b[34m";
 
 async function testPromptSystem() {
   console.log(`${BLUE}🧪 Testing Prompt Management System${RESET}\n`);
@@ -75,7 +75,7 @@ async function testPromptSystem() {
   console.log("Test 5: Nested Object Access");
   const template5 = "User: {{user.name}} ({{user.email}})";
   const result5 = VariableEngine.render(template5, {
-    user: { name: "Bob", email: "bob@example.com" }
+    user: { name: "Bob", email: "bob@example.com" },
   });
   const expected5 = "User: Bob (bob@example.com)";
   if (result5 === expected5) {
@@ -135,10 +135,10 @@ Status: {{status|default:"Active"}}
   const complexResult = VariableEngine.render(complexTemplate, {
     user: { name: "Charlie" },
     messages: ["Welcome!", "Check your settings"],
-    status: "Premium"
+    status: "Premium",
   });
 
-  const hasExpectedContent = 
+  const hasExpectedContent =
     complexResult.includes("Hello Charlie") &&
     complexResult.includes("You have 2 new messages") &&
     complexResult.includes("Welcome!") &&
@@ -163,9 +163,11 @@ Status: {{status|default:"Active"}}
     console.log(`${RED}Failed: ${failedTests}${RESET}`);
   }
   console.log(`Total: ${passedTests + failedTests}`);
-  
+
   if (failedTests === 0) {
-    console.log(`\n${GREEN}✨ All tests passed! The prompt management system is working correctly.${RESET}`);
+    console.log(
+      `\n${GREEN}✨ All tests passed! The prompt management system is working correctly.${RESET}`,
+    );
   } else {
     console.log(`\n${RED}⚠️ Some tests failed. Please check the implementation.${RESET}`);
     process.exit(1);
@@ -173,7 +175,7 @@ Status: {{status|default:"Active"}}
 }
 
 // Run tests
-testPromptSystem().catch(error => {
+testPromptSystem().catch((error) => {
   console.error(`${RED}Error running tests:${RESET}`, error);
   process.exit(1);
 });

@@ -28,8 +28,8 @@
       </p>
 
       <div class="flex flex-col gap-2 pt-4">
-        <Button @click="goToProfile" class="w-full"> Go to Profile </Button>
-        <Button @click="goToLogin" variant="outline" class="w-full"> Go to Login </Button>
+        <Button class="w-full" @click="goToProfile"> Go to Profile </Button>
+        <Button variant="outline" class="w-full" @click="goToLogin"> Go to Login </Button>
       </div>
     </div>
 
@@ -46,8 +46,8 @@
       </p>
 
       <div class="flex flex-col gap-2 pt-4">
-        <Button @click="goToProfile" class="w-full"> Go to Profile </Button>
-        <Button @click="retry" variant="outline" class="w-full" v-if="token"> Try Again </Button>
+        <Button class="w-full" @click="goToProfile"> Go to Profile </Button>
+        <Button v-if="token" variant="outline" class="w-full" @click="retry"> Try Again </Button>
       </div>
     </div>
 
@@ -59,7 +59,7 @@
         </AlertDescription>
       </Alert>
 
-      <Button @click="goToProfile" class="w-full"> Go to Profile </Button>
+      <Button class="w-full" @click="goToProfile"> Go to Profile </Button>
     </div>
   </CardContent>
 
@@ -163,7 +163,7 @@ const verifyEmail = async () => {
           ...userData,
           lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
           lastLoginAt: userData.lastLoginAt ? new Date(userData.lastLoginAt) : undefined,
-          organizations: userData.organizations?.map(org => ({
+          organizations: userData.organizations?.map((org) => ({
             ...org,
             joinedAt: org.joinedAt ? new Date(org.joinedAt) : undefined,
             lastAccessedAt: org.lastAccessedAt ? new Date(org.lastAccessedAt) : undefined,

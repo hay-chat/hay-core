@@ -54,7 +54,7 @@ export class AuditLogService {
   async logProfileUpdate(
     userId: string,
     changes: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -73,7 +73,7 @@ export class AuditLogService {
     userId: string,
     oldEmail: string,
     newEmail: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -91,10 +91,7 @@ export class AuditLogService {
   /**
    * Log password change
    */
-  async logPasswordChange(
-    userId: string,
-    metadata?: Record<string, any>
-  ): Promise<AuditLog> {
+  async logPasswordChange(userId: string, metadata?: Record<string, any>): Promise<AuditLog> {
     return this.log({
       userId,
       action: "password.change",
@@ -111,7 +108,7 @@ export class AuditLogService {
     userId: string,
     ipAddress?: string,
     userAgent?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -131,7 +128,7 @@ export class AuditLogService {
     userId: string,
     ipAddress?: string,
     userAgent?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -151,7 +148,7 @@ export class AuditLogService {
     userId: string,
     ipAddress?: string,
     userAgent?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -171,7 +168,7 @@ export class AuditLogService {
     email: string,
     ipAddress?: string,
     userAgent?: string,
-    errorMessage?: string
+    errorMessage?: string,
   ): Promise<AuditLog | null> {
     try {
       // Try to find user by email
@@ -261,10 +258,7 @@ export class AuditLogService {
   /**
    * Get recent security events for a user
    */
-  async getRecentSecurityEvents(
-    userId: string,
-    limit: number = 10
-  ): Promise<AuditLog[]> {
+  async getRecentSecurityEvents(userId: string, limit: number = 10): Promise<AuditLog[]> {
     const { logs } = await this.getLogs({
       userId,
       limit,
@@ -272,8 +266,8 @@ export class AuditLogService {
 
     return logs.filter((log) =>
       ["email.change", "password.change", "user.login", "apikey.create", "apikey.revoke"].includes(
-        log.action
-      )
+        log.action,
+      ),
     );
   }
 
@@ -301,7 +295,7 @@ export class AuditLogService {
     organizationId: string,
     invitedEmail: string,
     role: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -324,7 +318,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     role: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -345,7 +339,7 @@ export class AuditLogService {
   async logInvitationDecline(
     userId: string,
     organizationId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -364,7 +358,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     invitedEmail: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -386,7 +380,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     invitedEmail: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -410,7 +404,7 @@ export class AuditLogService {
     targetUserId: string,
     oldRole: string,
     newRole: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -435,7 +429,7 @@ export class AuditLogService {
     organizationId: string,
     removedUserId: string,
     removedUserEmail: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -458,7 +452,7 @@ export class AuditLogService {
     userId: string,
     fromOrganizationId: string | null,
     toOrganizationId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -477,7 +471,7 @@ export class AuditLogService {
   async logOrganizationCreated(
     userId: string,
     organizationId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -500,7 +494,7 @@ export class AuditLogService {
     organizationId: string,
     agentId: string,
     data: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -524,7 +518,7 @@ export class AuditLogService {
     organizationId: string,
     agentId: string,
     changes: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -547,7 +541,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     agentId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -570,7 +564,7 @@ export class AuditLogService {
     organizationId: string,
     playbookId: string,
     data: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -594,7 +588,7 @@ export class AuditLogService {
     organizationId: string,
     playbookId: string,
     changes: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -617,7 +611,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     playbookId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -639,7 +633,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     playbookId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -663,7 +657,7 @@ export class AuditLogService {
     organizationId: string,
     documentId: string,
     data: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -687,7 +681,7 @@ export class AuditLogService {
     organizationId: string,
     documentId: string,
     changes: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -710,7 +704,7 @@ export class AuditLogService {
     userId: string,
     organizationId: string,
     documentId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -733,7 +727,7 @@ export class AuditLogService {
     organizationId: string,
     resource: string,
     action: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<AuditLog> {
     return this.log({
       userId,

@@ -53,7 +53,7 @@
       </CardContent>
 
       <CardFooter v-if="connectionStatus === 'connected'">
-        <form @submit.prevent="sendMessage" class="flex w-full gap-2">
+        <form class="flex w-full gap-2" @submit.prevent="sendMessage">
           <Input
             v-model="messageInput"
             placeholder="Type your message..."
@@ -268,7 +268,7 @@ async function sendMessage() {
   try {
     isSending.value = true;
 
-    const { data, nonce } = await dpopClient.value.request(`/v1/publicConversations.sendMessage`, {
+    const { nonce } = await dpopClient.value.request(`/v1/publicConversations.sendMessage`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

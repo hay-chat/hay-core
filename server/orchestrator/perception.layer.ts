@@ -20,7 +20,11 @@ export class PerceptionLayer {
     debugLog("perception", "PerceptionLayer initialized");
   }
 
-  async perceive(message: Message, conversationId?: string, organizationId?: string): Promise<Perception> {
+  async perceive(
+    message: Message,
+    conversationId?: string,
+    organizationId?: string,
+  ): Promise<Perception> {
     debugLog("perception", "Starting intent and sentiment analysis", {
       messageId: message.id,
       messageContent: message.content.substring(0, 100),

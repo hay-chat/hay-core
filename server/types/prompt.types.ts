@@ -23,7 +23,14 @@ export interface PromptCache {
   timestamp: number;
 }
 
-export type PromptVariableType = string | number | boolean | any[] | Record<string, any> | null | undefined;
+export type PromptVariableType =
+  | string
+  | number
+  | boolean
+  | any[]
+  | Record<string, any>
+  | null
+  | undefined;
 
 export interface PromptConfig {
   supportedLanguages: string[];

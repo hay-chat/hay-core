@@ -89,6 +89,15 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
         // but the external-facing protocol is in X-Forwarded-Proto.
         const externalProto = req.get("x-forwarded-proto") || req.protocol;
         headers["x-original-url"] = `${externalProto}://${req.get("host")}${req.originalUrl}`;
+
+        // Forward the raw request body (base64-encoded to survive non-ASCII in
+        // JSON payloads such as emoji) so plugins can verify HMAC signatures
+        // computed over the exact original bytes. The body-parser `verify`
+        // hook in main.ts populates req.rawBody.
+        const rawBody = (req as Request & { rawBody?: string }).rawBody;
+        if (typeof rawBody === "string" && rawBody.length > 0) {
+          headers["x-original-body-base64"] = Buffer.from(rawBody, "utf8").toString("base64");
+        }
       }
 
       const response = await fetch(workerUrl, {

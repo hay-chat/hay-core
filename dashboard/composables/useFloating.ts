@@ -73,16 +73,17 @@ export function useFloating(
     return middlewares;
   });
 
-  const { floatingStyles, middlewareData, isPositioned, placement: computedPlacement } = useFloatingUI(
-    referenceEl,
-    floatingEl,
-    {
-      placement,
-      strategy,
-      middleware,
-      whileElementsMounted: autoUpdate,
-    },
-  );
+  const {
+    floatingStyles,
+    middlewareData,
+    isPositioned,
+    placement: computedPlacement,
+  } = useFloatingUI(referenceEl, floatingEl, {
+    placement,
+    strategy,
+    middleware,
+    whileElementsMounted: autoUpdate,
+  });
 
   return {
     floatingStyles,

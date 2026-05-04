@@ -35,10 +35,7 @@ async function loadUserOrganization(
 /**
  * Enhance AuthUser with organization context
  */
-async function enhanceWithOrgContext(
-  baseAuthUser: AuthUser,
-  req: Request,
-): Promise<AuthUser> {
+async function enhanceWithOrgContext(baseAuthUser: AuthUser, req: Request): Promise<AuthUser> {
   const organizationId = req.headers["x-organization-id"] as string | undefined;
 
   // If no organization header, return base AuthUser

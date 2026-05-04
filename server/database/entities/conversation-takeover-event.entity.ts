@@ -39,4 +39,3 @@ export class ConversationTakeoverEvent {
   @UpdateDateColumn({ type: "timestamptz" })
   updated_at!: Date;
 }
-

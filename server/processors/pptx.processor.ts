@@ -15,7 +15,7 @@ export class PptxProcessor extends BaseProcessor {
     "pptx",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "ppt",
-    "application/vnd.ms-powerpoint"
+    "application/vnd.ms-powerpoint",
   ];
 
   async process(buffer: Buffer, fileName?: string): Promise<ProcessedDocument> {
@@ -23,7 +23,7 @@ export class PptxProcessor extends BaseProcessor {
       if (this.isLegacyPpt(fileName, buffer)) {
         return this.processLegacyPpt(buffer, fileName);
       }
-      
+
       return await this.processPptx(buffer, fileName);
     } catch (error) {
       logger.error({ err: error }, "Error processing PowerPoint file");
@@ -32,8 +32,8 @@ export class PptxProcessor extends BaseProcessor {
         metadata: {
           fileName,
           fileType: "pptx",
-          error: "Failed to process PowerPoint file"
-        }
+          error: "Failed to process PowerPoint file",
+        },
       };
     }
   }
@@ -42,12 +42,12 @@ export class PptxProcessor extends BaseProcessor {
     if (fileName?.toLowerCase().endsWith(".ppt")) {
       return true;
     }
-    
+
     if (buffer && buffer.length > 8) {
       const signature = buffer.slice(0, 8).toString("hex");
       return signature.startsWith("d0cf11e0a1b11ae1");
     }
-    
+
     return false;
   }
 
@@ -58,7 +58,7 @@ export class PptxProcessor extends BaseProcessor {
     let slideCount = 0;
 
     const slideFiles = Object.keys(zip.files)
-      .filter(name => name.startsWith("ppt/slides/slide") && name.endsWith(".xml"))
+      .filter((name) => name.startsWith("ppt/slides/slide") && name.endsWith(".xml"))
       .sort((a, b) => {
         const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || "0");
         const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || "0");
@@ -94,9 +94,9 @@ export class PptxProcessor extends BaseProcessor {
     if (titleContent) {
       content += `Title: ${titleContent}\n\n`;
     }
-    
+
     content += slideTexts.join("\n\n---\n\n");
-    
+
     if (notesTexts.length > 0) {
       content += "\n\n=== SPEAKER NOTES ===\n\n";
       content += notesTexts.join("\n\n---\n\n");
@@ -108,26 +108,30 @@ export class PptxProcessor extends BaseProcessor {
         fileName,
         fileType: "pptx",
         slideCount,
-        ...metadata
-      }
+        ...metadata,
+      },
     };
   }
 
   private processLegacyPpt(buffer: Buffer, fileName?: string): ProcessedDocument {
     const textParts: string[] = [];
     const bufferString = buffer.toString("binary");
-    
+
     const textRegex = /[\x20-\x7E]{4,}/g;
     const matches = bufferString.match(textRegex);
-    
+
     if (matches) {
-      textParts.push(...matches.filter(text => {
-        return !text.includes("Microsoft") && 
-               !text.includes("PowerPoint") &&
-               !text.includes("Arial") &&
-               !text.includes("Times") &&
-               text.length > 10;
-      }));
+      textParts.push(
+        ...matches.filter((text) => {
+          return (
+            !text.includes("Microsoft") &&
+            !text.includes("PowerPoint") &&
+            !text.includes("Arial") &&
+            !text.includes("Times") &&
+            text.length > 10
+          );
+        }),
+      );
     }
 
     return {
@@ -135,8 +139,8 @@ export class PptxProcessor extends BaseProcessor {
       metadata: {
         fileName,
         fileType: "ppt",
-        warning: "Legacy PPT format - text extraction may be incomplete"
-      }
+        warning: "Legacy PPT format - text extraction may be incomplete",
+      },
     };
   }
 
@@ -144,9 +148,9 @@ export class PptxProcessor extends BaseProcessor {
     try {
       const result: any = await parseXml(xmlContent);
       const texts: string[] = [];
-      
+
       this.extractTextRecursive(result, texts);
-      
+
       return texts.join(" ").trim();
     } catch (error) {
       logger.error({ err: error }, "Error parsing XML");
@@ -172,7 +176,7 @@ export class PptxProcessor extends BaseProcessor {
       }
 
       for (const key in obj) {
-        if (key !== "a:t" && obj.hasOwnProperty(key)) {
+        if (key !== "a:t" && Object.prototype.hasOwnProperty.call(obj, key)) {
           if (Array.isArray(obj[key])) {
             obj[key].forEach((item: any) => this.extractTextRecursive(item, texts));
           } else if (typeof obj[key] === "object") {
@@ -188,7 +192,7 @@ export class PptxProcessor extends BaseProcessor {
       if (zip.files["docProps/core.xml"]) {
         const coreContent = await zip.files["docProps/core.xml"].async("string");
         const result: any = await parseXml(coreContent);
-        
+
         if (result?.["cp:coreProperties"]?.["dc:title"]) {
           const title = result["cp:coreProperties"]["dc:title"];
           return Array.isArray(title) ? title[0] : title;
@@ -208,33 +212,33 @@ export class PptxProcessor extends BaseProcessor {
     } catch (error) {
       logger.error({ err: error }, "Error extracting title");
     }
-    
+
     return null;
   }
 
   private async extractMetadata(zip: JSZip): Promise<Record<string, any>> {
     const metadata: Record<string, any> = {};
-    
+
     try {
       if (zip.files["docProps/core.xml"]) {
         const coreContent = await zip.files["docProps/core.xml"].async("string");
         const result: any = await parseXml(coreContent);
         const props = result?.["cp:coreProperties"];
-        
+
         if (props) {
           if (props["dc:creator"]) {
-            metadata.author = Array.isArray(props["dc:creator"]) 
-              ? props["dc:creator"][0] 
+            metadata.author = Array.isArray(props["dc:creator"])
+              ? props["dc:creator"][0]
               : props["dc:creator"];
           }
           if (props["dcterms:created"]) {
-            metadata.created = Array.isArray(props["dcterms:created"]) 
-              ? props["dcterms:created"][0] 
+            metadata.created = Array.isArray(props["dcterms:created"])
+              ? props["dcterms:created"][0]
               : props["dcterms:created"];
           }
           if (props["dcterms:modified"]) {
-            metadata.modified = Array.isArray(props["dcterms:modified"]) 
-              ? props["dcterms:modified"][0] 
+            metadata.modified = Array.isArray(props["dcterms:modified"])
+              ? props["dcterms:modified"][0]
               : props["dcterms:modified"];
           }
         }
@@ -244,11 +248,11 @@ export class PptxProcessor extends BaseProcessor {
         const appContent = await zip.files["docProps/app.xml"].async("string");
         const result: any = await parseXml(appContent);
         const props = result?.["Properties"];
-        
+
         if (props) {
           if (props["Application"]) {
-            metadata.application = Array.isArray(props["Application"]) 
-              ? props["Application"][0] 
+            metadata.application = Array.isArray(props["Application"])
+              ? props["Application"][0]
               : props["Application"];
           }
         }
@@ -256,7 +260,7 @@ export class PptxProcessor extends BaseProcessor {
     } catch (error) {
       logger.error({ err: error }, "Error extracting metadata");
     }
-    
+
     return metadata;
   }
 }

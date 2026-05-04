@@ -45,7 +45,7 @@ function formatTimeRemaining(resetAt: Date): string {
     if (remainingMinutes === 0) {
       return hours === 1 ? "1 hour" : `${hours} hours`;
     } else {
-      return `${hours} hour${hours > 1 ? 's' : ''} and ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+      return `${hours} hour${hours > 1 ? "s" : ""} and ${remainingMinutes} minute${remainingMinutes > 1 ? "s" : ""}`;
     }
   }
 }
@@ -55,10 +55,7 @@ function formatTimeRemaining(resetAt: Date): string {
  * Applies IP, email, and combined throttling
  * Uses fail-closed policy to prevent abuse during Redis outages
  */
-async function checkPrivacyRateLimits(
-  email: string,
-  ipAddress: string,
-): Promise<void> {
+async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise<void> {
   const FAIL_CLOSED = true; // Privacy endpoints fail closed for security
 
   try {
@@ -140,11 +137,7 @@ export const privacyRouter = t.router({
       await checkPrivacyRateLimits(input.email, ipAddress);
 
       try {
-        const result = await privacyService.requestExport(
-          input.email,
-          ipAddress,
-          ctx.userAgent,
-        );
+        const result = await privacyService.requestExport(input.email, ipAddress, ctx.userAgent);
 
         return {
           success: true,
@@ -155,7 +148,10 @@ export const privacyRouter = t.router({
         };
       } catch (error) {
         logger.error({ err: error }, "Export request failed");
-        const message = error instanceof Error ? error.message : "Failed to process export request. Please try again later.";
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to process export request. Please try again later.";
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message,
@@ -210,11 +206,7 @@ export const privacyRouter = t.router({
       await checkPrivacyRateLimits(input.email, ipAddress);
 
       try {
-        const result = await privacyService.requestDeletion(
-          input.email,
-          ipAddress,
-          ctx.userAgent,
-        );
+        const result = await privacyService.requestDeletion(input.email, ipAddress, ctx.userAgent);
 
         return {
           success: true,

@@ -212,7 +212,11 @@ export class TemplateService {
   /**
    * Replace variables in template content
    */
-  private replaceVariables(content: string, variables: Record<string, any>, stripUnmatched: boolean = true): string {
+  private replaceVariables(
+    content: string,
+    variables: Record<string, any>,
+    stripUnmatched: boolean = true,
+  ): string {
     let result = content;
     const originalLength = content.length;
 
@@ -238,7 +242,10 @@ export class TemplateService {
     if (stripUnmatched) {
       const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
       if (unmatchedVars) {
-        logger.debug({ count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) }, "Removing unmatched variables");
+        logger.debug(
+          { count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) },
+          "Removing unmatched variables",
+        );
       }
       result = result.replace(/\{\{[^}]+\}\}/g, "");
     }
@@ -258,7 +265,10 @@ export class TemplateService {
       const variable = condition.trim();
       const value = this.getNestedValue(variables, variable);
 
-      logger.debug({ conditionNumber: matchCount, variable, result: !!value }, "Processing conditional");
+      logger.debug(
+        { conditionNumber: matchCount, variable, result: !!value },
+        "Processing conditional",
+      );
 
       if (value) {
         return block; // Don't recursively replace here - will be done in main replaceVariables
@@ -371,9 +381,11 @@ export class TemplateService {
    * Falls back to the subject from the MJML comment if no translation is found.
    */
   getTranslatedSubject(templateId: string, locale?: string): string | null {
-    return this.translationService.getSubject(templateId, locale)
-      || this.getTemplate(templateId)?.subject
-      || null;
+    return (
+      this.translationService.getSubject(templateId, locale) ||
+      this.getTemplate(templateId)?.subject ||
+      null
+    );
   }
 
   /**

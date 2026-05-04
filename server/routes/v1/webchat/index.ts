@@ -26,7 +26,7 @@ export const webchatRouter = router({
         allowedDomains: z.array(z.string()).optional(),
         isEnabled: z.boolean().optional(),
         customCss: z.string().nullable().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       return await webchatSettingsService.updateSettings(ctx.organizationId!, input);
@@ -40,7 +40,7 @@ export const webchatRouter = router({
     .input(
       z.object({
         organizationId: z.string().uuid(),
-      })
+      }),
     )
     .query(async ({ input }) => {
       // Check if webchat is enabled

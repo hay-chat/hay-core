@@ -30,12 +30,11 @@ export class Conversation {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
-  @Column({
-    type: "enum",
-    enum: ["web", "whatsapp", "instagram", "telegram", "sms", "email"],
-    default: "web",
-  })
-  channel!: "web" | "whatsapp" | "instagram" | "telegram" | "sms" | "email";
+  // Channel identifier — a loose string so new channel plugins can register
+  // without a schema migration. Validation happens at plugin registration and
+  // at API boundaries.
+  @Column({ type: "varchar", length: 64, default: "web" })
+  channel!: string;
 
   @Column({ type: "jsonb", nullable: true })
   publicJwk!: Record<string, unknown> | null;

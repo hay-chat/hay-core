@@ -101,7 +101,7 @@ export const getWaitTimeClass = (waitTimeSeconds: number | null): string => {
  * Used for badge color coding in widgets
  */
 export const getWaitTimeBadgeVariant = (
-  waitTimeSeconds: number | null
+  waitTimeSeconds: number | null,
 ): "default" | "secondary" | "destructive" | "outline" => {
   if (!waitTimeSeconds) return "default";
 
@@ -119,7 +119,11 @@ export const getWaitTimeBadgeVariant = (
 /**
  * Get user's full name from user object
  */
-export const getFullName = (user: { first_name?: string; last_name?: string; email?: string }): string => {
+export const getFullName = (user: {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}): string => {
   if (user.first_name && user.last_name) {
     return `${user.first_name} ${user.last_name}`;
   } else if (user.first_name) {

@@ -172,7 +172,10 @@ export class OAuthService {
       instance.authState?.credentials?.[clientSecretFieldName] ||
       null;
 
-    logger.debug({ clientIdSet: !!clientId, clientSecretSet: !!clientSecret }, "OAuth client credentials resolved");
+    logger.debug(
+      { clientIdSet: !!clientId, clientSecretSet: !!clientSecret },
+      "OAuth client credentials resolved",
+    );
 
     if (!clientId) {
       throw new Error(`OAuth client ID not configured for plugin ${pluginId}`);
@@ -257,7 +260,10 @@ export class OAuthService {
     state: string,
     error?: string,
   ): Promise<{ success: boolean; pluginId?: string; organizationId?: string; error?: string }> {
-    logger.info({ codeProvided: !!code, stateProvided: !!state, hasError: !!error }, "OAuth callback received");
+    logger.info(
+      { codeProvided: !!code, stateProvided: !!state, hasError: !!error },
+      "OAuth callback received",
+    );
 
     if (error) {
       logger.warn({ error }, "OAuth provider returned error");
@@ -275,12 +281,15 @@ export class OAuthService {
       return { success: false, error: "Invalid or expired state" };
     }
 
-    logger.debug({
-      pluginId: oauthState.pluginId,
-      organizationId: oauthState.organizationId,
-      userId: oauthState.userId,
-      hasCodeVerifier: !!oauthState.codeVerifier,
-    }, "OAuth state retrieved from Redis");
+    logger.debug(
+      {
+        pluginId: oauthState.pluginId,
+        organizationId: oauthState.organizationId,
+        userId: oauthState.userId,
+        hasCodeVerifier: !!oauthState.codeVerifier,
+      },
+      "OAuth state retrieved from Redis",
+    );
 
     const { pluginId, organizationId, codeVerifier } = oauthState;
 
@@ -375,13 +384,16 @@ export class OAuthService {
         validCredentials,
         codeVerifier,
       );
-      logger.info({
-        hasAccessToken: !!tokens.access_token,
-        hasRefreshToken: !!tokens.refresh_token,
-        expiresIn: tokens.expires_in,
-        tokenType: tokens.token_type,
-        scope: tokens.scope,
-      }, "Tokens received from provider");
+      logger.info(
+        {
+          hasAccessToken: !!tokens.access_token,
+          hasRefreshToken: !!tokens.refresh_token,
+          expiresIn: tokens.expires_in,
+          tokenType: tokens.token_type,
+          scope: tokens.scope,
+        },
+        "Tokens received from provider",
+      );
 
       // Combine required and optional scopes for storage
       const allScopes: string[] = [];
@@ -404,11 +416,14 @@ export class OAuthService {
       logger.info({ pluginId, organizationId }, "OAuth callback completed successfully");
       return { success: true, pluginId, organizationId };
     } catch (error) {
-      logger.error({
-        err: error instanceof Error ? error : new Error(String(error)),
-        pluginId,
-        organizationId,
-      }, "OAuth callback failed");
+      logger.error(
+        {
+          err: error instanceof Error ? error : new Error(String(error)),
+          pluginId,
+          organizationId,
+        },
+        "OAuth callback failed",
+      );
       debugLog("oauth", `OAuth callback failed`, {
         level: "error",
         data: error instanceof Error ? error.message : String(error),
@@ -449,13 +464,16 @@ export class OAuthService {
       body.append("code_verifier", codeVerifier);
     }
 
-    logger.debug({
-      tokenUrl: oauthConfig.tokenUrl,
-      grantType: "authorization_code",
-      redirectUri,
-      hasClientSecret: !!credentials.clientSecret,
-      hasCodeVerifier: !!codeVerifier,
-    }, "Token exchange request");
+    logger.debug(
+      {
+        tokenUrl: oauthConfig.tokenUrl,
+        grantType: "authorization_code",
+        redirectUri,
+        hasClientSecret: !!credentials.clientSecret,
+        hasCodeVerifier: !!codeVerifier,
+      },
+      "Token exchange request",
+    );
 
     const response = await fetch(oauthConfig.tokenUrl, {
       method: "POST",
@@ -465,7 +483,10 @@ export class OAuthService {
       body: body.toString(),
     });
 
-    logger.debug({ status: response.status, statusText: response.statusText }, "Token exchange response received");
+    logger.debug(
+      { status: response.status, statusText: response.statusText },
+      "Token exchange response received",
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -474,12 +495,15 @@ export class OAuthService {
     }
 
     const data = await response.json();
-    logger.debug({
-      hasAccessToken: !!data.access_token,
-      hasRefreshToken: !!data.refresh_token,
-      expiresIn: data.expires_in,
-      tokenType: data.token_type,
-    }, "Token exchange response parsed");
+    logger.debug(
+      {
+        hasAccessToken: !!data.access_token,
+        hasRefreshToken: !!data.refresh_token,
+        expiresIn: data.expires_in,
+        tokenType: data.token_type,
+      },
+      "Token exchange response parsed",
+    );
 
     // Calculate expires_at if expires_in is provided
     let expiresAt: number | undefined;
@@ -517,13 +541,16 @@ export class OAuthService {
 
     // Get or create instance (pass string pluginId, not UUID)
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    logger.debug({
-      instanceFound: !!instance,
-      instanceId: instance?.id,
-      enabled: instance?.enabled,
-      authMethod: instance?.authMethod,
-      hasConfig: !!instance?.config,
-    }, "Plugin instance lookup result");
+    logger.debug(
+      {
+        instanceFound: !!instance,
+        instanceId: instance?.id,
+        enabled: instance?.enabled,
+        authMethod: instance?.authMethod,
+        hasConfig: !!instance?.config,
+      },
+      "Plugin instance lookup result",
+    );
 
     // Build authState - the standard way to store OAuth tokens
     // The authState format is what the plugin SDK expects via ctx.auth.get()

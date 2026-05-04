@@ -14,7 +14,9 @@
             {{
               wizardData.selectedActions.length === 0
                 ? $t("wizard.generate.actionsNone")
-                : $t("wizard.generate.actionsSelected", { count: wizardData.selectedActions.length })
+                : $t("wizard.generate.actionsSelected", {
+                    count: wizardData.selectedActions.length,
+                  })
             }}
           </p>
         </div>
@@ -24,14 +26,20 @@
             {{
               wizardData.selectedDocumentIds.length === 0
                 ? $t("wizard.generate.documentsNone")
-                : $t("wizard.generate.documentsSelected", { count: wizardData.selectedDocumentIds.length })
+                : $t("wizard.generate.documentsSelected", {
+                    count: wizardData.selectedDocumentIds.length,
+                  })
             }}
           </p>
         </div>
         <div>
           <p class="text-neutral-muted">{{ $t("wizard.generate.boundariesLabel") }}</p>
           <p class="text-foreground">
-            {{ hasBoundaries ? $t("wizard.generate.boundariesConfigured") : $t("wizard.generate.boundariesNone") }}
+            {{
+              hasBoundaries
+                ? $t("wizard.generate.boundariesConfigured")
+                : $t("wizard.generate.boundariesNone")
+            }}
           </p>
         </div>
       </div>
@@ -52,7 +60,9 @@
     <div v-else-if="generating" class="flex flex-col items-center gap-4 py-8">
       <Loader2 class="h-8 w-8 animate-spin text-primary" />
       <div class="text-center space-y-1">
-        <p class="text-sm font-medium text-foreground">{{ $t("wizard.generate.generatingText") }}</p>
+        <p class="text-sm font-medium text-foreground">
+          {{ $t("wizard.generate.generatingText") }}
+        </p>
         <p class="text-sm text-neutral-muted">{{ $t("wizard.generate.generatingHint") }}</p>
       </div>
     </div>

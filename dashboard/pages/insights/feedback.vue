@@ -216,9 +216,6 @@ import {
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import { useSources } from "@/composables/useSources";
-import { useRouter } from "vue-router";
-
-const router = useRouter();
 const { sources, loadSources } = useSources();
 const { formatDateTime } = useOrgDateTime();
 

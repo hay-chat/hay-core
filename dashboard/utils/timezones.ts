@@ -4,9 +4,7 @@
 export const TIMEZONE_GROUPS = [
   {
     label: "Universal",
-    options: [
-      { value: "UTC", label: "UTC" },
-    ],
+    options: [{ value: "UTC", label: "UTC" }],
   },
   {
     label: "Europe",
@@ -135,7 +133,8 @@ export function getTimezoneWithOffset(tz: string, label: string): string {
       timeZoneName: "shortOffset",
       hour: "2-digit",
     }).formatToParts(now);
-    const offset = parts.find((p) => p.type === "timeZoneName")?.value?.replace(/^UTC/, "GMT") ?? "";
+    const offset =
+      parts.find((p) => p.type === "timeZoneName")?.value?.replace(/^UTC/, "GMT") ?? "";
     return offset ? `${label} (${offset})` : label;
   } catch {
     return label;

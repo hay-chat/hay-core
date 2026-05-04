@@ -28,7 +28,9 @@ export class ConvertApiKeysToOrganizationTokens1761010000000 implements Migratio
       `);
 
       if (orphanedKeys[0].count > 0) {
-        console.log(`⚠️  Found ${orphanedKeys[0].count} orphaned API keys (no valid organization). These will be deleted.`);
+        console.log(
+          `⚠️  Found ${orphanedKeys[0].count} orphaned API keys (no valid organization). These will be deleted.`,
+        );
         await queryRunner.query(`DELETE FROM "api_keys" WHERE "organization_id" IS NULL`);
       }
 
@@ -48,9 +50,7 @@ export class ConvertApiKeysToOrganizationTokens1761010000000 implements Migratio
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_api_keys_organization"`);
 
     // Make organization_id required (NOT NULL)
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" ALTER COLUMN "organization_id" SET NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "api_keys" ALTER COLUMN "organization_id" SET NOT NULL`);
 
     // Create new index for organization_id
     await queryRunner.query(
@@ -63,30 +63,26 @@ export class ConvertApiKeysToOrganizationTokens1761010000000 implements Migratio
     );
 
     console.log("✅ API key migration completed successfully.");
-    console.log("📝 ACTION REQUIRED: Review your API keys in the dashboard at /settings/api-tokens\n");
+    console.log(
+      "📝 ACTION REQUIRED: Review your API keys in the dashboard at /settings/api-tokens\n",
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop organization foreign key
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" DROP CONSTRAINT "FK_api_keys_organization"`,
-    );
+    await queryRunner.query(`ALTER TABLE "api_keys" DROP CONSTRAINT "FK_api_keys_organization"`);
 
     // Drop the new organization_id index
     await queryRunner.query(`DROP INDEX "public"."idx_api_keys_organization_id"`);
 
     // Make organization_id nullable again
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" ALTER COLUMN "organization_id" DROP NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "api_keys" ALTER COLUMN "organization_id" DROP NOT NULL`);
 
     // Add user_id column back
     await queryRunner.query(`ALTER TABLE "api_keys" ADD "user_id" uuid NOT NULL`);
 
     // Recreate old indexes
-    await queryRunner.query(
-      `CREATE INDEX "idx_api_keys_user_id" ON "api_keys" ("user_id")`,
-    );
+    await queryRunner.query(`CREATE INDEX "idx_api_keys_user_id" ON "api_keys" ("user_id")`);
     await queryRunner.query(
       `CREATE INDEX "idx_api_keys_organization" ON "api_keys" ("organization_id")`,
     );

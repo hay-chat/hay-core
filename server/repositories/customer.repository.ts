@@ -45,7 +45,10 @@ export class CustomerRepository extends BaseRepository<Customer> {
   /**
    * Find customer by ID and organizationId - ensures proper organization scoping
    */
-  override async findByIdAndOrganization(id: string, organizationId: string): Promise<Customer | null> {
+  override async findByIdAndOrganization(
+    id: string,
+    organizationId: string,
+  ): Promise<Customer | null> {
     return await this.getLegacyRepository().findOne({
       where: { id, organization_id: organizationId },
       relations: ["conversations"],

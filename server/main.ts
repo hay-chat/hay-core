@@ -46,6 +46,7 @@ async function startServer() {
       await import("@server/services/orchestrator-queue.service");
     await orchestratorQueueService.declareQueues();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.warn("⚠️  Starting server without RabbitMQ connection");
   }
 
@@ -114,9 +115,17 @@ async function startServer() {
     }),
   );
 
-  // Add JSON parsing middleware with increased size limit for document uploads
-  server.use(express.json({ limit: "50mb" }));
-  server.use(express.urlencoded({ extended: true, limit: "50mb" }));
+  // Add JSON parsing middleware with increased size limit for document uploads.
+  // The `verify` hook captures the raw request bytes on `req.rawBody` so that
+  // downstream consumers (e.g. the plugin proxy → channel plugins) can verify
+  // HMAC signatures that are computed over the exact bytes the client sent.
+  const captureRawBody = (req: express.Request, _res: express.Response, buf: Buffer): void => {
+    if (buf && buf.length > 0) {
+      (req as express.Request & { rawBody?: string }).rawBody = buf.toString("utf8");
+    }
+  };
+  server.use(express.json({ limit: "50mb", verify: captureRawBody }));
+  server.use(express.urlencoded({ extended: true, limit: "50mb", verify: captureRawBody }));
 
   server.get("/", (req, res) => {
     res.send("Welcome to Hay");

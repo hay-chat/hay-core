@@ -31,7 +31,7 @@ export class SourceService {
     const validIdPattern = /^[a-z0-9_:-]+$/;
     if (!validIdPattern.test(data.id)) {
       throw new Error(
-        "Source ID must be lowercase alphanumeric with dashes, underscores, or colons only"
+        "Source ID must be lowercase alphanumeric with dashes, underscores, or colons only",
       );
     }
 

@@ -51,11 +51,11 @@ export async function generateConversationTitle(
     const prompt = await promptService.getPrompt(
       "conversation/title-generation",
       { conversationContext },
-      { conversationId, organizationId }
+      { conversationId, organizationId },
     );
 
     const response = await llmService.invoke({
-      prompt
+      prompt,
     });
 
     const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
@@ -101,11 +101,11 @@ export async function sendInactivityWarning(
     const prompt = await promptService.getPrompt(
       "conversation/inactivity-check",
       { conversationContext },
-      { conversationId: conversation.id, organizationId }
+      { conversationId: conversation.id, organizationId },
     );
 
     const response = await llmService.invoke({
-      prompt
+      prompt,
     });
 
     // Add the warning message to the conversation
@@ -171,11 +171,11 @@ export async function closeInactiveConversation(
         const prompt = await promptService.getPrompt(
           "conversation/closure-message",
           { conversationContext },
-          { conversationId: conversation.id, organizationId }
+          { conversationId: conversation.id, organizationId },
         );
 
         closureMessage = await llmService.invoke({
-          prompt
+          prompt,
         });
       }
 
@@ -234,7 +234,10 @@ export async function checkForClosureIntent(
 
     // Check if message has closure intent
     if (message.intent === "close_satisfied" || message.intent === "close_unsatisfied") {
-      logger.debug({ conversationId, messageId, intent: message.intent }, "Detected closure intent");
+      logger.debug(
+        { conversationId, messageId, intent: message.intent },
+        "Detected closure intent",
+      );
       return true;
     }
 
@@ -269,9 +272,9 @@ export async function validateConversationClosure(
       {
         transcript,
         detectedIntent,
-        hasActivePlaybook
+        hasActivePlaybook,
       },
-      { conversationId, organizationId }
+      { conversationId, organizationId },
     );
 
     const response = await llmService.invoke({

@@ -107,4 +107,3 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);
 });
 </script>
-

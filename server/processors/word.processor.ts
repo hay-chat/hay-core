@@ -29,7 +29,9 @@ export class WordProcessor extends BaseProcessor {
       }
     } catch (error) {
       logger.error({ err: error, fileName }, "Error processing Word document");
-      throw new Error(`Failed to process Word document: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to process Word document: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -61,7 +63,10 @@ export class WordProcessor extends BaseProcessor {
     return await this.processWithWordExtractor(buffer, fileName);
   }
 
-  private async processWithWordExtractor(buffer: Buffer, fileName?: string): Promise<ProcessedDocument> {
+  private async processWithWordExtractor(
+    buffer: Buffer,
+    fileName?: string,
+  ): Promise<ProcessedDocument> {
     try {
       const doc = await this.wordExtractor.extract(buffer);
 

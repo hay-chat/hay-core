@@ -30,7 +30,7 @@ export async function generateKeypair(): Promise<{
       namedCurve: "P-256",
     },
     false, // Not extractable by default for security
-    ["sign", "verify"]
+    ["sign", "verify"],
   );
 
   // Export public key as JWK for registration
@@ -81,7 +81,7 @@ export async function storeKeypair(
   conversationId: string,
   privateKey: CryptoKey,
   publicKey: CryptoKey,
-  publicJwk: JsonWebKey
+  publicJwk: JsonWebKey,
 ): Promise<void> {
   const db = await openDatabase();
 
@@ -183,17 +183,14 @@ export async function clearAllKeypairs(): Promise<void> {
 /**
  * Sign data with the private key
  */
-export async function signData(
-  privateKey: CryptoKey,
-  data: ArrayBuffer
-): Promise<ArrayBuffer> {
+export async function signData(privateKey: CryptoKey, data: ArrayBuffer): Promise<ArrayBuffer> {
   return crypto.subtle.sign(
     {
       name: "ECDSA",
       hash: "SHA-256",
     },
     privateKey,
-    data
+    data,
   );
 }
 
@@ -206,10 +203,7 @@ export function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 /**
@@ -233,11 +227,7 @@ export function generateJTI(): string {
  * Check if WebCrypto API is available
  */
 export function isWebCryptoAvailable(): boolean {
-  return !!(
-    window.crypto &&
-    window.crypto.subtle &&
-    window.indexedDB
-  );
+  return !!(window.crypto && window.crypto.subtle && window.indexedDB);
 }
 
 /**
@@ -272,7 +262,7 @@ export async function exportKeypairForBackup(conversationId: string): Promise<{
 export async function importKeypairFromBackup(
   conversationId: string,
   privateKeyJwk: JsonWebKey,
-  publicKeyJwk: JsonWebKey
+  publicKeyJwk: JsonWebKey,
 ): Promise<void> {
   const privateKey = await crypto.subtle.importKey(
     "jwk",
@@ -282,7 +272,7 @@ export async function importKeypairFromBackup(
       namedCurve: "P-256",
     },
     false,
-    ["sign"]
+    ["sign"],
   );
 
   const publicKey = await crypto.subtle.importKey(
@@ -293,7 +283,7 @@ export async function importKeypairFromBackup(
       namedCurve: "P-256",
     },
     false,
-    ["verify"]
+    ["verify"],
   );
 
   await storeKeypair(conversationId, privateKey, publicKey, publicKeyJwk);

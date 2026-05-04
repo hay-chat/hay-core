@@ -58,12 +58,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 icon: "heading-1",
                 type: "block",
                 command: ({ editor, range }) => {
-                  editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setNode("heading", { level: 1 })
-                    .run();
+                  editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run();
                 },
               },
               {
@@ -72,12 +67,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 icon: "heading-2",
                 type: "block",
                 command: ({ editor, range }) => {
-                  editor
-                    .chain()
-                    .focus()
-                    .deleteRange(range)
-                    .setNode("heading", { level: 2 })
-                    .run();
+                  editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run();
                 },
               },
               {
@@ -128,95 +118,96 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 item.description.toLowerCase().includes(lowerQuery),
             );
           },
-        render: () => {
-          let component: VueRenderer | null = null;
-          let popup: TippyInstance[] | null = null;
+          render: () => {
+            let component: VueRenderer | null = null;
+            let popup: TippyInstance[] | null = null;
 
-          return {
-            onStart: (props: SuggestionProps<CommandItem>) => {
-              component = new VueRenderer(SlashCommandList, {
-                props: {
+            return {
+              onStart: (props: SuggestionProps<CommandItem>) => {
+                component = new VueRenderer(SlashCommandList, {
+                  props: {
+                    ...props,
+                    mcpTools: config.mcpTools,
+                    documents: config.documents,
+                  },
+                  editor: props.editor,
+                });
+
+                if (!props.clientRect) {
+                  return;
+                }
+
+                popup = tippy(document.body as any, {
+                  getReferenceClientRect: props.clientRect as () => DOMRect,
+                  appendTo: () => document.body,
+                  content: component.element as HTMLElement,
+                  showOnCreate: true,
+                  interactive: true,
+                  trigger: "manual",
+                  placement: "bottom-start",
+                  maxWidth: "none",
+                  onHide: () => {
+                    // Ensure cleanup when popup is hidden
+                    if (popup && popup[0]) {
+                      popup[0].destroy();
+                    }
+                    if (component) {
+                      component.destroy();
+                    }
+                    popup = null;
+                    component = null;
+                  },
+                });
+              },
+
+              onUpdate(props: SuggestionProps<CommandItem>) {
+                if (!component || !popup) return;
+
+                component.updateProps({
                   ...props,
                   mcpTools: config.mcpTools,
                   documents: config.documents,
-                },
-                editor: props.editor,
-              });
+                });
 
-              if (!props.clientRect) {
-                return;
-              }
-
-              popup = tippy(document.body as any, {
-                getReferenceClientRect: props.clientRect as () => DOMRect,
-                appendTo: () => document.body,
-                content: component.element as HTMLElement,
-                showOnCreate: true,
-                interactive: true,
-                trigger: "manual",
-                placement: "bottom-start",
-                maxWidth: "none",
-                onHide: () => {
-                  // Ensure cleanup when popup is hidden
-                  if (popup && popup[0]) {
-                    popup[0].destroy();
-                  }
-                  if (component) {
-                    component.destroy();
-                  }
-                  popup = null;
-                  component = null;
-                },
-              });
-            },
-
-            onUpdate(props: SuggestionProps<CommandItem>) {
-              if (!component || !popup) return;
-
-              component.updateProps({
-                ...props,
-                mcpTools: config.mcpTools,
-                documents: config.documents,
-              });
-
-              if (!props.clientRect) {
-                return;
-              }
-
-              popup[0].setProps({
-                getReferenceClientRect: props.clientRect as () => DOMRect,
-              });
-            },
-
-            onKeyDown(props: { event: KeyboardEvent }) {
-              if (props.event.key === "Escape") {
-                // Clean up popup and component
-                if (popup && popup[0]) {
-                  popup[0].hide();
+                if (!props.clientRect) {
+                  return;
                 }
-                // Return false to let Tiptap close the suggestion
-                return false;
-              }
 
-              if (!component?.ref) return false;
+                popup[0].setProps({
+                  getReferenceClientRect: props.clientRect as () => DOMRect,
+                });
+              },
 
-              return component.ref.onKeyDown(props);
-            },
+              onKeyDown(props: { event: KeyboardEvent }) {
+                if (props.event.key === "Escape") {
+                  // Clean up popup and component
+                  if (popup && popup[0]) {
+                    popup[0].hide();
+                  }
+                  // Return false to let Tiptap close the suggestion
+                  return false;
+                }
 
-            onExit() {
-              // Clean up on exit
-              if (popup && popup[0]) {
-                popup[0].destroy();
-              }
-              if (component) {
-                component.destroy();
-              }
-              popup = null;
-              component = null;
-            },
-          };
-        },
-      }),
-    ];
-  },
-});};
+                if (!component?.ref) return false;
+
+                return component.ref.onKeyDown(props);
+              },
+
+              onExit() {
+                // Clean up on exit
+                if (popup && popup[0]) {
+                  popup[0].destroy();
+                }
+                if (component) {
+                  component.destroy();
+                }
+                popup = null;
+                component = null;
+              },
+            };
+          },
+        }),
+      ];
+    },
+  });
+};

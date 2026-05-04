@@ -6,7 +6,7 @@ export class AddCreatedAtToEmbeddings1765978029169 implements MigrationInterface
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Simply add the created_at column to embeddings table
     await queryRunner.query(
-      `ALTER TABLE "embeddings" ADD "created_at" TIMESTAMP NOT NULL DEFAULT now()`
+      `ALTER TABLE "embeddings" ADD "created_at" TIMESTAMP NOT NULL DEFAULT now()`,
     );
   }
 

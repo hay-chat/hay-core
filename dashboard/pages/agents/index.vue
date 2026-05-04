@@ -561,19 +561,6 @@ const bulkToggleStatus = async () => {
   }
 };
 
-const bulkExport = async () => {
-  try {
-    // TODO: Export selected agents configuration
-    console.log("Bulk export agents:", selectedAgents.value);
-
-    // TODO: Generate and download export file
-    // TODO: Show success notification
-  } catch (error) {
-    console.error("Error exporting agents:", error);
-    // TODO: Show error notification
-  }
-};
-
 const bulkDelete = () => {
   if (selectedAgents.value.length === 0) return;
 

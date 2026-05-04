@@ -38,13 +38,13 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 export function validateUuid(
   value: string,
   paramName: string = "UUID",
-  strict: boolean = false
+  strict: boolean = false,
 ): void {
   const regex = strict ? UUID_V4_REGEX : UUID_REGEX;
 
   if (!regex.test(value)) {
     throw new Error(
-      `Invalid UUID format for ${paramName}: ${value}. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+      `Invalid UUID format for ${paramName}: ${value}. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`,
     );
   }
 }
@@ -69,7 +69,7 @@ export function validateUuid(
 export function validateUuidArray(
   values: string[],
   paramName: string = "UUID array",
-  strict: boolean = false
+  strict: boolean = false,
 ): string[] {
   const regex = strict ? UUID_V4_REGEX : UUID_REGEX;
   return values.filter((value) => regex.test(value));

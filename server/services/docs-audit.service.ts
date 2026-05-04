@@ -98,26 +98,15 @@ const VERTICAL_REQUIRED_TOPICS: Record<string, string[]> = {
     "Warranty information",
     "Order/quote process",
   ],
-  PROFESSIONAL_SERVICES: [
-    "Service offerings",
-    "Engagement process",
-    "Pricing/rates information",
-  ],
+  PROFESSIONAL_SERVICES: ["Service offerings", "Engagement process", "Pricing/rates information"],
   AI_CUSTOMER_SUPPORT_OR_CHATBOTS: [
     "Setup / Installation guide",
     "Configuration / Customization",
     "Integration guides",
     "Analytics / Reporting",
   ],
-  MEDIA: [
-    "Content guidelines",
-    "Subscription information",
-    "Advertising / Partnership info",
-  ],
-  _ALL: [
-    "FAQ or Troubleshooting",
-    "Contact / Support information",
-  ],
+  MEDIA: ["Content guidelines", "Subscription information", "Advertising / Partnership info"],
+  _ALL: ["FAQ or Troubleshooting", "Contact / Support information"],
 };
 
 // ─── Company Context Type ────────────────────────────────────────────────────
@@ -265,8 +254,15 @@ Verticals: E_COMMERCE, SAAS, MANUFACTURING, INSURANCE, HEALTH, PROFESSIONAL_SERV
         vertical: {
           type: "string" as const,
           enum: [
-            "E_COMMERCE", "SAAS", "MANUFACTURING", "INSURANCE", "HEALTH",
-            "PROFESSIONAL_SERVICES", "AI_CUSTOMER_SUPPORT_OR_CHATBOTS", "MEDIA", "OTHER",
+            "E_COMMERCE",
+            "SAAS",
+            "MANUFACTURING",
+            "INSURANCE",
+            "HEALTH",
+            "PROFESSIONAL_SERVICES",
+            "AI_CUSTOMER_SUPPORT_OR_CHATBOTS",
+            "MEDIA",
+            "OTHER",
           ],
         },
         capabilities: {
@@ -402,20 +398,27 @@ Score from 0-100 based on how well the documentation covers the product's featur
 
       const findings: Finding[] = [
         // Covered topics
-        ...response.coveredTopics.map((t: { topic: string; coveredBy: string[]; adequacy: string }) => ({
-          type: (t.adequacy === "well_covered" ? "positive" : "suggestion") as "positive" | "suggestion",
-          title: t.adequacy === "well_covered" ? `${t.topic}` : `${t.topic} (partial)`,
-          detail: t.adequacy === "well_covered"
-            ? `Well documented across ${t.coveredBy.length} page(s).`
-            : `Partially covered. Consider expanding coverage.`,
-          affectedDocs: t.coveredBy,
-        })),
+        ...response.coveredTopics.map(
+          (t: { topic: string; coveredBy: string[]; adequacy: string }) => ({
+            type: (t.adequacy === "well_covered" ? "positive" : "suggestion") as
+              | "positive"
+              | "suggestion",
+            title: t.adequacy === "well_covered" ? `${t.topic}` : `${t.topic} (partial)`,
+            detail:
+              t.adequacy === "well_covered"
+                ? `Well documented across ${t.coveredBy.length} page(s).`
+                : `Partially covered. Consider expanding coverage.`,
+            affectedDocs: t.coveredBy,
+          }),
+        ),
         // Missing topics
-        ...response.missingTopics.map((t: { topic: string; importance: string; reason: string }) => ({
-          type: "negative" as const,
-          title: `Missing: ${t.topic}`,
-          detail: `${t.reason} (${t.importance})`,
-        })),
+        ...response.missingTopics.map(
+          (t: { topic: string; importance: string; reason: string }) => ({
+            type: "negative" as const,
+            title: `Missing: ${t.topic}`,
+            detail: `${t.reason} (${t.importance})`,
+          }),
+        ),
       ];
 
       return {
@@ -629,7 +632,9 @@ Score from 0-100 based on how well the documentation covers the product's featur
       try {
         const path = new URL(d.sourceUrl!).pathname.replace(/\/$/, "");
         if (path) docPathMap.set(path, d.sourceUrl!);
-      } catch { /* skip invalid URLs */ }
+      } catch {
+        /* skip invalid URLs */
+      }
     }
 
     let crossLinkCount = 0;

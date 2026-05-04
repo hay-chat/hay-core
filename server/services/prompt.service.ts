@@ -195,6 +195,7 @@ export class PromptService {
         const org = await organizationRepo.findOne({
           where: { id: options.organizationId },
           select: ["id", "defaultLanguage"],
+          loadEagerRelations: false,
         });
 
         if (org?.defaultLanguage) {

@@ -6,9 +6,11 @@ export function sanitizeContent(content: string): string {
   if (!content) return "";
 
   // Remove null bytes (0x00) which cause PostgreSQL UTF-8 encoding errors
+  // eslint-disable-next-line no-control-regex
   let sanitized = content.replace(/\x00/g, "");
 
   // Remove other control characters except tab, newline, and carriage return
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
   // Collapse runs of 3+ blank lines into 2 (preserves markdown structure)
@@ -31,7 +33,7 @@ export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
   const sanitized: any = Array.isArray(obj) ? [] : {};
 
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const value = obj[key];
 
       if (typeof value === "string") {
