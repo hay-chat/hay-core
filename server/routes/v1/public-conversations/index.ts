@@ -8,6 +8,13 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
+import {
+  formSchemaSchema,
+  validateResponse,
+  renderFormResponseAsText,
+  extractCustomerFields,
+  type FormSchema,
+} from "@hay/form-schema";
 
 const logger = createLogger("public-conversations");
 
@@ -34,6 +41,12 @@ const createPublicConversationSchema = z.object({
   context: z.record(z.any()).optional(),
   customerExternalId: z.string().optional(),
   isPlayground: z.boolean().optional().default(false),
+  preChatForm: z
+    .object({
+      schema: formSchemaSchema,
+      response: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+    })
+    .optional(),
 });
 
 // Schema for sending messages
@@ -93,27 +106,116 @@ export const publicConversationsRouter = t.router({
         },
       });
 
+      // Validate pre-chat form response (if supplied) before any persistence so
+      // we fail fast with a clear error instead of leaving partial state.
+      let preChatValidated: { schema: FormSchema; response: Record<string, unknown> } | null = null;
+      if (input.preChatForm) {
+        const result = validateResponse(input.preChatForm.schema, input.preChatForm.response);
+        if (!result.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid pre-chat form response: ${JSON.stringify(result.errors)}`,
+          });
+        }
+        preChatValidated = { schema: input.preChatForm.schema, response: result.data };
+      }
+
+      // Build the initial context: explicit input.context first, then pre-chat
+      // form fields (form fields win on conflict — they are user-confirmed).
+      const initialContext: Record<string, unknown> = {
+        ...(input.context ?? {}),
+        ...(preChatValidated?.response ?? {}),
+      };
+
       // Update the conversation with web-specific fields
       await conversationRepository.updateById(conversation.id, {
         channel: "web",
         publicJwk: input.publicJwk,
         lastMessageAt: new Date(),
-        ...(input.context && Object.keys(input.context).length > 0
-          ? { context: input.context }
-          : {}),
+        ...(Object.keys(initialContext).length > 0 ? { context: initialContext } : {}),
       });
 
-      // Link customer if customerExternalId is provided
+      // Link or upsert customer.
+      // Priority: customerExternalId match > email-based lookup from form > new customer with form fields.
+      let linkedCustomerId: string | null = null;
+
       if (input.customerExternalId) {
         const customer = await customerRepository.findByExternalId(
           input.customerExternalId,
           organizationId,
         );
         if (customer) {
-          await conversationRepository.updateById(conversation.id, {
-            customer_id: customer.id,
-          });
+          linkedCustomerId = customer.id;
         }
+      }
+
+      if (preChatValidated) {
+        const customerFields = extractCustomerFields(
+          preChatValidated.schema,
+          preChatValidated.response as Record<string, string | number | boolean | null>,
+        );
+
+        if (linkedCustomerId) {
+          // Update existing customer with any form-supplied fields (only set fields, never clear).
+          const updates: Record<string, string> = {};
+          if (customerFields.name) updates.name = customerFields.name;
+          if (customerFields.email) updates.email = customerFields.email;
+          if (customerFields.phone) updates.phone = customerFields.phone;
+          if (Object.keys(updates).length > 0) {
+            await customerRepository.update(linkedCustomerId, organizationId, updates as never);
+          }
+        } else if (customerFields.email) {
+          // Try to find existing customer by email; otherwise create one.
+          const existing = await customerRepository.findByEmail(
+            customerFields.email,
+            organizationId,
+          );
+          if (existing) {
+            linkedCustomerId = existing.id;
+            const updates: Record<string, string> = {};
+            if (customerFields.name && !existing.name) updates.name = customerFields.name;
+            if (customerFields.phone && !existing.phone) updates.phone = customerFields.phone;
+            if (Object.keys(updates).length > 0) {
+              await customerRepository.update(existing.id, organizationId, updates as never);
+            }
+          } else {
+            const created = await customerRepository.create({
+              organization_id: organizationId,
+              email: customerFields.email,
+              name: customerFields.name ?? null,
+              phone: customerFields.phone ?? null,
+            } as never);
+            linkedCustomerId = created.id;
+          }
+        }
+      }
+
+      if (linkedCustomerId) {
+        await conversationRepository.updateById(conversation.id, {
+          customer_id: linkedCustomerId,
+        });
+      }
+
+      // Persist a FORM message recording what was collected, so the transcript
+      // and the LLM history both surface the structured data clearly.
+      if (preChatValidated) {
+        const renderedContent = renderFormResponseAsText(
+          preChatValidated.schema,
+          preChatValidated.response as Record<string, string | number | boolean | null>,
+        );
+        await conversation.addMessage({
+          content: renderedContent,
+          type: MessageType.FORM,
+          metadata: {
+            ui: {
+              kind: "form",
+              schema: preChatValidated.schema as unknown as Record<string, unknown>,
+              status: "SUBMITTED",
+              response: preChatValidated.response,
+              submittedAt: new Date().toISOString(),
+            },
+          },
+        });
       }
 
       // Generate initial nonce for this conversation
@@ -347,6 +449,145 @@ export const publicConversationsRouter = t.router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to rotate keys",
+        });
+      }
+    }),
+
+  // Submit a response to an in-conversation FORM message (ASK_FORM step).
+  // Validates the response against the schema stored on the message, writes
+  // each field into conversation.context, applies mapToCustomer mappings to
+  // the linked Customer, mutates the FORM message to SUBMITTED, then
+  // re-enqueues the orchestrator so it resumes with the new context.
+  submitForm: publicProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        messageId: z.string().uuid(),
+        response: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+        proof: z.string(),
+        method: z.string(),
+        url: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const verified = await verifyDPoPForRequest(
+          input.conversationId,
+          input.proof,
+          input.method,
+          input.url,
+        );
+        if (!verified.success) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: verified.error || "Invalid DPoP proof",
+          });
+        }
+
+        const conversation = await conversationRepository.findById(input.conversationId);
+        if (!conversation) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+        }
+
+        const { MessageRepository } = await import("../../../repositories/message.repository");
+        const messageRepository = new MessageRepository();
+        const message = await messageRepository.findById(input.messageId);
+        if (!message || message.conversation_id !== conversation.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Form message not found" });
+        }
+        if (message.type !== MessageType.FORM) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Message is not a form" });
+        }
+        const ui = message.metadata?.ui;
+        if (!ui || ui.kind !== "form" || !ui.schema) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Form message has no schema" });
+        }
+        if (ui.status === "SUBMITTED") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Form already submitted" });
+        }
+
+        const schemaParsed = formSchemaSchema.safeParse(ui.schema);
+        if (!schemaParsed.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Stored form schema is invalid",
+          });
+        }
+        const schema = schemaParsed.data as FormSchema;
+
+        const validated = validateResponse(schema, input.response);
+        if (!validated.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid form response: ${JSON.stringify(validated.errors)}`,
+          });
+        }
+
+        // Merge response into conversation.context (form fields win on conflict).
+        const mergedContext: Record<string, unknown> = {
+          ...(conversation.context ?? {}),
+          ...validated.data,
+        };
+        await conversationRepository.updateById(conversation.id, { context: mergedContext });
+
+        // Apply mapToCustomer updates if a customer is linked.
+        if (conversation.customer_id) {
+          const customerFields = extractCustomerFields(
+            schema,
+            validated.data as Record<string, string | number | boolean | null>,
+          );
+          const updates: Record<string, string> = {};
+          if (customerFields.name) updates.name = customerFields.name;
+          if (customerFields.email) updates.email = customerFields.email;
+          if (customerFields.phone) updates.phone = customerFields.phone;
+          if (Object.keys(updates).length > 0) {
+            await customerRepository.update(
+              conversation.customer_id,
+              conversation.organization_id,
+              updates as never,
+            );
+          }
+        }
+
+        // Mutate the FORM message in place.
+        const renderedContent = renderFormResponseAsText(
+          schema,
+          validated.data as Record<string, string | number | boolean | null>,
+        );
+        await messageRepository.update(message.id, {
+          content: renderedContent,
+          metadata: {
+            ...(message.metadata ?? {}),
+            ui: {
+              kind: "form",
+              schema: ui.schema,
+              status: "SUBMITTED",
+              response: validated.data,
+              submittedAt: new Date().toISOString(),
+            },
+          },
+        } as never);
+
+        // Re-enqueue orchestrator so it resumes with the new context.
+        const { orchestratorQueueService } =
+          await import("../../../services/orchestrator-queue.service");
+        await orchestratorQueueService.enqueue(
+          conversation.id,
+          conversation.organization_id,
+          "form_submission",
+        );
+
+        return {
+          messageId: message.id,
+          nonce: verified.newNonce,
+          submittedAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        logger.error({ err: error }, "Error submitting form");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to submit form",
         });
       }
     }),

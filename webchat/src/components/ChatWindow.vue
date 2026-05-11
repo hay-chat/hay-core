@@ -123,15 +123,26 @@
       </div>
     </div>
 
+    <!-- Pre-chat form: shown before the conversation is created when configured -->
+    <div v-if="pendingPreChatForm && preChatFormSchema" class="hay-chat-pre-chat">
+      <PreChatForm
+        :schema="preChatFormSchema"
+        :context="context"
+        @submit="$emit('submitPreChatForm', $event)"
+      />
+    </div>
+
     <!-- Messages -->
     <MessageList
+      v-else
       :messages="messages"
       :is-typing="isTyping"
       :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
+      @submit-form="(messageId, response) => $emit('submitInConversationForm', messageId, response)"
     />
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
-    <div v-if="isConversationClosed" class="hay-chat-closed-footer">
+    <div v-if="isConversationClosed && !pendingPreChatForm" class="hay-chat-closed-footer">
       <div class="hay-chat-closed-footer__content">
         <span class="hay-chat-closed-footer__text">{{ t("chat.conversationEnded") }}</span>
       </div>
@@ -140,9 +151,9 @@
       </button>
     </div>
 
-    <!-- Input (hidden when conversation is closed) -->
+    <!-- Input (hidden when conversation is closed or while pre-chat form is pending) -->
     <MessageInput
-      v-else
+      v-else-if="!pendingPreChatForm"
       :is-connected="isConnected"
       @send="$emit('send', $event)"
       @start-typing="$emit('startTyping')"
@@ -186,8 +197,10 @@
 import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
+import PreChatForm from "./PreChatForm.vue";
 import { useI18n } from "@/i18n";
 import type { Message } from "@/types";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 const t = useI18n();
 
@@ -207,6 +220,9 @@ const props = defineProps<{
   organizationLogoUrl?: string;
   currentAgentType?: string;
   currentAgentName?: string;
+  pendingPreChatForm?: boolean;
+  preChatFormSchema?: FormSchema | null;
+  context?: Record<string, unknown>;
 }>();
 
 defineEmits<{
@@ -216,6 +232,8 @@ defineEmits<{
   stopTyping: [];
   startNewConversation: [];
   toggleExpand: [];
+  submitPreChatForm: [response: FormResponse];
+  submitInConversationForm: [messageId: string, response: FormResponse];
 }>();
 
 const isShowingTitle = computed(() => {

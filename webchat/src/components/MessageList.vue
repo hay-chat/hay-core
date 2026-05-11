@@ -14,66 +14,78 @@
         'hay-message--user': message.sender === 'user',
         'hay-message--agent': message.sender === 'agent',
         'hay-message--closure': message.metadata?.isClosureMessage,
+        'hay-message--form': isFormMessage(message),
       }"
     >
-      <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-        {{ t("chat.conversationClosed") }}
-      </div>
-      <!-- Product recommendation cards -->
-      <template
-        v-if="
-          message.agentType === 'ProductRecommendation' &&
-          message.metadata &&
-          Array.isArray((message.metadata as any).productRecommendation?.products)
-        "
-      >
-        <div class="hay-message__content hay-message__content--rich">
-          <div class="hay-product-recs">
-            <a
-              v-for="p in (message.metadata as any).productRecommendation.products as any[]"
-              :key="p.id || p.externalId"
-              :href="p.sourceUrl || '#'"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hay-product-card"
-            >
-              <div class="hay-product-card__image">
-                <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-              </div>
-              <div class="hay-product-card__body">
-                <div class="hay-product-card__title">{{ p.title }}</div>
-                <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                  {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                </div>
-                <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
-              </div>
-            </a>
-          </div>
-        </div>
+      <!-- FORM messages: render the form widget -->
+      <template v-if="isFormMessage(message)">
+        <FormMessage
+          :schema="getFormSchema(message)!"
+          :submitted="getFormStatus(message) === 'SUBMITTED'"
+          :submitted-response="getFormResponse(message)"
+          @submit="(response) => $emit('submitForm', message.id, response)"
+        />
       </template>
-      <!-- Agent messages: one bubble per image segment (word-reveal only when a
-           single, image-free segment). -->
-      <template v-else-if="message.sender === 'agent'">
-        <div
-          v-for="(segment, i) in splitMarkdownImages(message.content)"
-          :key="i"
-          class="hay-message__content hay-message__content--rich"
-          :class="{ 'hay-message__content--image': isImageSegment(segment) }"
-        >
-          <div
-            v-if="animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1"
-            v-html="getAnimatedHtml(segment)"
-          ></div>
-          <div v-else v-html="renderMarkdown(segment)"></div>
-        </div>
-      </template>
-      <!-- User messages: plain text -->
       <template v-else>
-        <div class="hay-message__content">{{ message.content }}</div>
+        <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
+          {{ t("chat.conversationClosed") }}
+        </div>
+        <!-- Product recommendation cards -->
+        <template
+          v-if="
+            message.agentType === 'ProductRecommendation' &&
+            message.metadata &&
+            Array.isArray((message.metadata as any).productRecommendation?.products)
+          "
+        >
+          <div class="hay-message__content hay-message__content--rich">
+            <div class="hay-product-recs">
+              <a
+                v-for="p in (message.metadata as any).productRecommendation.products as any[]"
+                :key="p.id || p.externalId"
+                :href="p.sourceUrl || '#'"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hay-product-card"
+              >
+                <div class="hay-product-card__image">
+                  <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+                </div>
+                <div class="hay-product-card__body">
+                  <div class="hay-product-card__title">{{ p.title }}</div>
+                  <div v-if="p.topVariant?.price" class="hay-product-card__price">
+                    {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+                  </div>
+                  <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </template>
+        <!-- Agent messages: one bubble per image segment (word-reveal only when a
+             single, image-free segment). -->
+        <template v-else-if="message.sender === 'agent'">
+          <div
+            v-for="(segment, i) in splitMarkdownImages(message.content)"
+            :key="i"
+            class="hay-message__content hay-message__content--rich"
+            :class="{ 'hay-message__content--image': isImageSegment(segment) }"
+          >
+            <div
+              v-if="animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1"
+              v-html="getAnimatedHtml(segment)"
+            ></div>
+            <div v-else v-html="renderMarkdown(segment)"></div>
+          </div>
+        </template>
+        <!-- User messages: plain text -->
+        <template v-else>
+          <div class="hay-message__content">{{ message.content }}</div>
+        </template>
+        <div class="hay-message__time">
+          {{ formatTime(message.timestamp) }}
+        </div>
       </template>
-      <div class="hay-message__time">
-        {{ formatTime(message.timestamp) }}
-      </div>
     </div>
 
     <div v-if="isTyping" class="hay-message hay-message--agent">
@@ -91,6 +103,8 @@ import { ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
+import FormMessage from "./FormMessage.vue";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 const t = useI18n();
 
@@ -99,6 +113,37 @@ const props = defineProps<{
   isTyping: boolean;
   greetingMessage?: string;
 }>();
+
+defineEmits<{
+  submitForm: [messageId: string, response: FormResponse];
+}>();
+
+function getFormUi(
+  message: Message,
+): { schema?: FormSchema; status?: string; response?: FormResponse } | null {
+  const ui = message.metadata?.ui as
+    | { kind?: string; schema?: FormSchema; status?: string; response?: FormResponse }
+    | undefined;
+  if (!ui || ui.kind !== "form") return null;
+  return ui;
+}
+
+function isFormMessage(message: Message): boolean {
+  if (message.agentType === "Form") return true;
+  return getFormUi(message) !== null;
+}
+
+function getFormSchema(message: Message): FormSchema | undefined {
+  return getFormUi(message)?.schema;
+}
+
+function getFormStatus(message: Message): string | undefined {
+  return getFormUi(message)?.status;
+}
+
+function getFormResponse(message: Message): FormResponse | undefined {
+  return getFormUi(message)?.response;
+}
 
 const messageListRef = ref<HTMLElement | null>(null);
 const seenIds = new Set<string>(props.messages.map((m) => m.id));

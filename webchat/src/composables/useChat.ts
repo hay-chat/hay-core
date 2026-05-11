@@ -12,6 +12,8 @@ import {
 } from "./useDPoP";
 import { safeStorage, useConsent } from "./useConsent";
 import type { HayChatConfig, Message } from "@/types";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
+import { findMissingRequiredFields } from "@hay/form-schema";
 
 interface Keypair {
   privateKey: CryptoKey;
@@ -36,6 +38,20 @@ export function useChat(config: HayChatConfig) {
   const lastReadMessageId = ref<string | null>(null);
   const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
   const currentAgentName = ref<string | null>(null);
+
+  // Pre-chat form: schema is set after Widget.vue fetches the public config.
+  // pendingPreChatForm gates createNewConversation so the user fills the form first.
+  const preChatFormSchema = ref<FormSchema | null>(null);
+  const preChatFormResponse = ref<FormResponse | null>(null);
+  const pendingPreChatForm = computed(() => {
+    if (!preChatFormSchema.value) return false;
+    if (preChatFormResponse.value) return false;
+    if (existingConversationId.value) return false;
+    return findMissingRequiredFields(preChatFormSchema.value, getContext()).length > 0;
+  });
+  const setPreChatFormSchema = (schema: FormSchema | null) => {
+    preChatFormSchema.value = schema;
+  };
 
   // Populated inside initialize() via safeStorage — see comment above.
   const existingConversationId = ref<string | null>(null);
@@ -117,11 +133,17 @@ export function useChat(config: HayChatConfig) {
         throw new Error("Failed to generate keypair");
       }
 
-      // Create conversation via HTTP, passing current context and customerExternalId
+      // Create conversation via HTTP, passing current context, customerExternalId,
+      // and the pre-chat form payload (if collected).
+      const preChatPayload =
+        preChatFormSchema.value && preChatFormResponse.value
+          ? { schema: preChatFormSchema.value, response: preChatFormResponse.value }
+          : undefined;
       const conversationData = await conversation.createConversation(
         newKeypair.publicJwk,
         getContext(),
         config.customerExternalId,
+        preChatPayload,
       );
       if (!conversationData) {
         throw new Error("Failed to create conversation");
@@ -338,13 +360,17 @@ export function useChat(config: HayChatConfig) {
       if (existingConvId) {
         const loaded = await loadExistingConversation(existingConvId);
         if (!loaded) {
-          // Failed to load, create new
-          await createNewConversation();
+          // Failed to load, create new (unless gated by pre-chat form)
+          if (!pendingPreChatForm.value) {
+            await createNewConversation();
+          }
         }
-      } else {
+      } else if (!pendingPreChatForm.value) {
         // No existing conversation, create new
         await createNewConversation();
       }
+      // If pendingPreChatForm is true, conversation creation is deferred until
+      // submitPreChatForm() is called from the Widget after the user fills it.
 
       // Connect WebSocket for real-time updates
       connect();
@@ -858,6 +884,75 @@ export function useChat(config: HayChatConfig) {
     }).length;
   });
 
+  // Submit the pre-chat form: stash the response, then run the deferred
+  // conversation creation + WebSocket connection.
+  const submitPreChatForm = async (response: FormResponse): Promise<boolean> => {
+    preChatFormResponse.value = response;
+    const created = await createNewConversation();
+    if (!created) {
+      preChatFormResponse.value = null;
+      return false;
+    }
+    connect();
+    return true;
+  };
+
+  // Submit a response to an in-conversation FORM message (ASK_FORM step).
+  // Optimistically mutates the local message, then POSTs to the server. The
+  // orchestrator resumes server-side; the updated message will also flow back
+  // via WS in case of any server-side rendering differences.
+  const submitInConversationForm = async (
+    messageId: string,
+    response: FormResponse,
+  ): Promise<boolean> => {
+    if (!keypair.value || !conversationId.value) {
+      console.error("[Webchat] Cannot submit form: missing keypair or conversation");
+      return false;
+    }
+    const httpUrl = `${config.baseUrl}/v1/publicConversations.submitForm`;
+    const proof = await createDPoPProof(
+      "POST",
+      httpUrl,
+      keypair.value.privateKey,
+      keypair.value.publicJwk,
+      nonce.value || "initial",
+    );
+    if (!proof) {
+      console.error("[Webchat] Failed to create DPoP proof for form submit");
+      return false;
+    }
+
+    // Optimistic UI update
+    const msg = messages.value.find((m) => m.id === messageId);
+    if (msg) {
+      const ui =
+        (msg.metadata?.ui as { schema?: unknown; status?: string } | undefined) ?? undefined;
+      msg.metadata = {
+        ...(msg.metadata ?? {}),
+        ui: {
+          ...(ui ?? {}),
+          kind: "form",
+          schema: ui?.schema,
+          status: "SUBMITTED",
+          response,
+          submittedAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    const result = await conversation.submitFormMessage(
+      conversationId.value,
+      messageId,
+      response,
+      proof,
+      "POST",
+      httpUrl,
+    );
+    if (!result) return false;
+    if (result.nonce) nonce.value = result.nonce;
+    return true;
+  };
+
   // Enhanced disconnect that also stops retry loop and polling
   const disconnectAll = () => {
     disconnect();
@@ -879,6 +974,8 @@ export function useChat(config: HayChatConfig) {
     isConversationClosed,
     currentAgentType,
     currentAgentName,
+    pendingPreChatForm,
+    preChatFormSchema,
 
     // Actions
     initialize,
@@ -891,5 +988,8 @@ export function useChat(config: HayChatConfig) {
     disconnect: disconnectAll,
     checkMessageForClosure,
     startNewConversation,
+    setPreChatFormSchema,
+    submitPreChatForm,
+    submitInConversationForm,
   };
 }

@@ -2,6 +2,7 @@ import { router, scopedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
+import { formSchemaSchema } from "@hay/form-schema";
 
 export const webchatRouter = router({
   /**
@@ -26,6 +27,7 @@ export const webchatRouter = router({
         allowedDomains: z.array(z.string()).optional(),
         isEnabled: z.boolean().optional(),
         customCss: z.string().nullable().optional(),
+        preChatForm: formSchemaSchema.nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

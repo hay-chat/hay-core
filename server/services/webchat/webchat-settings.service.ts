@@ -7,6 +7,8 @@ import {
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { storageService } from "@server/services/storage.service";
+import type { FormSchema } from "@hay/form-schema";
+import { formSchemaSchema } from "@hay/form-schema";
 
 export interface WebchatSettingsUpdateDTO {
   widgetTitle?: string;
@@ -18,6 +20,7 @@ export interface WebchatSettingsUpdateDTO {
   allowedDomains?: string[];
   isEnabled?: boolean;
   customCss?: string | null;
+  preChatForm?: FormSchema | null;
 }
 
 export class WebchatSettingsService {
@@ -35,7 +38,15 @@ export class WebchatSettingsService {
     organizationId: string,
     data: WebchatSettingsUpdateDTO,
   ): Promise<WebchatSettings> {
-    return await webchatSettingsRepository.update(organizationId, data);
+    if (data.preChatForm !== undefined && data.preChatForm !== null) {
+      formSchemaSchema.parse(data.preChatForm);
+    }
+    return await webchatSettingsRepository.update(organizationId, {
+      ...data,
+      preChatForm: data.preChatForm
+        ? (data.preChatForm as unknown as Record<string, unknown>)
+        : data.preChatForm,
+    });
   }
 
   /**
@@ -58,6 +69,7 @@ export class WebchatSettingsService {
     agentName: string | null;
     agentAvatarUrl: string | null;
     organizationLogoUrl: string | null;
+    preChatForm: FormSchema | null;
   }> {
     const settings = await this.getSettings(organizationId);
 
@@ -96,6 +108,7 @@ export class WebchatSettingsService {
       agentName,
       agentAvatarUrl,
       organizationLogoUrl,
+      preChatForm: (settings.preChatForm as FormSchema | null) ?? null,
     };
   }
 

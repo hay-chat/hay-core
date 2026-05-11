@@ -101,6 +101,9 @@
       </CardContent>
     </Card>
 
+    <!-- Pre-chat form -->
+    <PreChatFormBuilder v-model="settingsForm.preChatForm" />
+
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
       <Button variant="outline" :disabled="!hasChanges || isSaving" @click="resetForm">
@@ -139,6 +142,8 @@ import { ref, computed, onMounted } from "vue";
 import { Save, Copy, Check } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import type { RouterInputs } from "@/types/trpc";
+import type { FormSchema } from "@hay/form-schema";
+import PreChatFormBuilder from "@/components/settings/PreChatFormBuilder.vue";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { useDomain } from "@/composables/useDomain";
@@ -160,6 +165,7 @@ const settingsForm = ref({
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
   isEnabled: true,
+  preChatForm: null as FormSchema | null,
 });
 
 const allowedDomainsText = ref("*");
@@ -218,6 +224,7 @@ async function loadSettings() {
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage || "",
       isEnabled: settings.isEnabled,
+      preChatForm: (settings.preChatForm as FormSchema | null) ?? null,
     };
 
     allowedDomainsText.value = settings.allowedDomains.join("\n");
@@ -241,6 +248,7 @@ async function saveSettings() {
       greetingMessage: settingsForm.value.greetingMessage || null,
       allowedDomains: allowedDomainsArray.value,
       isEnabled: settingsForm.value.isEnabled,
+      preChatForm: settingsForm.value.preChatForm,
     });
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };

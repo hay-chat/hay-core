@@ -14,7 +14,7 @@ export interface CommandItem {
   title: string;
   description: string;
   icon: string;
-  type?: "block" | "action" | "document";
+  type?: "block" | "action" | "document" | "form";
   pluginId?: string;
   id?: string;
   command: ({ editor, range }: { editor: Editor; range: Range }) => void;
@@ -102,6 +102,25 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 type: "document",
                 command: () => {
                   // This will be handled by the component to show submenu
+                },
+              },
+              {
+                title: "Form",
+                description: "Collect structured input from the customer",
+                icon: "clipboard-list",
+                type: "form",
+                command: ({ editor, range }) => {
+                  // Remove the slash query, then dispatch a request for the
+                  // playbook page to open the FormBuilderModal. The page will
+                  // call editor.commands.insertContent(...) on save.
+                  editor.chain().focus().deleteRange(range).run();
+                  const view = editor.view as { dom: HTMLElement };
+                  view.dom.dispatchEvent(
+                    new CustomEvent("hay-tiptap-insert-form", {
+                      bubbles: true,
+                      detail: { source: "slash-command" },
+                    }),
+                  );
                 },
               },
             ];

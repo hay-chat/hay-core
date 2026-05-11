@@ -29,6 +29,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@aws-sdk/client-s3": "^3.932.0",
+    "@hay/form-schema": "*",
     "@aws-sdk/lib-storage": "^3.932.0",
     "@floating-ui/vue": "^1.1.9",
     "@google/genai": "^2.8.0",

@@ -37,11 +37,18 @@
     <p v-if="hint" class="text-sm text-neutral-muted">
       {{ hint }}
     </p>
+
+    <FormBuilderModal
+      :open="formModalOpen"
+      :initial-schema="formModalSchema"
+      @save="handleFormModalSave"
+      @cancel="closeFormModal"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import type { JSONContent } from "@tiptap/vue-3";
 import BaseTiptap from "@/components/BaseTiptap.vue";
 import { configureMentionExtension } from "@/components/tiptap/MentionExtension";
@@ -50,6 +57,8 @@ import type { MCPTool, DocumentItem } from "@/components/tiptap/MentionExtension
 import { HayApi } from "@/utils/api";
 import { useDomain } from "@/composables/useDomain";
 import { useToolLabel } from "@/composables/useToolLabel";
+import FormBuilderModal from "@/components/playbooks/FormBuilderModal.vue";
+import type { FormSchema } from "@hay/form-schema";
 
 interface Props {
   initialData?: JSONContent;
@@ -175,10 +184,106 @@ const handleUpdate = (content: JSONContent) => {
   emit("update", content);
 };
 
+// ---------- Form chip insertion / editing ----------
+// The slash-command's "Form" item dispatches `hay-tiptap-insert-form` on the
+// editor DOM; clicks on `.mention-form` chips dispatch via the delegated
+// click handler below. Both open the FormBuilderModal — the difference is
+// whether we insert a fresh chip on save or update an existing one.
+const formModalOpen = ref(false);
+const formModalSchema = ref<FormSchema | null>(null);
+const editingFormChipPos = ref<number | null>(null);
+
+function openFormModal(schema: FormSchema | null, pos: number | null) {
+  formModalSchema.value = schema;
+  editingFormChipPos.value = pos;
+  formModalOpen.value = true;
+}
+
+function closeFormModal() {
+  formModalOpen.value = false;
+  formModalSchema.value = null;
+  editingFormChipPos.value = null;
+}
+
+function handleFormModalSave(schema: FormSchema) {
+  const editor = editorRef.value?.getEditor?.();
+  if (!editor) {
+    closeFormModal();
+    return;
+  }
+  const schemaJson = JSON.stringify(schema);
+  const attrs = {
+    id: schema.id,
+    label: schema.title || "Form",
+    type: "form" as const,
+    schema: schemaJson,
+  };
+  if (editingFormChipPos.value !== null) {
+    // Replace the existing chip's attrs in place.
+    editor
+      .chain()
+      .focus()
+      .setNodeSelection(editingFormChipPos.value)
+      .updateAttributes("mention", attrs)
+      .run();
+  } else {
+    editor.chain().focus().insertContent({ type: "mention", attrs }).insertContent(" ").run();
+  }
+  closeFormModal();
+}
+
+function handleInsertFormEvent() {
+  openFormModal(null, null);
+}
+
+function handleEditorClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  const chip = target.closest(".mention-form") as HTMLElement | null;
+  if (!chip) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const schemaAttr = chip.getAttribute("data-schema");
+  let parsed: FormSchema | null = null;
+  if (schemaAttr) {
+    try {
+      parsed = JSON.parse(schemaAttr) as FormSchema;
+    } catch {
+      parsed = null;
+    }
+  }
+
+  // Resolve the chip's ProseMirror position so we can update it in place.
+  const editor = editorRef.value?.getEditor?.();
+  if (!editor) return;
+  const view = editor.view as { posAtDOM: (node: Node, offset: number) => number };
+  const pos = view.posAtDOM(chip, 0);
+  openFormModal(parsed, pos >= 0 ? pos : null);
+}
+
 // Initialize
 onMounted(async () => {
   await Promise.all([fetchMCPTools(), fetchDocuments()]);
   loading.value = false;
+
+  // Wait a tick for BaseTiptap to mount before binding handlers.
+  await Promise.resolve();
+  const editor = editorRef.value?.getEditor?.();
+  if (editor) {
+    const dom = (editor.view as { dom: HTMLElement }).dom;
+    dom.addEventListener("hay-tiptap-insert-form", handleInsertFormEvent as EventListener);
+    dom.addEventListener("click", handleEditorClick);
+  }
+});
+
+onBeforeUnmount(() => {
+  const editor = editorRef.value?.getEditor?.();
+  if (editor) {
+    const dom = (editor.view as { dom: HTMLElement }).dom;
+    dom.removeEventListener("hay-tiptap-insert-form", handleInsertFormEvent as EventListener);
+    dom.removeEventListener("click", handleEditorClick);
+  }
 });
 
 // Insert an action chip (mention node) at the current selection. Mirrors what
