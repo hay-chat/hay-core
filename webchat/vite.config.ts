@@ -67,8 +67,10 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: { chat: path.resolve(__dirname, "src/chat.ts") },
-      // Keep mountChat exported: the loader calls it.
-      preserveEntrySignatures: "exports-only",
+      // Keep mountChat exported: the loader calls it. "allow-extension" lets
+      // the chat chunk also export what the lazy form chunks need (Vue), so
+      // Vue is not split into a chunk of its own.
+      preserveEntrySignatures: "allow-extension",
       output: {
         format: "es",
         entryFileNames: "assets/[name]-[hash].js",
@@ -79,6 +81,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@hay/form-schema": path.resolve(__dirname, "../packages/form-schema/src/index.ts"),
     },
   },
   server: {

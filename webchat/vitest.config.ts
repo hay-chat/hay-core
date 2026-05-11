@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@hay/form-schema": fileURLToPath(
+        new URL("../packages/form-schema/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

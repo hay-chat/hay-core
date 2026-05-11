@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
+import type { FormSchema } from "@hay/form-schema";
 
 export enum WebchatPosition {
   LEFT = "left",
@@ -97,6 +98,10 @@ export class WebchatSettings {
   // Advanced
   @Column({ type: "text", name: "custom_css", nullable: true })
   customCss!: string | null;
+
+  // Pre-chat form the widget asks before the first message (null = none)
+  @Column({ type: "jsonb", name: "pre_chat_form", nullable: true })
+  preChatForm!: FormSchema | null;
 
   // Timestamps
   @CreateDateColumn({ name: "created_at" })
