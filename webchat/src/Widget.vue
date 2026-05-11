@@ -19,12 +19,17 @@
         :organization-logo-url="resolvedLogoUrl"
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
+        :pending-pre-chat-form="pendingPreChatForm"
+        :pre-chat-form-schema="preChatFormSchema"
+        :context="config.context"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
         @toggle-expand="toggleExpand"
+        @submit-pre-chat-form="submitPreChatForm"
+        @submit-in-conversation-form="submitInConversationForm"
       />
     </Transition>
 
@@ -63,6 +68,7 @@ const fetchedConfig = ref<{
   agentName?: string | null;
   agentAvatarUrl?: string | null;
   organizationLogoUrl?: string | null;
+  preChatForm?: import("@hay/form-schema").FormSchema | null;
 }>({});
 
 const fetchPublicConfig = async () => {
@@ -73,7 +79,11 @@ const fetchPublicConfig = async () => {
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.warn("[Hay Webchat] Public config fetch failed:", response.status, response.statusText);
+      console.warn(
+        "[Hay Webchat] Public config fetch failed:",
+        response.status,
+        response.statusText,
+      );
       return;
     }
 
@@ -86,7 +96,11 @@ const fetchPublicConfig = async () => {
         agentName: result.agentName,
         agentAvatarUrl: result.agentAvatarUrl,
         organizationLogoUrl: result.organizationLogoUrl,
+        preChatForm: result.preChatForm ?? null,
       };
+      if (result.preChatForm) {
+        setPreChatFormSchema(result.preChatForm);
+      }
       console.log("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
       console.log("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
       console.log("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
@@ -129,12 +143,17 @@ const {
   isConversationClosed,
   currentAgentType,
   currentAgentName,
+  pendingPreChatForm,
+  preChatFormSchema,
   toggleChat,
   closeChat,
   sendMessage,
   startTyping,
   stopTyping,
   startNewConversation,
+  setPreChatFormSchema,
+  submitPreChatForm,
+  submitInConversationForm,
 } = useChat(props.config);
 
 // Initialize on mount if configured to auto-open

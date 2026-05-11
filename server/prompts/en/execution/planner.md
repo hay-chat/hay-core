@@ -24,6 +24,7 @@ These tools are provided by Hay and may be called regardless of any playbook too
 {{toolsDetail}}
 {{/if}}
 {{/if}}
+ASK_FORM - To present a structured form to the customer instead of asking for one piece of information at a time. Use this ONLY when the playbook explicitly defines a form to collect, AND the form's required fields are NOT already present in the user context. Set `formJson` to a JSON-serialized FormSchema (id, fields[], etc.) matching the playbook's form definition. Set userMessage to null. The conversation pauses until the customer submits the form; their answers will appear in user context on the next turn, so you should then continue normally without re-asking.
 
 ## Product recommendations
 
@@ -49,8 +50,9 @@ IMPORTANT: When choosing CALL_TOOL for the first time in this conversation turn,
 - CALL_TOOL: MUST have toolName and toolArgs (as JSON string), SHOULD include userMessage for the first tool call (contextual message to inform user), MUST set userMessage to null for subsequent tool calls
 - HANDOFF: MUST have handoffReason, MAY have userMessage
 - CLOSE: MUST have closeReason, MAY have userMessage
+- ASK_FORM: MUST have formJson (a JSON string of the FormSchema from the playbook). Set userMessage and other fields to null.
 
-Note: All fields (userMessage, toolName, toolArgs, handoffReason, closeReason) are required in the response, but should be set to null when not applicable for the chosen step.
+Note: All fields (userMessage, toolName, toolArgs, handoffReason, closeReason, formJson) are required in the response, but should be set to null when not applicable for the chosen step.
 
 Important: For CALL_TOOL step, toolArgs must be a valid JSON string representing the arguments object. For example: "{\"email\": \"user@example.com\", \"subject\": \"Hello\"}"
 

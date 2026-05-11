@@ -936,6 +936,27 @@ async function handleExecutionLoop(
 
       // The tool execution service now updates the message internally
       // Continue the loop to let LLM analyze the result
+    } else if (executionResult.step === "ASK_FORM" && executionResult.form) {
+      // Emit a FORM message in PENDING state and pause the orchestrator loop.
+      // The conversation resumes when the customer submits the form via the
+      // submitForm endpoint, which mutates this message to SUBMITTED, writes
+      // the response into conversation.context, and re-invokes run().
+      await conversation.addMessage({
+        content: "",
+        type: MessageType.FORM,
+        metadata: {
+          ui: {
+            kind: "form",
+            schema: executionResult.form as unknown as Record<string, unknown>,
+            status: "PENDING",
+          },
+        },
+      });
+      logger.debug(
+        { schemaId: executionResult.form.id },
+        "Emitted ASK_FORM message; pausing orchestrator until submission",
+      );
+      break;
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
       log.debug(

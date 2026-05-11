@@ -79,6 +79,10 @@ export class WebchatSettings {
   @Column({ type: "text", name: "custom_css", nullable: true })
   customCss!: string | null;
 
+  // Pre-chat form (FormSchema from @hay/form-schema, stored as JSON)
+  @Column({ type: "jsonb", name: "pre_chat_form", nullable: true })
+  preChatForm!: Record<string, unknown> | null;
+
   // Timestamps
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;

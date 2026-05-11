@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@hay/form-schema": "*",
     "vue": "^3.4.21"
   },
   "devDependencies": {
