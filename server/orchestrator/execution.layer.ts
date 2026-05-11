@@ -27,6 +27,8 @@ import {
   resolveQuickCheckSettings,
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
+import type { FormSchema } from "@hay/form-schema";
+import { formSchemaSchema } from "@hay/form-schema";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -61,7 +63,7 @@ export interface ExecuteOptions {
 }
 
 export interface ExecutionResult {
-  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE" | "ASK_TEAM";
+  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE" | "ASK_TEAM" | "ASK_FORM";
   userMessage?: string | null;
   /**
    * ASK_TEAM (D19): the fact to check with the team. The shopper gets fixed
@@ -78,6 +80,7 @@ export interface ExecutionResult {
    * retry). The turn becomes a hand-off that must not need the LLM again.
    */
   aiUnavailable?: boolean;
+  formJson?: string | null; // JSON string of FormSchema (for ASK_FORM step only)
   rationale?: string;
   /**
    * Planner's verdict on whether the conversation's current playbook still fits
@@ -109,6 +112,7 @@ export interface ExecutionResult {
   close?: {
     reason: string;
   };
+  form?: FormSchema; // Parsed form schema for ASK_FORM step
 }
 
 /** The shopper's latest message text, for a quick check the planner left blank. */
@@ -174,6 +178,7 @@ export class ExecutionLayer {
             "HANDOFF",
             "CLOSE",
             ...(quickCheck ? ["ASK_TEAM"] : []),
+            "ASK_FORM",
           ],
         },
         userMessage: {
@@ -202,6 +207,11 @@ export class ExecutionLayer {
               },
             }
           : {}),
+        formJson: {
+          type: ["string", "null"],
+          description:
+            "JSON string of the FormSchema to render (for ASK_FORM step only). Must conform to the form-schema package shape.",
+        },
         rationale: {
           type: "string",
           description: "Explanation of why this step was chosen",
@@ -222,6 +232,7 @@ export class ExecutionLayer {
         "closeReason",
         "playbookFits",
         ...(quickCheck ? ["teamQuestion"] : []),
+        "formJson",
       ],
       additionalProperties: false,
     };
@@ -456,6 +467,39 @@ export class ExecutionLayer {
         // Clear userMessage from CALL_TOOL to prevent confusion
         if (result.userMessage) {
           log.warn({ toolName: result.tool.name }, "Removing userMessage from CALL_TOOL step");
+          result.userMessage = undefined;
+        }
+      }
+
+      // Validate ASK_FORM step has a parseable FormSchema in formJson.
+      if (result.step === "ASK_FORM") {
+        if (!result.formJson) {
+          logger.warn({ rationale: result.rationale }, "Invalid ASK_FORM: missing formJson");
+          return null;
+        }
+        let parsedForm: unknown;
+        try {
+          parsedForm = JSON.parse(result.formJson);
+        } catch (error) {
+          logger.warn(
+            { error: error instanceof Error ? error.message : String(error) },
+            "Invalid ASK_FORM: formJson is not valid JSON",
+          );
+          return null;
+        }
+        const validated = formSchemaSchema.safeParse(parsedForm);
+        if (!validated.success) {
+          logger.warn(
+            { errors: validated.error.issues },
+            "Invalid ASK_FORM: formJson does not conform to FormSchema",
+          );
+          return null;
+        }
+        result.form = validated.data as FormSchema;
+        // ASK_FORM steps must not also try to send a chat message — the form
+        // itself is the prompt to the user.
+        if (result.userMessage) {
+          logger.warn("Removing userMessage from ASK_FORM step");
           result.userMessage = undefined;
         }
       }

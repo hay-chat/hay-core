@@ -1,5 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { defineNuxtConfig } from "nuxt/config";
+import { fileURLToPath } from "node:url";
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-09-19",
@@ -280,6 +281,10 @@ export default defineNuxtConfig({
         vue: "vue/dist/vue.esm-bundler.js",
         // Add alias for plugins directory
         "@plugins": "../plugins",
+        // Shared form schema, read from source (the server uses its CommonJS build)
+        "@hay/form-schema": fileURLToPath(
+          new URL("../packages/form-schema/src/index.ts", import.meta.url),
+        ),
       },
     },
     server: {

@@ -1,3 +1,5 @@
+import type { FormSchema } from "@hay/form-schema";
+
 export interface HayChatConfig {
   organizationId: string;
   baseUrl: string;
@@ -77,6 +79,8 @@ export interface PublicConfig {
   aiLabelText?: string | null;
   /** Plugin contributions this widget advertised support for (never code). */
   contributions?: WidgetContribution[];
+  /** The org's pre-chat form, asked before the first message. */
+  preChatForm?: FormSchema | null;
 }
 
 /** A declarative plugin contribution, rendered by the widget's own code. */

@@ -1,3 +1,18 @@
+# Form schema + pre-chat form builder: rebase of hay-chat/hay-core#61 (2026-10-29)
+
+Branch `claude/happy-gates-f9a54x`. Goal: land the parked `form` branch on today's master with CI green.
+
+- [x] Cherry-pick fc3d1505 onto origin/master; resolve 17 conflicted files
+- [x] `@hay/form-schema`: CommonJS build for the server, source alias for dashboard and webchat; webchat is not a root workspace
+- [x] `validateResponse` without zod; lazy form components; widget under the 48 KB budget (47.8 KB)
+- [x] Migrations renumbered after 1785950000000
+- [x] Drop the unsigned `customerExternalId` lookup the old branch re-added in `publicConversations.create`
+- [x] Verify: form-schema vitest, server tsc + jest, dashboard nuxt typecheck + vitest, webchat vue-tsc + vitest + build + check:perf, root lint
+- [ ] Manual: `hay chat send` against an org with a pre-chat form; an `ASK_FORM` playbook turn (no stack in this session)
+
+## Results
+
+See the PR body. Jest suites that need Postgres fail identically on master in this environment.
 # Billing: currencies, usage alerts, overage switch, in-place plan change (2026-10-26)
 
 Slice 2 of the "fix or stop claiming" list (`tasks/prospect-faq-answers-2026-10-26.md`, items 1-3).

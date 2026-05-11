@@ -1,5 +1,6 @@
 import type { Attachment, HayChatConfig } from "@/types";
 import { resolveLocale } from "@/i18n/resolve";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 interface ConversationMetadata {
   source: string;
@@ -101,6 +102,7 @@ export function useConversation(config: HayChatConfig) {
     context?: Record<string, unknown>,
     customer?: { externalId?: string; signature?: string },
     challenge?: { token?: string; error?: string },
+    preChatForm?: { schema: FormSchema; response: FormResponse },
   ): Promise<CreateConversationResponse> => {
     const metadata: ConversationMetadata = {
       source: "web-embed",
@@ -128,6 +130,7 @@ export function useConversation(config: HayChatConfig) {
           : {}),
         ...(challenge?.token ? { challengeToken: challenge.token } : {}),
         ...(challenge?.error ? { challengeError: challenge.error } : {}),
+        ...(preChatForm ? { preChatForm } : {}),
       }),
     });
 
@@ -287,11 +290,47 @@ export function useConversation(config: HayChatConfig) {
     return data.result.data;
   };
 
+  /**
+   * Submit a response to an in-conversation FORM message
+   */
+  const submitFormMessage = async (
+    conversationId: string,
+    messageId: string,
+    response: FormResponse,
+    proof: string,
+    method: string,
+    url: string,
+  ): Promise<{ messageId: string; nonce: string; submittedAt: string } | null> => {
+    try {
+      const res = await fetch(`${baseUrl}/v1/publicConversations.submitForm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          messageId,
+          response,
+          proof,
+          method,
+          url,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || "Failed to submit form");
+      }
+      return data.result.data;
+    } catch (error) {
+      console.error("[Conversation] Failed to submit form:", error);
+      return null;
+    }
+  };
+
   return {
     createConversation,
     getMessages,
     sendMessage,
     sendAttachment,
     setContactEmail,
+    submitFormMessage,
   };
 }

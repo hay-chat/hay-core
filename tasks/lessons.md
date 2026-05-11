@@ -219,3 +219,15 @@
 - **Failure mode**: PluginPageSlot passes `:api="Hay"` to every plugin component. Components that didn't declare `api` (Messenger, Instagram, Chatwoot, Zendesk) got it as a root-element attribute; `setAttribute` stringified the tRPC proxy, which called a `toString` procedure and threw mid-mount, so the Suspense stayed on "Loading plugin component" forever with no error card.
 - **Detection signal**: A plugin slot spinning forever while the console shows `[PluginRegistry] Successfully loaded ...` followed by `client[procedureType] is not a function`.
 - **Prevention**: The registry returns plugin components with `inheritAttrs: false`. Never let a proxy object (tRPC client, reactive store) reach a DOM attribute; `dashboard/tests/plugin-page-slot.test.ts` mounts a component without the `api` prop.
+
+### "Keep both sides" conflict resolution silently breaks code that both sides extended
+
+- **Failure mode**: Rebasing the parked form branch (hay-chat/hay-core#61) onto master, both sides had added a branch to the same `if/else if` chain, union type or array. Keeping both hunks produced duplicate `type?:` lines, an `else if` nested inside another branch's object literal and a `| "simulation"; | "form_submission";` union: all syntax errors that lint and tsc caught, but only after the fact.
+- **Detection signal**: A conflict hunk that ends mid-expression (no closing `},` or `;` on the HEAD side) or where both sides edit the same union/enum/array literal.
+- **Prevention**: Keep-both only for hunks that are whole statements on both sides. For unions, enums, arrays and `else if` chains, merge by hand and run the typecheck for every package the file belongs to before moving on.
+
+### A webchat dependency on a shared package needs its own budget and lockfile check
+
+- **Failure mode**: The parked branch added `@hay/form-schema` (zod inside) to the widget. The widget has its own `package-lock.json` and CI `npm ci`, so a workspace dependency can't resolve there, and zod alone pushed the chat chunk 12 KB over its brotli budget.
+- **Detection signal**: A new `"@hay/..."` entry in `webchat/package.json`, or `import { z } from "zod"` reachable from `webchat/src`.
+- **Prevention**: The widget reads shared code through a Vite/tsconfig alias to the source, never as a package dependency, and shared code it imports stays plain TypeScript (`sideEffects: false` so unused zod schemas tree-shake). Run `npm run build && npm run check:perf` in `webchat/` before pushing.

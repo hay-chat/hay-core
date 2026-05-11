@@ -27,6 +27,9 @@
         :save-contact-email="saveContactEmail"
         :set-challenge-host="challengeContribution ? setChallengeHost : undefined"
         :challenge-interactive="isChallengeInteractive"
+        :pending-pre-chat-form="pendingPreChatForm"
+        :pre-chat-form-schema="preChatFormSchema"
+        :context="config.context"
         @close="closeChat"
         @send="sendMessage"
         @attach="sendAttachment"
@@ -34,6 +37,8 @@
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
         @toggle-expand="toggleExpand"
+        @submit-pre-chat-form="submitPreChatForm"
+        @submit-in-conversation-form="submitInConversationForm"
       />
     </Transition>
   </div>
@@ -124,6 +129,8 @@ const {
   sendFailure,
   challengeHost,
   isChallengeInteractive,
+  pendingPreChatForm,
+  preChatFormSchema,
   toggleChat,
   openChat,
   closeChat,
@@ -134,13 +141,18 @@ const {
   startNewConversation,
   resumeActiveConversation,
   saveContactEmail,
-} = useChat({
-  ...props.config,
-  // The greeting is pinned as the first message, so give the chat the same
-  // localised default the empty state shows.
-  showGreeting: props.config.showGreeting ?? true,
-  greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
-}, { challenge: challengeContribution });
+  submitPreChatForm,
+  submitInConversationForm,
+} = useChat(
+  {
+    ...props.config,
+    // The greeting is pinned as the first message, so give the chat the same
+    // localised default the empty state shows.
+    showGreeting: props.config.showGreeting ?? true,
+    greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+  },
+  { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
+);
 
 function setChallengeHost(el: HTMLElement | null) {
   challengeHost.value = el;
