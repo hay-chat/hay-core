@@ -293,18 +293,18 @@ export const runConversation = async (conversationId: string) => {
       return;
     }
 
-    // 00.1. Add Initial System Message
-    const systemMessages = await conversation.getSystemMessages();
+    // 00.1 / 00.2. Fetch initial conversation state in parallel
+    const [systemMessages, botMessages, lastCustomerMessage] = await Promise.all([
+      conversation.getSystemMessages(),
+      conversation.getBotMessages(),
+      conversation.getLastCustomerMessage(),
+    ]);
+
     if (systemMessages.length === 0) {
       await conversation.addInitialSystemMessage();
-
-      // 00.1.1. Add Initial Agent Instructions
       await conversation.addInitialAgentInstructions();
     }
 
-    // 00.2. Add Initial Bot Message
-    const botMessages = await conversation.getBotMessages();
-    const lastCustomerMessage = await conversation.getLastCustomerMessage();
     if (botMessages.length === 0 && !lastCustomerMessage) {
       await conversation.addInitialBotMessage();
     }
@@ -487,10 +487,13 @@ export const runConversation = async (conversationId: string) => {
       "Starting playbook retrieval",
     );
 
-    const activePlaybooks = await playbookRepository.findByStatus(
-      conversation.organization_id,
-      PlaybookStatus.ACTIVE,
-    );
+    // Run playbook lookup and document retrieval in parallel — they share no
+    // data dependency. Document retrieval (vector search) overlaps with the
+    // playbook DB fetch.
+    const [activePlaybooks, retrievedDocuments] = await Promise.all([
+      playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
+      retrievalLayer.getRelevantDocuments(publicMessages, conversation.organization_id),
+    ]);
 
     logger.debug(
       {
@@ -549,22 +552,11 @@ export const runConversation = async (conversationId: string) => {
       );
     }
 
-    // 02.2. Get Document Candidates
+    // 02.2. Document Candidates (already fetched in parallel above)
     logger.debug(
       {
         conversationId: conversation.id,
         currentDocumentIds: conversation.document_ids,
-      },
-      "Starting document retrieval",
-    );
-
-    const retrievedDocuments = await retrievalLayer.getRelevantDocuments(
-      publicMessages,
-      conversation.organization_id,
-    );
-
-    logger.debug(
-      {
         retrievedDocumentsCount: retrievedDocuments.length,
         documents: retrievedDocuments,
       },

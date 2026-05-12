@@ -50,6 +50,10 @@ export class ExecutionLayer {
   private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
   private plannerSchema: object;
+  // Per-instance memo for organization settings — both guardrail config
+  // helpers read the same row. ExecutionLayer is constructed per turn so this
+  // is naturally short-lived.
+  private orgSettingsCache: Map<string, Promise<Record<string, unknown> | undefined>> = new Map();
 
   constructor() {
     this.llmService = new LLMService();
@@ -546,18 +550,25 @@ export class ExecutionLayer {
         }
       }
 
-      // Fetch full document entities
-      for (const docId of conversation.document_ids) {
-        try {
-          const doc = await documentRepository.findById(docId);
-          if (doc) {
-            retrievedDocs.push({
-              document: doc,
-              similarity: documentScores[docId] || 0.5,
-            });
-          }
-        } catch (error) {
-          logger.error({ documentId: docId }, "Error fetching document for confidence assessment");
+      // Fetch full document entities in parallel
+      const fetchedDocs = await Promise.all(
+        conversation.document_ids.map((docId) =>
+          documentRepository.findById(docId).catch((error) => {
+            logger.error(
+              { documentId: docId, err: error },
+              "Error fetching document for confidence assessment",
+            );
+            return null;
+          }),
+        ),
+      );
+
+      for (const doc of fetchedDocs) {
+        if (doc) {
+          retrievedDocs.push({
+            document: doc,
+            similarity: documentScores[doc.id] || 0.5,
+          });
         }
       }
     }
@@ -808,16 +819,39 @@ export class ExecutionLayer {
     return block;
   }
 
-  private async getCompanyInterestConfig(conversation: Conversation) {
-    try {
+  /**
+   * Fetch organization settings, memoized per ExecutionLayer instance so that
+   * both guardrail config helpers do not each hit the DB.
+   */
+  private async getOrganizationSettings(
+    organizationId: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const cached = this.orgSettingsCache.get(organizationId);
+    if (cached) {
+      return cached;
+    }
+
+    const promise = (async () => {
       const { organizationRepository } =
         await import("@server/repositories/organization.repository");
-      const organization = await organizationRepository.findById(conversation.organization_id);
+      const organization = await organizationRepository.findById(organizationId);
+      return organization?.settings as Record<string, unknown> | undefined;
+    })();
 
-      return CompanyInterestGuardrailService.mergeConfig(
-        organization?.settings as Record<string, unknown>,
-        undefined,
-      );
+    this.orgSettingsCache.set(organizationId, promise);
+
+    try {
+      return await promise;
+    } catch (error) {
+      this.orgSettingsCache.delete(organizationId);
+      throw error;
+    }
+  }
+
+  private async getCompanyInterestConfig(conversation: Conversation) {
+    try {
+      const settings = await this.getOrganizationSettings(conversation.organization_id);
+      return CompanyInterestGuardrailService.mergeConfig(settings, undefined);
     } catch (error) {
       logger.warn({ err: error }, "Error loading company interest config, using defaults");
       return CompanyInterestGuardrailService.getDefaultConfig();
@@ -829,14 +863,8 @@ export class ExecutionLayer {
    */
   private async getConfidenceConfig(conversation: Conversation) {
     try {
-      const { organizationRepository } =
-        await import("@server/repositories/organization.repository");
-      const organization = await organizationRepository.findById(conversation.organization_id);
-
-      return ConfidenceGuardrailService.mergeConfig(
-        organization?.settings as Record<string, unknown>,
-        undefined,
-      );
+      const settings = await this.getOrganizationSettings(conversation.organization_id);
+      return ConfidenceGuardrailService.mergeConfig(settings, undefined);
     } catch (error) {
       logger.warn({ err: error }, "Error loading confidence config, using defaults");
       return ConfidenceGuardrailService.getDefaultConfig();
