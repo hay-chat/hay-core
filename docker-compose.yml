@@ -3,6 +3,10 @@ services:
     image: pgvector/pgvector:pg16
     container_name: hay-postgres
     restart: unless-stopped
+    # Needed by pgvector HNSW index builds: high maintenance_work_mem causes
+    # Postgres to allocate dynamic shared-memory segments that exceed Docker's
+    # 64 MB default for /dev/shm. Production DO Postgres is unaffected.
+    shm_size: 2gb
     environment:
       POSTGRES_USER: hay
       POSTGRES_PASSWORD: hay_password

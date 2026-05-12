@@ -8,6 +8,7 @@ import { Document, DocumentationType } from "../../entities/document.entity";
 
 describe("VectorStore Integration Tests", () => {
   const testorganizationId = "123e4567-e89b-12d3-a456-426614174000";
+  const testOrgId = testorganizationId; // alias used by later test cases
   const testDocId = "456e7890-e89b-12d3-a456-426614174000";
   const deleteDocId = "789e0123-e89b-12d3-a456-426614174000";
 

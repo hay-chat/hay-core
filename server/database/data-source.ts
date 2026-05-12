@@ -44,6 +44,12 @@ export const AppDataSource = new DataSource({
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
   ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+  // hnsw.iterative_scan: keeps probing the HNSW graph until LIMIT is satisfied
+  // post-filter (e.g. WHERE organization_id = ...). Required for correct top-K
+  // results on small tenants. Available in pgvector ≥ 0.8.
+  extra: {
+    options: "-c hnsw.iterative_scan=relaxed_order",
+  },
   entities: [
     User,
     ApiKey,
