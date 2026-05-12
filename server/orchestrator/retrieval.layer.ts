@@ -27,17 +27,17 @@ export class RetrievalLayer {
     playbooks: Playbook[],
     organizationId?: string,
   ): Promise<Playbook | null> {
-    logger.debug(
+    const log = logger.child({ organizationId });
+    log.debug(
       {
         messagesCount: messages.length,
         playbooksCount: playbooks.length,
-        organizationId,
       },
       "Starting playbook candidate selection",
     );
 
     if (playbooks.length === 0) {
-      logger.debug("No playbooks available, returning null");
+      log.debug("No playbooks available, returning null");
       return null;
     }
 
@@ -79,7 +79,7 @@ export class RetrievalLayer {
       additionalProperties: false,
     };
 
-    logger.debug("Invoking LLM for playbook selection");
+    log.debug("Invoking LLM for playbook selection");
 
     const result = await this.llmService.invoke({
       prompt: candidatePrompt,
@@ -90,7 +90,7 @@ export class RetrievalLayer {
       candidates: Array<{ id: string; score: number; rationale: string }>;
     };
 
-    logger.debug(
+    log.debug(
       {
         candidatesCount: parsed.candidates.length,
         candidates: parsed.candidates.map((c) => ({
@@ -107,14 +107,14 @@ export class RetrievalLayer {
       .sort((a, b) => b.score - a.score)[0];
 
     if (!topCandidate) {
-      logger.debug("No playbook candidate scored above 0.7, returning null");
+      log.debug("No playbook candidate scored above 0.7, returning null");
       return null;
     }
 
     const selectedPlaybook = playbooks.find((p) => p.id === topCandidate.id) || null;
 
     if (selectedPlaybook) {
-      logger.debug(
+      log.debug(
         {
           playbookId: selectedPlaybook.id,
           playbookTitle: selectedPlaybook.title,
@@ -124,10 +124,8 @@ export class RetrievalLayer {
         "Playbook selected",
       );
     } else {
-      logger.debug(
-        {
-          candidateId: topCandidate.id,
-        },
+      log.debug(
+        { candidateId: topCandidate.id },
         "Playbook candidate ID not found in available playbooks",
       );
     }
@@ -136,19 +134,14 @@ export class RetrievalLayer {
   }
 
   async getRelevantDocuments(messages: Message[], organizationId: string): Promise<Document[]> {
+    const log = logger.child({ organizationId });
     try {
-      logger.debug(
-        {
-          messagesCount: messages.length,
-          organizationId,
-        },
-        "Starting document retrieval",
-      );
+      log.debug({ messagesCount: messages.length }, "Starting document retrieval");
 
       // Get customer messages for context
       const customerMessages = messages.filter((msg) => msg.type === "Customer").slice(-3);
 
-      logger.debug(
+      log.debug(
         {
           customerMessagesCount: customerMessages.length,
           totalMessagesCount: messages.length,
@@ -157,7 +150,7 @@ export class RetrievalLayer {
       );
 
       if (customerMessages.length === 0) {
-        logger.debug("No customer messages found, skipping document retrieval");
+        log.debug("No customer messages found, skipping document retrieval");
         return [];
       }
 
@@ -166,7 +159,7 @@ export class RetrievalLayer {
         .join(" ")
         .trim();
 
-      logger.debug(
+      log.debug(
         {
           queryLength: query.length,
           queryPreview: query.substring(0, 150),
@@ -175,22 +168,16 @@ export class RetrievalLayer {
       );
 
       if (!query) {
-        logger.debug("Empty query after trimming, skipping document retrieval");
+        log.debug("Empty query after trimming, skipping document retrieval");
         return [];
       }
 
       if (!vectorStoreService.initialized) {
-        logger.debug("Vector store not initialized, initializing now");
+        log.debug("Vector store not initialized, initializing now");
         await vectorStoreService.initialize();
       }
 
-      logger.debug(
-        {
-          organizationId,
-          topK: 5,
-        },
-        "Searching vector store",
-      );
+      log.debug({ topK: 5 }, "Searching vector store");
 
       const searchResults = await vectorStoreService.search(
         organizationId,
@@ -198,7 +185,7 @@ export class RetrievalLayer {
         5, // Get top 5 most relevant chunks
       );
 
-      logger.debug(
+      log.debug(
         {
           resultsCount: searchResults?.length || 0,
           results: searchResults?.map((r) => ({
@@ -211,14 +198,14 @@ export class RetrievalLayer {
       );
 
       if (!searchResults || searchResults.length === 0) {
-        logger.debug("No search results found");
+        log.debug("No search results found");
         return [];
       }
 
       // Filter out low relevance results
       const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.4);
 
-      logger.debug(
+      log.debug(
         {
           threshold: 0.4,
           beforeCount: searchResults.length,
@@ -236,17 +223,11 @@ export class RetrievalLayer {
         similarity: result.similarity || 0,
       }));
 
-      logger.debug(
-        {
-          documentsCount: documents.length,
-          documents,
-        },
-        "Document retrieval complete",
-      );
+      log.debug({ documentsCount: documents.length, documents }, "Document retrieval complete");
 
       return documents;
     } catch (error) {
-      logger.error({ err: error }, "Error retrieving documents");
+      log.error({ err: error }, "Error retrieving documents");
       return [];
     }
   }

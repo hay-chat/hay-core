@@ -22,6 +22,7 @@ export async function generateConversationTitle(
   organizationId: string,
   force: boolean = false,
 ): Promise<void> {
+  const log = logger.child({ organizationId, conversationId });
   try {
     const conversation = await conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
@@ -64,9 +65,9 @@ export async function generateConversationTitle(
       title: title.substring(0, 255), // Ensure it fits in the column
     });
 
-    logger.debug({ conversationId, title }, "Generated conversation title");
+    log.debug({ title }, "Generated conversation title");
   } catch (error) {
-    logger.error({ err: error }, "Error generating conversation title");
+    log.error({ err: error }, "Error generating conversation title");
     // Don't throw - title generation is not critical
   }
 }
@@ -78,6 +79,7 @@ export async function sendInactivityWarning(
   conversationId: string,
   organizationId: string,
 ): Promise<void> {
+  const log = logger.child({ organizationId, conversationId });
   try {
     const conversation = await conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
@@ -119,9 +121,9 @@ export async function sendInactivityWarning(
       },
     });
 
-    logger.debug({ conversationId }, "Sent inactivity warning");
+    log.debug("Sent inactivity warning");
   } catch (error) {
-    logger.error({ err: error }, "Error sending inactivity warning");
+    log.error({ err: error }, "Error sending inactivity warning");
     throw error;
   }
 }
@@ -135,6 +137,7 @@ export async function closeInactiveConversation(
   timeSinceLastMessage: number,
   sendMessage: boolean = true,
 ): Promise<void> {
+  const log = logger.child({ organizationId, conversationId });
   try {
     const conversation = await conversationRepository.findById(conversationId);
     if (
@@ -212,9 +215,9 @@ export async function closeInactiveConversation(
       },
     });
 
-    logger.debug({ conversationId, silent: !sendMessage }, "Closed inactive conversation");
+    log.debug({ silent: !sendMessage }, "Closed inactive conversation");
   } catch (error) {
-    logger.error({ err: error }, "Error closing inactive conversation");
+    log.error({ err: error }, "Error closing inactive conversation");
     throw error;
   }
 }
@@ -243,7 +246,7 @@ export async function checkForClosureIntent(
 
     return false;
   } catch (error) {
-    logger.error({ err: error }, "Error checking closure intent");
+    logger.error({ err: error, conversationId, messageId }, "Error checking closure intent");
     return false;
   }
 }
@@ -292,7 +295,10 @@ export async function validateConversationClosure(
 
     return JSON.parse(response);
   } catch (error) {
-    logger.error({ err: error }, "Error validating conversation closure");
+    logger.error(
+      { err: error, organizationId, conversationId },
+      "Error validating conversation closure",
+    );
     // Default to not closing on error
     return {
       shouldClose: false,

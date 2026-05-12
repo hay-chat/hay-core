@@ -6,7 +6,7 @@
  * @module @hay/plugin-sdk/sdk/logger
  */
 
-import type { HayLogger } from '../types/index.js';
+import type { HayLogger } from "../types/index.js";
 
 /**
  * Log level enumeration.
@@ -14,10 +14,10 @@ import type { HayLogger } from '../types/index.js';
  * @internal
  */
 enum LogLevel {
-  DEBUG = 'DEBUG',
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR',
+  DEBUG = "DEBUG",
+  INFO = "INFO",
+  WARN = "WARN",
+  ERROR = "ERROR",
 }
 
 /**
@@ -149,7 +149,7 @@ export class Logger implements HayLogger {
   private log(level: LogLevel, message: string, meta?: any): void {
     const timestamp = new Date().toISOString();
     const contextTag = this.formatContext();
-    const metaString = meta !== undefined ? ' ' + this.formatMeta(meta) : '';
+    const metaString = meta !== undefined ? " " + this.formatMeta(meta) : "";
 
     const logMessage = `[${timestamp}]${contextTag} ${level}: ${message}${metaString}`;
 
@@ -179,7 +179,7 @@ export class Logger implements HayLogger {
       tags.push(`[plugin:${this.context.pluginId}]`);
     }
 
-    return tags.length > 0 ? ' ' + tags.join('') : '';
+    return tags.length > 0 ? " " + tags.join("") : "";
   }
 
   /**

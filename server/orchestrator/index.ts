@@ -27,7 +27,14 @@ export class Orchestrator {
         try {
           await this.processConversation(conversation.id);
         } catch (error) {
-          logger.error({ err: error }, `Error processing conversation ${conversation.id}:`);
+          logger.error(
+            {
+              err: error,
+              conversationId: conversation.id,
+              organizationId: conversation.organization_id,
+            },
+            "Error processing conversation",
+          );
         }
       });
 
@@ -41,7 +48,7 @@ export class Orchestrator {
     try {
       await runConversation(conversationId);
     } catch (error) {
-      logger.error({ err: error }, `Error processing conversation ${conversationId}:`);
+      logger.error({ err: error, conversationId }, "Error processing conversation");
       throw error;
     }
   }
@@ -66,12 +73,16 @@ export class Orchestrator {
       const silentCloseThreshold = inactivityThreshold * 2; // Close silently at 2x timeout
 
       for (const conversation of openConversations) {
+        const log = logger.child({
+          organizationId: conversation.organization_id,
+          conversationId: conversation.id,
+        });
         try {
           // Get the last message in the conversation
           const messages = await conversation.getMessages();
 
           if (messages.length === 0) {
-            logger.debug(`Conversation ${conversation.id} has no messages, skipping`);
+            log.debug("Conversation has no messages, skipping");
             continue;
           }
 
@@ -84,23 +95,17 @@ export class Orchestrator {
             // Check if conversation is old enough to delete (created more than 2x timeout ago)
             const conversationAge = now.getTime() - new Date(conversation.created_at).getTime();
             if (conversationAge > silentCloseThreshold) {
-              logger.debug(
-                { conversationId: conversation.id, conversationAge, silentCloseThreshold },
+              log.debug(
+                { conversationAge, silentCloseThreshold },
                 "Deleting empty conversation past silent close threshold",
               );
               await this.conversationRepository.delete(
                 conversation.id,
                 conversation.organization_id,
               );
-              logger.debug(
-                { conversationId: conversation.id },
-                "Deleted conversation and associated messages",
-              );
+              log.debug("Deleted conversation and associated messages");
             } else {
-              logger.debug(
-                { conversationId: conversation.id },
-                "Conversation has no user messages, skipping",
-              );
+              log.debug("Conversation has no user messages, skipping");
             }
             continue;
           }
@@ -118,8 +123,8 @@ export class Orchestrator {
           // Check for different timeout scenarios
           if (timeSinceLastMessage > silentCloseThreshold) {
             // 2x timeout: Close silently without sending a message
-            logger.debug(
-              { conversationId: conversation.id, timeSinceLastMessage, silentCloseThreshold },
+            log.debug(
+              { timeSinceLastMessage, silentCloseThreshold },
               "Conversation exceeded silent close threshold, closing silently",
             );
             await closeInactiveConversation(
@@ -134,10 +139,7 @@ export class Orchestrator {
 
             if (hasWarning) {
               // Warning was sent but no response, close the conversation
-              logger.debug(
-                { conversationId: conversation.id },
-                "Conversation didn't respond to warning, closing",
-              );
+              log.debug("Conversation didn't respond to warning, closing");
               await closeInactiveConversation(
                 conversation.id,
                 conversation.organization_id,
@@ -146,10 +148,7 @@ export class Orchestrator {
               );
             } else {
               // No warning sent yet but past full timeout, close with message
-              logger.debug(
-                { conversationId: conversation.id },
-                "Conversation exceeded timeout without warning, closing with message",
-              );
+              log.debug("Conversation exceeded timeout without warning, closing with message");
               await closeInactiveConversation(
                 conversation.id,
                 conversation.organization_id,
@@ -162,8 +161,8 @@ export class Orchestrator {
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
             if (!hasWarning) {
-              logger.debug(
-                { conversationId: conversation.id, timeSinceLastMessage, warningThreshold },
+              log.debug(
+                { timeSinceLastMessage, warningThreshold },
                 "Conversation reached warning threshold, sending warning",
               );
               await sendInactivityWarning(conversation.id, conversation.organization_id);
@@ -203,9 +202,8 @@ export class Orchestrator {
             );
 
             if (closureValidation.shouldClose) {
-              logger.debug(
+              log.debug(
                 {
-                  conversationId: conversation.id,
                   intent: lastUserMessage.intent,
                   reason: closureValidation.reason,
                 },
@@ -238,17 +236,14 @@ export class Orchestrator {
               // Generate title for closed conversation
               await generateConversationTitle(conversation.id, conversation.organization_id);
             } else {
-              logger.debug(
-                { conversationId: conversation.id, reason: closureValidation.reason },
+              log.debug(
+                { reason: closureValidation.reason },
                 "Conversation has closure intent but validation failed, keeping open",
               );
             }
           }
         } catch (error) {
-          logger.error(
-            { err: error, conversationId: conversation.id },
-            "Error checking conversation inactivity",
-          );
+          log.error({ err: error }, "Error checking conversation inactivity");
           // Continue with other conversations
         }
       }
