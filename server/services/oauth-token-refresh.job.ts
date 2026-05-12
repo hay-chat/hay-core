@@ -1,6 +1,8 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { oauthService } from "./oauth.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("oauth-refresh");
 
 /**
  * Background job to refresh OAuth tokens before they expire
@@ -11,7 +13,7 @@ export async function refreshOAuthTokens(): Promise<void> {
     // Get all plugin instances with OAuth auth_method
     const instances = await pluginInstanceRepository.findOAuthInstances();
 
-    debugLog("oauth-refresh", `Checking ${instances.length} OAuth instances for token refresh`);
+    logger.debug(`Checking ${instances.length} OAuth instances for token refresh`);
 
     const now = Math.floor(Date.now() / 1000);
     const refreshThreshold = 15 * 60; // 15 minutes in seconds
@@ -31,49 +33,36 @@ export async function refreshOAuthTokens(): Promise<void> {
 
         // Refresh if expiring within threshold
         if (timeUntilExpiry > 0 && timeUntilExpiry < refreshThreshold) {
-          debugLog("oauth-refresh", `Refreshing token for plugin ${instance.plugin.pluginId}`, {
-            organizationId: instance.organizationId,
-            expiresAt,
-            timeUntilExpiry,
-          });
+          logger.debug(
+            {
+              organizationId: instance.organizationId,
+              expiresAt,
+              timeUntilExpiry,
+            },
+            `Refreshing token for plugin ${instance.plugin.pluginId}`,
+          );
 
           try {
             await oauthService.refreshToken(instance.organizationId, instance.plugin.pluginId);
-            debugLog(
-              "oauth-refresh",
-              `Token refreshed successfully for plugin ${instance.plugin.pluginId}`,
-            );
+            logger.debug(`Token refreshed successfully for plugin ${instance.plugin.pluginId}`);
           } catch (error) {
-            debugLog(
-              "oauth-refresh",
+            logger.error(
+              { err: error },
               `Token refresh failed for plugin ${instance.plugin.pluginId}`,
-              {
-                level: "error",
-                data: error instanceof Error ? error.message : String(error),
-              },
             );
 
             // Mark connection as expired if refresh fails and token is already expired
             if (timeUntilExpiry <= 0) {
-              debugLog(
-                "oauth-refresh",
-                `Marking connection as expired for plugin ${instance.plugin.pluginId}`,
-              );
+              logger.debug(`Marking connection as expired for plugin ${instance.plugin.pluginId}`);
               // Could update instance status here if needed
             }
           }
         }
       } catch (error) {
-        debugLog("oauth-refresh", `Error processing instance ${instance.id}`, {
-          level: "error",
-          data: error instanceof Error ? error.message : String(error),
-        });
+        logger.error({ err: error }, `Error processing instance ${instance.id}`);
       }
     }
   } catch (error) {
-    debugLog("oauth-refresh", `OAuth token refresh job failed`, {
-      level: "error",
-      data: error instanceof Error ? error.message : String(error),
-    });
+    logger.error({ err: error }, `OAuth token refresh job failed`);
   }
 }

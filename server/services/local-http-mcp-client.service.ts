@@ -1,6 +1,8 @@
 import type { MCPClient, MCPTool, MCPCallResult } from "./mcp-client.interface";
 import { getPluginRunnerService } from "./plugin-runner.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("local-http-mcp");
 
 /**
  * Local HTTP MCP Client
@@ -24,7 +26,7 @@ export class LocalHTTPMCPClient implements MCPClient {
 
     // Check if worker is running
     if (!runner.isRunning(this.organizationId, this.pluginId)) {
-      debugLog("local-http-mcp", `Starting SDK worker for ${this.pluginId}`);
+      logger.debug(`Starting SDK worker for ${this.pluginId}`);
       await runner.startWorker(this.organizationId, this.pluginId);
     }
 
@@ -43,9 +45,7 @@ export class LocalHTTPMCPClient implements MCPClient {
   async listTools(): Promise<MCPTool[]> {
     const baseUrl = await this.ensureWorkerRunning();
 
-    debugLog("local-http-mcp", `Fetching tools from ${this.pluginId}`, {
-      url: `${baseUrl}/mcp/list-tools`,
-    });
+    logger.debug({ url: `${baseUrl}/mcp/list-tools` }, `Fetching tools from ${this.pluginId}`);
 
     try {
       const response = await fetch(`${baseUrl}/mcp/list-tools`, {
@@ -63,13 +63,10 @@ export class LocalHTTPMCPClient implements MCPClient {
         inputSchema: tool.input_schema || tool.inputSchema || {},
       }));
 
-      debugLog("local-http-mcp", `Fetched ${tools.length} tools from ${this.pluginId}`);
+      logger.debug(`Fetched ${tools.length} tools from ${this.pluginId}`);
       return tools;
     } catch (error) {
-      debugLog("local-http-mcp", `Failed to list tools from ${this.pluginId}`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error({ err: error }, `Failed to list tools from ${this.pluginId}`);
       throw error;
     }
   }
@@ -80,10 +77,10 @@ export class LocalHTTPMCPClient implements MCPClient {
   async callTool(toolName: string, args: Record<string, unknown>): Promise<MCPCallResult> {
     const baseUrl = await this.ensureWorkerRunning();
 
-    debugLog("local-http-mcp", `Calling tool ${toolName} on ${this.pluginId}`, {
-      url: `${baseUrl}/mcp/call-tool`,
-      args,
-    });
+    logger.debug(
+      { url: `${baseUrl}/mcp/call-tool`, args },
+      `Calling tool ${toolName} on ${this.pluginId}`,
+    );
 
     try {
       const response = await fetch(`${baseUrl}/mcp/call-tool`, {
@@ -100,18 +97,13 @@ export class LocalHTTPMCPClient implements MCPClient {
 
       if (!response.ok) {
         const errorText = await response.text();
-        debugLog("local-http-mcp", `Tool call failed with HTTP ${response.status}`, {
-          level: "error",
-          data: errorText,
-        });
+        logger.error({ errorText }, `Tool call failed with HTTP ${response.status}`);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
 
-      debugLog("local-http-mcp", `Tool call ${toolName} completed`, {
-        isError: result.isError || false,
-      });
+      logger.debug({ isError: result.isError || false }, `Tool call ${toolName} completed`);
 
       return {
         content: result.content || result,
@@ -119,10 +111,7 @@ export class LocalHTTPMCPClient implements MCPClient {
         error: result.error,
       };
     } catch (error) {
-      debugLog("local-http-mcp", `Failed to call tool ${toolName}`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-      });
+      logger.error({ err: error }, `Failed to call tool ${toolName}`);
 
       return {
         content: undefined,

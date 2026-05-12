@@ -1,7 +1,9 @@
 import { redisService } from "./redis.service";
 import type { OAuthState } from "../types/oauth.types";
 import crypto from "crypto";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("oauth-state");
 
 const STATE_TTL_SECONDS = 600; // 10 minutes
 const STATE_KEY_PREFIX = "oauth:state:";
@@ -38,10 +40,10 @@ export class OAuthStateService {
       }
 
       await client.setex(key, STATE_TTL_SECONDS, value);
-      debugLog("oauth-state", `Stored OAuth state for nonce: ${nonce.substring(0, 8)}...`);
+      logger.debug(`Stored OAuth state for nonce: ${nonce.substring(0, 8)}...`);
       return nonce;
     } catch (error) {
-      debugLog("oauth-state", `Failed to store OAuth state`, { level: "error", data: error });
+      logger.error({ err: error }, `Failed to store OAuth state`);
       throw error;
     }
   }
@@ -68,10 +70,10 @@ export class OAuthStateService {
       await client.del(key);
 
       const state = JSON.parse(value) as OAuthState;
-      debugLog("oauth-state", `Retrieved OAuth state for nonce: ${nonce.substring(0, 8)}...`);
+      logger.debug(`Retrieved OAuth state for nonce: ${nonce.substring(0, 8)}...`);
       return state;
     } catch (error) {
-      debugLog("oauth-state", `Failed to retrieve OAuth state`, { level: "error", data: error });
+      logger.error({ err: error }, `Failed to retrieve OAuth state`);
       return null;
     }
   }
@@ -91,7 +93,7 @@ export class OAuthStateService {
       const exists = await client.exists(key);
       return exists === 1;
     } catch (error) {
-      debugLog("oauth-state", `Failed to check OAuth state`, { level: "error", data: error });
+      logger.error({ err: error }, `Failed to check OAuth state`);
       return false;
     }
   }

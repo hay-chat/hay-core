@@ -3,7 +3,9 @@ import { LocalHTTPMCPClient } from "./local-http-mcp-client.service";
 import { RemoteMCPClient } from "./remote-mcp-client.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import type { HayPluginManifest } from "../types/plugin.types";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("mcp-factory");
 
 /**
  * Factory for creating MCP clients based on plugin manifest configuration
@@ -32,10 +34,7 @@ export class MCPClientFactory {
         throw new Error(`Remote MCP server URL not configured for plugin ${pluginId}`);
       }
 
-      debugLog("mcp-factory", `Creating remote MCP client for plugin ${pluginId}`, {
-        url,
-        organizationId,
-      });
+      logger.debug({ url, organizationId }, `Creating remote MCP client for plugin ${pluginId}`);
 
       const client = new RemoteMCPClient(url, organizationId, pluginId);
       await client.connect();
@@ -43,9 +42,7 @@ export class MCPClientFactory {
     }
 
     // All local plugins use HTTP-based communication via SDK runner
-    debugLog("mcp-factory", `Creating local HTTP MCP client for plugin ${pluginId}`, {
-      organizationId,
-    });
+    logger.debug({ organizationId }, `Creating local HTTP MCP client for plugin ${pluginId}`);
 
     return new LocalHTTPMCPClient(organizationId, pluginId);
   }

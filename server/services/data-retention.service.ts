@@ -3,7 +3,9 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("data-retention");
 
 /**
  * Data Retention Service
@@ -57,10 +59,7 @@ export class DataRetentionService {
       .andWhere("(org.settings->>'retentionDays')::int > 0")
       .getMany();
 
-    debugLog(
-      "data-retention",
-      `Found ${organizations.length} organizations with retention policies`,
-    );
+    logger.debug(`Found ${organizations.length} organizations with retention policies`);
 
     for (const org of organizations) {
       try {
@@ -92,12 +91,11 @@ export class DataRetentionService {
           .getMany();
 
         if (expiredConversations.length === 0) {
-          debugLog("data-retention", `No expired conversations for org ${org.id}`);
+          logger.debug(`No expired conversations for org ${org.id}`);
           continue;
         }
 
-        debugLog(
-          "data-retention",
+        logger.debug(
           `Found ${expiredConversations.length} expired conversations for org ${org.id} (${org.name})`,
         );
 
@@ -113,15 +111,12 @@ export class DataRetentionService {
           );
           embeddingsDeleted += orgEmbeddingsDeleted;
 
-          debugLog(
-            "data-retention",
-            `Deleted ${orgEmbeddingsDeleted} embeddings for org ${org.id}`,
-          );
+          logger.debug(`Deleted ${orgEmbeddingsDeleted} embeddings for org ${org.id}`);
         } catch (error) {
-          debugLog("data-retention", `Error deleting embeddings for org ${org.id}`, {
-            level: "error",
-            error: error instanceof Error ? error.message : String(error),
-          });
+          logger.error(
+            { error: error instanceof Error ? error.message : String(error) },
+            `Error deleting embeddings for org ${org.id}`,
+          );
           // Continue with anonymization even if embedding deletion fails
         }
 
@@ -169,21 +164,20 @@ export class DataRetentionService {
         });
         await auditLogRepository.save(auditLog);
 
-        debugLog(
-          "data-retention",
-          `Anonymized ${expiredConversations.length} conversations for org ${org.id}`,
+        logger.debug(
           {
             messagesDeleted: messageDeleteResult.affected || 0,
             embeddingsDeleted: orgEmbeddingsDeleted,
             retentionDays,
             cutoffDate: cutoffDate.toISOString(),
           },
+          `Anonymized ${expiredConversations.length} conversations for org ${org.id}`,
         );
       } catch (error) {
-        debugLog("data-retention", `Error processing org ${org.id}`, {
-          level: "error",
-          error: error instanceof Error ? error.message : String(error),
-        });
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          `Error processing org ${org.id}`,
+        );
 
         // Log failed retention attempt
         try {
@@ -205,12 +199,15 @@ export class DataRetentionService {
       }
     }
 
-    debugLog("data-retention", "Data retention cleanup complete", {
-      organizationsProcessed,
-      conversationsAnonymized,
-      messagesDeleted,
-      embeddingsDeleted,
-    });
+    logger.debug(
+      {
+        organizationsProcessed,
+        conversationsAnonymized,
+        messagesDeleted,
+        embeddingsDeleted,
+      },
+      "Data retention cleanup complete",
+    );
 
     return {
       organizationsProcessed,
@@ -241,8 +238,7 @@ export class DataRetentionService {
       return null;
     }
 
-    debugLog(
-      "data-retention",
+    logger.debug(
       `Legal hold ${legalHold ? "enabled" : "disabled"} for conversation ${conversationId}`,
     );
 

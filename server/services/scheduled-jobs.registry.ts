@@ -102,10 +102,10 @@ const jobRegistry: CronJobConfig[] = [
       const { ConversationRepository } = await import("../repositories/conversation.repository");
       const { orchestratorQueueService } = await import("./orchestrator-queue.service");
       const { rabbitmqService } = await import("./rabbitmq.service");
-      const { debugLog } = await import("../lib/debug-logger");
+      const sweepLogger = createLogger("orchestrator-sweep");
 
       if (!rabbitmqService.isConnected()) {
-        debugLog("orchestrator-sweep", "RabbitMQ not connected, skipping sweep");
+        sweepLogger.debug("RabbitMQ not connected, skipping sweep");
         return;
       }
 
@@ -114,10 +114,7 @@ const jobRegistry: CronJobConfig[] = [
 
       if (staleConversations.length === 0) return;
 
-      debugLog(
-        "orchestrator-sweep",
-        `Found ${staleConversations.length} stale conversations, re-enqueuing`,
-      );
+      sweepLogger.debug(`Found ${staleConversations.length} stale conversations, re-enqueuing`);
 
       for (const conv of staleConversations) {
         await orchestratorQueueService.enqueue(conv.id, conv.organization_id, "sweep");

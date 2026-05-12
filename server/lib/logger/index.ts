@@ -23,6 +23,48 @@ import { REDACT_PATHS, REDACT_CENSOR, redactString } from "./redaction";
 
 const level = config.logging.level || (config.isProduction ? "info" : "debug");
 
+/**
+ * Parse DEBUG_MODULES env var.
+ *
+ * - Unset or "*" → all modules emit at the root level (no filtering)
+ * - "perception,retrieval" → only those modules emit debug; others floor at info
+ * - "!noisy,other" → exclude "noisy" from debug, allow everything else
+ */
+function parseDebugModules(input: string | undefined): {
+  include: string[];
+  exclude: string[];
+  active: boolean;
+} {
+  if (!input || input.trim() === "" || input.trim() === "*") {
+    return { include: [], exclude: [], active: false };
+  }
+  const include: string[] = [];
+  const exclude: string[] = [];
+  for (const raw of input.split(",")) {
+    const mod = raw.trim().toLowerCase();
+    if (!mod || mod === "*") continue;
+    if (mod.startsWith("!")) exclude.push(mod.substring(1));
+    else include.push(mod);
+  }
+  return { include, exclude, active: include.length > 0 || exclude.length > 0 };
+}
+
+const debugModules = parseDebugModules(process.env.DEBUG_MODULES);
+
+function levelForModule(moduleName: string): string {
+  if (!debugModules.active) return level;
+  const m = moduleName.toLowerCase();
+  if (debugModules.exclude.includes(m)) {
+    // Excluded: raise floor above debug
+    return level === "trace" || level === "debug" ? "info" : level;
+  }
+  if (debugModules.include.length > 0 && !debugModules.include.includes(m)) {
+    // Filter is set and module isn't in it: raise floor above debug
+    return level === "trace" || level === "debug" ? "info" : level;
+  }
+  return level;
+}
+
 function buildTransport(): pino.TransportSingleOptions | undefined {
   // In production or test, use default JSON to stdout (no transport needed)
   if (config.isProduction || config.isTest) {
@@ -68,7 +110,7 @@ const rootLogger = pino({
  * The module name appears in every log line for easy filtering.
  */
 export function createLogger(module: string): pino.Logger {
-  return rootLogger.child({ module });
+  return rootLogger.child({ module }, { level: levelForModule(module) });
 }
 
 /**

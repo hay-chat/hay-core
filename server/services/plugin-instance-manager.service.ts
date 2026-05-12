@@ -2,7 +2,9 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { getUTCNow } from "@server/utils/date.utils";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("plugin-manager");
 
 interface InstancePoolStats {
   runningCount: number;
@@ -24,7 +26,7 @@ export class PluginInstanceManagerService {
    */
   startCleanup(): void {
     // No-op: Cleanup is now handled by scheduler
-    debugLog("plugin-manager", "Plugin instance cleanup handled by scheduler service");
+    logger.debug("Plugin instance cleanup handled by scheduler service");
   }
 
   /**
@@ -33,7 +35,7 @@ export class PluginInstanceManagerService {
    */
   stopCleanup(): void {
     // No-op: Cleanup is now handled by scheduler
-    debugLog("plugin-manager", "Plugin instance cleanup handled by scheduler service");
+    logger.debug("Plugin instance cleanup handled by scheduler service");
   }
 
   /**
@@ -61,7 +63,7 @@ export class PluginInstanceManagerService {
     const canStart = await this.canStartInstance(pluginId);
     if (!canStart) {
       // Queue the request or wait
-      debugLog("plugin-manager", `Instance pool limit reached for ${pluginId}, queueing request`);
+      logger.debug(`Instance pool limit reached for ${pluginId}, queueing request`);
       await this.waitForAvailableSlot(pluginId);
     }
 
@@ -81,10 +83,7 @@ export class PluginInstanceManagerService {
    */
   private async startInstance(organizationId: string, pluginId: string): Promise<void> {
     try {
-      debugLog(
-        "plugin-manager",
-        `Starting plugin ${pluginId} for organization ${organizationId} on-demand`,
-      );
+      logger.debug(`Starting plugin ${pluginId} for organization ${organizationId} on-demand`);
 
       // Get plugin registry
       const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
@@ -99,10 +98,7 @@ export class PluginInstanceManagerService {
       await this.updateActivityTimestamp(organizationId, pluginId);
       this.updatePoolStats(pluginId);
     } catch (error) {
-      debugLog("plugin-manager", `Failed to start plugin ${pluginId} for org ${organizationId}`, {
-        level: "error",
-        data: error,
-      });
+      logger.error({ err: error }, `Failed to start plugin ${pluginId} for org ${organizationId}`);
 
       // Extract meaningful error message
       let errorMessage = "Failed to start plugin";
@@ -157,8 +153,7 @@ export class PluginInstanceManagerService {
       if (!lastActivity || lastActivity < inactiveThreshold) {
         // Check if instance is actually running
         if (runner.isRunning(instance.organizationId, instance.plugin.pluginId)) {
-          debugLog(
-            "plugin-manager",
+          logger.debug(
             `Stopping inactive plugin ${instance.plugin.name} for org ${instance.organizationId} (inactive for ${this.INACTIVITY_TIMEOUT_MS / 1000 / 60} minutes)`,
           );
 
@@ -167,10 +162,7 @@ export class PluginInstanceManagerService {
             this.instanceActivity.delete(instanceKey);
             this.updatePoolStats(instance.plugin.pluginId);
           } catch (error) {
-            debugLog("plugin-manager", `Error stopping inactive instance ${instanceKey}`, {
-              level: "error",
-              data: error,
-            });
+            logger.error({ err: error }, `Error stopping inactive instance ${instanceKey}`);
           }
         }
       }

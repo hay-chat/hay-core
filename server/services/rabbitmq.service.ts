@@ -1,6 +1,5 @@
 import amqplib, { type ChannelModel, type Channel, type ConsumeMessage } from "amqplib";
 import { config } from "@server/config/env";
-import { debugLog } from "@server/lib/debug-logger";
 import { createLogger } from "@server/lib/logger";
 import { EventEmitter } from "events";
 
@@ -32,18 +31,19 @@ export class RabbitMQService extends EventEmitter {
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      debugLog("rabbitmq", "Already initialized");
+      logger.debug("Already initialized");
       return;
     }
 
-    debugLog("rabbitmq", "Initializing RabbitMQ service", {
-      url: config.rabbitmq.url.replace(/\/\/.*@/, "//***@"),
-    });
+    logger.debug(
+      { url: config.rabbitmq.url.replace(/\/\/.*@/, "//***@") },
+      "Initializing RabbitMQ service",
+    );
 
     try {
       await this.connect();
       this.isInitialized = true;
-      debugLog("rabbitmq", "RabbitMQ service fully initialized and ready");
+      logger.debug("RabbitMQ service fully initialized and ready");
     } catch (error) {
       logger.error({ err: error }, "Failed to initialize RabbitMQ");
       throw error;
@@ -76,14 +76,14 @@ export class RabbitMQService extends EventEmitter {
     });
 
     this.channel.on("close", () => {
-      debugLog("rabbitmq", "Channel closed");
+      logger.debug("Channel closed");
       this.channel = null;
     });
 
     this.reconnectAttempts = 0;
     this.reconnecting = false;
     this.emit("connected");
-    debugLog("rabbitmq", "Connected to RabbitMQ");
+    logger.debug("Connected to RabbitMQ");
   }
 
   private scheduleReconnect(): void {
@@ -98,14 +98,14 @@ export class RabbitMQService extends EventEmitter {
     const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, this.maxReconnectDelay);
     this.reconnectAttempts++;
 
-    debugLog("rabbitmq", `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    logger.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(async () => {
       try {
         await this.connect();
         // Re-declare queues and re-attach consumers
         await this.restoreState();
-        debugLog("rabbitmq", "Reconnected and restored state");
+        logger.debug("Reconnected and restored state");
       } catch (error) {
         logger.error({ err: error }, "Reconnect failed");
         this.reconnecting = false;
@@ -143,7 +143,7 @@ export class RabbitMQService extends EventEmitter {
     });
 
     this.declaredQueues.add(queue);
-    debugLog("rabbitmq", `Queue declared: ${queue}`);
+    logger.debug(`Queue declared: ${queue}`);
   }
 
   /**
@@ -164,10 +164,7 @@ export class RabbitMQService extends EventEmitter {
         timestamp: Date.now(),
       });
 
-      debugLog("rabbitmq", `Published message to queue: ${queue}`, {
-        messageId: message.messageId,
-        sent,
-      });
+      logger.debug({ messageId: message.messageId, sent }, `Published message to queue: ${queue}`);
 
       return sent;
     } catch (error) {
@@ -196,7 +193,7 @@ export class RabbitMQService extends EventEmitter {
     options?: { prefetch?: number },
   ): Promise<void> {
     if (!this.channel) {
-      debugLog("rabbitmq", `Cannot consume ${queue}: channel not available`);
+      logger.debug(`Cannot consume ${queue}: channel not available`);
       return;
     }
 
@@ -220,7 +217,7 @@ export class RabbitMQService extends EventEmitter {
     );
 
     this.consumerTags.set(queue, consumerTag);
-    debugLog("rabbitmq", `Consuming from queue: ${queue}`, { consumerTag });
+    logger.debug({ consumerTag }, `Consuming from queue: ${queue}`);
   }
 
   /**
@@ -259,7 +256,7 @@ export class RabbitMQService extends EventEmitter {
         for (const [queue, tag] of this.consumerTags.entries()) {
           try {
             await this.channel.cancel(tag);
-            debugLog("rabbitmq", `Cancelled consumer for queue: ${queue}`);
+            logger.debug(`Cancelled consumer for queue: ${queue}`);
           } catch {
             // Channel may already be closed
           }

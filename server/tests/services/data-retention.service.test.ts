@@ -21,9 +21,14 @@ jest.mock("../../services/vector-store.service", () => ({
   },
 }));
 
-// Mock debug logger
-jest.mock("../../lib/debug-logger", () => ({
-  debugLog: jest.fn(),
+// Mock centralized logger
+jest.mock("@server/lib/logger", () => ({
+  createLogger: () => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  }),
 }));
 
 /**

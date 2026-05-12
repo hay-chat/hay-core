@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import { rabbitmqService } from "./rabbitmq.service";
-import { debugLog } from "@server/lib/debug-logger";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("orchestrator-queue");
 
 /**
  * Queue names for orchestrator processing
@@ -46,7 +48,7 @@ class OrchestratorQueueService {
    */
   async declareQueues(): Promise<void> {
     if (!rabbitmqService.isConnected()) {
-      debugLog("orchestrator-queue", "RabbitMQ not connected, skipping queue declaration");
+      logger.debug("RabbitMQ not connected, skipping queue declaration");
       return;
     }
 
@@ -71,7 +73,7 @@ class OrchestratorQueueService {
       deadLetterRoutingKey: ORCHESTRATOR_QUEUES.DEAD,
     });
 
-    debugLog("orchestrator-queue", "All orchestrator queues declared");
+    logger.debug("All orchestrator queues declared");
   }
 
   /**
@@ -84,10 +86,9 @@ class OrchestratorQueueService {
     trigger: OrchestratorTrigger,
   ): Promise<boolean> {
     if (!rabbitmqService.isConnected()) {
-      debugLog(
-        "orchestrator-queue",
-        `RabbitMQ unavailable, skipping enqueue (sweep will catch it)`,
+      logger.debug(
         { conversationId, trigger },
+        `RabbitMQ unavailable, skipping enqueue (sweep will catch it)`,
       );
       return false;
     }
@@ -103,11 +104,7 @@ class OrchestratorQueueService {
 
     const sent = await rabbitmqService.publish(ORCHESTRATOR_QUEUES.PROCESS, message);
 
-    debugLog("orchestrator-queue", `Enqueued conversation for processing`, {
-      conversationId,
-      trigger,
-      sent,
-    });
+    logger.debug({ conversationId, trigger, sent }, `Enqueued conversation for processing`);
 
     return sent;
   }

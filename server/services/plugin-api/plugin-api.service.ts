@@ -5,8 +5,10 @@ import type {
   EmailResult,
 } from "../../types/plugin-api.types";
 import { emailService } from "../email.service";
-import { debugLog } from "../../lib/debug-logger";
+import { createLogger } from "../../lib/logger";
 import { config } from "../../config/env";
+
+const logger = createLogger("plugin-api");
 
 /**
  * Plugin API Service
@@ -53,11 +55,7 @@ export class PluginAPIService {
       audience: "plugin",
     });
 
-    debugLog("plugin-api", "Generated token for plugin", {
-      pluginId,
-      organizationId,
-      capabilities,
-    });
+    logger.debug({ pluginId, organizationId, capabilities }, "Generated token for plugin");
 
     return token;
   }
@@ -77,10 +75,10 @@ export class PluginAPIService {
 
       return decoded;
     } catch (error) {
-      debugLog("plugin-api", "Token validation failed", {
-        level: "warn",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      logger.warn(
+        { error: error instanceof Error ? error.message : "Unknown error" },
+        "Token validation failed",
+      );
       return null;
     }
   }
@@ -110,11 +108,13 @@ export class PluginAPIService {
   ): Promise<EmailResult> {
     // Check capability
     if (!this.hasCapability(tokenPayload, "email")) {
-      debugLog("plugin-api", "Plugin attempted to send email without capability", {
-        level: "error",
-        pluginId: tokenPayload.pluginId,
-        organizationId: tokenPayload.organizationId,
-      });
+      logger.error(
+        {
+          pluginId: tokenPayload.pluginId,
+          organizationId: tokenPayload.organizationId,
+        },
+        "Plugin attempted to send email without capability",
+      );
 
       return {
         success: false,
@@ -123,14 +123,17 @@ export class PluginAPIService {
     }
 
     try {
-      debugLog("plugin-api", "Sending email via plugin", {
-        pluginId: tokenPayload.pluginId,
-        organizationId: tokenPayload.organizationId,
-        subject: options.subject,
-        hasTo: !!options.to,
-        hasText: !!options.text,
-        hasHtml: !!options.html,
-      });
+      logger.debug(
+        {
+          pluginId: tokenPayload.pluginId,
+          organizationId: tokenPayload.organizationId,
+          subject: options.subject,
+          hasTo: !!options.to,
+          hasText: !!options.text,
+          hasHtml: !!options.html,
+        },
+        "Sending email via plugin",
+      );
 
       // Validate required fields
       if (!options.to) {
@@ -154,23 +157,28 @@ export class PluginAPIService {
         bcc: options.bcc,
       });
 
-      debugLog("plugin-api", "Email sent successfully via plugin", {
-        pluginId: tokenPayload.pluginId,
-        organizationId: tokenPayload.organizationId,
-        messageId: result.messageId,
-      });
+      logger.debug(
+        {
+          pluginId: tokenPayload.pluginId,
+          organizationId: tokenPayload.organizationId,
+          messageId: result.messageId,
+        },
+        "Email sent successfully via plugin",
+      );
 
       return {
         success: true,
         messageId: result.messageId,
       };
     } catch (error) {
-      debugLog("plugin-api", "Failed to send email via plugin", {
-        level: "error",
-        pluginId: tokenPayload.pluginId,
-        organizationId: tokenPayload.organizationId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      logger.error(
+        {
+          pluginId: tokenPayload.pluginId,
+          organizationId: tokenPayload.organizationId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "Failed to send email via plugin",
+      );
 
       return {
         success: false,

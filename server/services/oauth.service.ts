@@ -10,7 +10,6 @@ import type {
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
-import { debugLog } from "@server/lib/debug-logger";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("oauth");
@@ -243,11 +242,14 @@ export class OAuthService {
 
     logger.info({ pluginId }, "OAuth authorization URL generated");
 
-    debugLog("oauth", `Initiated OAuth flow for plugin ${pluginId}`, {
-      organizationId,
-      userId,
-      nonce: nonce.substring(0, 8) + "...",
-    });
+    logger.debug(
+      {
+        organizationId,
+        userId,
+        nonce: nonce.substring(0, 8) + "...",
+      },
+      `Initiated OAuth flow for plugin ${pluginId}`,
+    );
 
     return { authorizationUrl, state: nonce };
   }
@@ -267,7 +269,7 @@ export class OAuthService {
 
     if (error) {
       logger.warn({ error }, "OAuth provider returned error");
-      debugLog("oauth", `OAuth callback error: ${error}`, { level: "error" });
+      logger.error(`OAuth callback error: ${error}`);
       return { success: false, error };
     }
 
@@ -277,7 +279,7 @@ export class OAuthService {
 
     if (!oauthState) {
       logger.warn("OAuth state not found in Redis or expired");
-      debugLog("oauth", `Invalid or expired OAuth state: ${state}`, { level: "error" });
+      logger.error(`Invalid or expired OAuth state: ${state}`);
       return { success: false, error: "Invalid or expired state" };
     }
 
@@ -409,9 +411,7 @@ export class OAuthService {
       await this.storeTokens(organizationId, pluginId, tokens, allScopes);
       logger.info("Tokens stored successfully");
 
-      debugLog("oauth", `OAuth callback successful for plugin ${pluginId}`, {
-        organizationId,
-      });
+      logger.debug({ organizationId }, `OAuth callback successful for plugin ${pluginId}`);
 
       logger.info({ pluginId, organizationId }, "OAuth callback completed successfully");
       return { success: true, pluginId, organizationId };
@@ -424,12 +424,14 @@ export class OAuthService {
         },
         "OAuth callback failed",
       );
-      debugLog("oauth", `OAuth callback failed`, {
-        level: "error",
-        data: error instanceof Error ? error.message : String(error),
-        pluginId,
-        organizationId,
-      });
+      logger.error(
+        {
+          err: error,
+          pluginId,
+          organizationId,
+        },
+        `OAuth callback failed`,
+      );
       return {
         success: false,
         error: error instanceof Error ? error.message : "Token exchange failed",
@@ -611,7 +613,7 @@ export class OAuthService {
       authState: undefined,
     });
 
-    debugLog("oauth", `OAuth revoked for plugin ${pluginId}`, { organizationId });
+    logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
   }
 
   /**
@@ -794,7 +796,7 @@ export class OAuthService {
 
     await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, authState);
 
-    debugLog("oauth", `Token refreshed for plugin ${pluginId}`, { organizationId });
+    logger.debug({ organizationId }, `Token refreshed for plugin ${pluginId}`);
 
     return newTokens;
   }

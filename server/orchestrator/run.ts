@@ -15,8 +15,36 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import type { ExecutionResult } from "./execution.layer";
+import type { Message } from "@server/database/entities/message.entity";
+import type pino from "pino";
 
 const logger = createLogger("orchestrator-run");
+
+/**
+ * Send a bot message and log how long it took from the start of processing.
+ */
+async function sendBotMessage(
+  conversation: Conversation,
+  payload: {
+    content: string;
+    type: string;
+    metadata?: Record<string, unknown>;
+    sender?: string;
+  },
+  log: pino.Logger,
+  processingStartedAt: number,
+): Promise<Message> {
+  const message = await conversation.addMessage(payload);
+  log.info(
+    {
+      durationMs: Date.now() - processingStartedAt,
+      messageType: payload.type,
+      messagePreview: payload.content.substring(0, 100),
+    },
+    "Bot message sent",
+  );
+  return message;
+}
 
 /**
  * Helper function to publish conversation status changes via Redis/WebSocket
@@ -288,6 +316,8 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
+  const processingStartedAt = Date.now();
+
   try {
     // Increment processing attempts
     await conversationRepository.updateById(conversation.id, {
@@ -442,14 +472,19 @@ export const runConversation = async (conversationId: string) => {
             : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
       }
 
-      await conversation.addMessage({
-        content: closingMessage,
-        type: MessageType.BOT_AGENT,
-        metadata: {
-          isClosureMessage: true,
-          closureReason: intent.label,
+      await sendBotMessage(
+        conversation,
+        {
+          content: closingMessage,
+          type: MessageType.BOT_AGENT,
+          metadata: {
+            isClosureMessage: true,
+            closureReason: intent.label,
+          },
         },
-      });
+        log,
+        processingStartedAt,
+      );
 
       // Set processed and unlock early since we're closing
       conversation.setProcessed(true);
@@ -606,7 +641,7 @@ export const runConversation = async (conversationId: string) => {
     );
 
     // 04. Execution - Handle iterative execution with tool calls
-    await handleExecutionLoop(conversation, language);
+    await handleExecutionLoop(conversation, processingStartedAt, language);
 
     // Update processing state to idle (done)
     await updateProcessingState(conversation, "idle");
@@ -695,7 +730,11 @@ export const runConversation = async (conversationId: string) => {
  * Handle iterative execution loop with tool calls
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
-async function handleExecutionLoop(conversation: Conversation, customerLanguage?: string) {
+async function handleExecutionLoop(
+  conversation: Conversation,
+  processingStartedAt: number,
+  customerLanguage?: string,
+) {
   const log = logger.child({
     organizationId: conversation.organization_id,
     conversationId: conversation.id,
@@ -732,14 +771,19 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // If we've retried too many times, use a fallback response
       if (emptyRetries >= MAX_EMPTY_RETRIES) {
         log.warn("Max empty retries reached, using fallback response");
-        await conversation.addMessage({
-          content: "I'm here to help! How can I assist you today?",
-          type: MessageType.BOT_AGENT,
-          metadata: {
-            isFallbackResponse: true,
-            reason: "execution_planning_failed",
+        await sendBotMessage(
+          conversation,
+          {
+            content: "I'm here to help! How can I assist you today?",
+            type: MessageType.BOT_AGENT,
+            metadata: {
+              isFallbackResponse: true,
+              reason: "execution_planning_failed",
+            },
           },
-        });
+          log,
+          processingStartedAt,
+        );
         break;
       }
       continue;
@@ -801,10 +845,15 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
     ) {
       // Only send the userMessage if this is the first tool call
       if (!hasToolCallBeenMade) {
-        await conversation.addMessage({
-          content: executionResult.userMessage,
-          type: MessageType.BOT_AGENT,
-        });
+        await sendBotMessage(
+          conversation,
+          {
+            content: executionResult.userMessage,
+            type: MessageType.BOT_AGENT,
+          },
+          log,
+          processingStartedAt,
+        );
         hasToolCallBeenMade = true;
       }
 
@@ -891,13 +940,18 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           executionResult.userMessage ||
           "I'm transferring you to a human agent. Someone will be with you shortly.";
 
-        await conversation.addMessage({
-          content: handoffMessage,
-          type: MessageType.BOT_AGENT,
-          metadata: buildMessageMetadata(executionResult, {
-            isHandoffMessage: true,
-          }),
-        });
+        await sendBotMessage(
+          conversation,
+          {
+            content: handoffMessage,
+            type: MessageType.BOT_AGENT,
+            metadata: buildMessageMetadata(executionResult, {
+              isHandoffMessage: true,
+            }),
+          },
+          log,
+          processingStartedAt,
+        );
         break;
       }
 
@@ -957,24 +1011,34 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           }
 
           try {
-            await conversation.addMessage({
-              content: handoffMessage,
-              type: MessageType.BOT_AGENT,
-              metadata: buildMessageMetadata(executionResult, {
-                isHandoffMessage: true,
-                handoffType: "available",
-              }),
-            });
+            await sendBotMessage(
+              conversation,
+              {
+                content: handoffMessage,
+                type: MessageType.BOT_AGENT,
+                metadata: buildMessageMetadata(executionResult, {
+                  isHandoffMessage: true,
+                  handoffType: "available",
+                }),
+              },
+              log,
+              processingStartedAt,
+            );
           } catch (error) {
             log.error({ err: error }, "Error generating handoff message");
-            await conversation.addMessage({
-              content: "I'm connecting you with a human agent who will be with you shortly.",
-              type: MessageType.BOT_AGENT,
-              metadata: buildMessageMetadata(executionResult, {
-                isHandoffMessage: true,
-                handoffType: "available",
-              }),
-            });
+            await sendBotMessage(
+              conversation,
+              {
+                content: "I'm connecting you with a human agent who will be with you shortly.",
+                type: MessageType.BOT_AGENT,
+                metadata: buildMessageMetadata(executionResult, {
+                  isHandoffMessage: true,
+                  handoffType: "available",
+                }),
+              },
+              log,
+              processingStartedAt,
+            );
           }
           break;
         }
@@ -1011,14 +1075,19 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
             "I apologize, but no human agents are currently available.";
 
           log.debug("No custom fallback, using default message");
-          await conversation.addMessage({
-            content: unavailableMessage,
-            type: MessageType.BOT_AGENT,
-            metadata: buildMessageMetadata(executionResult, {
-              isHandoffMessage: true,
-              handoffType: "unavailable",
-            }),
-          });
+          await sendBotMessage(
+            conversation,
+            {
+              content: unavailableMessage,
+              type: MessageType.BOT_AGENT,
+              metadata: buildMessageMetadata(executionResult, {
+                isHandoffMessage: true,
+                handoffType: "unavailable",
+              }),
+            },
+            log,
+            processingStartedAt,
+          );
           break;
         }
       }
@@ -1026,10 +1095,15 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
       // Handle conversation closure
       log.debug("CLOSE step detected");
       if (executionResult.userMessage) {
-        await conversation.addMessage({
-          content: executionResult.userMessage,
-          type: MessageType.BOT_AGENT,
-        });
+        await sendBotMessage(
+          conversation,
+          {
+            content: executionResult.userMessage,
+            type: MessageType.BOT_AGENT,
+          },
+          log,
+          processingStartedAt,
+        );
       }
       // Clean up ephemeral secrets from Redis
       await conversationSecretService.deleteSecrets(conversation.id);
@@ -1051,16 +1125,21 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
           );
         }
 
-        await conversation.addMessage({
-          content: executionResult.userMessage,
-          type: MessageType.BOT_AGENT,
-          metadata: {
-            ...buildMessageMetadata(executionResult),
-            ...(executionResult.tool
-              ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
-              : {}),
+        await sendBotMessage(
+          conversation,
+          {
+            content: executionResult.userMessage,
+            type: MessageType.BOT_AGENT,
+            metadata: {
+              ...buildMessageMetadata(executionResult),
+              ...(executionResult.tool
+                ? { potentialHallucination: true, claimedTool: executionResult.tool.name }
+                : {}),
+            },
           },
-        });
+          log,
+          processingStartedAt,
+        );
         log.debug(
           {
             messagePreview: executionResult.userMessage.substring(0, 100),
@@ -1093,14 +1172,19 @@ async function handleExecutionLoop(conversation: Conversation, customerLanguage?
         // If we've retried too many times, use a fallback response
         if (emptyRetries >= MAX_EMPTY_RETRIES) {
           log.warn("Max retries for missing userMessage, using fallback");
-          await conversation.addMessage({
-            content: "I'm here to help! How can I assist you today?",
-            type: MessageType.BOT_AGENT,
-            metadata: {
-              isFallbackResponse: true,
-              reason: "missing_user_message",
+          await sendBotMessage(
+            conversation,
+            {
+              content: "I'm here to help! How can I assist you today?",
+              type: MessageType.BOT_AGENT,
+              metadata: {
+                isFallbackResponse: true,
+                reason: "missing_user_message",
+              },
             },
-          });
+            log,
+            processingStartedAt,
+          );
           break;
         }
         continue;
