@@ -20,6 +20,8 @@ import type pino from "pino";
 
 const logger = createLogger("orchestrator-run");
 
+const LOCK_HEARTBEAT_INTERVAL_MS = 5_000;
+
 /**
  * Send a bot message and log how long it took from the start of processing.
  */
@@ -318,24 +320,35 @@ export const runConversation = async (conversationId: string) => {
 
   const processingStartedAt = Date.now();
 
+  // 00. Acquire processing lock before doing any work or incrementing attempt
+  //     counters. Lock contention isn't a processing failure — just bail.
+  const lockerId = await conversation.lock();
+  if (!lockerId) {
+    log.debug("Could not acquire lock, conversation already being processed");
+    return;
+  }
+
+  // Keep the lock alive while we work. Long ops (vector search, LLM calls)
+  // can far exceed the base lock duration; the heartbeat prevents the stale
+  // detector from treating this run as abandoned.
+  let heartbeatFailed = false;
+  const heartbeatInterval = setInterval(async () => {
+    try {
+      const refreshed = await conversation.refreshLock(lockerId);
+      if (!refreshed) {
+        heartbeatFailed = true;
+        log.warn("Lock heartbeat refresh failed — another worker may have taken over");
+      }
+    } catch (err) {
+      log.warn({ err }, "Lock heartbeat error");
+    }
+  }, LOCK_HEARTBEAT_INTERVAL_MS);
+
   try {
-    // Increment processing attempts
+    // Increment processing attempts now that we own the lock
     await conversationRepository.updateById(conversation.id, {
       processing_attempts: (conversation.processing_attempts || 0) + 1,
     });
-
-    // 00. Intialize
-    const locked = await conversation.lock();
-    if (!locked) {
-      // Track lock acquisition failure
-      await conversationRepository.updateById(conversation.id, {
-        processing_error_count: (conversation.processing_error_count || 0) + 1,
-        last_processing_error: "Failed to acquire lock",
-        last_processing_error_at: new Date(),
-      });
-      log.debug("Could not acquire lock, conversation already being processed");
-      return;
-    }
 
     // 00.1 / 00.2. Fetch initial conversation state in parallel
     const [systemMessages, botMessages, lastCustomerMessage] = await Promise.all([
@@ -359,6 +372,10 @@ export const runConversation = async (conversationId: string) => {
     }
 
     if (!lastCustomerMessage) {
+      // Clear needs_processing so the sweep doesn't re-enqueue this conversation
+      // in a tight loop. Without this, any row with needs_processing=true but
+      // no customer message becomes a sweep zombie.
+      await conversation.setProcessed(true);
       throw new Error("Last customer message not found");
     }
 
@@ -486,10 +503,12 @@ export const runConversation = async (conversationId: string) => {
         processingStartedAt,
       );
 
-      // Set processed and unlock early since we're closing
+      // Set processed and unlock early since we're closing.
+      // The finally block will still run — it clears the heartbeat and the
+      // ownership-checked unlock is a no-op the second time around.
       conversation.setProcessed(true);
       await updateProcessingState(conversation, "idle");
-      await conversation.unlock();
+      await conversation.unlock(lockerId);
       return; // Exit early since conversation is closed
     }
 
@@ -707,21 +726,20 @@ export const runConversation = async (conversationId: string) => {
     // Set to idle on error
     await updateProcessingState(conversation, "idle");
   } finally {
-    // CRITICAL: Always unlock, even on error
+    // Stop the heartbeat first so we don't refresh a lock we're about to release.
+    clearInterval(heartbeatInterval);
+
+    if (heartbeatFailed) {
+      log.warn(
+        "Run completed after heartbeat failure — another worker likely processed this conversation in parallel",
+      );
+    }
+
+    // Ownership-checked unlock: no-op if we lost the lock to another worker.
     try {
-      await conversation.unlock();
+      await conversation.unlock(lockerId);
     } catch (unlockError) {
-      log.error({ err: unlockError }, "CRITICAL: Failed to unlock conversation");
-      // Emergency fallback: Force clear lock via direct DB update
-      try {
-        await conversationRepository.updateById(conversation.id, {
-          processing_locked_until: null,
-          processing_locked_by: null,
-        });
-        log.info("Emergency unlock completed via direct DB update");
-      } catch (emergencyError) {
-        log.error({ err: emergencyError }, "CRITICAL: Emergency unlock also failed");
-      }
+      log.error({ err: unlockError }, "Failed to release lock");
     }
   }
 };

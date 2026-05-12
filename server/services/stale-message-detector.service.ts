@@ -6,6 +6,14 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("stale-message");
 
+/**
+ * Grace period after a lock has expired before we treat the conversation as
+ * abandoned. The active worker refreshes its lock every 5 seconds; this
+ * window must comfortably exceed several missed heartbeats so a momentarily
+ * slow worker isn't preempted.
+ */
+const LOCK_EXPIRY_GRACE_MS = 60_000;
+
 export enum StaleReason {
   LOCK_EXPIRED = "lock_expired",
   NO_RESPONSE_TIMEOUT = "no_response_timeout",
@@ -104,10 +112,16 @@ export class StaleMessageDetectorService {
           AND (
             -- Already marked as stuck
             is_stuck = TRUE
-            -- Lock expired but still in processing status
-            OR (status = 'processing' AND processing_locked_until < NOW())
-            -- Needs processing but no lock held for threshold duration
-            OR (needs_processing = TRUE AND (processing_locked_until IS NULL OR processing_locked_until < NOW()))
+            -- Lock expired (past grace period) but still in processing status
+            OR (status = 'processing' AND processing_locked_until < NOW() - ($2 || ' milliseconds')::interval)
+            -- Needs processing but no live lock — grace period covers heartbeat blips
+            OR (
+              needs_processing = TRUE
+              AND (
+                processing_locked_until IS NULL
+                OR processing_locked_until < NOW() - ($2 || ' milliseconds')::interval
+              )
+            )
             -- Cooldown expired but not marked for processing
             OR (cooldown_until IS NOT NULL AND cooldown_until < NOW() AND needs_processing = FALSE)
             -- Multiple consecutive failures
@@ -115,7 +129,7 @@ export class StaleMessageDetectorService {
           )
       `;
 
-      const results = await AppDataSource.query(query, [thresholdDate]);
+      const results = await AppDataSource.query(query, [thresholdDate, LOCK_EXPIRY_GRACE_MS]);
 
       const staleConversations: StaleConversation[] = results.map((row: any) => {
         const stuckReason = this.determineStuckReason(row, now);
@@ -163,11 +177,13 @@ export class StaleMessageDetectorService {
       return StaleReason.REPEATED_FAILURES;
     }
 
-    // Lock expired but still in processing status
+    const lockExpiryDeadline = new Date(now.getTime() - LOCK_EXPIRY_GRACE_MS);
+
+    // Lock expired (past grace) but still in processing status
     if (
       row.status === "processing" &&
       row.processing_locked_until &&
-      new Date(row.processing_locked_until) < now
+      new Date(row.processing_locked_until) < lockExpiryDeadline
     ) {
       return StaleReason.LOCK_EXPIRED;
     }
@@ -181,10 +197,10 @@ export class StaleMessageDetectorService {
       return StaleReason.COOLDOWN_STUCK;
     }
 
-    // Needs processing but no lock held (abandoned)
+    // Needs processing but no live lock (past grace = abandoned)
     if (
       row.needs_processing === true &&
-      (!row.processing_locked_until || new Date(row.processing_locked_until) < now)
+      (!row.processing_locked_until || new Date(row.processing_locked_until) < lockExpiryDeadline)
     ) {
       return StaleReason.ABANDONED_PROCESSING;
     }

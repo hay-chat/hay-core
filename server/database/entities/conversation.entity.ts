@@ -189,17 +189,19 @@ export class Conversation {
     return conversationRepository.getLastHumanMessage(this.id);
   }
 
-  async lock(): Promise<boolean> {
+  async lock(): Promise<string | null> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
     return await conversationRepository.acquireLock(this.id, this.organization_id);
   }
 
-  async unlock(): Promise<void> {
+  async refreshLock(lockerId: string): Promise<boolean> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
-    await conversationRepository.update(this.id, this.organization_id, {
-      processing_locked_until: null,
-      processing_locked_by: null,
-    });
+    return await conversationRepository.refreshLock(this.id, lockerId);
+  }
+
+  async unlock(lockerId: string): Promise<void> {
+    const { conversationRepository } = await import("../../repositories/conversation.repository");
+    await conversationRepository.releaseLock(this.id, lockerId);
   }
 
   async updateAgent(agentId: string): Promise<void> {

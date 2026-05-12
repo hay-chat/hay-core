@@ -1,10 +1,13 @@
 import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
+import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType, MessageStatus } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+
+const LOCK_DURATION_MS = 15_000;
 
 const logger = createLogger("conversation-repo");
 
@@ -206,6 +209,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .andWhere("conversation.status IN (:...statuses)", {
           statuses: ["open", "processing"],
         })
+        .andWhere(
+          "(conversation.processing_locked_until IS NULL OR conversation.processing_locked_until < :now)",
+          { now: new Date() },
+        )
         .select(["conversation.id", "conversation.organization_id"])
         .getMany();
     } catch (error) {
@@ -643,29 +650,61 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   /**
-   * Atomically acquire a processing lock on a conversation
-   * Returns true if lock was acquired, false if conversation is already locked
+   * Atomically acquire a processing lock on a conversation.
+   * Returns a unique lockerId on success, null if already locked.
+   * The lockerId must be passed to refreshLock / releaseLock to prove ownership.
    */
-  async acquireLock(conversationId: string, organizationId: string): Promise<boolean> {
-    const lockDuration = 15_000; // 15 seconds
-    const lockUntil = new Date(Date.now() + lockDuration);
+  async acquireLock(conversationId: string, organizationId: string): Promise<string | null> {
+    const lockerId = uuidv4();
+    const lockUntil = new Date(Date.now() + LOCK_DURATION_MS);
     const now = new Date();
 
-    // Atomic compare-and-set: only update if not currently locked
     const result = await this.getRepository()
       .createQueryBuilder()
       .update(Conversation)
       .set({
         processing_locked_until: lockUntil,
-        processing_locked_by: "orchestrator-v2",
+        processing_locked_by: lockerId,
       })
       .where("id = :id", { id: conversationId })
       .andWhere("organization_id = :organizationId", { organizationId })
       .andWhere("(processing_locked_until IS NULL OR processing_locked_until < :now)", { now })
       .execute();
 
-    // If affected rows = 1, we successfully acquired the lock
+    return (result.affected ?? 0) > 0 ? lockerId : null;
+  }
+
+  /**
+   * Extend an existing lock's expiry. Only succeeds if the caller owns the lock
+   * (i.e. processing_locked_by matches the lockerId returned by acquireLock).
+   * Returns false if the lock was stolen or already released — caller should abort.
+   */
+  async refreshLock(conversationId: string, lockerId: string): Promise<boolean> {
+    const lockUntil = new Date(Date.now() + LOCK_DURATION_MS);
+
+    const result = await this.getRepository()
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({ processing_locked_until: lockUntil })
+      .where("id = :id", { id: conversationId })
+      .andWhere("processing_locked_by = :lockerId", { lockerId })
+      .execute();
+
     return (result.affected ?? 0) > 0;
+  }
+
+  /**
+   * Release a lock — only clears it if we still own it.
+   * Silent no-op if the lock has been taken over by another worker.
+   */
+  async releaseLock(conversationId: string, lockerId: string): Promise<void> {
+    await this.getRepository()
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({ processing_locked_until: null, processing_locked_by: null })
+      .where("id = :id", { id: conversationId })
+      .andWhere("processing_locked_by = :lockerId", { lockerId })
+      .execute();
   }
 }
 
