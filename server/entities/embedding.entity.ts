@@ -28,30 +28,9 @@ export class Embedding {
   @Column({ type: "jsonb", nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Column({
-    type: "text",
-    nullable: true,
-    transformer: {
-      to: (value: number[] | null): string | null => {
-        if (!value || !Array.isArray(value)) return null;
-        return `[${value.join(",")}]`;
-      },
-      from: (value: string | null): number[] | null => {
-        if (!value) return null;
-        if (Array.isArray(value)) return value;
-
-        // Handle pgvector format
-        if (typeof value === "string") {
-          const cleaned = value.replace(/[[\]]/g, "");
-          if (!cleaned) return null;
-          return cleaned.split(",").map((v) => parseFloat(v.trim()));
-        }
-
-        return null;
-      },
-    },
-  })
-  embedding?: number[] | null;
+  // The `embedding` column exists in the DB as vector(1536) but is intentionally
+  // omitted from this entity — all reads/writes go through raw SQL in
+  // vector-store.service.ts, and TypeORM has no native vector column type.
 
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;

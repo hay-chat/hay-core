@@ -19,6 +19,10 @@ const EMBEDDING_BATCH_SIZE = 100;
 // OpenAI allows max 300K tokens per embedding request.
 // Conservative estimate: ~3 chars per token → 900K char budget per batch.
 const MAX_CHARS_PER_BATCH = 900_000;
+// HNSW candidate pool for searchDocuments: top-N chunks the index returns
+// before aggregating by document. Must be ≥ the largest expected k × a few
+// chunks per doc; 100 covers k ≤ 10 comfortably.
+const SEARCH_DOCUMENTS_CANDIDATE_POOL = 100;
 
 export interface VectorChunk {
   content: string;
@@ -196,10 +200,10 @@ export class VectorStoreService {
         id,
         "page_content" as content,
         metadata,
-        1 - (embedding::vector <=> $1::vector) as similarity
+        1 - (embedding <=> $1::vector) as similarity
       FROM embeddings
       WHERE "organization_id" = $2
-      ORDER BY embedding::vector <=> $1::vector
+      ORDER BY embedding <=> $1::vector
       LIMIT $3
     `;
 
@@ -245,21 +249,30 @@ export class VectorStoreService {
 
     const queryVector = await this.embedQuery(query);
 
+    // Subquery pulls top-N nearest chunks via HNSW, then aggregates by document.
+    // Without the inner LIMIT, a GROUP BY over the full org partition would
+    // force a sequential scan and bypass the index entirely.
     const searchQuery = `
-      SELECT
-        "document_id" as "documentId",
-        MAX(1 - (embedding::vector <=> $1::vector)) as similarity
-      FROM embeddings
-      WHERE "organization_id" = $2
-        AND "document_id" IS NOT NULL
-      GROUP BY "document_id"
+      SELECT "documentId", MAX(similarity) AS similarity
+      FROM (
+        SELECT
+          "document_id" AS "documentId",
+          1 - (embedding <=> $1::vector) AS similarity
+        FROM embeddings
+        WHERE "organization_id" = $2
+          AND "document_id" IS NOT NULL
+        ORDER BY embedding <=> $1::vector
+        LIMIT $3
+      ) candidates
+      GROUP BY "documentId"
       ORDER BY similarity DESC
-      LIMIT $3
+      LIMIT $4
     `;
 
     const results = await AppDataSource.query(searchQuery, [
       `[${queryVector.join(",")}]`,
       organizationId,
+      SEARCH_DOCUMENTS_CANDIDATE_POOL,
       k,
     ]);
 
