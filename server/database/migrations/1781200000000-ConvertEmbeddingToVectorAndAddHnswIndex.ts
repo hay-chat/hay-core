@@ -24,10 +24,14 @@ export class ConvertEmbeddingToVectorAndAddHnswIndex1781200000000 implements Mig
     // pgvector must be present. No-op if already installed.
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS vector`);
 
-    // HNSW build on ~200k × 1536-dim vectors needs roughly 1.3 GB working set.
-    // Without enough maintenance_work_mem the build spills to disk and slows
-    // by orders of magnitude. SET LOCAL only applies inside this transaction.
-    await queryRunner.query(`SET LOCAL maintenance_work_mem = '2GB'`);
+    // DO managed Postgres has a bounded /dev/shm and rejects multi-GB DSM
+    // segment allocations. pgvector's HNSW build allocates a DSM segment
+    // proportional to maintenance_work_mem to coordinate parallel maintenance
+    // workers; with workers disabled, the build is single-threaded and uses
+    // per-backend RAM instead. 1 GB maintenance_work_mem keeps the build in
+    // memory for ~200k × 1536-dim vectors without hitting shared-memory.
+    await queryRunner.query(`SET LOCAL max_parallel_maintenance_workers = 0`);
+    await queryRunner.query(`SET LOCAL maintenance_work_mem = '1GB'`);
 
     // Rewrite the column. Every existing row's text payload of the form
     // '[v1,v2,...,v1536]' is parsed into a native pgvector value.
