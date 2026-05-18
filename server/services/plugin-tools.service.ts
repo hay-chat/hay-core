@@ -14,10 +14,23 @@ const logger = createLogger("plugin-tools");
 /**
  * MCP Tool definition from worker
  */
+interface MCPToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
 interface MCPTool {
   name: string;
+  title?: string;
   description: string;
-  input_schema: Record<string, any>;
+  // The MCP spec uses `inputSchema` on the wire. `input_schema` is kept as
+  // an alias for older cached entries; new tools land in `inputSchema`.
+  inputSchema?: Record<string, any>;
+  input_schema?: Record<string, any>;
+  annotations?: MCPToolAnnotations;
   serverId?: string;
 }
 

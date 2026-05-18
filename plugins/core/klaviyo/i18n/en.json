@@ -1,0 +1,11 @@
+{
+  "name": "Klaviyo",
+  "description": "Connect your Klaviyo account to manage profiles, lists, segments, campaigns, flows, events, and templates",
+  "tools": {},
+  "config": {
+    "apiKey": {
+      "label": "Private API Key",
+      "description": "Klaviyo private API key (starts with pk_). Create one under Account → Settings → API Keys."
+    }
+  }
+}

@@ -283,47 +283,85 @@
             </div>
           </CardContent>
         </Card>
+      </template>
 
-        <!-- Available Actions Card (for MCP plugins) -->
-        <!-- Note: TypeScript-first plugins don't show tools here as they're registered dynamically -->
-        <Card
-          v-if="
-            !Array.isArray(plugin.manifest.capabilities) &&
-            plugin.manifest?.capabilities?.mcp?.tools &&
-            plugin.manifest.capabilities.mcp.tools.length > 0
-          "
-        >
-          <CardHeader>
-            <CardTitle>{{ $t("pluginSettings.availableActions.title") }}</CardTitle>
-            <CardDescription>{{
-              $t("pluginSettings.availableActions.toolsAvailable", {
-                count: plugin.manifest.capabilities.mcp.tools.length,
-              })
-            }}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="grid gap-3">
+      <!-- Available Actions Card (for MCP plugins) -->
+      <!-- Renders for both enabled and disabled plugins. Prefers live tools registered
+           by the running worker; falls back to manifest tools when no worker is running. -->
+      <Card v-if="availableTools.length > 0">
+        <CardHeader>
+          <CardTitle>{{ $t("pluginSettings.availableActions.title") }}</CardTitle>
+          <CardDescription>{{
+            $t("pluginSettings.availableActions.toolsAvailable", {
+              count: availableTools.length,
+            })
+          }}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="relative">
+            <div class="grid gap-2">
               <div
-                v-for="tool in plugin.manifest.capabilities.mcp.tools"
+                v-for="tool in displayedTools"
                 :key="tool.name"
-                class="flex items-start gap-3 p-3 rounded-lg border border-border"
+                class="rounded-lg border border-border overflow-hidden"
               >
-                <div
-                  class="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0"
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+                  :aria-expanded="expandedTools.has(tool.name)"
+                  @click="toggleTool(tool.name)"
                 >
-                  <Zap class="h-4 w-4 text-primary" />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <h4 class="font-medium text-sm">{{ getToolLabel(pluginId, tool.name) }}</h4>
-                  <p class="text-xs text-muted-foreground mt-1">
+                  <Badge :variant="getToolBadgeVariant(tool)" class="flex-shrink-0">
+                    {{ getToolBadgeLabel(tool) }}
+                  </Badge>
+                  <h4 class="font-medium text-sm flex-1 min-w-0 truncate">
+                    {{ getToolLabel(pluginId, tool.name) }}
+                  </h4>
+                  <ChevronDown
+                    class="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform"
+                    :class="{ 'rotate-180': expandedTools.has(tool.name) }"
+                  />
+                </button>
+                <div v-if="expandedTools.has(tool.name)" class="p-4 pt-1 space-y-2">
+                  <p v-if="tool.description" class="text-xs text-muted-foreground">
                     {{ getToolDescription(pluginId, tool.name, tool.description) }}
                   </p>
+                  <div v-if="tool.input_schema">
+                    <p class="text-[11px] font-medium uppercase text-muted-foreground mb-2">
+                      Parameters
+                    </p>
+                    <McpToolInputSchema :schema="tool.input_schema" />
+                  </div>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </template>
+
+            <!-- Fade overlay + Show all button (only when collapsed) -->
+            <div
+              v-if="!showAllTools && availableTools.length > 5"
+              class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center pt-32 pb-2 bg-gradient-to-t from-background to-transparent"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                class="pointer-events-auto shadow-sm"
+                @click="showAllTools = true"
+              >
+                {{
+                  $t("pluginSettings.availableActions.showAll", { count: availableTools.length })
+                }}
+              </Button>
+            </div>
+          </div>
+
+          <!-- Hide button shown below the full list when expanded -->
+          <div v-if="showAllTools && availableTools.length > 5" class="mt-3 flex justify-center">
+            <Button variant="ghost" size="sm" @click="showAllTools = false">
+              {{ $t("pluginSettings.availableActions.hide") }}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <!-- OAuth Connection Card (show when OAuth is available and configured) -->
       <Card v-if="enabled && oauthAvailable && oauthConfigured">
@@ -570,7 +608,7 @@
 </template>
 
 <script setup lang="ts">
-import { markRaw, defineAsyncComponent, computed, onUnmounted } from "vue";
+import { markRaw, defineAsyncComponent, computed, ref, onUnmounted } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
@@ -587,6 +625,7 @@ import {
   Check,
   Info,
   RotateCw,
+  ChevronDown,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -595,6 +634,7 @@ import { useDomain } from "@/composables/useDomain";
 import { sanitizeHtml } from "@/utils/sanitize";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
 
 const { t } = useI18n();
@@ -659,6 +699,100 @@ const isMcpPlugin = computed(() => {
   const caps = plugin.value.manifest.capabilities;
   return Array.isArray(caps) ? caps.includes("mcp") : !!caps.mcp;
 });
+
+// Tools to render in the Available Actions card.
+// Prefers live tools registered by the running worker; falls back to manifest tools
+// for plugins that statically declare them.
+type ToolAnnotations = {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  title?: string;
+};
+type DisplayTool = {
+  name: string;
+  title?: string;
+  description?: string;
+  input_schema?: Record<string, any>;
+  annotations?: ToolAnnotations;
+};
+const availableTools = computed<DisplayTool[]>(() => {
+  const live = plugin.value?.tools;
+  if (Array.isArray(live) && live.length > 0) {
+    return live;
+  }
+  const caps = plugin.value?.manifest?.capabilities;
+  if (!Array.isArray(caps) && caps?.mcp?.tools?.length) {
+    return caps.mcp.tools;
+  }
+  return [];
+});
+
+const showAllTools = ref(false);
+const expandedTools = ref<Set<string>>(new Set());
+
+const COLLAPSED_TOOL_LIMIT = 5;
+const displayedTools = computed(() =>
+  showAllTools.value ? availableTools.value : availableTools.value.slice(0, COLLAPSED_TOOL_LIMIT),
+);
+
+function toggleTool(name: string) {
+  const next = new Set(expandedTools.value);
+  if (next.has(name)) {
+    next.delete(name);
+  } else {
+    next.add(name);
+  }
+  expandedTools.value = next;
+}
+
+// Classify a tool as read / write / destructive using MCP annotations when
+// present, falling back to name-token heuristics for servers that don't ship
+// annotations (e.g. Klaviyo). Annotations are advisory hints per the MCP
+// spec, not security guarantees.
+const DESTRUCTIVE_TOKENS = new Set(["delete", "destroy", "remove", "drop", "archive", "purge"]);
+const READ_TOKENS = new Set([
+  "get",
+  "list",
+  "find",
+  "show",
+  "describe",
+  "read",
+  "search",
+  "fetch",
+  "query",
+  "retrieve",
+  "inspect",
+]);
+
+function classifyTool(tool: DisplayTool): "read" | "write" | "destructive" {
+  const ann = tool.annotations;
+  if (ann) {
+    if (ann.destructiveHint === true) return "destructive";
+    if (ann.readOnlyHint === true) return "read";
+    if (ann.readOnlyHint === false) return "write";
+  }
+  const segments = tool.name.toLowerCase().split(/[_\-:.]/);
+  for (const seg of segments) {
+    if (DESTRUCTIVE_TOKENS.has(seg)) return "destructive";
+  }
+  for (const seg of segments) {
+    if (READ_TOKENS.has(seg)) return "read";
+  }
+  return "write";
+}
+
+function getToolBadgeVariant(tool: DisplayTool): "success" | "warning" | "destructive" {
+  const cls = classifyTool(tool);
+  if (cls === "destructive") return "destructive";
+  if (cls === "read") return "success";
+  return "warning";
+}
+
+function getToolBadgeLabel(tool: DisplayTool): string {
+  return t(`pluginSettings.availableActions.classification.${classifyTool(tool)}`);
+}
 
 // Configuration
 const hasConfiguration = ref(false);

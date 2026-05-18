@@ -215,7 +215,14 @@
     },
     "availableActions": {
       "title": "Ações Disponíveis",
-      "toolsAvailable": "{count} ferramentas disponíveis"
+      "toolsAvailable": "{count} ferramentas disponíveis",
+      "showAll": "Mostrar todas ({count})",
+      "hide": "Ocultar",
+      "classification": {
+        "read": "Leitura",
+        "write": "Escrita",
+        "destructive": "Destrutiva"
+      }
     },
     "configuration": {
       "title": "Configuração",

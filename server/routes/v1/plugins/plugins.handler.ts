@@ -269,6 +269,20 @@ export const getPlugin = authenticatedProcedure
       }
     }
 
+    // Live MCP tools registered by the running plugin worker.
+    // The MCP spec uses `inputSchema` (camelCase) on the wire — accept either
+    // shape in case older cached entries use snake_case.
+    const liveTools =
+      instance && instance.enabled
+        ? getToolsFromConfig(instance.config).map((tool) => ({
+            name: tool.name,
+            title: tool.title,
+            description: tool.description || "",
+            input_schema: tool.inputSchema ?? tool.input_schema,
+            annotations: tool.annotations,
+          }))
+        : [];
+
     return {
       // Plugin metadata
       id: plugin.pluginId,
@@ -282,6 +296,7 @@ export const getPlugin = authenticatedProcedure
       installed: plugin.installed,
       built: plugin.built,
       status: plugin.status || PluginStatus.AVAILABLE,
+      tools: liveTools,
 
       // Configuration data (from getPluginConfiguration)
       configuration,

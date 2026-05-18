@@ -1,0 +1,28 @@
+{
+  "name": "hay-plugin-klaviyo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Klaviyo account to manage profiles, lists, segments, campaigns, flows, events, and templates",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Klaviyo",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}

@@ -6,9 +6,9 @@
  * instead of HTTP transport.
  */
 
-import { ChildProcess } from 'child_process';
-import { createInterface, Interface as ReadlineInterface } from 'readline';
-import type { HayLogger } from '../types/index.js';
+import { ChildProcess } from "child_process";
+import { createInterface, Interface as ReadlineInterface } from "readline";
+import type { HayLogger } from "../types/index.js";
 
 export interface StdioMcpClientOptions {
   /**
@@ -27,14 +27,24 @@ export interface StdioMcpClientOptions {
   timeout?: number;
 }
 
+export interface McpToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
 export interface McpTool {
   name: string;
+  title?: string;
   description?: string;
   input_schema: {
     type: string;
     properties?: Record<string, any>;
     required?: string[];
   };
+  annotations?: McpToolAnnotations;
 }
 
 interface PendingRequest {
@@ -56,6 +66,7 @@ export class StdioMcpClient {
   private isReady = false;
   private readyPromise: Promise<void>;
   private readyResolve?: () => void;
+  private initPromise: Promise<void> | null = null;
 
   constructor(options: StdioMcpClientOptions) {
     this.process = options.process;
@@ -75,11 +86,11 @@ export class StdioMcpClient {
    */
   private setupIoHandlers(): void {
     if (!this.process.stdout) {
-      throw new Error('Child process stdout is not available');
+      throw new Error("Child process stdout is not available");
     }
 
     if (!this.process.stdin) {
-      throw new Error('Child process stdin is not available');
+      throw new Error("Child process stdin is not available");
     }
 
     // Create readline interface for stdout
@@ -89,30 +100,30 @@ export class StdioMcpClient {
     });
 
     // Handle responses from MCP server
-    this.readline.on('line', (line: string) => {
+    this.readline.on("line", (line: string) => {
       this.handleResponse(line);
     });
 
     // Handle stderr output
     if (this.process.stderr) {
-      this.process.stderr.on('data', (data: Buffer) => {
+      this.process.stderr.on("data", (data: Buffer) => {
         const message = data.toString().trim();
         // Only log non-empty stderr messages
         if (message) {
-          this.logger.debug('[Stdio MCP] stderr:', message);
+          this.logger.debug("[Stdio MCP] stderr:", message);
         }
       });
     }
 
     // Handle process exit
-    this.process.on('exit', (code: number | null, signal: string | null) => {
-      this.logger.info('[Stdio MCP] Process exited', { code, signal });
+    this.process.on("exit", (code: number | null, signal: string | null) => {
+      this.logger.info("[Stdio MCP] Process exited", { code, signal });
       this.cleanup();
     });
 
     // Handle process errors
-    this.process.on('error', (error: Error) => {
-      this.logger.error('[Stdio MCP] Process error:', error);
+    this.process.on("error", (error: Error) => {
+      this.logger.error("[Stdio MCP] Process error:", error);
       this.cleanup();
     });
 
@@ -122,7 +133,7 @@ export class StdioMcpClient {
       this.readyResolve();
     }
 
-    this.logger.debug('[Stdio MCP] IO handlers setup complete');
+    this.logger.debug("[Stdio MCP] IO handlers setup complete");
   }
 
   /**
@@ -132,8 +143,8 @@ export class StdioMcpClient {
     try {
       const response = JSON.parse(line);
 
-      if (!response.jsonrpc || response.jsonrpc !== '2.0') {
-        this.logger.warn('[Stdio MCP] Invalid JSON-RPC version in response:', response);
+      if (!response.jsonrpc || response.jsonrpc !== "2.0") {
+        this.logger.warn("[Stdio MCP] Invalid JSON-RPC version in response:", response);
         return;
       }
 
@@ -142,7 +153,7 @@ export class StdioMcpClient {
       // Look up the pending request
       const pending = this.pendingRequests.get(id);
       if (!pending) {
-        this.logger.warn('[Stdio MCP] Received response for unknown request ID:', id);
+        this.logger.warn("[Stdio MCP] Received response for unknown request ID:", id);
         return;
       }
 
@@ -152,12 +163,12 @@ export class StdioMcpClient {
 
       // Resolve or reject based on response
       if (error) {
-        pending.reject(new Error(error.message || 'MCP request failed'));
+        pending.reject(new Error(error.message || "MCP request failed"));
       } else {
         pending.resolve(result);
       }
     } catch (err) {
-      this.logger.error('[Stdio MCP] Failed to parse response', { error: err, line });
+      this.logger.error("[Stdio MCP] Failed to parse response", { error: err, line });
     }
   }
 
@@ -169,13 +180,13 @@ export class StdioMcpClient {
     await this.readyPromise;
 
     if (!this.isReady || !this.process.stdin) {
-      throw new Error('Stdio MCP client is not ready');
+      throw new Error("Stdio MCP client is not ready");
     }
 
     return new Promise((resolve, reject) => {
       const id = this.requestId++;
       const request = {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id,
         method,
         params,
@@ -192,10 +203,10 @@ export class StdioMcpClient {
 
       // Send the request
       const requestLine = JSON.stringify(request);
-      this.logger.debug('[Stdio MCP] Sending request:', { method, id });
+      this.logger.debug("[Stdio MCP] Sending request:", { method, id });
 
       try {
-        this.process.stdin!.write(requestLine + '\n');
+        this.process.stdin!.write(requestLine + "\n");
       } catch (err) {
         clearTimeout(timer);
         this.pendingRequests.delete(id);
@@ -205,13 +216,51 @@ export class StdioMcpClient {
   }
 
   /**
+   * Send a JSON-RPC notification (no id, no response expected).
+   */
+  private async sendNotification(method: string, params: any = {}): Promise<void> {
+    await this.readyPromise;
+
+    if (!this.isReady || !this.process.stdin) {
+      throw new Error("Stdio MCP client is not ready");
+    }
+
+    const notification = { jsonrpc: "2.0", method, params };
+    this.logger.debug("[Stdio MCP] Sending notification:", { method });
+    this.process.stdin.write(JSON.stringify(notification) + "\n");
+  }
+
+  /**
+   * Perform the MCP initialize handshake once, before any other request.
+   * Spec-compliant servers (e.g. FastMCP) reject tools/list and tools/call
+   * until this completes.
+   */
+  private ensureInitialized(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        await this.sendRequest("initialize", {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "hay-plugin-sdk", version: "1.0.0" },
+        });
+        await this.sendNotification("notifications/initialized", {});
+      })().catch((err) => {
+        this.initPromise = null;
+        throw err;
+      });
+    }
+    return this.initPromise;
+  }
+
+  /**
    * List all available tools from the MCP server
    */
   async listTools(): Promise<McpTool[]> {
-    this.logger.debug('[Stdio MCP] Listing tools');
+    this.logger.debug("[Stdio MCP] Listing tools");
 
     try {
-      const result = await this.sendRequest('tools/list', {});
+      await this.ensureInitialized();
+      const result = await this.sendRequest("tools/list", {});
 
       // Handle different response formats
       if (Array.isArray(result)) {
@@ -222,10 +271,10 @@ export class StdioMcpClient {
         return result.tools;
       }
 
-      this.logger.warn('[Stdio MCP] Unexpected listTools response format:', result);
+      this.logger.warn("[Stdio MCP] Unexpected listTools response format:", result);
       return [];
     } catch (err) {
-      this.logger.error('[Stdio MCP] Failed to list tools:', err);
+      this.logger.error("[Stdio MCP] Failed to list tools:", err);
       throw err;
     }
   }
@@ -234,17 +283,18 @@ export class StdioMcpClient {
    * Call a tool on the MCP server
    */
   async callTool(name: string, args: Record<string, any>): Promise<any> {
-    this.logger.debug('[Stdio MCP] Calling tool', { name, args });
+    this.logger.debug("[Stdio MCP] Calling tool", { name, args });
 
     try {
-      const result = await this.sendRequest('tools/call', {
+      await this.ensureInitialized();
+      const result = await this.sendRequest("tools/call", {
         name,
         arguments: args,
       });
 
       return result;
     } catch (err) {
-      this.logger.error('[Stdio MCP] Failed to call tool', { name, error: err });
+      this.logger.error("[Stdio MCP] Failed to call tool", { name, error: err });
       throw err;
     }
   }
@@ -256,7 +306,7 @@ export class StdioMcpClient {
     // Reject all pending requests
     for (const [, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
-      pending.reject(new Error('MCP process terminated'));
+      pending.reject(new Error("MCP process terminated"));
     }
     this.pendingRequests.clear();
 
@@ -273,7 +323,7 @@ export class StdioMcpClient {
    * Stop the client and cleanup
    */
   async stop(): Promise<void> {
-    this.logger.debug('[Stdio MCP] Stopping client');
+    this.logger.debug("[Stdio MCP] Stopping client");
     this.cleanup();
 
     // The process itself should be managed by the parent

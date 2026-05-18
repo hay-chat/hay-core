@@ -215,7 +215,14 @@
     },
     "availableActions": {
       "title": "Available Actions",
-      "toolsAvailable": "{count} tools available"
+      "toolsAvailable": "{count} tools available",
+      "showAll": "Show all ({count})",
+      "hide": "Hide",
+      "classification": {
+        "read": "Read",
+        "write": "Write",
+        "destructive": "Destructive"
+      }
     },
     "configuration": {
       "title": "Configuration",
