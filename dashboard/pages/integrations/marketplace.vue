@@ -114,7 +114,7 @@
         <CardHeader>
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center space-x-3 min-w-0">
-              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden">
+              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden shadow-md">
                 <img
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
