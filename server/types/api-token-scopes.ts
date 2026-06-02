@@ -33,6 +33,12 @@ export enum ApiTokenScope {
   SETTINGS_READ = "settings:read",
   SETTINGS_WRITE = "settings:write",
 
+  // Commerce
+  PRODUCTS_READ = "products:read",
+  PRODUCTS_WRITE = "products:write",
+  PRODUCTS_INGEST = "products:create",
+  PRODUCTS_DELETE = "products:delete",
+
   // Full Access
   ALL = "*:*",
 }
@@ -62,6 +68,12 @@ export const API_TOKEN_SCOPE_GROUPS = {
     ApiTokenScope.PRIVACY_DELETE,
   ],
   Settings: [ApiTokenScope.SETTINGS_READ, ApiTokenScope.SETTINGS_WRITE],
+  Products: [
+    ApiTokenScope.PRODUCTS_READ,
+    ApiTokenScope.PRODUCTS_WRITE,
+    ApiTokenScope.PRODUCTS_INGEST,
+    ApiTokenScope.PRODUCTS_DELETE,
+  ],
   "Full Access": [ApiTokenScope.ALL],
 } as const;
 
@@ -86,6 +98,10 @@ export const API_TOKEN_SCOPE_DESCRIPTIONS: Record<ApiTokenScope, string> = {
   [ApiTokenScope.PRIVACY_DELETE]: "Request user deletion (DSAR)",
   [ApiTokenScope.SETTINGS_READ]: "View organization settings",
   [ApiTokenScope.SETTINGS_WRITE]: "Modify organization settings",
+  [ApiTokenScope.PRODUCTS_READ]: "Read products and variants",
+  [ApiTokenScope.PRODUCTS_WRITE]: "Update existing products",
+  [ApiTokenScope.PRODUCTS_INGEST]: "Ingest products from external catalogs",
+  [ApiTokenScope.PRODUCTS_DELETE]: "Delete products",
   [ApiTokenScope.ALL]: "Full access to all resources",
 };
 

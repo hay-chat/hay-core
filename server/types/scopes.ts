@@ -35,6 +35,9 @@ export const RESOURCES = {
   ANALYTICS: "analytics",
   AUDIT_LOGS: "audit_logs",
 
+  // Commerce
+  PRODUCTS: "products",
+
   // Wildcards
   ALL: "*",
 } as const;
@@ -139,6 +142,9 @@ export const MEMBER_SCOPES = [
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),
 ];
 
 /**
@@ -162,6 +168,9 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
+  buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),
   // Note: Contributors cannot publish or delete - requires admin approval
 ];
 
