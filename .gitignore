@@ -8,6 +8,8 @@ plugins/*/*/dist/
 # Compiled JS files (should only be in dist)
 server/**/*.js
 server/**/*.js.map
+# ...but the hand-written Jest config must be tracked (CI needs it)
+!server/jest.config.js
 
 # Symlinked plugin pages (created dynamically by plugin system)
 dashboard/pages/plugins/*/
