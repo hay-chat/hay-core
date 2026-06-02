@@ -110,6 +110,53 @@ export class DocumentRepository extends BaseRepository<Document> {
   }
 
   /**
+   * Find a document by its external id within a document source.
+   * Used by the sync engine to look up existing documents.
+   */
+  async findByExternalId(documentSourceId: string, externalId: string): Promise<Document | null> {
+    return await this.getRepository().findOne({
+      where: { documentSourceId, externalId } as any,
+    });
+  }
+
+  /**
+   * Find all documents belonging to a document source, with optional pagination.
+   */
+  async findByDocumentSourceId(
+    documentSourceId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<Document[]> {
+    return await this.getRepository().find({
+      where: { documentSourceId } as any,
+      take: options?.limit,
+      skip: options?.offset,
+    });
+  }
+
+  async countByDocumentSourceId(documentSourceId: string): Promise<number> {
+    return await this.getRepository().count({
+      where: { documentSourceId } as any,
+    });
+  }
+
+  /**
+   * Return only the external ids of documents in a document source.
+   * Cheap projection used by the deletion-detection full sweep; may return
+   * thousands of rows.
+   */
+  async findExternalIdsForSource(documentSourceId: string): Promise<string[]> {
+    const results = await this.getRepository()
+      .createQueryBuilder("entity")
+      .select("entity.external_id", "externalId")
+      .where("entity.document_source_id = :documentSourceId", { documentSourceId })
+      .getRawMany();
+
+    return results
+      .map((row: { externalId: string | null }) => row.externalId)
+      .filter((externalId): externalId is string => externalId !== null);
+  }
+
+  /**
    * Apply document-specific includes/relations
    */
   protected override applyIncludes(

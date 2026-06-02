@@ -1,0 +1,38 @@
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import path from "path";
+
+/**
+ * Builds this plugin's Vue settings components into a UMD bundle (dist/ui.js)
+ * that the Hay dashboard loads at runtime with Vue provided as a global.
+ *
+ * The global `name` MUST equal the dashboard's convertPluginIdToGlobalVar(pluginId):
+ *   strip a leading `hay-plugin-` / `hay-channel-`, PascalCase the rest, append "Plugin".
+ *     hay-plugin-zendesk            -> ZendeskPlugin
+ *     hay-channel-whatsapp-twilio   -> WhatsappTwilioPlugin
+ *   If this name is wrong, the dashboard can't resolve the component and the page is blank.
+ */
+export default defineConfig({
+  plugins: [vue()],
+  build: {
+    emptyOutDir: false, // keep dist/index.js produced by tsc
+    lib: {
+      entry: path.resolve(__dirname, "components/index.ts"),
+      formats: ["umd"],
+      name: "<PascalCasePluginName>Plugin",
+      fileName: () => "ui.js",
+    },
+    outDir: "dist",
+    rollupOptions: {
+      external: ["vue"], // Vue is a dashboard-provided global, not bundled
+      output: {
+        globals: { vue: "Vue" },
+        assetFileNames: "style.[ext]", // dashboard expects dist/style.css
+      },
+    },
+  },
+});
+
+// components/index.ts must be a barrel whose EXPORT NAMES match the component
+// names declared in register.ui.page({ component: "./components/settings/AfterSettings.vue" }):
+//   export { default as AfterSettings } from "./settings/AfterSettings.vue";

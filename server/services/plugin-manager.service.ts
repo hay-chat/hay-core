@@ -1,4 +1,4 @@
-import { promises as fs, readFileSync, writeFileSync } from "fs";
+import { promises as fs, readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
@@ -176,9 +176,22 @@ export class PluginManagerService {
         author: packageJson.author,
         category: hayPlugin.category,
         icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
-        type: hayPlugin.category
-          ? [hayPlugin.category]
-          : this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+        // Primary type from category, plus any extra types inferred from
+        // capabilities (e.g. a document_importer plugin that ALSO exposes MCP
+        // tools — like Atlassian, where Confluence is the importer and Jira
+        // is served over MCP from the same connection).
+        type: Array.from(
+          new Set(
+            [
+              ...(hayPlugin.category ? [hayPlugin.category] : []),
+              ...this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+              // Hay-specific extension: hay-plugin.documentImporter=true marks
+              // a plugin as a document_importer without using SDK capability
+              // names that the worker bootstrap doesn't recognize.
+              ...(hayPlugin.documentImporter === true ? ["document_importer"] : []),
+            ].filter(Boolean),
+          ),
+        ),
         entry: hayPlugin.entry,
         capabilities: hayPlugin.capabilities || [],
         configSchema: hayPlugin.config || {},
@@ -188,6 +201,8 @@ export class PluginManagerService {
         },
         auth: hayPlugin.auth || undefined, // Include auth config if present
         channel: hayPlugin.channel || undefined, // For channel-type plugins
+        autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
+        trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
       };
 
       // Load i18n translations from plugin's i18n/ directory
@@ -482,6 +497,20 @@ export class PluginManagerService {
         env: this.buildMinimalEnv(),
       });
 
+      // Install bundled MCP server dependencies, if any. The mcp/ server is plain
+      // runtime JS spawned over stdio and is NOT part of the npm workspace, so its
+      // declared deps must be installed separately or the stdio server fails to
+      // resolve modules at spawn time (it otherwise relies on monorepo hoisting).
+      const mcpPackageJson = path.join(pluginPath, "mcp", "package.json");
+      if (existsSync(mcpPackageJson)) {
+        logger.info({ pluginName: plugin.name }, "Installing MCP server dependencies");
+        execSync("npm install --ignore-scripts", {
+          cwd: path.join(pluginPath, "mcp"),
+          stdio: "inherit",
+          env: this.buildMinimalEnv(),
+        });
+      }
+
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       plugin.installed = true;
       logger.info({ pluginName: plugin.name }, "Plugin installed successfully");
@@ -617,10 +646,17 @@ export class PluginManagerService {
 
       if (manifest.autoActivate && manifest.trpcRouter) {
         try {
-          // Dynamically import the plugin's router using the stored plugin path
+          // Dynamically load the plugin's router using the stored plugin path.
+          // For .ts files we go through CommonJS require() because dynamic
+          // ESM import() rejects unknown file extensions under ts-node — but
+          // require() is hooked by ts-node (and tsconfig-paths) so @server/*
+          // aliases inside the plugin's router resolve correctly.
           const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
           logger.debug({ routerPath }, "Loading router");
-          const routerModule = await import(routerPath);
+          const routerModule = routerPath.endsWith(".ts")
+            ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+              require(routerPath)
+            : await import(routerPath);
           const pluginRouter = routerModule.default || routerModule.router;
 
           if (pluginRouter) {

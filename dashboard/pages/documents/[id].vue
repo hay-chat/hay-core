@@ -183,7 +183,7 @@
       <!-- Content Card -->
       <Card v-else>
         <CardContent class="pt-6">
-          <div class="document-page-content">
+          <div class="document-page-content" data-testid="document-content">
             <div v-if="document.content" v-html="renderedContent" />
             <div v-else class="text-neutral-muted italic py-8 text-center">
               {{ $t("documents.detail.noContent") }}

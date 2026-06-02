@@ -1,9 +1,9 @@
 name: Playwright Tests
+# Manual-only: these are heavyweight E2E tests that boot the full app and need
+# external service credentials. They are NOT a merge gate (see ci.yml for the
+# required checks). Run on demand from the Actions tab via "Run workflow".
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+  workflow_dispatch:
 jobs:
   test:
     timeout-minutes: 60

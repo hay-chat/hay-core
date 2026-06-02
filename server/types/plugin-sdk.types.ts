@@ -194,6 +194,70 @@ export interface ExternalMcpDescriptor {
 }
 
 // ============================================================================
+// Document Importer Contract
+// ============================================================================
+
+/** A logical root inside a document source (Confluence space, GitHub repo, Notion DB). */
+export interface DocumentImporterRoot {
+  id: string;
+  label: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** A page descriptor returned by discover() / listChanges() — minimal metadata only. */
+export interface DocumentImporterExternalPage {
+  externalId: string;
+  title: string;
+  externalUpdatedAt: string; // ISO 8601
+  externalUrl?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Full fetched page content returned by fetchPage(). */
+export interface DocumentImporterFetchedPage {
+  externalId: string;
+  title: string;
+  markdown: string;
+  externalUpdatedAt: string;
+  externalUrl?: string;
+  attachments?: Array<{ name: string; url: string; mimeType?: string }>;
+}
+
+export type DocumentImporterChangeOp = "upsert" | "delete";
+
+export interface DocumentImporterPageChange {
+  externalId: string;
+  op: DocumentImporterChangeOp;
+  externalUpdatedAt?: string;
+}
+
+/**
+ * Contract that a 'document_importer' plugin's tRPC sub-router must implement.
+ * Core resolves the plugin's router via PluginRouterRegistry and calls these procedures
+ * from the document-source sync service.
+ */
+export interface DocumentImporterContract {
+  listRoots(input: { instanceId: string }): Promise<DocumentImporterRoot[]>;
+  discover(input: { instanceId: string; rootId: string; cursor?: string }): Promise<{
+    pages: DocumentImporterExternalPage[];
+    nextCursor?: string;
+  }>;
+  fetchPage(input: {
+    instanceId: string;
+    externalId: string;
+  }): Promise<DocumentImporterFetchedPage>;
+  listChanges(input: {
+    instanceId: string;
+    rootId: string;
+    since: string;
+    cursor?: string;
+  }): Promise<{
+    changes: DocumentImporterPageChange[];
+    nextCursor?: string;
+  }>;
+}
+
+// ============================================================================
 // MCP Tool Types
 // ============================================================================
 

@@ -5,6 +5,7 @@ import { Organization } from "../entities/organization.entity";
 import { UserOrganization } from "../entities/user-organization.entity";
 import { OrganizationInvitation } from "../entities/organization-invitation.entity";
 import { Document } from "../entities/document.entity";
+import { DocumentSource } from "../entities/document-source.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
 import { Embedding } from "../entities/embedding.entity";
@@ -57,6 +58,7 @@ export const AppDataSource = new DataSource({
     UserOrganization,
     OrganizationInvitation,
     Document,
+    DocumentSource,
     Job,
     Session,
     Embedding,

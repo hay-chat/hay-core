@@ -1,0 +1,115 @@
+/**
+ * <Provider> channel plugin  (plugins/core/<name>/src/index.ts)
+ *
+ * A channel relays messages between an external messaging platform and Hay:
+ *   INBOUND   platform webhook  -> verify signature -> messages.receive (to Hay)
+ *   OUTBOUND  Hay  -> POST /deliver -> provider send API
+ *   (optional) /escalate for human handoff, conversation-status sync
+ *
+ * package.json hay-plugin: { category: "channel", channel: "<provider>",
+ *   capabilities: ["messages", "customers"] }
+ */
+
+import { defineHayPlugin } from "@hay/plugin-sdk";
+import { createPluginApiClient } from "./plugin-api"; // tRPC-over-HTTP client to core
+
+export default defineHayPlugin((globalCtx) => {
+  // Runtime state set in onStart, nulled in onDisable.
+  let client: ProviderClient | null = null;
+  let webhookSecret = "";
+
+  return {
+    name: "<Provider>",
+
+    onInitialize(ctx) {
+      ctx.register.config({
+        apiToken: { type: "string", label: "API Token", required: true, encrypted: true },
+        webhookSecret: { type: "string", label: "Webhook Secret", required: true, encrypted: true },
+      });
+      ctx.register.auth.apiKey({ id: "apiToken", label: "<Provider> API Token", configField: "apiToken" });
+      ctx.register.ui.page({
+        id: "setup-guide",
+        title: "Setup",
+        component: "./components/settings/AfterSettings.vue",
+        slot: "after-settings",
+      });
+
+      // Inbound + outbound routes. Keep handlers in separate files for testability.
+      ctx.register.route("POST", "/webhook", (req, res) => handleWebhook(req, res, { getSecret: () => webhookSecret, getClient: () => client, api: createPluginApiClient(), logger: ctx.logger }));
+      ctx.register.route("POST", "/deliver", (req, res) => handleDeliver(req, res, { getClient: () => client, logger: ctx.logger }));
+    },
+
+    async onValidateAuth(ctx) {
+      const token = ctx.config.get<string>("apiToken");
+      if (!token) throw new Error("API Token is required");
+      const ok = await new ProviderClient(token).ping(); // real round-trip
+      if (!ok) throw new Error("Invalid credentials");
+      return true;
+    },
+
+    async onStart(ctx) {
+      const token = ctx.config.getOptional<string>("apiToken");
+      const secret = ctx.config.getOptional<string>("webhookSecret");
+      if (!token || !secret) {
+        ctx.logger.info("<Provider>: not fully configured — enabled but inactive.");
+        return;
+      }
+      client = new ProviderClient(token);
+      webhookSecret = secret;
+    },
+
+    async onConfigUpdate(ctx) {
+      // Re-initialize state so edits take effect WITHOUT a restart.
+      const token = ctx.config.getOptional<string>("apiToken");
+      const secret = ctx.config.getOptional<string>("webhookSecret");
+      client = token ? new ProviderClient(token) : null;
+      webhookSecret = secret ?? "";
+    },
+
+    async onDisable() {
+      client = null;
+      webhookSecret = "";
+    },
+  };
+});
+
+// ── INBOUND ──────────────────────────────────────────────────────────────────
+async function handleWebhook(req, res, ctx) {
+  // 1. VERIFY the signature against RAW bytes with a constant-time compare and a
+  //    replay window. (The proxy exposes raw bytes via x-original-body-base64.)
+  if (!verifySignature(req, ctx.getSecret())) return res.status(403).json({ error: "bad signature" });
+
+  // 2. FILTER noise: drop bot echoes, private notes, empty/template messages.
+  const msg = parseInbound(req.body);
+  if (!msg) return res.status(200).json({ received: true, ignored: "not a user message" });
+
+  // 3. DEDUPE on the provider's message id so webhook retries don't double-post.
+  //    Pass providerMessageId so core can ignore duplicates (do not rely on metadata alone).
+  // 4. Forward to core. ALWAYS return 200 on success so the provider stops retrying.
+  await ctx.api.mutation("messages.receive", {
+    from: msg.from,
+    content: msg.content,
+    channel: "<provider>",
+    senderType: msg.senderType,                 // "customer" | "human_agent"
+    externalConversationId: msg.conversationId, // stable thread id
+    metadata: { providerMessageId: msg.id },
+  });
+  return res.status(200).json({ received: true });
+}
+
+// ── OUTBOUND ─────────────────────────────────────────────────────────────────
+async function handleDeliver(req, res, ctx) {
+  const client = ctx.getClient();
+  if (!client) return res.status(503).json({ error: "not configured" });
+  const { to, content } = req.body;
+  if (!to || !content) return res.status(400).json({ error: "to and content required" });
+  try {
+    const sent = await client.send(to, content);
+    return res.status(200).json({ success: true, providerMessageId: sent.id });
+  } catch (err) {
+    // Non-retryable provider errors (e.g. 24h window closed, 4xx) → 200 + success:false
+    // so Hay records the failure instead of retry-storming.
+    if (isNonRetryable(err)) return res.status(200).json({ success: false, error: err.code });
+    return res.status(500).json({ error: "delivery failed" });
+  }
+}

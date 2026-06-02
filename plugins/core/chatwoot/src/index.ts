@@ -190,7 +190,31 @@ export default defineHayPlugin((globalCtx) => {
     },
 
     async onConfigUpdate(ctx) {
-      ctx.logger.info("Chatwoot plugin config updated — will take effect on next restart");
+      // Re-read config and rebuild the client so edits take effect immediately
+      // (no worker restart required).
+      const baseUrl = ctx.config.getOptional<string>("baseUrl");
+      const accountId = ctx.config.getOptional<string>("accountId");
+      const token = ctx.config.getOptional<string>("botAccessToken");
+      const secret = ctx.config.getOptional<string>("webhookSecret");
+      const teamId = ctx.config.getOptional<string>("defaultEscalationTeamId");
+
+      if (!baseUrl || !accountId || !token || !secret) {
+        chatwootApi = null;
+        webhookSecret = null;
+        defaultEscalationTeamId = null;
+        ctx.logger.info("Chatwoot plugin config updated — credentials cleared, channel disabled");
+        return;
+      }
+
+      chatwootApi = new ChatwootApi({
+        baseUrl,
+        accountId,
+        botAccessToken: token,
+        logger: ctx.logger,
+      });
+      webhookSecret = secret;
+      defaultEscalationTeamId = teamId || null;
+      ctx.logger.info("Chatwoot plugin config updated — client reinitialized");
     },
 
     async onDisable(ctx) {

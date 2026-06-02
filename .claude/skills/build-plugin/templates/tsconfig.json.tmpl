@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "mcp"]
+}
+
+// NOTES — delete before saving (JSON has no comments):
+// - module MUST emit ESM (ES2020/ES2022), never CommonJS — the loader imports ESM only.
+// - "strict": true. Do NOT ship strict:false; it defeats the SDK's typed config/auth APIs.
+// - exclude "mcp": the bundled MCP server is plain runtime JS, not TS-compiled.

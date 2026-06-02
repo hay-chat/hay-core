@@ -1,0 +1,114 @@
+/**
+ * <Name> Plugin
+ *
+ * <One-paragraph description of what it connects and how — e.g.
+ *  "Spawns a local Node MCP server (./mcp/index.js) that calls <Service>'s REST
+ *   API directly using an API key.">
+ */
+
+import { defineHayPlugin } from "@hay/plugin-sdk";
+
+// Constants that the entry and validation share (API revisions, base URLs).
+const SERVICE_BASE_URL = "https://api.example.com";
+
+export default defineHayPlugin((globalCtx) => ({
+  name: "<Human Name>",
+
+  // ── 1. DECLARE everything (runs once per worker, before any request). ──
+  // Only descriptor calls here: config, auth, ui, routes. No network, no MCP.
+  onInitialize(ctx) {
+    ctx.register.config({
+      apiKey: {
+        type: "string",
+        label: "API Key",
+        description:
+          "Your <Service> API key. Create one under Settings → API Keys.",
+        required: true,
+        encrypted: true, // secrets MUST be encrypted; never log them
+      },
+    });
+
+    ctx.register.auth.apiKey({
+      id: "<name>-apikey",
+      label: "<Service> API Key",
+      configField: "apiKey",
+    });
+
+    globalCtx.logger.info("<Name> plugin: config + auth registered");
+  },
+
+  // ── 2. VALIDATE with a real round-trip (called when creds change). ──
+  // Throw a user-facing message on failure; return true on success.
+  async onValidateAuth(ctx) {
+    const authState = ctx.auth.get();
+    if (!authState) throw new Error("No authentication configured");
+
+    const apiKey = ctx.config.get<string>("apiKey");
+    if (!apiKey) throw new Error("API Key is required");
+
+    const res = await fetch(`${SERVICE_BASE_URL}/account`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("Invalid credentials — please check your API key");
+      }
+      throw new Error(`<Service> request failed with status ${res.status}`);
+    }
+    return true;
+  },
+
+  // ── 3. START runtime per org. GATE on credentials, then wire MCP. ──
+  // Missing creds = enabled-but-idle (log + return), never crash the worker.
+  async onStart(ctx) {
+    const authState = ctx.auth.get();
+    if (!authState) {
+      ctx.logger.info(
+        "<Name>: credentials not configured — enabled but MCP tools unavailable.",
+      );
+      return;
+    }
+
+    const apiKey = ctx.config.get<string>("apiKey");
+    if (!apiKey) {
+      ctx.logger.warn("<Name>: no API key in config — MCP server not started.");
+      return;
+    }
+
+    // ARCHETYPE A — bundled local MCP server (most common). See mcp-server.js.tmpl.
+    await ctx.mcp.startLocalStdio({
+      id: "<name>-mcp",
+      command: "node",
+      args: ["index.js"],
+      cwd: "./mcp",
+      env: { SERVICE_API_KEY: apiKey }, // creds reach the child via env, not config
+    });
+
+    // ARCHETYPE B — remote MCP server (provider hosts it). Use INSTEAD of A:
+    // await ctx.mcp.startExternal({
+    //   id: "<name>-mcp",
+    //   url: "https://mcp.example.com",
+    //   authHeaders: { Authorization: `Bearer ${apiKey}` },
+    // });
+
+    ctx.logger.info("<Name> MCP server started", { orgId: ctx.org.id });
+  },
+
+  // ── 4. React to config edits. ──
+  // NOTE: startLocalStdio/startExternal are restarted by the platform on config
+  // change, so for pure-MCP plugins logging is enough. If you hold your OWN
+  // client/state in closure vars, RE-INITIALIZE it here — a log-only handler
+  // means edits silently need a restart (a known anti-pattern in older plugins).
+  async onConfigUpdate(ctx) {
+    ctx.logger.info("<Name> plugin: config updated");
+  },
+
+  // ── 5. Tear DOWN fully (called on disable + worker shutdown). ──
+  // Stop pollers, close sockets/transports, null closure state. The platform
+  // stops MCP servers for you, but anything YOU opened, you must close here.
+  async onDisable(ctx) {
+    ctx.logger.info("<Name> plugin disabled", { orgId: ctx.org.id });
+  },
+
+  // Do NOT add onEnable — the runner never calls it (dead hook).
+}));
