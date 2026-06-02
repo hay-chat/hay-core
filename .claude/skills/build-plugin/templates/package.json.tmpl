@@ -1,0 +1,44 @@
+{
+  "name": "hay-plugin-<name>",
+  "version": "1.0.0",
+  "description": "<One sentence: what this plugin connects and what it lets the agent do>",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "<Human Name>",
+    "category": "integration",
+    "capabilities": ["mcp", "auth"],
+    "env": []
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTES — delete this comment block in the real file (JSON has no comments).
+//
+// name        Plugin ID = this npm name. Channels use hay-channel-<x>-<provider>.
+// hay-plugin  The ONLY metadata the loader reads. Do NOT add a manifest.json.
+//   category      one of: integration | channel | tool | analytics
+//   capabilities  mcp | auth | config | ui | routes  (+ channel-only: messages, customers, sources)
+//   env           ALLOW-LIST of host env var names a config field may fall back to.
+//                 Leave [] unless self-hosters set creds via process.env.
+//
+// If capability "ui":  add  "build": "npm run build:ui && npm run build:mcp",
+//                            "build:mcp": "tsc",
+//                            "build:ui": "vite build --config vite.config.ui.ts"
+//                      and devDeps: @vitejs/plugin-vue, vite, vue.
+// If you bundle a local MCP server (mcp/), see mcp-server.js.tmpl + the install policy
+// in reference/anti-patterns.md ("The mcp/ dependency gap").

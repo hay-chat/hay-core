@@ -134,7 +134,7 @@ describe("config-resolver", () => {
       expect(result.values.apiKey).toBe("********");
     });
 
-    it("should mask encrypted env-sourced values but not non-encrypted when maskSecrets is true", () => {
+    it("should not expose env-sourced values in masked mode, only signal source via metadata", () => {
       const dbConfig = {};
 
       const result = resolveConfigWithEnv(dbConfig, schema, {
@@ -142,11 +142,12 @@ describe("config-resolver", () => {
         maskSecrets: true,
       });
 
-      // Encrypted field should be masked
-      expect(result.values.apiKey).toBe("********");
-      // Non-encrypted field should be undefined (not exposed to frontend)
+      // In masked mode (frontend), env-sourced values are never exposed —
+      // regardless of whether the field is encrypted. The frontend relies on
+      // metadata.source to know a value is configured via .env.
+      expect(result.values.apiKey).toBe(undefined);
       expect(result.values.clientId).toBe(undefined);
-      // But metadata should indicate it's from env
+      expect(result.metadata.apiKey.source).toBe("env");
       expect(result.metadata.clientId.source).toBe("env");
     });
 

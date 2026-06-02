@@ -12,7 +12,8 @@
     "category": "tool",
     "capabilities": [
       "mcp",
-      "config"
+      "config",
+      "email"
     ],
     "env": []
   },

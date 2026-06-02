@@ -115,6 +115,18 @@ export function encryptConfig(
 
   for (const [key, value] of Object.entries(config)) {
     if (schema[key]?.encrypted && value !== null && value !== undefined) {
+      // Skip already-encrypted values to prevent double-encryption.
+      // (enablePlugin encrypts via this fn and then calls upsertInstance which
+      // re-runs encryptConfig — without this guard the second pass would
+      // String()-coerce the wrapped object to "[object Object]".)
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        (value as { encrypted?: boolean }).encrypted === true
+      ) {
+        encrypted[key] = value;
+        continue;
+      }
       // Encrypt sensitive values
       encrypted[key] = {
         encrypted: true,

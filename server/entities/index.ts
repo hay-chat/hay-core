@@ -1,5 +1,6 @@
 export * from "./base.entity";
 export * from "./document.entity";
+export * from "./document-source.entity";
 export * from "./organization.entity";
 export * from "./user.entity";
 export * from "./user-organization.entity";

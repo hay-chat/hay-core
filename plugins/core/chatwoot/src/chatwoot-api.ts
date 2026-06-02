@@ -102,15 +102,13 @@ export class ChatwootApi {
   }
 
   /**
-   * Lightweight credential validation — the bot-scoped profile endpoint will
-   * 401 on a bad token and 200 with bot metadata on a good one. Falls back to
-   * the accounts endpoint for broader compatibility.
+   * Lightweight credential validation — probes a bot-scoped account endpoint.
+   * A bad token 401s; a good one returns 200.
    */
   async validateCredentials(): Promise<void> {
-    const url = `${this.baseUrl}/auth/sign_in`;
-    // Primary path: fetch bot profile info
+    const probePath = this.accountUrl("/conversations?status=open&page=1&per_page=1");
     try {
-      await this.request("GET", this.accountUrl("/conversations?status=open&page=1&per_page=1"));
+      await this.request("GET", probePath);
       this.logger.info("Chatwoot credentials validated");
       return;
     } catch (err) {
@@ -120,7 +118,7 @@ export class ChatwootApi {
         );
       }
       // Re-throw other errors (network, 5xx, etc.)
-      this.logger.warn("Chatwoot validation probe failed", { err, probedUrl: url });
+      this.logger.warn("Chatwoot validation probe failed", { err, probedUrl: probePath });
       throw err;
     }
   }

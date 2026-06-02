@@ -136,7 +136,12 @@ describe("DataRetentionService", () => {
 
       // Verify audit log was saved
       expect(mockSave).toHaveBeenCalled();
-      const auditLogArg = mockSave.mock.calls[0]?.[0];
+      const auditLogArg = mockSave.mock.calls[0]?.[0] as {
+        action: string;
+        status: string;
+        organizationId: string;
+        metadata: Record<string, number>;
+      };
       expect(auditLogArg).toBeDefined();
       expect(auditLogArg.action).toBe("retention.cleanup");
       expect(auditLogArg.status).toBe("success");
@@ -243,7 +248,7 @@ describe("DataRetentionService", () => {
       );
 
       // Verify deleted_at is set (should be a Date)
-      const setArg = convQueryBuilder.set.mock.calls[0]?.[0];
+      const setArg = convQueryBuilder.set.mock.calls[0]?.[0] as { deleted_at: Date };
       expect(setArg.deleted_at).toBeInstanceOf(Date);
     });
 
@@ -303,7 +308,12 @@ describe("DataRetentionService", () => {
 
       // Verify failure audit log was saved
       expect(mockSave).toHaveBeenCalled();
-      const auditLogArg = mockSave.mock.calls[0]?.[0];
+      const auditLogArg = mockSave.mock.calls[0]?.[0] as {
+        action: string;
+        status: string;
+        organizationId: string;
+        metadata: Record<string, number>;
+      };
       expect(auditLogArg.action).toBe("retention.cleanup");
       expect(auditLogArg.status).toBe("failure");
     });

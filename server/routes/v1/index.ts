@@ -1,6 +1,7 @@
 import { router } from "@server/trpc";
 import { authRouter } from "./auth";
 import { documentsRouter } from "./documents";
+import { documentSourcesRouter } from "./document-sources";
 import { agentsRouter } from "./agents";
 import { playbooksRouter } from "./playbooks";
 import { conversationsRouter } from "./conversations";
@@ -29,6 +30,7 @@ import { productsRouter } from "./products";
 const coreRouters = {
   auth: authRouter,
   documents: documentsRouter,
+  documentSources: documentSourcesRouter,
   agents: agentsRouter,
   playbooks: playbooksRouter,
   conversations: conversationsRouter,

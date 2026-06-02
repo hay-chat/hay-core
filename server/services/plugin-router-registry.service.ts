@@ -47,6 +47,13 @@ export class PluginRouterRegistry {
   }
 
   /**
+   * Get a single registered plugin router by id, or undefined if not registered.
+   */
+  getRouter(pluginId: string): any | undefined {
+    return this.pluginRouters.get(pluginId);
+  }
+
+  /**
    * Create a merged router with all plugin routers
    */
   createMergedRouter(baseRouters: Record<string, any>): any {
