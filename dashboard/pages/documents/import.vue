@@ -121,6 +121,7 @@
             <div
               v-for="plugin in pluginImporters"
               :key="plugin.id"
+              :data-testid="`importer-card-${plugin.id}`"
               class="p-6 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
               :class="{
                 'border-primary bg-primary/5': importType === `plugin:${plugin.id}`,
@@ -162,7 +163,11 @@
         </div>
 
         <div class="mt-6 flex justify-end">
-          <Button :disabled="!importType" @click="proceedToNextStep">
+          <Button
+            :disabled="!importType || proceedingToNext"
+            :loading="proceedingToNext"
+            @click="proceedToNextStep"
+          >
             {{ $t("documents.import.source.next") }}
             <ChevronRight class="ml-2 h-4 w-4" />
           </Button>
@@ -756,6 +761,55 @@
       </CardContent>
     </Card>
 
+    <!-- Step 2: Plugin Connect -->
+    <Card v-if="currentStep === 2 && importType.startsWith('plugin:') && activePluginImporter">
+      <CardHeader>
+        <CardTitle>Connect {{ activePluginImporter.name }}</CardTitle>
+        <CardDescription>
+          Provide the credentials this plugin needs to access your data.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <PluginImportConnect :plugin="activePluginImporter" @connected="handlePluginConnected" />
+        <div class="mt-6 flex justify-between">
+          <Button variant="outline" @click="currentStep = 1">
+            <ChevronLeft class="mr-2 h-4 w-4" />
+            {{ $t("documents.import.fileSelection.back") }}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Step 3: Plugin Source Picker -->
+    <Card
+      v-if="
+        currentStep === 3 &&
+        importType.startsWith('plugin:') &&
+        activePluginImporter &&
+        pluginInstanceId
+      "
+    >
+      <CardHeader>
+        <CardTitle>Pick a source</CardTitle>
+        <CardDescription>
+          Choose which {{ activePluginImporter.name }} content to keep in sync.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <PluginSpacePicker
+          :plugin="activePluginImporter"
+          :instance-id="pluginInstanceId"
+          @source-created="handlePluginSourceCreated"
+        />
+        <div class="mt-6 flex justify-between">
+          <Button variant="outline" @click="currentStep = 2">
+            <ChevronLeft class="mr-2 h-4 w-4" />
+            {{ $t("documents.import.fileSelection.back") }}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Step 5/4: Processing -->
     <Card
       v-if="
@@ -1049,8 +1103,13 @@ interface WebImportProgress {
 
 interface PluginImporter {
   id: string;
+  pluginId: string;
   name: string;
   description: string;
+  icon?: string;
+  thumbnail?: string | null;
+  connected: boolean;
+  sourceIds?: string[];
   supportedFormats?: string[];
 }
 
@@ -1178,10 +1237,41 @@ const steps = computed(() => {
       t("documents.import.steps.addDetails"),
       t("documents.import.steps.upload"),
     ];
+  } else if (importType.value.startsWith("plugin:")) {
+    return [t("documents.import.steps.selectSource"), "Connect", "Pick source"];
   } else {
     return [t("documents.import.steps.selectSource")];
   }
 });
+
+// Plugin import state. Resolved from the importType when it starts with
+// "plugin:<id>", letting us look up the matching importer entry.
+const activePluginImporter = computed<PluginImporter | null>(() => {
+  if (!importType.value.startsWith("plugin:")) return null;
+  const id = importType.value.slice("plugin:".length);
+  return pluginImporters.value.find((p) => p.id === id) ?? null;
+});
+
+// Once the user has finished the connect step (or the plugin was already
+// connected when the page loaded) we hold the instance id here so the picker
+// can call listRoots and create a source against it.
+const pluginInstanceId = ref<string | null>(null);
+
+const handlePluginConnected = (payload: { instanceId: string }) => {
+  pluginInstanceId.value = payload.instanceId;
+  currentStep.value = 3;
+};
+
+const handlePluginSourceCreated = (payload: { sourceId: string }) => {
+  const redirectPath = route.query.redirect as string;
+  if (redirectPath) {
+    router.push(redirectPath);
+    return;
+  }
+  // Land on the source detail page, which polls sync status live and shows
+  // per-page progress as the importer creates placeholder documents.
+  router.push(`/documents/sources/${payload.sourceId}`);
+};
 
 const uploadFormats = ["PDF", "TXT", "MD", "DOC", "DOCX", "PPT", "PPTX", "HTML", "JSON", "CSV"];
 
@@ -1420,8 +1510,38 @@ const selectImportType = (type: string) => {
   importType.value = type;
 };
 
+const proceedingToNext = ref(false);
+
 const proceedToNextStep = () => {
   if (currentStep.value === 1 && importType.value) {
+    // Plugin importers that already have a configured instance skip the
+    // credentials step and go straight to picking a space.
+    if (importType.value.startsWith("plugin:")) {
+      const plugin = activePluginImporter.value;
+      if (plugin?.connected) {
+        // We don't have the instanceId from getImporters yet; fetch it from
+        // the plugin detail endpoint before advancing.
+        proceedingToNext.value = true;
+        Hay.plugins.get
+          .query({ pluginId: plugin.pluginId })
+          .then((data) => {
+            if (data?.instanceId) {
+              pluginInstanceId.value = data.instanceId;
+              currentStep.value = 3;
+            } else {
+              // Fall back to the connect step if no instance was found.
+              currentStep.value = 2;
+            }
+          })
+          .catch(() => {
+            currentStep.value = 2;
+          })
+          .finally(() => {
+            proceedingToNext.value = false;
+          });
+        return;
+      }
+    }
     currentStep.value = 2;
   } else if (currentStep.value === 2 && importType.value === "upload") {
     currentStep.value = 3;

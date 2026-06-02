@@ -176,9 +176,18 @@ export class PluginManagerService {
         author: packageJson.author,
         category: hayPlugin.category,
         icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
-        type: hayPlugin.category
-          ? [hayPlugin.category]
-          : this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+        // Primary type from category, plus any extra types inferred from
+        // capabilities (e.g. a document_importer plugin that ALSO exposes MCP
+        // tools — like Atlassian, where Confluence is the importer and Jira
+        // is served over MCP from the same connection).
+        type: Array.from(
+          new Set(
+            [
+              ...(hayPlugin.category ? [hayPlugin.category] : []),
+              ...this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+            ].filter(Boolean),
+          ),
+        ),
         entry: hayPlugin.entry,
         capabilities: hayPlugin.capabilities || [],
         configSchema: hayPlugin.config || {},
@@ -188,6 +197,8 @@ export class PluginManagerService {
         },
         auth: hayPlugin.auth || undefined, // Include auth config if present
         channel: hayPlugin.channel || undefined, // For channel-type plugins
+        autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
+        trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
       };
 
       // Load i18n translations from plugin's i18n/ directory
@@ -617,10 +628,17 @@ export class PluginManagerService {
 
       if (manifest.autoActivate && manifest.trpcRouter) {
         try {
-          // Dynamically import the plugin's router using the stored plugin path
+          // Dynamically load the plugin's router using the stored plugin path.
+          // For .ts files we go through CommonJS require() because dynamic
+          // ESM import() rejects unknown file extensions under ts-node — but
+          // require() is hooked by ts-node (and tsconfig-paths) so @server/*
+          // aliases inside the plugin's router resolve correctly.
           const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
           logger.debug({ routerPath }, "Loading router");
-          const routerModule = await import(routerPath);
+          const routerModule = routerPath.endsWith(".ts")
+            ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+              require(routerPath)
+            : await import(routerPath);
           const pluginRouter = routerModule.default || routerModule.router;
 
           if (pluginRouter) {

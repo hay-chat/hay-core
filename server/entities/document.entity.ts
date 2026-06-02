@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, JoinColumn } from "typeorm";
+import { Column, Entity, Index, ManyToOne, JoinColumn } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 
@@ -34,6 +34,7 @@ export enum ImportMethod {
 }
 
 @Entity("documents")
+@Index(["documentSourceId", "externalId"], { unique: true })
 export class Document extends OrganizationScopedEntity {
   @Column({ type: "varchar", nullable: true })
   title!: string;
@@ -112,6 +113,24 @@ export class Document extends OrganizationScopedEntity {
 
   @Column({ type: "timestamptz", nullable: true })
   lastCrawledAt?: Date;
+
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  documentSourceId?: string;
+
+  @Index()
+  @Column({ type: "varchar", length: 255, nullable: true })
+  externalId?: string;
+
+  @Column({ type: "timestamptz", nullable: true })
+  externalUpdatedAt?: Date;
+
+  @Column({ type: "text", nullable: true })
+  externalUrl?: string;
+
+  // Sticky user override — set when user archives a synced doc; sync engine skips re-upserting it.
+  @Column({ type: "boolean", default: false })
+  excludedFromSync!: boolean;
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
   @ManyToOne(() => Organization, (organization) => organization.documents)

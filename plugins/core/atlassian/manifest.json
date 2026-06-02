@@ -1,0 +1,75 @@
+{
+  "id": "atlassian",
+  "name": "Atlassian",
+  "version": "0.2.0",
+  "description": "One Atlassian connection — import Confluence pages as documents and give the agent Jira tools via MCP",
+  "vendor": {
+    "name": "Hay",
+    "url": "https://hay.chat"
+  },
+  "type": ["document_importer", "mcp-connector"],
+  "entry": "./dist/index.js",
+  "thumbnail": "thumbnail.png",
+  "autoActivate": true,
+  "trpcRouter": "./src/router.ts",
+  "capabilities": {
+    "document_importer": {
+      "name": "Atlassian (Confluence)",
+      "description": "Confluence Cloud spaces & pages",
+      "icon": "atlassian",
+      "supportedFormats": ["adf", "storage"],
+      "configSchema": {
+        "authMode": {
+          "type": "string",
+          "label": "Auth method",
+          "options": [
+            { "label": "API Token (recommended)", "value": "basic" },
+            { "label": "OAuth", "value": "oauth" }
+          ],
+          "default": "basic",
+          "required": true
+        },
+        "siteUrl": {
+          "type": "string",
+          "label": "Atlassian site URL",
+          "placeholder": "https://your-team.atlassian.net",
+          "helpText": "Used for both Confluence and Jira access.",
+          "required": true
+        },
+        "email": {
+          "type": "string",
+          "label": "Atlassian email",
+          "placeholder": "you@example.com",
+          "required": false,
+          "helpText": "Required when Auth method is 'API Token'."
+        },
+        "apiToken": {
+          "type": "string",
+          "label": "API token",
+          "encrypted": true,
+          "required": false,
+          "helpText": "Required when Auth method is 'API Token'. Works for both Confluence and Jira. Create one at id.atlassian.com/manage-profile/security/api-tokens"
+        }
+      }
+    }
+  },
+  "auth": {
+    "type": "oauth2",
+    "authorizationUrl": "https://auth.atlassian.com/authorize",
+    "tokenUrl": "https://auth.atlassian.com/oauth/token",
+    "scopes": [
+      "read:confluence-content.all",
+      "read:confluence-space.summary",
+      "read:content-details:confluence",
+      "read:content.metadata:confluence",
+      "read:jira-work",
+      "read:jira-user",
+      "write:jira-work",
+      "offline_access"
+    ],
+    "pkce": true,
+    "audience": "api.atlassian.com",
+    "clientIdEnvVar": "ATLASSIAN_CLIENT_ID",
+    "clientSecretEnvVar": "ATLASSIAN_CLIENT_SECRET"
+  }
+}

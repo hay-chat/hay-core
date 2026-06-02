@@ -7,6 +7,12 @@
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           {{ $t("documents.actions.refresh") }}
         </Button>
+        <NuxtLink to="/documents/sources">
+          <Button variant="outline">
+            <Plug class="mr-2 h-4 w-4" />
+            Connected sources
+          </Button>
+        </NuxtLink>
         <NuxtLink to="/documents/new">
           <Button variant="outline">
             <FilePlus class="mr-2 h-4 w-4" />
@@ -432,6 +438,7 @@ import {
   AlertCircle,
   ExternalLink,
   FilePlus,
+  Plug,
 } from "lucide-vue-next";
 
 const { t } = useI18n();

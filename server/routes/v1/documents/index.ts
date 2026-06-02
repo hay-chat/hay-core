@@ -26,6 +26,10 @@ import { storageService } from "@server/services/storage.service";
 import { AppDataSource } from "@server/database/data-source";
 import { websocketService } from "@server/services/websocket.service";
 import { createLogger } from "@server/lib/logger";
+import { pluginManagerService } from "@server/services/plugin-manager.service";
+import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
+import { documentSourceRepository } from "@server/repositories/document-source.repository";
+import type { HayPluginManifest } from "@server/types/plugin.types";
 
 const logger = createLogger("documents");
 
@@ -755,31 +759,101 @@ export const documentsRouter = t.router({
       };
     }),
 
-  getImporters: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ).query(async () => {
-    // Get enabled plugins with document_importer capability
-    // For now, return only the native web importer
-    // TODO: Load plugins with document_importer capability
+  getImporters: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
+    .output(
+      z.object({
+        native: z.array(
+          z.object({
+            id: z.string(),
+            kind: z.literal("upload").or(z.literal("web")),
+            name: z.string(),
+            description: z.string(),
+            icon: z.string(),
+            connected: z.boolean(),
+          }),
+        ),
+        plugins: z.array(
+          z.object({
+            id: z.string(),
+            kind: z.literal("plugin"),
+            pluginId: z.string(),
+            name: z.string(),
+            description: z.string(),
+            icon: z.string(),
+            thumbnail: z.string().nullable(),
+            connected: z.boolean(),
+            sourceIds: z.array(z.string()),
+          }),
+        ),
+      }),
+    )
+    .query(async ({ ctx }) => {
+      const organizationId = ctx.organizationId!;
 
-    return {
-      native: [
-        {
-          id: "web",
-          name: "Import from Website",
-          description: "Crawl and import documentation from any website",
-          icon: "globe",
-          supportedFormats: ["html", "xhtml"],
-        },
+      const native = [
         {
           id: "upload",
-          name: "Upload Files",
-          description: "Upload documents from your computer",
+          kind: "upload" as const,
+          name: "Upload files",
+          description: "Upload PDFs, Word docs, markdown, or text files",
           icon: "upload",
-          supportedFormats: ["pdf", "txt", "md", "doc", "docx", "html", "json", "csv"],
+          connected: true,
         },
-      ],
-      plugins: [], // TODO: Load from plugin system
-    };
-  }),
+        {
+          id: "web",
+          kind: "web" as const,
+          name: "Import from website",
+          description: "Crawl a website and import discovered pages",
+          icon: "globe",
+          connected: true,
+        },
+      ];
+
+      // Discover plugins with document_importer capability
+      const allPlugins = pluginManagerService.getAllPlugins();
+      const importerPlugins = allPlugins.filter((plugin) => {
+        const manifest = plugin.manifest as HayPluginManifest | undefined;
+        if (!manifest) return false;
+        const typeMatch =
+          Array.isArray(manifest.type) && manifest.type.includes("document_importer");
+        const capabilityMatch = manifest.capabilities?.document_importer !== undefined;
+        return typeMatch || capabilityMatch;
+      });
+
+      // Pre-fetch all document sources for this org once to avoid N+1
+      const orgSources = await documentSourceRepository.findByOrganization(organizationId);
+
+      const plugins = await Promise.all(
+        importerPlugins.map(async (plugin) => {
+          const manifest = plugin.manifest as HayPluginManifest;
+          const importerMeta = manifest.capabilities?.document_importer;
+          const publicId = manifest.id ?? plugin.pluginId;
+
+          const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+            organizationId,
+            plugin.pluginId,
+          );
+
+          const sourceIds = orgSources
+            .filter((s) => s.pluginId === plugin.pluginId)
+            .map((s) => s.id);
+
+          return {
+            id: publicId,
+            kind: "plugin" as const,
+            pluginId: plugin.pluginId,
+            name: importerMeta?.name ?? plugin.name,
+            description: importerMeta?.description ?? manifest.description ?? "",
+            icon: importerMeta?.icon ?? publicId,
+            thumbnail: `/plugins/thumbnails/${encodeURIComponent(plugin.pluginId)}`,
+            connected: instance !== null,
+            sourceIds,
+          };
+        }),
+      );
+
+      return { native, plugins };
+    }),
 
   getDownloadUrl: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(

@@ -188,6 +188,35 @@ const jobRegistry: CronJobConfig[] = [
     maxRetries: 2,
   },
 
+  {
+    name: "document-source-sync-dispatcher",
+    description: "Dispatch document source syncs that are due",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { documentSourceRepository } =
+        await import("../repositories/document-source.repository");
+      const { documentSourceSyncService } = await import("./document-source-sync.service");
+
+      try {
+        const due = await documentSourceRepository.findDueForSync();
+        if (due.length === 0) return;
+        logger.info({ count: due.length }, "Dispatching document source syncs");
+        for (const source of due) {
+          try {
+            await documentSourceSyncService.enqueueSync(source.id);
+          } catch (err) {
+            logger.error({ err, sourceId: source.id }, "Failed to enqueue document source sync");
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, "document-source-sync-dispatcher tick failed");
+      }
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
   // ============================================================
   // PRIVACY & GDPR JOBS
   // ============================================================

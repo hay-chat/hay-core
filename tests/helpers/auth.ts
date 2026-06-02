@@ -102,6 +102,7 @@ export async function createTestUser(): Promise<{
       firstName: "E2E",
       lastName: "Test User",
       isActive: true,
+      emailVerified: true,
       organizationId: organization.id,
       role: "owner",
     });
