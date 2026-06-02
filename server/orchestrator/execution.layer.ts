@@ -128,12 +128,31 @@ export class ExecutionLayer {
 
       const messages = await conversation.getMessages();
 
+      // Always-available core tools (e.g. recommend_products) get merged with
+      // the playbook-allowed tools. The planner sees the combined name list;
+      // the enabled_tools gate in run.ts exempts core tools so playbooks
+      // don't have to opt in.
+      const { coreToolRegistry } = await import("@server/services/core/core-tools");
+      const coreTools = coreToolRegistry.list();
+      const enabledTools = conversation.enabled_tools ?? [];
+      const allToolNames = [...enabledTools, ...coreTools.map((t) => t.name)];
+      const hasTools = allToolNames.length > 0;
+      const toolsDetail = coreTools.length
+        ? coreTools
+            .map(
+              (t) =>
+                `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`,
+            )
+            .join("\n")
+        : "";
+
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
         "execution/planner",
         {
-          hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
-          tools: conversation.enabled_tools?.join(", "),
+          hasTools,
+          tools: allToolNames.join(", "),
+          toolsDetail,
         },
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );

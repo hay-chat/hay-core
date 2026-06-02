@@ -827,9 +827,13 @@ async function handleExecutionLoop(
     // Enforce enabled_tools: reject tool calls not in the conversation's allowed list.
     // Policy: when enabled_tools is null/empty (no playbook), all tools are allowed.
     // When a playbook defines enabled_tools, only those tools may be called.
+    // EXCEPTION: core tools (e.g. recommend_products) are always allowed —
+    // they're built into core and not part of any playbook's tool list.
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       const enabledTools = conversation.enabled_tools;
-      if (enabledTools && enabledTools.length > 0) {
+      const { coreToolRegistry } = await import("@server/services/core/core-tools");
+      const isCoreTool = coreToolRegistry.has(executionResult.tool.name);
+      if (!isCoreTool && enabledTools && enabledTools.length > 0) {
         if (!enabledTools.includes(executionResult.tool.name)) {
           log.warn(
             {
