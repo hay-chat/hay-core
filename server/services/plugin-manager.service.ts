@@ -1,4 +1,4 @@
-import { promises as fs, readFileSync, writeFileSync } from "fs";
+import { promises as fs, readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
@@ -185,6 +185,10 @@ export class PluginManagerService {
             [
               ...(hayPlugin.category ? [hayPlugin.category] : []),
               ...this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+              // Hay-specific extension: hay-plugin.documentImporter=true marks
+              // a plugin as a document_importer without using SDK capability
+              // names that the worker bootstrap doesn't recognize.
+              ...(hayPlugin.documentImporter === true ? ["document_importer"] : []),
             ].filter(Boolean),
           ),
         ),
@@ -492,6 +496,20 @@ export class PluginManagerService {
         stdio: "inherit",
         env: this.buildMinimalEnv(),
       });
+
+      // Install bundled MCP server dependencies, if any. The mcp/ server is plain
+      // runtime JS spawned over stdio and is NOT part of the npm workspace, so its
+      // declared deps must be installed separately or the stdio server fails to
+      // resolve modules at spawn time (it otherwise relies on monorepo hoisting).
+      const mcpPackageJson = path.join(pluginPath, "mcp", "package.json");
+      if (existsSync(mcpPackageJson)) {
+        logger.info({ pluginName: plugin.name }, "Installing MCP server dependencies");
+        execSync("npm install --ignore-scripts", {
+          cwd: path.join(pluginPath, "mcp"),
+          stdio: "inherit",
+          env: this.buildMinimalEnv(),
+        });
+      }
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
       plugin.installed = true;

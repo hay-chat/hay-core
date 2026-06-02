@@ -118,11 +118,10 @@ export default defineHayPlugin((globalCtx) => ({
         throw new Error("No authentication configured for HubSpot plugin");
       }
 
-      // Log auth state details for debugging
+      // Log only non-sensitive shape — never token values or the credentials object.
       ctx.logger.debug("Auth state retrieved", {
         methodId: authState.methodId,
         hasAccessToken: !!authState.credentials.accessToken,
-        credentialKeys: Object.keys(authState.credentials),
       });
 
       // Build auth headers
@@ -130,17 +129,9 @@ export default defineHayPlugin((globalCtx) => ({
       if (authState.credentials.accessToken) {
         const token = authState.credentials.accessToken as string;
         authHeaders["Authorization"] = `Bearer ${token}`;
-        ctx.logger.info("✅ Authorization header added", {
-          tokenPreview: token.substring(0, 20) + "...",
-          tokenLength: token.length,
-        });
+        ctx.logger.info("Authorization header added");
       } else {
-        ctx.logger.error(
-          "❌ No access token found in auth state - MCP server connection will fail",
-          {
-            credentials: authState.credentials,
-          },
-        );
+        ctx.logger.error("No access token found in auth state - MCP server connection will fail");
       }
 
       // Connect to external MCP server

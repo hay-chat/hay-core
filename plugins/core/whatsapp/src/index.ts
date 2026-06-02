@@ -158,7 +158,24 @@ export default defineHayPlugin((globalCtx) => {
     },
 
     async onConfigUpdate(ctx) {
-      ctx.logger.info("WhatsApp plugin config updated — will take effect on next restart");
+      // Re-read config and rebuild the client so edits take effect immediately
+      // (no worker restart required).
+      const accountSid = ctx.config.getOptional<string>("accountSid");
+      const token = ctx.config.getOptional<string>("authToken");
+      const number = ctx.config.getOptional<string>("whatsappNumber");
+
+      if (!accountSid || !token) {
+        twilioClient = null;
+        authToken = null;
+        whatsappNumber = null;
+        ctx.logger.info("WhatsApp plugin config updated — credentials cleared, delivery disabled");
+        return;
+      }
+
+      twilioClient = Twilio(accountSid, token);
+      authToken = token;
+      whatsappNumber = number || null;
+      ctx.logger.info("WhatsApp plugin config updated — client reinitialized");
     },
 
     async onDisable(ctx) {

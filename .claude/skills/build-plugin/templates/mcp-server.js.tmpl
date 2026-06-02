@@ -1,0 +1,85 @@
+/**
+ * Local MCP server for <Service>  (plugins/core/<name>/mcp/index.js)
+ *
+ * Plain runtime JS (NOT compiled from TS — tsconfig excludes mcp/).
+ * Spawned over stdio by the entry's ctx.mcp.startLocalStdio({ cwd: "./mcp" }).
+ *
+ * Rules this template encodes (see reference/archetypes.md "Local MCP server"):
+ *  - Use @modelcontextprotocol/sdk — never hand-roll JSON-RPC over readline.
+ *  - Read creds from process.env; hard-exit if missing (fail fast, loud).
+ *  - stdout is reserved for JSON-RPC — log ONLY to console.error.
+ *  - One shared request() helper builds auth headers + normalizes errors.
+ *  - Every tool returns { content: [{ type: "text", text }] }, isError on failure.
+ *  - Declare every dependency you import in mcp/package.json.
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const API_KEY = process.env.SERVICE_API_KEY;
+if (!API_KEY) {
+  console.error("[<name>-mcp] SERVICE_API_KEY missing — cannot start.");
+  process.exit(1);
+}
+
+const BASE_URL = "https://api.example.com";
+
+/** Single request helper: centralizes auth + error normalization. */
+async function api(method, path, { query, body } = {}) {
+  const url = new URL(BASE_URL + path);
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v === undefined || v === null || v === "") continue;
+      url.searchParams.set(k, Array.isArray(v) ? v.join(",") : String(v));
+    }
+  }
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      Accept: "application/json",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`<Service> ${method} ${path} failed: ${res.status} ${text}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+/** Standard tool responses. */
+const ok = (payload) => ({
+  content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+});
+const fail = (err) => ({
+  content: [{ type: "text", text: `Error: ${err.message || String(err)}` }],
+  isError: true,
+});
+
+const server = new McpServer({ name: "<name>-mcp-server", version: "1.0.0" });
+
+// Tool: rich description + a zod schema with .describe() on every param.
+// Good descriptions and schemas are what make the agent call tools correctly.
+server.tool(
+  "get_item",
+  "Fetch a single <Service> item by its ID. Returns the full item record.",
+  { id: z.string().describe("The item ID, e.g. 'itm_123'.") },
+  async ({ id }) => {
+    try {
+      return ok(await api("GET", `/items/${id}`));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+// For many tools: split by domain into mcp/tools/*.js exporting arrays of
+// { name, description, schema, handler }, then aggregate here (zendesk pattern):
+//   import { itemTools } from "./tools/items.js";
+//   [...itemTools].forEach((t) => server.tool(t.name, t.description, t.schema, t.handler));
+
+await server.connect(new StdioServerTransport());
+console.error("[<name>-mcp] server connected over stdio.");

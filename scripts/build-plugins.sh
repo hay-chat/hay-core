@@ -47,6 +47,18 @@ for plugin_dir in plugins/core/*/; do
     fi
   fi
 
+  # Install bundled MCP server dependencies. The mcp/ server is plain runtime JS
+  # spawned over stdio and is NOT part of the npm workspace, so its declared deps
+  # must be installed here — otherwise it relies on monorepo hoisting and breaks
+  # the moment a dep (e.g. magento's date-fns) isn't present at the repo root.
+  if [ -f "${plugin_dir}mcp/package.json" ] && [ ! -d "${plugin_dir}mcp/node_modules" ]; then
+    echo "  Installing MCP server deps for $plugin_name..."
+    if ! (cd "${plugin_dir}mcp" && npm install 2>&1); then
+      echo "  MCP install failed for $plugin_name, skipping"
+      continue
+    fi
+  fi
+
   # Run build
   if ! (cd "$plugin_dir" && npm run build 2>&1); then
     echo "  Build failed for $plugin_name, skipping"
