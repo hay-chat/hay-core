@@ -149,16 +149,14 @@
           </div>
 
           <div>
-            <Label for="syncInterval">Sync interval (minutes)</Label>
+            <Label for="syncInterval">Sync frequency</Label>
             <Input
               id="syncInterval"
-              v-model="syncIntervalMinutes"
-              type="number"
-              min="0"
-              placeholder="Manual only"
+              v-model="syncIntervalChoice"
+              type="select"
+              :options="syncIntervalOptions"
               class="mt-1"
             />
-            <p class="text-xs text-neutral-muted mt-1">Leave blank or 0 for manual-only sync.</p>
           </div>
 
           <div class="flex justify-end">
@@ -340,6 +338,7 @@ interface DocumentSource {
   lastFullSweepAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  documentsCount?: number;
 }
 
 interface SyncJob {
@@ -383,7 +382,26 @@ const form = ref({
   displayName: "",
   enabled: true,
 });
-const syncIntervalMinutes = ref<string>("");
+
+// Discrete options match the connect flow (PluginSpacePicker) — no more
+// open-ended numeric input. Each value maps to milliseconds; null = manual.
+const syncIntervalOptions = [
+  { label: "Manual only", value: "manual" },
+  { label: "Every hour", value: "1h" },
+  { label: "Every day", value: "1d" },
+];
+const SYNC_INTERVAL_MS: Record<string, number | null> = {
+  manual: null,
+  "1h": 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000,
+};
+const msToChoice = (ms: number | null | undefined): string => {
+  if (!ms || ms <= 0) return "manual";
+  if (ms >= SYNC_INTERVAL_MS["1d"]!) return "1d";
+  if (ms >= SYNC_INTERVAL_MS["1h"]!) return "1h";
+  return "manual";
+};
+const syncIntervalChoice = ref<string>("manual");
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -393,22 +411,24 @@ const needsPolling = computed(() => {
 });
 
 const documentCount = computed(() => {
+  // Authoritative count from the server (set by documentSources.get).
+  if (typeof source.value?.documentsCount === "number") {
+    return source.value.documentsCount;
+  }
+  // Fallback: best-effort approximation from the latest sync stats if the
+  // server hasn't filled in documentsCount yet (e.g. older cached payload).
   const stats = source.value?.lastSyncStats as Record<string, unknown> | null;
-  if (!stats) return 0;
-  const candidates = ["documentsTotal", "documentsCount", "totalDocuments", "imported", "ingested"];
-  for (const key of candidates) {
-    if (typeof stats[key] === "number") return stats[key] as number;
+  if (stats) {
+    const sum =
+      (Number(stats.created) || 0) + (Number(stats.updated) || 0) + (Number(stats.skipped) || 0);
+    if (sum > 0) return sum;
   }
   return 0;
 });
 
 const isDirty = computed(() => {
   if (!source.value) return false;
-  const currentIntervalMs = (() => {
-    const n = parseInt(syncIntervalMinutes.value, 10);
-    if (!syncIntervalMinutes.value || isNaN(n) || n <= 0) return null;
-    return n * 60_000;
-  })();
+  const currentIntervalMs = SYNC_INTERVAL_MS[syncIntervalChoice.value] ?? null;
   return (
     form.value.displayName !== source.value.displayName ||
     form.value.enabled !== source.value.enabled ||
@@ -419,7 +439,7 @@ const isDirty = computed(() => {
 const applyFormFromSource = (s: DocumentSource) => {
   form.value.displayName = s.displayName;
   form.value.enabled = s.enabled;
-  syncIntervalMinutes.value = s.syncIntervalMs ? String(Math.round(s.syncIntervalMs / 60_000)) : "";
+  syncIntervalChoice.value = msToChoice(s.syncIntervalMs);
 };
 
 const loadSource = async () => {
@@ -490,11 +510,7 @@ const saveSettings = async () => {
   if (!source.value) return;
   saving.value = true;
   try {
-    const intervalNum = parseInt(syncIntervalMinutes.value, 10);
-    const syncIntervalMs =
-      !syncIntervalMinutes.value || isNaN(intervalNum) || intervalNum <= 0
-        ? null
-        : intervalNum * 60_000;
+    const syncIntervalMs = SYNC_INTERVAL_MS[syncIntervalChoice.value] ?? null;
 
     const updated = (await HayApi.documentSources.update.mutate({
       id: source.value.id,

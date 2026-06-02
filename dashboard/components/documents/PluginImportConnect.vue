@@ -26,7 +26,12 @@
 
     <!-- Form -->
     <form v-else-if="configSchema" class="space-y-4" @submit.prevent="handleSubmit">
-      <div v-for="(field, key) in configSchema" :key="key" class="space-y-1">
+      <div
+        v-for="(field, key) in configSchema"
+        v-show="evaluateShowWhen(field.showWhen, formValues)"
+        :key="key"
+        class="space-y-1"
+      >
         <!-- Select with options -->
         <template v-if="field.options && field.options.length > 0">
           <Input
@@ -106,6 +111,13 @@ interface PluginImporter {
   supportedFormats?: string[];
 }
 
+interface ShowWhen {
+  field: string;
+  equals?: string | number | boolean;
+  in?: Array<string | number | boolean>;
+  notEquals?: string | number | boolean;
+}
+
 interface FieldSchema {
   type?: string;
   label?: string;
@@ -115,6 +127,16 @@ interface FieldSchema {
   encrypted?: boolean;
   default?: unknown;
   options?: Array<{ label: string; value: string | number }>;
+  showWhen?: ShowWhen;
+}
+
+function evaluateShowWhen(rule: ShowWhen | undefined, values: Record<string, unknown>): boolean {
+  if (!rule) return true;
+  const current = values[rule.field];
+  if (rule.equals !== undefined && current !== rule.equals) return false;
+  if (rule.notEquals !== undefined && current === rule.notEquals) return false;
+  if (rule.in !== undefined && !rule.in.includes(current as never)) return false;
+  return true;
 }
 
 const props = defineProps<{
@@ -138,12 +160,13 @@ const submitError = ref<string | null>(null);
 
 const canSubmit = computed(() => {
   if (!configSchema.value) return false;
-  // All required fields must be non-empty
+  // All required fields must be non-empty — but skip required-validation for
+  // fields whose `showWhen` predicate hides them from the user.
   for (const [key, field] of Object.entries(configSchema.value)) {
-    if (field.required) {
-      const value = formValues[key];
-      if (value === undefined || value === null || value === "") return false;
-    }
+    if (!field.required) continue;
+    if (!evaluateShowWhen(field.showWhen, formValues)) continue;
+    const value = formValues[key];
+    if (value === undefined || value === null || value === "") return false;
   }
   return !submitting.value;
 });
@@ -190,10 +213,14 @@ const handleSubmit = async () => {
   submitting.value = true;
 
   try {
-    // Strip empty optional fields so the server doesn't store empty strings
+    // Strip empty optional fields so the server doesn't store empty strings,
+    // and drop any field whose `showWhen` hides it (the user can't have
+    // intended to set it — skip serializing it).
     const configuration: Record<string, unknown> = {};
+    const schema = configSchema.value ?? {};
     for (const [key, value] of Object.entries(formValues)) {
       if (value === "" || value === null || value === undefined) continue;
+      if (!evaluateShowWhen(schema[key]?.showWhen, formValues)) continue;
       configuration[key] = value;
     }
 

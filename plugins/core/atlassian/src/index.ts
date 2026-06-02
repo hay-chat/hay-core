@@ -10,8 +10,8 @@
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
-import { JiraClient } from "./jira-client";
-import type { AuthConfig } from "./confluence-client";
+import { JiraClient } from "./jira-client.js";
+import type { AuthConfig } from "./confluence-client.js";
 
 interface MCPTool {
   name: string;
@@ -57,23 +57,65 @@ export default defineHayPlugin((globalCtx) => ({
   onInitialize(ctx) {
     globalCtx.logger.info("Initializing Atlassian plugin");
 
-    // OAuth app credentials (used only when authMode='oauth').
+    // Per-org connection settings (shown as a form to users). MUST be
+    // registered here for ctx.config.getOptional() to return them inside the
+    // worker — the package.json `config` block alone is not enough; the SDK
+    // only exposes fields declared via ctx.register.config().
     ctx.register.config({
+      authMode: {
+        type: "string",
+        label: "Auth method",
+        description: "How to authenticate with Atlassian.",
+        required: true,
+        encrypted: false,
+        default: "basic",
+        options: [
+          { label: "API Token (recommended)", value: "basic" },
+          { label: "OAuth", value: "oauth" },
+        ],
+      },
+      siteUrl: {
+        type: "string",
+        label: "Atlassian site URL",
+        description: "Used for both Confluence and Jira access.",
+        placeholder: "https://your-team.atlassian.net",
+        required: true,
+        encrypted: false,
+      },
+      email: {
+        type: "string",
+        label: "Atlassian email",
+        placeholder: "you@example.com",
+        required: true,
+        encrypted: false,
+        showWhen: { field: "authMode", equals: "basic" },
+      },
+      apiToken: {
+        type: "string",
+        label: "API token",
+        description:
+          "Works for both Confluence and Jira. Create one at id.atlassian.com/manage-profile/security/api-tokens",
+        required: true,
+        encrypted: true,
+        showWhen: { field: "authMode", equals: "basic" },
+      },
       clientId: {
         type: "string",
         label: "Atlassian OAuth Client ID",
-        description: "OAuth client ID — only needed when authMode='oauth'",
-        required: false,
+        description: "OAuth client ID — used when Auth method is OAuth.",
+        required: true,
         encrypted: false,
         env: "ATLASSIAN_CLIENT_ID",
+        showWhen: { field: "authMode", equals: "oauth" },
       },
       clientSecret: {
         type: "string",
         label: "Atlassian OAuth Client Secret",
-        description: "OAuth client secret — only needed when authMode='oauth'",
-        required: false,
+        description: "OAuth client secret — used when Auth method is OAuth.",
+        required: true,
         encrypted: true,
         env: "ATLASSIAN_CLIENT_SECRET",
+        showWhen: { field: "authMode", equals: "oauth" },
       },
     });
 

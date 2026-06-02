@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { adfToMarkdown, type AdfDocument } from "@plugins/core/confluence/src/adf-to-markdown";
+import { adfToMarkdown, type AdfDocument } from "@plugins/core/atlassian/src/adf-to-markdown";
 
 describe("adfToMarkdown", () => {
   it("returns empty string for an empty doc", () => {
@@ -11,7 +11,6 @@ describe("adfToMarkdown", () => {
     // Defensive: never throws.
     expect(adfToMarkdown(null)).toBe("");
     expect(adfToMarkdown(undefined)).toBe("");
-    // @ts-expect-error - intentionally malformed
     expect(adfToMarkdown({ type: "doc", version: 1 })).toBe("");
   });
 
@@ -135,7 +134,7 @@ describe("adfToMarkdown", () => {
     const cell = (
       text: string,
       isHeader = false,
-    ): import("@plugins/core/confluence/src/adf-to-markdown").AdfNode => ({
+    ): import("@plugins/core/atlassian/src/adf-to-markdown").AdfNode => ({
       type: isHeader ? "tableHeader" : "tableCell",
       content: [
         {
@@ -183,7 +182,8 @@ describe("adfToMarkdown", () => {
       type: "doc",
       version: 1,
       content: [
-        // @ts-expect-error - intentionally unknown type
+        // Unknown node type — AdfNode.type is an open string, so this is valid
+        // structurally; the renderer must ignore nodes it doesn't understand.
         { type: "extensionMacroXyz", attrs: { name: "mystery" } },
       ],
     };

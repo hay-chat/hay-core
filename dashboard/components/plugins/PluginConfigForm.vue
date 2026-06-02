@@ -1,6 +1,12 @@
 <template>
   <form @submit.prevent="$emit('submit')" class="space-y-4">
-    <div v-for="(field, key) in configSchema" :key="key" class="space-y-2" :id="key">
+    <div
+      v-for="(field, key) in configSchema"
+      v-show="evaluateShowWhen(field.showWhen, formData)"
+      :key="key"
+      class="space-y-2"
+      :id="key"
+    >
       <!-- Text Input -->
       <template v-if="field.type === 'string' && !field.options">
         <Label :for="key" :required="field.required">
@@ -264,6 +270,13 @@
 <script setup lang="ts">
 import { Lock, Edit3, X, RotateCcw } from "lucide-vue-next";
 
+interface ShowWhen {
+  field: string;
+  equals?: string | number | boolean;
+  in?: Array<string | number | boolean>;
+  notEquals?: string | number | boolean;
+}
+
 interface FieldSchema {
   type: "string" | "select" | "boolean" | "textarea" | "number";
   label?: string;
@@ -273,6 +286,16 @@ interface FieldSchema {
   encrypted?: boolean;
   env?: string;
   options?: Array<{ value: string; label: string }>;
+  showWhen?: ShowWhen;
+}
+
+function evaluateShowWhen(rule: ShowWhen | undefined, values: Record<string, unknown>): boolean {
+  if (!rule) return true;
+  const current = values[rule.field];
+  if (rule.equals !== undefined && current !== rule.equals) return false;
+  if (rule.notEquals !== undefined && current === rule.notEquals) return false;
+  if (rule.in !== undefined && !rule.in.includes(current as never)) return false;
+  return true;
 }
 
 interface ConfigFieldMetadata {
@@ -341,7 +364,7 @@ function handleCancelEditEnvField(key: string) {
   }
 
   // Validate that it's actually an env field
-  if (props.configMetadata?.[key]?.source !== 'env') {
+  if (props.configMetadata?.[key]?.source !== "env") {
     console.error(`Cannot cancel edit for non-env field: ${key}`);
     return;
   }

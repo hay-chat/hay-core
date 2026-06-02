@@ -7,7 +7,17 @@
  * `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3` (OAuth).
  */
 
-import type { AuthConfig } from "./confluence-client";
+import type { AuthConfig } from "./confluence-client.js";
+
+// Retry policy for GET reads — mirrors ConfluenceClient so both halves of the
+// plugin behave consistently under Atlassian rate limits / transient 5xx.
+const RATE_LIMIT_MAX_RETRIES = 5;
+const SERVER_ERROR_MAX_RETRIES = 3;
+const SERVER_ERROR_BACKOFFS_MS = [1000, 2000, 4000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface JiraProject {
   id: string;
@@ -77,18 +87,57 @@ export class JiraClient {
         }
       }
     }
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: this.authHeader(),
-        Accept: "application/json",
-      },
-    });
-    if (!res.ok) {
+    const headers = {
+      Authorization: this.authHeader(),
+      Accept: "application/json",
+    };
+
+    let rateLimitAttempts = 0;
+    let serverErrorAttempts = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), { method: "GET", headers });
+      } catch (err) {
+        // Network-level failure — treat like a 5xx retry path.
+        if (serverErrorAttempts >= SERVER_ERROR_MAX_RETRIES) {
+          throw new Error(`Jira request failed (network): ${path} - ${(err as Error).message}`);
+        }
+        await sleep(SERVER_ERROR_BACKOFFS_MS[serverErrorAttempts]);
+        serverErrorAttempts += 1;
+        continue;
+      }
+
+      if (res.ok) {
+        return (await res.json()) as T;
+      }
+
+      // 429 — honor Retry-After.
+      if (res.status === 429 && rateLimitAttempts < RATE_LIMIT_MAX_RETRIES) {
+        const retryAfter = parseFloat(res.headers.get("retry-after") ?? "1");
+        const waitMs = Math.max(0, isFinite(retryAfter) ? retryAfter * 1000 : 1000);
+        rateLimitAttempts += 1;
+        await sleep(waitMs);
+        continue;
+      }
+
+      // 5xx — exponential backoff.
+      if (
+        res.status >= 500 &&
+        res.status <= 599 &&
+        serverErrorAttempts < SERVER_ERROR_MAX_RETRIES
+      ) {
+        await sleep(SERVER_ERROR_BACKOFFS_MS[serverErrorAttempts]);
+        serverErrorAttempts += 1;
+        continue;
+      }
+
+      // Other 4xx, or retries exhausted — throw immediately.
       const body = await res.text().catch(() => "");
       throw new Error(`Jira ${res.status} ${res.statusText} for ${path}: ${body.slice(0, 300)}`);
     }
-    return (await res.json()) as T;
   }
 
   /** GET /project/search — paginated list of Jira projects. */

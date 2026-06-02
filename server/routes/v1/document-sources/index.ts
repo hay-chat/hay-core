@@ -63,7 +63,8 @@ export const documentSourcesRouter = t.router({
       if (!source) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Document source not found" });
       }
-      return serialize(source);
+      const documentsCount = await documentRepository.countByDocumentSourceId(input.id);
+      return { ...serialize(source), documentsCount };
     }),
 
   /**

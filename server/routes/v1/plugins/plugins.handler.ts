@@ -1554,18 +1554,28 @@ export const validateAuth = authenticatedProcedure
  */
 export const getPluginTranslations = authenticatedProcedure
   .input(z.object({ locale: z.string() }))
-  .query(async ({ input }) => {
-    const plugins = pluginManagerService.getAllPlugins();
-    const translations: Record<string, any> = {};
+  .query(async ({ ctx, input }) => {
+    // Only return translations for plugins the current org has actually
+    // enabled — this powers tool labels in the playbook editor, agent
+    // configuration, etc. Returning every filesystem-discovered plugin made
+    // the UI list tools the org can't use.
+    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+    const enabledPluginIds = new Set(
+      instances
+        .filter((i) => i.enabled)
+        .map((i) => i.plugin?.pluginId)
+        .filter(Boolean) as string[],
+    );
 
-    for (const plugin of plugins) {
+    const translations: Record<string, unknown> = {};
+
+    for (const plugin of pluginManagerService.getAllPlugins()) {
+      if (!enabledPluginIds.has(plugin.pluginId)) continue;
       const manifest = plugin.manifest as HayPluginManifest;
-      if (manifest.i18n) {
-        // Try exact locale, then fallback to "en"
-        const localeData = manifest.i18n[input.locale] || manifest.i18n["en"];
-        if (localeData) {
-          translations[plugin.pluginId] = localeData;
-        }
+      if (!manifest.i18n) continue;
+      const localeData = manifest.i18n[input.locale] || manifest.i18n["en"];
+      if (localeData) {
+        translations[plugin.pluginId] = localeData;
       }
     }
 

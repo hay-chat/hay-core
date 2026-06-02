@@ -130,31 +130,38 @@
             >
               <div class="flex items-start gap-4">
                 <div
-                  class="p-3 rounded-lg"
+                  class="p-3 rounded-lg flex items-center justify-center w-12 h-12 overflow-hidden"
                   :class="
                     importType === `plugin:${plugin.id}` ? 'bg-white' : 'bg-background-tertiary'
                   "
                 >
-                  <Package class="h-6 w-6 text-neutral-muted" />
+                  <img
+                    v-if="!pluginThumbFailed[plugin.pluginId]"
+                    :src="pluginThumbUrl(plugin.pluginId)"
+                    :alt="plugin.name"
+                    class="w-full h-full object-cover rounded"
+                    @error="pluginThumbFailed[plugin.pluginId] = true"
+                  />
+                  <Package v-else class="h-6 w-6 text-neutral-muted" />
                 </div>
                 <div class="flex-1">
                   <h3 class="mb-1">
                     {{ plugin.name }}
                   </h3>
-                  <p class="text-sm text-neutral-muted mb-2">
+                  <p class="text-sm text-neutral-muted">
                     {{ plugin.description }}
                   </p>
-                  <div class="flex items-center gap-2">
-                    <Badge variant="secondary"> {{ $t("documents.import.source.plugin") }} </Badge>
-                    <template v-if="plugin.supportedFormats">
-                      <Badge
-                        v-for="format in plugin.supportedFormats"
-                        :key="format"
-                        variant="outline"
-                      >
-                        {{ format }}
-                      </Badge>
-                    </template>
+                  <div
+                    v-if="plugin.supportedFormats && plugin.supportedFormats.length > 0"
+                    class="flex items-center gap-2"
+                  >
+                    <Badge
+                      v-for="format in plugin.supportedFormats"
+                      :key="format"
+                      variant="outline"
+                    >
+                      {{ format }}
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -1123,6 +1130,10 @@ interface DiscoveredPage {
 const webImportJob = ref<WebImportJob | null>(null);
 const webImportProgress = ref<WebImportProgress | null>(null);
 const pluginImporters = ref<PluginImporter[]>([]);
+const pluginThumbFailed = reactive<Record<string, boolean>>({});
+const { getApiUrl: getApiBase } = useDomain();
+const pluginThumbUrl = (pluginId: string) =>
+  `${getApiBase()}/plugins/thumbnails/${encodeURIComponent(pluginId)}`;
 const discoveredPages = ref<DiscoveredPage[]>([]);
 const pageFilterType = ref<
   "contains" | "not_contains" | "starts_with" | "not_starts_with" | "ends_with" | "not_ends_with"

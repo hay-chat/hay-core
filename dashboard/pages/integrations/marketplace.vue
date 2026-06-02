@@ -114,17 +114,16 @@
         <CardHeader>
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center space-x-3 min-w-0">
-              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden shadow-md">
+              <div
+                class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden shadow-md bg-background-tertiary flex items-center justify-center"
+              >
                 <img
                   :src="getPluginThumbnail(plugin.id)"
                   :alt="`${plugin.name} thumbnail`"
                   class="w-full h-full object-cover"
-                  onerror="
-                    this.style.display = 'none';
-                    this.nextElementSibling.style.display = 'flex';
-                  "
                   @error="handleThumbnailError($event)"
                 />
+                <Package class="h-6 w-6 text-neutral-muted hidden" />
               </div>
               <div class="min-w-0">
                 <div class="flex items-center space-x-2 min-w-0">

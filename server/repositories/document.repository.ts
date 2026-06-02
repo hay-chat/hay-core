@@ -133,6 +133,12 @@ export class DocumentRepository extends BaseRepository<Document> {
     });
   }
 
+  async countByDocumentSourceId(documentSourceId: string): Promise<number> {
+    return await this.getRepository().count({
+      where: { documentSourceId } as any,
+    });
+  }
+
   /**
    * Return only the external ids of documents in a document source.
    * Cheap projection used by the deletion-detection full sweep; may return
