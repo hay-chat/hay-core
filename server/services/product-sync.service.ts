@@ -19,6 +19,7 @@ import { ProductVariant, VariantAvailability } from "../entities/product-variant
 import { htmlToSanitizedMarkdown } from "../utils/sanitize-html";
 import { sanitizeContent } from "../utils/sanitize";
 import { productVectorStoreService } from "./product-vector-store.service";
+import { auditLogService } from "./audit-log.service";
 import { createLogger } from "@server/lib/logger";
 import type { CanonicalProduct, CanonicalVariant } from "../types/canonical-product";
 
@@ -57,6 +58,20 @@ export class ProductSyncService {
           "Failed to upsert product",
         );
         result.errors.push({ externalId: product.externalId, message });
+      }
+    }
+
+    // Audit the batch result. Errors are swallowed inside auditLog itself,
+    // but keep this defensive in case it ever changes.
+    if (products.length > 0) {
+      const source = products[0].source;
+      try {
+        await auditLogService.logProductSync(undefined, organizationId, source, {
+          upserted: result.upserted,
+          errors: result.errors.length,
+        });
+      } catch (err) {
+        logger.error({ err }, "Failed to write product sync audit log");
       }
     }
 
@@ -149,8 +164,6 @@ export class ProductSyncService {
         embeddingRefreshed = true;
       }
 
-      // Audit logging is wired in P7 to avoid coupling early; the variable
-      // is preserved in the return so callers can decide what to log today.
       logger.debug(
         {
           organizationId,
@@ -161,6 +174,24 @@ export class ProductSyncService {
         },
         "Product upserted",
       );
+
+      // Best-effort audit — swallow failures so a slow audit table never
+      // blocks ingestion.
+      try {
+        await auditLogService.logProductUpsert(
+          undefined,
+          organizationId,
+          saved.id,
+          {
+            source: canonical.source,
+            externalId: canonical.externalId,
+            title: saved.title,
+          },
+          { created, embeddingRefreshed },
+        );
+      } catch (err) {
+        logger.error({ err, productId: saved.id }, "Failed to write product audit log");
+      }
 
       return { productId: saved.id, created, embeddingRefreshed };
     });
@@ -185,6 +216,15 @@ export class ProductSyncService {
     // documents pattern (and so the vector index is reaped immediately).
     await productVectorStoreService.deleteByProductId(organizationId, row.id);
     await repo.delete({ id: row.id });
+
+    try {
+      await auditLogService.logProductDelete(undefined, organizationId, row.id, {
+        source,
+        externalId,
+      });
+    } catch (err) {
+      logger.error({ err, productId: row.id }, "Failed to write product delete audit log");
+    }
     return true;
   }
 

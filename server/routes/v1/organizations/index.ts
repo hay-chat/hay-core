@@ -715,6 +715,13 @@ export const organizationsRouter = t.router({
       // Delete embeddings from vector store within the transaction
       await vectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
 
+      // Product embeddings live in a separate table (product_embeddings) and
+      // are NOT FK-cascaded onto organizations through the entity layer, so
+      // delete them explicitly here in the same transaction.
+      const { productVectorStoreService } =
+        await import("@server/services/product-vector-store.service");
+      await productVectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
+
       // Delete organization - CASCADE will handle most related entities:
       // - Agents (onDelete: CASCADE)
       // - Conversations (onDelete: CASCADE) -> Messages (onDelete: CASCADE)
@@ -732,6 +739,8 @@ export const organizationsRouter = t.router({
       // - ScheduledJobs (onDelete: CASCADE)
       // - AuditLogs (onDelete: CASCADE)
       // - PrivacyRequests (onDelete: CASCADE)
+      // - Products / ProductVariants (onDelete: CASCADE; product_embeddings
+      //   handled above because it's a raw-SQL table without an entity FK)
 
       const orgRepository = manager.getRepository(Organization);
       await orgRepository.delete({ id: orgId });

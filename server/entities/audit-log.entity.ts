@@ -50,6 +50,10 @@ export type AuditAction =
   | "document.create"
   | "document.update"
   | "document.delete"
+  | "product.create"
+  | "product.update"
+  | "product.delete"
+  | "product.sync"
   | "permission.denied"
   | "retention.cleanup";
 
