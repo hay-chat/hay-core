@@ -179,7 +179,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     throw new Error('Missing or invalid "category" field in hay-plugin manifest');
   }
 
-  const validCategories = ["integration", "channel", "tool", "analytics"];
+  const validCategories = ["integration", "channel", "tool", "analytics", "products"];
   if (!validCategories.includes(manifest.category)) {
     throw new Error(
       `Invalid category "${manifest.category}". Must be one of: ${validCategories.join(", ")}`,
@@ -201,6 +201,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "messages",
     "customers",
     "sources",
+    "products",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {

@@ -6,12 +6,13 @@
  * @module @hay/plugin-sdk/types/contexts
  */
 
-import type { HayRegisterAPI } from './register';
-import type { HayConfigDescriptorAPI, HayConfigRuntimeAPI } from './config';
-import type { HayAuthRuntimeAPI } from './auth';
-import type { HayMcpRuntimeAPI } from './mcp';
-import type { HayLogger } from './logger';
-import type { HayOrg } from './org';
+import type { HayRegisterAPI } from "./register";
+import type { HayConfigDescriptorAPI, HayConfigRuntimeAPI } from "./config";
+import type { HayAuthRuntimeAPI } from "./auth";
+import type { HayMcpRuntimeAPI } from "./mcp";
+import type { HayLogger } from "./logger";
+import type { HayOrg } from "./org";
+import type { HayProductSourceRuntimeAPI } from "./products";
 
 /**
  * Global context provided to onInitialize hook.
@@ -166,6 +167,15 @@ export interface HayStartContext {
    * Used to start local or external MCP servers for this organization.
    */
   mcp: HayMcpRuntimeAPI;
+
+  /**
+   * Product source runtime API.
+   *
+   * Only populated when the plugin declares the `products` capability.
+   * Used to push CanonicalProduct payloads to Hay's catalog from inside
+   * `onStart` (initial bulk sync) or webhook handlers (real-time updates).
+   */
+  productSource?: HayProductSourceRuntimeAPI;
 
   /**
    * Logger for plugin messages.

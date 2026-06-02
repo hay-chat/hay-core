@@ -61,6 +61,23 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
+  /**
+   * Find every enabled plugin instance whose manifest declares a given
+   * capability. The capability lives in the JSONB manifest column, so we
+   * fetch enabled rows and filter in JS. Used by scheduled jobs that fan out
+   * across orgs by capability (e.g. product source re-sync).
+   */
+  async findEnabledInstancesByCapability(capability: string): Promise<PluginInstance[]> {
+    const rows = await this.getRepository().find({
+      where: { enabled: true },
+      relations: ["plugin", "organization"],
+    });
+    return rows.filter((instance) => {
+      const manifest = instance.plugin?.manifest as { capabilities?: string[] } | undefined;
+      return Array.isArray(manifest?.capabilities) && manifest!.capabilities!.includes(capability);
+    });
+  }
+
   async findByPlugin(pluginRegistryId: string): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { pluginId: pluginRegistryId },

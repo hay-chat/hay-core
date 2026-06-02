@@ -266,6 +266,9 @@ export class PluginManagerService {
     if (capabilities.includes("sources")) {
       types.push("retriever");
     }
+    if (capabilities.includes("products")) {
+      types.push("products");
+    }
 
     return types.length > 0 ? types : ["mcp-connector"];
   }
