@@ -6,6 +6,7 @@
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { PluginApiClient } from "./plugin-api";
 
 /**
  * MCP Tool Definition
@@ -29,6 +30,9 @@ interface MCPTool {
  * - Tool discovery and execution
  */
 export default defineHayPlugin((globalCtx) => {
+  // Set in onStart once recipients are configured; used by the send-email tool.
+  let apiClient: PluginApiClient | null = null;
+
   return {
     name: "Email",
 
@@ -58,8 +62,16 @@ export default defineHayPlugin((globalCtx) => {
     async onStart(ctx) {
       ctx.logger.info("Starting Email plugin for org", { orgId: ctx.org.id });
 
-      // Get recipients from config (with fallback to default for testing)
-      const recipients = ctx.config.getOptional<string>("recipients") || "test@example.com";
+      // Gate on configuration — enabled but inactive until recipients are set
+      // (do not crash the worker, and never fall back to a hardcoded address).
+      const recipients = ctx.config.getOptional<string>("recipients");
+      if (!recipients) {
+        ctx.logger.info(
+          "Email plugin: no recipients configured — enabled but sending is unavailable. " +
+            "Set recipients in the plugin settings.",
+        );
+        return;
+      }
 
       // Parse and validate recipients
       const recipientList = recipients
@@ -68,7 +80,8 @@ export default defineHayPlugin((globalCtx) => {
         .filter((email) => email.length > 0);
 
       if (recipientList.length === 0) {
-        throw new Error("No valid recipients configured");
+        ctx.logger.info("Email plugin: recipients list is empty — sending unavailable.");
+        return;
       }
 
       // Validate email format
@@ -82,6 +95,9 @@ export default defineHayPlugin((globalCtx) => {
       ctx.logger.info(`Email plugin configured with ${recipientList.length} recipient(s)`, {
         recipients: recipientList,
       });
+
+      // Client for calling core's email service. Requires the "email" capability.
+      apiClient = new PluginApiClient(ctx.logger);
 
       // Start local MCP server
       await ctx.mcp.startLocal("email-mcp", async (mcpCtx) => {
@@ -149,23 +165,36 @@ export default defineHayPlugin((globalCtx) => {
                 throw new Error("Subject and body are required");
               }
 
+              if (!apiClient) {
+                throw new Error("Email plugin is not configured — set recipients first");
+              }
+
               mcpCtx.logger.info("Sending email", {
                 subject,
                 recipientCount: recipientList.length,
               });
 
-              // Mock email send (in production, this would call Platform API)
+              // Send through the platform's email service (POST /v1/plugin-api/send-email).
+              const sent = await apiClient.sendEmail({
+                subject,
+                body,
+                to: recipientList,
+              });
+
+              if (!sent.success) {
+                mcpCtx.logger.error("Email send failed", { error: sent.error });
+                throw new Error(`Failed to send email: ${sent.error}`);
+              }
+
               const result = {
                 success: true,
-                message: `Email sent successfully to ${recipientList.length} recipient(s): ${recipientList.join(", ")}`,
-                messageId: `mock-${Date.now()}`,
-                recipients: recipientList,
-                timestamp: new Date().toISOString(),
+                message: `Email sent to ${recipientList.length} recipient(s)`,
+                messageId: sent.messageId,
+                recipients: sent.recipients ?? recipientList,
                 subject,
-                bodyPreview: body.substring(0, 50) + (body.length > 50 ? "..." : ""),
               };
 
-              mcpCtx.logger.info("Email sent successfully", result);
+              mcpCtx.logger.info("Email sent successfully", { messageId: sent.messageId });
 
               return result;
             }
@@ -201,16 +230,8 @@ export default defineHayPlugin((globalCtx) => {
      */
     async onDisable(ctx) {
       ctx.logger.info("Email plugin disabled for org", { orgId: ctx.org.id });
+      apiClient = null;
       // MCP servers are stopped automatically by the SDK
-    },
-
-    /**
-     * Enable handler - called by core when plugin is enabled
-     * Note: This is a CORE-ONLY hook, receives global context (not org context)
-     */
-    async onEnable(ctx) {
-      ctx.logger.info("Email plugin enabled");
-      // Plugin will be restarted via onStart automatically for each org
     },
   };
 });
