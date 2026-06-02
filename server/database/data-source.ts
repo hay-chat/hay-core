@@ -26,6 +26,9 @@ import { ScheduledJobHistory } from "../entities/scheduled-job-history.entity";
 import { WebchatSettings } from "./entities/webchat-settings.entity";
 import { AuthCode } from "../entities/auth-code.entity";
 import { GitConnection } from "../entities/git-connection.entity";
+import { Product } from "../entities/product.entity";
+import { ProductVariant } from "../entities/product-variant.entity";
+import { ProductEmbedding } from "../entities/product-embedding.entity";
 import { ConversationTakeoverEvent } from "./entities/conversation-takeover-event.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
@@ -78,6 +81,9 @@ export const AppDataSource = new DataSource({
     WebchatSettings,
     AuthCode,
     GitConnection,
+    Product,
+    ProductVariant,
+    ProductEmbedding,
     ConversationTakeoverEvent,
   ],
   migrations: __filename.includes("dist")
