@@ -96,6 +96,7 @@ export default defineNuxtConfig({
           "en/queue.json",
           "en/privacy-pages.json",
           "en/organizations.json",
+          "en/products.json",
         ],
       },
       {
@@ -114,6 +115,7 @@ export default defineNuxtConfig({
           "pt-BR/queue.json",
           "pt-BR/privacy-pages.json",
           "pt-BR/organizations.json",
+          "pt-BR/products.json",
         ],
       },
     ],

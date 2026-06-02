@@ -31,6 +31,7 @@ import {
   Zap,
   Globe,
   ExternalLink,
+  Package,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -164,6 +165,17 @@ const navMain = computed(() => {
     //   isActive: isPathActive("/insights"),
     // },
   );
+
+  // Products nav — only shown when a product-source plugin is enabled
+  // (e.g. Shopify). Mirrors the marketplace's type.includes('channel') gate.
+  if (appStore.enabledPlugins.some((p) => p.type?.includes("products"))) {
+    items.push({
+      title: t("nav.products"),
+      url: "/products",
+      icon: Package,
+      isActive: isPathActive("/products"),
+    });
+  }
 
   // Only show Integrations if admin or owner
   if (isAdminOrOwner) {
