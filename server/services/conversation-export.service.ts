@@ -10,6 +10,7 @@ const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.TOOL]: "Tool",
   [MessageType.DOCUMENT]: "Document",
   [MessageType.PLAYBOOK]: "Playbook",
+  [MessageType.PRODUCT_RECOMMENDATION]: "Product Recommendation",
 };
 
 export class ConversationExportService {

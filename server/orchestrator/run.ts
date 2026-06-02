@@ -891,10 +891,15 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool
-      await toolExecutionService.handleToolExecution(
+      const toolExecResult1 = await toolExecutionService.handleToolExecution(
         conversation,
         executionResult.tool,
         toolMessageId?.id,
+      );
+      await maybeEmitProductRecommendation(
+        conversation,
+        executionResult.tool.name,
+        toolExecResult1,
       );
 
       // Continue the loop to let LLM analyze the result
@@ -912,10 +917,15 @@ async function handleExecutionLoop(
       });
 
       // Execute the tool with the message ID for updating
-      await toolExecutionService.handleToolExecution(
+      const toolExecResult2 = await toolExecutionService.handleToolExecution(
         conversation,
         executionResult.tool,
         toolMessageId?.id,
+      );
+      await maybeEmitProductRecommendation(
+        conversation,
+        executionResult.tool.name,
+        toolExecResult2,
       );
 
       // The tool execution service now updates the message internally
@@ -1217,4 +1227,42 @@ async function handleExecutionLoop(
   if (iterations >= MAX_ITERATIONS) {
     log.warn("Reached maximum execution iterations, ending loop");
   }
+}
+
+/**
+ * After `recommend_products` returns, emit a dedicated PRODUCT_RECOMMENDATION
+ * message so webchat + dashboard can render the cards. The TOOL message stays
+ * as-is for transparency; the rich payload lives in this separate message's
+ * metadata so renderers can branch on `message.type === "ProductRecommendation"`
+ * without parsing tool outputs.
+ */
+async function maybeEmitProductRecommendation(
+  conversation: Conversation,
+  toolName: string,
+  result: { success: boolean; result?: unknown } | undefined,
+): Promise<void> {
+  if (toolName !== "recommend_products") return;
+  if (!result?.success) return;
+  const payload = result.result as
+    | {
+        products?: Array<Record<string, unknown>>;
+        query?: string;
+        filtersApplied?: Record<string, unknown>;
+      }
+    | undefined;
+  if (!payload || !Array.isArray(payload.products) || payload.products.length === 0) {
+    return;
+  }
+
+  await conversation.addMessage({
+    content: `Recommending ${payload.products.length} product${payload.products.length === 1 ? "" : "s"}`,
+    type: MessageType.PRODUCT_RECOMMENDATION,
+    metadata: {
+      productRecommendation: {
+        query: payload.query,
+        filtersApplied: payload.filtersApplied,
+        products: payload.products,
+      },
+    },
+  });
 }

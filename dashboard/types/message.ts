@@ -90,6 +90,41 @@ export enum MessageType {
   TOOL = "Tool",
   DOCUMENT = "Document",
   PLAYBOOK = "Playbook",
+  PRODUCT_RECOMMENDATION = "ProductRecommendation",
+}
+
+export interface ProductRecommendationCardProduct {
+  id: string;
+  externalId?: string;
+  source?: string;
+  title: string;
+  handle?: string;
+  description?: string;
+  imageUrl?: string;
+  sourceUrl?: string;
+  vendor?: string;
+  productType?: string;
+  tags?: string[];
+  available?: boolean;
+  similarity?: number;
+  topVariant?: {
+    id: string;
+    externalId?: string;
+    title: string;
+    price?: string;
+    compareAtPrice?: string;
+    currency?: string;
+    sku?: string;
+    availability?: string;
+  };
+}
+
+export interface ProductRecommendationPayload {
+  /** Short framing line (e.g. "Matched on 'wireless headphones under $200'"). */
+  reason?: string;
+  /** Original shopper query (for analytics / debug). */
+  query?: string;
+  products: ProductRecommendationCardProduct[];
 }
 
 export enum MessageSentiment {

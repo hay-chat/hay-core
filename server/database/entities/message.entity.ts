@@ -20,6 +20,7 @@ export enum MessageType {
   TOOL = "Tool",
   DOCUMENT = "Document",
   PLAYBOOK = "Playbook",
+  PRODUCT_RECOMMENDATION = "ProductRecommendation",
 }
 
 export enum MessageDirection {

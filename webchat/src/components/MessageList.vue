@@ -23,8 +23,38 @@
         class="hay-message__content"
         :class="{ 'hay-message__content--rich': message.sender === 'agent' }"
       >
+        <!-- Product recommendation cards -->
+        <template
+          v-if="
+            message.agentType === 'ProductRecommendation' &&
+            message.metadata &&
+            Array.isArray((message.metadata as any).productRecommendation?.products)
+          "
+        >
+          <div class="hay-product-recs">
+            <a
+              v-for="p in (message.metadata as any).productRecommendation.products as any[]"
+              :key="p.id || p.externalId"
+              :href="p.sourceUrl || '#'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hay-product-card"
+            >
+              <div class="hay-product-card__image">
+                <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+              </div>
+              <div class="hay-product-card__body">
+                <div class="hay-product-card__title">{{ p.title }}</div>
+                <div v-if="p.topVariant?.price" class="hay-product-card__price">
+                  {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+                </div>
+                <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
+              </div>
+            </a>
+          </div>
+        </template>
         <!-- Agent messages: animated word reveal or static markdown -->
-        <template v-if="message.sender === 'agent'">
+        <template v-else-if="message.sender === 'agent'">
           <div v-if="animatingIds.has(message.id)" v-html="getAnimatedHtml(message.content)"></div>
           <div v-else v-html="renderMarkdown(message.content)"></div>
         </template>
@@ -115,6 +145,21 @@ const formatTime = (timestamp: number) => {
   const hours = date.getHours().toString().padStart(2, "0");
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
+};
+
+const formatPrice = (amount?: string | number, currency?: string): string => {
+  if (amount === undefined || amount === null || amount === "") return "";
+  const value = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (Number.isNaN(value)) return "";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency ?? ""}`.trim();
+  }
 };
 
 const scrollToBottom = () => {
@@ -341,5 +386,74 @@ watch(
   border-radius: 8px;
   display: inline-block;
   align-self: flex-start;
+}
+
+/* Product recommendation cards */
+.hay-product-recs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.hay-product-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid var(--color-neutral-200, #e5e7eb);
+  background: white;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.hay-product-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.hay-product-card__image {
+  aspect-ratio: 1 / 1;
+  background: var(--color-neutral-100, #f3f4f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hay-product-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hay-product-card__body {
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hay-product-card__title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hay-product-card__price {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hay-primary);
+}
+
+.hay-product-card__oos {
+  font-size: 10px;
+  color: var(--color-neutral-500);
 }
 </style>

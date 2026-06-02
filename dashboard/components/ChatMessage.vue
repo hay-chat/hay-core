@@ -85,6 +85,12 @@
             :executed-at="message.metadata?.toolExecutedAt"
           />
         </div>
+        <div v-else-if="message.type === 'ProductRecommendation'">
+          <ProductRecommendationCard
+            :products="message.metadata?.productRecommendation?.products || []"
+            :query="message.metadata?.productRecommendation?.query"
+          />
+        </div>
         <div v-else-if="message.type === 'System'">
           <div class="chat-message__system-title font-bold">
             <BrainCircuit class="mr-2 h-4 w-4 inline" /> Agent is following system instructions
