@@ -231,11 +231,4 @@ export class RetrievalLayer {
       return [];
     }
   }
-
-  private limitDocumentSize(content: string, maxSize: number = 8000): string {
-    if (content.length <= maxSize) {
-      return content;
-    }
-    return content.substring(0, maxSize) + "...";
-  }
 }
