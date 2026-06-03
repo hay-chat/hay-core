@@ -7,7 +7,7 @@ import type { VectorChunk } from "../../services/vector-store.service";
 import { Organization } from "../../entities/organization.entity";
 import { Agent } from "../../database/entities/agent.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
-import { Message, MessageType } from "../../database/entities/message.entity";
+import { MessageType } from "../../database/entities/message.entity";
 import { Customer } from "../../database/entities/customer.entity";
 
 describe("ConversationService - Cascade Delete Embeddings", () => {

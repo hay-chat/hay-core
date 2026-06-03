@@ -92,9 +92,9 @@ const handleSubmit = async () => {
 
     // Reset form
     password.value = "";
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Password verification failed:", err);
-    error.value = err.message || t("reauth.verifyFailed");
+    error.value = (err instanceof Error && err.message) || t("reauth.verifyFailed");
   } finally {
     loading.value = false;
   }

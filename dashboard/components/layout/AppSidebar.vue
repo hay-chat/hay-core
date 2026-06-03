@@ -43,6 +43,9 @@ import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 import { Hay } from "@/utils/api";
 import { roleProtectedRoutes } from "@/middleware/auth.global";
+import type { RouterOutputs } from "@/types/trpc";
+
+type PluginMenuItem = RouterOutputs["plugins"]["getMenuItems"]["items"][number];
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -53,7 +56,7 @@ const appStore = useAppStore();
 const route = useRoute();
 
 // Plugin menu items
-const pluginMenuItems = ref<any[]>([]);
+const pluginMenuItems = ref<PluginMenuItem[]>([]);
 
 // Map icon name strings from CUSTOM_MENU to Lucide components
 const ICON_MAP: Record<string, Component> = {

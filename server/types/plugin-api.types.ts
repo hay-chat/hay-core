@@ -11,7 +11,7 @@ export interface PluginContext {
   pluginId: string;
 
   // Configuration (decrypted and parsed from plugin instance)
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 
   // Service APIs (only included if plugin declares capability in manifest)
   email?: EmailAPI;
@@ -25,10 +25,10 @@ export interface PluginContext {
 
   // Logging (always available)
   logger: {
-    info: (message: string, ...args: any[]) => void;
-    warn: (message: string, ...args: any[]) => void;
-    error: (message: string, ...args: any[]) => void;
-    debug: (message: string, ...args: any[]) => void;
+    info: (message: string, ...args: unknown[]) => void;
+    warn: (message: string, ...args: unknown[]) => void;
+    error: (message: string, ...args: unknown[]) => void;
+    debug: (message: string, ...args: unknown[]) => void;
   };
 }
 

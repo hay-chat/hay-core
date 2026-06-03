@@ -155,9 +155,9 @@ const handleDelete = async () => {
         window.location.href = "/login";
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to delete organization:", err);
-    error.value = err.message || t("deleteOrganization.deleteFailed");
+    error.value = (err instanceof Error && err.message) || t("deleteOrganization.deleteFailed");
     toast.error(t("deleteOrganization.deleteFailed"), error.value);
   } finally {
     isDeleting.value = false;

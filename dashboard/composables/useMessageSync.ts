@@ -4,7 +4,7 @@ interface Message {
   id: string;
   content: string;
   created_at: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface SyncOptions {

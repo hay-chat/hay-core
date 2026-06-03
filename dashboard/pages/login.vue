@@ -314,8 +314,9 @@ const handleResendVerification = async () => {
   try {
     await Hay.auth.resendSignupVerification.mutate({ email: form.email });
     verificationResent.value = true;
-  } catch (err: any) {
-    if (err.message.includes("Too many requests")) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("Too many requests")) {
       error.value = t("login.errors.tooManyRequests");
     } else {
       error.value = t("login.errors.resendFailed");

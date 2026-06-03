@@ -33,7 +33,7 @@ export interface EmailOptions {
 export interface EmailTemplateOptions extends Omit<EmailOptions, "html" | "text" | "subject"> {
   template: string;
   subject?: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
   locale?: string;
 }
 
@@ -70,15 +70,15 @@ export interface EmailResult {
 
 export interface TemplateVariable {
   name: string;
-  value: any;
+  value: unknown;
   type?: "string" | "number" | "boolean" | "date" | "array" | "object";
   required?: boolean;
-  default?: any;
+  default?: unknown;
 }
 
 export interface TemplateRenderOptions {
   template: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   locale?: string;
   useCache?: boolean;
   stripComments?: boolean;

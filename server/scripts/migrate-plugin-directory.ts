@@ -3,6 +3,7 @@ import * as path from "path";
 import { AppDataSource } from "@server/database/data-source";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
+import type { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
 /**
  * Migration script to restructure plugin directory
@@ -106,7 +107,7 @@ async function migratePluginDirectory() {
           pluginPath: newPath,
           sourceType: "core" as const,
           organizationId: undefined,
-        } as any);
+        } as QueryDeepPartialEntity<PluginRegistry>);
 
         console.log(`   ✓ Updated DB: ${plugin.pluginPath} → ${newPath}`);
         updatedCount++;

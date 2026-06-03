@@ -6,7 +6,61 @@ import {
 } from "@/utils/websocket";
 import { useNotifications } from "@/composables/useNotifications";
 
-type WebSocketEventHandler = (data: any) => void;
+type WebSocketEventHandler = (data: unknown) => void;
+
+interface ConversationStatusChangedPayload {
+  conversationId: string;
+  status: string;
+  title?: string;
+  customerName?: string;
+}
+
+interface ConversationTakenOverPayload {
+  conversationId: string;
+  userId: string;
+  userName: string;
+  previousOwnerId?: string;
+}
+
+interface ConversationReleasedPayload {
+  conversationId: string;
+  newStatus: string;
+  releasedBy: string;
+  userName: string;
+  returnToMode: "ai" | "queue";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isConversationStatusChangedPayload(
+  value: unknown,
+): value is ConversationStatusChangedPayload {
+  return (
+    isRecord(value) && typeof value.conversationId === "string" && typeof value.status === "string"
+  );
+}
+
+function isConversationTakenOverPayload(value: unknown): value is ConversationTakenOverPayload {
+  return (
+    isRecord(value) &&
+    typeof value.conversationId === "string" &&
+    typeof value.userId === "string" &&
+    typeof value.userName === "string"
+  );
+}
+
+function isConversationReleasedPayload(value: unknown): value is ConversationReleasedPayload {
+  return (
+    isRecord(value) &&
+    typeof value.conversationId === "string" &&
+    typeof value.newStatus === "string" &&
+    typeof value.releasedBy === "string" &&
+    typeof value.userName === "string" &&
+    (value.returnToMode === "ai" || value.returnToMode === "queue")
+  );
+}
 
 const ws = ref<WebSocket | null>(null);
 const isConnected = ref(false);
@@ -65,8 +119,8 @@ export function useWebSocket() {
         scheduleReconnect();
       };
 
-      ws.value.onerror = (error) => {};
-    } catch (error) {
+      ws.value.onerror = () => {};
+    } catch {
       scheduleReconnect();
     }
   };
@@ -120,15 +174,21 @@ export function useWebSocket() {
     // Handle built-in events
     switch (message.type) {
       case "conversation_status_changed":
-        handleConversationStatusChanged(message.payload as any);
+        if (isConversationStatusChangedPayload(message.payload)) {
+          handleConversationStatusChanged(message.payload);
+        }
         break;
 
       case "conversation_taken_over":
-        handleConversationTakenOver(message.payload as any);
+        if (isConversationTakenOverPayload(message.payload)) {
+          handleConversationTakenOver(message.payload);
+        }
         break;
 
       case "conversation_released":
-        handleConversationReleased(message.payload as any);
+        if (isConversationReleasedPayload(message.payload)) {
+          handleConversationReleased(message.payload);
+        }
         break;
 
       case "message_received":
@@ -147,12 +207,7 @@ export function useWebSocket() {
   /**
    * Handle conversation status change event
    */
-  const handleConversationStatusChanged = async (payload: {
-    conversationId: string;
-    status: string;
-    title?: string;
-    customerName?: string;
-  }) => {
+  const handleConversationStatusChanged = async (payload: ConversationStatusChangedPayload) => {
     // Show notification if conversation needs human attention
     if (payload.status === "pending-human") {
       await notifications.notifyConversationNeedsAttention({
@@ -166,12 +221,7 @@ export function useWebSocket() {
   /**
    * Handle conversation taken over event
    */
-  const handleConversationTakenOver = async (payload: {
-    conversationId: string;
-    userId: string;
-    userName: string;
-    previousOwnerId?: string;
-  }) => {
+  const handleConversationTakenOver = async (payload: ConversationTakenOverPayload) => {
     // Get current user from user store
     const { useUserStore } = await import("@/stores/user");
     const userStore = useUserStore();
@@ -192,13 +242,7 @@ export function useWebSocket() {
   /**
    * Handle conversation released event
    */
-  const handleConversationReleased = async (payload: {
-    conversationId: string;
-    newStatus: string;
-    releasedBy: string;
-    userName: string;
-    returnToMode: "ai" | "queue";
-  }) => {
+  const handleConversationReleased = async (payload: ConversationReleasedPayload) => {
     // If released back to queue, notify available agents
     if (payload.returnToMode === "queue" && payload.newStatus === "pending-human") {
       const { useToast } = await import("@/composables/useToast");
@@ -217,7 +261,6 @@ export function useWebSocket() {
   const send = (message: Record<string, unknown>) => {
     if (ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify(message));
-    } else {
     }
   };
 

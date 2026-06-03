@@ -1,5 +1,6 @@
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
+import type { FileFilterCallback } from "multer";
 import cors from "cors";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
@@ -151,7 +152,7 @@ async function startServer() {
       maxAge: "7d",
       etag: true,
       lastModified: true,
-      setHeaders: (res, filePath) => {
+      setHeaders: (res, _filePath) => {
         // Security headers
         res.setHeader("X-Content-Type-Options", "nosniff");
       },
@@ -367,7 +368,7 @@ async function startServer() {
       fileSize: config.plugins.maxUploadSizeMB * 1024 * 1024,
       files: 1,
     },
-    fileFilter: (req: any, file: any, cb: any) => {
+    fileFilter: (_req: express.Request, file: Express.Multer.File, cb: FileFilterCallback) => {
       if (file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed") {
         cb(null, true);
       } else {

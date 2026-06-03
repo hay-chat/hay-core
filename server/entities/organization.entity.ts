@@ -136,7 +136,7 @@ export class Organization extends BaseEntity {
     return this.users.some((user) => user.isOnline());
   }
 
-  toJSON(): any {
+  toJSON() {
     const {
       users: _users,
       documents: _documents,

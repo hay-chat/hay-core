@@ -480,10 +480,7 @@ const hasDebugData = computed(() => {
 
 // Check if message is queued (delivery_state = 'queued')
 const isQueued = computed(() => {
-  return (
-    (props.message as any).deliveryState === "queued" ||
-    (props.message as any).delivery_state === "queued"
-  );
+  return props.message.deliveryState === "queued" || props.message.delivery_state === "queued";
 });
 
 const handleApproveClick = () => {

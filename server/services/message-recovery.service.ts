@@ -3,6 +3,7 @@ import { StaleConversation, StaleReason } from "./stale-message-detector.service
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 import { MessageType } from "../database/entities/message.entity";
+import { Conversation } from "../database/entities/conversation.entity";
 
 const logger = createLogger("message-recovery");
 
@@ -116,7 +117,7 @@ export class MessageRecoveryService {
   /**
    * Recover from expired lock
    */
-  private async recoverFromLockExpiry(conversation: any): Promise<RecoveryResult> {
+  private async recoverFromLockExpiry(conversation: Conversation): Promise<RecoveryResult> {
     await this.conversationRepository.updateById(conversation.id, {
       processing_locked_until: null,
       processing_locked_by: null,
@@ -134,7 +135,7 @@ export class MessageRecoveryService {
   /**
    * Recover from no response timeout
    */
-  private async recoverFromNoResponseTimeout(conversation: any): Promise<RecoveryResult> {
+  private async recoverFromNoResponseTimeout(conversation: Conversation): Promise<RecoveryResult> {
     await this.conversationRepository.updateById(conversation.id, {
       needs_processing: true,
       status: "open",
@@ -150,7 +151,7 @@ export class MessageRecoveryService {
   /**
    * Recover from repeated failures with exponential backoff
    */
-  private async recoverFromRepeatedFailures(conversation: any): Promise<RecoveryResult> {
+  private async recoverFromRepeatedFailures(conversation: Conversation): Promise<RecoveryResult> {
     const errorCount = conversation.processing_error_count || 0;
 
     // Escalate to human after threshold
@@ -194,7 +195,9 @@ export class MessageRecoveryService {
   /**
    * Recover from abandoned processing state
    */
-  private async recoverFromAbandonedProcessing(conversation: any): Promise<RecoveryResult> {
+  private async recoverFromAbandonedProcessing(
+    conversation: Conversation,
+  ): Promise<RecoveryResult> {
     await this.conversationRepository.updateById(conversation.id, {
       needs_processing: true,
       status: "open",
@@ -215,7 +218,7 @@ export class MessageRecoveryService {
   /**
    * Recover from stuck cooldown
    */
-  private async recoverFromCooldownStuck(conversation: any): Promise<RecoveryResult> {
+  private async recoverFromCooldownStuck(conversation: Conversation): Promise<RecoveryResult> {
     await this.conversationRepository.updateById(conversation.id, {
       cooldown_until: null,
       needs_processing: true,
@@ -231,7 +234,10 @@ export class MessageRecoveryService {
   /**
    * Escalate conversation to human agent
    */
-  private async escalateToHuman(conversation: any, reason: string): Promise<RecoveryResult> {
+  private async escalateToHuman(
+    conversation: Conversation,
+    reason: string,
+  ): Promise<RecoveryResult> {
     // Set status to pending-human
     await this.conversationRepository.updateById(conversation.id, {
       status: "pending-human",
@@ -289,7 +295,7 @@ export class MessageRecoveryService {
   /**
    * Publish alert about stuck conversation to organization
    */
-  private async publishStuckConversationAlert(conversation: any): Promise<void> {
+  private async publishStuckConversationAlert(conversation: Conversation): Promise<void> {
     try {
       const { conversationEventsService } = await import("./conversation-events.service");
 

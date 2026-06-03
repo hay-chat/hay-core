@@ -20,8 +20,11 @@ export async function refreshOAuthTokens(): Promise<void> {
 
     for (const instance of instances) {
       try {
-        // Check authState for OAuth credentials
-        const expiresAt = instance.authState?.credentials?.expiresAt;
+        // Check authState for OAuth credentials. credentials is a
+        // Record<string, unknown> (jsonb), so narrow expiresAt to a number
+        // (epoch seconds) before using it in arithmetic.
+        const rawExpiresAt = instance.authState?.credentials?.expiresAt;
+        const expiresAt = typeof rawExpiresAt === "number" ? rawExpiresAt : undefined;
         const hasRefreshToken = !!instance.authState?.credentials?.refreshToken;
 
         // Skip if no expiry info or no refresh token

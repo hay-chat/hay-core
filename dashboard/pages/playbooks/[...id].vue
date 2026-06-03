@@ -297,7 +297,15 @@ import {
   Circle,
   History,
 } from "lucide-vue-next";
+import type { JSONContent } from "@tiptap/vue-3";
 import type { PlaybookStatus, Agent, Playbook, PlaybookVersion } from "~/types/playbook";
+
+// Instructions are authored in the Tiptap editor and stored as a Tiptap document.
+const EMPTY_INSTRUCTIONS: JSONContent = { type: "doc", content: [] };
+
+// Server-sourced instructions are opaque (jsonb); narrow to a Tiptap document for the editor.
+const toInstructionContent = (value: unknown): JSONContent =>
+  value && typeof value === "object" ? (value as JSONContent) : EMPTY_INSTRUCTIONS;
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { useAutoSave } from "~/composables/useAutoSave";
@@ -336,7 +344,7 @@ const form = ref({
   title: "",
   trigger: "",
   description: "",
-  instructions: { blocks: [] } as any,
+  instructions: EMPTY_INSTRUCTIONS as JSONContent,
   status: "draft" as PlaybookStatus,
   agentIds: [] as string[],
 });
@@ -347,9 +355,10 @@ const isSubmitting = ref(false);
 const isPublishing = ref(false);
 
 // Editor refs
-const instructionsEditorRef = ref<{ save: () => Promise<unknown>; getJSON: () => unknown } | null>(
-  null,
-);
+const instructionsEditorRef = ref<{
+  save: () => JSONContent | null;
+  getJSON: () => JSONContent | null;
+} | null>(null);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
 const playbook = ref<Playbook | null>(null);
@@ -456,7 +465,7 @@ onMounted(async () => {
 
       form.value = {
         ...identityData,
-        instructions: draft?.instructions || playbookResponse.instructions || { blocks: [] },
+        instructions: toInstructionContent(draft?.instructions || playbookResponse.instructions),
       };
 
       // Set initial form state for unsaved changes detection (identity fields only)
@@ -536,7 +545,7 @@ const handleSubmit = async () => {
         title: form.value.title,
         trigger: form.value.trigger,
         description: form.value.description || undefined,
-        instructions: savedInstructions || { blocks: [] },
+        instructions: savedInstructions ?? EMPTY_INSTRUCTIONS,
         status: form.value.status,
         agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
       };
@@ -607,7 +616,7 @@ const handleRollback = async () => {
   const updated = await HayApi.playbooks.get.query({ id: playbookId.value });
   if (updated) {
     playbook.value = updated;
-    form.value.instructions = updated.instructions || { blocks: [] };
+    form.value.instructions = toInstructionContent(updated.instructions);
     // Draft was deleted by rollback — reset
     draftVersion.value = null;
     initialForm.value = JSON.parse(

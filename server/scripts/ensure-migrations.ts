@@ -10,11 +10,6 @@ async function ensureMigrations() {
 
     dataSource = await AppDataSource.initialize();
 
-    const executedMigrations = await dataSource.showMigrations();
-    const pendingMigrations = await dataSource.query(
-      `SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'migrations'`,
-    );
-
     const hasPendingMigrations = await dataSource.showMigrations();
 
     if (hasPendingMigrations) {

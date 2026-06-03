@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import type { SelectContentEmits, SelectContentProps } from "reka-ui";
-import type { HTMLAttributes } from "vue";
+import type { ComponentPublicInstance, HTMLAttributes } from "vue";
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { reactiveOmit } from "@vueuse/core";
 import { SelectContent, SelectPortal, SelectViewport, useForwardPropsEmits } from "reka-ui";
@@ -50,14 +50,23 @@ const emits = defineEmits<SelectContentEmits>();
 const delegatedProps = reactiveOmit(props, "class");
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
-const contentRef = ref<any>(null);
+const contentRef = ref<ComponentPublicInstance | HTMLElement | null>(null);
+
+// Resolve the underlying DOM element (contentRef might be a component wrapper)
+const resolveElement = (
+  target: ComponentPublicInstance | HTMLElement | null,
+): HTMLElement | null => {
+  if (!target) return null;
+  if (target instanceof HTMLElement) return target;
+  const el = (target as ComponentPublicInstance).$el;
+  return el instanceof HTMLElement ? el : null;
+};
 
 // Watch for position changes and update CSS variable
 const updatePosition = () => {
   if (!contentRef.value) return;
 
-  // Get the actual DOM element (contentRef might be a component wrapper)
-  const el = (contentRef.value as any)?.$el || contentRef.value;
+  const el = resolveElement(contentRef.value);
   if (!el || typeof el.getBoundingClientRect !== "function") return;
 
   const rect = el.getBoundingClientRect();
@@ -72,8 +81,8 @@ onMounted(() => {
   });
 
   if (contentRef.value) {
-    const el = (contentRef.value as any)?.$el || contentRef.value;
-    if (el && typeof el.observe !== "undefined") {
+    const el = resolveElement(contentRef.value);
+    if (el && "observe" in el) {
       observer.observe(el, { attributes: true, attributeFilter: ["style"] });
       // Initial update
       setTimeout(updatePosition, 0);

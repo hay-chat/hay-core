@@ -281,7 +281,11 @@
 
 <script setup lang="ts">
 import { Save, Mail, Lock, Shield, Key, UserX, Trash2 } from "lucide-vue-next";
+import type { Icon as LucideIcon } from "lucide-vue-next";
+import type { RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
+
+type SecurityEvent = RouterOutputs["auth"]["getRecentSecurityEvents"][number];
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { validateEmail as validateEmailUtil, validatePassword } from "@/lib/utils";
@@ -363,7 +367,7 @@ const canChangePassword = computed(() => {
 });
 
 // Security events
-const securityEvents = ref<any[]>([]);
+const securityEvents = ref<SecurityEvent[]>([]);
 const loadingEvents = ref(false);
 
 // Re-authentication
@@ -490,16 +494,20 @@ const saveProfile = async () => {
     });
 
     if (response.success && response.user) {
-      // Update user in store
-      userStore.setUser(response.user);
+      // Update user in store (convert serialized date strings to Date objects)
+      const { lastSeenAt, ...rest } = response.user;
+      userStore.setUser({
+        ...rest,
+        lastSeenAt: lastSeenAt ? new Date(lastSeenAt) : undefined,
+      });
       originalProfile.firstName = profileForm.firstName;
       originalProfile.lastName = profileForm.lastName;
 
       toast.success(t("profile.profileUpdated"));
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to update profile:", error);
-    toast.error(error.message || t("profile.profileUpdateFailed"));
+    toast.error(error instanceof Error ? error.message : t("profile.profileUpdateFailed"));
   } finally {
     isSavingProfile.value = false;
   }
@@ -545,9 +553,9 @@ const executeEmailChange = async (password: string) => {
 
       toast.success(response.message || t("profile.verificationEmailSent"));
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to update email:", error);
-    toast.error(error.message || t("profile.verificationEmailFailed"));
+    toast.error(error instanceof Error ? error.message : t("profile.verificationEmailFailed"));
   } finally {
     isChangingEmail.value = false;
   }
@@ -569,9 +577,9 @@ const cancelEmailChange = async () => {
 
       toast.success(t("profile.emailChangeCancelled"));
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to cancel email change:", error);
-    toast.error(error.message || t("profile.emailChangeCancelFailed"));
+    toast.error(error instanceof Error ? error.message : t("profile.emailChangeCancelFailed"));
   }
 };
 
@@ -584,9 +592,9 @@ const resendVerificationEmail = async () => {
     if (response.success) {
       toast.success(t("profile.verificationResent"));
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to resend verification email:", error);
-    toast.error(error.message || t("profile.verificationResendFailed"));
+    toast.error(error instanceof Error ? error.message : t("profile.verificationResendFailed"));
   } finally {
     resendingEmail.value = false;
   }
@@ -612,9 +620,9 @@ const changePassword = async () => {
 
     // Reload security events
     await loadSecurityEvents();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to change password:", error);
-    toast.error(error.message || t("profile.passwordChangeFailed"));
+    toast.error(error instanceof Error ? error.message : t("profile.passwordChangeFailed"));
   } finally {
     isChangingPassword.value = false;
   }
@@ -634,7 +642,7 @@ const loadSecurityEvents = async () => {
 };
 
 const getEventIcon = (action: string) => {
-  const icons: Record<string, any> = {
+  const icons: Record<string, LucideIcon> = {
     "email.change": Mail,
     "password.change": Lock,
     "user.login": Key,

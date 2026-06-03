@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Playbook } from "./playbook.entity";
-import type { InstructionItem } from "./playbook.entity";
+import type { PlaybookInstructions } from "./playbook.entity";
 import { User } from "../../entities/user.entity";
 
 export enum PlaybookVersionStatus {
@@ -36,7 +36,7 @@ export class PlaybookVersion {
   status!: PlaybookVersionStatus;
 
   @Column({ type: "jsonb", nullable: true })
-  instructions!: InstructionItem[] | string | null;
+  instructions!: PlaybookInstructions;
 
   @Column({ type: "text", nullable: true })
   prompt_template!: string | null;

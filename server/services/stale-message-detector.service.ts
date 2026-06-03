@@ -1,6 +1,4 @@
 import { AppDataSource } from "../database/data-source";
-import { Conversation } from "../database/entities/conversation.entity";
-import { MessageType } from "../database/entities/message.entity";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 
@@ -20,6 +18,30 @@ export enum StaleReason {
   REPEATED_FAILURES = "repeated_failures",
   ABANDONED_PROCESSING = "abandoned_processing",
   COOLDOWN_STUCK = "cooldown_stuck",
+}
+
+/**
+ * Shape of a single row returned by the raw stale-conversation detection query.
+ * Postgres returns timestamp columns as `Date`, numeric aggregates as strings
+ * (e.g. `stale_duration_ms` from `EXTRACT`), and `count`-style columns may come
+ * back as either number or string depending on the driver.
+ */
+interface StaleConversationRow {
+  id: string;
+  organization_id: string;
+  status: string;
+  needs_processing: boolean;
+  processing_locked_until: Date | null;
+  processing_locked_by: string | null;
+  cooldown_until: Date | null;
+  processing_attempts: number | null;
+  processing_error_count: number | null;
+  last_processing_error: string | null;
+  is_stuck: boolean;
+  last_message_at: Date | null;
+  last_message_type: string | null;
+  last_customer_message_at: Date | null;
+  stale_duration_ms: string;
 }
 
 export interface StaleConversation {
@@ -129,9 +151,12 @@ export class StaleMessageDetectorService {
           )
       `;
 
-      const results = await AppDataSource.query(query, [thresholdDate, LOCK_EXPIRY_GRACE_MS]);
+      const results: StaleConversationRow[] = await AppDataSource.query(query, [
+        thresholdDate,
+        LOCK_EXPIRY_GRACE_MS,
+      ]);
 
-      const staleConversations: StaleConversation[] = results.map((row: any) => {
+      const staleConversations: StaleConversation[] = results.map((row) => {
         const stuckReason = this.determineStuckReason(row, now);
 
         return {
@@ -163,17 +188,19 @@ export class StaleMessageDetectorService {
   /**
    * Determines the specific reason why a conversation is stuck
    */
-  private determineStuckReason(row: any, now: Date): StaleReason {
+  private determineStuckReason(row: StaleConversationRow, now: Date): StaleReason {
+    const processingErrorCount = row.processing_error_count ?? 0;
+
     // Already marked as stuck
     if (row.is_stuck === true) {
       // Return the most severe condition
-      if (row.processing_error_count >= 3) {
+      if (processingErrorCount >= 3) {
         return StaleReason.REPEATED_FAILURES;
       }
     }
 
     // Check for repeated failures first (highest priority)
-    if (row.processing_error_count >= 3) {
+    if (processingErrorCount >= 3) {
       return StaleReason.REPEATED_FAILURES;
     }
 

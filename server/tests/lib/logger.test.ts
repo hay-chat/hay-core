@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
 import { redactString, REDACT_PATHS, REDACT_CENSOR } from "../../lib/logger/redaction";
 
 // Mock config before importing logger

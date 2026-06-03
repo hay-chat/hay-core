@@ -1,4 +1,5 @@
 import { Repository, In } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import { Playbook, PlaybookStatus } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
@@ -92,7 +93,10 @@ export class PlaybookRepository {
     // not when the playbook itself is updated. See conversation.entity.ts updatePlaybook method.
 
     if (Object.keys(data).length > 0) {
-      await this.getRepository().update({ id, organization_id: organizationId }, data as any);
+      await this.getRepository().update(
+        { id, organization_id: organizationId },
+        data as QueryDeepPartialEntity<Playbook>,
+      );
     }
 
     return await this.findById(id);

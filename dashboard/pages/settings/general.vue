@@ -468,6 +468,11 @@ import { useToast } from "@/composables/useToast";
 import { useFileUpload } from "@/composables/useFileUpload";
 import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
+import { SupportedLanguage } from "@server/types/language.types";
+import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
+
+type UpdateSettingsInput = RouterInputs["organizations"]["updateSettings"];
 
 const { t } = useI18n();
 const toast = useToast();
@@ -495,19 +500,50 @@ type ConfidenceGuardrailSettings = {
   };
 };
 
+type NotificationSettings = {
+  email: {
+    newConversations: boolean;
+    escalatedConversations: boolean;
+    performanceAlerts: boolean;
+    weeklyReports: boolean;
+  };
+  inApp: {
+    realTimeAlerts: boolean;
+    systemUpdates: boolean;
+    featureAnnouncements: boolean;
+  };
+  quietHours: {
+    start: string;
+    end: string;
+  };
+};
+
+type WebhookSettings = {
+  url: string;
+  secret: string;
+  events: string[];
+};
+
+type DataRetentionSettings = {
+  conversations: string;
+  analytics: string;
+  logs: string;
+  exports: string;
+};
+
 type PlatformSettings = {
   organizationName: string;
   organizationAbout: string;
-  defaultLanguage: string;
-  timezone: string;
-  dateFormat: string;
-  timeFormat: string;
+  defaultLanguage: NonNullable<UpdateSettingsInput["defaultLanguage"]>;
+  timezone: NonNullable<UpdateSettingsInput["timezone"]>;
+  dateFormat: NonNullable<UpdateSettingsInput["dateFormat"]>;
+  timeFormat: NonNullable<UpdateSettingsInput["timeFormat"]>;
   defaultAgent: string;
   testModeDefault: boolean;
   confidenceGuardrail: ConfidenceGuardrailSettings;
-  notifications: any;
-  webhooks: any;
-  dataRetention: any;
+  notifications: NotificationSettings;
+  webhooks: WebhookSettings;
+  dataRetention: DataRetentionSettings;
   retentionDays: number | null; // null = disabled/forever
 };
 
@@ -517,10 +553,10 @@ const isSaving = ref(false);
 const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
-  defaultLanguage: "en",
-  timezone: "UTC",
-  dateFormat: "MM/DD/YYYY",
-  timeFormat: "12h",
+  defaultLanguage: SupportedLanguage.ENGLISH,
+  timezone: Timezone.UTC,
+  dateFormat: DateFormat.US,
+  timeFormat: TimeFormat.TWELVE_HOUR,
   defaultAgent: "",
   testModeDefault: false,
   confidenceGuardrail: {
@@ -567,7 +603,8 @@ const settings = ref<PlatformSettings>({
 });
 
 // Agents data
-const agents = ref<any[]>([]);
+type AgentListItem = RouterOutputs["agents"]["list"][number];
+const agents = ref<AgentListItem[]>([]);
 
 // Computed properties
 const hasChanges = computed(() => {
@@ -691,10 +728,10 @@ const saveSettings = async () => {
     const response = await Hay.organizations.updateSettings.mutate({
       name: settings.value.organizationName,
       about: settings.value.organizationAbout,
-      defaultLanguage: settings.value.defaultLanguage as any,
-      timezone: settings.value.timezone as any,
-      dateFormat: settings.value.dateFormat as any,
-      timeFormat: settings.value.timeFormat as any,
+      defaultLanguage: settings.value.defaultLanguage,
+      timezone: settings.value.timezone,
+      dateFormat: settings.value.dateFormat,
+      timeFormat: settings.value.timeFormat,
       defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
       retentionDays: settings.value.retentionDays,
@@ -720,12 +757,12 @@ const saveSettings = async () => {
       originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
       // Update the organization name in the user store if it changed
-      if ((response.data as any).name) {
+      if (response.data.name) {
         const activeOrg = userStore.organizations.find(
-          (org: any) => org.id === userStore.activeOrganizationId,
+          (org) => org.id === userStore.activeOrganizationId,
         );
         if (activeOrg) {
-          activeOrg.name = (response.data as any).name;
+          activeOrg.name = response.data.name;
         }
       }
 
@@ -761,7 +798,7 @@ const removeLogo = async () => {
 
     // Update the user store to remove the logo immediately
     const activeOrg = userStore.organizations.find(
-      (org: any) => org.id === userStore.activeOrganizationId,
+      (org) => org.id === userStore.activeOrganizationId,
     );
     if (activeOrg) {
       activeOrg.logo = null;
@@ -775,14 +812,14 @@ const removeLogo = async () => {
 const loadOrganizationSettings = async () => {
   try {
     const orgSettings = await Hay.organizations.getSettings.query();
-    organizationLogo.value = (orgSettings as any).logoUrl || null;
+    organizationLogo.value = orgSettings.logoUrl || null;
 
     // Update the logo in the user store so it shows in the org switcher immediately
     const activeOrg = userStore.organizations.find(
-      (org: any) => org.id === userStore.activeOrganizationId,
+      (org) => org.id === userStore.activeOrganizationId,
     );
     if (activeOrg) {
-      activeOrg.logo = (orgSettings as any).logoUrl || null;
+      activeOrg.logo = orgSettings.logoUrl || null;
     }
   } catch (error) {
     console.error("Failed to load organization logo:", error);
@@ -794,10 +831,10 @@ const resetToDefaults = () => {
     settings.value = {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
-      defaultLanguage: "en",
-      timezone: "UTC",
-      dateFormat: "MM/DD/YYYY",
-      timeFormat: "12h",
+      defaultLanguage: SupportedLanguage.ENGLISH,
+      timezone: Timezone.UTC,
+      dateFormat: DateFormat.US,
+      timeFormat: TimeFormat.TWELVE_HOUR,
       defaultAgent: "",
       testModeDefault: false,
       confidenceGuardrail: {
@@ -861,8 +898,8 @@ onMounted(async () => {
     const orgSettings = await Hay.organizations.getSettings.query();
 
     // Update only platform settings, keep other settings as mock for now
-    settings.value.organizationName = (orgSettings as any).name;
-    settings.value.organizationAbout = (orgSettings as any).about || "";
+    settings.value.organizationName = orgSettings.name;
+    settings.value.organizationAbout = orgSettings.about || "";
     settings.value.defaultLanguage = orgSettings.defaultLanguage;
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;
@@ -874,13 +911,13 @@ onMounted(async () => {
         : false;
 
     // Load organization logo
-    organizationLogo.value = (orgSettings as any).logoUrl || null;
+    organizationLogo.value = orgSettings.logoUrl || null;
 
     // Load confidence guardrail settings
     if (orgSettings.confidenceGuardrail) {
       settings.value.confidenceGuardrail = {
         ...settings.value.confidenceGuardrail,
-        ...(orgSettings.confidenceGuardrail as any),
+        ...orgSettings.confidenceGuardrail,
       };
     }
 

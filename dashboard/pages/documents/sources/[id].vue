@@ -64,8 +64,8 @@
                   @error="thumbnailFailed = true"
                 />
                 <component
-                  v-else
                   :is="getSourceIcon(source.sourceType)"
+                  v-else
                   class="h-6 w-6 text-foreground"
                 />
               </div>

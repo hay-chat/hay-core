@@ -143,8 +143,9 @@ const verifyEmail = async () => {
       // Try email change first (profile settings flow), fall back to signup verification
       try {
         response = await Hay.auth.verifyEmailChange.mutate({ token: token.value });
-      } catch (changeError: any) {
-        if (changeError.message?.includes("pending email change")) {
+      } catch (changeError) {
+        const changeErrorMessage = changeError instanceof Error ? changeError.message : "";
+        if (changeErrorMessage.includes("pending email change")) {
           response = await Hay.auth.verifyEmail.mutate({ token: token.value });
         } else {
           throw changeError;
@@ -174,16 +175,17 @@ const verifyEmail = async () => {
         console.error("Failed to refresh user data after verification:", error);
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Email verification failed:", error);
     verificationStatus.value = "error";
-    errorMessage.value = error.message || "Failed to verify email address";
+    const message = error instanceof Error ? error.message : "";
+    errorMessage.value = message || "Failed to verify email address";
 
     // Provide helpful hints based on error
-    if (error.message?.includes("expired")) {
+    if (message.includes("expired")) {
       errorHint.value =
         "The verification link has expired. Please request a new verification email.";
-    } else if (error.message?.includes("Invalid")) {
+    } else if (message.includes("Invalid")) {
       errorHint.value =
         "The verification link is invalid. Please check your email or request a new verification link.";
     } else {

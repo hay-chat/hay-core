@@ -1,4 +1,5 @@
 import { Repository } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import {
   PlaybookVersion,
   PlaybookVersionStatus,
@@ -67,7 +68,7 @@ export class PlaybookVersionRepository {
   }
 
   async update(id: string, data: Partial<PlaybookVersion>): Promise<PlaybookVersion | null> {
-    await this.getRepository().update({ id }, data as any);
+    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<PlaybookVersion>);
     return await this.findById(id);
   }
 

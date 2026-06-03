@@ -4,8 +4,9 @@
  */
 
 import { Extension } from "@tiptap/core";
+import type { Editor, Range } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
-import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
+import type { SuggestionProps } from "@tiptap/suggestion";
 import { VueRenderer } from "@tiptap/vue-3";
 import tippy from "tippy.js";
 import type { Instance as TippyInstance } from "tippy.js";
@@ -19,7 +20,7 @@ export interface CommandItem {
   type?: "block" | "action" | "document";
   pluginId?: string;
   id?: string;
-  command: ({ editor, range }: any) => void;
+  command: ({ editor, range }: { editor: Editor; range: Range }) => void;
 }
 
 export interface SlashCommandConfig {
@@ -93,7 +94,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 description: `Insert an action (${config.mcpTools.length} available)`,
                 icon: "zap",
                 type: "action",
-                command: ({ editor, range }) => {
+                command: () => {
                   // This will be handled by the component to show submenu
                 },
               },
@@ -102,7 +103,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 description: `Insert a document (${config.documents.length} available)`,
                 icon: "book",
                 type: "document",
-                command: ({ editor, range }) => {
+                command: () => {
                   // This will be handled by the component to show submenu
                 },
               },
@@ -120,7 +121,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
           },
           render: () => {
             let component: VueRenderer | null = null;
-            let popup: TippyInstance[] | null = null;
+            let popup: TippyInstance | null = null;
 
             return {
               onStart: (props: SuggestionProps<CommandItem>) => {
@@ -137,7 +138,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                   return;
                 }
 
-                popup = tippy(document.body as any, {
+                popup = tippy(document.body, {
                   getReferenceClientRect: props.clientRect as () => DOMRect,
                   appendTo: () => document.body,
                   content: component.element as HTMLElement,
@@ -148,8 +149,8 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                   maxWidth: "none",
                   onHide: () => {
                     // Ensure cleanup when popup is hidden
-                    if (popup && popup[0]) {
-                      popup[0].destroy();
+                    if (popup) {
+                      popup.destroy();
                     }
                     if (component) {
                       component.destroy();
@@ -173,7 +174,7 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                   return;
                 }
 
-                popup[0].setProps({
+                popup.setProps({
                   getReferenceClientRect: props.clientRect as () => DOMRect,
                 });
               },
@@ -181,8 +182,8 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
               onKeyDown(props: { event: KeyboardEvent }) {
                 if (props.event.key === "Escape") {
                   // Clean up popup and component
-                  if (popup && popup[0]) {
-                    popup[0].hide();
+                  if (popup) {
+                    popup.hide();
                   }
                   // Return false to let Tiptap close the suggestion
                   return false;
@@ -195,8 +196,8 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
 
               onExit() {
                 // Clean up on exit
-                if (popup && popup[0]) {
-                  popup[0].destroy();
+                if (popup) {
+                  popup.destroy();
                 }
                 if (component) {
                   component.destroy();

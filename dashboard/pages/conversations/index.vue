@@ -280,6 +280,14 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 
 // API data
+interface AssignedUser {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  avatarUrl?: string | null;
+}
+
 interface Conversation {
   id: string;
   title?: string;
@@ -296,13 +304,33 @@ interface Conversation {
   metadata?: {
     satisfaction?: number;
   };
-  assignedUser?: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    avatarUrl?: string | null;
-  };
+  assignedUser?: AssignedUser;
+}
+
+// WebSocket payload shapes for conversation events
+type ConversationCreatedPayload = Conversation;
+type ConversationUpdatedPayload = Partial<Conversation> & {
+  id: string;
+  changedFields?: string[];
+};
+interface ConversationDeletedPayload {
+  id: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isConversationCreatedPayload(value: unknown): value is ConversationCreatedPayload {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isConversationUpdatedPayload(value: unknown): value is ConversationUpdatedPayload {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isConversationDeletedPayload(value: unknown): value is ConversationDeletedPayload {
+  return isRecord(value) && typeof value.id === "string";
 }
 
 const conversations = ref<Conversation[]>([]);
@@ -420,7 +448,7 @@ const formatStatus = (status: string) => {
   return keys[status] ? t(keys[status]) : status;
 };
 
-const getFullName = (user: any) => {
+const getFullName = (user: AssignedUser | undefined) => {
   if (!user) return "";
   if (user.firstName && user.lastName) {
     return `${user.firstName} ${user.lastName}`;
@@ -476,7 +504,7 @@ const fetchConversations = async () => {
         period: escalationsPeriod.value,
         limit: 200,
       });
-      conversations.value = response as any;
+      conversations.value = response as unknown as Conversation[];
       totalConversations.value = conversations.value.length;
       currentPage.value = 1;
     } else {
@@ -486,7 +514,7 @@ const fetchConversations = async () => {
         include: ["assignedUser", "messages"],
       });
 
-      conversations.value = response.items as any;
+      conversations.value = response.items as unknown as Conversation[];
       totalConversations.value = response.pagination.total;
     }
   } catch (err) {
@@ -546,66 +574,75 @@ onMounted(async () => {
   websocket.connect();
 
   // Listen for new conversations
-  unsubscribeConversationCreated = websocket.on("conversation_created", async (payload: any) => {
-    console.log("[Conversations List] Received conversation_created event", payload);
-    if (payload) {
-      const newConversation = payload;
+  unsubscribeConversationCreated = websocket.on(
+    "conversation_created",
+    async (payload: unknown) => {
+      console.log("[Conversations List] Received conversation_created event", payload);
+      if (isConversationCreatedPayload(payload)) {
+        const newConversation = payload;
 
-      // Only add if not already in list (avoid duplicates)
-      const exists = conversations.value.some((c) => c.id === newConversation.id);
-      if (!exists) {
-        // Add to beginning of list (newest first)
-        conversations.value.unshift(newConversation as any);
-        totalConversations.value++;
+        // Only add if not already in list (avoid duplicates)
+        const exists = conversations.value.some((c) => c.id === newConversation.id);
+        if (!exists) {
+          // Add to beginning of list (newest first)
+          conversations.value.unshift(newConversation);
+          totalConversations.value++;
 
-        // Update stats
-        await appStore.refreshConversationsCount();
-      }
-    }
-  });
-
-  // Listen for conversation updates
-  unsubscribeConversationUpdated = websocket.on("conversation_updated", async (payload: any) => {
-    console.log("[Conversations List] Received conversation_updated event", payload);
-    if (payload) {
-      const updatedData = payload;
-      const index = conversations.value.findIndex((c) => c.id === updatedData.id);
-
-      if (index !== -1) {
-        // Update existing conversation
-        conversations.value[index] = {
-          ...conversations.value[index],
-          ...updatedData,
-        };
-
-        // Update stats if status changed
-        if (updatedData.changedFields?.includes("status")) {
+          // Update stats
           await appStore.refreshConversationsCount();
         }
-      } else {
-        // Conversation might have been filtered out, but status changed - refetch to be safe
-        await fetchConversations();
       }
-    }
-  });
+    },
+  );
+
+  // Listen for conversation updates
+  unsubscribeConversationUpdated = websocket.on(
+    "conversation_updated",
+    async (payload: unknown) => {
+      console.log("[Conversations List] Received conversation_updated event", payload);
+      if (isConversationUpdatedPayload(payload)) {
+        const updatedData = payload;
+        const index = conversations.value.findIndex((c) => c.id === updatedData.id);
+
+        if (index !== -1) {
+          // Update existing conversation
+          conversations.value[index] = {
+            ...conversations.value[index],
+            ...updatedData,
+          };
+
+          // Update stats if status changed
+          if (updatedData.changedFields?.includes("status")) {
+            await appStore.refreshConversationsCount();
+          }
+        } else {
+          // Conversation might have been filtered out, but status changed - refetch to be safe
+          await fetchConversations();
+        }
+      }
+    },
+  );
 
   // Listen for conversation deletions
-  unsubscribeConversationDeleted = websocket.on("conversation_deleted", async (payload: any) => {
-    console.log("[Conversations List] Received conversation_deleted event", payload);
-    if (payload) {
-      const deletedId = payload.id;
-      const index = conversations.value.findIndex((c) => c.id === deletedId);
+  unsubscribeConversationDeleted = websocket.on(
+    "conversation_deleted",
+    async (payload: unknown) => {
+      console.log("[Conversations List] Received conversation_deleted event", payload);
+      if (isConversationDeletedPayload(payload)) {
+        const deletedId = payload.id;
+        const index = conversations.value.findIndex((c) => c.id === deletedId);
 
-      if (index !== -1) {
-        // Remove from list
-        conversations.value.splice(index, 1);
-        totalConversations.value--;
+        if (index !== -1) {
+          // Remove from list
+          conversations.value.splice(index, 1);
+          totalConversations.value--;
 
-        // Update stats
-        await appStore.refreshConversationsCount();
+          // Update stats
+          await appStore.refreshConversationsCount();
+        }
       }
-    }
-  });
+    },
+  );
 
   // TODO: Fetch agents from API
 });

@@ -10,7 +10,7 @@ export class UnifyToolMessages1760900000000 implements MigrationInterface {
         `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Note: PostgreSQL doesn't support removing enum values directly
     // This would require recreating the enum type, which is complex
     // For now, we'll leave the 'Tool' value in place even on rollback

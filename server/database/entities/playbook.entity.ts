@@ -32,6 +32,21 @@ export interface InstructionItem {
   instructions: string;
 }
 
+/**
+ * Tiptap document persisted in the instructions jsonb column after the Tiptap
+ * migration. Inner node shape is left open since Tiptap nodes are extensible.
+ */
+export interface TiptapDocument {
+  type?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Stored shape of playbook/version instructions: a Tiptap document (current),
+ * a legacy structured list, a raw string, or null.
+ */
+export type PlaybookInstructions = TiptapDocument | InstructionItem[] | string | null;
+
 @Entity("playbooks")
 export class Playbook {
   @PrimaryGeneratedColumn("uuid")
@@ -47,7 +62,7 @@ export class Playbook {
   description!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
-  instructions!: InstructionItem[] | string | null;
+  instructions!: PlaybookInstructions;
 
   @Column({
     type: "enum",

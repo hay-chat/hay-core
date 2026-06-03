@@ -215,7 +215,6 @@ describe("Organization Management", () => {
 
     it("should allow owners to remove other owners (if not last)", () => {
       const currentUserRole = "owner";
-      const targetUserRole = "owner";
 
       const canRemove = currentUserRole === "owner";
 
@@ -266,8 +265,6 @@ describe("Organization Management", () => {
       // 2. Role update
       // 3. Audit log
       // All happen atomically
-
-      const operations = ["countOwners", "checkLastOwner", "updateRole", "logAudit"];
 
       // In a transaction, all operations should succeed or all should fail
       const allOrNothing = true;

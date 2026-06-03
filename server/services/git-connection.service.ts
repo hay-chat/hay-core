@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
-import { config, getDashboardUrl } from "@server/config/env";
+import type { Repository } from "typeorm";
+import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { gitConnectionRepository } from "@server/repositories/git-connection.repository";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
@@ -13,6 +14,43 @@ import type { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import { AppDataSource } from "@server/database/data-source";
 
 const logger = createLogger("git-connection");
+
+/**
+ * The partial-entity shape accepted by TypeORM's `Repository.update`. Derived
+ * from the public `Repository` API so we don't reach into TypeORM's internal
+ * `query-builder/QueryPartialEntity` module (not exported in the package
+ * `exports` map).
+ */
+type PluginRegistryUpdate = Parameters<Repository<PluginRegistry>["update"]>[1];
+
+/**
+ * The git-metadata columns this service writes. Every field is nullable in the
+ * database; `gitSyncError` is explicitly cleared to `null` on a successful
+ * sync, so the type must permit `null` (the entity declares it `?: string`
+ * because TypeORM models nullable columns as optional, but the column itself is
+ * `NULL`-able and TypeORM accepts `null` at write time).
+ */
+interface GitMetadataUpdate {
+  gitConnectionId?: string;
+  gitRepoFullName?: string;
+  gitBranch?: string;
+  gitLastCommitSha?: string;
+  gitLastSyncAt?: Date;
+  gitSyncError?: string | null;
+  zipFilePath?: string;
+  zipUploadId?: string;
+  uploadedById?: string;
+  uploadedAt?: Date;
+}
+
+/**
+ * Narrow a fully-typed git-metadata payload to TypeORM's update type at a
+ * single, documented boundary. The only divergence is `gitSyncError: null`,
+ * which the nullable DB column accepts at runtime, so the conversion is safe.
+ */
+function toUpdatePayload(fields: GitMetadataUpdate): PluginRegistryUpdate {
+  return fields as PluginRegistryUpdate;
+}
 
 export class GitConnectionService {
   private providers: Map<string, GitProvider> = new Map();
@@ -43,7 +81,7 @@ export class GitConnectionService {
    * Get the GitHub App installation URL.
    * Returns null if the GitHub App is not configured.
    */
-  getInstallUrl(organizationId: string, userId: string): string | null {
+  getInstallUrl(_organizationId: string, _userId: string): string | null {
     if (!this.isGitHubConfigured()) {
       return null;
     }
@@ -192,7 +230,7 @@ export class GitConnectionService {
     const archive = await provider.downloadArchive(connection.installationId, repoFullName, branch);
 
     // Validate the tarball contains a valid plugin
-    const { manifest, pluginId } = await validateTarball(archive.buffer);
+    const { pluginId } = await validateTarball(archive.buffer);
 
     // Check if plugin already exists for this org
     const existing = await pluginRegistryRepository.findByPluginId(pluginId);
@@ -232,17 +270,20 @@ export class GitConnectionService {
     if (plugin) {
       await AppDataSource.getRepository(
         (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
-      ).update(plugin.id, {
-        gitConnectionId: connectionId,
-        gitRepoFullName: repoFullName,
-        gitBranch: branch,
-        gitLastCommitSha: archive.commitSha,
-        gitLastSyncAt: new Date(),
-        zipFilePath: uploadResult.upload.path,
-        zipUploadId: uploadResult.upload.id,
-        uploadedById: userId,
-        uploadedAt: new Date(),
-      } as any);
+      ).update(
+        plugin.id,
+        toUpdatePayload({
+          gitConnectionId: connectionId,
+          gitRepoFullName: repoFullName,
+          gitBranch: branch,
+          gitLastCommitSha: archive.commitSha,
+          gitLastSyncAt: new Date(),
+          zipFilePath: uploadResult.upload.path,
+          zipUploadId: uploadResult.upload.id,
+          uploadedById: userId,
+          uploadedAt: new Date(),
+        }),
+      );
     }
 
     logger.info(
@@ -312,10 +353,13 @@ export class GitConnectionService {
       // No update needed
       await AppDataSource.getRepository(
         (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
-      ).update(plugin.id, {
-        gitLastSyncAt: new Date(),
-        gitSyncError: null,
-      } as any);
+      ).update(
+        plugin.id,
+        toUpdatePayload({
+          gitLastSyncAt: new Date(),
+          gitSyncError: null,
+        }),
+      );
       return { updated: false };
     }
 
@@ -376,13 +420,16 @@ export class GitConnectionService {
     // Update git metadata
     await AppDataSource.getRepository(
       (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
-    ).update(plugin.id, {
-      gitLastCommitSha: archive.commitSha,
-      gitLastSyncAt: new Date(),
-      gitSyncError: null,
-      zipFilePath: uploadResult.upload.path,
-      zipUploadId: uploadResult.upload.id,
-    } as any);
+    ).update(
+      plugin.id,
+      toUpdatePayload({
+        gitLastCommitSha: archive.commitSha,
+        gitLastSyncAt: new Date(),
+        gitSyncError: null,
+        zipFilePath: uploadResult.upload.path,
+        zipUploadId: uploadResult.upload.id,
+      }),
+    );
 
     // Restart worker if it was running before the update
     if (wasRunning && plugin.organizationId) {
@@ -428,10 +475,13 @@ export class GitConnectionService {
         await AppDataSource.getRepository(
           (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
         )
-          .update(plugin.id, {
-            gitSyncError: message,
-            gitLastSyncAt: new Date(),
-          } as any)
+          .update(
+            plugin.id,
+            toUpdatePayload({
+              gitSyncError: message,
+              gitLastSyncAt: new Date(),
+            }),
+          )
           .catch(() => {});
       }
     }

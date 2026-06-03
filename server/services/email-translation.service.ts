@@ -13,8 +13,14 @@ const LOCALE_MAP: Record<string, string> = {
   pt: "pt-BR",
 };
 
+/**
+ * Parsed contents of a locale JSON file: top-level sections ("common" and one
+ * per template id) each map a translation key to its string value.
+ */
+type LocaleTranslations = Record<string, Record<string, string>>;
+
 export class EmailTranslationService {
-  private cache: Map<string, Record<string, any>> = new Map();
+  private cache: Map<string, LocaleTranslations> = new Map();
   private localesDir: string;
   private isInitialized = false;
 

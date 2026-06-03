@@ -1,4 +1,5 @@
 import { Repository } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import { Message, MessageType, MessageSentiment } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
 
@@ -74,12 +75,12 @@ export class MessageRepository {
   }
 
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
-    await this.getRepository().update(id, data as any);
+    await this.getRepository().update(id, data as QueryDeepPartialEntity<Message>);
     return await this.findById(id);
   }
 
   async updateProviderMessageId(id: string, providerMessageId: string): Promise<void> {
-    await this.getRepository().update(id, { providerMessageId } as any);
+    await this.getRepository().update(id, { providerMessageId });
   }
 
   async delete(id: string): Promise<boolean> {
@@ -140,7 +141,7 @@ export class MessageRepository {
         WHERE c.organization_id = $1
     `;
 
-    const params: any[] = [organizationId];
+    const params: (string | Date)[] = [organizationId];
     let paramIndex = 2;
 
     if (startDate) {
@@ -161,7 +162,10 @@ export class MessageRepository {
       SELECT AVG(message_count) as avg_messages FROM conversation_message_counts
     `;
 
-    const avgResult = await this.getRepository().query(query, params);
+    const avgResult: Array<{ avg_messages: string | null }> = await this.getRepository().query(
+      query,
+      params,
+    );
 
     return avgResult[0]?.avg_messages ? parseFloat(avgResult[0].avg_messages) : 0;
   }

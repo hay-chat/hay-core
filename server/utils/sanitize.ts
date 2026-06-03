@@ -27,10 +27,14 @@ export function sanitizeContent(content: string): string {
 /**
  * Sanitizes an object recursively, cleaning all string properties
  */
-export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
+export function sanitizeObject<T>(obj: T): T {
   if (!obj || typeof obj !== "object") return obj;
 
-  const sanitized: any = Array.isArray(obj) ? [] : {};
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeObject(item)) as T;
+  }
+
+  const sanitized: Record<string, unknown> = {};
 
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {

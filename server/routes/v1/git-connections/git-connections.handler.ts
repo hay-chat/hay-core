@@ -2,9 +2,6 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { authenticatedProcedure } from "@server/trpc";
 import { gitConnectionService } from "@server/services/git-connection.service";
-import { createLogger } from "@server/lib/logger";
-
-const logger = createLogger("git-connections");
 
 /**
  * Get the GitHub App installation URL (or null if not configured).

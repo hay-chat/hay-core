@@ -284,10 +284,6 @@ export class PromptService {
           const newRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
           await this.scanDirectory(fullPath, newRelativePath, prompts);
         } else if (entry.name.endsWith(".md")) {
-          const promptId = relativePath
-            ? `${relativePath}/${entry.name.replace(".md", "")}`
-            : entry.name.replace(".md", "");
-
           try {
             const content = await PromptParser.parsePromptFile(fullPath);
             prompts.push(content);

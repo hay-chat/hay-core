@@ -235,9 +235,9 @@ const verifyToken = async () => {
         ("message" in response ? response.message : "") || t("resetPassword.errors.invalidToken");
       isVerifyingToken.value = false;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Token verification error:", err);
-    tokenError.value = err.message || t("resetPassword.errors.verifyFailed");
+    tokenError.value = err instanceof Error ? err.message : t("resetPassword.errors.verifyFailed");
     isVerifyingToken.value = false;
   }
 };
@@ -268,9 +268,9 @@ const handleSubmit = async () => {
         router.push("/login");
       }, 3000);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Password reset error:", err);
-    error.value = err.message || t("resetPassword.errors.resetFailed");
+    error.value = err instanceof Error ? err.message : t("resetPassword.errors.resetFailed");
   } finally {
     loading.value = false;
   }
