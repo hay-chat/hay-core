@@ -135,36 +135,36 @@
 
         <div v-else class="space-y-4">
           <div
-            v-for="feedback in paginatedFeedback"
-            :key="feedback.id"
+            v-for="entry in paginatedFeedback"
+            :key="entry.id"
             class="border rounded-lg p-4 hover:bg-neutral-50 transition-colors"
           >
             <div class="flex items-start justify-between">
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
-                  <Badge :variant="getRatingVariant(feedback.rating)">
-                    <ThumbsUp v-if="feedback.rating === 'good'" class="h-3 w-3 mr-1" />
-                    <ThumbsDown v-if="feedback.rating === 'bad'" class="h-3 w-3 mr-1" />
-                    {{ feedback.rating }}
+                  <Badge :variant="getRatingVariant(entry.rating)">
+                    <ThumbsUp v-if="entry.rating === 'good'" class="h-3 w-3 mr-1" />
+                    <ThumbsDown v-if="entry.rating === 'bad'" class="h-3 w-3 mr-1" />
+                    {{ entry.rating }}
                   </Badge>
                   <Badge variant="outline">
-                    {{ getSourceName(feedback.message?.source?.id) }}
+                    {{ getSourceName(entry.message?.source?.id) }}
                   </Badge>
                   <span class="text-xs text-neutral-muted">
-                    {{ formatDateTime(feedback.createdAt) }}
+                    {{ formatDateTime(entry.createdAt) }}
                   </span>
                 </div>
 
-                <p v-if="feedback.comment" class="text-sm mb-2">{{ feedback.comment }}</p>
+                <p v-if="entry.comment" class="text-sm mb-2">{{ entry.comment }}</p>
 
                 <div class="text-xs text-neutral-muted">
-                  <span>Message ID: {{ feedback.messageId.slice(0, 8) }}</span>
+                  <span>Message ID: {{ entry.messageId.slice(0, 8) }}</span>
                   <span class="mx-2">•</span>
-                  <span>Reviewer: {{ feedback.reviewer?.email }}</span>
+                  <span>Reviewer: {{ entry.reviewer?.email }}</span>
                 </div>
               </div>
 
-              <Button variant="ghost" size="sm" @click="viewMessage(feedback.messageId)">
+              <Button variant="ghost" size="sm" @click="viewMessage(entry.messageId)">
                 <ExternalLink class="h-4 w-4" />
               </Button>
             </div>
@@ -215,14 +215,18 @@ import {
   ExternalLink,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { useSources } from "@/composables/useSources";
+
+type FeedbackEntry = RouterOutputs["messageFeedback"]["list"][number];
+
 const { sources, loadSources } = useSources();
 const { formatDateTime } = useOrgDateTime();
 
 // State
 const loading = ref(false);
 const exporting = ref(false);
-const feedback = ref<any[]>([]);
+const feedback = ref<FeedbackEntry[]>([]);
 const stats = ref({
   total: 0,
   byRating: { good: 0, bad: 0, neutral: 0 },
@@ -257,7 +261,7 @@ const successRateColor = computed(() => {
 
 const sourceOptions = computed(() => {
   const options = [{ label: "All Sources", value: "" }];
-  sources.value.forEach((source: any) => {
+  sources.value.forEach((source) => {
     options.push({ label: source.name, value: source.id });
   });
   return options;
@@ -309,14 +313,14 @@ const loadFeedback = async () => {
     stats.value = {
       total: statsData.total,
       byRating: {
-        good: (statsData.byRating as any).good || 0,
-        bad: (statsData.byRating as any).bad || 0,
-        neutral: (statsData.byRating as any).neutral || 0,
+        good: statsData.byRating.good || 0,
+        bad: statsData.byRating.bad || 0,
+        neutral: statsData.byRating.neutral || 0,
       },
       percentages: {
-        good: (statsData.percentages as any).good || 0,
-        bad: (statsData.percentages as any).bad || 0,
-        neutral: (statsData.percentages as any).neutral || 0,
+        good: statsData.percentages.good || 0,
+        bad: statsData.percentages.bad || 0,
+        neutral: statsData.percentages.neutral || 0,
       },
     };
   } catch (error) {
@@ -338,7 +342,8 @@ const exportToCSV = async () => {
   exporting.value = true;
   try {
     const result = await HayApi.messageFeedback.export.query({
-      rating: (filters.value.rating as any) || undefined,
+      rating:
+        (filters.value.rating as RouterInputs["messageFeedback"]["export"]["rating"]) || undefined,
       startDate: filters.value.startDate || undefined,
       endDate: filters.value.endDate || undefined,
     });
@@ -368,7 +373,7 @@ const getRatingVariant = (rating: string) => {
 
 const getSourceName = (sourceId: string | undefined) => {
   if (!sourceId) return "Unknown";
-  const source = sources.value.find((s: any) => s.id === sourceId);
+  const source = sources.value.find((s) => s.id === sourceId);
   return source?.name || sourceId;
 };
 

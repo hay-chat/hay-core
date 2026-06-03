@@ -5,7 +5,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('bold') }]"
         :title="$t('documents.editor.bold')"
-        @click="run((c) => c.toggleBold())"
+        @click="run((c: ChainedCommands) => c.toggleBold())"
       >
         <Bold class="h-4 w-4" />
       </button>
@@ -13,7 +13,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('italic') }]"
         :title="$t('documents.editor.italic')"
-        @click="run((c) => c.toggleItalic())"
+        @click="run((c: ChainedCommands) => c.toggleItalic())"
       >
         <Italic class="h-4 w-4" />
       </button>
@@ -22,7 +22,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('heading', { level: 1 }) }]"
         title="H1"
-        @click="run((c) => c.toggleHeading({ level: 1 }))"
+        @click="run((c: ChainedCommands) => c.toggleHeading({ level: 1 }))"
       >
         <Heading1 class="h-4 w-4" />
       </button>
@@ -30,7 +30,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('heading', { level: 2 }) }]"
         title="H2"
-        @click="run((c) => c.toggleHeading({ level: 2 }))"
+        @click="run((c: ChainedCommands) => c.toggleHeading({ level: 2 }))"
       >
         <Heading2 class="h-4 w-4" />
       </button>
@@ -38,7 +38,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('heading', { level: 3 }) }]"
         title="H3"
-        @click="run((c) => c.toggleHeading({ level: 3 }))"
+        @click="run((c: ChainedCommands) => c.toggleHeading({ level: 3 }))"
       >
         <Heading3 class="h-4 w-4" />
       </button>
@@ -47,7 +47,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('bulletList') }]"
         :title="$t('documents.editor.bulletList')"
-        @click="run((c) => c.toggleBulletList())"
+        @click="run((c: ChainedCommands) => c.toggleBulletList())"
       >
         <List class="h-4 w-4" />
       </button>
@@ -55,7 +55,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('orderedList') }]"
         :title="$t('documents.editor.orderedList')"
-        @click="run((c) => c.toggleOrderedList())"
+        @click="run((c: ChainedCommands) => c.toggleOrderedList())"
       >
         <ListOrdered class="h-4 w-4" />
       </button>
@@ -63,7 +63,7 @@
         type="button"
         :class="['toolbar-btn', { active: isActive('blockquote') }]"
         :title="$t('documents.editor.quote')"
-        @click="run((c) => c.toggleBlockquote())"
+        @click="run((c: ChainedCommands) => c.toggleBlockquote())"
       >
         <Quote class="h-4 w-4" />
       </button>
@@ -142,7 +142,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import { Editor, EditorContent } from "@tiptap/vue-3";
-import type { JSONContent } from "@tiptap/vue-3";
+import type { JSONContent, ChainedCommands } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
@@ -229,10 +229,9 @@ const initEditor = () => {
 const isActive = (name: string, attrs?: Record<string, unknown>) =>
   !!editor.value?.isActive(name, attrs);
 
-const run = (cb: (chain: ReturnType<NonNullable<typeof editor.value>["chain"]>) => unknown) => {
+const run = (cb: (chain: ChainedCommands) => ChainedCommands) => {
   if (!editor.value) return;
-  const chain = editor.value.chain().focus();
-  (cb(chain) as { run?: () => void } | undefined)?.run?.();
+  cb(editor.value.chain().focus()).run();
 };
 
 const promptExternalLink = () => {

@@ -1,5 +1,8 @@
 import { ref } from "vue";
 import { HayApi } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
+
+type FeedbackRecord = RouterOutputs["messageFeedback"]["getByMessage"][number];
 
 export enum FeedbackRating {
   GOOD = "good",
@@ -35,7 +38,7 @@ export function useMessageFeedback() {
       const feedback = await HayApi.messageFeedback.create.mutate(input);
       return {
         ...feedback,
-        createdAt: new Date(feedback.createdAt as any),
+        createdAt: new Date(feedback.createdAt),
       };
     } catch (err) {
       error.value = err instanceof Error ? err : new Error("Failed to submit feedback");
@@ -51,7 +54,7 @@ export function useMessageFeedback() {
 
     try {
       const feedback = await HayApi.messageFeedback.getByMessage.query({ messageId });
-      return feedback.map((f: any) => ({
+      return feedback.map((f: FeedbackRecord) => ({
         ...f,
         createdAt: new Date(f.createdAt),
       }));

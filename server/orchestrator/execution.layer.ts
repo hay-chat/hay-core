@@ -8,12 +8,33 @@ const logger = createLogger("execution");
 import {
   ConfidenceGuardrailService,
   type ConfidenceAssessment,
+  type ConfidenceContext,
 } from "@server/services/core/confidence-guardrail.service";
 import {
   CompanyInterestGuardrailService,
   type CompanyInterestAssessment,
 } from "@server/services/core/company-interest-guardrail.service";
-import { MessageIntent } from "@server/database/entities/message.entity";
+import { MessageIntent, Message } from "@server/database/entities/message.entity";
+import { Document } from "@server/entities/document.entity";
+
+/**
+ * Minimal shape of a retrieved document needed for confidence assessment.
+ * Real Document entities and synthetic tool-result documents both satisfy it.
+ */
+interface ConfidenceDocument {
+  id: string;
+  title: string;
+  content?: string;
+}
+
+/**
+ * Subset of orchestration_status read during confidence assessment.
+ */
+interface OrchestrationRagStatus {
+  rag?: {
+    retrievedDocuments?: Array<{ id: string; similarity?: number }>;
+  };
+}
 
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
@@ -555,14 +576,16 @@ export class ExecutionLayer {
     const recentToolMessages = conversationHistory.filter((msg) => msg.type === "Tool").slice(-3); // Get last 3 tool messages
 
     // Get retrieved documents with full content
-    const retrievedDocs: Array<{ document: any; similarity: number }> = [];
+    const retrievedDocs: Array<{ document: ConfidenceDocument; similarity: number }> = [];
     if (conversation.document_ids && conversation.document_ids.length > 0) {
-      const orchestrationStatus = conversation.orchestration_status as any;
+      const orchestrationStatus =
+        conversation.orchestration_status as OrchestrationRagStatus | null;
       const documentScores: Record<string, number> = {};
 
       // Extract similarity scores if available
-      if (orchestrationStatus?.rag?.retrievedDocuments) {
-        for (const doc of orchestrationStatus.rag.retrievedDocuments) {
+      const retrievedFromStatus = orchestrationStatus?.rag?.retrievedDocuments;
+      if (retrievedFromStatus) {
+        for (const doc of retrievedFromStatus) {
           documentScores[doc.id] = doc.similarity || 0.5;
         }
       }
@@ -631,7 +654,6 @@ export class ExecutionLayer {
           id: `tool-result-${toolMsg.id}`,
           title: `Tool Result: ${toolMsg.metadata?.toolName || "Unknown Tool"}`,
           content: toolContent,
-          type: "tool-result",
         },
         similarity: 0.95, // High similarity since tool results are authoritative
       });
@@ -643,10 +665,12 @@ export class ExecutionLayer {
       throw new Error("No customer message found for confidence assessment");
     }
 
-    // Build confidence context
-    const context = {
+    // Build confidence context. The guardrail service only reads id/title/content
+    // from each document, which both real Document entities and the synthetic
+    // tool-result documents provide via ConfidenceDocument.
+    const context: ConfidenceContext = {
       response,
-      retrievedDocuments: retrievedDocs,
+      retrievedDocuments: retrievedDocs as Array<{ document: Document; similarity: number }>,
       conversationHistory,
       customerQuery: lastCustomerMessage.content,
     };
@@ -744,7 +768,7 @@ export class ExecutionLayer {
    * Retrieve documents with relaxed threshold
    */
   private async retrieveWithRelaxedThreshold(
-    messages: any[],
+    messages: Message[],
     organizationId: string,
     conversation?: Conversation,
   ): Promise<Array<{ id: string; similarity: number }>> {

@@ -10,7 +10,6 @@ import { triggersTools } from "./tools/triggers.js";
 import { automationsTools } from "./tools/automations.js";
 import { searchTools } from "./tools/search.js";
 import { helpCenterTools } from "./tools/help-center.js";
-import { supportTools } from "./tools/support.js";
 import { talkTools } from "./tools/talk.js";
 import { chatTools } from "./tools/chat.js";
 
@@ -33,7 +32,6 @@ const allTools = [
   ...automationsTools,
   ...searchTools,
   ...helpCenterTools,
-  ...supportTools,
   ...talkTools,
   ...chatTools,
 ];

@@ -28,8 +28,8 @@ interface MCPTool {
   description: string;
   // The MCP spec uses `inputSchema` on the wire. `input_schema` is kept as
   // an alias for older cached entries; new tools land in `inputSchema`.
-  inputSchema?: Record<string, any>;
-  input_schema?: Record<string, any>;
+  inputSchema?: Record<string, unknown>;
+  input_schema?: Record<string, unknown>;
   annotations?: MCPToolAnnotations;
   serverId?: string;
 }
@@ -42,6 +42,18 @@ interface LocalMCPServerConfig {
   serverPath?: string;
   startCommand?: string;
   tools?: MCPTool[];
+}
+
+/**
+ * Subset of the plugin instance jsonb `config` that this service reads/writes.
+ * The column is an open `Record<string, unknown>`; this captures the
+ * `mcpServers` branch we manage here while preserving any other keys.
+ */
+interface PluginToolsConfig extends Record<string, unknown> {
+  mcpServers?: {
+    local?: LocalMCPServerConfig[];
+    remote?: LocalMCPServerConfig[];
+  };
 }
 
 /**
@@ -146,7 +158,7 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
   }
 
   // Get current config or initialize
-  const config = (instance.config as any) || {};
+  const config: PluginToolsConfig = instance.config ?? {};
 
   // Initialize mcpServers structure if missing
   if (!config.mcpServers) {
@@ -155,6 +167,7 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
   if (!config.mcpServers.local) {
     config.mcpServers.local = [];
   }
+  const localServers = config.mcpServers.local;
 
   // Group tools by serverId
   const toolsByServer = new Map<string, MCPTool[]>();
@@ -169,7 +182,7 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
   // Update or create server entries
   for (const [serverId, serverTools] of toolsByServer.entries()) {
     // Find existing server entry
-    const existingServerIndex = config.mcpServers.local.findIndex(
+    const existingServerIndex = localServers.findIndex(
       (s: LocalMCPServerConfig) => s.serverId === serverId,
     );
 
@@ -178,10 +191,10 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
 
     if (existingServerIndex >= 0) {
       // Update existing server
-      config.mcpServers.local[existingServerIndex].tools = cleanTools;
+      localServers[existingServerIndex].tools = cleanTools;
     } else {
       // Create new server entry
-      config.mcpServers.local.push({
+      localServers.push({
         serverId,
         tools: cleanTools,
       });

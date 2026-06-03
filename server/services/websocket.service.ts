@@ -1,8 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { IncomingMessage } from "http";
-import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
-import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { conversationRepository } from "../repositories/conversation.repository";
 import jwt from "jsonwebtoken";
 import { config } from "../config/env";
@@ -59,6 +57,36 @@ interface SubscribeMessage extends WebSocketMessage {
 
 interface JWTPayloadWithOrg extends JWTPayload {
   organizationId?: string;
+}
+
+/**
+ * Event broadcast over the Redis "websocket:events" channel.
+ * Payload is the (untrusted) data forwarded to local clients.
+ */
+interface RedisEvent {
+  type?: string;
+  organizationId?: string;
+  conversationId?: string;
+  payload?: RedisEventPayload;
+}
+
+interface RedisEventPayload {
+  type?: string;
+  isPlayground?: boolean;
+  deliveryState?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Event broadcast over the Redis "job:updates" channel for real-time job progress.
+ */
+interface JobUpdateEvent {
+  jobId?: string;
+  organizationId?: string;
+  status?: string;
+  progress?: number;
+  result?: unknown;
+  error?: unknown;
 }
 
 export class WebSocketService {
@@ -131,8 +159,8 @@ export class WebSocketService {
   /**
    * Handle incoming Redis event and broadcast to local WebSocket clients
    */
-  private handleRedisEvent(event: any): void {
-    const { type, organizationId, conversationId, payload } = event;
+  private handleRedisEvent(event: unknown): void {
+    const { type, organizationId, conversationId, payload } = (event ?? {}) as RedisEvent;
 
     if (!type || !organizationId) {
       logger.error({ event }, "Invalid Redis event");
@@ -148,8 +176,9 @@ export class WebSocketService {
 
       // Define public message types (visible to customers via webchat)
       const publicMessageTypes = ["Customer", "BotAgent", "HumanAgent"];
-      const isPublicMessage = publicMessageTypes.includes(payload.type);
-      const isPlayground = payload.isPlayground === true;
+      const isPublicMessage =
+        payload?.type !== undefined && publicMessageTypes.includes(payload.type);
+      const isPlayground = payload?.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility
       const orgSent = this.sendToOrganization(organizationId, messagePayload);
@@ -157,21 +186,21 @@ export class WebSocketService {
       // Send to conversation clients (webchat) if:
       // 1. Public message type with SENT delivery state (normal webchat), OR
       // 2. ANY message type for playground conversations (demo mode shows all internal events)
-      if ((isPublicMessage && payload.deliveryState === "sent") || isPlayground) {
+      if ((isPublicMessage && payload?.deliveryState === "sent") || isPlayground) {
         const conversationSent = this.sendToConversation(conversationId, messagePayload);
 
         logger.debug(
-          { messageType: payload.type, conversationSent, orgSent, isPlayground },
+          { messageType: payload?.type, conversationSent, orgSent, isPlayground },
           "Broadcasted message to conversation and org clients",
         );
       } else if (!isPublicMessage) {
         logger.debug(
-          { messageType: payload.type, orgSent },
+          { messageType: payload?.type, orgSent },
           "Broadcasted internal message to org clients only",
         );
       } else {
         logger.debug(
-          { messageType: payload.type, orgSent },
+          { messageType: payload?.type, orgSent },
           "Broadcasted QUEUED message to org clients only",
         );
       }
@@ -204,8 +233,9 @@ export class WebSocketService {
   /**
    * Handle job update event from Redis and broadcast to clients
    */
-  private handleJobUpdate(event: any): void {
-    const { jobId, organizationId, status, progress, result, error } = event;
+  private handleJobUpdate(event: unknown): void {
+    const { jobId, organizationId, status, progress, result, error } = (event ??
+      {}) as JobUpdateEvent;
 
     if (!jobId || !organizationId) {
       logger.error({ event }, "Invalid job update event");

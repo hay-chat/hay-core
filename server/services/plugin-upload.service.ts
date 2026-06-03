@@ -13,6 +13,41 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-upload");
 
+/**
+ * Minimal view of a plugin's package.json used during upload validation.
+ * Only the fields read by `validateZipStructure` are declared; the parsed
+ * JSON is treated as `unknown` and narrowed against this shape.
+ */
+interface PluginPackageJson {
+  name?: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  "hay-plugin"?: {
+    entry?: string;
+    displayName?: string;
+    category?: string;
+    capabilities?: string[];
+  };
+}
+
+/**
+ * Summary manifest derived from a plugin's package.json during upload.
+ * This is distinct from the full `HayPluginManifest` persisted by
+ * `pluginManagerService.registerPlugin`; it is only used to validate the
+ * upload and to populate the HTTP response.
+ */
+interface UploadedPluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  category?: string;
+  entry: string;
+  capabilities: string[];
+}
+
 export class PluginUploadService {
   private pluginsDir: string;
 
@@ -83,7 +118,7 @@ export class PluginUploadService {
           zipUploadId: uploadResult.upload.id,
           uploadedById: req.user.id,
           uploadedAt: new Date(),
-        } as any);
+        });
       }
 
       res.status(201).json({
@@ -168,15 +203,15 @@ export class PluginUploadService {
       // Re-register plugin
       await pluginManagerService.registerPlugin(extractPath, "custom", req.organizationId);
 
-      // Update database
+      // Update database. The canonical manifest is already persisted by
+      // registerPlugin above; here we only record the new ZIP/upload metadata.
       await AppDataSource.getRepository(PluginRegistry).update(existing.id, {
         zipFilePath: uploadResult.upload.path,
         zipUploadId: uploadResult.upload.id,
         uploadedById: req.user.id,
         uploadedAt: new Date(),
         version: manifest.version,
-        manifest: manifest as any,
-      } as any);
+      });
 
       res.status(200).json({
         success: true,
@@ -266,7 +301,7 @@ export class PluginUploadService {
    * Validate ZIP structure and package.json with hay-plugin field
    */
   private async validateZipStructure(zipBuffer: Buffer): Promise<{
-    manifest: any;
+    manifest: UploadedPluginManifest;
     pluginId: string;
   }> {
     try {
@@ -301,14 +336,19 @@ export class PluginUploadService {
 
       // Parse package.json
       const packageContent = zip.readAsText(packageEntry);
-      const packageJson = JSON.parse(packageContent);
+      const parsed: unknown = JSON.parse(packageContent);
 
-      // Validate hay-plugin field exists
-      if (!packageJson["hay-plugin"]) {
-        throw new Error("package.json must contain a 'hay-plugin' field");
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("package.json must contain a JSON object");
       }
 
+      const packageJson = parsed as PluginPackageJson;
+
+      // Validate hay-plugin field exists
       const hayPlugin = packageJson["hay-plugin"];
+      if (!hayPlugin) {
+        throw new Error("package.json must contain a 'hay-plugin' field");
+      }
 
       // Validate required fields
       if (!packageJson.name) {
@@ -328,7 +368,7 @@ export class PluginUploadService {
       }
 
       // Build manifest from package.json for compatibility with rest of upload flow
-      const manifest = {
+      const manifest: UploadedPluginManifest = {
         id: pluginId,
         name: hayPlugin.displayName || pluginId,
         version: packageJson.version || "1.0.0",

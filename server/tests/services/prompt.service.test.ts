@@ -1,15 +1,8 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import { PromptService } from "../../services/prompt.service";
+import { describe, it, expect } from "@jest/globals";
 import { VariableEngine } from "../../utils/variable-engine";
 import { PromptParser } from "../../utils/prompt-parser";
 
 describe("PromptService", () => {
-  let promptService: PromptService;
-
-  beforeEach(() => {
-    promptService = PromptService.getInstance();
-  });
-
   describe("Variable Engine", () => {
     it("should replace simple variables", () => {
       const template = "Hello {{name}}, welcome to {{place}}!";

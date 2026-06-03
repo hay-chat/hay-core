@@ -56,7 +56,10 @@ export function useNotifications() {
     try {
       // Initialize AudioContext if needed
       if (!audioContext.value) {
-        audioContext.value = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        audioContext.value = new AudioContextClass();
       }
 
       const ctx = audioContext.value;
@@ -136,14 +139,7 @@ export function useNotifications() {
    * Show all types of notifications based on options
    */
   const notify = async (options: NotificationOptions) => {
-    const {
-      title,
-      body,
-      conversationId,
-      playSound = true,
-      showToast = true,
-      showBrowser = true,
-    } = options;
+    const { title, body, playSound = true, showToast = true, showBrowser = true } = options;
 
     // Play sound
     if (playSound) {

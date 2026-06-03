@@ -6,7 +6,7 @@ export interface HookPayload {
   organizationId: string;
   conversationId?: string;
   userId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export type HookHandler = (payload: HookPayload) => Promise<void>;

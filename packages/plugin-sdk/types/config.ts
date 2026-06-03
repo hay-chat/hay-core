@@ -125,6 +125,61 @@ export interface ConfigFieldDescriptor<T = any> {
    * Default value if not configured.
    */
   default?: T;
+
+  /**
+   * Discrete choices for this field. When set, the UI renders a dropdown
+   * (select) instead of a free-text input. Each option has a human label
+   * and a value that is stored as the field's configured value.
+   *
+   * @example
+   * ```typescript
+   * authMode: {
+   *   type: 'string',
+   *   label: 'Auth method',
+   *   options: [
+   *     { label: 'API Token (recommended)', value: 'basic' },
+   *     { label: 'OAuth', value: 'oauth' },
+   *   ],
+   *   default: 'basic',
+   * }
+   * ```
+   */
+  options?: Array<{ label: string; value: string | number }>;
+
+  /**
+   * Conditionally show this field based on the value of another field in the
+   * same form. The UI hides the field (and excludes its value from required-
+   * field validation) when the predicate is false.
+   *
+   * Declarative on purpose so it can be serialized across the SDK/UI
+   * boundary. Each clause references another field by name and asserts a
+   * relationship with the field's current value.
+   *
+   * @example
+   * ```typescript
+   * email: {
+   *   type: 'string',
+   *   label: 'Atlassian email',
+   *   showWhen: { field: 'authMode', equals: 'basic' },
+   * }
+   * ```
+   */
+  showWhen?: ShowWhen;
+}
+
+/**
+ * Declarative visibility predicate for {@link ConfigFieldDescriptor.showWhen}.
+ * The field is shown when ALL clauses match.
+ */
+export interface ShowWhen {
+  /** Name of the other field whose value drives this field's visibility. */
+  field: string;
+  /** Show this field when the referenced field equals this value. */
+  equals?: string | number | boolean;
+  /** Show this field when the referenced field is in this set of values. */
+  in?: Array<string | number | boolean>;
+  /** Show this field when the referenced field does NOT equal this value. */
+  notEquals?: string | number | boolean;
 }
 
 /**

@@ -5,6 +5,8 @@
  * The SDK uses a minimal manifest approach where metadata is fetched at runtime.
  */
 
+import type { ChildProcess } from "child_process";
+
 // ============================================================================
 // Manifest Types (Minimal - from package.json)
 // ============================================================================
@@ -87,7 +89,7 @@ export interface AuthState {
   methodId: string;
 
   /** Credentials (e.g., { apiKey: "..." } or { accessToken: "...", refreshToken: "..." }) */
-  credentials: Record<string, any>;
+  credentials: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -104,13 +106,13 @@ export interface ConfigFieldDescriptor {
   placeholder?: string; // Placeholder text for input field in UI
   required?: boolean;
   encrypted?: boolean;
-  default?: any;
+  default?: unknown;
   env?: string; // Environment variable fallback
   validation?: {
     min?: number;
     max?: number;
     pattern?: string;
-    enum?: any[];
+    enum?: unknown[];
   };
 }
 
@@ -162,7 +164,7 @@ export interface UIExtensionDescriptor {
   id: string;
   slot: string; // e.g., "plugin-settings", "conversation-sidebar"
   component: string; // Vue component path
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
 }
 
 /**
@@ -194,6 +196,70 @@ export interface ExternalMcpDescriptor {
 }
 
 // ============================================================================
+// Document Importer Contract
+// ============================================================================
+
+/** A logical root inside a document source (Confluence space, GitHub repo, Notion DB). */
+export interface DocumentImporterRoot {
+  id: string;
+  label: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** A page descriptor returned by discover() / listChanges() — minimal metadata only. */
+export interface DocumentImporterExternalPage {
+  externalId: string;
+  title: string;
+  externalUpdatedAt: string; // ISO 8601
+  externalUrl?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Full fetched page content returned by fetchPage(). */
+export interface DocumentImporterFetchedPage {
+  externalId: string;
+  title: string;
+  markdown: string;
+  externalUpdatedAt: string;
+  externalUrl?: string;
+  attachments?: Array<{ name: string; url: string; mimeType?: string }>;
+}
+
+export type DocumentImporterChangeOp = "upsert" | "delete";
+
+export interface DocumentImporterPageChange {
+  externalId: string;
+  op: DocumentImporterChangeOp;
+  externalUpdatedAt?: string;
+}
+
+/**
+ * Contract that a 'document_importer' plugin's tRPC sub-router must implement.
+ * Core resolves the plugin's router via PluginRouterRegistry and calls these procedures
+ * from the document-source sync service.
+ */
+export interface DocumentImporterContract {
+  listRoots(input: { instanceId: string }): Promise<DocumentImporterRoot[]>;
+  discover(input: { instanceId: string; rootId: string; cursor?: string }): Promise<{
+    pages: DocumentImporterExternalPage[];
+    nextCursor?: string;
+  }>;
+  fetchPage(input: {
+    instanceId: string;
+    externalId: string;
+  }): Promise<DocumentImporterFetchedPage>;
+  listChanges(input: {
+    instanceId: string;
+    rootId: string;
+    since: string;
+    cursor?: string;
+  }): Promise<{
+    changes: DocumentImporterPageChange[];
+    nextCursor?: string;
+  }>;
+}
+
+// ============================================================================
 // MCP Tool Types
 // ============================================================================
 
@@ -204,7 +270,7 @@ export interface MCPTool {
   serverId: string;
   name: string;
   description: string;
-  input_schema: Record<string, any>;
+  input_schema: Record<string, unknown>;
   organizationId: string;
   pluginId: string;
 }
@@ -217,12 +283,12 @@ export interface MCPTool {
  * Worker process information
  */
 export interface WorkerInfo {
-  process: any; // ChildProcess
+  process: ChildProcess;
   port: number;
   startedAt: Date;
   lastActivity: Date;
   organizationId: string;
   pluginId: string;
   instanceId: string;
-  metadata?: any; // Plugin registry metadata (for compatibility with legacy code)
+  metadata?: PluginMetadata; // Plugin registry metadata
 }

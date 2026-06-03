@@ -137,7 +137,7 @@ export interface HayPluginManifest {
     component: string;
     tabName?: string;
     tabOrder?: number;
-    props?: Record<string, any>;
+    props?: Record<string, unknown>;
   }>;
   i18n?: Record<string, PluginLocale>;
 }
@@ -157,14 +157,14 @@ export interface WebhookRequest {
   method: string;
   path: string;
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
   query: Record<string, string>;
 }
 
 export interface WebhookResponse {
   status: number;
   headers?: Record<string, string>;
-  body?: any;
+  body?: unknown;
 }
 
 // ============================================================================
@@ -178,7 +178,7 @@ export interface WebhookResponse {
 export interface MCPToolDefinition {
   name: string;
   description: string;
-  input_schema: Record<string, any>;
+  input_schema: Record<string, unknown>;
 }
 
 /**
@@ -224,6 +224,6 @@ export interface MCPServersConfig {
  * Plugin Instance Configuration (extended with MCP support)
  */
 export interface PluginInstanceConfig {
-  [key: string]: any; // Plugin-specific config fields
+  [key: string]: unknown; // Plugin-specific config fields
   mcpServers?: MCPServersConfig;
 }

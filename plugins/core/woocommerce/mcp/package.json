@@ -1,0 +1,16 @@
+{
+  "name": "hay-plugin-woocommerce-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for WooCommerce. Spawned over stdio by the WooCommerce plugin.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "axios": "^1.13.2",
+    "zod": "^3.25.76"
+  }
+}

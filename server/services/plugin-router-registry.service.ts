@@ -1,3 +1,4 @@
+import type { AnyRouter } from "@trpc/server";
 import { router } from "@server/trpc";
 import { createLogger } from "@server/lib/logger";
 
@@ -8,8 +9,8 @@ const logger = createLogger("plugin-router-registry");
  */
 export class PluginRouterRegistry {
   private static instance: PluginRouterRegistry;
-  private pluginRouters: Map<string, any> = new Map();
-  private mergedRouter: any = null;
+  private pluginRouters: Map<string, AnyRouter> = new Map();
+  private mergedRouter: AnyRouter | null = null;
 
   private constructor() {}
 
@@ -24,7 +25,7 @@ export class PluginRouterRegistry {
    * Register a plugin router
    * Called by plugins during initialization
    */
-  registerRouter(pluginId: string, pluginRouter: any): void {
+  registerRouter(pluginId: string, pluginRouter: AnyRouter): void {
     logger.info({ pluginId }, "Registering router for plugin");
     this.pluginRouters.set(pluginId, pluginRouter);
     this.mergedRouter = null; // Invalidate cache
@@ -42,14 +43,21 @@ export class PluginRouterRegistry {
   /**
    * Get all registered plugin routers as a map
    */
-  getPluginRouters(): Map<string, any> {
+  getPluginRouters(): Map<string, AnyRouter> {
     return new Map(this.pluginRouters);
+  }
+
+  /**
+   * Get a single registered plugin router by id, or undefined if not registered.
+   */
+  getRouter(pluginId: string): AnyRouter | undefined {
+    return this.pluginRouters.get(pluginId);
   }
 
   /**
    * Create a merged router with all plugin routers
    */
-  createMergedRouter(baseRouters: Record<string, any>): any {
+  createMergedRouter(baseRouters: Record<string, AnyRouter>): AnyRouter {
     if (this.mergedRouter) {
       return this.mergedRouter;
     }

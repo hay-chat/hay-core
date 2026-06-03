@@ -40,7 +40,7 @@ export async function authenticateBearerAuth(authHeader?: string): Promise<AuthU
   }
 
   // Skip plugin API tokens — they use a different auth flow (verifyPluginAuth middleware)
-  if ((payload as any).scope === "plugin-api") {
+  if ("scope" in payload && payload.scope === "plugin-api") {
     return null;
   }
 

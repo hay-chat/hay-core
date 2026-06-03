@@ -169,16 +169,22 @@ export class VariableEngine {
     path: string,
   ): PromptVariableType | undefined {
     const keys = path.split(".");
-    let current: any = obj;
+    let current: PromptVariableType = obj;
 
     for (const key of keys) {
-      if (current === null || current === undefined) {
+      if (current === null || current === undefined || typeof current !== "object") {
         return undefined;
       }
-      current = current[key];
+
+      if (Array.isArray(current)) {
+        const index = Number(key);
+        current = Number.isInteger(index) ? current[index] : undefined;
+      } else {
+        current = current[key];
+      }
     }
 
-    return current as PromptVariableType | undefined;
+    return current;
   }
 
   /**

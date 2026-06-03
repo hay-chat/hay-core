@@ -131,8 +131,14 @@ import { HayApi } from "@/utils/api";
 import { useToast } from "~/composables/useToast";
 import { PlaybookStatus } from "~/types/playbook";
 import { markdownToTiptapJSON } from "@/utils/markdownToTiptap";
+import type { JSONContent } from "@tiptap/vue-3";
+import type { RouterInputs } from "@/types/trpc";
 
 type StepId = "purpose" | "actions" | "documents" | "boundaries" | "generate";
+
+// The instructions accepted by the playbook create mutation (Tiptap document,
+// legacy structured list, raw string, or null), inferred from the tRPC router.
+type PlaybookInstructionsInput = NonNullable<RouterInputs["playbooks"]["create"]["instructions"]>;
 
 const { t } = useI18n();
 const router = useRouter();
@@ -238,10 +244,19 @@ async function handleCreate() {
 
   creating.value = true;
   try {
-    const instructionsJSON = markdownToTiptapJSON(
+    // Playbook instructions are a Tiptap/ProseMirror JSON document (the same
+    // shape produced by the editor's getJSON() in [...id].vue). The wizard
+    // always produces a top-level "doc" node, so the node `type` is guaranteed
+    // present — matching the server's instructions input contract, where the
+    // Tiptap document branch requires a string `type`.
+    const document: JSONContent = markdownToTiptapJSON(
       generatedResult.value.instructions,
       generatedResult.value.references,
     );
+    const instructionsJSON: PlaybookInstructionsInput = {
+      ...document,
+      type: document.type ?? "doc",
+    };
     const response = await HayApi.playbooks.create.mutate({
       title: generatedResult.value.title,
       trigger: generatedResult.value.trigger,

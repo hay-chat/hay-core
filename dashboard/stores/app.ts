@@ -1,25 +1,10 @@
 import { defineStore } from "pinia";
 import { Hay } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
 
-interface Plugin {
-  id: string;
-  dbId: string;
-  name: string;
-  version: string;
-  type: string[];
-  description?: string;
-  installed: boolean;
-  built: boolean;
-  enabled: boolean;
-  hasConfiguration: boolean;
-  hasCustomUI: boolean;
-  capabilities?: Record<string, unknown>;
-  features?: Record<string, unknown>;
-  sourceType?: "core" | "custom" | "git";
-  isCustom?: boolean;
-  uploadedAt?: string;
-  uploadedBy?: string;
-}
+// Derive the plugin shape from the tRPC router so the store stays in sync
+// with the server contract instead of duplicating (and drifting from) it.
+type Plugin = RouterOutputs["plugins"]["getAll"][number];
 
 interface AppState {
   openConversationsCount: number;

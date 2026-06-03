@@ -5,8 +5,6 @@ import {
   getDefaultScopesForRole,
   isValidScope,
   validateScopes,
-  type Resource,
-  type Action,
 } from "@server/types/scopes";
 
 describe("Scope System", () => {

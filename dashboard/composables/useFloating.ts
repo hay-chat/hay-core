@@ -1,4 +1,4 @@
-import { ref, computed, watch, type Ref } from "vue";
+import { computed, type Ref } from "vue";
 import {
   useFloating as useFloatingUI,
   autoUpdate,

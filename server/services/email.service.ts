@@ -245,7 +245,7 @@ export class EmailService {
       defaultVariables.emailPreview = finalSubject;
 
       // Merge with provided variables (provided variables take precedence)
-      const mergedVariables: Record<string, string> = {
+      const mergedVariables: Record<string, unknown> = {
         ...defaultVariables,
         ...(options.variables || {}),
       };

@@ -1,6 +1,6 @@
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
-import { MessageType } from "@server/database/entities/message.entity";
+import { Message, MessageType } from "@server/database/entities/message.entity";
 import { LLMService } from "@server/services/core/llm.service";
 import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
@@ -255,7 +255,7 @@ export async function checkForClosureIntent(
  * Validate if a conversation should actually be closed based on full context
  */
 export async function validateConversationClosure(
-  publicMessages: any[],
+  publicMessages: Message[],
   detectedIntent: string,
   hasActivePlaybook: boolean,
   conversationId?: string,

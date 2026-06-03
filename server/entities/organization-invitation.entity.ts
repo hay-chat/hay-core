@@ -104,7 +104,7 @@ export class OrganizationInvitation extends BaseEntity {
     }
   }
 
-  toJSON(): any {
+  toJSON() {
     return {
       id: this.id,
       organizationId: this.organizationId,

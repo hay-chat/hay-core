@@ -1,0 +1,17 @@
+{
+  "name": "hay-plugin-magento-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Magento. Spawned over stdio by the Magento plugin. Vendored from boldcommerce/magento2-mcp, trimmed to the deps actually used.",
+  "main": "mcp-server.js",
+  "scripts": {
+    "start": "node mcp-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "axios": "^1.8.1",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  }
+}

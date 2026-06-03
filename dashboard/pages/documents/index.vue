@@ -7,6 +7,12 @@
           <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
           {{ $t("documents.actions.refresh") }}
         </Button>
+        <NuxtLink to="/documents/sources">
+          <Button variant="outline">
+            <Plug class="mr-2 h-4 w-4" />
+            Connected sources
+          </Button>
+        </NuxtLink>
         <NuxtLink to="/documents/new">
           <Button variant="outline">
             <FilePlus class="mr-2 h-4 w-4" />
@@ -432,6 +438,7 @@ import {
   AlertCircle,
   ExternalLink,
   FilePlus,
+  Plug,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -458,7 +465,7 @@ interface Document {
   createdAt: Date;
   updatedAt: Date;
   sourceUrl?: string;
-  importMethod?: "upload" | "web" | "plugin";
+  importMethod?: "upload" | "web" | "plugin" | "editor";
   hasAttachment?: boolean;
 }
 
@@ -560,7 +567,7 @@ const refreshData = async () => {
       createdAt: new Date((doc.created_at || doc.createdAt) as string),
       updatedAt: new Date((doc.updated_at || doc.updatedAt) as string),
       sourceUrl: doc.sourceUrl as string | undefined,
-      importMethod: doc.importMethod as "upload" | "web" | "plugin" | undefined,
+      importMethod: doc.importMethod as Document["importMethod"],
       hasAttachment: !!(doc.attachments as Array<unknown>)?.length,
     }));
     totalDocuments.value = result.pagination.total;
@@ -583,7 +590,7 @@ const searchDocuments = async () => {
     });
 
     // Update the main documents list with search results
-    documents.value = (results || []).map((doc: any) => ({
+    documents.value = (results || []).map((doc) => ({
       id: doc.id,
       name: doc.title || "Untitled",
       title: doc.title,
@@ -1018,10 +1025,16 @@ onMounted(async () => {
   websocket.connect();
 
   // Listen for document status updates
-  const unsubscribe = websocket.on("document:status-updated", (data: any) => {
+  const unsubscribe = websocket.on("document:status-updated", (data: unknown) => {
     console.log("[Documents] Received document status update:", data);
 
-    if (!data?.documentId || !data?.status) {
+    const isStatusUpdate = (payload: unknown): payload is { documentId: string; status: string } =>
+      typeof payload === "object" &&
+      payload !== null &&
+      typeof (payload as { documentId?: unknown }).documentId === "string" &&
+      typeof (payload as { status?: unknown }).status === "string";
+
+    if (!isStatusUpdate(data)) {
       console.warn("[Documents] Invalid document status update payload:", data);
       return;
     }

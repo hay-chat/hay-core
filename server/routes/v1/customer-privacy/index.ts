@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
 import { AppDataSource } from "@server/database/data-source";
+import type { FindOptionsWhere } from "typeorm";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
 import { createLogger } from "@server/lib/logger";
 
@@ -351,7 +352,17 @@ export const customerPrivacyRouter = t.router({
   listRequests: authenticatedProcedure
     .input(
       z.object({
-        status: z.string().optional(),
+        status: z
+          .enum([
+            "pending_verification",
+            "verified",
+            "processing",
+            "completed",
+            "failed",
+            "expired",
+            "cancelled",
+          ])
+          .optional(),
         type: z.enum(["export", "deletion", "rectification"]).optional(),
         customerId: z.string().uuid().optional(),
         page: z.number().min(1).default(1),
@@ -370,7 +381,7 @@ export const customerPrivacyRouter = t.router({
         const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
         // Build query
-        const where: any = {
+        const where: FindOptionsWhere<PrivacyRequest> = {
           organizationId: ctx.organizationId,
           subjectType: "customer",
         };

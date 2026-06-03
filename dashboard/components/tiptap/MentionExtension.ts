@@ -8,6 +8,7 @@ import { VueRenderer } from "@tiptap/vue-3";
 import tippy from "tippy.js";
 import type { Instance as TippyInstance } from "tippy.js";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import MentionList from "./MentionList.vue";
 
 export interface MCPTool {
@@ -114,7 +115,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
       }
 
       // Build the content array
-      const content: any[] = [];
+      const content: DOMOutputSpec[] = [];
 
       // Add thumbnail for actions with pluginId
       if (type === "action" && pluginId) {
@@ -201,7 +202,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
       },
       render: () => {
         let component: VueRenderer | null = null;
-        let popup: TippyInstance[] | null = null;
+        let popup: TippyInstance | null = null;
 
         return {
           onStart: (props: SuggestionProps) => {
@@ -214,7 +215,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
               return;
             }
 
-            popup = tippy(document.body as any, {
+            popup = tippy(document.body, {
               getReferenceClientRect: props.clientRect as () => DOMRect,
               appendTo: () => document.body,
               content: component.element as HTMLElement,
@@ -225,8 +226,8 @@ export const configureMentionExtension = (config: MentionConfig) => {
               maxWidth: "none",
               onHide: () => {
                 // Ensure cleanup when popup is hidden
-                if (popup && popup[0]) {
-                  popup[0].destroy();
+                if (popup) {
+                  popup.destroy();
                 }
                 if (component) {
                   component.destroy();
@@ -246,7 +247,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
               return;
             }
 
-            popup[0].setProps({
+            popup.setProps({
               getReferenceClientRect: props.clientRect as () => DOMRect,
             });
           },
@@ -254,8 +255,8 @@ export const configureMentionExtension = (config: MentionConfig) => {
           onKeyDown(props: { event: KeyboardEvent }) {
             if (props.event.key === "Escape") {
               // Clean up popup and component
-              if (popup && popup[0]) {
-                popup[0].hide();
+              if (popup) {
+                popup.hide();
               }
               // Return false to let Tiptap close the suggestion
               return false;
@@ -268,8 +269,8 @@ export const configureMentionExtension = (config: MentionConfig) => {
 
           onExit() {
             // Clean up on exit
-            if (popup && popup[0]) {
-              popup[0].destroy();
+            if (popup) {
+              popup.destroy();
             }
             if (component) {
               component.destroy();

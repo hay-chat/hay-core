@@ -351,12 +351,9 @@ export class StorageService {
       throw new Error(`Failed to download file from S3: ${filePath}`);
     }
 
-    // Convert stream to buffer
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as any) {
-      chunks.push(chunk);
-    }
-    return Buffer.concat(chunks);
+    // Convert stream to buffer using the SDK stream mixin helper
+    const bytes = await response.Body.transformToByteArray();
+    return Buffer.from(bytes);
   }
 
   /**

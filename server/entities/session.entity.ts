@@ -36,7 +36,7 @@ export class Session extends BaseEntity {
     return new Date() > this.expiresAt;
   }
 
-  toJSON(): any {
+  toJSON() {
     const { refreshTokenHash: _refreshTokenHash, ...sessionWithoutToken } = this;
     return sessionWithoutToken;
   }

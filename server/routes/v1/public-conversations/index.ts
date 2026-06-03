@@ -352,6 +352,14 @@ export const publicConversationsRouter = t.router({
     }),
 });
 
+// Public components of an EC JWK used for DPoP proof verification.
+interface EcPublicJwk {
+  kty?: string;
+  crv?: string;
+  x?: string;
+  y?: string;
+}
+
 // Helper function to verify DPoP proof for a request
 export async function verifyDPoPForRequest(
   conversationId: string,
@@ -398,10 +406,10 @@ export async function verifyDPoPForRequest(
     }
 
     // Verify the JWK matches the registered one
-    const registeredJwk = conversation.publicJwk as any;
+    const registeredJwk = conversation.publicJwk as EcPublicJwk | null;
 
     // Compare the essential public key components (x and y for EC keys)
-    const receivedJwk = protectedHeader.jwk as any;
+    const receivedJwk = protectedHeader.jwk as EcPublicJwk | undefined;
     if (!receivedJwk || !registeredJwk) {
       return { success: false, error: "Missing JWK" };
     }

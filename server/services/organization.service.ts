@@ -1,6 +1,6 @@
 import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
-import type { DeepPartial } from "typeorm";
+import type { DeepPartial, QueryDeepPartialEntity } from "typeorm";
 import { StorageService } from "./storage.service";
 
 class OrganizationService {
@@ -78,7 +78,7 @@ class OrganizationService {
   }
 
   async update(id: string, data: DeepPartial<Organization>): Promise<Organization> {
-    await this.repository.update(id, data as any);
+    await this.repository.update(id, data as QueryDeepPartialEntity<Organization>);
     const updated = await this.findOne(id);
     if (!updated) {
       throw new Error("Organization not found after update");

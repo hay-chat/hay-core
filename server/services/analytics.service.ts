@@ -1,7 +1,7 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { MessageRepository } from "../repositories/message.repository";
 import { DocumentRepository } from "../repositories/document.repository";
-import { MessageType, MessageSentiment } from "../database/entities/message.entity";
+import { MessageSentiment } from "../database/entities/message.entity";
 import { DocumentationStatus } from "../entities/document.entity";
 
 export interface AnalyticsFilters {
@@ -117,7 +117,7 @@ export class AnalyticsService {
     }));
   }
 
-  async getResponseTimeAnalytics(filters: AnalyticsFilters) {
+  async getResponseTimeAnalytics(_filters: AnalyticsFilters) {
     // Placeholder for future response time analytics
     // This would analyze the time between customer messages and agent responses
     return {

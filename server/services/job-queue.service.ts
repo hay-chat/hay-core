@@ -6,6 +6,37 @@ import { createLogger } from "@server/lib/logger";
 const logger = createLogger("job-queue");
 
 /**
+ * Job `data.type` values that are processed by the background queue worker.
+ * Other types (web_import, page_discovery, privacy export, ...) are dispatched
+ * inline by their initiating route and must NOT be listed here, or the worker
+ * would race the inline processor.
+ */
+const BACKGROUND_JOB_TYPES = ["document_source_sync"];
+
+/** Partial job state changes published on the job-updates channel. */
+interface JobUpdate {
+  status?: JobStatus;
+  progress?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+/** Full payload broadcast on the job-updates channel. */
+interface JobUpdateEvent extends JobUpdate {
+  jobId: string;
+  organizationId: string;
+  timestamp: string;
+}
+
+function isJobUpdateEvent(value: unknown): value is JobUpdateEvent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).jobId === "string"
+  );
+}
+
+/**
  * Job Queue Service
  * Manages background jobs using Redis for persistence and pub/sub
  */
@@ -37,16 +68,7 @@ export class JobQueueService {
   /**
    * Publish a job update event to Redis
    */
-  async publishJobUpdate(
-    jobId: string,
-    organizationId: string,
-    update: {
-      status?: JobStatus;
-      progress?: Record<string, unknown>;
-      result?: Record<string, unknown>;
-      error?: string;
-    },
-  ): Promise<void> {
+  async publishJobUpdate(jobId: string, organizationId: string, update: JobUpdate): Promise<void> {
     await redisService.publish(this.JOB_CHANNEL, {
       jobId,
       organizationId,
@@ -58,7 +80,12 @@ export class JobQueueService {
   /**
    * Handle incoming job update from Redis
    */
-  private handleJobUpdate(event: any): void {
+  private handleJobUpdate(event: unknown): void {
+    if (!isJobUpdateEvent(event)) {
+      logger.warn({ event }, "Ignoring malformed job update event");
+      return;
+    }
+
     logger.debug(
       {
         jobId: event.jobId,
@@ -93,9 +120,81 @@ export class JobQueueService {
    * Called by the scheduler service for background job processing
    */
   async processNextJob(): Promise<void> {
-    // This is a placeholder for future job processing
-    // Jobs are currently processed inline in the import functions
-    // In the future, we can move job processing here for true background processing
+    // Most job types are processed inline by their initiating route (web import,
+    // page discovery, privacy export). Background-dispatched types claim a row
+    // here and route to their handler service.
+    if (this.isProcessing) {
+      return;
+    }
+    this.isProcessing = true;
+    try {
+      const claimed = await this.claimNextBackgroundJob();
+      if (!claimed) {
+        return;
+      }
+      await this.dispatchBackgroundJob(claimed);
+    } catch (err) {
+      logger.error({ err }, "Background job processing error");
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Atomically claim the next QUEUED background job. Returns null when nothing
+   * is eligible. Only job types listed in BACKGROUND_JOB_TYPES are claimed here;
+   * inline-processed jobs are left alone.
+   */
+  private async claimNextBackgroundJob(): Promise<Job | null> {
+    const { AppDataSource } = await import("../database/data-source");
+    if (!AppDataSource.isInitialized) {
+      return null;
+    }
+    const rows: Array<{ id: string }> = await AppDataSource.query(
+      `UPDATE jobs
+       SET status = 'processing', updated_at = now()
+       WHERE id = (
+         SELECT id FROM jobs
+         WHERE status = 'queued'
+           AND data->>'type' = ANY($1::text[])
+         ORDER BY priority DESC, created_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING id`,
+      [BACKGROUND_JOB_TYPES],
+    );
+    if (rows.length === 0) {
+      return null;
+    }
+    return jobRepository.findById(rows[0].id);
+  }
+
+  /**
+   * Route a claimed background job to its handler by `data.type`.
+   */
+  private async dispatchBackgroundJob(job: Job): Promise<void> {
+    const type = (job.data?.type as string | undefined) ?? "";
+    try {
+      switch (type) {
+        case "document_source_sync": {
+          const { documentSourceSyncService } = await import("./document-source-sync.service");
+          await documentSourceSyncService.processSyncJob(job);
+          // processSyncJob is responsible for setting the terminal status
+          // (success/partial/failed) via the document-source repository. We
+          // mark the Job row complete here so the queue doesn't re-claim it.
+          await this.completeJob(job.id, job.organizationId, { ok: true });
+          return;
+        }
+        default:
+          logger.warn({ jobId: job.id, type }, "No background handler for job type");
+          await this.failJob(job.id, job.organizationId, `No handler for job type: ${type}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ err, jobId: job.id, type }, "Background job handler failed");
+      await this.failJob(job.id, job.organizationId, message);
+    }
   }
 
   /**

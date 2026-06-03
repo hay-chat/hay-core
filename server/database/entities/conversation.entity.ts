@@ -22,6 +22,35 @@ import { SupportedLanguage } from "../../types/language.types";
 
 const logger = createLogger("conversation-entity");
 
+/** Minimal shape of a tool schema entry used when rendering playbook/handoff actions. */
+type ToolSchemaEntry = Record<string, unknown>;
+
+/**
+ * Resolve a tool's JSON input schema from either the plugin manifest format
+ * (`input_schema`) or the alternative `parameters` format. The underlying jsonb
+ * is dynamic, so it is narrowed to a plain object map for safe property access.
+ */
+function toResolvedInputSchema(toolSchema: ToolSchemaEntry): Record<string, unknown> {
+  const candidate = toolSchema.input_schema ?? toolSchema.parameters;
+  return candidate && typeof candidate === "object" ? (candidate as Record<string, unknown>) : {};
+}
+
+/**
+ * Narrow dynamic jsonb instruction data (stored on playbooks/agents) to the
+ * Tiptap document shape consumed by {@link analyzeTiptapInstructions}. Non-doc
+ * values are passed through as `undefined`, which the analyzer treats as empty.
+ */
+type TiptapInstructionInput = Parameters<typeof analyzeTiptapInstructions>[0];
+
+function toTiptapInstructions(value: unknown): TiptapInstructionInput {
+  if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc") {
+    // The runtime jsonb is a Tiptap document; the column types are too loose to
+    // express that, so we narrow via `unknown` after confirming the doc marker.
+    return value as unknown as TiptapInstructionInput;
+  }
+  return undefined;
+}
+
 @Entity("conversations")
 export class Conversation {
   @PrimaryGeneratedColumn("uuid")
@@ -264,7 +293,7 @@ export class Conversation {
     let referencedDocuments: string[] = [];
 
     if (instructions) {
-      const analysis = analyzeTiptapInstructions(instructions as any);
+      const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
       instructionText = analysis.formattedText;
       referencedActions = analysis.actions;
       referencedDocuments = analysis.documents;
@@ -427,12 +456,11 @@ The following tools are available for you to use. You MUST return only valid JSO
           }
 
           // Get the actual input schema - check both 'input_schema' (plugin manifest format) and 'parameters' (alternative format)
-          const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
+          const inputSchema = toResolvedInputSchema(toolSchema);
+          const required = inputSchema.required;
           const requiredFields =
-            inputSchema.required &&
-            Array.isArray(inputSchema.required) &&
-            inputSchema.required.length > 0
-              ? ` (Required: ${(inputSchema.required as string[]).join(", ")})`
+            Array.isArray(required) && required.length > 0
+              ? ` (Required: ${(required as string[]).join(", ")})`
               : "";
 
           return `- **${actionName}**: ${
@@ -569,7 +597,7 @@ The following tools are available for you to use. You MUST return only valid JSO
     let referencedDocuments: string[] = [];
 
     if (instructions) {
-      const analysis = analyzeTiptapInstructions(instructions as any);
+      const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
       instructionText = analysis.formattedText;
       referencedActions = analysis.actions;
       referencedDocuments = analysis.documents;
@@ -662,12 +690,11 @@ The following tools are available for you to use. You MUST return only valid JSO
             enabledToolIds.push(toolNameToAdd);
           }
 
-          const inputSchema: any = toolSchema.input_schema || toolSchema.parameters || {};
+          const inputSchema = toResolvedInputSchema(toolSchema);
+          const required = inputSchema.required;
           const requiredFields =
-            inputSchema.required &&
-            Array.isArray(inputSchema.required) &&
-            inputSchema.required.length > 0
-              ? ` (Required: ${(inputSchema.required as string[]).join(", ")})`
+            Array.isArray(required) && required.length > 0
+              ? ` (Required: ${(required as string[]).join(", ")})`
               : "";
 
           return `- **${actionName}**: ${
@@ -1110,7 +1137,7 @@ Translated message:`;
 
     // Handle Tiptap-formatted instructions
     if (agent.instructions) {
-      const analysis = analyzeTiptapInstructions(agent.instructions as any);
+      const analysis = analyzeTiptapInstructions(toTiptapInstructions(agent.instructions));
 
       if (analysis.formattedText) {
         content += content ? `\n` : "";
@@ -1196,7 +1223,7 @@ Translated message:`;
         ? "open" // Always return to "open" when returning to AI
         : "pending-human";
 
-    const updates: any = {
+    const updates: Partial<Conversation> = {
       assigned_user_id: null,
       assigned_at: null,
       status: newStatus,

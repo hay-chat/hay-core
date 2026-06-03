@@ -14,7 +14,7 @@ export interface Agent {
   id: string;
   name: string;
   description?: string | null;
-  instructions?: any;
+  instructions?: unknown;
   tone?: string | null;
   avoid?: string | null;
   trigger?: string | null;
@@ -22,14 +22,14 @@ export interface Agent {
   organization_id?: string;
   created_at?: string;
   updated_at?: string;
-  [key: string]: any; // Allow additional properties from API
+  [key: string]: unknown; // Allow additional properties from API
 }
 
 export interface Playbook {
   id: string;
   title: string;
   description?: string | null;
-  instructions?: any;
+  instructions?: unknown;
   required_fields?: string[] | null;
   trigger?: string;
   status?: PlaybookStatus;
@@ -38,7 +38,7 @@ export interface Playbook {
   draft_version_id?: string | null;
   created_at?: string;
   updated_at?: string;
-  [key: string]: any; // Allow additional properties from API
+  [key: string]: unknown; // Allow additional properties from API
 }
 
 export interface PlaybookVersion {
@@ -46,7 +46,7 @@ export interface PlaybookVersion {
   playbook_id: string;
   version_number: number;
   status: PlaybookVersionStatus;
-  instructions?: any;
+  instructions?: unknown;
   prompt_template?: string | null;
   required_fields?: string[] | null;
   publish_note?: string | null;

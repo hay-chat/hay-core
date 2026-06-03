@@ -7,6 +7,43 @@ import { v4 as uuidv4 } from "uuid";
 
 const logger = createLogger("remote-mcp");
 
+/** JSON-RPC 2.0 request sent to a remote MCP server. */
+interface JsonRpcRequest {
+  jsonrpc: "2.0";
+  id: string;
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+/** JSON-RPC 2.0 error object. */
+interface JsonRpcError {
+  code?: number;
+  message?: string;
+  data?: unknown;
+}
+
+/** JSON-RPC 2.0 response received from a remote MCP server. */
+interface JsonRpcResponse {
+  jsonrpc?: string;
+  id?: string;
+  result?: Record<string, unknown>;
+  error?: JsonRpcError;
+}
+
+/** Raw tool descriptor as returned by a remote MCP server's tools/list result. */
+interface RemoteMCPToolDescriptor {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+/** Decrypted plugin config may carry an API key under one of several field names. */
+interface ApiKeyConfig {
+  stripeApiKey?: string;
+  apiKey?: string;
+  api_key?: string;
+}
+
 /**
  * Validate that a URL does not point to private/internal networks (SSRF protection).
  * Rejects private IP ranges, localhost, link-local, cloud metadata endpoints,
@@ -95,7 +132,10 @@ export class RemoteMCPClient implements MCPClient {
    * Send JSON-RPC request and parse SSE response
    * Used for MCP servers that use Server-Sent Events (SSE) transport
    */
-  private async sendSSERequest(request: any, authHeaders: Record<string, string>): Promise<any> {
+  private async sendSSERequest(
+    request: JsonRpcRequest,
+    authHeaders: Record<string, string>,
+  ): Promise<JsonRpcResponse> {
     // Try without forcing text/event-stream first - let server decide
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -130,7 +170,7 @@ export class RemoteMCPClient implements MCPClient {
     if (!contentType?.includes("text/event-stream")) {
       // Not SSE, try to parse as regular JSON
       logger.debug("Not an SSE response, parsing as JSON");
-      const result = await response.json();
+      const result = (await response.json()) as JsonRpcResponse;
       return result;
     }
 
@@ -143,10 +183,10 @@ export class RemoteMCPClient implements MCPClient {
 
     const decoder = new TextDecoder();
     let buffer = "";
-    let jsonResponse: any = null;
+    let jsonResponse: JsonRpcResponse | null = null;
 
     try {
-      while (true) {
+      for (;;) {
         const { done, value } = await reader.read();
 
         if (done) {
@@ -172,7 +212,7 @@ export class RemoteMCPClient implements MCPClient {
             if (line.startsWith("data: ")) {
               const jsonData = line.substring(6); // Remove "data: " prefix
               try {
-                const parsed = JSON.parse(jsonData);
+                const parsed = JSON.parse(jsonData) as JsonRpcResponse;
                 logger.debug({ parsedId: parsed.id }, "Parsed SSE JSON response");
 
                 // Store the JSON-RPC response
@@ -230,13 +270,11 @@ export class RemoteMCPClient implements MCPClient {
       );
 
       if (instance?.config) {
-        const decryptedConfig = decryptConfig(instance.config);
+        const decryptedConfig = decryptConfig(instance.config) as ApiKeyConfig;
 
         // Check for various API key field names (plugin-specific)
         const apiKey =
-          (decryptedConfig as any).stripeApiKey ||
-          (decryptedConfig as any).apiKey ||
-          (decryptedConfig as any).api_key;
+          decryptedConfig.stripeApiKey || decryptedConfig.apiKey || decryptedConfig.api_key;
 
         if (apiKey) {
           headers.Authorization = `Bearer ${apiKey}`;
@@ -274,7 +312,7 @@ export class RemoteMCPClient implements MCPClient {
       );
 
       // Test connection with initialize request
-      const initRequest = {
+      const initRequest: JsonRpcRequest = {
         jsonrpc: "2.0",
         id: uuidv4(),
         method: "initialize",
@@ -326,7 +364,7 @@ export class RemoteMCPClient implements MCPClient {
     // Get auth headers (OAuth or API key)
     const authHeaders = await this.getAuthHeaders();
 
-    const request = {
+    const request: JsonRpcRequest = {
       jsonrpc: "2.0",
       id: uuidv4(),
       method: "tools/list",
@@ -343,7 +381,10 @@ export class RemoteMCPClient implements MCPClient {
         throw new Error(`MCP error: ${result.error.message || result.error}`);
       }
 
-      const tools = (result.result?.tools || []).map((tool: any) => ({
+      const rawTools = Array.isArray(result.result?.tools)
+        ? (result.result.tools as RemoteMCPToolDescriptor[])
+        : [];
+      const tools: MCPTool[] = rawTools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema || {},
@@ -371,7 +412,7 @@ export class RemoteMCPClient implements MCPClient {
     // Get auth headers (OAuth or API key)
     const authHeaders = await this.getAuthHeaders();
 
-    const request = {
+    const request: JsonRpcRequest = {
       jsonrpc: "2.0",
       id: uuidv4(),
       method: "tools/call",
@@ -398,13 +439,16 @@ export class RemoteMCPClient implements MCPClient {
       }
 
       // Transform MCP result to our format
-      const toolResult = result.result || {};
+      const toolResult = result.result ?? {};
+      const content = Array.isArray(toolResult.content)
+        ? (toolResult.content as MCPCallResult["content"])
+        : [];
       logger.info({ toolName: name }, "Tool executed successfully");
 
       return {
-        content: toolResult.content || [],
-        isError: false,
         ...toolResult,
+        content,
+        isError: false,
       };
     } catch (error) {
       logger.error(

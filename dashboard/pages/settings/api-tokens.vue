@@ -282,7 +282,11 @@
 
 <script setup lang="ts">
 import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-next";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
+
+type ApiToken = RouterOutputs["apiTokens"]["list"][number];
+type EditingToken = Pick<ApiToken, "id" | "name" | "scopes">;
 
 const { t } = useI18n();
 const { formatDate } = useOrgDateTime();
@@ -291,7 +295,7 @@ const { formatDate } = useOrgDateTime();
 const loading = ref(false);
 const creating = ref(false);
 const updating = ref(false);
-const tokens = ref<any[]>([]);
+const tokens = ref<ApiToken[]>([]);
 const createDialogOpen = ref(false);
 const showTokenDialogOpen = ref(false);
 const editDialogOpen = ref(false);
@@ -306,7 +310,7 @@ const newToken = ref({
   expiresAt: "",
 });
 
-const editingToken = ref<any>({
+const editingToken = ref<EditingToken>({
   id: "",
   name: "",
   scopes: [] as string[],
@@ -391,7 +395,7 @@ const createToken = async () => {
   try {
     const result = await Hay.apiTokens.create.mutate({
       name: newToken.value.name,
-      scopes: newToken.value.scopes as any,
+      scopes: newToken.value.scopes as RouterInputs["apiTokens"]["create"]["scopes"],
       expiresAt: newToken.value.expiresAt ? new Date(newToken.value.expiresAt) : undefined,
     });
 
@@ -432,7 +436,7 @@ const closeTokenDialog = () => {
   copied.value = false;
 };
 
-const openEditDialog = (token: any) => {
+const openEditDialog = (token: ApiToken) => {
   editingToken.value = {
     id: token.id,
     name: token.name,
@@ -447,7 +451,7 @@ const updateToken = async () => {
     await Hay.apiTokens.update.mutate({
       id: editingToken.value.id,
       name: editingToken.value.name,
-      scopes: editingToken.value.scopes as any,
+      scopes: editingToken.value.scopes as RouterInputs["apiTokens"]["update"]["scopes"],
     });
 
     editDialogOpen.value = false;
@@ -485,7 +489,7 @@ const deleteToken = async (id: string) => {
   }
 };
 
-const isExpired = (token: any) => {
+const isExpired = (token: ApiToken) => {
   if (!token.expiresAt) return false;
   return new Date(token.expiresAt) < new Date();
 };

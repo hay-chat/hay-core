@@ -1,9 +1,36 @@
 import { type FindManyOptions } from "typeorm";
+import type { DeepPartial, Repository } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
 import { encryptConfig, type ConfigSchema } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { AuthState } from "@server/types/plugin-sdk.types";
+
+/**
+ * The partial-entity shape accepted by TypeORM's `Repository.update`. Derived
+ * from the public `Repository` API so we don't reach into TypeORM's internal
+ * `query-builder/QueryPartialEntity` module (not exported in the package
+ * `exports` map).
+ */
+type PluginInstanceUpdate = Parameters<Repository<PluginInstance>["update"]>[1];
+
+/**
+ * Narrow an entity-shaped partial to TypeORM's update payload type.
+ *
+ * TypeORM's `QueryDeepPartialEntity` recursively deep-partials nested objects
+ * and unions every leaf with `(() => string)`. That mangles the structured
+ * `jsonb` columns (`config`, `authState`) — e.g. it rejects a valid
+ * `Record<string, unknown>` config because the nested leaf shape no longer
+ * matches. `DeepPartial<PluginInstance>` is the type that actually describes
+ * our update payloads (it keeps jsonb values whole), so we accept that and
+ * assert across to the update type at a single, documented boundary. The two
+ * types describe partial column writes of the same entity, so the runtime
+ * object is identical — the cast is safe.
+ */
+function toUpdatePayload(fields: DeepPartial<PluginInstance>): PluginInstanceUpdate {
+  return fields as PluginInstanceUpdate;
+}
 
 export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   constructor() {
@@ -69,7 +96,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   async updateStatus(id: string, status: PluginInstance["status"], error?: string): Promise<void> {
-    const updates: Partial<PluginInstance> = { status };
+    const updates: DeepPartial<PluginInstance> = { status };
 
     if (status === "running") {
       updates.running = true;
@@ -83,13 +110,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       updates.lastError = error;
     }
 
-    await this.getRepository().update(id, updates as any);
+    await this.getRepository().update(id, toUpdatePayload(updates));
   }
 
   async updateProcessId(id: string, processId: string | null): Promise<void> {
     await this.getRepository().update(id, {
       processId: processId || undefined,
-    } as any);
+    });
   }
 
   async updateConfig(id: string, config: Record<string, unknown>): Promise<void> {
@@ -112,7 +139,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     // Encrypt sensitive fields before storing
     const encryptedConfig = encryptConfig(config, configSchema);
 
-    await this.getRepository().update(id, { config: encryptedConfig } as any);
+    await this.getRepository().update(id, toUpdatePayload({ config: encryptedConfig }));
   }
 
   async incrementRestartCount(id: string): Promise<void> {
@@ -126,7 +153,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     await this.getRepository().update(id, {
       lastHealthCheck: new Date(),
       healthStatus: status,
-    } as any);
+    });
   }
 
   async upsertInstance(
@@ -156,10 +183,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
 
     if (existing) {
-      await this.getRepository().update(existing.id, {
-        ...data,
-        updatedAt: new Date(),
-      } as any);
+      await this.getRepository().update(
+        existing.id,
+        toUpdatePayload({
+          ...data,
+          updatedAt: new Date(),
+        }),
+      );
       return (await this.findById(existing.id))!;
     } else {
       const entity = this.getRepository().create({
@@ -213,11 +243,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
    * Update auth state for a plugin instance
    * Uses .save() to trigger TypeORM transformers for encryption
    */
-  async updateAuthState(
-    instanceId: string,
-    orgId: string,
-    authState: { methodId: string; credentials: Record<string, any> },
-  ): Promise<void> {
+  async updateAuthState(instanceId: string, orgId: string, authState: AuthState): Promise<void> {
     // Use .findOne() and .save() to ensure transformers run
     const instance = await this.getRepository().findOne({
       where: { id: instanceId, organizationId: orgId },
@@ -238,10 +264,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   /**
    * Get auth state for a plugin instance
    */
-  async getAuthState(
-    orgId: string,
-    pluginId: string,
-  ): Promise<{ methodId: string; credentials: Record<string, any> } | null> {
+  async getAuthState(orgId: string, pluginId: string): Promise<AuthState | null> {
     const instance = await this.findByOrgAndPlugin(orgId, pluginId);
     return instance?.authState || null;
   }
@@ -254,7 +277,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     runtimeState: "stopped" | "starting" | "ready" | "degraded" | "error",
     error?: string,
   ): Promise<void> {
-    const updates: any = {
+    const updates: PluginInstanceUpdate = {
       runtimeState,
       updatedAt: new Date(),
     };
@@ -267,7 +290,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       updates.lastError = error;
     }
 
-    // Clear error when transitioning to ready
+    // Clear error when transitioning to ready (writes SQL NULL)
     if (runtimeState === "ready") {
       updates.lastError = null;
     }

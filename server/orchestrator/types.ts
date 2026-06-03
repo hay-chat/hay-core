@@ -77,5 +77,20 @@ export interface ConversationContext {
     idempotencyKey: string;
   }>;
   guardrailLog?: GuardrailLogEntry[];
-  confidenceLog?: Array<any>; // Legacy, kept for backward compatibility
+  confidenceLog?: ConfidenceLogEntry[]; // Legacy, kept for backward compatibility
+}
+
+export interface ConfidenceLogEntry {
+  timestamp: string;
+  score: number;
+  tier: string;
+  breakdown: {
+    grounding: number;
+    retrieval: number;
+    certainty: number;
+  };
+  documentsUsed: Array<{ id: string; title: string; similarity: number }>;
+  recheckAttempted: boolean;
+  recheckCount: number;
+  details: string;
 }

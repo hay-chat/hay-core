@@ -1,5 +1,6 @@
 import axios, { type AxiosResponse } from "axios";
 import * as cheerio from "cheerio";
+import type { Element } from "domhandler";
 import { URL } from "url";
 import { EventEmitter } from "events";
 import { createLogger } from "@server/lib/logger";
@@ -246,7 +247,7 @@ export class WebScraperService extends EventEmitter {
 
       // This is a sitemap index, recursively fetch and parse sub-sitemaps
       const subSitemapUrls: string[] = [];
-      sitemapElements.each((_: number, element: any) => {
+      sitemapElements.each((_: number, element: Element) => {
         const url = $(element).text().trim();
         if (url) {
           subSitemapUrls.push(url);
@@ -296,7 +297,7 @@ export class WebScraperService extends EventEmitter {
     const urlElements = $("url > loc");
     if (urlElements.length > 0) {
       logger.info({ count: urlElements.length, sitemapUrl }, "Found regular sitemap");
-      urlElements.each((_: number, element: any) => {
+      urlElements.each((_: number, element: Element) => {
         const url = $(element).text().trim();
         // Always check if URL is from same domain
         if (url && this.isSameDomain(url)) {
@@ -521,7 +522,7 @@ export class WebScraperService extends EventEmitter {
     const urls: string[] = [];
     const $ = cheerio.load(html);
 
-    $("a[href]").each((_: number, element: any) => {
+    $("a[href]").each((_: number, element: Element) => {
       const href = $(element).attr("href");
       if (href) {
         try {
@@ -592,7 +593,19 @@ export class WebScraperService extends EventEmitter {
    * Allows benign normalizations (http→https, trailing slash).
    */
   private wasHttpRedirected(response: AxiosResponse, originalUrl: string): boolean {
-    const finalUrl: string | undefined = (response.request as any)?.res?.responseUrl;
+    // axios surfaces the post-redirect URL on the underlying Node request's
+    // response object (`request.res.responseUrl`), which is not part of the
+    // typed axios surface — narrow it from `unknown` instead of casting.
+    const request: unknown = response.request;
+    const res =
+      typeof request === "object" && request !== null && "res" in request
+        ? (request as { res?: unknown }).res
+        : undefined;
+    const responseUrl =
+      typeof res === "object" && res !== null && "responseUrl" in res
+        ? (res as { responseUrl?: unknown }).responseUrl
+        : undefined;
+    const finalUrl = typeof responseUrl === "string" ? responseUrl : undefined;
     if (!finalUrl) {
       return false;
     }

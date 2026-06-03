@@ -3,14 +3,31 @@ import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { Organization } from "./organization.entity";
 import {
-  buildScope,
   getDefaultScopesForRole,
   hasRequiredScope,
-  RESOURCES,
   ACTIONS,
   type Resource,
   type Action,
 } from "../types/scopes";
+
+type UserOrganizationRole = "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
+
+/**
+ * Serialized representation of a UserOrganization (returned by toJSON).
+ */
+export interface UserOrganizationJSON {
+  id: string;
+  userId: string;
+  organizationId: string;
+  role: UserOrganizationRole;
+  permissions?: string[];
+  isActive: boolean;
+  invitedAt?: Date;
+  joinedAt?: Date;
+  lastAccessedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * UserOrganization entity - Join table for many-to-many relationship between users and organizations
@@ -30,7 +47,7 @@ export class UserOrganization extends BaseEntity {
   organizationId!: string;
 
   @Column({ type: "varchar", length: 50, default: "member" })
-  role!: "owner" | "admin" | "member" | "viewer" | "contributor" | "agent";
+  role!: UserOrganizationRole;
 
   @Column({ type: "jsonb", nullable: true })
   permissions?: string[];
@@ -107,7 +124,7 @@ export class UserOrganization extends BaseEntity {
     this.lastAccessedAt = new Date();
   }
 
-  toJSON(): any {
+  toJSON(): UserOrganizationJSON {
     return {
       id: this.id,
       userId: this.userId,

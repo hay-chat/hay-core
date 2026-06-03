@@ -6,7 +6,7 @@
         :key="toast.id"
         :class="[
           'px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300',
-          toastClasses[toast.type],
+          toastClass(toast.type),
         ]"
       >
         <div class="flex items-center justify-between">
@@ -22,16 +22,18 @@
 
 <script setup lang="ts">
 import { X } from "lucide-vue-next";
-import { useToast } from "@/composables/useToast";
+import { useToast, type Toast } from "@/composables/useToast";
 
 const { toasts, remove } = useToast();
 
-const toastClasses = {
+const toastClasses: Record<Toast["type"], string> = {
   success: "bg-green-600 text-white",
   error: "bg-red-600 text-white",
   warning: "bg-yellow-600 text-white",
   info: "bg-blue-600 text-white",
 };
+
+const toastClass = (type: Toast["type"]): string => toastClasses[type];
 </script>
 
 <style scoped>

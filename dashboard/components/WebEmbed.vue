@@ -90,7 +90,7 @@ interface WebEmbedProps {
   description?: string;
   apiUrl?: string;
   organizationId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 const props = withDefaults(defineProps<WebEmbedProps>(), {
@@ -109,6 +109,23 @@ interface Message {
   content: string;
   direction: "in" | "out";
   createdAt: Date;
+}
+
+/** Raw message shape returned by the publicConversations.getMessages endpoint. */
+interface RawMessage {
+  id: string;
+  content: string;
+  direction: "in" | "out";
+  createdAt: string;
+}
+
+/** Envelope returned by the publicConversations.getMessages endpoint. */
+interface GetMessagesResponse {
+  result: {
+    data: {
+      messages: RawMessage[];
+    };
+  };
 }
 
 // State
@@ -219,20 +236,23 @@ async function fetchMessages() {
   try {
     isLoading.value = true;
 
-    const { data, nonce } = await dpopClient.value.request(`/v1/publicConversations.getMessages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        conversationId: conversationId.value,
+    const { data, nonce } = await dpopClient.value.request<GetMessagesResponse>(
+      `/v1/publicConversations.getMessages`,
+      {
         method: "POST",
-        url: `${apiUrl.value}/v1/publicConversations.getMessages`,
-        limit: 50,
-      }),
-    });
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId: conversationId.value,
+          method: "POST",
+          url: `${apiUrl.value}/v1/publicConversations.getMessages`,
+          limit: 50,
+        }),
+      },
+    );
 
-    messages.value = data.result.data.messages.map((msg: any) => ({
+    messages.value = data.result.data.messages.map((msg: RawMessage) => ({
       id: msg.id,
       content: msg.content,
       direction: msg.direction,

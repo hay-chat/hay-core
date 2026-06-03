@@ -15,8 +15,8 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   };
 
   const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn as any,
-    algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
+    expiresIn: authConfig.jwt.expiresIn as jwt.SignOptions["expiresIn"],
+    algorithm: authConfig.jwt.algorithm,
   };
   const accessToken = jwt.sign(payload, authConfig.jwt.secret, signOptions);
 
@@ -29,8 +29,8 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
   };
 
   const refreshSignOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.refreshExpiresIn as any,
-    algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
+    expiresIn: authConfig.jwt.refreshExpiresIn as jwt.SignOptions["expiresIn"],
+    algorithm: authConfig.jwt.algorithm,
   };
   const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.refreshSecret, refreshSignOptions);
 
@@ -54,9 +54,9 @@ export function verifyToken<T = JWTPayload>(token: string): T {
   try {
     const decoded = jwt.verify(token, authConfig.jwt.secret, {
       algorithms: [authConfig.jwt.algorithm as jwt.Algorithm],
-    }) as T;
+    }) as T & Pick<JWTPayload, "type">;
     // Reject refresh tokens used as access tokens
-    if ((decoded as any).type === "refresh") {
+    if (decoded.type === "refresh") {
       throw new Error("Invalid token");
     }
     return decoded;
@@ -119,8 +119,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   };
 
   const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn as any,
-    algorithm: authConfig.jwt.algorithm as jwt.Algorithm,
+    expiresIn: authConfig.jwt.expiresIn as jwt.SignOptions["expiresIn"],
+    algorithm: authConfig.jwt.algorithm,
   };
   return jwt.sign(newPayload, authConfig.jwt.secret, signOptions);
 }
