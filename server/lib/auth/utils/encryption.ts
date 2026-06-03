@@ -148,10 +148,10 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
   const decrypted: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(config)) {
-    if (value && typeof value === "object" && (value as any).encrypted) {
+    if (isEncrypted(value)) {
       // Decrypt encrypted values
       try {
-        decrypted[key] = decryptValue((value as any).value);
+        decrypted[key] = decryptValue(value.value);
       } catch (error) {
         logger.error({ err: error, key }, "Failed to decrypt config key");
         decrypted[key] = null;
@@ -169,7 +169,12 @@ export function decryptConfig(config: Record<string, unknown>): Record<string, u
  * Check if a value is encrypted
  */
 export function isEncrypted(value: unknown): value is EncryptedValue {
-  return !!(value && typeof value === "object" && (value as any).encrypted === true);
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { encrypted?: unknown }).encrypted === true &&
+    typeof (value as { value?: unknown }).value === "string"
+  );
 }
 
 /**
@@ -195,15 +200,16 @@ export class EncryptedTransformer {
   /**
    * Transform value to database (encrypt)
    */
-  to(value: any): any {
+  to(value: unknown): unknown {
     if (!value || typeof value !== "object") {
       return value;
     }
 
-    const encrypted = { ...value };
+    const encrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
     for (const field of this.fieldsToEncrypt) {
-      if (encrypted[field] && typeof encrypted[field] === "string") {
-        encrypted[field] = encryptValue(encrypted[field]);
+      const fieldValue = encrypted[field];
+      if (typeof fieldValue === "string") {
+        encrypted[field] = encryptValue(fieldValue);
       }
     }
     return encrypted;
@@ -212,16 +218,17 @@ export class EncryptedTransformer {
   /**
    * Transform value from database (decrypt)
    */
-  from(value: any): any {
+  from(value: unknown): unknown {
     if (!value || typeof value !== "object") {
       return value;
     }
 
-    const decrypted = { ...value };
+    const decrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
     for (const field of this.fieldsToEncrypt) {
-      if (decrypted[field] && typeof decrypted[field] === "string") {
+      const fieldValue = decrypted[field];
+      if (typeof fieldValue === "string") {
         try {
-          decrypted[field] = decryptValue(decrypted[field]);
+          decrypted[field] = decryptValue(fieldValue);
         } catch (error) {
           logger.error({ err: error, field }, "Failed to decrypt field");
           // Keep encrypted value if decryption fails
@@ -239,16 +246,16 @@ export class AuthStateEncryptedTransformer {
   /**
    * Transform value to database (encrypt all credentials)
    */
-  to(value: any): any {
+  to(value: unknown): unknown {
     if (!value || typeof value !== "object") {
       return value;
     }
 
     // AuthState structure: { methodId: string, credentials: Record<string, unknown> }
-    const encrypted = { ...value };
+    const encrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
 
     if (encrypted.credentials && typeof encrypted.credentials === "object") {
-      const encryptedCredentials: Record<string, any> = {};
+      const encryptedCredentials: Record<string, unknown> = {};
 
       for (const [key, val] of Object.entries(encrypted.credentials)) {
         if (val !== null && val !== undefined) {
@@ -273,15 +280,15 @@ export class AuthStateEncryptedTransformer {
   /**
    * Transform value from database (decrypt all credentials)
    */
-  from(value: any): any {
+  from(value: unknown): unknown {
     if (!value || typeof value !== "object") {
       return value;
     }
 
-    const decrypted = { ...value };
+    const decrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
 
     if (decrypted.credentials && typeof decrypted.credentials === "object") {
-      const decryptedCredentials: Record<string, any> = {};
+      const decryptedCredentials: Record<string, unknown> = {};
 
       for (const [key, val] of Object.entries(decrypted.credentials)) {
         if (val && typeof val === "string") {

@@ -12,8 +12,19 @@ import { resolveConfigForWorker } from "@server/lib/config-resolver";
 import { getApiUrl, config as envConfig } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
+import type { HayPluginManifest } from "../types/plugin.types";
 
 const logger = createLogger("plugin-runner");
+
+/**
+ * Manifest as persisted in the plugin registry: identical to
+ * {@link HayPluginManifest} except `capabilities` is stored as the flat
+ * string-array form sourced from package.json `hay-plugin.capabilities`.
+ * The registry also mirrors allowed host env vars under `permissions.env`.
+ */
+type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
+  capabilities: string[];
+};
 
 /**
  * Plugin Runner Service
@@ -127,12 +138,13 @@ export class PluginRunnerService {
             },
             "Refreshed auth state",
           );
-        } catch (error: any) {
+        } catch (error) {
           logger.error({ err: error, pluginId }, "OAuth token refresh failed");
           // If token is already expired and refresh failed, throw error
           if (expiresAt - now <= 0) {
+            const message = error instanceof Error ? error.message : String(error);
             throw new Error(
-              `OAuth token expired and refresh failed: ${error.message}. Please re-authenticate.`,
+              `OAuth token expired and refresh failed: ${message}. Please re-authenticate.`,
             );
           }
           // If token hasn't expired yet, continue with existing token
@@ -149,7 +161,7 @@ export class PluginRunnerService {
       runtimeState: "starting",
       lastStartedAt: new Date(),
       lastError: undefined,
-    } as any);
+    });
 
     try {
       // Allocate port
@@ -175,14 +187,15 @@ export class PluginRunnerService {
         config: resolvedConfig,
       };
 
+      const manifest = plugin.manifest as RegistryManifest;
       const env = this.buildSDKEnv({
         orgId,
         pluginId,
         port,
         orgConfig,
         orgAuth: instance.authState || null,
-        capabilities: (plugin.manifest as any).capabilities || [],
-        allowedEnvVars: (plugin.manifest as any).env || [],
+        capabilities: manifest.capabilities || [],
+        allowedEnvVars: manifest.permissions?.env || [],
       });
 
       // Plugin path - if already absolute, use as-is; otherwise join with pluginsDir
@@ -248,7 +261,7 @@ export class PluginRunnerService {
           runtimeState: code === 0 ? "stopped" : "error",
           lastError: code !== 0 ? `Process exited with code ${code}` : undefined,
           lastStoppedAt: new Date(),
-        } as any);
+        });
         // Update health status - unhealthy if exited with error, unknown if stopped normally
         await pluginInstanceRepository.updateHealthCheck(
           instance.id,
@@ -295,11 +308,11 @@ export class PluginRunnerService {
       });
 
       return workerInfo;
-    } catch (error: any) {
+    } catch (error) {
       // Update runtime state to "error"
       await instanceRepo.update(instance.id, {
         runtimeState: "error",
-        lastError: error.message,
+        lastError: error instanceof Error ? error.message : String(error),
         running: false,
       });
       // Mark as unhealthy when worker fails to start
@@ -368,7 +381,7 @@ export class PluginRunnerService {
       });
 
       logger.info({ workerKey }, "Worker stopped");
-    } catch (error: any) {
+    } catch (error) {
       logger.error({ err: error, workerKey }, "Failed to stop worker");
       throw error;
     }
@@ -414,7 +427,7 @@ export class PluginRunnerService {
     orgId: string;
     pluginId: string;
     port: number;
-    orgConfig: Record<string, any>;
+    orgConfig: { org: { id: string }; config: Record<string, unknown> };
     orgAuth: AuthState | null;
     capabilities: string[];
     allowedEnvVars: string[];

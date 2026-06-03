@@ -13,6 +13,29 @@ const logger = createLogger("job-queue");
  */
 const BACKGROUND_JOB_TYPES = ["document_source_sync"];
 
+/** Partial job state changes published on the job-updates channel. */
+interface JobUpdate {
+  status?: JobStatus;
+  progress?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+/** Full payload broadcast on the job-updates channel. */
+interface JobUpdateEvent extends JobUpdate {
+  jobId: string;
+  organizationId: string;
+  timestamp: string;
+}
+
+function isJobUpdateEvent(value: unknown): value is JobUpdateEvent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).jobId === "string"
+  );
+}
+
 /**
  * Job Queue Service
  * Manages background jobs using Redis for persistence and pub/sub
@@ -45,16 +68,7 @@ export class JobQueueService {
   /**
    * Publish a job update event to Redis
    */
-  async publishJobUpdate(
-    jobId: string,
-    organizationId: string,
-    update: {
-      status?: JobStatus;
-      progress?: Record<string, unknown>;
-      result?: Record<string, unknown>;
-      error?: string;
-    },
-  ): Promise<void> {
+  async publishJobUpdate(jobId: string, organizationId: string, update: JobUpdate): Promise<void> {
     await redisService.publish(this.JOB_CHANNEL, {
       jobId,
       organizationId,
@@ -66,7 +80,12 @@ export class JobQueueService {
   /**
    * Handle incoming job update from Redis
    */
-  private handleJobUpdate(event: any): void {
+  private handleJobUpdate(event: unknown): void {
+    if (!isJobUpdateEvent(event)) {
+      logger.warn({ event }, "Ignoring malformed job update event");
+      return;
+    }
+
     logger.debug(
       {
         jobId: event.jobId,

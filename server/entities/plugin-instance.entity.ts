@@ -50,7 +50,7 @@ export class PluginInstance extends OrganizationScopedEntity {
   lastStoppedAt?: Date;
 
   @Column({ type: "text", nullable: true })
-  lastError?: string;
+  lastError?: string | null;
 
   @Column({ type: "integer", default: 0 })
   restartCount!: number;

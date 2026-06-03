@@ -367,8 +367,8 @@ interface Agent {
   enabled: boolean;
   created_at: string;
   description?: string | null;
-  organization?: any;
-  playbooks?: any[];
+  organization?: unknown;
+  playbooks?: unknown[];
   updated_at: string;
 }
 
@@ -380,7 +380,7 @@ interface Conversation {
   created_at: string;
   updated_at: string;
   messages?: Array<{ content: string; created_at: string }>;
-  organization?: any;
+  organization?: unknown;
   metadata?: Record<string, unknown> | null;
 }
 

@@ -5,9 +5,9 @@
 
 interface TiptapNode {
   type: string;
-  attrs?: Record<string, any>;
+  attrs?: Record<string, unknown>;
   content?: TiptapNode[];
-  marks?: Array<{ type: string; attrs?: Record<string, any> }>;
+  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
   text?: string;
 }
 
@@ -81,7 +81,7 @@ function convertNodeToMarkdown(
     }
 
     case "heading": {
-      const level = node.attrs?.level || 1;
+      const level = typeof node.attrs?.level === "number" ? node.attrs.level : 1;
       let text = "";
 
       if (node.content) {
@@ -181,8 +181,8 @@ function convertNodeToMarkdown(
     }
 
     case "mention": {
-      const id = node.attrs?.id;
-      const type = node.attrs?.type;
+      const id = typeof node.attrs?.id === "string" ? node.attrs.id : undefined;
+      const type = typeof node.attrs?.type === "string" ? node.attrs.type : undefined;
 
       if (id && type) {
         if (type === "action") {
@@ -195,13 +195,13 @@ function convertNodeToMarkdown(
       }
 
       // Fallback to just the label
-      const label = node.attrs?.label || "";
+      const label = typeof node.attrs?.label === "string" ? node.attrs.label : "";
       return { markdown: `@${label}`, actions, documents };
     }
 
     // Keep old format for backward compatibility during migration
     case "actionMergeField": {
-      const id = node.attrs?.id;
+      const id = typeof node.attrs?.id === "string" ? node.attrs.id : undefined;
       if (id) {
         actions.add(id);
         return { markdown: `[action](${id})`, actions, documents };
@@ -210,7 +210,7 @@ function convertNodeToMarkdown(
     }
 
     case "documentMergeField": {
-      const id = node.attrs?.id;
+      const id = typeof node.attrs?.id === "string" ? node.attrs.id : undefined;
       if (id) {
         documents.add(id);
         return { markdown: `[document](${id})`, actions, documents };

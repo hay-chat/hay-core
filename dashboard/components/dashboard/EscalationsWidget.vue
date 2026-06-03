@@ -85,8 +85,8 @@ const fetchStats = async (forceRefresh = false) => {
       { ttl: CACHE_TTL, forceRefresh },
     ),
   ]);
-  statsToday.value = (today as any) || null;
-  statsWeek.value = (week as any) || null;
+  statsToday.value = today ?? null;
+  statsWeek.value = week ?? null;
 };
 
 const openEscalations = () => {

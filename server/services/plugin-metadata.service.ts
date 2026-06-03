@@ -14,25 +14,27 @@ const logger = createLogger("plugin-metadata");
  * Validate plugin metadata structure
  * Ensures the metadata response from /metadata endpoint is well-formed
  */
-export function validateMetadata(metadata: any): metadata is PluginMetadata {
+export function validateMetadata(metadata: unknown): metadata is PluginMetadata {
   // Basic structure validation
   if (!metadata || typeof metadata !== "object") {
     throw new Error("Metadata must be an object");
   }
 
+  const meta = metadata as Record<string, unknown>;
+
   // Validate configSchema
-  if (metadata.configSchema !== undefined) {
-    if (typeof metadata.configSchema !== "object" || Array.isArray(metadata.configSchema)) {
+  if (meta.configSchema !== undefined) {
+    if (typeof meta.configSchema !== "object" || Array.isArray(meta.configSchema)) {
       throw new Error("configSchema must be an object");
     }
 
     // Validate each config field descriptor
-    for (const [key, field] of Object.entries(metadata.configSchema)) {
+    for (const [key, field] of Object.entries(meta.configSchema as Record<string, unknown>)) {
       if (!field || typeof field !== "object") {
         throw new Error(`Config field "${key}" must be an object`);
       }
-      const f = field as any;
-      if (!["string", "number", "boolean", "json"].includes(f.type)) {
+      const f = field as Record<string, unknown>;
+      if (typeof f.type !== "string" || !["string", "number", "boolean", "json"].includes(f.type)) {
         throw new Error(`Config field "${key}" has invalid type: ${f.type}`);
       }
       if (!f.label || typeof f.label !== "string") {
@@ -42,17 +44,18 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
   }
 
   // Validate authMethods
-  if (metadata.authMethods !== undefined) {
-    if (!Array.isArray(metadata.authMethods)) {
+  if (meta.authMethods !== undefined) {
+    if (!Array.isArray(meta.authMethods)) {
       throw new Error("authMethods must be an array");
     }
 
-    for (const method of metadata.authMethods) {
+    for (const entry of meta.authMethods) {
+      const method = entry as Record<string, unknown>;
       if (!method.id || typeof method.id !== "string") {
         throw new Error("Auth method must have a string id");
       }
-      if (!method.type || !["apiKey", "oauth2"].includes(method.type)) {
-        throw new Error(`Auth method "${method.id}" has invalid type: ${method.type}`);
+      if (typeof method.type !== "string" || !["apiKey", "oauth2"].includes(method.type)) {
+        throw new Error(`Auth method "${method.id}" has invalid type: ${String(method.type)}`);
       }
       if (!method.label || typeof method.label !== "string") {
         throw new Error(`Auth method "${method.id}" must have a string label`);
@@ -61,12 +64,13 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
   }
 
   // Validate uiExtensions
-  if (metadata.uiExtensions !== undefined) {
-    if (!Array.isArray(metadata.uiExtensions)) {
+  if (meta.uiExtensions !== undefined) {
+    if (!Array.isArray(meta.uiExtensions)) {
       throw new Error("uiExtensions must be an array");
     }
 
-    for (const ext of metadata.uiExtensions) {
+    for (const entry of meta.uiExtensions) {
+      const ext = entry as Record<string, unknown>;
       if (!ext.slot || typeof ext.slot !== "string") {
         throw new Error(`UI extension must have a string slot`);
       }
@@ -78,56 +82,70 @@ export function validateMetadata(metadata: any): metadata is PluginMetadata {
   }
 
   // Validate routes
-  if (metadata.routes !== undefined) {
-    if (!Array.isArray(metadata.routes)) {
+  if (meta.routes !== undefined) {
+    if (!Array.isArray(meta.routes)) {
       throw new Error("routes must be an array");
     }
 
-    for (const route of metadata.routes) {
+    for (const entry of meta.routes) {
+      const route = entry as Record<string, unknown>;
       if (!route.path || typeof route.path !== "string") {
         throw new Error("Route must have a string path");
       }
-      if (!route.method || !["GET", "POST", "PUT", "DELETE", "PATCH"].includes(route.method)) {
-        throw new Error(`Route "${route.path}" has invalid method: ${route.method}`);
+      if (
+        typeof route.method !== "string" ||
+        !["GET", "POST", "PUT", "DELETE", "PATCH"].includes(route.method)
+      ) {
+        throw new Error(`Route "${route.path}" has invalid method: ${String(route.method)}`);
       }
     }
   }
 
   // Validate mcp
-  if (metadata.mcp !== undefined) {
-    if (!metadata.mcp || typeof metadata.mcp !== "object") {
+  if (meta.mcp !== undefined) {
+    if (!meta.mcp || typeof meta.mcp !== "object") {
       throw new Error("mcp must be an object");
     }
 
-    if (metadata.mcp.local !== undefined) {
-      if (!Array.isArray(metadata.mcp.local)) {
+    const mcp = meta.mcp as Record<string, unknown>;
+
+    if (mcp.local !== undefined) {
+      if (!Array.isArray(mcp.local)) {
         throw new Error("mcp.local must be an array");
       }
 
-      for (const server of metadata.mcp.local) {
+      for (const entry of mcp.local) {
+        const server = entry as Record<string, unknown>;
         if (!server.serverId || typeof server.serverId !== "string") {
           throw new Error("Local MCP server must have a string serverId");
         }
-        if (!["available", "unavailable"].includes(server.status)) {
+        if (
+          typeof server.status !== "string" ||
+          !["available", "unavailable"].includes(server.status)
+        ) {
           throw new Error(
-            `Local MCP server "${server.serverId}" has invalid status: ${server.status}`,
+            `Local MCP server "${server.serverId}" has invalid status: ${String(server.status)}`,
           );
         }
       }
     }
 
-    if (metadata.mcp.external !== undefined) {
-      if (!Array.isArray(metadata.mcp.external)) {
+    if (mcp.external !== undefined) {
+      if (!Array.isArray(mcp.external)) {
         throw new Error("mcp.external must be an array");
       }
 
-      for (const server of metadata.mcp.external) {
+      for (const entry of mcp.external) {
+        const server = entry as Record<string, unknown>;
         if (!server.serverId || typeof server.serverId !== "string") {
           throw new Error("External MCP server must have a string serverId");
         }
-        if (!["available", "unavailable"].includes(server.status)) {
+        if (
+          typeof server.status !== "string" ||
+          !["available", "unavailable"].includes(server.status)
+        ) {
           throw new Error(
-            `External MCP server "${server.serverId}" has invalid status: ${server.status}`,
+            `External MCP server "${server.serverId}" has invalid status: ${String(server.status)}`,
           );
         }
       }

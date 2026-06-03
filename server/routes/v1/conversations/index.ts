@@ -23,6 +23,23 @@ const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
 
+/**
+ * Raw row shape returned by the active-conversations SQL query below.
+ * Column names are snake_case because the query bypasses TypeORM mapping.
+ */
+interface ActiveConversationRow {
+  id: string;
+  title: string | null;
+  status: string;
+  assigned_user_id: string | null;
+  updated_at: Date | string | null;
+  customer_name: string | null;
+  customer_external_id: string | null;
+  handler_first_name: string | null;
+  handler_last_name: string | null;
+  last_message_at: Date | string | null;
+}
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
@@ -105,7 +122,7 @@ export const conversationsRouter = t.router({
       [organizationId, statuses],
     );
 
-    return (rows || []).map((r: any) => {
+    return ((rows as ActiveConversationRow[]) || []).map((r) => {
       const handlerName =
         r.handler_first_name || r.handler_last_name
           ? `${r.handler_first_name || ""} ${r.handler_last_name || ""}`.trim()
@@ -244,7 +261,7 @@ export const conversationsRouter = t.router({
         [organizationId, start.toISOString(), now.toISOString(), input.limit],
       );
 
-      const ids = (idsRows || []).map((r: any) => r.id).filter(Boolean);
+      const ids = ((idsRows as Array<{ id: string }>) || []).map((r) => r.id).filter(Boolean);
       if (ids.length === 0) return [];
 
       // Return full conversation objects so the existing conversations table can render.

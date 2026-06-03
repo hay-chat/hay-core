@@ -7,7 +7,7 @@ import {
   PlaybookVersion,
   PlaybookVersionStatus,
 } from "../database/entities/playbook-version.entity";
-import type { InstructionItem } from "../database/entities/playbook.entity";
+import type { PlaybookInstructions } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
 
@@ -30,7 +30,7 @@ export class PlaybookService {
       title: string;
       trigger: string;
       description?: string;
-      instructions?: InstructionItem[] | string | null;
+      instructions?: PlaybookInstructions;
       status?: PlaybookStatus;
       agentIds?: string[];
     },
@@ -110,7 +110,7 @@ export class PlaybookService {
       title?: string;
       trigger?: string;
       description?: string;
-      instructions?: InstructionItem[] | string | null;
+      instructions?: PlaybookInstructions;
       status?: PlaybookStatus;
       agentIds?: string[];
     },
@@ -259,7 +259,7 @@ export class PlaybookService {
     organizationId: string,
     playbookId: string,
     data: {
-      instructions?: InstructionItem[] | string | null;
+      instructions?: PlaybookInstructions;
       promptTemplate?: string;
       requiredFields?: string[];
     },
@@ -329,7 +329,7 @@ export class PlaybookService {
 
       // 4. Sync versioned fields to playbook row (materialized view)
       await this.playbookRepository.update(playbookId, organizationId, {
-        instructions: draft.instructions as any,
+        instructions: draft.instructions,
         prompt_template: draft.prompt_template,
         required_fields: draft.required_fields,
         active_version_id: newActive.id,
@@ -382,7 +382,7 @@ export class PlaybookService {
 
       // 4. Sync versioned fields to playbook row
       await this.playbookRepository.update(playbookId, organizationId, {
-        instructions: targetVersion.instructions as any,
+        instructions: targetVersion.instructions,
         prompt_template: targetVersion.prompt_template,
         required_fields: targetVersion.required_fields,
         active_version_id: newActive.id,

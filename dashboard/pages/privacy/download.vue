@@ -153,7 +153,7 @@ const downloaded = ref(false);
 const error = ref(false);
 const errorMessage = ref("");
 const fileSize = ref("~500 KB");
-const exportData = ref<any>(null);
+const exportData = ref<unknown>(null);
 const isZipFormat = ref(true);
 
 const exportFormat = computed(() => (isZipFormat.value ? "ZIP Archive" : "JSON"));

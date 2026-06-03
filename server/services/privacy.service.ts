@@ -6,6 +6,7 @@ import type {
 } from "@server/entities/privacy-request.entity";
 import { User } from "@server/entities/user.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
+import type { AuditAction } from "@server/entities/audit-log.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Document } from "@server/entities/document.entity";
 import { Upload } from "@server/entities/upload.entity";
@@ -26,8 +27,8 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as archiver from "archiver";
 import { getDashboardUrl } from "@server/config/env";
-import { IsNull, Not, In, EntityManager } from "typeorm";
-import type { AttachmentDeletionResult } from "@server/types/privacy.types";
+import { IsNull, In, EntityManager } from "typeorm";
+import type { AttachmentDeletionResult, ExportPackageData } from "@server/types/privacy.types";
 
 /**
  * Privacy Service
@@ -498,7 +499,7 @@ export class PrivacyService {
     requestId: string,
     downloadToken: string,
     ipAddress?: string,
-  ): Promise<{ data: any; fileName: string; isZip?: boolean; filePath?: string }> {
+  ): Promise<{ data: unknown; fileName: string; isZip?: boolean; filePath?: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId, type: "export", status: "completed" },
@@ -613,9 +614,8 @@ export class PrivacyService {
   /**
    * Collect all user data for export
    */
-  private async collectUserData(userId: string, email: string): Promise<any> {
+  private async collectUserData(userId: string, _email: string): Promise<ExportPackageData> {
     const userRepository = AppDataSource.getRepository(User);
-    const apiKeyRepository = AppDataSource.getRepository(ApiKey);
     const auditLogRepository = AppDataSource.getRepository(AuditLog);
     const documentRepository = AppDataSource.getRepository(Document);
     const uploadRepository = AppDataSource.getRepository(Upload);
@@ -632,7 +632,7 @@ export class PrivacyService {
 
     // Note: API keys are now organization-scoped, not user-scoped
     // They are not included in individual user data exports
-    const apiKeys: any[] = [];
+    const apiKeys: ApiKey[] = [];
 
     // Get audit logs
     const auditLogs = await auditLogRepository.find({
@@ -853,7 +853,6 @@ export class PrivacyService {
   private async executeDataDeletion(userId: string, email: string): Promise<void> {
     return AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
-      const apiKeyRepository = manager.getRepository(ApiKey);
       const auditLogRepository = manager.getRepository(AuditLog);
 
       // Get user
@@ -869,8 +868,10 @@ export class PrivacyService {
       const auditLogs = await auditLogRepository.find({ where: { userId } });
 
       for (const log of auditLogs) {
-        // Anonymize user identifier - set to null since userId is UUID type
-        log.userId = null as any;
+        // Anonymize user identifier - clear the nullable userId column.
+        // The entity types userId as `string | undefined`, but the DB column is
+        // nullable, so we explicitly null it to erase the association.
+        log.userId = null as unknown as undefined;
 
         // Anonymize IP addresses
         if (log.ipAddress) {
@@ -884,11 +885,11 @@ export class PrivacyService {
 
         // Anonymize PII in changes/metadata JSON fields
         if (log.changes) {
-          log.changes = this.anonymizeJsonPii(log.changes);
+          log.changes = this.anonymizeJsonPii(log.changes) as Record<string, unknown>;
         }
 
         if (log.metadata) {
-          log.metadata = this.anonymizeJsonPii(log.metadata);
+          log.metadata = this.anonymizeJsonPii(log.metadata) as Record<string, unknown>;
         }
 
         await auditLogRepository.save(log);
@@ -897,8 +898,10 @@ export class PrivacyService {
       // Soft delete user
       user.softDelete();
       user.email = `deleted-${userId}@deleted.local`;
-      user.firstName = null as any;
-      user.lastName = null as any;
+      // Clear nullable name columns. Entity types them as `string | undefined`,
+      // but the DB columns are nullable, so we null them to erase the PII.
+      user.firstName = null as unknown as undefined;
+      user.lastName = null as unknown as undefined;
       user.password = "deleted";
 
       await userRepository.save(user);
@@ -1006,17 +1009,20 @@ export class PrivacyService {
     action: string,
     email: string,
     userId?: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     try {
       await auditLogService.log({
         userId: userId || "anonymous",
-        action: action as any,
+        // Privacy logging uses a broader action vocabulary than the core
+        // AuditAction union (e.g. customer.* and ip_mismatch events). The DB
+        // column is a plain varchar, so widening here is safe.
+        action: action as AuditAction,
         resource: "privacy_request",
         changes: { email, ...metadata },
         status: "success",
-        ipAddress: metadata?.ipAddress,
-        userAgent: metadata?.userAgent,
+        ipAddress: typeof metadata?.ipAddress === "string" ? metadata.ipAddress : undefined,
+        userAgent: typeof metadata?.userAgent === "string" ? metadata.userAgent : undefined,
       });
     } catch (error) {
       logger.error({ err: error }, "Failed to log audit action");
@@ -1424,7 +1430,10 @@ export class PrivacyService {
    * GDPR Article 15 - Right of Access
    * Traverses: customers → conversations → messages → embeddings
    */
-  private async collectCustomerData(customerId: string, organizationId: string): Promise<any> {
+  private async collectCustomerData(
+    customerId: string,
+    organizationId: string,
+  ): Promise<ExportPackageData> {
     const customerRepository = AppDataSource.getRepository(Customer);
     const conversationRepository = AppDataSource.getRepository(Conversation);
     const messageRepository = AppDataSource.getRepository(Message);
@@ -1669,9 +1678,9 @@ export class PrivacyService {
    * Create a signed ZIP export file containing data.json, README.md, manifest.json, and attachments
    */
   private async createSignedZipExport(
-    exportData: any,
+    exportData: ExportPackageData,
     requestId: string,
-    email: string,
+    _email: string,
   ): Promise<{ filePath: string; signature: string }> {
     const exportDir = path.join(process.cwd(), "exports");
     await fs.mkdir(exportDir, { recursive: true });
@@ -1868,7 +1877,7 @@ export class PrivacyService {
    * Generate README.md for the export package
    */
   private generateExportReadme(
-    exportData: any,
+    exportData: ExportPackageData,
     requestId: string,
     totalAttachments: number = 0,
     downloadedAttachments: number = 0,
@@ -1925,7 +1934,7 @@ ${stats.totalEmbeddings || 0} embedding(s):
 - Used for AI-powered search and assistance`;
     } else {
       const orgInfo =
-        stats.totalAuditLogs > 0
+        (stats.totalAuditLogs ?? 0) > 0
           ? "Organization membership and role information"
           : "No organization membership";
       dataIncludedSections = `### Profile Information
@@ -2139,7 +2148,7 @@ please contact ${supportContact}.
     for (const message of messages) {
       if (!message.attachments || message.attachments.length === 0) continue;
 
-      for (const attachment of message.attachments as any[]) {
+      for (const attachment of message.attachments) {
         try {
           // Only delete local files (not external URLs)
           if (
@@ -2449,9 +2458,8 @@ please contact ${supportContact}.
 
         // Split by :: to handle compression
         if (ip.includes("::")) {
-          const [left, right] = ip.split("::");
+          const [left] = ip.split("::");
           const leftParts = left ? left.split(":") : [];
-          const rightParts = right ? right.split(":") : [];
 
           // Keep only the first 3 hextets from the left side
           const firstHextet = leftParts[0] || "0000";
@@ -2497,7 +2505,7 @@ please contact ${supportContact}.
   /**
    * Recursively anonymize PII in JSON objects and arrays
    */
-  private anonymizeJsonPii(obj: any): any {
+  private anonymizeJsonPii(obj: unknown): unknown {
     // Handle null/undefined
     if (!obj) {
       return obj;
@@ -2532,7 +2540,7 @@ please contact ${supportContact}.
       "userAgent",
     ];
 
-    const anonymized = { ...obj };
+    const anonymized: Record<string, unknown> = { ...(obj as Record<string, unknown>) };
 
     for (const key in anonymized) {
       if (sensitiveFields.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {

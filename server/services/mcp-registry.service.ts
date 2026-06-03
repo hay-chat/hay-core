@@ -17,6 +17,21 @@ export interface MCPTool extends MCPToolDefinition {
 }
 
 /**
+ * Tool descriptor returned by a plugin worker's /mcp/list-tools endpoint.
+ * Mirrors MCPToolDefinition with an optional serverId for routing.
+ */
+interface WorkerToolDescriptor extends MCPToolDefinition {
+  serverId?: string;
+}
+
+/**
+ * Shape of the JSON body returned by /mcp/list-tools.
+ */
+interface ListToolsResponse {
+  tools?: WorkerToolDescriptor[];
+}
+
+/**
  * MCP Registry Service
  *
  * Central registry for managing MCP tools across all plugin instances.
@@ -77,7 +92,7 @@ export class MCPRegistryService {
           });
 
           if (response.ok) {
-            const data = (await response.json()) as { tools: any[] };
+            const data = (await response.json()) as ListToolsResponse;
 
             for (const tool of data.tools || []) {
               tools.push({
@@ -102,9 +117,9 @@ export class MCPRegistryService {
               "Failed to fetch tools from worker",
             );
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.warn(
-            { pluginId: semanticPluginId, error: error.message },
+            { pluginId: semanticPluginId, error: error instanceof Error ? error.message : error },
             "Failed to fetch tools from worker",
           );
         }
@@ -130,8 +145,8 @@ export class MCPRegistryService {
   async executeTool(
     organizationId: string,
     toolName: string,
-    args: Record<string, any>,
-  ): Promise<any> {
+    args: Record<string, unknown>,
+  ): Promise<unknown> {
     const tool = await this.getTool(organizationId, toolName);
 
     if (!tool) {
@@ -169,9 +184,10 @@ export class MCPRegistryService {
       const result = await response.json();
       logger.debug({ toolName }, "Tool executed successfully");
       return result;
-    } catch (error: any) {
-      logger.error({ toolName, error: error.message }, "Tool execution failed");
-      throw new Error(`Tool execution failed: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ toolName, error: message }, "Tool execution failed");
+      throw new Error(`Tool execution failed: ${message}`);
     }
   }
 }

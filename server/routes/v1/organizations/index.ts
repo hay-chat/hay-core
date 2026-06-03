@@ -9,10 +9,10 @@ import {
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
 } from "@server/types/organization-settings.types";
+import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
-import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
@@ -226,7 +226,7 @@ export const organizationsRouter = t.router({
       const { testModeDefault, confidenceGuardrail, retentionDays, ...topLevelFields } = input;
 
       // Prepare update payload
-      const updatePayload: any = {
+      const updatePayload: DeepPartial<Organization> = {
         ...topLevelFields,
       };
 

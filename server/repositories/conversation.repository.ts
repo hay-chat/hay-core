@@ -1,10 +1,11 @@
 import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
-import { Message, MessageType, MessageStatus } from "@server/database/entities/message.entity";
+import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 
 const LOCK_DURATION_MS = 15_000;
@@ -110,7 +111,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as any);
+    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
 
     const updatedConversation = await this.findById(id);
 
@@ -134,7 +135,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as any);
+    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
 
     const updatedConversation = await this.findById(id);
 

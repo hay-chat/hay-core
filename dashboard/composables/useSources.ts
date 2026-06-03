@@ -29,7 +29,7 @@ export function useSources() {
 
     try {
       const result = await HayApi.sources.list.query();
-      sources.value = result.map((source: any) => ({
+      sources.value = result.map((source) => ({
         ...source,
         createdAt: new Date(source.createdAt),
         updatedAt: new Date(source.updatedAt),

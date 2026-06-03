@@ -1,7 +1,7 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { auditLogService } from "@server/services/audit-log.service";
-import type { AuditAction } from "@server/entities/audit-log.entity";
+import type { AuditAction, AuditLog } from "@server/entities/audit-log.entity";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
@@ -37,7 +37,7 @@ const listAuditLogsSchema = z.object({
 /**
  * Convert audit logs to CSV format
  */
-function convertToCSV(logs: any[]): string {
+function convertToCSV(logs: AuditLog[]): string {
   if (logs.length === 0) {
     return "No audit logs found";
   }

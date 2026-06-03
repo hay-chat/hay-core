@@ -47,30 +47,3 @@ export function createListProcedure<
       return result;
     });
 }
-
-/**
- * Creates a simplified list procedure with minimal configuration
- * Useful for basic entity listing without complex filtering
- */
-export function createSimpleListProcedure<TEntity extends ObjectLiteral>(
-  repository: BaseRepository<TEntity>,
-) {
-  return authenticatedProcedure.input(z.object({}).optional()).query(async ({ ctx }) => {
-    // Use simple find for basic listing
-    const items = await repository.findByOrganization(ctx.organizationId!, {
-      order: { created_at: "DESC" } as any,
-    });
-
-    return {
-      items,
-      pagination: {
-        page: 1,
-        limit: items.length,
-        total: items.length,
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false,
-      },
-    };
-  });
-}

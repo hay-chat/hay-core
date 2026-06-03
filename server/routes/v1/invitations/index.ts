@@ -2,6 +2,7 @@ import { t, publicProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
+import type { FindOptionsWhere } from "typeorm";
 import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
@@ -248,7 +249,7 @@ export const invitationsRouter = t.router({
 
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
 
-      const where: any = {
+      const where: FindOptionsWhere<OrganizationInvitation> = {
         organizationId: ctx.organizationId,
       };
 

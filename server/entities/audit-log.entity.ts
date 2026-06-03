@@ -81,10 +81,10 @@ export class AuditLog extends TypeOrmBaseEntity {
   resource?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  changes?: Record<string, any>;
+  changes?: Record<string, unknown>;
 
   @Column({ type: "jsonb", nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Column({ type: "varchar", length: 45, nullable: true })
   ipAddress?: string;
@@ -113,8 +113,8 @@ export class AuditLog extends TypeOrmBaseEntity {
     organizationId?: string;
     action: AuditAction;
     resource?: string;
-    changes?: Record<string, any>;
-    metadata?: Record<string, any>;
+    changes?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
     status?: "success" | "failure" | "warning";

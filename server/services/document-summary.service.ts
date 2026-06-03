@@ -14,7 +14,7 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { Document } from "@server/entities/document.entity";
 import { createLogger } from "@server/lib/logger";
-import { IsNull } from "typeorm";
+import { IsNull, type FindOptionsWhere } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 
 const logger = createLogger("document-summary");
@@ -145,7 +145,7 @@ ${content}`;
       where: {
         organizationId,
         description: IsNull(),
-      } as any,
+      } as FindOptionsWhere<Document>,
     });
   }
 }

@@ -8,7 +8,16 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("pptx-processor");
 
-const parseXml = promisify(parseString);
+const parseXml = promisify(parseString) as (xml: string) => Promise<unknown>;
+
+/**
+ * Narrows a parsed xml2js node to a plain object. xml2js represents elements as
+ * objects whose values are arrays of child nodes; text content is either a plain
+ * string or an object carrying it under the `_` key (with attributes under `$`).
+ */
+function isXmlObject(value: unknown): value is { [key: string]: unknown } {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export class PptxProcessor extends BaseProcessor {
   supportedTypes = [
@@ -146,7 +155,7 @@ export class PptxProcessor extends BaseProcessor {
 
   private async extractTextFromXml(xmlContent: string): Promise<string> {
     try {
-      const result: any = await parseXml(xmlContent);
+      const result = await parseXml(xmlContent);
       const texts: string[] = [];
 
       this.extractTextRecursive(result, texts);
@@ -158,29 +167,35 @@ export class PptxProcessor extends BaseProcessor {
     }
   }
 
-  private extractTextRecursive(obj: any, texts: string[]): void {
+  private extractTextRecursive(obj: unknown, texts: string[]): void {
     if (typeof obj === "string") {
       texts.push(obj);
       return;
     }
 
-    if (obj && typeof obj === "object") {
-      if (obj["a:t"]) {
-        if (Array.isArray(obj["a:t"])) {
-          texts.push(...obj["a:t"]);
-        } else if (typeof obj["a:t"] === "string") {
-          texts.push(obj["a:t"]);
-        } else if (obj["a:t"]["_"]) {
-          texts.push(obj["a:t"]["_"]);
+    if (isXmlObject(obj)) {
+      const textNode = obj["a:t"];
+      if (textNode) {
+        if (Array.isArray(textNode)) {
+          for (const entry of textNode) {
+            if (typeof entry === "string") {
+              texts.push(entry);
+            }
+          }
+        } else if (typeof textNode === "string") {
+          texts.push(textNode);
+        } else if (isXmlObject(textNode) && typeof textNode["_"] === "string") {
+          texts.push(textNode["_"]);
         }
       }
 
       for (const key in obj) {
         if (key !== "a:t" && Object.prototype.hasOwnProperty.call(obj, key)) {
-          if (Array.isArray(obj[key])) {
-            obj[key].forEach((item: any) => this.extractTextRecursive(item, texts));
-          } else if (typeof obj[key] === "object") {
-            this.extractTextRecursive(obj[key], texts);
+          const value = obj[key];
+          if (Array.isArray(value)) {
+            value.forEach((item) => this.extractTextRecursive(item, texts));
+          } else if (typeof value === "object" && value !== null) {
+            this.extractTextRecursive(value, texts);
           }
         }
       }
@@ -191,18 +206,26 @@ export class PptxProcessor extends BaseProcessor {
     try {
       if (zip.files["docProps/core.xml"]) {
         const coreContent = await zip.files["docProps/core.xml"].async("string");
-        const result: any = await parseXml(coreContent);
+        const result = await parseXml(coreContent);
 
-        if (result?.["cp:coreProperties"]?.["dc:title"]) {
-          const title = result["cp:coreProperties"]["dc:title"];
-          return Array.isArray(title) ? title[0] : title;
+        if (isXmlObject(result)) {
+          const coreProps = result["cp:coreProperties"];
+          if (isXmlObject(coreProps)) {
+            const title = coreProps["dc:title"];
+            if (title) {
+              const value = Array.isArray(title) ? title[0] : title;
+              if (typeof value === "string") {
+                return value;
+              }
+            }
+          }
         }
       }
 
       const slide1 = zip.files["ppt/slides/slide1.xml"];
       if (slide1) {
         const slideContent = await slide1.async("string");
-        const result: any = await parseXml(slideContent);
+        const result = await parseXml(slideContent);
         const texts: string[] = [];
         this.extractTextRecursive(result, texts);
         if (texts.length > 0) {
@@ -216,44 +239,46 @@ export class PptxProcessor extends BaseProcessor {
     return null;
   }
 
-  private async extractMetadata(zip: JSZip): Promise<Record<string, any>> {
-    const metadata: Record<string, any> = {};
+  private async extractMetadata(zip: JSZip): Promise<Record<string, string>> {
+    const metadata: Record<string, string> = {};
+
+    const readStringProp = (props: { [key: string]: unknown }, key: string): string | undefined => {
+      const raw = props[key];
+      const value = Array.isArray(raw) ? raw[0] : raw;
+      return typeof value === "string" ? value : undefined;
+    };
 
     try {
       if (zip.files["docProps/core.xml"]) {
         const coreContent = await zip.files["docProps/core.xml"].async("string");
-        const result: any = await parseXml(coreContent);
-        const props = result?.["cp:coreProperties"];
+        const result = await parseXml(coreContent);
+        const props = isXmlObject(result) ? result["cp:coreProperties"] : undefined;
 
-        if (props) {
-          if (props["dc:creator"]) {
-            metadata.author = Array.isArray(props["dc:creator"])
-              ? props["dc:creator"][0]
-              : props["dc:creator"];
+        if (isXmlObject(props)) {
+          const author = readStringProp(props, "dc:creator");
+          if (author !== undefined) {
+            metadata.author = author;
           }
-          if (props["dcterms:created"]) {
-            metadata.created = Array.isArray(props["dcterms:created"])
-              ? props["dcterms:created"][0]
-              : props["dcterms:created"];
+          const created = readStringProp(props, "dcterms:created");
+          if (created !== undefined) {
+            metadata.created = created;
           }
-          if (props["dcterms:modified"]) {
-            metadata.modified = Array.isArray(props["dcterms:modified"])
-              ? props["dcterms:modified"][0]
-              : props["dcterms:modified"];
+          const modified = readStringProp(props, "dcterms:modified");
+          if (modified !== undefined) {
+            metadata.modified = modified;
           }
         }
       }
 
       if (zip.files["docProps/app.xml"]) {
         const appContent = await zip.files["docProps/app.xml"].async("string");
-        const result: any = await parseXml(appContent);
-        const props = result?.["Properties"];
+        const result = await parseXml(appContent);
+        const props = isXmlObject(result) ? result["Properties"] : undefined;
 
-        if (props) {
-          if (props["Application"]) {
-            metadata.application = Array.isArray(props["Application"])
-              ? props["Application"][0]
-              : props["Application"];
+        if (isXmlObject(props)) {
+          const application = readStringProp(props, "Application");
+          if (application !== undefined) {
+            metadata.application = application;
           }
         }
       }

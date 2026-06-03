@@ -180,9 +180,9 @@ const handleSubmit = async () => {
       emailSent.value = true;
       toast.success(t("forgotPassword.toast.sent"));
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Password reset error:", err);
-    error.value = err.message || t("forgotPassword.toast.sendFailed");
+    error.value = err instanceof Error ? err.message : t("forgotPassword.toast.sendFailed");
     toast.error(t("forgotPassword.toast.sendFailedTitle"));
   } finally {
     loading.value = false;
@@ -203,9 +203,9 @@ const resendEmail = async () => {
       // Start cooldown timer
       startResendCooldown();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Resend error:", err);
-    error.value = err.message || t("forgotPassword.toast.resendFailed");
+    error.value = err instanceof Error ? err.message : t("forgotPassword.toast.resendFailed");
     toast.error(t("forgotPassword.toast.resendFailedTitle"));
   } finally {
     resendLoading.value = false;

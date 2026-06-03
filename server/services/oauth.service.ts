@@ -14,6 +14,16 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("oauth");
 
+/**
+ * Coerce a resolved config/credential value (typed `unknown`) to a string,
+ * or null if it is absent or not a string. OAuth client credentials are
+ * always stored as strings, but the config resolver and authState typings
+ * surface them as `unknown`.
+ */
+function asCredentialString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export class OAuthService {
   /**
    * Get OAuth redirect URI
@@ -163,13 +173,11 @@ export class OAuthService {
 
     // Check resolved metadata for values (includes env fallback)
     const clientId =
-      resolved.metadata[clientIdFieldName]?.value ||
-      instance.authState?.credentials?.[clientIdFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
     const clientSecret =
-      resolved.metadata[clientSecretFieldName]?.value ||
-      instance.authState?.credentials?.[clientSecretFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
     logger.debug(
       { clientIdSet: !!clientId, clientSecretSet: !!clientSecret },
@@ -361,13 +369,11 @@ export class OAuthService {
       );
 
       const clientId =
-        resolved.metadata[clientIdFieldName]?.value ||
-        instance.authState?.credentials?.[clientIdFieldName] ||
-        null;
+        asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+        asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
       const clientSecret =
-        resolved.metadata[clientSecretFieldName]?.value ||
-        instance.authState?.credentials?.[clientSecretFieldName] ||
-        null;
+        asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+        asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
       if (!clientId) {
         throw new Error("OAuth client ID not configured");
@@ -719,13 +725,11 @@ export class OAuthService {
     );
 
     const clientId =
-      resolved.metadata[clientIdFieldName]?.value ||
-      instance.authState?.credentials?.[clientIdFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
     const clientSecret =
-      resolved.metadata[clientSecretFieldName]?.value ||
-      instance.authState?.credentials?.[clientSecretFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
     if (!clientId) {
       throw new Error("OAuth client ID not configured");

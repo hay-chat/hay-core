@@ -1,11 +1,19 @@
 import { Request, Response, NextFunction } from "express";
+import type {
+  JWK,
+  JWTPayload as JoseJWTPayload,
+  JWTVerifyResult,
+  JWTVerifyOptions,
+  CryptoKey,
+  KeyObject,
+} from "jose";
 import { dpopCacheService } from "../../services/dpop-cache.service";
 import { conversationRepository } from "../../repositories/conversation.repository";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("dpop");
 
-export interface DPoPPayload {
+export interface DPoPPayload extends JoseJWTPayload {
   iat?: number;
   htm: string;
   htu: string;
@@ -13,10 +21,26 @@ export interface DPoPPayload {
   nonce: string;
 }
 
+/**
+ * The subset of the `jose` module API used here. `jose` is imported dynamically
+ * (via the Function constructor) to avoid static-analysis bundling, so we type
+ * the resolved module structurally instead of importing its runtime values.
+ */
+interface JoseModule {
+  decodeJwt<T = JoseJWTPayload>(token: string): T;
+  decodeProtectedHeader(token: string): { typ?: string; alg?: string; jwk?: JWK };
+  importJWK(jwk: JWK, alg?: string): Promise<CryptoKey | Uint8Array>;
+  jwtVerify<T = JoseJWTPayload>(
+    token: string,
+    key: CryptoKey | KeyObject | JWK | Uint8Array,
+    options?: JWTVerifyOptions,
+  ): Promise<JWTVerifyResult<T>>;
+}
+
 export interface DPoPVerifiedRequest extends Request {
   dpop?: {
     conversationId: string;
-    publicJwk: any;
+    publicJwk: JWK;
   };
 }
 
@@ -39,14 +63,15 @@ export async function verifyDPoPProof(
   conversationId: string,
   method: string,
   url: string,
-): Promise<{ publicJwk: any; newNonce: string }> {
+): Promise<{ publicJwk: JWK; newNonce: string }> {
   try {
     // Dynamically import jose using Function constructor to avoid static analysis
-    const importDynamic = new Function("specifier", "return import(specifier)");
+    const importDynamic = new Function("specifier", "return import(specifier)") as (
+      specifier: string,
+    ) => Promise<JoseModule>;
     const jose = await importDynamic("jose");
 
-    // Parse the JWT to get header and payload
-    const payload = jose.decodeJwt(token) as DPoPPayload;
+    // Parse the header to inspect type, algorithm and the embedded JWK
     const protectedHeader = jose.decodeProtectedHeader(token);
 
     // Verify header requirements
@@ -61,6 +86,7 @@ export async function verifyDPoPProof(
     if (!protectedHeader.jwk) {
       throw new DPoPError("invalid_token", "Missing JWK in header");
     }
+    const headerJwk: JWK = protectedHeader.jwk;
 
     // Get the conversation to verify the public key
     const conversation = await conversationRepository.findById(conversationId);
@@ -83,19 +109,19 @@ export async function verifyDPoPProof(
     }
 
     // Verify the JWK matches the registered one
-    const registeredJwk = conversation.publicJwk as any;
-    if (JSON.stringify(protectedHeader.jwk) !== JSON.stringify(registeredJwk)) {
+    const registeredJwk = conversation.publicJwk;
+    if (JSON.stringify(headerJwk) !== JSON.stringify(registeredJwk)) {
       throw new DPoPError("invalid_token", "Public key does not match registered key", 403);
     }
 
     // Import the public key for verification
-    const publicKey = await jose.importJWK(protectedHeader.jwk, "ES256");
+    const publicKey = await jose.importJWK(headerJwk, "ES256");
 
     // Verify the JWT signature
-    const { payload: verifiedPayload } = (await jose.jwtVerify(token, publicKey, {
+    const { payload: verifiedPayload } = await jose.jwtVerify<DPoPPayload>(token, publicKey, {
       typ: "dpop+jwt",
       algorithms: ["ES256"],
-    })) as { payload: DPoPPayload };
+    });
 
     // Verify the claims
     if (!verifiedPayload.htm || verifiedPayload.htm !== method.toUpperCase()) {
@@ -147,7 +173,7 @@ export async function verifyDPoPProof(
     });
 
     return {
-      publicJwk: protectedHeader.jwk,
+      publicJwk: headerJwk,
       newNonce,
     };
   } catch (error) {

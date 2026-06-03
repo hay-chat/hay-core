@@ -1,8 +1,6 @@
 #!/usr/bin/env ts-node
 
 import { PromptService } from "../services/prompt.service";
-import { PromptParser } from "../utils/prompt-parser";
-import { VariableEngine } from "../utils/variable-engine";
 import { SupportedLanguage } from "../types/language.types";
 
 // Test colors for console output

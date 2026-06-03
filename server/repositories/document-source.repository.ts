@@ -1,3 +1,4 @@
+import type { QueryDeepPartialEntity } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { DocumentSource, DocumentSourceSyncStatus } from "../entities/document-source.entity";
 
@@ -72,7 +73,10 @@ export class DocumentSourceRepository extends BaseRepository<DocumentSource> {
     organizationId: string,
     patch: Partial<DocumentSource>,
   ): Promise<DocumentSource> {
-    await this.getRepository().update({ id, organizationId }, patch as any);
+    await this.getRepository().update(
+      { id, organizationId },
+      patch as QueryDeepPartialEntity<DocumentSource>,
+    );
     const updated = await this.findById(id, organizationId);
     if (!updated) {
       throw new Error(
@@ -161,7 +165,7 @@ export class DocumentSourceRepository extends BaseRepository<DocumentSource> {
       patch.lastFullSweepAt = new Date();
     }
 
-    await this.getRepository().update({ id }, patch as any);
+    await this.getRepository().update({ id }, patch as QueryDeepPartialEntity<DocumentSource>);
   }
 }
 

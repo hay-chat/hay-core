@@ -18,14 +18,14 @@ module.exports = {
 
     // TypeScript rules
     "@typescript-eslint/no-unused-vars": [
-      "warn",
+      "error",
       {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_",
         caughtErrorsIgnorePattern: "^_",
       },
     ],
-    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/no-var-requires": "off",
@@ -37,7 +37,8 @@ module.exports = {
     "no-console": process.env.NODE_ENV === "production" ? "warn" : "off",
     "no-debugger": process.env.NODE_ENV === "production" ? "error" : "off",
     "prefer-const": "warn",
-    "no-constant-condition": "warn",
+    // Intentional infinite loops (paginated fetch, polling with internal break) are allowed.
+    "no-constant-condition": ["warn", { checkLoops: false }],
     "no-empty": ["warn", { allowEmptyCatch: true }],
   },
   overrides: [
@@ -54,10 +55,10 @@ module.exports = {
       extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended", "prettier"],
       plugins: ["vue"],
       rules: {
-        // Match base config: any is allowed but discouraged (consistent with server files)
-        "@typescript-eslint/no-explicit-any": "warn",
+        // Match base config: any and unused vars are errors (consistent with server files)
+        "@typescript-eslint/no-explicit-any": "error",
         "@typescript-eslint/no-unused-vars": [
-          "warn",
+          "error",
           {
             argsIgnorePattern: "^_",
             varsIgnorePattern: "^_",
@@ -206,6 +207,7 @@ module.exports = {
         // Project composables (auto-imported by Nuxt from dashboard/composables)
         useOrgDateTime: "readonly",
         useToast: "readonly",
+        useDomain: "readonly",
         // Node.js types
         NodeJS: "readonly",
       },

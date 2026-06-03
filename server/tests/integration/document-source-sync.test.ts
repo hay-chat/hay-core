@@ -84,7 +84,7 @@ function buildFakeImporter(
   const listRoots = jest.fn(async () => [{ id: "root", label: "Root" }]);
 
   const discover = jest.fn(
-    async (input: { instanceId: string; rootId: string; cursor?: string }) => {
+    async (_input: { instanceId: string; rootId: string; cursor?: string }) => {
       // Single-page discovery for simplicity. Tests that need budget-exhaust
       // behavior install their own discover override on the returned mock.
       const all: DocumentImporterExternalPage[] = Array.from(pages.values()).map((p) => ({

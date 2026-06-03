@@ -17,10 +17,10 @@ import type { PluginMetadata, AuthState } from "../types/plugin-sdk.types";
  * @returns Separated config and authState
  */
 export function separateConfigAndAuth(
-  input: Record<string, any>,
+  input: Record<string, unknown>,
   metadata: PluginMetadata | null | undefined,
 ): {
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   authState: AuthState | null;
 } {
   // If no metadata, treat everything as config (fallback for legacy plugins)
@@ -64,8 +64,8 @@ export function separateConfigAndAuth(
   }
 
   // Separate into auth and config
-  const config: Record<string, any> = {};
-  const credentials: Record<string, any> = {};
+  const config: Record<string, unknown> = {};
+  const credentials: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(input)) {
     if (authFieldNames.has(key)) {
@@ -95,7 +95,7 @@ export function separateConfigAndAuth(
  * @returns True if auth fields are present in input
  */
 export function hasAuthChanges(
-  input: Record<string, any>,
+  input: Record<string, unknown>,
   metadata: PluginMetadata | null | undefined,
 ): boolean {
   if (!metadata || !metadata.authMethods) {
@@ -143,7 +143,7 @@ export function hasAuthChanges(
  * @returns Auth state or null
  */
 export function extractAuthState(
-  input: Record<string, any>,
+  input: Record<string, unknown>,
   metadata: PluginMetadata | null | undefined,
 ): AuthState | null {
   const { authState } = separateConfigAndAuth(input, metadata);

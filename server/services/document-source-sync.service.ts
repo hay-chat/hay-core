@@ -27,6 +27,7 @@ import type {
   DocumentImporterExternalPage,
   DocumentImporterPageChange,
 } from "@server/types/plugin-sdk.types";
+import type { AnyRouter } from "@trpc/server";
 
 const logger = createLogger("document-source-sync");
 
@@ -512,7 +513,10 @@ export class DocumentSourceSyncService {
    * the router's createCaller with a minimal admin context scoped to the
    * source's organization.
    */
-  private createImporter(pluginRouter: any, source: DocumentSource): DocumentImporterContract {
+  private createImporter(
+    pluginRouter: AnyRouter,
+    source: DocumentSource,
+  ): DocumentImporterContract {
     // createCaller is attached to v11 router instances. We pass a partial
     // Context with only the org context populated — plugin importer
     // procedures are expected to authorize off `organizationId`.
@@ -530,7 +534,7 @@ export class DocumentSourceSyncService {
           `cannot invoke document_importer contract`,
       );
     }
-    return caller as DocumentImporterContract;
+    return caller as unknown as DocumentImporterContract;
   }
 }
 

@@ -133,6 +133,67 @@ export interface UserExportData {
 }
 
 /**
+ * Structural shape consumed by the export packaging pipeline
+ * (createSignedZipExport / generateExportReadme).
+ *
+ * Both user and customer exports produce richer objects than the strict
+ * UserExportData / CustomerExportData shapes (with extra channel/status/role
+ * fields). This interface captures only the fields the packaging code reads,
+ * so the collectors' inferred return types remain assignable to it.
+ */
+export interface ExportPackageAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
+export interface ExportPackageMessage {
+  id: string;
+  attachments?: ExportPackageAttachment[];
+}
+
+export interface ExportPackageConversation {
+  id: string;
+  messages?: ExportPackageMessage[];
+}
+
+export interface ExportPackageUpload {
+  id: string;
+  path: string;
+  originalName: string;
+  folder: string;
+}
+
+export interface ExportPackageStatistics {
+  totalConversations?: number;
+  totalMessages?: number;
+  totalAttachments?: number;
+  totalEmbeddings?: number;
+  totalDocuments?: number;
+  totalUploads?: number;
+  totalAuditLogs?: number;
+}
+
+export interface ExportPackageData {
+  exportDate: string;
+  exportVersion: string;
+  dataSubject: {
+    email?: string;
+    userId?: string;
+    customerId?: string;
+    organizationId?: string;
+  };
+  personalData: {
+    conversations?: ExportPackageConversation[];
+    uploads?: ExportPackageUpload[];
+    statistics: ExportPackageStatistics;
+    [key: string]: unknown;
+  };
+}
+
+/**
  * Result statistics for attachment file deletion operations
  * Used during GDPR customer erasure
  */

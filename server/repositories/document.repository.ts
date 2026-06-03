@@ -105,7 +105,7 @@ export class DocumentRepository extends BaseRepository<Document> {
    */
   async findBySourceUrl(sourceUrl: string, organizationId: string): Promise<Document | null> {
     return await this.getRepository().findOne({
-      where: { sourceUrl, organizationId } as any,
+      where: { sourceUrl, organizationId },
     });
   }
 
@@ -115,7 +115,7 @@ export class DocumentRepository extends BaseRepository<Document> {
    */
   async findByExternalId(documentSourceId: string, externalId: string): Promise<Document | null> {
     return await this.getRepository().findOne({
-      where: { documentSourceId, externalId } as any,
+      where: { documentSourceId, externalId },
     });
   }
 
@@ -127,7 +127,7 @@ export class DocumentRepository extends BaseRepository<Document> {
     options?: { limit?: number; offset?: number },
   ): Promise<Document[]> {
     return await this.getRepository().find({
-      where: { documentSourceId } as any,
+      where: { documentSourceId },
       take: options?.limit,
       skip: options?.offset,
     });
@@ -135,7 +135,7 @@ export class DocumentRepository extends BaseRepository<Document> {
 
   async countByDocumentSourceId(documentSourceId: string): Promise<number> {
     return await this.getRepository().count({
-      where: { documentSourceId } as any,
+      where: { documentSourceId },
     });
   }
 

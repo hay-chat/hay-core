@@ -35,12 +35,12 @@ export class EmailAPIImpl implements EmailAPI {
   private organizationId: string;
   private defaultRecipients: string[];
 
-  constructor(pluginId: string, organizationId: string, config: Record<string, any>) {
+  constructor(pluginId: string, organizationId: string, config: Record<string, unknown>) {
     this.pluginId = pluginId;
     this.organizationId = organizationId;
 
     // Parse recipients from plugin config
-    const recipientsStr = config.recipients || "";
+    const recipientsStr = typeof config.recipients === "string" ? config.recipients : "";
     this.defaultRecipients = recipientsStr
       .split(",")
       .map((email: string) => email.trim())

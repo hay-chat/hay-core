@@ -170,7 +170,7 @@ export class DPoPClient {
   /**
    * Make an authenticated request with DPoP proof
    */
-  async request<T = any>(
+  async request<T = unknown>(
     path: string,
     options: RequestInit = {},
   ): Promise<{ data: T; nonce: string }> {

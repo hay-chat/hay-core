@@ -47,7 +47,7 @@ export const embeddingsRouter = t.router({
 
       if (input.chunks && input.chunks.length > 0) {
         // Use provided chunks
-        chunks = input.chunks as any;
+        chunks = input.chunks;
       } else {
         // Create a single chunk from content
         chunks = [

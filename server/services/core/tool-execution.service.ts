@@ -1,5 +1,4 @@
 import { Conversation } from "@server/database/entities/conversation.entity";
-import { Message } from "@server/database/entities/message.entity";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import type { ConversationContext } from "@server/orchestrator/types";
 import { MessageService } from "./message.service";
@@ -20,6 +19,14 @@ interface ToolExecutionResult {
 interface ToolCallData {
   tool_name: string;
   arguments: Record<string, unknown>;
+}
+
+/**
+ * Error enriched with MCP-specific failure details, attached by `executeMCPTool`
+ * when an MCP tool call returns an error response.
+ */
+interface MCPError extends Error {
+  mcpErrorDetails?: unknown;
 }
 
 interface ToolSchema {
@@ -129,7 +136,7 @@ export class ToolExecutionService {
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as any,
+            orchestration_status: currentContext as unknown as Record<string, unknown>,
           });
 
           return { success: true, result };
@@ -141,7 +148,7 @@ export class ToolExecutionService {
           toolLogEntry.latencyMs = Date.now() - startTime;
 
           // Extract MCP error details if available
-          const mcpErrorDetails = (err as any).mcpErrorDetails;
+          const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
           const errorOutput = mcpErrorDetails || {
             error: err.message || "Unknown error",
             errorType: err.constructor.name,
@@ -181,7 +188,7 @@ export class ToolExecutionService {
 
           currentContext.toolLog.push(toolLogEntry);
           await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as any,
+            orchestration_status: currentContext as unknown as Record<string, unknown>,
           });
 
           return { success: false, error: err.message || "Unknown error" };
@@ -530,9 +537,9 @@ export class ToolExecutionService {
         const errorMessage =
           typeof errorDetails === "object" ? JSON.stringify(errorDetails) : String(errorDetails);
 
-        const error = new Error(`MCP tool error: ${errorMessage}`);
+        const error: MCPError = new Error(`MCP tool error: ${errorMessage}`);
         // Attach the full error object to the error for better handling
-        (error as any).mcpErrorDetails = errorDetails;
+        error.mcpErrorDetails = errorDetails;
         throw error;
       }
 

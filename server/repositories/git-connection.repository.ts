@@ -1,3 +1,4 @@
+import type { QueryDeepPartialEntity } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { GitConnection } from "@server/entities/git-connection.entity";
 import type { GitProvider as GitProviderType } from "@server/entities/git-connection.entity";
@@ -44,7 +45,7 @@ export class GitConnectionRepository extends BaseRepository<GitConnection> {
       status,
       lastSyncError: error || null,
       updatedAt: new Date(),
-    } as any);
+    } as QueryDeepPartialEntity<GitConnection>);
   }
 
   async updateSyncStatus(id: string, error?: string): Promise<void> {
@@ -52,7 +53,7 @@ export class GitConnectionRepository extends BaseRepository<GitConnection> {
       lastSyncAt: new Date(),
       lastSyncError: error || null,
       updatedAt: new Date(),
-    } as any);
+    } as QueryDeepPartialEntity<GitConnection>);
   }
 
   async deleteConnection(id: string): Promise<void> {
