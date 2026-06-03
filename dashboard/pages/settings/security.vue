@@ -108,15 +108,23 @@
                   {{ $t("security.minimumLengthDescription") }}
                 </p>
               </div>
-              <select
-                v-model="settings.authentication.passwordPolicy.minLength"
-                class="px-3 py-2 text-sm border border-input rounded-md"
-              >
-                <option value="8">{{ $t("security.characters", { count: 8 }) }}</option>
-                <option value="10">{{ $t("security.characters", { count: 10 }) }}</option>
-                <option value="12">{{ $t("security.characters", { count: 12 }) }}</option>
-                <option value="16">{{ $t("security.characters", { count: 16 }) }}</option>
-              </select>
+              <Select v-model="settings.authentication.passwordPolicy.minLength">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.minimumLength')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="8">{{ $t("security.characters", { count: 8 }) }}</SelectItem>
+                  <SelectItem :value="10">{{
+                    $t("security.characters", { count: 10 })
+                  }}</SelectItem>
+                  <SelectItem :value="12">{{
+                    $t("security.characters", { count: 12 })
+                  }}</SelectItem>
+                  <SelectItem :value="16">{{
+                    $t("security.characters", { count: 16 })
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div class="flex items-center justify-between">
@@ -156,16 +164,26 @@
                   {{ $t("security.passwordExpirationDescription") }}
                 </p>
               </div>
-              <select
-                v-model="settings.authentication.passwordPolicy.expirationDays"
-                class="px-3 py-2 text-sm border border-input rounded-md"
-              >
-                <option value="0">{{ $t("security.expirationNever") }}</option>
-                <option value="30">{{ $t("security.expirationDays", { days: 30 }) }}</option>
-                <option value="60">{{ $t("security.expirationDays", { days: 60 }) }}</option>
-                <option value="90">{{ $t("security.expirationDays", { days: 90 }) }}</option>
-                <option value="180">{{ $t("security.expirationDays", { days: 180 }) }}</option>
-              </select>
+              <Select v-model="settings.authentication.passwordPolicy.expirationDays">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.passwordExpiration')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="0">{{ $t("security.expirationNever") }}</SelectItem>
+                  <SelectItem :value="30">{{
+                    $t("security.expirationDays", { days: 30 })
+                  }}</SelectItem>
+                  <SelectItem :value="60">{{
+                    $t("security.expirationDays", { days: 60 })
+                  }}</SelectItem>
+                  <SelectItem :value="90">{{
+                    $t("security.expirationDays", { days: 90 })
+                  }}</SelectItem>
+                  <SelectItem :value="180">{{
+                    $t("security.expirationDays", { days: 180 })
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -181,17 +199,19 @@
                   {{ $t("security.sessionTimeoutDescription") }}
                 </p>
               </div>
-              <select
-                v-model="settings.authentication.sessionTimeout"
-                class="px-3 py-2 text-sm border border-input rounded-md"
-              >
-                <option value="15">{{ $t("security.timeout15min") }}</option>
-                <option value="30">{{ $t("security.timeout30min") }}</option>
-                <option value="60">{{ $t("security.timeout1h") }}</option>
-                <option value="240">{{ $t("security.timeout4h") }}</option>
-                <option value="480">{{ $t("security.timeout8h") }}</option>
-                <option value="1440">{{ $t("security.timeout24h") }}</option>
-              </select>
+              <Select v-model="settings.authentication.sessionTimeout">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.sessionTimeout')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="15">{{ $t("security.timeout15min") }}</SelectItem>
+                  <SelectItem :value="30">{{ $t("security.timeout30min") }}</SelectItem>
+                  <SelectItem :value="60">{{ $t("security.timeout1h") }}</SelectItem>
+                  <SelectItem :value="240">{{ $t("security.timeout4h") }}</SelectItem>
+                  <SelectItem :value="480">{{ $t("security.timeout8h") }}</SelectItem>
+                  <SelectItem :value="1440">{{ $t("security.timeout24h") }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div class="flex items-center justify-between">
@@ -201,16 +221,18 @@
                   {{ $t("security.concurrentSessionsDescription") }}
                 </p>
               </div>
-              <select
-                v-model="settings.authentication.maxConcurrentSessions"
-                class="px-3 py-2 text-sm border border-input rounded-md"
-              >
-                <option value="1">{{ $t("security.session1") }}</option>
-                <option value="3">{{ $t("security.sessions", { count: 3 }) }}</option>
-                <option value="5">{{ $t("security.sessions", { count: 5 }) }}</option>
-                <option value="10">{{ $t("security.sessions", { count: 10 }) }}</option>
-                <option value="-1">{{ $t("security.sessionsUnlimited") }}</option>
-              </select>
+              <Select v-model="settings.authentication.maxConcurrentSessions">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.concurrentSessions')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="1">{{ $t("security.session1") }}</SelectItem>
+                  <SelectItem :value="3">{{ $t("security.sessions", { count: 3 }) }}</SelectItem>
+                  <SelectItem :value="5">{{ $t("security.sessions", { count: 5 }) }}</SelectItem>
+                  <SelectItem :value="10">{{ $t("security.sessions", { count: 10 }) }}</SelectItem>
+                  <SelectItem :value="-1">{{ $t("security.sessionsUnlimited") }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div class="flex items-center justify-between">
@@ -220,15 +242,17 @@
                   {{ $t("security.rememberMeDurationDescription") }}
                 </p>
               </div>
-              <select
-                v-model="settings.authentication.rememberMeDuration"
-                class="px-3 py-2 text-sm border border-input rounded-md"
-              >
-                <option value="7">{{ $t("security.days", { count: 7 }) }}</option>
-                <option value="14">{{ $t("security.days", { count: 14 }) }}</option>
-                <option value="30">{{ $t("security.days", { count: 30 }) }}</option>
-                <option value="90">{{ $t("security.days", { count: 90 }) }}</option>
-              </select>
+              <Select v-model="settings.authentication.rememberMeDuration">
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.rememberMeDuration')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="7">{{ $t("security.days", { count: 7 }) }}</SelectItem>
+                  <SelectItem :value="14">{{ $t("security.days", { count: 14 }) }}</SelectItem>
+                  <SelectItem :value="30">{{ $t("security.days", { count: 30 }) }}</SelectItem>
+                  <SelectItem :value="90">{{ $t("security.days", { count: 90 }) }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -252,16 +276,20 @@
                   {{ $t("security.gracePeriodDescription") }}
                 </p>
               </div>
-              <select
+              <Select
                 v-model="settings.authentication.twoFAGracePeriod"
-                class="px-3 py-2 text-sm border border-input rounded-md"
                 :disabled="!settings.authentication.require2FA"
               >
-                <option value="0">{{ $t("security.immediate") }}</option>
-                <option value="3">{{ $t("security.days", { count: 3 }) }}</option>
-                <option value="7">{{ $t("security.days", { count: 7 }) }}</option>
-                <option value="14">{{ $t("security.days", { count: 14 }) }}</option>
-              </select>
+                <SelectTrigger class="w-40">
+                  <SelectValue :placeholder="$t('security.gracePeriod')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="0">{{ $t("security.immediate") }}</SelectItem>
+                  <SelectItem :value="3">{{ $t("security.days", { count: 3 }) }}</SelectItem>
+                  <SelectItem :value="7">{{ $t("security.days", { count: 7 }) }}</SelectItem>
+                  <SelectItem :value="14">{{ $t("security.days", { count: 14 }) }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div class="flex items-center justify-between">

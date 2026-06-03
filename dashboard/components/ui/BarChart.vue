@@ -27,8 +27,10 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+export type BarChartData = Array<{ label: string; value: number; color?: string }>;
+
 interface Props {
-  data: Array<{ label: string; value: number; color?: string }>;
+  data: BarChartData;
   height?: number;
   colors?: string[];
   title?: string;

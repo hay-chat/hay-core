@@ -592,46 +592,53 @@
         <div class="space-y-6">
           <div>
             <Label for="web-doc-type">{{ $t("documents.import.metadata.documentType") }}</Label>
-            <select
-              id="web-doc-type"
-              v-model="webMetadata.type"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="article">{{ $t("documents.filters.article") }}</option>
-              <option value="guide">{{ $t("documents.filters.guide") }}</option>
-              <option value="faq">{{ $t("documents.filters.faq") }}</option>
-              <option value="tutorial">{{ $t("documents.filters.tutorial") }}</option>
-              <option value="reference">{{ $t("documents.filters.reference") }}</option>
-              <option value="policy">{{ $t("documents.filters.policy") }}</option>
-            </select>
+            <Select v-model="webMetadata.type">
+              <SelectTrigger id="web-doc-type" class="w-full mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="article">{{ $t("documents.filters.article") }}</SelectItem>
+                <SelectItem value="guide">{{ $t("documents.filters.guide") }}</SelectItem>
+                <SelectItem value="faq">{{ $t("documents.filters.faq") }}</SelectItem>
+                <SelectItem value="tutorial">{{ $t("documents.filters.tutorial") }}</SelectItem>
+                <SelectItem value="reference">{{ $t("documents.filters.reference") }}</SelectItem>
+                <SelectItem value="policy">{{ $t("documents.filters.policy") }}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <Label for="web-doc-status">{{ $t("documents.import.metadata.status") }}</Label>
-            <select
-              id="web-doc-status"
-              v-model="webMetadata.status"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="published">{{ $t("documents.filters.published") }}</option>
-              <option value="draft">{{ $t("documents.filters.draft") }}</option>
-              <option value="under_review">
-                {{ $t("documents.import.metadata.underReview") }}
-              </option>
-            </select>
+            <Select v-model="webMetadata.status">
+              <SelectTrigger id="web-doc-status" class="w-full mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="published">{{ $t("documents.filters.published") }}</SelectItem>
+                <SelectItem value="draft">{{ $t("documents.filters.draft") }}</SelectItem>
+                <SelectItem value="under_review">
+                  {{ $t("documents.import.metadata.underReview") }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <Label for="web-doc-visibility">{{ $t("documents.import.metadata.visibility") }}</Label>
-            <select
-              id="web-doc-visibility"
-              v-model="webMetadata.visibility"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="private">{{ $t("documents.import.metadata.private") }}</option>
-              <option value="internal">{{ $t("documents.import.metadata.internal") }}</option>
-              <option value="public">{{ $t("documents.import.metadata.public") }}</option>
-            </select>
+            <Select v-model="webMetadata.visibility">
+              <SelectTrigger id="web-doc-visibility" class="w-full mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">{{
+                  $t("documents.import.metadata.private")
+                }}</SelectItem>
+                <SelectItem value="internal">{{
+                  $t("documents.import.metadata.internal")
+                }}</SelectItem>
+                <SelectItem value="public">{{ $t("documents.import.metadata.public") }}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <!-- Preview of selected pages -->
@@ -706,30 +713,34 @@
                 <Label :for="`category-${index}`">{{
                   $t("documents.import.details.category")
                 }}</Label>
-                <select
-                  :id="`category-${index}`"
-                  v-model="file.category"
-                  class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">{{ $t("documents.import.details.selectCategory") }}</option>
-                  <option value="product">
-                    {{ $t("documents.import.details.categories.product") }}
-                  </option>
-                  <option value="api">{{ $t("documents.import.details.categories.api") }}</option>
-                  <option value="faq">{{ $t("documents.import.details.categories.faq") }}</option>
-                  <option value="legal">
-                    {{ $t("documents.import.details.categories.legal") }}
-                  </option>
-                  <option value="training">
-                    {{ $t("documents.import.details.categories.training") }}
-                  </option>
-                  <option value="technical">
-                    {{ $t("documents.import.details.categories.technical") }}
-                  </option>
-                  <option value="other">
-                    {{ $t("documents.import.details.categories.other") }}
-                  </option>
-                </select>
+                <Select v-model="file.category">
+                  <SelectTrigger :id="`category-${index}`" class="w-full">
+                    <SelectValue :placeholder="$t('documents.import.details.selectCategory')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">
+                      {{ $t("documents.import.details.categories.product") }}
+                    </SelectItem>
+                    <SelectItem value="api">{{
+                      $t("documents.import.details.categories.api")
+                    }}</SelectItem>
+                    <SelectItem value="faq">{{
+                      $t("documents.import.details.categories.faq")
+                    }}</SelectItem>
+                    <SelectItem value="legal">
+                      {{ $t("documents.import.details.categories.legal") }}
+                    </SelectItem>
+                    <SelectItem value="training">
+                      {{ $t("documents.import.details.categories.training") }}
+                    </SelectItem>
+                    <SelectItem value="technical">
+                      {{ $t("documents.import.details.categories.technical") }}
+                    </SelectItem>
+                    <SelectItem value="other">
+                      {{ $t("documents.import.details.categories.other") }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

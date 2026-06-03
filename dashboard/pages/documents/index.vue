@@ -32,13 +32,11 @@
     <div class="flex flex-col sm:flex-row gap-4">
       <div class="flex-1">
         <div class="relative">
-          <Search
-            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-muted"
-          />
           <Input
             v-model="searchQuery"
             :placeholder="$t('documents.search.placeholder')"
             class="pl-10"
+            :icon-start="Search"
             @keyup.enter="searchDocuments"
           />
         </div>
@@ -47,31 +45,33 @@
         {{ searching ? $t("documents.actions.searching") : $t("documents.actions.search") }}
       </Button>
       <div class="flex gap-2">
-        <select
-          v-model="typeFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">{{ $t("documents.filters.allTypes") }}</option>
-          <option value="article">{{ $t("documents.filters.article") }}</option>
-          <option value="guide">{{ $t("documents.filters.guide") }}</option>
-          <option value="faq">{{ $t("documents.filters.faq") }}</option>
-          <option value="tutorial">{{ $t("documents.filters.tutorial") }}</option>
-          <option value="reference">{{ $t("documents.filters.reference") }}</option>
-          <option value="policy">{{ $t("documents.filters.policy") }}</option>
-        </select>
-        <select
-          v-model="statusFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">{{ $t("documents.filters.allStatus") }}</option>
-          <option value="published">{{ $t("documents.filters.published") }}</option>
-          <option value="processing">{{ $t("documents.filters.processing") }}</option>
-          <option value="draft">{{ $t("documents.filters.draft") }}</option>
-          <option value="archived">{{ $t("documents.filters.archived") }}</option>
-          <option value="error">{{ $t("documents.filters.error") }}</option>
-        </select>
+        <Select v-model="typeFilter" @update:model-value="applyFilters">
+          <SelectTrigger class="w-[180px]">
+            <SelectValue :placeholder="$t('documents.filters.allTypes')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{{ $t("documents.filters.allTypes") }}</SelectItem>
+            <SelectItem value="article">{{ $t("documents.filters.article") }}</SelectItem>
+            <SelectItem value="guide">{{ $t("documents.filters.guide") }}</SelectItem>
+            <SelectItem value="faq">{{ $t("documents.filters.faq") }}</SelectItem>
+            <SelectItem value="tutorial">{{ $t("documents.filters.tutorial") }}</SelectItem>
+            <SelectItem value="reference">{{ $t("documents.filters.reference") }}</SelectItem>
+            <SelectItem value="policy">{{ $t("documents.filters.policy") }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select v-model="statusFilter" @update:model-value="applyFilters">
+          <SelectTrigger class="w-[180px]">
+            <SelectValue :placeholder="$t('documents.filters.allStatus')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{{ $t("documents.filters.allStatus") }}</SelectItem>
+            <SelectItem value="published">{{ $t("documents.filters.published") }}</SelectItem>
+            <SelectItem value="processing">{{ $t("documents.filters.processing") }}</SelectItem>
+            <SelectItem value="draft">{{ $t("documents.filters.draft") }}</SelectItem>
+            <SelectItem value="archived">{{ $t("documents.filters.archived") }}</SelectItem>
+            <SelectItem value="error">{{ $t("documents.filters.error") }}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
 
@@ -152,6 +152,7 @@
             </TableHead>
             <TableHead class="w-auto">{{ $t("documents.table.name") }}</TableHead>
             <TableHead class="w-24">{{ $t("documents.table.type") }}</TableHead>
+            <TableHead class="w-40">{{ $t("documents.table.source") }}</TableHead>
             <TableHead class="w-32">{{ $t("documents.table.status") }}</TableHead>
             <TableHead class="w-44">{{ $t("documents.table.lastModified") }}</TableHead>
             <TableHead class="w-12 text-right" />
@@ -188,6 +189,26 @@
                 class="inline-flex items-center px-2 py-1 rounded-md bg-background-tertiary text-xs whitespace-nowrap"
               >
                 {{ document.type ? $t(`documents.filters.${document.type}`) : "DOC" }}
+              </span>
+            </TableCell>
+            <TableCell class="max-w-0">
+              <a
+                v-if="document.importMethod === 'web' && document.sourceUrl"
+                :href="document.sourceUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1.5 min-w-0 text-xs text-primary hover:underline"
+                :title="document.sourceUrl"
+              >
+                <Globe class="h-3.5 w-3.5 min-w-3.5 flex-shrink-0" />
+                <span class="truncate">{{ getHostname(document.sourceUrl) }}</span>
+              </a>
+              <span
+                v-else
+                class="inline-flex items-center gap-1.5 text-xs text-neutral-muted whitespace-nowrap"
+              >
+                <component :is="getSourceIcon(document.importMethod)" class="h-3.5 w-3.5" />
+                {{ getSourceLabel(document.importMethod) }}
               </span>
             </TableCell>
             <TableCell>
@@ -297,23 +318,23 @@
     <EmptyState
       v-else-if="!loading && documents.length === 0"
       :title="
-        searchQuery || typeFilter || statusFilter
+        searchQuery || typeFilter !== 'all' || statusFilter !== 'all'
           ? $t('documents.empty.noDocumentsFound')
           : $t('documents.empty.noDocumentsYet')
       "
       :description="
-        searchQuery || typeFilter || statusFilter
+        searchQuery || typeFilter !== 'all' || statusFilter !== 'all'
           ? $t('documents.empty.adjustFilters')
           : $t('documents.empty.getStarted')
       "
       illustration="/bale/document.svg"
       :action="
-        searchQuery || typeFilter || statusFilter
+        searchQuery || typeFilter !== 'all' || statusFilter !== 'all'
           ? $t('documents.actions.clearFilters')
           : $t('documents.actions.importDocument')
       "
       @click="
-        searchQuery || typeFilter || statusFilter
+        searchQuery || typeFilter !== 'all' || statusFilter !== 'all'
           ? clearFilters()
           : $router.push('/documents/import')
       "
@@ -439,6 +460,7 @@ import {
   ExternalLink,
   FilePlus,
   Plug,
+  Globe,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -450,8 +472,8 @@ const loading = ref(false);
 const searching = ref(false);
 const searchQuery = ref("");
 const retryingAll = ref(false);
-const typeFilter = ref("");
-const statusFilter = ref("");
+const typeFilter = ref("all");
+const statusFilter = ref("all");
 const selectedDocuments = ref<string[]>([]);
 interface Document {
   id: string;
@@ -512,12 +534,31 @@ const errorDocuments = computed(() => {
 });
 
 // Methods
-const _getHostname = (url: string) => {
+const getHostname = (url: string) => {
   try {
-    return new URL(url).hostname;
+    return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return url;
   }
+};
+
+const getSourceIcon = (importMethod?: Document["importMethod"]) => {
+  switch (importMethod) {
+    case "web":
+      return Globe;
+    case "plugin":
+      return Plug;
+    case "editor":
+      return Edit;
+    case "upload":
+      return Upload;
+    default:
+      return File;
+  }
+};
+
+const getSourceLabel = (importMethod?: Document["importMethod"]) => {
+  return t(`documents.source.${importMethod ?? "unknown"}`);
 };
 
 const getFileIcon = (type: string) => {
@@ -547,8 +588,8 @@ const refreshData = async () => {
   loading.value = true;
   try {
     const filters: Record<string, string> = {};
-    if (typeFilter.value) filters.type = typeFilter.value;
-    if (statusFilter.value) filters.status = statusFilter.value;
+    if (typeFilter.value !== "all") filters.type = typeFilter.value;
+    if (statusFilter.value !== "all") filters.status = statusFilter.value;
 
     const result = await HayApi.documents.list.query({
       pagination: { page: currentPage.value, limit: pageSize.value },
@@ -662,8 +703,8 @@ const applyFilters = () => {
 
 const clearFilters = () => {
   searchQuery.value = "";
-  typeFilter.value = "";
-  statusFilter.value = "";
+  typeFilter.value = "all";
+  statusFilter.value = "all";
   selectedDocuments.value = [];
   currentPage.value = 1;
   refreshData();

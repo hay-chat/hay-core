@@ -347,6 +347,7 @@ export const organizationsRouter = t.router({
         email: userOrg.user.email,
         firstName: userOrg.user.firstName,
         lastName: userOrg.user.lastName,
+        avatarUrl: userOrg.user.avatarUrl,
         role: userOrg.role,
         permissions: userOrg.permissions,
         isActive: userOrg.isActive,

@@ -192,18 +192,16 @@
         <p v-if="field.description" class="text-sm mt-0 text-neutral-muted">
           {{ field.description }}
         </p>
-        <select
-          :id="key"
-          :value="formData[key]"
-          @input="updateFormData(key, ($event.target as HTMLSelectElement).value)"
-          class="w-full px-3 py-2 text-sm border border-input rounded-md"
-          :required="field.required"
-        >
-          <option value="">Select {{ (field.label || key).toLowerCase() }}</option>
-          <option v-for="option in field.options" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
+        <Select :model-value="formData[key]" @update:model-value="updateFormData(key, $event)">
+          <SelectTrigger :id="key" class="w-full">
+            <SelectValue :placeholder="`Select ${(field.label || key).toLowerCase()}`" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="option in field.options" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </template>
 
       <!-- Boolean -->

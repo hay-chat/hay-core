@@ -53,30 +53,32 @@
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <Label for="report-type">Report Type</Label>
-                <select
-                  id="report-type"
-                  v-model="reportConfig.type"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="summary">Summary Report</option>
-                  <option value="detailed">Detailed Analysis</option>
-                  <option value="performance">Performance Report</option>
-                  <option value="trends">Trends Analysis</option>
-                </select>
+                <Select v-model="reportConfig.type">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="Select report type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="summary">Summary Report</SelectItem>
+                    <SelectItem value="detailed">Detailed Analysis</SelectItem>
+                    <SelectItem value="performance">Performance Report</SelectItem>
+                    <SelectItem value="trends">Trends Analysis</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label for="report-format">Output Format</Label>
-                <select
-                  id="report-format"
-                  v-model="reportConfig.format"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="pdf">PDF Document</option>
-                  <option value="csv">CSV Export</option>
-                  <option value="excel">Excel Spreadsheet</option>
-                  <option value="dashboard">Interactive Dashboard</option>
-                </select>
+                <Select v-model="reportConfig.format">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="Select output format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF Document</SelectItem>
+                    <SelectItem value="csv">CSV Export</SelectItem>
+                    <SelectItem value="excel">Excel Spreadsheet</SelectItem>
+                    <SelectItem value="dashboard">Interactive Dashboard</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -144,61 +146,65 @@
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <Label for="date-range">Date Range</Label>
-                <select
-                  id="date-range"
-                  v-model="reportConfig.dateRange"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
-                  <option value="custom">Custom Range</option>
-                </select>
+                <Select v-model="reportConfig.dateRange">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="Select date range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">Last 7 days</SelectItem>
+                    <SelectItem value="30d">Last 30 days</SelectItem>
+                    <SelectItem value="90d">Last 90 days</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label for="agent-filter">Agent Filter</Label>
-                <select
-                  id="agent-filter"
-                  v-model="reportConfig.agentFilter"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="">All Agents</option>
-                  <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-                    {{ agent.name }}
-                  </option>
-                </select>
+                <Select v-model="reportConfig.agentFilter">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    <SelectItem v-for="agent in agents" :key="agent.id" :value="agent.id">
+                      {{ agent.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <Label for="channel-filter">Channel Filter</Label>
-                <select
-                  id="channel-filter"
-                  v-model="reportConfig.channelFilter"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="">All Channels</option>
-                  <option value="web">Web Chat</option>
-                  <option value="email">Email</option>
-                  <option value="slack">Slack</option>
-                  <option value="whatsapp">WhatsApp</option>
-                </select>
+                <Select v-model="reportConfig.channelFilter">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="All Channels" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Channels</SelectItem>
+                    <SelectItem value="web">Web Chat</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="slack">Slack</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label for="status-filter">Status Filter</Label>
-                <select
-                  id="status-filter"
-                  v-model="reportConfig.statusFilter"
-                  class="w-full px-3 py-2 text-sm border border-input rounded-md mt-1"
-                >
-                  <option value="">All Status</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="escalated">Escalated</option>
-                  <option value="closed">Closed</option>
-                </select>
+                <Select v-model="reportConfig.statusFilter">
+                  <SelectTrigger class="w-full mt-1">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="escalated">Escalated</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -389,9 +395,9 @@ const reportConfig = ref({
   metrics: [] as string[],
   groupBy: [] as string[],
   dateRange: "30d",
-  agentFilter: "",
-  channelFilter: "",
-  statusFilter: "",
+  agentFilter: "all",
+  channelFilter: "all",
+  statusFilter: "all",
   visualizations: [] as string[],
 });
 
@@ -612,9 +618,9 @@ const createNewReport = () => {
     metrics: [],
     groupBy: [],
     dateRange: "30d",
-    agentFilter: "",
-    channelFilter: "",
-    statusFilter: "",
+    agentFilter: "all",
+    channelFilter: "all",
+    statusFilter: "all",
     visualizations: [],
   };
 };

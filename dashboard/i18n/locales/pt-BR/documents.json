@@ -54,8 +54,16 @@
     "table": {
       "name": "Nome",
       "type": "Tipo",
+      "source": "Origem",
       "status": "Status",
       "lastModified": "Última Modificação"
+    },
+    "source": {
+      "upload": "Upload",
+      "web": "Web",
+      "plugin": "Plugin",
+      "editor": "Editor",
+      "unknown": "—"
     },
     "empty": {
       "noDocumentsFound": "Nenhum documento encontrado",
