@@ -1,7 +1,7 @@
 <template>
   <Page :title="$t('llmSettings.title')" :description="$t('llmSettings.description')">
     <template #header>
-      <Button v-if="unlocked" :loading="isSaving" :disabled="!hasChanges" @click="save">
+      <Button :loading="isSaving" :disabled="!unlocked || !hasChanges" @click="save">
         <Save class="h-4 w-4 mr-2" />
         {{ $t("llmSettings.save") }}
       </Button>
@@ -28,7 +28,14 @@
       </CardContent>
     </Card>
 
-    <template v-if="unlocked">
+    <!-- Config — visible but locked (dimmed + non-interactive) until acknowledged -->
+    <div
+      :class="[
+        'space-y-6 transition-opacity',
+        { 'pointer-events-none select-none opacity-50': !unlocked },
+      ]"
+      :aria-disabled="!unlocked"
+    >
       <!-- Chat provider -->
       <Card>
         <CardHeader>
@@ -120,7 +127,7 @@
           />
         </CardContent>
       </Card>
-    </template>
+    </div>
   </Page>
 </template>
 
