@@ -208,6 +208,7 @@ module.exports = {
         useOrgDateTime: "readonly",
         useToast: "readonly",
         useDomain: "readonly",
+        usePagination: "readonly",
         // Node.js types
         NodeJS: "readonly",
       },

@@ -213,15 +213,16 @@
         "description": "Provide the URL of the documentation website you want to import.",
         "label": "Documentation URL",
         "placeholder": "https://docs.example.com",
-        "hint": "We'll crawl this website and import all documentation pages automatically.",
+        "hint": "We'll connect this website as a synced source and keep its pages up to date.",
         "howItWorks": "How it works",
         "howItWorksList": {
           "sitemap": "We'll check for a sitemap.xml file first",
           "crawl": "If no sitemap is found, we'll crawl all internal links",
           "sameDomain": "Only pages from the same domain will be imported",
-          "markdown": "Content will be converted to clean markdown format"
+          "markdown": "Content is converted to markdown and re-synced automatically"
         },
-        "discoverPages": "Discover Pages"
+        "discoverPages": "Discover Pages",
+        "connectWebsite": "Connect website"
       },
       "discovery": {
         "titleDiscovering": "Discovering Pages",
@@ -342,7 +343,9 @@
         "cancelSuccess": "Import cancelled",
         "cancelSuccessMessage": "The import job has been cancelled successfully.",
         "cancelFailed": "Failed to cancel import",
-        "cancelFailedMessage": "Please try again."
+        "cancelFailedMessage": "Please try again.",
+        "webConnectFailed": "Failed to connect website",
+        "webConnectFailedMessage": "Please check the URL and try again."
       }
     }
   }

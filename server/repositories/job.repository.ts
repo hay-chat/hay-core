@@ -1,5 +1,5 @@
 import { Repository } from "typeorm";
-import { Job } from "@server/entities/job.entity";
+import { Job, JobStatus } from "@server/entities/job.entity";
 import { AppDataSource } from "@server/database/data-source";
 
 export class JobRepository {
@@ -28,6 +28,23 @@ export class JobRepository {
     return await this.getRepository().findOne({
       where: { id },
     });
+  }
+
+  /**
+   * Find an in-flight (not-yet-terminal) sync job for a given document source.
+   * Used to keep enqueueSync idempotent so the 60s dispatcher does not pile up
+   * a fresh job every tick while an earlier one is still queued or running.
+   */
+  async findActiveSyncJob(documentSourceId: string): Promise<Job | null> {
+    return await this.getRepository()
+      .createQueryBuilder("job")
+      .where("job.data->>'type' = :type", { type: "document_source_sync" })
+      .andWhere("job.data->>'documentSourceId' = :id", { id: documentSourceId })
+      .andWhere("job.status IN (:...statuses)", {
+        statuses: [JobStatus.PENDING, JobStatus.QUEUED, JobStatus.PROCESSING],
+      })
+      .orderBy("job.created_at", "DESC")
+      .getOne();
   }
 
   async findByOrganization(organizationId: string): Promise<Job[]> {

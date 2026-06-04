@@ -277,13 +277,6 @@
                     {{ $t("documents.actions.edit") }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    v-if="document.sourceUrl && document.importMethod === 'web'"
-                    @click="recrawlDocument(document)"
-                  >
-                    <RefreshCw class="mr-2 h-4 w-4" />
-                    {{ $t("documents.actions.updateFromSource") }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
                     v-if="document.status === 'error'"
                     @click="retryDocument(document)"
                   >
@@ -492,8 +485,7 @@ interface Document {
 }
 
 const documents = ref<Document[]>([]);
-const currentPage = ref(1);
-const pageSize = ref(10);
+const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 const totalDocuments = ref(0);
 
 // Computed total pages
@@ -656,13 +648,12 @@ const searchDocuments = async () => {
 
 // Pagination handlers
 const handlePageChange = async (page: number) => {
-  currentPage.value = page;
+  setPage(page);
   await refreshData();
 };
 
 const handleItemsPerPageChange = async (itemsPerPage: number) => {
-  pageSize.value = itemsPerPage;
-  currentPage.value = 1; // Reset to first page when changing page size
+  setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
   await refreshData();
 };
 
@@ -696,7 +687,7 @@ const _mapDocumentStatus = (documentStatus: string, processingStatus?: string): 
 };
 
 const applyFilters = () => {
-  currentPage.value = 1;
+  setPage(1);
   selectedDocuments.value = [];
   refreshData();
 };
@@ -706,7 +697,7 @@ const clearFilters = () => {
   typeFilter.value = "all";
   statusFilter.value = "all";
   selectedDocuments.value = [];
-  currentPage.value = 1;
+  setPage(1);
   refreshData();
 };
 
@@ -762,22 +753,6 @@ const downloadDocument = async (document: Document) => {
 
 const editDocument = (document: Document) => {
   router.push(`/documents/${document.id}`);
-};
-
-const recrawlDocument = async (document: Document) => {
-  try {
-    const _response = await HayApi.documents.recrawl.mutate({
-      documentId: document.id,
-    });
-
-    toast.success(t("documents.toast.updateStarted", { name: document.title || document.name }));
-
-    // Optionally redirect to job queue
-    // router.push('/queue');
-  } catch (error) {
-    console.error("Recrawl error:", error);
-    toast.error(t("documents.toast.updateFailed"));
-  }
 };
 
 const archiveDocument = async (document: Document) => {
@@ -990,7 +965,7 @@ const retryDocument = async (document: Document) => {
 
 const viewFailedDocuments = () => {
   statusFilter.value = "error";
-  currentPage.value = 1;
+  setPage(1);
   refreshData();
 };
 

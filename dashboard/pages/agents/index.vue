@@ -366,8 +366,7 @@ const toast = useToast();
 const { t } = useI18n();
 const organizationStore = useOrganizationStore();
 const { formatDateTime } = useOrgDateTime();
-const currentPage = ref(1);
-const pageSize = ref(10);
+const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 
 // Agents data from API
 const agents = ref<AgentData[]>([]);
@@ -661,12 +660,11 @@ const performBulkDelete = async () => {
 
 // Pagination handlers
 const handlePageChange = (page: number) => {
-  currentPage.value = page;
+  setPage(page);
 };
 
 const handleItemsPerPageChange = (itemsPerPage: number) => {
-  pageSize.value = itemsPerPage;
-  currentPage.value = 1; // Reset to first page when changing page size
+  setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
 };
 
 // Lifecycle

@@ -30,6 +30,8 @@ const ALLOWED_TAGS = [
   "u",
   "code",
   "pre",
+  "blockquote",
+  "del",
   "table",
   "thead",
   "tbody",
@@ -56,8 +58,8 @@ const ALLOWED_ATTRS: Record<string, string[]> = {
   h5: ["class", "id"],
   h6: ["class", "id"],
   table: ["class", "id"],
-  td: ["class", "id", "colspan", "rowspan"],
-  th: ["class", "id", "colspan", "rowspan"],
+  td: ["class", "id", "colspan", "rowspan", "align"],
+  th: ["class", "id", "colspan", "rowspan", "align"],
 };
 
 /**

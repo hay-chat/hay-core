@@ -126,6 +126,50 @@
         </CardContent>
       </Card>
 
+      <!-- Live sync progress -->
+      <Card v-if="isSyncing" class="border-primary/40">
+        <CardHeader class="pb-3">
+          <CardTitle class="flex items-center gap-2 text-base">
+            <Loader2 class="h-4 w-4 animate-spin text-primary" />
+            {{ progressPhaseLabel }}
+          </CardTitle>
+          <CardDescription>{{ progressSummary }}</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3">
+          <!-- Determinate bar when we know the total, otherwise an indeterminate sweep -->
+          <div class="h-2 rounded bg-background-tertiary overflow-hidden">
+            <div
+              v-if="progressPercent !== null"
+              class="h-full bg-primary transition-all duration-500"
+              :style="{ width: `${progressPercent}%` }"
+            />
+            <div v-else class="h-full w-1/3 bg-primary/60 animate-pulse" />
+          </div>
+
+          <p
+            v-if="activeProgress && (activeProgress.currentTitle || activeProgress.currentUrl)"
+            class="text-xs text-neutral-muted truncate"
+            :title="activeProgress.currentUrl || ''"
+          >
+            Now importing: {{ activeProgress.currentTitle || activeProgress.currentUrl }}
+          </p>
+
+          <div v-if="activeProgress" class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span class="text-neutral-muted">Discovered {{ activeProgress.discovered }}</span>
+            <span class="text-green-600 dark:text-green-400"
+              >+{{ activeProgress.created }} new</span
+            >
+            <span class="text-neutral-muted">{{ activeProgress.updated }} updated</span>
+            <span v-if="activeProgress.skipped > 0" class="text-neutral-muted">
+              {{ activeProgress.skipped }} unchanged
+            </span>
+            <span v-if="activeProgress.failed > 0" class="text-red-600 dark:text-red-400">
+              {{ activeProgress.failed }} failed
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
       <!-- Settings card -->
       <Card>
         <CardHeader>
@@ -221,7 +265,11 @@
                     ]"
                   >
                     <Loader2
-                      v-if="job.status === 'running' || job.status === 'in_progress'"
+                      v-if="
+                        ['running', 'in_progress', 'processing', 'queued', 'pending'].includes(
+                          job.status,
+                        )
+                      "
                       class="h-3 w-3 mr-1.5 animate-spin"
                     />
                     <div
@@ -405,10 +453,72 @@ const syncIntervalChoice = ref<string>("manual");
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-const needsPolling = computed(() => {
-  if (!source.value) return false;
-  return source.value.lastSyncStatus === "running" || source.value.lastSyncStatus === "partial";
+// Live, per-run progress the sync engine streams onto the job's data.progress.
+interface SyncProgressView {
+  phase: "discovering" | "importing" | "reconciling";
+  total?: number;
+  discovered: number;
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  currentTitle?: string;
+  currentUrl?: string;
+  updatedAt?: string;
+}
+
+// Job statuses that mean "a sync is happening right now" (queue lifecycle +
+// the source's own status). Used to decide when to poll and show progress.
+const ACTIVE_JOB_STATUSES = [
+  "pending",
+  "queued",
+  "processing",
+  "retrying",
+  "running",
+  "in_progress",
+];
+
+const activeJob = computed(
+  () => history.value.find((j) => ACTIVE_JOB_STATUSES.includes(j.status)) ?? null,
+);
+
+const activeProgress = computed<SyncProgressView | null>(() => {
+  const data = activeJob.value?.data as { progress?: SyncProgressView } | null;
+  return data?.progress ?? null;
 });
+
+const isSyncing = computed(() => {
+  if (activeJob.value) return true;
+  const status = source.value?.lastSyncStatus;
+  return status === "running" || status === "partial";
+});
+
+const progressPercent = computed<number | null>(() => {
+  const p = activeProgress.value;
+  if (!p || !p.total || p.total <= 0) return null;
+  return Math.min(100, Math.round((p.processed / p.total) * 100));
+});
+
+const progressPhaseLabel = computed(() => {
+  switch (activeProgress.value?.phase) {
+    case "discovering":
+      return "Discovering pages…";
+    case "reconciling":
+      return "Finishing up…";
+    default:
+      return "Importing pages…";
+  }
+});
+
+const progressSummary = computed(() => {
+  const p = activeProgress.value;
+  if (!p) return "Starting…";
+  if (p.total && p.total > 0) return `${p.processed} of ${p.total} pages`;
+  return `${p.processed} imported · ${p.discovered} discovered`;
+});
+
+const needsPolling = computed(() => isSyncing.value);
 
 const documentCount = computed(() => {
   // Authoritative count from the server (set by documentSources.get).
@@ -611,6 +721,9 @@ const jobStatusPillClass = (status: string) => {
       return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
     case "running":
     case "in_progress":
+    case "processing":
+    case "queued":
+    case "pending":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "partial":
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
@@ -671,7 +784,7 @@ const startPolling = () => {
     } else {
       stopPolling();
     }
-  }, 5000);
+  }, 2000);
 };
 
 const stopPolling = () => {

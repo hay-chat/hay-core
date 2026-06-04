@@ -30,6 +30,14 @@ export interface ScrapedPage {
   content: string;
   html: string;
   crawledAt: Date;
+  /** Value of the HTTP `Last-Modified` response header, if the server sent one. */
+  lastModified?: string;
+}
+
+/** A URL discovered via sitemap, carrying its `<lastmod>` when present. */
+export interface SitemapEntry {
+  url: string;
+  lastmod?: string;
 }
 
 const HAY_USER_AGENT = "Mozilla/5.0 (compatible; HayDocumentImporter/1.0)";
@@ -64,7 +72,8 @@ export class WebScraperService extends EventEmitter {
     try {
       // Step 1: Try to find sitemap
       this.emitProgress("discovering", 0, 0);
-      const sitemapUrls = await this.discoverSitemap();
+      const sitemapEntries = await this.discoverSitemap();
+      const sitemapUrls = sitemapEntries.map((e) => e.url);
 
       if (sitemapUrls.length > 0) {
         this.urlQueue = sitemapUrls;
@@ -147,7 +156,8 @@ export class WebScraperService extends EventEmitter {
     try {
       // Step 1: Try to find sitemap
       this.emitProgress("discovering", 0, 0);
-      const sitemapUrls = await this.discoverSitemap();
+      const sitemapEntries = await this.discoverSitemap();
+      const sitemapUrls = sitemapEntries.map((e) => e.url);
 
       if (sitemapUrls.length > 0) {
         this.urlQueue = sitemapUrls;
@@ -186,8 +196,7 @@ export class WebScraperService extends EventEmitter {
     this.emit("progress", progress);
   }
 
-  private async discoverSitemap(): Promise<string[]> {
-    const sitemapUrls: string[] = [];
+  private async discoverSitemap(): Promise<SitemapEntry[]> {
     const possibleSitemapPaths = [
       "/sitemap.xml",
       "/sitemap_index.xml",
@@ -219,9 +228,9 @@ export class WebScraperService extends EventEmitter {
         }
 
         if (response.status === 200) {
-          const urls = await this.parseSitemap(response.data, sitemapUrl);
-          if (urls.length > 0) {
-            return urls;
+          const entries = await this.parseSitemap(response.data, sitemapUrl);
+          if (entries.length > 0) {
+            return entries;
           }
         }
       } catch (error) {
@@ -230,11 +239,11 @@ export class WebScraperService extends EventEmitter {
       }
     }
 
-    return sitemapUrls;
+    return [];
   }
 
-  private async parseSitemap(content: string, sitemapUrl: string): Promise<string[]> {
-    const urls: string[] = [];
+  private async parseSitemap(content: string, sitemapUrl: string): Promise<SitemapEntry[]> {
+    const entries: SitemapEntry[] = [];
     const $ = cheerio.load(content, { xmlMode: true });
 
     // Check if this is a sitemap index file (contains <sitemap> elements)
@@ -270,55 +279,59 @@ export class WebScraperService extends EventEmitter {
 
             if (response.status === 200) {
               // Recursively parse the sub-sitemap
-              const subUrls = await this.parseSitemap(response.data, subSitemapUrl);
-              logger.debug({ count: subUrls.length, subSitemapUrl }, "Found URLs in sub-sitemap");
-              return subUrls;
+              const subEntries = await this.parseSitemap(response.data, subSitemapUrl);
+              logger.debug(
+                { count: subEntries.length, subSitemapUrl },
+                "Found URLs in sub-sitemap",
+              );
+              return subEntries;
             }
           } catch (error) {
             logger.error({ err: error, subSitemapUrl }, "Failed to fetch sub-sitemap");
           }
-          return [];
+          return [] as SitemapEntry[];
         });
 
         const batchResults = await Promise.all(batchPromises);
-        for (const subUrls of batchResults) {
-          urls.push(...subUrls);
+        for (const subEntries of batchResults) {
+          entries.push(...subEntries);
         }
       }
 
       // If this was a sitemap index and we found URLs, return them prioritized
-      if (urls.length > 0) {
-        logger.info({ count: urls.length }, "Total URLs from sitemap index");
-        return this.prioritizeUrls(urls, this.maxPages);
+      if (entries.length > 0) {
+        logger.info({ count: entries.length }, "Total URLs from sitemap index");
+        return this.prioritizeEntries(entries, this.maxPages);
       }
     }
 
-    // Parse regular sitemap (contains <url> elements)
-    const urlElements = $("url > loc");
+    // Parse regular sitemap (contains <url> elements with optional <lastmod>)
+    const urlElements = $("url");
     if (urlElements.length > 0) {
       logger.info({ count: urlElements.length, sitemapUrl }, "Found regular sitemap");
       urlElements.each((_: number, element: Element) => {
-        const url = $(element).text().trim();
+        const url = $(element).children("loc").first().text().trim();
         // Always check if URL is from same domain
         if (url && this.isSameDomain(url)) {
-          urls.push(url);
+          const lastmod = $(element).children("lastmod").first().text().trim() || undefined;
+          entries.push({ url, lastmod });
         }
       });
     }
 
-    // Parse text sitemap (one URL per line)
-    if (urls.length === 0 && !content.includes("<")) {
+    // Parse text sitemap (one URL per line — no lastmod available)
+    if (entries.length === 0 && !content.includes("<")) {
       const lines = content.split("\n");
       for (const line of lines) {
         const url = line.trim();
         if (url && url.startsWith("http") && this.isSameDomain(url)) {
-          urls.push(url);
+          entries.push({ url });
         }
       }
     }
 
-    logger.debug({ count: urls.length, sitemapUrl }, "Returning URLs from sitemap");
-    return this.prioritizeUrls(urls, this.maxPages);
+    logger.debug({ count: entries.length, sitemapUrl }, "Returning URLs from sitemap");
+    return this.prioritizeEntries(entries, this.maxPages);
   }
 
   private async crawlUrls(): Promise<void> {
@@ -402,17 +415,38 @@ export class WebScraperService extends EventEmitter {
       $("script, style").remove();
       const textContent = $.text().replace(/\s+/g, " ").trim();
 
+      const lastModifiedHeader = response.headers["last-modified"];
+
       return {
         url,
         title: title.trim(),
         content: textContent,
         html: fullHtml, // Return full HTML — Readability handles content extraction
         crawledAt: new Date(),
+        lastModified: typeof lastModifiedHeader === "string" ? lastModifiedHeader : undefined,
       };
     } catch (error) {
       logger.error({ err: error, url }, "Error scraping URL");
       return null;
     }
+  }
+
+  /**
+   * Public, stateless primitives used by the website document-source importer.
+   * Unlike discoverUrls/scrapeWebsite these do not crawl the whole site or
+   * emit progress events — they fetch exactly what is asked for.
+   */
+
+  /** Fetch and return the sitemap entries (with `<lastmod>`) for a site, or [] if none. */
+  async getSitemapEntries(siteUrl: string): Promise<SitemapEntry[]> {
+    await validateUrlForSSRF(siteUrl);
+    this.baseUrl = new URL(siteUrl);
+    return this.discoverSitemap();
+  }
+
+  /** Fetch a single page's HTML + title + Last-Modified header. Returns null on failure. */
+  async fetchPageContent(url: string): Promise<ScrapedPage | null> {
+    return this.scrapePage(url);
   }
 
   /**
@@ -516,6 +550,24 @@ export class WebScraperService extends EventEmitter {
     );
 
     return result;
+  }
+
+  /**
+   * Like prioritizeUrls but preserves each entry's lastmod. Deterministic sort
+   * (by scoreUrl) so callers paginating by offset get a stable ordering across
+   * runs — important for the document-source importer's resumable cursor.
+   */
+  private prioritizeEntries(entries: SitemapEntry[], limit: number): SitemapEntry[] {
+    const sorted = [...entries].sort((a, b) => this.scoreUrl(a.url) - this.scoreUrl(b.url));
+    if (entries.length <= limit) {
+      return sorted;
+    }
+    const dropped = entries.length - limit;
+    logger.info(
+      { total: entries.length, kept: limit, dropped },
+      "Prioritized sitemap entries: dropped lowest-priority pages to stay within limit",
+    );
+    return sorted.slice(0, limit);
   }
 
   private extractUrls(html: string, baseUrl: string): string[] {

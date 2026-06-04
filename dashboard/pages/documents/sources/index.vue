@@ -106,7 +106,10 @@
               <FileText class="h-3.5 w-3.5" />
               <span>{{ documentCount(source) }} documents</span>
             </div>
-            <div v-if="source.pluginId" class="flex items-center gap-1 truncate">
+            <div
+              v-if="source.pluginId && !source.pluginId.startsWith('core:')"
+              class="flex items-center gap-1 truncate"
+            >
               <Puzzle class="h-3.5 w-3.5" />
               <span class="truncate" :title="source.pluginId">{{ source.pluginId }}</span>
             </div>
@@ -171,6 +174,7 @@ import {
   Cloud,
   BookOpen,
   FolderTree,
+  Globe,
 } from "lucide-vue-next";
 
 interface DocumentSource {
@@ -283,6 +287,7 @@ const statusDotClass = (status: string) => {
 
 const getSourceIcon = (sourceType: string) => {
   const t = sourceType?.toLowerCase() ?? "";
+  if (t.includes("website") || t.includes("web")) return Globe;
   if (t.includes("confluence") || t.includes("wiki") || t.includes("notion")) return BookOpen;
   if (t.includes("drive") || t.includes("gdrive") || t.includes("doc")) return FolderTree;
   if (t.includes("cloud") || t.includes("s3") || t.includes("blob")) return Cloud;

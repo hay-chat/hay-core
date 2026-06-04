@@ -213,15 +213,16 @@
         "description": "Forneça a URL do website de documentação que deseja importar.",
         "label": "URL da Documentação",
         "placeholder": "https://docs.exemplo.com",
-        "hint": "Vamos rastrear este website e importar todas as páginas de documentação automaticamente.",
+        "hint": "Vamos conectar este website como uma fonte sincronizada e manter suas páginas atualizadas.",
         "howItWorks": "Como funciona",
         "howItWorksList": {
           "sitemap": "Verificaremos primeiro um arquivo sitemap.xml",
           "crawl": "Se não houver sitemap, rastrearemos todos os links internos",
           "sameDomain": "Apenas páginas do mesmo domínio serão importadas",
-          "markdown": "O conteúdo será convertido para formato markdown limpo"
+          "markdown": "O conteúdo é convertido para markdown e ressincronizado automaticamente"
         },
-        "discoverPages": "Descobrir Páginas"
+        "discoverPages": "Descobrir Páginas",
+        "connectWebsite": "Conectar website"
       },
       "discovery": {
         "titleDiscovering": "Descobrindo Páginas",
@@ -324,7 +325,9 @@
         "cancelSuccess": "Importação cancelada",
         "cancelSuccessMessage": "O trabalho de importação foi cancelado com sucesso.",
         "cancelFailed": "Falha ao cancelar importação",
-        "cancelFailedMessage": "Por favor, tente novamente."
+        "cancelFailedMessage": "Por favor, tente novamente.",
+        "webConnectFailed": "Falha ao conectar website",
+        "webConnectFailedMessage": "Verifique a URL e tente novamente."
       }
     }
   }

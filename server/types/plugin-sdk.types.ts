@@ -243,6 +243,12 @@ export interface DocumentImporterContract {
   discover(input: { instanceId: string; rootId: string; cursor?: string }): Promise<{
     pages: DocumentImporterExternalPage[];
     nextCursor?: string;
+    /**
+     * Optional hint: total number of pages the importer expects to enumerate
+     * for this root. Lets the sync engine report "X of Y" progress. Importers
+     * that can't know this up front (e.g. cursor-only APIs) may omit it.
+     */
+    total?: number;
   }>;
   fetchPage(input: {
     instanceId: string;

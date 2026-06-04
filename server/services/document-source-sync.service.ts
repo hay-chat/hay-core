@@ -19,6 +19,7 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { DocumentSource } from "@server/entities/document-source.entity";
 import { DocumentationStatus, ImportMethod, type Document } from "@server/entities/document.entity";
 import { pluginRouterRegistry } from "./plugin-router-registry.service";
+import { WebsiteImporter, isWebsiteSource } from "./importers/website-importer";
 import { vectorStoreService } from "./vector-store.service";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
 import { createLogger } from "@server/lib/logger";
@@ -35,6 +36,34 @@ const logger = createLogger("document-source-sync");
 const BUDGET_MS = 50_000;
 /** Force a full sweep if the last one is older than this. */
 const FULL_SWEEP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Don't persist live progress more often than this (keeps DB writes bounded). */
+const PROGRESS_THROTTLE_MS = 750;
+
+/**
+ * Live, per-run progress persisted onto the job's `data.progress` so the
+ * dashboard can show what a sync is doing right now (pages discovered, pages
+ * imported, the page being processed) instead of just a spinner.
+ */
+export type SyncProgress = {
+  phase: "discovering" | "importing" | "reconciling";
+  /** Total pages the importer expects, when known. */
+  total?: number;
+  /** Distinct pages seen so far this run. */
+  discovered: number;
+  /** Pages handled so far (created + updated + skipped + failed). */
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  /** The page currently being processed (for a live "now importing…" line). */
+  currentTitle?: string;
+  currentUrl?: string;
+  updatedAt?: string;
+};
+
+/** Throttled writer that streams SyncProgress onto a job's data field. */
+type ProgressReporter = (progress: SyncProgress, force?: boolean) => Promise<void>;
 
 type SyncStats = {
   created: number;
@@ -98,6 +127,21 @@ export class DocumentSourceSyncService {
     if (!source) {
       throw new Error(`DocumentSource not found: ${documentSourceId}`);
     }
+
+    // Idempotency: if a sync is already in flight for this source, reuse it
+    // instead of queuing a duplicate. Without this, the 60s dispatcher enqueues
+    // a fresh job every tick for a source whose first sync has not yet recorded
+    // a result (e.g. a brand-new source with no lastSyncedAt), and the UI ends
+    // up polling a duplicate that bailed at markRunning and never reports progress.
+    const inFlight = await jobRepository.findActiveSyncJob(documentSourceId);
+    if (inFlight) {
+      logger.debug(
+        { documentSourceId, jobId: inFlight.id },
+        "Sync already in flight; reusing existing job",
+      );
+      return { jobId: inFlight.id };
+    }
+
     const job = await jobRepository.create({
       title: `Sync ${source.displayName}`,
       description: `Sync document source ${source.displayName} (${source.pluginId})`,
@@ -155,24 +199,35 @@ export class DocumentSourceSyncService {
       await vectorStoreService.initialize();
     }
 
+    const report = this.makeProgressReporter(job, source.organizationId);
+
     try {
-      const pluginRouter = pluginRouterRegistry.getRouter(source.pluginId);
-      if (!pluginRouter) {
-        throw new Error(`Plugin not registered: ${source.pluginId}`);
-      }
-      const importer = this.createImporter(pluginRouter, source);
+      const importer = this.resolveImporter(source);
 
       initiallyDoingFullSweep = this.shouldDoFullSweep(source, data.forceFullSweep ?? false);
 
+      // Seed a "discovering" state immediately so the UI shows life while the
+      // importer enumerates (fetching a sitemap / first page can take a moment).
+      await report({ phase: "discovering", discovered: 0, processed: 0, ...emptyStats() }, true);
+
       if (initiallyDoingFullSweep) {
         isFullSweep = true;
-        const result = await this.fullDiscovery(source, importer, startedAt);
+        const result = await this.fullDiscovery(source, importer, startedAt, report);
         stats = mergeStats(stats, result.stats);
         cursor = result.cursor;
 
         if (result.complete) {
           // Only reconcile deletions when the discovery loop ran end-to-end;
           // otherwise the "live set" is partial and would archive valid docs.
+          await report(
+            {
+              phase: "reconciling",
+              discovered: result.liveExternalIds.size,
+              processed: 0,
+              ...stats,
+            },
+            true,
+          );
           const reconcile = await this.reconcileDeletions(
             source,
             result.liveExternalIds,
@@ -184,7 +239,7 @@ export class DocumentSourceSyncService {
           status = "partial";
         }
       } else {
-        const result = await this.incrementalSync(source, importer, startedAt);
+        const result = await this.incrementalSync(source, importer, startedAt, report);
         stats = mergeStats(stats, result.stats);
         cursor = result.cursor;
         status = result.complete ? "success" : "partial";
@@ -231,10 +286,12 @@ export class DocumentSourceSyncService {
     source: DocumentSource,
     importer: DocumentImporterContract,
     startedAt: number,
+    report: ProgressReporter,
   ): Promise<DiscoveryResult> {
     const liveExternalIds = new Set<string>();
     let stats = emptyStats();
     let cursor: string | undefined = source.lastSyncCursor ?? undefined;
+    let total: number | undefined;
     if (!source.externalRootId) {
       throw new Error(`DocumentSource ${source.id} has no externalRootId; cannot discover`);
     }
@@ -249,18 +306,38 @@ export class DocumentSourceSyncService {
         rootId: source.externalRootId,
         cursor,
       });
+      if (typeof page.total === "number") total = page.total;
 
       for (const item of page.pages) {
         if (this.elapsed(startedAt) > BUDGET_MS) {
           return { complete: false, cursor: cursor ?? null, stats, liveExternalIds };
         }
         liveExternalIds.add(item.externalId);
+        await report({
+          phase: "importing",
+          total,
+          discovered: liveExternalIds.size,
+          processed: this.processedCount(stats),
+          ...stats,
+          currentTitle: item.title,
+          currentUrl: item.externalUrl,
+        });
         const outcome = await this.safeUpsert(source, importer, item, stats);
         stats = this.bumpStats(stats, outcome);
       }
 
       cursor = page.nextCursor;
       if (!cursor) {
+        await report(
+          {
+            phase: "importing",
+            total,
+            discovered: liveExternalIds.size,
+            processed: this.processedCount(stats),
+            ...stats,
+          },
+          true,
+        );
         return { complete: true, cursor: null, stats, liveExternalIds };
       }
     }
@@ -274,6 +351,7 @@ export class DocumentSourceSyncService {
     source: DocumentSource,
     importer: DocumentImporterContract,
     startedAt: number,
+    report: ProgressReporter,
   ): Promise<IncrementalResult> {
     if (!source.externalRootId) {
       throw new Error(`DocumentSource ${source.id} has no externalRootId; cannot sync`);
@@ -281,6 +359,7 @@ export class DocumentSourceSyncService {
     const since = (source.lastSyncedAt ?? new Date(0)).toISOString();
     let stats = emptyStats();
     let cursor: string | undefined = source.lastSyncCursor ?? undefined;
+    let discovered = 0;
 
     while (true) {
       if (this.elapsed(startedAt) > BUDGET_MS) {
@@ -298,6 +377,14 @@ export class DocumentSourceSyncService {
         if (this.elapsed(startedAt) > BUDGET_MS) {
           return { complete: false, cursor: cursor ?? null, stats };
         }
+        discovered += 1;
+        await report({
+          phase: "importing",
+          discovered,
+          processed: this.processedCount(stats),
+          ...stats,
+          currentUrl: change.externalId,
+        });
         try {
           if (change.op === "upsert") {
             const outcome = await this.upsertPage(source, importer, this.changeToPage(change));
@@ -489,6 +576,33 @@ export class DocumentSourceSyncService {
     return stats;
   }
 
+  private processedCount(stats: SyncStats): number {
+    return stats.created + stats.updated + stats.skipped + stats.failed;
+  }
+
+  /**
+   * Build a throttled reporter that streams SyncProgress onto the job's
+   * `data.progress`. The dashboard polls the job (via getSyncHistory) and
+   * renders this as a live "discovering / importing page N of M" panel.
+   * Writes are best-effort: a failed progress write never fails the sync.
+   */
+  private makeProgressReporter(job: Job, organizationId: string): ProgressReporter {
+    let lastWrite = 0;
+    const baseData = { ...(job.data ?? {}) };
+    return async (progress, force = false) => {
+      const now = this.now();
+      if (!force && now - lastWrite < PROGRESS_THROTTLE_MS) return;
+      lastWrite = now;
+      try {
+        await jobRepository.update(job.id, organizationId, {
+          data: { ...baseData, progress: { ...progress, updatedAt: new Date().toISOString() } },
+        });
+      } catch (err) {
+        logger.debug({ err, jobId: job.id }, "Failed to persist sync progress");
+      }
+    };
+  }
+
   /**
    * A change-record minus the 'op' field is shaped enough like a discover()
    * page that upsertPage can consume it. fetchPage() is the source of truth
@@ -504,6 +618,22 @@ export class DocumentSourceSyncService {
 
   private elapsed(startedAt: number): number {
     return this.now() - startedAt;
+  }
+
+  /**
+   * Resolve the importer for a source. Built-in sources (websites) use a
+   * native importer; everything else resolves to a document_importer plugin's
+   * tRPC router. This is the single seam that lets non-plugin importers exist.
+   */
+  private resolveImporter(source: DocumentSource): DocumentImporterContract {
+    if (isWebsiteSource(source)) {
+      return new WebsiteImporter(source);
+    }
+    const pluginRouter = pluginRouterRegistry.getRouter(source.pluginId);
+    if (!pluginRouter) {
+      throw new Error(`Plugin not registered: ${source.pluginId}`);
+    }
+    return this.createImporter(pluginRouter, source);
   }
 
   /**
