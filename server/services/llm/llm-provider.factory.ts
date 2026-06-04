@@ -15,6 +15,7 @@
 
 import { config } from "@server/config/env";
 import { OpenAICompatibleProvider } from "./openai-compatible.provider";
+import { PROVIDER_TIER_DEFAULTS } from "./tier-maps";
 import type { ChatProvider, EmbeddingProvider, TierModelMap } from "./provider.types";
 
 export interface ResolvedLlmBundle {
@@ -22,13 +23,6 @@ export interface ResolvedLlmBundle {
   embedding: EmbeddingProvider;
   tiers: TierModelMap;
 }
-
-/** Today's hardcoded models, now overridable by env. gpt-4o stays the `hard` default. */
-const DEFAULT_TIERS: TierModelMap = {
-  hard: process.env.LLM_TIER_HARD || process.env.OPENAI_CHAT_MODEL || "gpt-4o",
-  medium: process.env.LLM_TIER_MEDIUM || "gpt-4o-mini",
-  easy: process.env.LLM_TIER_EASY || "gpt-4.1-nano",
-};
 
 class LLMProviderFactory {
   private defaultBundle: ResolvedLlmBundle | undefined;
@@ -49,7 +43,7 @@ class LLMProviderFactory {
       this.defaultBundle = {
         chat: provider,
         embedding: provider,
-        tiers: DEFAULT_TIERS,
+        tiers: PROVIDER_TIER_DEFAULTS["openai-compatible"],
       };
     }
     return this.defaultBundle;

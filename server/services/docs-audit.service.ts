@@ -279,7 +279,7 @@ Verticals: E_COMMERCE, SAAS, MANUFACTURING, INSURANCE, HEALTH, PROFESSIONAL_SERV
       const responseText = await this.llm.invoke({
         prompt,
         jsonSchema: schema,
-        model: "gpt-4o-mini",
+        tier: "medium",
         temperature: 0.3,
         max_tokens: 1000,
       });
@@ -389,7 +389,7 @@ Score from 0-100 based on how well the documentation covers the product's featur
       const responseText = await this.llm.invoke({
         prompt,
         jsonSchema: schema,
-        model: "gpt-4o-mini",
+        tier: "medium",
         temperature: 0.3,
         max_tokens: 3000,
       });

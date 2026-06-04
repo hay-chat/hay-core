@@ -1,7 +1,7 @@
 /**
  * Document Summary Service
  *
- * Generates 1-2 sentence summaries for documents using gpt-4.1-nano.
+ * Generates 1-2 sentence summaries for documents using the "easy" model tier.
  * Summaries are stored in the document.description field.
  *
  * This is a reusable hay-core feature — triggered on document import
@@ -19,7 +19,6 @@ import { AppDataSource } from "@server/database/data-source";
 
 const logger = createLogger("document-summary");
 
-const SUMMARY_MODEL = "gpt-4.1-nano";
 const MAX_CONCURRENCY = 5;
 
 class DocumentSummaryService {
@@ -69,7 +68,7 @@ ${content}`;
       const responseText = await this.llm.invoke({
         prompt,
         jsonSchema: schema,
-        model: SUMMARY_MODEL,
+        tier: "easy",
         temperature: 0.3,
         max_tokens: 200,
       });
