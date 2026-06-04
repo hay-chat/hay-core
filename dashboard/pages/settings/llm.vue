@@ -122,7 +122,7 @@
         <CardContent>
           <ModelSelect
             v-model="form.embeddingModel"
-            :options="EMBEDDING_MODELS"
+            :options="EMBEDDING_MODEL_CATALOG"
             :label="$t('llmSettings.embedding.model')"
             :helper-text="$t('llmSettings.embedding.modelHelper')"
             :custom-label="$t('llmSettings.modelCustom')"
@@ -138,9 +138,15 @@
 import { Save, AlertTriangle, Unlock, ShieldCheck } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import {
+  CHAT_MODEL_CATALOG,
+  EMBEDDING_MODEL_CATALOG,
+  DEFAULT_TIER_MAP,
+  type ModelFamily,
+} from "@server/services/llm/model-catalog";
 
 // A single, flat provider choice in the UI; mapped to the backend's {provider, vendor}.
-type ProviderChoice = "openai" | "anthropic" | "gemini" | "mistral" | "grok" | "custom";
+type ProviderChoice = ModelFamily | "custom";
 type Provider = "openai-compatible" | "anthropic" | "gemini";
 type Vendor = "openai" | "mistral" | "grok" | "custom";
 
@@ -162,32 +168,17 @@ const hasApiKey = ref(false);
 // radically alter agent behavior.
 const unlocked = ref(false);
 
-// Preset chat models offered per provider (a "Custom…" entry is always appended).
-const CHAT_MODELS: Record<ProviderChoice, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"],
-  anthropic: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
-  mistral: ["mistral-large-latest", "mistral-small-latest", "ministral-3b-latest"],
-  grok: ["grok-4", "grok-4-fast-non-reasoning"],
-  custom: [],
-};
+const EMPTY_TIERS = { hard: "", medium: "", easy: "" };
 
-// Managed embeddings are always OpenAI (1536-dim).
-const EMBEDDING_MODELS = ["text-embedding-3-small", "text-embedding-3-large"];
+/** Tier defaults for a UI choice; "custom" has no presets. */
+function tierDefaultsFor(choice: ProviderChoice): { hard: string; medium: string; easy: string } {
+  return choice === "custom" ? { ...EMPTY_TIERS } : { ...DEFAULT_TIER_MAP[choice] };
+}
 
-// Sensible default tier→model map per provider, applied when the provider changes.
-const DEFAULT_TIERS: Record<ProviderChoice, { hard: string; medium: string; easy: string }> = {
-  openai: { hard: "gpt-4o", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
-  anthropic: { hard: "claude-opus-4-8", medium: "claude-sonnet-4-6", easy: "claude-haiku-4-5" },
-  gemini: { hard: "gemini-2.5-pro", medium: "gemini-2.5-flash", easy: "gemini-2.5-flash-lite" },
-  mistral: {
-    hard: "mistral-large-latest",
-    medium: "mistral-small-latest",
-    easy: "ministral-3b-latest",
-  },
-  grok: { hard: "grok-4", medium: "grok-4", easy: "grok-4-fast-non-reasoning" },
-  custom: { hard: "", medium: "", easy: "" },
-};
+/** Preset chat models for a UI choice ("custom" offers none — free text only). */
+function chatModelsFor(choice: ProviderChoice): string[] {
+  return choice === "custom" ? [] : CHAT_MODEL_CATALOG[choice];
+}
 
 function defaults(): LlmForm {
   return {
@@ -195,7 +186,7 @@ function defaults(): LlmForm {
     baseUrl: "",
     byo: false,
     apiKey: "",
-    tiers: { ...DEFAULT_TIERS.openai },
+    tiers: tierDefaultsFor("openai"),
     embeddingModel: "text-embedding-3-small",
   };
 }
@@ -218,14 +209,14 @@ const providerChoice = computed<ProviderChoice>({
   get: () => form.value.selection,
   set: (v) => {
     form.value.selection = v;
-    form.value.tiers = { ...DEFAULT_TIERS[v] };
+    form.value.tiers = tierDefaultsFor(v);
   },
 });
 
 // Custom and OpenAI-compatible non-OpenAI vendors expose a base URL.
 const showBaseUrl = computed(() => ["mistral", "grok", "custom"].includes(form.value.selection));
 
-const chatModelOptions = computed(() => CHAT_MODELS[form.value.selection]);
+const chatModelOptions = computed(() => chatModelsFor(form.value.selection));
 
 function toProviderVendor(sel: ProviderChoice): { provider: Provider; vendor?: Vendor } {
   switch (sel) {
