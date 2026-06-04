@@ -588,6 +588,8 @@
     "saveSuccess": "Configurações de modelos de IA salvas",
     "saveFailed": "Falha ao salvar as configurações de modelos de IA",
     "loadFailed": "Falha ao carregar as configurações de modelos de IA",
+    "modelCustom": "Personalizado…",
+    "modelCustomPlaceholder": "Insira o id de um modelo",
     "warning": {
       "title": "Avançado — alterações aqui afetam todos os agentes",
       "description": "Estas configurações controlam o provedor e os modelos de IA por trás dos seus agentes. Alterar os padrões pode mudar radicalmente a qualidade das respostas, o custo, a latência e a confiabilidade. Só prossiga se souber o que está fazendo.",
@@ -602,6 +604,7 @@
       "vendor": "Fornecedor",
       "vendorHelper": "Seleciona o formato de requisição e o tratamento de saída estruturada corretos.",
       "vendorCustom": "Personalizado (compatível com OpenAI)",
+      "providerCustom": "Personalizado (compatível com OpenAI)",
       "baseUrl": "URL Base",
       "baseUrlHelper": "A URL base da API compatível com OpenAI do provedor.",
       "byo": "Usar minha própria chave de API",

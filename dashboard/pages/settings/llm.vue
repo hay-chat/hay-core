@@ -44,7 +44,7 @@
         </CardHeader>
         <CardContent class="space-y-6">
           <Input
-            v-model="form.provider"
+            v-model="providerChoice"
             type="select"
             :label="$t('llmSettings.chat.provider')"
             :options="providerOptions"
@@ -52,16 +52,7 @@
           />
 
           <Input
-            v-if="form.provider === 'openai-compatible'"
-            v-model="form.vendor"
-            type="select"
-            :label="$t('llmSettings.chat.vendor')"
-            :options="vendorOptions"
-            :helper-text="$t('llmSettings.chat.vendorHelper')"
-          />
-
-          <Input
-            v-if="form.provider === 'openai-compatible' && form.vendor !== 'openai'"
+            v-if="showBaseUrl"
             v-model="form.baseUrl"
             :label="$t('llmSettings.chat.baseUrl')"
             placeholder="https://api.example.com/v1"
@@ -95,20 +86,29 @@
           <CardDescription>{{ $t("llmSettings.tiers.description") }}</CardDescription>
         </CardHeader>
         <CardContent class="grid gap-4 md:grid-cols-3">
-          <Input
+          <ModelSelect
             v-model="form.tiers.hard"
+            :options="chatModelOptions"
             :label="$t('llmSettings.tiers.hard')"
             :helper-text="$t('llmSettings.tiers.hardHelper')"
+            :custom-label="$t('llmSettings.modelCustom')"
+            :custom-placeholder="$t('llmSettings.modelCustomPlaceholder')"
           />
-          <Input
+          <ModelSelect
             v-model="form.tiers.medium"
+            :options="chatModelOptions"
             :label="$t('llmSettings.tiers.medium')"
             :helper-text="$t('llmSettings.tiers.mediumHelper')"
+            :custom-label="$t('llmSettings.modelCustom')"
+            :custom-placeholder="$t('llmSettings.modelCustomPlaceholder')"
           />
-          <Input
+          <ModelSelect
             v-model="form.tiers.easy"
+            :options="chatModelOptions"
             :label="$t('llmSettings.tiers.easy')"
             :helper-text="$t('llmSettings.tiers.easyHelper')"
+            :custom-label="$t('llmSettings.modelCustom')"
+            :custom-placeholder="$t('llmSettings.modelCustomPlaceholder')"
           />
         </CardContent>
       </Card>
@@ -120,10 +120,13 @@
           <CardDescription>{{ $t("llmSettings.embedding.description") }}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Input
+          <ModelSelect
             v-model="form.embeddingModel"
+            :options="EMBEDDING_MODELS"
             :label="$t('llmSettings.embedding.model')"
             :helper-text="$t('llmSettings.embedding.modelHelper')"
+            :custom-label="$t('llmSettings.modelCustom')"
+            :custom-placeholder="$t('llmSettings.modelCustomPlaceholder')"
           />
         </CardContent>
       </Card>
@@ -136,12 +139,13 @@ import { Save, AlertTriangle, Unlock, ShieldCheck } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
+// A single, flat provider choice in the UI; mapped to the backend's {provider, vendor}.
+type ProviderChoice = "openai" | "anthropic" | "gemini" | "mistral" | "grok" | "custom";
 type Provider = "openai-compatible" | "anthropic" | "gemini";
 type Vendor = "openai" | "mistral" | "grok" | "custom";
 
 interface LlmForm {
-  provider: Provider;
-  vendor: Vendor;
+  selection: ProviderChoice;
   baseUrl: string;
   byo: boolean;
   apiKey: string;
@@ -158,14 +162,40 @@ const hasApiKey = ref(false);
 // radically alter agent behavior.
 const unlocked = ref(false);
 
+// Preset chat models offered per provider (a "Custom…" entry is always appended).
+const CHAT_MODELS: Record<ProviderChoice, string[]> = {
+  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"],
+  anthropic: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+  gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+  mistral: ["mistral-large-latest", "mistral-small-latest", "ministral-3b-latest"],
+  grok: ["grok-4", "grok-4-fast-non-reasoning"],
+  custom: [],
+};
+
+// Managed embeddings are always OpenAI (1536-dim).
+const EMBEDDING_MODELS = ["text-embedding-3-small", "text-embedding-3-large"];
+
+// Sensible default tier→model map per provider, applied when the provider changes.
+const DEFAULT_TIERS: Record<ProviderChoice, { hard: string; medium: string; easy: string }> = {
+  openai: { hard: "gpt-4o", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
+  anthropic: { hard: "claude-opus-4-8", medium: "claude-sonnet-4-6", easy: "claude-haiku-4-5" },
+  gemini: { hard: "gemini-2.5-pro", medium: "gemini-2.5-flash", easy: "gemini-2.5-flash-lite" },
+  mistral: {
+    hard: "mistral-large-latest",
+    medium: "mistral-small-latest",
+    easy: "ministral-3b-latest",
+  },
+  grok: { hard: "grok-4", medium: "grok-4", easy: "grok-4-fast-non-reasoning" },
+  custom: { hard: "", medium: "", easy: "" },
+};
+
 function defaults(): LlmForm {
   return {
-    provider: "openai-compatible",
-    vendor: "openai",
+    selection: "openai",
     baseUrl: "",
     byo: false,
     apiKey: "",
-    tiers: { hard: "gpt-4o", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
+    tiers: { ...DEFAULT_TIERS.openai },
     embeddingModel: "text-embedding-3-small",
   };
 }
@@ -174,17 +204,45 @@ const form = ref<LlmForm>(defaults());
 const original = ref<LlmForm>(defaults());
 
 const providerOptions = computed(() => [
-  { label: "OpenAI-compatible (OpenAI / Mistral / Grok / custom)", value: "openai-compatible" },
+  { label: "OpenAI", value: "openai" },
   { label: "Anthropic (Claude)", value: "anthropic" },
   { label: "Google Gemini", value: "gemini" },
-]);
-
-const vendorOptions = computed(() => [
-  { label: "OpenAI", value: "openai" },
   { label: "Mistral", value: "mistral" },
   { label: "xAI Grok", value: "grok" },
-  { label: t("llmSettings.chat.vendorCustom"), value: "custom" },
+  { label: t("llmSettings.chat.providerCustom"), value: "custom" },
 ]);
+
+// Bound to the select. The setter resets tier models to the new provider's defaults;
+// load() assigns form.selection directly, so loaded tiers are never clobbered.
+const providerChoice = computed<ProviderChoice>({
+  get: () => form.value.selection,
+  set: (v) => {
+    form.value.selection = v;
+    form.value.tiers = { ...DEFAULT_TIERS[v] };
+  },
+});
+
+// Custom and OpenAI-compatible non-OpenAI vendors expose a base URL.
+const showBaseUrl = computed(() => ["mistral", "grok", "custom"].includes(form.value.selection));
+
+const chatModelOptions = computed(() => CHAT_MODELS[form.value.selection]);
+
+function toProviderVendor(sel: ProviderChoice): { provider: Provider; vendor?: Vendor } {
+  switch (sel) {
+    case "anthropic":
+      return { provider: "anthropic" };
+    case "gemini":
+      return { provider: "gemini" };
+    default:
+      return { provider: "openai-compatible", vendor: sel };
+  }
+}
+
+function toSelection(provider: string, vendor?: string): ProviderChoice {
+  if (provider === "anthropic") return "anthropic";
+  if (provider === "gemini") return "gemini";
+  return (vendor as ProviderChoice) ?? "openai";
+}
 
 const hasChanges = computed(() => JSON.stringify(form.value) !== JSON.stringify(original.value));
 
@@ -193,8 +251,7 @@ async function load() {
     const config = await Hay.organizations.getLlmConfig.query();
     if (config) {
       const f: LlmForm = {
-        provider: config.chat.provider as Provider,
-        vendor: (config.chat.vendor as Vendor) ?? "openai",
+        selection: toSelection(config.chat.provider, config.chat.vendor),
         baseUrl: config.chat.baseUrl ?? "",
         byo: config.chat.hasApiKey,
         apiKey: "",
@@ -214,10 +271,11 @@ async function load() {
 async function save() {
   try {
     isSaving.value = true;
+    const { provider, vendor } = toProviderVendor(form.value.selection);
     await Hay.organizations.updateLlmConfig.mutate({
       chat: {
-        provider: form.value.provider,
-        vendor: form.value.provider === "openai-compatible" ? form.value.vendor : undefined,
+        provider,
+        vendor,
         baseUrl: form.value.baseUrl || undefined,
         apiKey: form.value.byo && form.value.apiKey ? form.value.apiKey : undefined,
         clearApiKey: !form.value.byo,
