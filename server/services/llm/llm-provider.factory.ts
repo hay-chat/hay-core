@@ -21,8 +21,12 @@ import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { decryptValue } from "@server/lib/auth/utils/encryption";
 import { organizationRepository } from "@server/repositories/organization.repository";
-import { OpenAICompatibleProvider } from "./openai-compatible.provider";
+import {
+  OpenAICompatibleProvider,
+  OPENAI_COMPATIBLE_CAPABILITIES,
+} from "./openai-compatible.provider";
 import { AnthropicChatProvider } from "./anthropic.provider";
+import { GeminiChatProvider } from "./gemini.provider";
 import { PROVIDER_TIER_DEFAULTS } from "./tier-maps";
 import type { ChatProvider, EmbeddingProvider, OrgLlmConfig, TierModelMap } from "./provider.types";
 
@@ -99,17 +103,22 @@ class LLMProviderFactory {
   }
 
   private buildChatProvider(llm: OrgLlmConfig): ChatProvider {
-    const { provider, apiKeyEncrypted, baseUrl } = llm.chat;
+    const { provider, apiKeyEncrypted, baseUrl, vendor } = llm.chat;
     // BYO key decrypted only here; falls back to the env/Hay key (Auto/OSS).
     const apiKey = apiKeyEncrypted ? decryptValue(apiKeyEncrypted) : config.openai.apiKey;
 
     switch (provider) {
       case "openai-compatible":
-        return new OpenAICompatibleProvider({ id: "openai-compatible", apiKey, baseURL: baseUrl });
+        return new OpenAICompatibleProvider({
+          id: "openai-compatible",
+          apiKey,
+          baseURL: baseUrl,
+          capabilities: OPENAI_COMPATIBLE_CAPABILITIES[vendor ?? "openai"],
+        });
       case "anthropic":
         return new AnthropicChatProvider({ apiKey, baseURL: baseUrl });
       case "gemini":
-        throw new Error("Gemini chat provider is not wired yet (slice 8)");
+        return new GeminiChatProvider({ apiKey });
       default:
         throw new Error(`Unknown chat provider: ${String(provider)}`);
     }

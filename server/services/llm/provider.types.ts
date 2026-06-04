@@ -193,6 +193,9 @@ export interface TierModelMap {
 
 export type ChatProviderId = "openai-compatible" | "anthropic" | "gemini";
 
+/** Which OpenAI-compatible vendor (selects a capability profile). */
+export type OpenAICompatibleVendor = "openai" | "mistral" | "grok" | "custom";
+
 export interface OrgLlmConfig {
   chat: {
     provider: ChatProviderId;
@@ -200,6 +203,8 @@ export interface OrgLlmConfig {
     apiKeyEncrypted?: string;
     /** openai-compatible only (OpenAI / Mistral / Grok / custom vendor). */
     baseUrl?: string;
+    /** openai-compatible only: selects the vendor capability profile. Defaults to "openai". */
+    vendor?: OpenAICompatibleVendor;
     tiers: TierModelMap;
   };
   embedding: {

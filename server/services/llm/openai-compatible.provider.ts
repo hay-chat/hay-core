@@ -39,6 +39,36 @@ export const OPENAI_CAPABILITIES: ProviderCapabilities = {
   supportedTiers: ["easy", "medium", "hard"],
 };
 
+/**
+ * Capability profiles for OpenAI-compatible vendors, selected by `OrgLlmConfig.chat.vendor`.
+ * - openai / grok: strict json_schema is honored (rung 1, trusted).
+ * - mistral: accepts the json_schema shape but does NOT hard-guarantee it → strict=false,
+ *   so LLMService validate-and-repairs (rung 2 + backstop).
+ * - custom: conservative defaults for an unknown vendor (validate everything).
+ */
+export const OPENAI_COMPATIBLE_CAPABILITIES: Record<string, ProviderCapabilities> = {
+  openai: OPENAI_CAPABILITIES,
+  grok: OPENAI_CAPABILITIES,
+  mistral: {
+    strictJsonSchema: false,
+    jsonObjectMode: true,
+    toolForcedJson: true,
+    streaming: true,
+    reportsUsage: true,
+    systemRole: "message",
+    supportedTiers: ["easy", "medium", "hard"],
+  },
+  custom: {
+    strictJsonSchema: false,
+    jsonObjectMode: true,
+    toolForcedJson: false,
+    streaming: true,
+    reportsUsage: true,
+    systemRole: "message",
+    supportedTiers: ["easy", "medium", "hard"],
+  },
+};
+
 export interface OpenAICompatibleProviderOptions {
   apiKey: string;
   /** Defaults to the OpenAI API. Set to a vendor's OpenAI-compatible base URL. */

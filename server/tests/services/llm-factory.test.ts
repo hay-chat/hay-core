@@ -111,11 +111,12 @@ describe("LLMProviderFactory.forOrganization", () => {
     expect(decryptValue).toHaveBeenCalledWith("enc-anthropic");
   });
 
-  it("throws a clear error for not-yet-wired providers (gemini)", async () => {
+  it("builds a dedicated Gemini chat provider (managed embeddings)", async () => {
     findById.mockResolvedValue(
       orgWithLlm({
         chat: {
           provider: "gemini",
+          apiKeyEncrypted: "enc-gemini",
           tiers: {
             easy: "gemini-2.5-flash-lite",
             medium: "gemini-2.5-flash",
@@ -125,6 +126,26 @@ describe("LLMProviderFactory.forOrganization", () => {
         embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
       }),
     );
-    await expect(llmProviderFactory.forOrganization("org-gemini")).rejects.toThrow(/slice 8/);
+    const bundle = await llmProviderFactory.forOrganization("org-gemini");
+    expect(bundle.chat.id).toBe("gemini");
+    expect(bundle.chat.capabilities.systemRole).toBe("top-level");
+    expect(bundle.embedding.id).toBe("openai-compatible");
+  });
+
+  it("applies the mistral vendor capability profile (non-strict → validate-and-repair)", async () => {
+    findById.mockResolvedValue(
+      orgWithLlm({
+        chat: {
+          provider: "openai-compatible",
+          vendor: "mistral",
+          baseUrl: "https://api.mistral.ai/v1",
+          apiKeyEncrypted: "enc-mistral",
+          tiers: { easy: "ministral-3b", medium: "mistral-small", hard: "mistral-large" },
+        },
+        embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
+      }),
+    );
+    const bundle = await llmProviderFactory.forOrganization("org-mistral");
+    expect(bundle.chat.capabilities.strictJsonSchema).toBe(false);
   });
 });
