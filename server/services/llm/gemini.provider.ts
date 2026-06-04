@@ -22,8 +22,29 @@ import type {
   ChatStreamResult,
   FinishReason,
   ProviderCapabilities,
+  StreamCompletionMeta,
   UsageRecord,
 } from "./provider.types";
+
+interface GeminiUsageMeta {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
+  totalTokenCount?: number;
+}
+
+function geminiUsage(meta: GeminiUsageMeta | undefined): UsageRecord {
+  if (!meta) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
+  const promptTokens = meta.promptTokenCount ?? 0;
+  // thinking models bill thoughts as output tokens.
+  const completionTokens = (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0);
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: meta.totalTokenCount ?? promptTokens + completionTokens,
+    estimated: false,
+  };
+}
 
 export const GEMINI_CAPABILITIES: ProviderCapabilities = {
   strictJsonSchema: false, // native schema is a subset — keep validate-and-repair on
@@ -83,7 +104,12 @@ export class GeminiChatProvider implements ChatProvider {
     this.client = new GoogleGenAI({ apiKey: opts.apiKey });
   }
 
-  async chat(req: ChatRequest): Promise<ChatResult> {
+  /** Build the model/contents/config triple shared by chat() and chatStream(). */
+  private buildGenerate(req: ChatRequest): {
+    model: string;
+    contents: ReturnType<typeof toContents>;
+    config: Record<string, unknown>;
+  } {
     const flags = req.flags ?? {};
     const allowsSampling = flags.acceptsSampling !== false && !flags.reasoningModel;
 
@@ -101,49 +127,47 @@ export class GeminiChatProvider implements ChatProvider {
       config.responseJsonSchema = req.structured.schema;
     }
 
-    const response = await this.client.models.generateContent({
-      model: req.model,
-      contents,
-      config,
-    });
+    return { model: req.model, contents, config };
+  }
 
-    const usage = this.toUsage(response.usageMetadata);
-    const finishReason = mapFinishReason(response.candidates?.[0]?.finishReason);
+  async chat(req: ChatRequest): Promise<ChatResult> {
+    const response = await this.client.models.generateContent(this.buildGenerate(req));
 
     return {
       content: response.text ?? "",
-      usage,
+      usage: geminiUsage(response.usageMetadata),
       model: req.model,
       provider: this.id,
-      finishReason,
+      finishReason: mapFinishReason(response.candidates?.[0]?.finishReason),
     };
   }
 
-  private toUsage(
-    meta:
-      | {
-          promptTokenCount?: number;
-          candidatesTokenCount?: number;
-          thoughtsTokenCount?: number;
-          totalTokenCount?: number;
-        }
-      | undefined,
-  ): UsageRecord {
-    if (!meta) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
-    const promptTokens = meta.promptTokenCount ?? 0;
-    // thinking models bill thoughts as output tokens.
-    const completionTokens = (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0);
-    return {
-      promptTokens,
-      completionTokens,
-      totalTokens: meta.totalTokenCount ?? promptTokens + completionTokens,
-      estimated: false,
-    };
-  }
+  async chatStream(req: ChatRequest): Promise<ChatStreamResult> {
+    const sdkStream = await this.client.models.generateContentStream(this.buildGenerate(req));
+    const providerId = this.id;
+    const model = req.model;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async chatStream(_req: ChatRequest): Promise<ChatStreamResult> {
-    // Streaming is wired in slice 9; no call site streams today.
-    throw new Error("Gemini streaming is not implemented yet (slice 9)");
+    let resolveCompletion!: (v: StreamCompletionMeta) => void;
+    const completion = new Promise<StreamCompletionMeta>((resolve) => {
+      resolveCompletion = resolve;
+    });
+
+    async function* iterate(): AsyncIterable<string> {
+      let last:
+        | { usageMetadata?: GeminiUsageMeta; candidates?: Array<{ finishReason?: string }> }
+        | undefined;
+      for await (const chunk of sdkStream) {
+        last = chunk;
+        if (chunk.text) yield chunk.text;
+      }
+      resolveCompletion({
+        usage: geminiUsage(last?.usageMetadata),
+        model,
+        provider: providerId,
+        finishReason: mapFinishReason(last?.candidates?.[0]?.finishReason),
+      });
+    }
+
+    return { stream: iterate(), completion };
   }
 }

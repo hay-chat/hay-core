@@ -15,6 +15,7 @@ import type {
   ChatProvider,
   ChatRequest,
   ChatResult,
+  EmbeddingRequest,
   ModelTier,
   UsageRecord,
 } from "@server/services/llm/provider.types";
@@ -126,9 +127,8 @@ export class LLMService {
     if (options.stream) {
       const { bundle, request, organizationId, tier } = await this.resolveChat(options);
       try {
-        const streamResponse = await this.executeWithTimeout(
-          bundle.chat.chatStream(request),
-          60000, // 60 second timeout to establish the stream
+        const streamResponse = await this.runWithTimeout(60000, request, (req) =>
+          bundle.chat.chatStream(req),
         );
         // Meter once the stream is fully consumed.
         streamResponse.completion
@@ -161,10 +161,7 @@ export class LLMService {
 
     let result: ChatResult;
     try {
-      result = await this.executeWithTimeout(
-        bundle.chat.chat(request),
-        30000, // 30 second timeout for non-streaming
-      );
+      result = await this.runWithTimeout(30000, request, (req) => bundle.chat.chat(req));
       result = await this.coerceStructured(bundle.chat, request, result);
     } catch (error) {
       if (error instanceof StructuredOutputError) throw error;
@@ -233,7 +230,7 @@ export class LLMService {
       ...request,
       messages: buildRepairMessages(request.messages, result.content, first.errors),
     };
-    const repaired = await this.executeWithTimeout(provider.chat(repairReq), 30000);
+    const repaired = await this.runWithTimeout(30000, repairReq, (req) => provider.chat(req));
     const summedUsage = sumUsage(result.usage, repaired.usage);
 
     const second = validateJsonString(schema, repaired.content);
@@ -252,9 +249,9 @@ export class LLMService {
     const bundle = await llmProviderFactory.forOrganization();
 
     try {
-      const result = await this.executeWithTimeout(
-        bundle.embedding.embed({ model, input: text }),
-        30000, // 30 second timeout for embeddings
+      const embedRequest: EmbeddingRequest = { model, input: text };
+      const result = await this.runWithTimeout(30000, embedRequest, (req) =>
+        bundle.embedding.embed(req),
       );
 
       emitUsage({
@@ -278,19 +275,34 @@ export class LLMService {
   }
 
   /**
-   * Executes a promise with a timeout
-   * @param promise The promise to execute
-   * @param timeoutMs Timeout in milliseconds (default: 30000ms / 30s)
-   * @returns The promise result
-   * @throws Error if the operation times out
+   * Run a provider call with a timeout that actually CANCELS the in-flight request
+   * (via AbortSignal) rather than just abandoning the promise. Any caller-supplied
+   * signal is combined with the timeout signal. For streaming, `run` resolves once
+   * the stream is established, so the timer only bounds establishment, not the
+   * lifetime of the stream.
    */
-  private async executeWithTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(`Operation timeout after ${timeoutMs}ms`)), timeoutMs),
-      ),
-    ]);
+  private async runWithTimeout<TReq extends { signal?: AbortSignal }, TRes>(
+    timeoutMs: number,
+    request: TReq,
+    run: (req: TReq) => Promise<TRes>,
+  ): Promise<TRes> {
+    const controller = new AbortController();
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, controller.signal])
+      : controller.signal;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    try {
+      return await run({ ...request, signal });
+    } catch (err) {
+      if (timedOut) throw new Error(`Operation timeout after ${timeoutMs}ms`);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private prepareMessages(history: string | Message[], systemPrompt?: string): ChatMessage[] {

@@ -20,8 +20,25 @@ import type {
   ChatStreamResult,
   FinishReason,
   ProviderCapabilities,
+  StreamCompletionMeta,
   UsageRecord,
 } from "./provider.types";
+
+function anthropicUsage(usage: Anthropic.Usage | undefined): UsageRecord {
+  if (!usage) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
+  // input_tokens is the UNCACHED remainder — sum the cache fields or metering undercounts.
+  const promptTokens =
+    usage.input_tokens +
+    (usage.cache_creation_input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0);
+  const completionTokens = usage.output_tokens;
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    estimated: false,
+  };
+}
 
 export const ANTHROPIC_CAPABILITIES: ProviderCapabilities = {
   // Forced tool-use yields schema-shaped JSON, but we keep validate-and-repair on as
@@ -118,22 +135,6 @@ export class AnthropicChatProvider implements ChatProvider {
     return params;
   }
 
-  private toUsage(usage: Anthropic.Usage | undefined): UsageRecord {
-    if (!usage) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
-    // input_tokens is the UNCACHED remainder — sum the cache fields or metering undercounts.
-    const promptTokens =
-      usage.input_tokens +
-      (usage.cache_creation_input_tokens ?? 0) +
-      (usage.cache_read_input_tokens ?? 0);
-    const completionTokens = usage.output_tokens;
-    return {
-      promptTokens,
-      completionTokens,
-      totalTokens: promptTokens + completionTokens,
-      estimated: false,
-    };
-  }
-
   async chat(req: ChatRequest): Promise<ChatResult> {
     const message = await this.client.messages.create(this.buildParams(req), {
       signal: req.signal,
@@ -152,16 +153,38 @@ export class AnthropicChatProvider implements ChatProvider {
 
     return {
       content,
-      usage: this.toUsage(message.usage),
+      usage: anthropicUsage(message.usage),
       model: message.model ?? req.model,
       provider: this.id,
       finishReason: mapStopReason(message.stop_reason),
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async chatStream(_req: ChatRequest): Promise<ChatStreamResult> {
-    // Streaming is wired in slice 9; no call site streams today.
-    throw new Error("Anthropic streaming is not implemented yet (slice 9)");
+  async chatStream(req: ChatRequest): Promise<ChatStreamResult> {
+    const sdkStream = this.client.messages.stream(this.buildParams(req), { signal: req.signal });
+    const providerId = this.id;
+    const fallbackModel = req.model;
+
+    let resolveCompletion!: (v: StreamCompletionMeta) => void;
+    const completion = new Promise<StreamCompletionMeta>((resolve) => {
+      resolveCompletion = resolve;
+    });
+
+    async function* iterate(): AsyncIterable<string> {
+      for await (const event of sdkStream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          yield event.delta.text;
+        }
+      }
+      const final = await sdkStream.finalMessage();
+      resolveCompletion({
+        usage: anthropicUsage(final.usage),
+        model: final.model ?? fallbackModel,
+        provider: providerId,
+        finishReason: mapStopReason(final.stop_reason),
+      });
+    }
+
+    return { stream: iterate(), completion };
   }
 }

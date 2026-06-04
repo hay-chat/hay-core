@@ -4,10 +4,22 @@ import type { ChatRequest } from "../../services/llm/provider.types";
 /** Slice 7 — Anthropic dedicated adapter. SDK mocked; assert request shaping + mapping. */
 
 const mockCreate = jest.fn();
+const mockStream = jest.fn();
 jest.mock("@anthropic-ai/sdk", () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+  default: jest
+    .fn()
+    .mockImplementation(() => ({ messages: { create: mockCreate, stream: mockStream } })),
 }));
+
+function makeStream(events: unknown[], final: unknown) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const e of events) yield e;
+    },
+    finalMessage: async () => final,
+  };
+}
 
 import { AnthropicChatProvider } from "../../services/llm/anthropic.provider";
 
@@ -28,7 +40,34 @@ describe("AnthropicChatProvider", () => {
   let provider: AnthropicChatProvider;
   beforeEach(() => {
     mockCreate.mockReset();
+    mockStream.mockReset();
     provider = new AnthropicChatProvider({ apiKey: "k" });
+  });
+
+  it("streams text deltas and resolves completion usage", async () => {
+    mockStream.mockReturnValue(
+      makeStream(
+        [
+          { type: "content_block_delta", delta: { type: "text_delta", text: "Hel" } },
+          { type: "content_block_delta", delta: { type: "text_delta", text: "lo" } },
+        ],
+        {
+          model: "claude-sonnet-4-6",
+          stop_reason: "end_turn",
+          usage: { input_tokens: 3, output_tokens: 2 },
+        },
+      ),
+    );
+
+    const { stream, completion } = await provider.chatStream(req());
+    let text = "";
+    for await (const chunk of stream) text += chunk;
+    expect(text).toBe("Hello");
+
+    const meta = await completion;
+    expect(meta.usage.totalTokens).toBe(5);
+    expect(meta.finishReason).toBe("stop");
+    expect(meta.provider).toBe("anthropic");
   });
 
   it("splits the system prompt to a top-level param and maps text + usage", async () => {

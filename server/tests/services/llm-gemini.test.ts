@@ -4,9 +4,16 @@ import type { ChatRequest } from "../../services/llm/provider.types";
 /** Slice 8 — Gemini dedicated adapter. SDK mocked; assert request shaping + mapping. */
 
 const mockGenerate = jest.fn();
+const mockGenerateStream = jest.fn();
 jest.mock("@google/genai", () => ({
-  GoogleGenAI: jest.fn().mockImplementation(() => ({ models: { generateContent: mockGenerate } })),
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    models: { generateContent: mockGenerate, generateContentStream: mockGenerateStream },
+  })),
 }));
+
+async function* chunks(items: unknown[]) {
+  for (const i of items) yield i;
+}
 
 import { GeminiChatProvider } from "../../services/llm/gemini.provider";
 
@@ -27,7 +34,31 @@ describe("GeminiChatProvider", () => {
   let provider: GeminiChatProvider;
   beforeEach(() => {
     mockGenerate.mockReset();
+    mockGenerateStream.mockReset();
     provider = new GeminiChatProvider({ apiKey: "k" });
+  });
+
+  it("streams text chunks and resolves completion usage from the final chunk", async () => {
+    mockGenerateStream.mockResolvedValue(
+      chunks([
+        { text: "Hel" },
+        {
+          text: "lo",
+          candidates: [{ finishReason: "STOP" }],
+          usageMetadata: { promptTokenCount: 6, candidatesTokenCount: 3, totalTokenCount: 9 },
+        },
+      ]),
+    );
+
+    const { stream, completion } = await provider.chatStream(req());
+    let text = "";
+    for await (const chunk of stream) text += chunk;
+    expect(text).toBe("Hello");
+
+    const meta = await completion;
+    expect(meta.usage.totalTokens).toBe(9);
+    expect(meta.finishReason).toBe("stop");
+    expect(meta.provider).toBe("gemini");
   });
 
   it("maps system→systemInstruction, roles, maxOutputTokens, and usage", async () => {
