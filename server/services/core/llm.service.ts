@@ -5,12 +5,28 @@ import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
+import {
+  buildRepairMessages,
+  StructuredOutputError,
+  validateJsonString,
+} from "@server/services/llm/structured-output";
 import type {
   ChatMessage,
+  ChatProvider,
   ChatRequest,
   ChatResult,
   ModelTier,
+  UsageRecord,
 } from "@server/services/llm/provider.types";
+
+function sumUsage(a: UsageRecord, b: UsageRecord): UsageRecord {
+  return {
+    promptTokens: a.promptTokens + b.promptTokens,
+    completionTokens: a.completionTokens + b.completionTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    estimated: a.estimated || b.estimated,
+  };
+}
 
 /** Result of a chat call with its normalized usage + provenance, for callers that need it. */
 export interface ChatMeta<T> {
@@ -143,34 +159,92 @@ export class LLMService {
   async invokeWithMeta<T = string>(options: ChatOptions): Promise<ChatMeta<T>> {
     const { bundle, request, organizationId, tier } = this.resolveChat(options);
 
+    let result: ChatResult;
     try {
-      const result = await this.executeWithTimeout(
+      result = await this.executeWithTimeout(
         bundle.chat.chat(request),
         30000, // 30 second timeout for non-streaming
       );
-
-      emitUsage({
-        kind: "chat",
-        usage: result.usage,
-        model: result.model,
-        provider: result.provider,
-        organizationId,
-        tier,
-      });
-      this.logChatResultDebugInfo(result);
-
-      if (!result.content) {
-        throw new Error("No content received from LLM provider");
-      }
-      return {
-        content: result.content as T,
-        usage: result.usage,
-        model: result.model,
-        provider: result.provider,
-      };
+      result = await this.coerceStructured(bundle.chat, request, result);
     } catch (error) {
+      if (error instanceof StructuredOutputError) throw error;
       throw this.wrapError(error, "chat response");
     }
+
+    emitUsage({
+      kind: "chat",
+      usage: result.usage,
+      model: result.model,
+      provider: result.provider,
+      organizationId,
+      tier,
+    });
+    this.logChatResultDebugInfo(result);
+
+    if (!result.content) {
+      throw new Error("No content received from LLM provider");
+    }
+    return {
+      content: result.content as T,
+      usage: result.usage,
+      model: result.model,
+      provider: result.provider,
+    };
+  }
+
+  /**
+   * Guarantee `result.content` is schema-valid JSON when a structured spec was
+   * requested. Strict-capable providers (rung 1) are trusted verbatim; others are
+   * validated and given exactly one repair round-trip (its tokens summed into the
+   * returned usage). Refusals and truncated responses are surfaced as errors.
+   */
+  private async coerceStructured(
+    provider: ChatProvider,
+    request: ChatRequest,
+    result: ChatResult,
+  ): Promise<ChatResult> {
+    if (!request.structured) return result;
+    const name = request.structured.name ?? "structured_response";
+
+    if (result.finishReason === "content_filter") {
+      throw new StructuredOutputError(
+        "Provider refused or filtered the response",
+        result.content,
+        name,
+      );
+    }
+    if (result.finishReason === "length") {
+      throw new StructuredOutputError(
+        "Response truncated before valid JSON (max tokens)",
+        result.content,
+        name,
+      );
+    }
+    // Strict-capable providers constrain decoding — trust verbatim (preserves the
+    // legacy OpenAI path, including the loose json_object mode, with zero validation).
+    if (provider.capabilities.strictJsonSchema) return result;
+
+    const schema = request.structured.schema;
+    const first = validateJsonString(schema, result.content);
+    if (first.valid) return result;
+
+    // One bounded repair round-trip.
+    const repairReq: ChatRequest = {
+      ...request,
+      messages: buildRepairMessages(request.messages, result.content, first.errors),
+    };
+    const repaired = await this.executeWithTimeout(provider.chat(repairReq), 30000);
+    const summedUsage = sumUsage(result.usage, repaired.usage);
+
+    const second = validateJsonString(schema, repaired.content);
+    if (second.valid) {
+      return { ...repaired, usage: summedUsage };
+    }
+    throw new StructuredOutputError(
+      `Structured output failed schema validation after repair: ${second.errors}`,
+      repaired.content,
+      name,
+    );
   }
 
   async embedding(options: EmbeddingOptions): Promise<number[]> {

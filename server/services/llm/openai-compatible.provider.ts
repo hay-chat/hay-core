@@ -13,6 +13,7 @@
  */
 
 import OpenAI from "openai";
+import { injectSchemaIntoMessages } from "./structured-output";
 import type {
   ChatProvider,
   ChatRequest,
@@ -111,17 +112,37 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
     }
 
     if (req.structured) {
-      const strict = req.structured.strict !== false;
-      body.response_format = strict
-        ? {
-            type: "json_schema",
-            json_schema: {
-              name: req.structured.name ?? "structured_response",
-              schema: req.structured.schema,
-              strict: true,
-            },
-          }
-        : { type: "json_object" };
+      const spec = req.structured;
+      const name = spec.name ?? "structured_response";
+      const wantStrict = spec.strict !== false;
+
+      if (this.capabilities.strictJsonSchema && wantStrict) {
+        // Rung 1: provider guarantees schema validity (no post-validation).
+        body.response_format = {
+          type: "json_schema",
+          json_schema: { name, schema: spec.schema, strict: true },
+        };
+      } else if (this.capabilities.strictJsonSchema) {
+        // Strict-capable provider, caller opted into loose JSON — preserve the
+        // legacy behavior exactly (json_object, schema lives in the caller's prompt).
+        body.response_format = { type: "json_object" };
+      } else if (this.capabilities.jsonObjectMode) {
+        // Rung 2: provider can't guarantee strict — loose JSON + schema-in-prompt.
+        // LLMService validates and repairs the result.
+        body.response_format = { type: "json_object" };
+        body.messages = injectSchemaIntoMessages(
+          req.messages,
+          spec.schema,
+          name,
+        ) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+      } else {
+        // Rung 4: prompt-only injection (defensive; no OpenAI-compatible vendor lands here).
+        body.messages = injectSchemaIntoMessages(
+          req.messages,
+          spec.schema,
+          name,
+        ) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+      }
     }
 
     return body;
@@ -132,7 +153,12 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
       signal: req.signal,
     });
 
-    const content = response.choices[0]?.message?.content ?? "";
+    const choice = response.choices[0];
+    const message = choice?.message;
+    // A safety refusal arrives as `message.refusal` with null content. Surface it
+    // as content_filter so callers don't try to JSON.parse an empty/explanatory body.
+    const refused = typeof message?.refusal === "string" && message.refusal.length > 0;
+    const content = refused ? "" : (message?.content ?? "");
     const usage = response.usage
       ? {
           promptTokens: response.usage.prompt_tokens,
@@ -147,7 +173,7 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
       usage,
       model: response.model ?? req.model,
       provider: this.id,
-      finishReason: mapFinishReason(response.choices[0]?.finish_reason),
+      finishReason: refused ? "content_filter" : mapFinishReason(choice?.finish_reason),
     };
   }
 
