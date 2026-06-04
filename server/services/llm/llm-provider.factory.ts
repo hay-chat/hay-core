@@ -22,6 +22,7 @@ import { createLogger } from "@server/lib/logger";
 import { decryptValue } from "@server/lib/auth/utils/encryption";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { OpenAICompatibleProvider } from "./openai-compatible.provider";
+import { AnthropicChatProvider } from "./anthropic.provider";
 import { PROVIDER_TIER_DEFAULTS } from "./tier-maps";
 import type { ChatProvider, EmbeddingProvider, OrgLlmConfig, TierModelMap } from "./provider.types";
 
@@ -106,7 +107,7 @@ class LLMProviderFactory {
       case "openai-compatible":
         return new OpenAICompatibleProvider({ id: "openai-compatible", apiKey, baseURL: baseUrl });
       case "anthropic":
-        throw new Error("Anthropic chat provider is not wired yet (slice 7)");
+        return new AnthropicChatProvider({ apiKey, baseURL: baseUrl });
       case "gemini":
         throw new Error("Gemini chat provider is not wired yet (slice 8)");
       default:

@@ -93,16 +93,38 @@ describe("LLMProviderFactory.forOrganization", () => {
     expect(findById).toHaveBeenCalledTimes(2);
   });
 
-  it("throws a clear error for not-yet-wired providers", async () => {
+  it("builds a dedicated Anthropic chat provider with managed (OpenAI) embeddings", async () => {
     findById.mockResolvedValue(
       orgWithLlm({
         chat: {
           provider: "anthropic",
+          apiKeyEncrypted: "enc-anthropic",
           tiers: { easy: "claude-haiku-4-5", medium: "claude-sonnet-4-6", hard: "claude-opus-4-8" },
         },
         embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
       }),
     );
-    await expect(llmProviderFactory.forOrganization("org-anthropic")).rejects.toThrow(/slice 7/);
+    const bundle = await llmProviderFactory.forOrganization("org-anthropic");
+    expect(bundle.chat.id).toBe("anthropic");
+    expect(bundle.chat.capabilities.systemRole).toBe("top-level");
+    expect(bundle.embedding.id).toBe("openai-compatible"); // embeddings stay managed
+    expect(decryptValue).toHaveBeenCalledWith("enc-anthropic");
+  });
+
+  it("throws a clear error for not-yet-wired providers (gemini)", async () => {
+    findById.mockResolvedValue(
+      orgWithLlm({
+        chat: {
+          provider: "gemini",
+          tiers: {
+            easy: "gemini-2.5-flash-lite",
+            medium: "gemini-2.5-flash",
+            hard: "gemini-2.5-pro",
+          },
+        },
+        embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
+      }),
+    );
+    await expect(llmProviderFactory.forOrganization("org-gemini")).rejects.toThrow(/slice 8/);
   });
 });
