@@ -580,5 +580,46 @@
     "dateWeeksAgo": "{weeks} semanas atrás",
     "connectedTo": "Conectado a {accountLogin}",
     "completionFailed": "Falha ao completar instalação"
+  },
+  "llmSettings": {
+    "title": "Modelos de IA",
+    "description": "Escolha qual provedor e modelos de IA alimentam seus agentes. Os embeddings continuam gerenciados pela Hay.",
+    "save": "Salvar Alterações",
+    "saveSuccess": "Configurações de modelos de IA salvas",
+    "saveFailed": "Falha ao salvar as configurações de modelos de IA",
+    "loadFailed": "Falha ao carregar as configurações de modelos de IA",
+    "chat": {
+      "title": "Provedor de Chat",
+      "description": "O provedor e a conta usados para gerar as respostas dos agentes.",
+      "provider": "Provedor",
+      "providerHelper": "Compatível com OpenAI cobre OpenAI, Mistral, Grok e endpoints personalizados.",
+      "vendor": "Fornecedor",
+      "vendorHelper": "Seleciona o formato de requisição e o tratamento de saída estruturada corretos.",
+      "vendorCustom": "Personalizado (compatível com OpenAI)",
+      "baseUrl": "URL Base",
+      "baseUrlHelper": "A URL base da API compatível com OpenAI do provedor.",
+      "byo": "Usar minha própria chave de API",
+      "byoHint": "Quando desativado, a IA gerenciada da Hay é usada (cobrada no seu plano).",
+      "apiKey": "Chave de API",
+      "apiKeyPlaceholder": "Insira a chave de API do provedor",
+      "apiKeyHelper": "Armazenada criptografada; nunca exibida novamente após salvar.",
+      "apiKeySet": "Uma chave está definida. Insira uma nova para substituí-la."
+    },
+    "tiers": {
+      "title": "Níveis de Modelo",
+      "description": "Os agentes escolhem um nível pela complexidade da tarefa; mapeie cada nível para um modelo do seu provedor.",
+      "hard": "Difícil (mais capaz)",
+      "hardHelper": "Orquestração, planejamento e guardrails.",
+      "medium": "Médio (equilibrado)",
+      "mediumHelper": "Auditorias e traduções.",
+      "easy": "Fácil (mais barato)",
+      "easyHelper": "Resumos de documentos em massa."
+    },
+    "embedding": {
+      "title": "Embeddings (Gerenciado)",
+      "description": "Os embeddings são sempre gerenciados pela Hay e fixados em 1536 dimensões.",
+      "model": "Modelo de Embedding",
+      "modelHelper": "Deve produzir vetores de 1536 dimensões (ex.: text-embedding-3-small)."
+    }
   }
 }
