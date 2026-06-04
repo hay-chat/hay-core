@@ -1,108 +1,131 @@
 <template>
   <Page :title="$t('llmSettings.title')" :description="$t('llmSettings.description')">
     <template #header>
-      <Button :loading="isSaving" :disabled="!hasChanges" @click="save">
+      <Button v-if="unlocked" :loading="isSaving" :disabled="!hasChanges" @click="save">
         <Save class="h-4 w-4 mr-2" />
         {{ $t("llmSettings.save") }}
       </Button>
     </template>
 
-    <!-- Chat provider -->
-    <Card>
+    <!-- Warning gate -->
+    <Card class="border-amber-500/50">
       <CardHeader>
-        <CardTitle>{{ $t("llmSettings.chat.title") }}</CardTitle>
-        <CardDescription>{{ $t("llmSettings.chat.description") }}</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <Input
-          v-model="form.provider"
-          type="select"
-          :label="$t('llmSettings.chat.provider')"
-          :options="providerOptions"
-          :helper-text="$t('llmSettings.chat.providerHelper')"
-        />
-
-        <Input
-          v-if="form.provider === 'openai-compatible'"
-          v-model="form.vendor"
-          type="select"
-          :label="$t('llmSettings.chat.vendor')"
-          :options="vendorOptions"
-          :helper-text="$t('llmSettings.chat.vendorHelper')"
-        />
-
-        <Input
-          v-if="form.provider === 'openai-compatible' && form.vendor !== 'openai'"
-          v-model="form.baseUrl"
-          :label="$t('llmSettings.chat.baseUrl')"
-          placeholder="https://api.example.com/v1"
-          :helper-text="$t('llmSettings.chat.baseUrlHelper')"
-        />
-
-        <Input
-          v-model="form.byo"
-          type="switch"
-          :label="$t('llmSettings.chat.byo')"
-          :hint="$t('llmSettings.chat.byoHint')"
-        />
-
-        <Input
-          v-if="form.byo"
-          v-model="form.apiKey"
-          type="password"
-          :label="$t('llmSettings.chat.apiKey')"
-          :placeholder="hasApiKey ? '••••••••••••••••' : $t('llmSettings.chat.apiKeyPlaceholder')"
-          :helper-text="
-            hasApiKey ? $t('llmSettings.chat.apiKeySet') : $t('llmSettings.chat.apiKeyHelper')
-          "
-        />
-      </CardContent>
-    </Card>
-
-    <!-- Model tiers -->
-    <Card>
-      <CardHeader>
-        <CardTitle>{{ $t("llmSettings.tiers.title") }}</CardTitle>
-        <CardDescription>{{ $t("llmSettings.tiers.description") }}</CardDescription>
-      </CardHeader>
-      <CardContent class="grid gap-4 md:grid-cols-3">
-        <Input
-          v-model="form.tiers.hard"
-          :label="$t('llmSettings.tiers.hard')"
-          :helper-text="$t('llmSettings.tiers.hardHelper')"
-        />
-        <Input
-          v-model="form.tiers.medium"
-          :label="$t('llmSettings.tiers.medium')"
-          :helper-text="$t('llmSettings.tiers.mediumHelper')"
-        />
-        <Input
-          v-model="form.tiers.easy"
-          :label="$t('llmSettings.tiers.easy')"
-          :helper-text="$t('llmSettings.tiers.easyHelper')"
-        />
-      </CardContent>
-    </Card>
-
-    <!-- Embeddings (managed) -->
-    <Card>
-      <CardHeader>
-        <CardTitle>{{ $t("llmSettings.embedding.title") }}</CardTitle>
-        <CardDescription>{{ $t("llmSettings.embedding.description") }}</CardDescription>
+        <CardTitle class="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+          <AlertTriangle class="h-5 w-5" />
+          {{ $t("llmSettings.warning.title") }}
+        </CardTitle>
+        <CardDescription>{{ $t("llmSettings.warning.description") }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Input
-          v-model="form.embeddingModel"
-          :label="$t('llmSettings.embedding.model')"
-          :helper-text="$t('llmSettings.embedding.modelHelper')"
-        />
+        <Button v-if="!unlocked" variant="outline" @click="unlocked = true">
+          <Unlock class="h-4 w-4 mr-2" />
+          {{ $t("llmSettings.warning.unlock") }}
+        </Button>
+        <div v-else class="flex items-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck class="h-4 w-4 text-amber-600 dark:text-amber-500" />
+          {{ $t("llmSettings.warning.unlocked") }}
+        </div>
       </CardContent>
     </Card>
+
+    <template v-if="unlocked">
+      <!-- Chat provider -->
+      <Card>
+        <CardHeader>
+          <CardTitle>{{ $t("llmSettings.chat.title") }}</CardTitle>
+          <CardDescription>{{ $t("llmSettings.chat.description") }}</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-6">
+          <Input
+            v-model="form.provider"
+            type="select"
+            :label="$t('llmSettings.chat.provider')"
+            :options="providerOptions"
+            :helper-text="$t('llmSettings.chat.providerHelper')"
+          />
+
+          <Input
+            v-if="form.provider === 'openai-compatible'"
+            v-model="form.vendor"
+            type="select"
+            :label="$t('llmSettings.chat.vendor')"
+            :options="vendorOptions"
+            :helper-text="$t('llmSettings.chat.vendorHelper')"
+          />
+
+          <Input
+            v-if="form.provider === 'openai-compatible' && form.vendor !== 'openai'"
+            v-model="form.baseUrl"
+            :label="$t('llmSettings.chat.baseUrl')"
+            placeholder="https://api.example.com/v1"
+            :helper-text="$t('llmSettings.chat.baseUrlHelper')"
+          />
+
+          <Input
+            v-model="form.byo"
+            type="switch"
+            :label="$t('llmSettings.chat.byo')"
+            :hint="$t('llmSettings.chat.byoHint')"
+          />
+
+          <Input
+            v-if="form.byo"
+            v-model="form.apiKey"
+            type="password"
+            :label="$t('llmSettings.chat.apiKey')"
+            :placeholder="hasApiKey ? '••••••••••••••••' : $t('llmSettings.chat.apiKeyPlaceholder')"
+            :helper-text="
+              hasApiKey ? $t('llmSettings.chat.apiKeySet') : $t('llmSettings.chat.apiKeyHelper')
+            "
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Model tiers -->
+      <Card>
+        <CardHeader>
+          <CardTitle>{{ $t("llmSettings.tiers.title") }}</CardTitle>
+          <CardDescription>{{ $t("llmSettings.tiers.description") }}</CardDescription>
+        </CardHeader>
+        <CardContent class="grid gap-4 md:grid-cols-3">
+          <Input
+            v-model="form.tiers.hard"
+            :label="$t('llmSettings.tiers.hard')"
+            :helper-text="$t('llmSettings.tiers.hardHelper')"
+          />
+          <Input
+            v-model="form.tiers.medium"
+            :label="$t('llmSettings.tiers.medium')"
+            :helper-text="$t('llmSettings.tiers.mediumHelper')"
+          />
+          <Input
+            v-model="form.tiers.easy"
+            :label="$t('llmSettings.tiers.easy')"
+            :helper-text="$t('llmSettings.tiers.easyHelper')"
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Embeddings (managed) -->
+      <Card>
+        <CardHeader>
+          <CardTitle>{{ $t("llmSettings.embedding.title") }}</CardTitle>
+          <CardDescription>{{ $t("llmSettings.embedding.description") }}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Input
+            v-model="form.embeddingModel"
+            :label="$t('llmSettings.embedding.model')"
+            :helper-text="$t('llmSettings.embedding.modelHelper')"
+          />
+        </CardContent>
+      </Card>
+    </template>
   </Page>
 </template>
 
 <script setup lang="ts">
-import { Save } from "lucide-vue-next";
+import { Save, AlertTriangle, Unlock, ShieldCheck } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
@@ -124,6 +147,9 @@ const toast = useToast();
 
 const isSaving = ref(false);
 const hasApiKey = ref(false);
+// Config is gated behind an explicit acknowledgement that changing AI defaults can
+// radically alter agent behavior.
+const unlocked = ref(false);
 
 function defaults(): LlmForm {
   return {

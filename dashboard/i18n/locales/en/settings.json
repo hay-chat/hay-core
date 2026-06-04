@@ -588,6 +588,12 @@
     "saveSuccess": "AI model settings saved",
     "saveFailed": "Failed to save AI model settings",
     "loadFailed": "Failed to load AI model settings",
+    "warning": {
+      "title": "Advanced — changes here affect every agent",
+      "description": "These settings control the AI provider and models behind your agents. Changing the defaults can radically change response quality, cost, latency, and reliability. Only proceed if you know what you're doing.",
+      "unlock": "I understand — let me edit",
+      "unlocked": "Editing unlocked. Save carefully — changes apply to all agents in this organization."
+    },
     "chat": {
       "title": "Chat Provider",
       "description": "The provider and account used to generate agent responses.",

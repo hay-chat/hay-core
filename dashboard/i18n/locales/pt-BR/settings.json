@@ -588,6 +588,12 @@
     "saveSuccess": "Configurações de modelos de IA salvas",
     "saveFailed": "Falha ao salvar as configurações de modelos de IA",
     "loadFailed": "Falha ao carregar as configurações de modelos de IA",
+    "warning": {
+      "title": "Avançado — alterações aqui afetam todos os agentes",
+      "description": "Estas configurações controlam o provedor e os modelos de IA por trás dos seus agentes. Alterar os padrões pode mudar radicalmente a qualidade das respostas, o custo, a latência e a confiabilidade. Só prossiga se souber o que está fazendo.",
+      "unlock": "Eu entendo — deixe-me editar",
+      "unlocked": "Edição desbloqueada. Salve com cuidado — as alterações se aplicam a todos os agentes desta organização."
+    },
     "chat": {
       "title": "Provedor de Chat",
       "description": "O provedor e a conta usados para gerar as respostas dos agentes.",
