@@ -12,6 +12,7 @@ import {
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
@@ -257,6 +258,9 @@ export const organizationsRouter = t.router({
       }
 
       const updatedOrg = await organizationService.update(ctx.organizationId!, updatePayload);
+
+      // Drop any cached LLM provider bundle so settings changes take effect immediately.
+      llmProviderFactory.invalidate(ctx.organizationId!);
 
       return {
         success: true,

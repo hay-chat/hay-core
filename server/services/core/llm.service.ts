@@ -79,12 +79,12 @@ export class LLMService {
   }
 
   /** Resolve the org's provider bundle and build the provider-neutral request. */
-  private resolveChat(options: ChatOptions): {
-    bundle: ReturnType<typeof llmProviderFactory.forOrganization>;
+  private async resolveChat(options: ChatOptions): Promise<{
+    bundle: Awaited<ReturnType<typeof llmProviderFactory.forOrganization>>;
     request: ChatRequest;
     organizationId?: string;
     tier: ModelTier;
-  } {
+  }> {
     const {
       history,
       prompt,
@@ -98,7 +98,7 @@ export class LLMService {
       signal,
     } = options;
 
-    const bundle = llmProviderFactory.forOrganization(organizationId);
+    const bundle = await llmProviderFactory.forOrganization(organizationId);
     const resolvedModel = model ?? bundle.tiers[tier];
 
     const request: ChatRequest = {
@@ -124,7 +124,7 @@ export class LLMService {
    */
   async invoke<T = string>(options: ChatOptions): Promise<T> {
     if (options.stream) {
-      const { bundle, request, organizationId, tier } = this.resolveChat(options);
+      const { bundle, request, organizationId, tier } = await this.resolveChat(options);
       try {
         const streamResponse = await this.executeWithTimeout(
           bundle.chat.chatStream(request),
@@ -157,7 +157,7 @@ export class LLMService {
    * Non-streaming only. Every call fires the usage seam.
    */
   async invokeWithMeta<T = string>(options: ChatOptions): Promise<ChatMeta<T>> {
-    const { bundle, request, organizationId, tier } = this.resolveChat(options);
+    const { bundle, request, organizationId, tier } = await this.resolveChat(options);
 
     let result: ChatResult;
     try {
@@ -249,7 +249,7 @@ export class LLMService {
 
   async embedding(options: EmbeddingOptions): Promise<number[]> {
     const { text, model = config.openai.models.embedding.model } = options;
-    const bundle = llmProviderFactory.forOrganization();
+    const bundle = await llmProviderFactory.forOrganization();
 
     try {
       const result = await this.executeWithTimeout(
