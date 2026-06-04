@@ -4,12 +4,21 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { emitUsage } from "@server/services/llm/usage-sink";
 import type {
   ChatMessage,
   ChatRequest,
   ChatResult,
   ModelTier,
 } from "@server/services/llm/provider.types";
+
+/** Result of a chat call with its normalized usage + provenance, for callers that need it. */
+export interface ChatMeta<T> {
+  content: T;
+  usage: ChatResult["usage"];
+  model: string;
+  provider: string;
+}
 
 const logger = createLogger("llm");
 
@@ -53,7 +62,13 @@ export class LLMService {
     this.logFilePath = path.join(logsDir, `llm-${today}.log`);
   }
 
-  async invoke<T = string>(options: ChatOptions): Promise<T> {
+  /** Resolve the org's provider bundle and build the provider-neutral request. */
+  private resolveChat(options: ChatOptions): {
+    bundle: ReturnType<typeof llmProviderFactory.forOrganization>;
+    request: ChatRequest;
+    organizationId?: string;
+    tier: ModelTier;
+  } {
     const {
       history,
       prompt,
@@ -64,7 +79,6 @@ export class LLMService {
       organizationId,
       temperature = 0.7,
       max_tokens = 2000,
-      stream = false,
       signal,
     } = options;
 
@@ -85,31 +99,77 @@ export class LLMService {
       }),
     };
 
-    try {
-      if (stream) {
+    return { bundle, request, organizationId, tier };
+  }
+
+  /**
+   * Chat completion. Returns the raw string content (callers JSON.parse structured
+   * responses). When `stream` is set, returns the async iterable of content chunks.
+   */
+  async invoke<T = string>(options: ChatOptions): Promise<T> {
+    if (options.stream) {
+      const { bundle, request, organizationId, tier } = this.resolveChat(options);
+      try {
         const streamResponse = await this.executeWithTimeout(
           bundle.chat.chatStream(request),
           60000, // 60 second timeout to establish the stream
         );
+        // Meter once the stream is fully consumed.
+        streamResponse.completion
+          .then((meta) =>
+            emitUsage({
+              kind: "chat",
+              usage: meta.usage,
+              model: meta.model,
+              provider: meta.provider,
+              organizationId,
+              tier,
+            }),
+          )
+          .catch(() => undefined);
         return streamResponse.stream as T;
+      } catch (error) {
+        throw this.wrapError(error, "chat response");
       }
+    }
 
+    return (await this.invokeWithMeta<T>(options)).content;
+  }
+
+  /**
+   * Like `invoke`, but also returns normalized usage + provider/model provenance.
+   * Non-streaming only. Every call fires the usage seam.
+   */
+  async invokeWithMeta<T = string>(options: ChatOptions): Promise<ChatMeta<T>> {
+    const { bundle, request, organizationId, tier } = this.resolveChat(options);
+
+    try {
       const result = await this.executeWithTimeout(
         bundle.chat.chat(request),
         30000, // 30 second timeout for non-streaming
       );
 
+      emitUsage({
+        kind: "chat",
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+        organizationId,
+        tier,
+      });
       this.logChatResultDebugInfo(result);
 
       if (!result.content) {
         throw new Error("No content received from LLM provider");
       }
-      return result.content as T;
+      return {
+        content: result.content as T,
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+      };
     } catch (error) {
-      if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`LLM provider timeout: ${error.message}`);
-      }
-      throw new Error(`Failed to generate chat response: ${error}`);
+      throw this.wrapError(error, "chat response");
     }
   }
 
@@ -123,13 +183,24 @@ export class LLMService {
         30000, // 30 second timeout for embeddings
       );
 
+      emitUsage({
+        kind: "embedding",
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+      });
+
       return result.embeddings[0] ?? [];
     } catch (error) {
-      if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`LLM embedding timeout: ${error.message}`);
-      }
-      throw new Error(`Failed to generate embedding: ${error}`);
+      throw this.wrapError(error, "embedding", "LLM embedding timeout");
     }
+  }
+
+  private wrapError(error: unknown, what: string, timeoutLabel = "LLM provider timeout"): Error {
+    if (error instanceof Error && error.message.includes("timeout")) {
+      return new Error(`${timeoutLabel}: ${error.message}`);
+    }
+    return new Error(`Failed to generate ${what}: ${error}`);
   }
 
   /**

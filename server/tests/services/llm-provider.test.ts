@@ -32,6 +32,7 @@ jest.mock("@server/lib/logger", () => ({
 }));
 
 import { LLMService } from "../../services/core/llm.service";
+import { setUsageSink, type UsageEvent } from "../../services/llm/usage-sink";
 
 const CHAT_RESPONSE = {
   model: "gpt-4o",
@@ -100,6 +101,38 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
   it("returns the raw string content (callers JSON.parse it)", async () => {
     const out = await llm.invoke({ history: "hi" });
     expect(out).toBe('{"ok":true}');
+  });
+
+  it("invokeWithMeta returns normalized usage + provenance alongside content", async () => {
+    const meta = await llm.invokeWithMeta({ history: "hi" });
+    expect(meta).toEqual({
+      content: '{"ok":true}',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15, estimated: false },
+      model: "gpt-4o",
+      provider: "openai-compatible",
+    });
+  });
+
+  it("fires the usage seam once per chat and once per embedding", async () => {
+    const events: UsageEvent[] = [];
+    setUsageSink((e) => events.push(e));
+    try {
+      await llm.invoke({ history: "hi", tier: "medium" });
+      mockEmbeddingsCreate.mockResolvedValue({
+        model: "text-embedding-3-small",
+        data: [{ index: 0, embedding: [0.1] }],
+        usage: { prompt_tokens: 2, total_tokens: 2 },
+      } as never);
+      await llm.embedding({ text: "x" });
+    } finally {
+      setUsageSink(undefined);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ kind: "chat", model: "gpt-4o", tier: "medium" });
+    expect(events[0].usage.totalTokens).toBe(15);
+    expect(events[1]).toMatchObject({ kind: "embedding", model: "text-embedding-3-small" });
+    expect(events[1].usage.completionTokens).toBe(0);
   });
 
   it("embeds via the default text-embedding-3-small model and returns the vector", async () => {
