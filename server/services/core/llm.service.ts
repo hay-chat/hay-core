@@ -1,9 +1,15 @@
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { config } from "@server/config/env";
-import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "@server/lib/logger";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import type {
+  ChatMessage,
+  ChatRequest,
+  ChatResult,
+  ModelTier,
+} from "@server/services/llm/provider.types";
 
 const logger = createLogger("llm");
 
@@ -12,10 +18,19 @@ export interface ChatOptions {
   prompt?: string;
   jsonSchema?: object;
   strictSchema?: boolean; // Whether to enforce strict schema adherence (default: true for reliability)
+  /**
+   * Task-complexity tier; resolves to a concrete model via the org's provider config.
+   * Primary selector — prefer this over `model`. Defaults to "hard".
+   */
+  tier?: ModelTier;
+  /** Escape hatch: a concrete model id, bypassing tier resolution. */
   model?: string;
+  /** Organization whose provider config to use. Falls back to the env default bundle. */
+  organizationId?: string;
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface EmbeddingOptions {
@@ -24,14 +39,9 @@ export interface EmbeddingOptions {
 }
 
 export class LLMService {
-  private openai: OpenAI;
   private logFilePath: string;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-
     // Create logs directory if it doesn't exist
     const logsDir = path.join(process.cwd(), "logs");
     if (!fs.existsSync(logsDir)) {
@@ -49,87 +59,74 @@ export class LLMService {
       prompt,
       jsonSchema,
       strictSchema = true, // Default to strict mode for guaranteed schema compliance
-      model = "gpt-4o",
+      tier = "hard",
+      model,
+      organizationId,
       temperature = 0.7,
       max_tokens = 2000,
       stream = false,
+      signal,
     } = options;
 
+    const bundle = llmProviderFactory.forOrganization(organizationId);
+    const resolvedModel = model ?? bundle.tiers[tier];
+
+    const request: ChatRequest = {
+      model: resolvedModel,
+      messages: this.prepareMessages(history || "", prompt),
+      temperature,
+      maxTokens: max_tokens,
+      signal,
+      ...(jsonSchema && {
+        structured: {
+          schema: jsonSchema as Record<string, unknown>,
+          strict: strictSchema,
+        },
+      }),
+    };
+
     try {
-      const preparedMessages = this.prepareMessages(history || "", prompt);
-
-      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-        model,
-        messages: preparedMessages,
-        temperature,
-        max_tokens,
-        ...(jsonSchema &&
-          (strictSchema
-            ? {
-                // Structured Outputs with strict schema validation
-                response_format: {
-                  type: "json_schema",
-                  json_schema: {
-                    name: "structured_response",
-                    schema: jsonSchema as Record<string, unknown>,
-                    strict: true,
-                  },
-                },
-              }
-            : {
-                // JSON mode without strict validation (schema in prompt only)
-                response_format: { type: "json_object" },
-              })),
-      };
-
       if (stream) {
         const streamResponse = await this.executeWithTimeout(
-          this.openai.chat.completions.create({
-            ...requestConfig,
-            stream: true,
-          }),
-          60000, // 60 second timeout for streaming
+          bundle.chat.chatStream(request),
+          60000, // 60 second timeout to establish the stream
         );
-        return this.streamToAsyncIterable(streamResponse) as T;
+        return streamResponse.stream as T;
       }
 
-      const response = await this.executeWithTimeout(
-        this.openai.chat.completions.create(requestConfig),
+      const result = await this.executeWithTimeout(
+        bundle.chat.chat(request),
         30000, // 30 second timeout for non-streaming
       );
-      const content = response.choices[0]?.message?.content;
 
-      // Debugging: Log response information
-      this.logLLMResponseDebugInfo(response);
+      this.logChatResultDebugInfo(result);
 
-      if (!content) {
-        throw new Error("No content received from OpenAI");
+      if (!result.content) {
+        throw new Error("No content received from LLM provider");
       }
-      return content as T;
+      return result.content as T;
     } catch (error) {
       if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`OpenAI API timeout: ${error.message}`);
+        throw new Error(`LLM provider timeout: ${error.message}`);
       }
       throw new Error(`Failed to generate chat response: ${error}`);
     }
   }
 
   async embedding(options: EmbeddingOptions): Promise<number[]> {
-    const { text, model = "text-embedding-3-small" } = options;
+    const { text, model = config.openai.models.embedding.model } = options;
+    const bundle = llmProviderFactory.forOrganization();
 
     try {
-      const response = await this.executeWithTimeout(
-        this.openai.embeddings.create({
-          model,
-          input: text,
-        }),
+      const result = await this.executeWithTimeout(
+        bundle.embedding.embed({ model, input: text }),
         30000, // 30 second timeout for embeddings
       );
 
-      return response.data[0]?.embedding || [];
+      return result.embeddings[0] ?? [];
     } catch (error) {
       if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`OpenAI embedding timeout: ${error.message}`);
+        throw new Error(`LLM embedding timeout: ${error.message}`);
       }
       throw new Error(`Failed to generate embedding: ${error}`);
     }
@@ -151,11 +148,8 @@ export class LLMService {
     ]);
   }
 
-  private prepareMessages(
-    history: string | Message[],
-    systemPrompt?: string,
-  ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  private prepareMessages(history: string | Message[], systemPrompt?: string): ChatMessage[] {
+    const messages: ChatMessage[] = [];
 
     if (systemPrompt) {
       messages.push({ role: "system", content: systemPrompt });
@@ -170,20 +164,7 @@ export class LLMService {
     return messages;
   }
 
-  private async *streamToAsyncIterable(
-    stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
-  ): AsyncIterable<string> {
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
-      }
-    }
-  }
-
-  private serializeMessages(
-    messages: Message[],
-  ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  private serializeMessages(messages: Message[]): ChatMessage[] {
     return messages.map((message) => {
       let role: "system" | "user" | "assistant";
 
@@ -246,33 +227,25 @@ export class LLMService {
     }
   }
 
-  private logLLMResponseDebugInfo(response: OpenAI.Chat.Completions.ChatCompletion): void {
+  private logChatResultDebugInfo(result: ChatResult): void {
     this.writeToLog("=== LLM RESPONSE DEBUG INFO ===");
-    this.writeToLog(`Model: ${response.model}`);
-    this.writeToLog(`Created: ${new Date(response.created * 1000).toISOString()}`);
-    this.writeToLog(`Finish reason: ${response.choices[0]?.finish_reason}`);
+    this.writeToLog(`Provider: ${result.provider}`);
+    this.writeToLog(`Model: ${result.model}`);
+    this.writeToLog(`Finish reason: ${result.finishReason}`);
+    this.writeToLog("--- TOKEN USAGE ---");
+    this.writeToLog(`Prompt tokens: ${result.usage.promptTokens}`);
+    this.writeToLog(`Completion tokens: ${result.usage.completionTokens}`);
+    this.writeToLog(
+      `Total tokens: ${result.usage.totalTokens}${result.usage.estimated ? " (estimated)" : ""}`,
+    );
 
-    if (response.usage) {
-      this.writeToLog("--- TOKEN USAGE ---");
-      this.writeToLog(`Prompt tokens: ${response.usage.prompt_tokens}`);
-      this.writeToLog(`Completion tokens: ${response.usage.completion_tokens}`);
-      this.writeToLog(`Total tokens: ${response.usage.total_tokens}`);
-
-      // Calculate approximate cost (rough estimates for GPT-4o)
-      const inputCost = (response.usage.prompt_tokens / 1000) * 0.005; // $5 per 1M tokens
-      const outputCost = (response.usage.completion_tokens / 1000) * 0.015; // $15 per 1M tokens
-      const totalCost = inputCost + outputCost;
-      this.writeToLog(`Estimated cost: $${totalCost.toFixed(6)}`);
-    }
-
-    const responseContent = response.choices[0]?.message?.content || "";
+    const responseContent = result.content;
     this.writeToLog(`Response length: ${responseContent.length} chars`);
     this.writeToLog(
       `Response preview: "${responseContent.substring(0, 200)}${
         responseContent.length > 200 ? "..." : ""
       }"`,
     );
-
     this.writeToLog("=== END LLM RESPONSE DEBUG INFO ===");
   }
 }
