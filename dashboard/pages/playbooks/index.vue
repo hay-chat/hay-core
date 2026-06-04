@@ -272,8 +272,7 @@ const searchQuery = ref("");
 const selectedCategory = ref("");
 const selectedStatus = ref("");
 const viewMode = ref<"grid" | "table">("grid");
-const currentPage = ref(1);
-const pageSize = ref(10);
+const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 
 // Data from API
 const playbooks = ref<Playbook[]>([]);
@@ -417,12 +416,11 @@ const fetchPlaybooks = async () => {
 
 // Pagination handlers
 const handlePageChange = (page: number) => {
-  currentPage.value = page;
+  setPage(page);
 };
 
 const handleItemsPerPageChange = (itemsPerPage: number) => {
-  pageSize.value = itemsPerPage;
-  currentPage.value = 1; // Reset to first page when changing page size
+  setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
 };
 
 // Lifecycle

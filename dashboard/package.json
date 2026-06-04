@@ -37,6 +37,7 @@
     "@tiptap/vue-3": "^2.10.5",
     "canvas-confetti": "^1.9.4",
     "marked": "^17.0.1",
+    "node-emoji": "^2.2.0",
     "pinia-plugin-persistedstate": "^4.7.1",
     "sonner": "^2.0.7",
     "tippy.js": "^6.3.7",

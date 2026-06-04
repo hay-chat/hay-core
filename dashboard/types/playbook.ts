@@ -36,6 +36,7 @@ export interface Playbook {
   organization_id?: string | null;
   active_version_id?: string | null;
   draft_version_id?: string | null;
+  agents?: Agent[];
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown; // Allow additional properties from API

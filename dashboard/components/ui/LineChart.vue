@@ -27,8 +27,15 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
+export type LineChartData = Array<{
+  date?: string;
+  chartIndex?: number;
+  count: number;
+  label?: string;
+}>;
+
 interface Props {
-  data: Array<{ date?: string; chartIndex?: number; count: number; label?: string }>;
+  data: LineChartData;
   height?: number;
   colors?: string[];
   showLegend?: boolean;

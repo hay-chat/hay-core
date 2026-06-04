@@ -304,15 +304,22 @@
                 </div>
                 <div class="flex items-center space-x-3">
                   <div class="text-sm">
-                    <select
-                      v-model="member.role"
-                      class="px-3 py-1 border border-input bg-background rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      @change="updateMemberRole(member)"
-                    >
-                      <option value="admin">{{ $t("organizations.members.roles.admin") }}</option>
-                      <option value="member">{{ $t("organizations.members.roles.member") }}</option>
-                      <option value="viewer">{{ $t("organizations.members.roles.viewer") }}</option>
-                    </select>
+                    <Select v-model="member.role" @update:model-value="updateMemberRole(member)">
+                      <SelectTrigger class="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">{{
+                          $t("organizations.members.roles.admin")
+                        }}</SelectItem>
+                        <SelectItem value="member">{{
+                          $t("organizations.members.roles.member")
+                        }}</SelectItem>
+                        <SelectItem value="viewer">{{
+                          $t("organizations.members.roles.viewer")
+                        }}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button variant="ghost" size="sm" @click="removeMember(member)">
                     <X class="h-4 w-4" />
@@ -354,16 +361,17 @@
             </div>
             <div>
               <Label html-for="timezone">{{ $t("organizations.settings.timezone") }}</Label>
-              <select
-                id="timezone"
-                v-model="organizationForm.timezone"
-                class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="UTC">UTC</option>
-                <option value="America/New_York">Eastern Time</option>
-                <option value="America/Chicago">Central Time</option>
-                <option value="America/Los_Angeles">Pacific Time</option>
-              </select>
+              <Select v-model="organizationForm.timezone">
+                <SelectTrigger id="timezone" class="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UTC">UTC</SelectItem>
+                  <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                  <SelectItem value="America/Chicago">Central Time</SelectItem>
+                  <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div class="flex justify-end">
               <Button @click="saveSettings">

@@ -159,7 +159,7 @@
             <ChatMessage
               v-for="message in messages"
               :key="message.id"
-              :message="message"
+              :message="message as Message"
               :inverted="true"
               :show-feedback="true"
               @retry="retryMessage"
@@ -233,7 +233,7 @@
               <ChatMessage
                 v-for="message in conversation?.messages"
                 :key="message.id"
-                :message="message"
+                :message="message as Message"
                 :show-feedback="true"
                 :show-approval="isTestMode"
                 @message-approved="handleMessageApproved"
@@ -730,7 +730,7 @@ import {
 } from "lucide-vue-next";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
-import { MessageType } from "~/types/message";
+import { MessageType, type Message } from "~/types/message";
 import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
 

@@ -36,16 +36,17 @@
         </div>
       </div>
       <div class="flex gap-2">
-        <select
-          v-model="statusFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
-        </select>
+        <Select v-model="statusFilter" @update:model-value="applyFilters">
+          <SelectTrigger class="w-40">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
 
@@ -158,18 +159,22 @@
     <div v-else-if="!loading && filteredOrganizations.length === 0" class="text-center py-12">
       <Building2 class="mx-auto h-12 w-12 text-neutral-muted" />
       <h3 class="mt-4 text-lg font-medium text-foreground">
-        {{ searchQuery || statusFilter ? "No organizations found" : "No organizations yet" }}
+        {{
+          searchQuery || statusFilter !== "all" ? "No organizations found" : "No organizations yet"
+        }}
       </h3>
       <p class="mt-2 text-sm text-neutral-muted">
         {{
-          searchQuery || statusFilter
+          searchQuery || statusFilter !== "all"
             ? "Try adjusting your search or filters."
             : "Get started by creating your first organization."
         }}
       </p>
       <div class="mt-6">
-        <Button @click="searchQuery || statusFilter ? clearFilters() : createOrganization()">
-          {{ searchQuery || statusFilter ? "Clear Filters" : "Create Organization" }}
+        <Button
+          @click="searchQuery || statusFilter !== 'all' ? clearFilters() : createOrganization()"
+        >
+          {{ searchQuery || statusFilter !== "all" ? "Clear Filters" : "Create Organization" }}
         </Button>
       </div>
     </div>
@@ -224,7 +229,7 @@ const { formatDateTime } = useOrgDateTime();
 // State
 const loading = ref(false);
 const searchQuery = ref("");
-const statusFilter = ref("");
+const statusFilter = ref("all");
 
 interface CurrentOrganization {
   id: string;
@@ -306,7 +311,7 @@ const filteredOrganizations = computed(() => {
   }
 
   // Apply status filter
-  if (statusFilter.value) {
+  if (statusFilter.value !== "all") {
     filtered = filtered.filter((org) => org.status === statusFilter.value);
   }
 
@@ -360,7 +365,7 @@ const applyFilters = () => {
 
 const clearFilters = () => {
   searchQuery.value = "";
-  statusFilter.value = "";
+  statusFilter.value = "all";
 };
 
 const createOrganization = () => {

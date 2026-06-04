@@ -276,8 +276,7 @@ const selectedAgent = ref("");
 const selectedTimeframe = ref("week");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
-const currentPage = ref(1);
-const pageSize = ref(10);
+const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 
 // API data
 interface AssignedUser {
@@ -531,13 +530,12 @@ const refreshConversations = async () => {
 };
 
 const handlePageChange = async (page: number) => {
-  currentPage.value = page;
+  setPage(page);
   await fetchConversations();
 };
 
 const handleItemsPerPageChange = async (itemsPerPage: number) => {
-  pageSize.value = itemsPerPage;
-  currentPage.value = 1; // Reset to first page when changing page size
+  setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
   await fetchConversations();
 };
 

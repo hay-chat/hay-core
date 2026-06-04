@@ -91,34 +91,38 @@
         </div>
       </div>
       <div class="flex gap-2">
-        <select
-          v-model="statusFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">{{ $t("queue.filters.allStatus") }}</option>
-          <option value="pending">{{ $t("queue.filters.statusPending") }}</option>
-          <option value="queued">{{ $t("queue.filters.statusQueued") }}</option>
-          <option value="processing">{{ $t("queue.filters.statusProcessing") }}</option>
-          <option value="completed">{{ $t("queue.filters.statusCompleted") }}</option>
-          <option value="failed">{{ $t("queue.filters.statusFailed") }}</option>
-          <option value="cancelled">{{ $t("queue.filters.statusCancelled") }}</option>
-          <option value="retrying">{{ $t("queue.filters.statusRetrying") }}</option>
-        </select>
-        <select
-          v-model="typeFilter"
-          class="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          @change="applyFilters"
-        >
-          <option value="">{{ $t("queue.filters.allTypes") }}</option>
-          <option value="document_upload">{{ $t("queue.filters.typeDocumentUpload") }}</option>
-          <option value="document_processing">
-            {{ $t("queue.filters.typeDocumentProcessing") }}
-          </option>
-          <option value="email">{{ $t("queue.filters.typeEmail") }}</option>
-          <option value="export">{{ $t("queue.filters.typeExport") }}</option>
-          <option value="import">{{ $t("queue.filters.typeImport") }}</option>
-        </select>
+        <Select v-model="statusFilter" @update:model-value="applyFilters">
+          <SelectTrigger class="w-40">
+            <SelectValue :placeholder="$t('queue.filters.allStatus')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{{ $t("queue.filters.allStatus") }}</SelectItem>
+            <SelectItem value="pending">{{ $t("queue.filters.statusPending") }}</SelectItem>
+            <SelectItem value="queued">{{ $t("queue.filters.statusQueued") }}</SelectItem>
+            <SelectItem value="processing">{{ $t("queue.filters.statusProcessing") }}</SelectItem>
+            <SelectItem value="completed">{{ $t("queue.filters.statusCompleted") }}</SelectItem>
+            <SelectItem value="failed">{{ $t("queue.filters.statusFailed") }}</SelectItem>
+            <SelectItem value="cancelled">{{ $t("queue.filters.statusCancelled") }}</SelectItem>
+            <SelectItem value="retrying">{{ $t("queue.filters.statusRetrying") }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select v-model="typeFilter" @update:model-value="applyFilters">
+          <SelectTrigger class="w-40">
+            <SelectValue :placeholder="$t('queue.filters.allTypes')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{{ $t("queue.filters.allTypes") }}</SelectItem>
+            <SelectItem value="document_upload">{{
+              $t("queue.filters.typeDocumentUpload")
+            }}</SelectItem>
+            <SelectItem value="document_processing">{{
+              $t("queue.filters.typeDocumentProcessing")
+            }}</SelectItem>
+            <SelectItem value="email">{{ $t("queue.filters.typeEmail") }}</SelectItem>
+            <SelectItem value="export">{{ $t("queue.filters.typeExport") }}</SelectItem>
+            <SelectItem value="import">{{ $t("queue.filters.typeImport") }}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
 
@@ -440,8 +444,8 @@ const totalJobs = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
 const searchQuery = ref("");
-const statusFilter = ref("");
-const typeFilter = ref("");
+const statusFilter = ref("all");
+const typeFilter = ref("all");
 const showDetailsModal = ref(false);
 const selectedJob = ref<Job | null>(null);
 const stats = ref({
@@ -577,7 +581,7 @@ const setupWebSocket = () => {
         // Handle different message types for queue updates
         if (message.type === "queue_update" || message.type === "job_update") {
           fetchStats();
-          if (["", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
+          if (["all", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
             fetchJobs();
           }
         }
@@ -610,7 +614,7 @@ const setupWebSocket = () => {
         if (!loading.value) {
           fetchStats();
           // Only refresh jobs if we're viewing active jobs
-          if (["", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
+          if (["all", "pending", "queued", "processing", "retrying"].includes(statusFilter.value)) {
             fetchJobs();
           }
         }

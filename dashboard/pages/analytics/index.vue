@@ -7,15 +7,17 @@
         <p class="text-neutral-muted">Monitor your chatbot performance and conversation insights</p>
       </div>
       <div class="flex items-center space-x-2">
-        <select
-          v-model="selectedTimeframe"
-          class="px-3 py-2 text-sm border border-input rounded-md"
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-          <option value="custom">Custom Range</option>
-        </select>
+        <Select v-model="selectedTimeframe">
+          <SelectTrigger class="w-40">
+            <SelectValue placeholder="Select timeframe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="90d">Last 90 days</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" @click="exportReport">
           <Download class="h-4 w-4 mr-2" />
           Export

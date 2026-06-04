@@ -90,14 +90,14 @@
         <!-- Line Chart -->
         <LineChart
           v-if="chartType === 'line' && chartData"
-          :data="chartData"
+          :data="chartData as LineChartData"
           v-bind="chartConfig"
         />
 
         <!-- Bar Chart -->
         <BarChart
           v-else-if="chartType === 'bar' && chartData"
-          :data="chartData"
+          :data="chartData as BarChartData"
           v-bind="chartConfig"
         />
 
@@ -133,8 +133,8 @@ import DropdownMenuTrigger from "./DropdownMenuTrigger.vue";
 import DropdownMenuContent from "./DropdownMenuContent.vue";
 import DropdownMenuItem from "./DropdownMenuItem.vue";
 import DropdownMenuSeparator from "./DropdownMenuSeparator.vue";
-import LineChart from "./LineChart.vue";
-import BarChart from "./BarChart.vue";
+import LineChart, { type LineChartData } from "./LineChart.vue";
+import BarChart, { type BarChartData } from "./BarChart.vue";
 import SentimentGauge from "./SentimentGauge.vue";
 import Loading from "./Loading.vue";
 import Error from "./Error.vue";
