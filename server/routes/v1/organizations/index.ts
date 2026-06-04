@@ -15,6 +15,11 @@ import { Organization } from "@server/entities/organization.entity";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
+import {
+  CHAT_MODEL_CATALOG,
+  EMBEDDING_MODEL_CATALOG,
+  DEFAULT_TIER_MAP,
+} from "@server/services/llm/model-catalog";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
@@ -232,6 +237,14 @@ export const organizationsRouter = t.router({
       };
     },
   ),
+
+  // Static model presets + default tier maps for the settings UI (single source of
+  // truth lives in services/llm/model-catalog.ts).
+  getModelCatalog: authenticatedProcedure.query(() => ({
+    chatModels: CHAT_MODEL_CATALOG,
+    embeddingModels: EMBEDDING_MODEL_CATALOG,
+    defaultTiers: DEFAULT_TIER_MAP,
+  })),
 
   // Read the org's LLM provider config. The encrypted BYO key is never returned —
   // only whether one is set.

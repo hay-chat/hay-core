@@ -122,7 +122,7 @@
         <CardContent>
           <ModelSelect
             v-model="form.embeddingModel"
-            :options="EMBEDDING_MODEL_CATALOG"
+            :options="embeddingOptions"
             :label="$t('llmSettings.embedding.model')"
             :helper-text="$t('llmSettings.embedding.modelHelper')"
             :custom-label="$t('llmSettings.modelCustom')"
@@ -138,12 +138,16 @@
 import { Save, AlertTriangle, Unlock, ShieldCheck } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
-import {
-  CHAT_MODEL_CATALOG,
-  EMBEDDING_MODEL_CATALOG,
-  DEFAULT_TIER_MAP,
-  type ModelFamily,
-} from "@server/services/llm/model-catalog";
+// Type-only import (erased at runtime); the catalog VALUES are fetched over tRPC,
+// because @server has no runtime alias in the dashboard bundle.
+import type { ModelFamily } from "@server/services/llm/model-catalog";
+
+type TierMap = { hard: string; medium: string; easy: string };
+interface ModelCatalog {
+  chatModels: Record<ModelFamily, string[]>;
+  embeddingModels: string[];
+  defaultTiers: Record<ModelFamily, TierMap>;
+}
 
 // A single, flat provider choice in the UI; mapped to the backend's {provider, vendor}.
 type ProviderChoice = ModelFamily | "custom";
@@ -168,16 +172,21 @@ const hasApiKey = ref(false);
 // radically alter agent behavior.
 const unlocked = ref(false);
 
-const EMPTY_TIERS = { hard: "", medium: "", easy: "" };
+// Catalog fetched from the server on mount (presets + default tier maps).
+const catalog = ref<ModelCatalog | null>(null);
+
+const EMPTY_TIERS: TierMap = { hard: "", medium: "", easy: "" };
 
 /** Tier defaults for a UI choice; "custom" has no presets. */
-function tierDefaultsFor(choice: ProviderChoice): { hard: string; medium: string; easy: string } {
-  return choice === "custom" ? { ...EMPTY_TIERS } : { ...DEFAULT_TIER_MAP[choice] };
+function tierDefaultsFor(choice: ProviderChoice): TierMap {
+  if (choice === "custom" || !catalog.value) return { ...EMPTY_TIERS };
+  return { ...catalog.value.defaultTiers[choice] };
 }
 
 /** Preset chat models for a UI choice ("custom" offers none — free text only). */
 function chatModelsFor(choice: ProviderChoice): string[] {
-  return choice === "custom" ? [] : CHAT_MODEL_CATALOG[choice];
+  if (choice === "custom" || !catalog.value) return [];
+  return catalog.value.chatModels[choice];
 }
 
 function defaults(): LlmForm {
@@ -217,6 +226,7 @@ const providerChoice = computed<ProviderChoice>({
 const showBaseUrl = computed(() => ["mistral", "grok", "custom"].includes(form.value.selection));
 
 const chatModelOptions = computed(() => chatModelsFor(form.value.selection));
+const embeddingOptions = computed(() => catalog.value?.embeddingModels ?? []);
 
 function toProviderVendor(sel: ProviderChoice): { provider: Provider; vendor?: Vendor } {
   switch (sel) {
@@ -237,6 +247,14 @@ function toSelection(provider: string, vendor?: string): ProviderChoice {
 
 const hasChanges = computed(() => JSON.stringify(form.value) !== JSON.stringify(original.value));
 
+async function loadCatalog() {
+  try {
+    catalog.value = (await Hay.organizations.getModelCatalog.query()) as ModelCatalog;
+  } catch (error) {
+    console.error("Failed to load model catalog:", error);
+  }
+}
+
 async function load() {
   try {
     const config = await Hay.organizations.getLlmConfig.query();
@@ -251,6 +269,10 @@ async function load() {
       };
       form.value = f;
       hasApiKey.value = config.chat.hasApiKey;
+    } else {
+      // No saved config — start from the provider's preset defaults (now that the
+      // catalog is loaded, defaults() ran before it was available).
+      form.value.tiers = tierDefaultsFor("openai");
     }
     original.value = JSON.parse(JSON.stringify(form.value));
   } catch (error) {
@@ -286,7 +308,10 @@ async function save() {
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  await loadCatalog();
+  await load();
+});
 
 definePageMeta({ layout: "default" });
 useHead({ title: computed(() => `${t("llmSettings.title")} - Hay Dashboard`) });
