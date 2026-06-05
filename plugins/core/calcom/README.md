@@ -34,19 +34,22 @@ resource. The MCP server pins a known-good version per domain (see `mcp/index.js
 - slots → `2024-09-04`
 - bookings (create/list/get/cancel/reschedule) and `/me` → `2026-02-25`
 
-## The `mcp/` dependency install (framework gap)
+## The `mcp/` dependency install
 
-The platform spawns `mcp/index.js` but does **not** run `npm install` inside `mcp/`, and
-`mcp/node_modules` is gitignored. So before this plugin can start, install the MCP server's
-runtime deps once:
+The bundled `mcp/` server is deliberately outside the npm workspace and its
+`mcp/node_modules` is gitignored, so it isn't populated by the root install. The platform
+now installs it automatically: the SDK presence-checks `mcp/node_modules` and runs
+`npm install --omit=dev` on first spawn (`packages/plugin-sdk/sdk/mcp-runtime.ts`), and
+`installPlugin`/`needsInstallation` reconcile the gitignored directory with the persisted
+install flag. No manual step is required.
+
+(The committed `mcp/package.json` + lockfile pin `@modelcontextprotocol/sdk` and `zod`.)
+
+If you ever need to install it by hand (e.g. to debug the server standalone):
 
 ```bash
 npm install --omit=dev --prefix plugins/core/calcom/mcp
 ```
-
-(The committed `mcp/package.json` + lockfile pin `@modelcontextprotocol/sdk` and `zod`.)
-This matches how `klaviyo` is run today. The cleaner long-term fix is to add an `mcp/`
-install step to the build — flagged for the maintainers.
 
 ## Build
 
