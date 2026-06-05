@@ -151,6 +151,7 @@ const editorExtensions = computed(() => [
     mcpTools: resolvedTools.value,
     documents: documents.value,
     apiBaseUrl,
+    resolveLabel: getToolLabel,
   }),
   configureSlashCommand({
     mcpTools: resolvedTools.value,
