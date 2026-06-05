@@ -1,0 +1,44 @@
+{
+  "name": "Cal.com",
+  "description": "Conecte sua conta do Cal.com para que o agente possa listar tipos de evento, encontrar horários livres e agendar, remarcar ou cancelar reuniões.",
+  "tools": {
+    "get_me": {
+      "label": "Obter Conta",
+      "description": "Consulta a conta do Cal.com conectada (usuário, e-mail, fuso horário padrão)."
+    },
+    "list_event_types": {
+      "label": "Listar Tipos de Evento",
+      "description": "Lista os tipos de reunião disponíveis para agendamento e suas durações."
+    },
+    "get_available_slots": {
+      "label": "Verificar Disponibilidade",
+      "description": "Encontra horários livres para um tipo de evento dentro de um período."
+    },
+    "create_booking": {
+      "label": "Agendar Reunião",
+      "description": "Agenda uma reunião em um tipo de evento para o cliente."
+    },
+    "list_bookings": {
+      "label": "Listar Agendamentos",
+      "description": "Lista agendamentos, com filtros opcionais, para localizar um antes de remarcar ou cancelar."
+    },
+    "get_booking": {
+      "label": "Obter Agendamento",
+      "description": "Obtém os detalhes de um agendamento específico pela sua referência."
+    },
+    "cancel_booking": {
+      "label": "Cancelar Agendamento",
+      "description": "Cancela um agendamento aceito ou pendente."
+    },
+    "reschedule_booking": {
+      "label": "Remarcar Agendamento",
+      "description": "Move um agendamento aceito ou pendente para um novo horário."
+    }
+  },
+  "config": {
+    "apiKey": {
+      "label": "Chave de API",
+      "description": "Sua chave de API do Cal.com (começa com cal_). Crie uma em Configurações → Desenvolvedor → Chaves de API."
+    }
+  }
+}

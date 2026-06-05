@@ -40,6 +40,13 @@ export interface MentionConfig {
   mcpTools: MCPTool[];
   documents: DocumentItem[];
   apiBaseUrl: string;
+  /**
+   * Resolves an action chip's display label from its plugin + tool name at
+   * render time. Lets stored mention nodes (which carry the raw tool name)
+   * show the locale's translated/humanized label instead. Documents are
+   * unaffected — their stored label is the real title.
+   */
+  resolveLabel?: (pluginId: string, toolName: string) => string;
 }
 
 export const configureMentionExtension = (config: MentionConfig) => {
@@ -108,6 +115,21 @@ export const configureMentionExtension = (config: MentionConfig) => {
       const pluginId = node.attrs.pluginId;
       const classes = ["mention"];
 
+      // Resolve the action chip's visible label at render time so stored
+      // mentions (which carry the raw tool name, e.g. "list_event_types")
+      // display the current locale's translated/humanized label. The node id
+      // is always `${pluginId}:${toolName}`, so we recover the tool name from
+      // it. data-label keeps the original for round-tripping.
+      let displayLabel = node.attrs.label;
+      if (type === "action" && config.resolveLabel) {
+        const id = typeof node.attrs.id === "string" ? node.attrs.id : "";
+        const toolName =
+          pluginId && id.startsWith(`${pluginId}:`)
+            ? id.slice(pluginId.length + 1)
+            : node.attrs.label;
+        displayLabel = config.resolveLabel(pluginId, toolName) || node.attrs.label;
+      }
+
       if (type === "action") {
         classes.push("mention-action");
       } else if (type === "document") {
@@ -148,7 +170,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
           node.attrs.label,
         ]);
       } else {
-        content.push(node.attrs.label);
+        content.push(displayLabel);
       }
 
       return [
