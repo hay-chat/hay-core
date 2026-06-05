@@ -132,14 +132,18 @@ async function startServer() {
     res.send("Welcome to Hay");
   });
 
-  // Health check endpoint
-  server.get("/health", (req, res) => {
+  // Health check endpoint.
+  // Registered at both `/health` (internal — used by deploy.sh) and `/v1/health`
+  // (externally reachable via the nginx `/v1` proxy; `/health` is not proxied).
+  const healthHandler = (_req: express.Request, res: express.Response): void => {
     res.json({
       status: "ok",
       redis: redisService.isConnected(),
       rabbitmq: rabbitmqService.isConnected(),
     });
-  });
+  };
+  server.get("/health", healthHandler);
+  server.get("/v1/health", healthHandler);
 
   // Serve uploaded files from local storage
   const uploadDir = require("path").resolve(config.storage.local.uploadDir);
