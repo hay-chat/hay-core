@@ -4,12 +4,10 @@
  */
 
 import Mention from "@tiptap/extension-mention";
-import { VueRenderer } from "@tiptap/vue-3";
-import tippy from "tippy.js";
-import type { Instance as TippyInstance } from "tippy.js";
-import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
+import type { SuggestionOptions } from "@tiptap/suggestion";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 import MentionList from "./MentionList.vue";
+import { createSuggestionRenderer } from "./suggestionRenderer";
 
 export interface MCPTool {
   id: string;
@@ -229,86 +227,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
 
         return [...actions, ...documents];
       },
-      render: () => {
-        let component: VueRenderer | null = null;
-        let popup: TippyInstance | null = null;
-
-        return {
-          onStart: (props: SuggestionProps) => {
-            component = new VueRenderer(MentionList, {
-              props,
-              editor: props.editor,
-            });
-
-            if (!props.clientRect) {
-              return;
-            }
-
-            popup = tippy(document.body, {
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-              appendTo: () => document.body,
-              content: component.element as HTMLElement,
-              showOnCreate: true,
-              interactive: true,
-              trigger: "manual",
-              placement: "bottom-start",
-              maxWidth: "none",
-              onHide: () => {
-                // Ensure cleanup when popup is hidden
-                if (popup) {
-                  popup.destroy();
-                }
-                if (component) {
-                  component.destroy();
-                }
-                popup = null;
-                component = null;
-              },
-            });
-          },
-
-          onUpdate(props: SuggestionProps) {
-            if (!component || !popup) return;
-
-            component.updateProps(props);
-
-            if (!props.clientRect) {
-              return;
-            }
-
-            popup.setProps({
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-            });
-          },
-
-          onKeyDown(props: { event: KeyboardEvent }) {
-            if (props.event.key === "Escape") {
-              // Clean up popup and component
-              if (popup) {
-                popup.hide();
-              }
-              // Return false to let Tiptap close the suggestion
-              return false;
-            }
-
-            if (!component?.ref) return false;
-
-            return component.ref.onKeyDown(props);
-          },
-
-          onExit() {
-            // Clean up on exit
-            if (popup) {
-              popup.destroy();
-            }
-            if (component) {
-              component.destroy();
-            }
-            popup = null;
-            component = null;
-          },
-        };
-      },
+      render: createSuggestionRenderer({ component: MentionList }),
     } as Omit<SuggestionOptions, "editor">,
   });
 };
