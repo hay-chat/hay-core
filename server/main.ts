@@ -190,7 +190,7 @@ async function startServer() {
 
   // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
 
-  // Plugin thumbnail route - serve thumbnail.jpg files
+  // Plugin thumbnail route - serves the plugin's thumbnail (svg > png > jpg)
   server.get(/^\/plugins\/thumbnails\/([^/]+)$/, (req, res) => {
     req.params = { pluginName: req.params[0] };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {

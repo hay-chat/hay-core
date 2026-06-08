@@ -1,0 +1,28 @@
+{
+  "name": "hay-plugin-wix",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Wix Stores site to look up orders, read transactions and fulfilment, issue refunds, and browse your catalog",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Wix Stores",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}
