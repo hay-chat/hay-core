@@ -4,12 +4,10 @@
  */
 
 import Mention from "@tiptap/extension-mention";
-import { VueRenderer } from "@tiptap/vue-3";
-import tippy from "tippy.js";
-import type { Instance as TippyInstance } from "tippy.js";
-import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
+import type { SuggestionOptions } from "@tiptap/suggestion";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 import MentionList from "./MentionList.vue";
+import { createSuggestionRenderer } from "./suggestionRenderer";
 
 export interface MCPTool {
   id: string;
@@ -40,10 +38,24 @@ export interface MentionConfig {
   mcpTools: MCPTool[];
   documents: DocumentItem[];
   apiBaseUrl: string;
+  /**
+   * Resolves an action chip's display label from its plugin + tool name at
+   * render time. Lets stored mention nodes (which carry the raw tool name)
+   * show the locale's translated/humanized label instead. Documents are
+   * unaffected — their stored label is the real title.
+   */
+  resolveLabel?: (pluginId: string, toolName: string) => string;
 }
 
 export const configureMentionExtension = (config: MentionConfig) => {
   return Mention.extend({
+    // Let action/document chips be dragged to reorder them within the document.
+    // ProseMirror handles the move (cut from old position, drop at new) for any
+    // node whose schema is draggable. `selectable` must be true as well — the
+    // base Mention extension disables it, which would block the node-selection
+    // that drag-and-drop relies on.
+    draggable: true,
+    selectable: true,
     addAttributes() {
       return {
         id: {
@@ -108,6 +120,21 @@ export const configureMentionExtension = (config: MentionConfig) => {
       const pluginId = node.attrs.pluginId;
       const classes = ["mention"];
 
+      // Resolve the action chip's visible label at render time so stored
+      // mentions (which carry the raw tool name, e.g. "list_event_types")
+      // display the current locale's translated/humanized label. The node id
+      // is always `${pluginId}:${toolName}`, so we recover the tool name from
+      // it. data-label keeps the original for round-tripping.
+      let displayLabel = node.attrs.label;
+      if (type === "action" && config.resolveLabel) {
+        const id = typeof node.attrs.id === "string" ? node.attrs.id : "";
+        const toolName =
+          pluginId && id.startsWith(`${pluginId}:`)
+            ? id.slice(pluginId.length + 1)
+            : node.attrs.label;
+        displayLabel = config.resolveLabel(pluginId, toolName) || node.attrs.label;
+      }
+
       if (type === "action") {
         classes.push("mention-action");
       } else if (type === "document") {
@@ -148,7 +175,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
           node.attrs.label,
         ]);
       } else {
-        content.push(node.attrs.label);
+        content.push(displayLabel);
       }
 
       return [
@@ -200,86 +227,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
 
         return [...actions, ...documents];
       },
-      render: () => {
-        let component: VueRenderer | null = null;
-        let popup: TippyInstance | null = null;
-
-        return {
-          onStart: (props: SuggestionProps) => {
-            component = new VueRenderer(MentionList, {
-              props,
-              editor: props.editor,
-            });
-
-            if (!props.clientRect) {
-              return;
-            }
-
-            popup = tippy(document.body, {
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-              appendTo: () => document.body,
-              content: component.element as HTMLElement,
-              showOnCreate: true,
-              interactive: true,
-              trigger: "manual",
-              placement: "bottom-start",
-              maxWidth: "none",
-              onHide: () => {
-                // Ensure cleanup when popup is hidden
-                if (popup) {
-                  popup.destroy();
-                }
-                if (component) {
-                  component.destroy();
-                }
-                popup = null;
-                component = null;
-              },
-            });
-          },
-
-          onUpdate(props: SuggestionProps) {
-            if (!component || !popup) return;
-
-            component.updateProps(props);
-
-            if (!props.clientRect) {
-              return;
-            }
-
-            popup.setProps({
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-            });
-          },
-
-          onKeyDown(props: { event: KeyboardEvent }) {
-            if (props.event.key === "Escape") {
-              // Clean up popup and component
-              if (popup) {
-                popup.hide();
-              }
-              // Return false to let Tiptap close the suggestion
-              return false;
-            }
-
-            if (!component?.ref) return false;
-
-            return component.ref.onKeyDown(props);
-          },
-
-          onExit() {
-            // Clean up on exit
-            if (popup) {
-              popup.destroy();
-            }
-            if (component) {
-              component.destroy();
-            }
-            popup = null;
-            component = null;
-          },
-        };
-      },
+      render: createSuggestionRenderer({ component: MentionList }),
     } as Omit<SuggestionOptions, "editor">,
   });
 };

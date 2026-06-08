@@ -9,6 +9,8 @@
         </main>
       </div>
     </div>
+    <!-- Global red/green topbar shown when the server is unreachable -->
+    <ServerStatusBanner />
     <!-- Toast Container for all pages -->
     <ToastContainer />
   </SidebarProvider>
@@ -19,13 +21,15 @@ import { useWebSocket } from "@/composables/useWebSocket";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePluginTranslations } from "@/composables/usePluginTranslations";
 import { useToast } from "@/composables/useToast";
-import { onMounted } from "vue";
+import { useServerStatus } from "@/composables/useServerStatus";
+import { onMounted, onUnmounted } from "vue";
 
 // Initialize WebSocket connection for real-time updates
 const websocket = useWebSocket();
 const notifications = useNotifications();
 const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 const { toast } = useToast();
+const serverStatus = useServerStatus();
 
 onMounted(() => {
   // Request notification permission on mount
@@ -33,6 +37,9 @@ onMounted(() => {
 
   // Connect to WebSocket
   websocket.connect();
+
+  // Start polling /v1/health so we can surface a banner when the server is down
+  serverStatus.startMonitoring();
 
   // Load plugin i18n translations
   loadPluginTranslations();
@@ -49,5 +56,9 @@ onMounted(() => {
       sessionStorage.removeItem("org-switch-success");
     }
   }
+});
+
+onUnmounted(() => {
+  serverStatus.stopMonitoring();
 });
 </script>
