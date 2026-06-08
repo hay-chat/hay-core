@@ -26,19 +26,19 @@
 // Core Factory (Phase 3.1) ✅
 // ============================================================================
 
-export { defineHayPlugin, PluginDefinitionError } from './factory.js';
+export { defineHayPlugin, PluginDefinitionError } from "./factory.js";
 
 // ============================================================================
 // Logger (Phase 3.2) ✅
 // ============================================================================
 
-export { Logger, createLogger, type LoggerContext } from './logger.js';
+export { Logger, createLogger, type LoggerContext } from "./logger.js";
 
 // ============================================================================
 // Stdio MCP Client
 // ============================================================================
 
-export { StdioMcpClient, type StdioMcpClientOptions, type McpTool } from './stdio-mcp-client.js';
+export { StdioMcpClient, type StdioMcpClientOptions, type McpTool } from "./stdio-mcp-client.js";
 
 // ============================================================================
 // Re-export types for convenience
@@ -84,6 +84,14 @@ export type {
   ExternalMcpOptions,
   HayMcpRuntimeAPI,
 
+  // Cron
+  CronRetryPolicy,
+  HayCronAuthAPI,
+  HayCronContext,
+  CronJobHandler,
+  CronJobOptions,
+  CronJobDescriptor,
+
   // Other
   HayLogger,
   HayOrg,
@@ -91,7 +99,7 @@ export type {
   UIExtensionDescriptor,
   HttpMethod,
   RouteHandler,
-} from '../types/index.js';
+} from "../types/index.js";
 
 // ============================================================================
 // Future SDK exports (upcoming phases):

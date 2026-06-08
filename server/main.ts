@@ -356,6 +356,11 @@ async function startServer() {
   try {
     await pluginManagerService.initialize();
     logger.info("Plugin manager initialized");
+
+    // Register plugin-declared cron jobs for enabled orgs (depends on plugin
+    // metadata populated by the manager above).
+    const { pluginCronService } = await import("@server/services/plugin-cron.service");
+    await pluginCronService.initialize();
   } catch (error) {
     logger.error({ err: error }, "Failed to initialize plugin system");
   }

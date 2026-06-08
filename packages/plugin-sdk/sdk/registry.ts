@@ -15,6 +15,8 @@ import type {
   RouteHandler,
   UIExtensionDescriptor,
   PluginPage,
+  CronJobOptions,
+  CronJobDescriptor,
 } from "../types/index.js";
 
 /**
@@ -81,6 +83,12 @@ export class PluginRegistry {
   private uiPages: PluginPage[] = [];
 
   /**
+   * Registered cron jobs.
+   * Array of cron job options (includes handler functions).
+   */
+  private cronJobs: CronJobOptions[] = [];
+
+  /**
    * Register config schema.
    *
    * @param schema - Config field descriptors
@@ -145,6 +153,43 @@ export class PluginRegistry {
     }
 
     this.uiPages.push(page);
+  }
+
+  /**
+   * Register a cron job.
+   *
+   * @param job - Cron job options
+   */
+  registerCronJob(job: CronJobOptions): void {
+    const existing = this.cronJobs.find((c) => c.name === job.name);
+    if (existing) {
+      throw new Error(`Cron job with name "${job.name}" is already registered`);
+    }
+
+    this.cronJobs.push(job);
+  }
+
+  /**
+   * Get a registered cron job (with handler) by name.
+   *
+   * @param name - Cron job name
+   * @returns Cron job options or undefined
+   */
+  getCronJob(name: string): CronJobOptions | undefined {
+    return this.cronJobs.find((c) => c.name === name);
+  }
+
+  /**
+   * Get serialisable cron descriptors (no handlers) for the `/metadata` endpoint.
+   *
+   * @returns Array of cron descriptors
+   */
+  getCronJobDescriptors(): CronJobDescriptor[] {
+    return this.cronJobs.map(({ name, schedule, retryPolicy }) => ({
+      name,
+      schedule,
+      ...(retryPolicy ? { retryPolicy } : {}),
+    }));
   }
 
   /**

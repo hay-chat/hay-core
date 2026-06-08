@@ -95,6 +95,20 @@ export type { UIExtensionDescriptor, PluginPage } from "./ui";
 export type { HayRegisterAPI, UIRegistrationAPI } from "./register";
 
 // ============================================================================
+// Cron Jobs (HAY-221)
+// ============================================================================
+
+export type {
+  CronRetryPolicy,
+  HayCronAuthAPI,
+  HayCronContext,
+  CronJobHandler,
+  CronJobOptions,
+  CronJobDescriptor,
+  CronInvocationResult,
+} from "./cron";
+
+// ============================================================================
 // Organization (Phase 2.2) ✅
 // ============================================================================
 
