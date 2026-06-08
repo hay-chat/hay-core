@@ -4,7 +4,14 @@
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
-const { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors } = require("../lib/format");
+const {
+  ok,
+  fail,
+  unwrapConnection,
+  pageInfo,
+  toGid,
+  assertNoUserErrors,
+} = require("../lib/format");
 
 function registerFulfillmentTools(server) {
   server.tool(
@@ -22,7 +29,7 @@ function registerFulfillmentTools(server) {
               id
               name
               displayFulfillmentStatus
-              fulfillments(first: 10) { # TODO(HAY-219 §8): verify Order.fulfillments accepts first: arg in 2026-04 against a real dev store — if it is a plain list, drop the (first:10).
+              fulfillments(first: 10) { # Verified 2026-04: Order.fulfillments is a plain [Fulfillment!]! list accepting first:; select fields directly (no edges/node).
                 status
                 displayStatus
                 estimatedDeliveryAt
@@ -67,7 +74,7 @@ function registerFulfillmentTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 }
 

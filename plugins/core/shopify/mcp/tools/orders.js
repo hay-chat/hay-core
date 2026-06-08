@@ -3,7 +3,14 @@
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
-const { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors } = require("../lib/format");
+const {
+  ok,
+  fail,
+  unwrapConnection,
+  pageInfo,
+  toGid,
+  assertNoUserErrors,
+} = require("../lib/format");
 
 function registerOrderTools(server) {
   server.tool(
@@ -38,34 +45,41 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
     "shopify_get_order_by_name",
-    "Look up an order by its human-readable name (e.g. \"#1001\").",
+    'Look up an order by its human-readable name (e.g. "#1001").',
     {
-      name: z.string().describe("Order name including any prefix, e.g. \"#1001\"."),
+      name: z.string().describe('Order name including any prefix, e.g. "#1001".'),
     },
     async (args) => {
       try {
+        // OrderIdentifierInput has no `name` field (only id / customId), so look
+        // an order up by its name via the orders search query. Verified 2026-04.
         const QUERY = `
-          query GetOrderByName($name: String!) {
-            orderByIdentifier(identifier: { name: $name }) {
-              id
-              name
-              displayFinancialStatus
-              displayFulfillmentStatus
-              note
+          query GetOrderByName($query: String!) {
+            orders(first: 1, query: $query) {
+              edges {
+                node {
+                  id
+                  name
+                  displayFinancialStatus
+                  displayFulfillmentStatus
+                  note
+                }
+              }
             }
           }
-        `; // TODO(HAY-219 §8): verify orderByIdentifier accepts { name } against a real dev store.
-        const data = await shopifyGql(QUERY, { name: args.name });
-        return ok(data.orderByIdentifier);
+        `;
+        const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
+        const first = unwrapConnection(data.orders)[0];
+        return ok(first || null);
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
@@ -92,7 +106,7 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
@@ -130,18 +144,27 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
     "shopify_search_orders",
     "Search orders with optional filters and cursor pagination. Returns { items, pageInfo }.",
     {
-      query: z.string().optional().describe("Raw Shopify search query; merged with the structured filters below."),
+      query: z
+        .string()
+        .optional()
+        .describe("Raw Shopify search query; merged with the structured filters below."),
       limit: z.number().int().optional().describe("Max orders to return (default 20)."),
       cursor: z.string().optional().describe("Pagination cursor (endCursor from a prior page)."),
-      financialStatus: z.string().optional().describe("financial_status filter, e.g. \"paid\", \"refunded\"."),
-      fulfillmentStatus: z.string().optional().describe("fulfillment_status filter, e.g. \"unfulfilled\", \"fulfilled\"."),
+      financialStatus: z
+        .string()
+        .optional()
+        .describe('financial_status filter, e.g. "paid", "refunded".'),
+      fulfillmentStatus: z
+        .string()
+        .optional()
+        .describe('fulfillment_status filter, e.g. "unfulfilled", "fulfilled".'),
       createdAfter: z.string().optional().describe("ISO date; filters created_at >= value."),
       createdBefore: z.string().optional().describe("ISO date; filters created_at <= value."),
     },
@@ -180,7 +203,7 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
@@ -188,10 +211,20 @@ function registerOrderTools(server) {
     "Cancel an order (WRITE). Optionally restock, refund, and notify the customer.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
-      reason: z.enum(["CUSTOMER", "DECLINED", "FRAUD", "INVENTORY", "OTHER", "STAFF"]).describe("Cancellation reason."),
+      reason: z
+        .enum(["CUSTOMER", "DECLINED", "FRAUD", "INVENTORY", "OTHER", "STAFF"])
+        .describe("Cancellation reason."),
       restock: z.boolean().describe("Whether to restock line items."),
-      refund_to_original_payment: z.boolean().optional().describe("If true, refund to the original payment method; if omitted, no refundMethod is sent."),
-      notify_customer: z.boolean().optional().describe("Whether to notify the customer of the cancellation."),
+      refund_to_original_payment: z
+        .boolean()
+        .optional()
+        .describe(
+          "If true, refund to the original payment method; if omitted, no refundMethod is sent.",
+        ),
+      notify_customer: z
+        .boolean()
+        .optional()
+        .describe("Whether to notify the customer of the cancellation."),
       staff_note: z.string().optional().describe("Internal staff note for the cancellation."),
     },
     async (args) => {
@@ -204,8 +237,10 @@ function registerOrderTools(server) {
           notify: args.notify_customer ?? null,
           note: args.staff_note ?? null,
         };
-        // (verify) refundMethod required-ness in 2026-04 — if refund_to_original_payment omitted, omit refundMethod.
-        // TODO(HAY-219 §8): verify refundMethod required-ness and shape against a real dev store.
+        // Verified 2026-04: orderCancel requires orderId/reason/restock; refundMethod
+        // is optional (OrderCancelRefundMethodInput). TODO(HAY-219 §8): the exact
+        // OrderCancelRefundMethodInput subfield (originalPaymentMethodsRefund) is a
+        // best-guess — confirm against a dev store before relying on refunds-on-cancel.
         if (args.refund_to_original_payment !== undefined) {
           variables.refundMethod = args.refund_to_original_payment
             ? { originalPaymentMethodsRefund: true }
@@ -243,7 +278,7 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
@@ -258,12 +293,18 @@ function registerOrderTools(server) {
           z.object({
             lineItemId: z.string().describe("LineItem GID."),
             quantity: z.number().int().describe("Quantity to refund."),
-            restockType: z.string().optional().describe("Restock type, e.g. RETURN, CANCEL, NO_RESTOCK."),
-          })
+            restockType: z
+              .string()
+              .optional()
+              .describe("Restock type, e.g. RETURN, CANCEL, NO_RESTOCK."),
+          }),
         )
         .optional()
         .describe("Line items to refund."),
-      shipping_amount: z.string().optional().describe("Shipping amount to refund (decimal string)."),
+      shipping_amount: z
+        .string()
+        .optional()
+        .describe("Shipping amount to refund (decimal string)."),
       transactions: z
         .array(
           z.object({
@@ -271,11 +312,13 @@ function registerOrderTools(server) {
             amount: z.string().describe("Amount to refund (decimal string)."),
             gateway: z.string().describe("Payment gateway."),
             kind: z.string().describe("Transaction kind, e.g. REFUND."),
-          })
+          }),
         )
         .optional()
         .describe("Transactions to process for the refund."),
-      idempotency_key: z.string().describe("Idempotency key to make refund creation safe to retry."),
+      idempotency_key: z
+        .string()
+        .describe("Idempotency key to make refund creation safe to retry."),
     },
     async (args) => {
       try {
@@ -323,7 +366,7 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
   server.tool(
@@ -350,7 +393,7 @@ function registerOrderTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 }
 
