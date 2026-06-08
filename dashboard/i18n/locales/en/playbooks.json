@@ -240,5 +240,20 @@
       "startingPointText": "This is a starting point. You'll be able to refine everything in the editor.",
       "regenerateButton": "Regenerate"
     }
+  },
+  "editor": {
+    "titlePlaceholder": "Untitled playbook",
+    "documentLabel": "Playbook body",
+    "detailsSection": "Details",
+    "agentsSection": "Agents",
+    "actionsSection": "Available Actions",
+    "actionsHint": "Type {'@'} in the body to insert an action or document.",
+    "actionsLoading": "Loading actions...",
+    "actionsEmpty": "No actions available yet. Connect a plugin to add actions.",
+    "actionsCount": "{count} actions",
+    "actionsAdd": "Add to playbook",
+    "actionsNoDescription": "No description available.",
+    "metadataSection": "About",
+    "dangerSection": "Danger zone"
   }
 }

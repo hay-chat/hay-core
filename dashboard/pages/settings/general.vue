@@ -468,8 +468,12 @@ import { useToast } from "@/composables/useToast";
 import { useFileUpload } from "@/composables/useFileUpload";
 import { useUserStore } from "@/stores/user";
 import { TIMEZONE_GROUPS } from "@/utils/timezones";
-import { SupportedLanguage } from "@server/types/language.types";
-import { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
+// Type-only imports: `@server` is a tsconfig type path in the dashboard, not a
+// Vite runtime alias. A value import of these enums leaves them in the browser
+// bundle and breaks the Rollup build. Import the types only and use the enums'
+// string values (cast to the type) for defaults — the casts erase at build time.
+import type { SupportedLanguage } from "@server/types/language.types";
+import type { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 
 type UpdateSettingsInput = RouterInputs["organizations"]["updateSettings"];
@@ -553,10 +557,10 @@ const isSaving = ref(false);
 const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
-  defaultLanguage: SupportedLanguage.ENGLISH,
-  timezone: Timezone.UTC,
-  dateFormat: DateFormat.US,
-  timeFormat: TimeFormat.TWELVE_HOUR,
+  defaultLanguage: "en" as SupportedLanguage,
+  timezone: "UTC" as Timezone,
+  dateFormat: "MM/DD/YYYY" as DateFormat,
+  timeFormat: "12h" as TimeFormat,
   defaultAgent: "",
   testModeDefault: false,
   confidenceGuardrail: {
@@ -831,10 +835,10 @@ const resetToDefaults = () => {
     settings.value = {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
-      defaultLanguage: SupportedLanguage.ENGLISH,
-      timezone: Timezone.UTC,
-      dateFormat: DateFormat.US,
-      timeFormat: TimeFormat.TWELVE_HOUR,
+      defaultLanguage: "en" as SupportedLanguage,
+      timezone: "UTC" as Timezone,
+      dateFormat: "MM/DD/YYYY" as DateFormat,
+      timeFormat: "12h" as TimeFormat,
       defaultAgent: "",
       testModeDefault: false,
       confidenceGuardrail: {

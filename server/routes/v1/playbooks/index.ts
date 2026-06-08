@@ -11,6 +11,23 @@ import { In } from "typeorm";
 
 const playbookService = new PlaybookService();
 
+/**
+ * Strip a single wrapping code fence from an LLM-generated markdown string.
+ *
+ * The generation model is told to return raw markdown, but it sometimes wraps
+ * the whole `instructions` value in a ```/```markdown fence (mimicking the
+ * example block in the prompt). When that happens the downstream preview runs
+ * the fenced text through `marked`, which escapes the inline mention spans and
+ * surfaces literal `<span class="mention-token ...">` markup instead of chips.
+ * Unwrapping here fixes both the wizard preview and the saved Tiptap document
+ * from a single place.
+ */
+function stripWrappingCodeFence(markdown: string): string {
+  const trimmed = markdown.trim();
+  const match = /^```[^\n]*\n([\s\S]*?)\n?```$/.exec(trimmed);
+  return match ? match[1].trim() : markdown;
+}
+
 const playbookStatusEnum = z.enum([
   PlaybookStatus.DRAFT,
   PlaybookStatus.ACTIVE,
@@ -426,6 +443,9 @@ export const playbooksRouter = t.router({
 
       try {
         const parsed = JSON.parse(response);
+        if (typeof parsed.instructions === "string") {
+          parsed.instructions = stripWrappingCodeFence(parsed.instructions);
+        }
         return {
           ...parsed,
           references: {

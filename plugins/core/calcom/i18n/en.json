@@ -1,0 +1,44 @@
+{
+  "name": "Cal.com",
+  "description": "Connect your Cal.com account so the agent can list event types, find open slots, and book, reschedule, or cancel meetings.",
+  "tools": {
+    "get_me": {
+      "label": "Get Account",
+      "description": "Look up the connected Cal.com account (username, email, default timezone)."
+    },
+    "list_event_types": {
+      "label": "List Event Types",
+      "description": "List the bookable meeting types and their durations."
+    },
+    "get_available_slots": {
+      "label": "Check Availability",
+      "description": "Find open time slots for an event type within a date range."
+    },
+    "create_booking": {
+      "label": "Book Meeting",
+      "description": "Schedule a meeting on an event type for the customer."
+    },
+    "list_bookings": {
+      "label": "List Bookings",
+      "description": "List bookings, optionally filtered, to find one before rescheduling or cancelling."
+    },
+    "get_booking": {
+      "label": "Get Booking",
+      "description": "Get a single booking's details by its reference."
+    },
+    "cancel_booking": {
+      "label": "Cancel Booking",
+      "description": "Cancel an accepted or pending booking."
+    },
+    "reschedule_booking": {
+      "label": "Reschedule Booking",
+      "description": "Move an accepted or pending booking to a new time."
+    }
+  },
+  "config": {
+    "apiKey": {
+      "label": "API Key",
+      "description": "Your Cal.com API key (starts with cal_). Create one under Settings → Developer → API keys."
+    }
+  }
+}

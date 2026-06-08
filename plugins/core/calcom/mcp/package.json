@@ -1,0 +1,14 @@
+{
+  "name": "calcom-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Cal.com. Calls the Cal.com REST API (v2) directly to manage event types, slots, and bookings.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.2"
+  }
+}

@@ -828,6 +828,13 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
     description: string;
     pluginId: string;
     pluginName: string;
+    annotations?: {
+      readOnlyHint?: boolean;
+      destructiveHint?: boolean;
+      idempotentHint?: boolean;
+      openWorldHint?: boolean;
+      title?: string;
+    };
   }> = [];
 
   // Process each enabled plugin instance
@@ -904,6 +911,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
         description: tool.description || "",
         pluginId: plugin.pluginId, // Plugin package ID (e.g., "hay-plugin-email")
         pluginName: plugin.name,
+        annotations: tool.annotations,
       });
     }
   }
