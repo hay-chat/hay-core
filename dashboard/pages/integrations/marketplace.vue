@@ -78,7 +78,7 @@
     </div> -->
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div v-if="loading" class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <div v-for="i in 6" :key="i" class="animate-pulse">
         <Card>
           <CardHeader>
@@ -105,7 +105,7 @@
     </div>
 
     <!-- Plugins Grid -->
-    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <Card
         v-for="plugin in filteredPlugins"
         :key="plugin.id"

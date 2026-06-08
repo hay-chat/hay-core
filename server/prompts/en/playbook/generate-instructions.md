@@ -56,7 +56,7 @@ The agent must NEVER:
 Based on the information above, generate a complete playbook with:
 
 1. **title**: A short, descriptive name for this playbook (max 80 characters).
-2. **trigger**: A phrase or sentence pattern that should activate this playbook when a customer says something similar.
+2. **trigger**: A short, third-person description of the customer intent(s) that should activate this playbook, written from the system's perspective and covering the range of scenarios that map to it. Phrase it as "Customer wants to..." / "Customer is asking about...". Do NOT write it in the first person or as a literal customer quote. Example: "Customer wants to schedule a demo, book a meeting, or speak directly with a founder."
 3. **description**: A one-to-two sentence summary of what this playbook handles.
 4. **instructions**: A markdown-formatted string with step-by-step instructions the agent should follow. Use the following structure:
 
@@ -95,3 +95,4 @@ Guidelines for instructions:
 - Write instructions in second person ("Ask the customer...", "Look up...", "If the customer...").
 - You may optionally include an "Additional Notes" section at the end for edge cases.
 - Use only headings (`#`), bullet lists (`-`), and paragraphs. Do not use bold, italic, code blocks, or other formatting (except for the reference tokens).
+- Return the `instructions` value as raw markdown. Do NOT wrap the whole thing in a code fence (```) and do NOT indent lines by 4+ spaces — doing so prevents the reference tokens from rendering.

@@ -114,6 +114,7 @@ import { computed } from "vue";
 import { Sparkles, Loader2, RefreshCw, Info as InfoIcon } from "lucide-vue-next";
 import { marked } from "marked";
 import { renderTokensForPreview, type MentionReferences } from "@/utils/markdownToTiptap";
+import { useToolLabel } from "@/composables/useToolLabel";
 
 interface WizardData {
   purpose: string;
@@ -149,11 +150,21 @@ const hasBoundaries = computed(() => {
   );
 });
 
+const { getToolLabel } = useToolLabel();
+
 const instructionsHtml = computed(() => {
   if (!props.generatedResult?.instructions) return "";
-  const preprocessed = props.generatedResult.references
-    ? renderTokensForPreview(props.generatedResult.instructions, props.generatedResult.references)
-    : props.generatedResult.instructions;
+  const refs = props.generatedResult.references;
+  if (!refs) {
+    return marked.parse(props.generatedResult.instructions, { async: false }) as string;
+  }
+  // Resolve action labels to their translated/humanized form so preview chips
+  // match what the saved editor renders (instead of the raw tool name).
+  const localizedRefs: MentionReferences = {
+    ...refs,
+    actions: refs.actions.map((a) => ({ ...a, name: getToolLabel(a.pluginId, a.name) })),
+  };
+  const preprocessed = renderTokensForPreview(props.generatedResult.instructions, localizedRefs);
   return marked.parse(preprocessed, { async: false }) as string;
 });
 </script>

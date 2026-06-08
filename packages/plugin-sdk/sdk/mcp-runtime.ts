@@ -6,8 +6,9 @@
  * @module @hay/plugin-sdk/sdk/mcp-runtime
  */
 
-import { spawn } from "child_process";
-import { resolve } from "path";
+import { spawn, execSync } from "child_process";
+import { existsSync } from "fs";
+import { resolve, join } from "path";
 import type {
   HayMcpRuntimeAPI,
   McpServerInstance,
@@ -18,6 +19,56 @@ import type {
 import type { HayConfigRuntimeAPI, HayAuthRuntimeAPI, HayLogger } from "../types/index.js";
 import { StdioMcpClient } from "./stdio-mcp-client.js";
 import { killProcessGracefully } from "./process-utils.js";
+
+/**
+ * Directories whose stdio MCP dependencies have already been ensured in this
+ * process. Keyed by absolute cwd so the (potentially slow) install runs at most
+ * once per server directory per process, even if the server is restarted.
+ *
+ * @internal
+ */
+const ensuredStdioDependencyDirs = new Set<string>();
+
+/**
+ * Ensure a nested stdio MCP server's dependencies are installed before it is
+ * spawned.
+ *
+ * The mcp/ server is plain runtime JS spawned over stdio and is deliberately NOT
+ * part of the npm workspace, so its node_modules is never created by the root
+ * install and is gitignored. We presence-check the directory here — rather than
+ * trusting a persisted "installed" flag — because that flag is keyed to the
+ * plugin checksum and desyncs from the actual (untracked) node_modules on fresh
+ * clones, CI, or `git clean`. Without this, spawn would succeed but the server
+ * would crash at import time with "Cannot find module".
+ *
+ * @internal
+ */
+function ensureStdioDependencies(serverCwd: string, id: string, logger: HayLogger): void {
+  if (ensuredStdioDependencyDirs.has(serverCwd)) {
+    return;
+  }
+
+  // Nothing to install if the server has no manifest of its own.
+  if (!existsSync(join(serverCwd, "package.json"))) {
+    ensuredStdioDependencyDirs.add(serverCwd);
+    return;
+  }
+
+  // Already installed — trust the directory on disk, not external bookkeeping.
+  if (existsSync(join(serverCwd, "node_modules"))) {
+    ensuredStdioDependencyDirs.add(serverCwd);
+    return;
+  }
+
+  logger.info(`Installing stdio MCP server dependencies: ${id}`, { cwd: serverCwd });
+  // --ignore-scripts: never run a dependency's lifecycle scripts during a
+  // server spawn. --omit=dev: stdio servers only need runtime deps.
+  execSync("npm install --omit=dev --ignore-scripts", {
+    cwd: serverCwd,
+    stdio: "inherit",
+  });
+  ensuredStdioDependencyDirs.add(serverCwd);
+}
 
 /**
  * Registered MCP server (local or external).
@@ -189,6 +240,11 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
       try {
         // Resolve cwd relative to plugin directory
         const absoluteCwd = resolve(pluginDir, cwd);
+
+        // Ensure the server's dependencies exist before spawning it. The nested
+        // mcp/ node_modules is gitignored and outside the npm workspace, so it
+        // may be absent even when platform bookkeeping marks the plugin installed.
+        ensureStdioDependencies(absoluteCwd, id, logger);
 
         // Merge environment variables
         const processEnv = {

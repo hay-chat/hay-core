@@ -16,7 +16,8 @@
     <div
       :id="editorId"
       class="instructions-editor-container"
-      :class="{ 'instructions-editor-error': error }"
+      :class="{ 'instructions-editor-error': error, 'instructions-editor-bare': bare }"
+      :style="{ minHeight }"
     >
       <BaseTiptap
         v-if="!loading"
@@ -58,11 +59,17 @@ interface Props {
   disableApi?: boolean;
   mockDocuments?: DocumentItem[];
   mockTools?: MCPTool[];
+  /** Minimum height of the editor surface (CSS value). Lets the body grow to fill a document canvas. */
+  minHeight?: string;
+  /** Strip the editor's own border/padding/focus ring so it blends into a surrounding canvas. */
+  bare?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   label: "Instructions",
   disableApi: false,
+  minHeight: "200px",
+  bare: false,
 });
 
 const modifierKey = computed(() =>
@@ -151,6 +158,7 @@ const editorExtensions = computed(() => [
     mcpTools: resolvedTools.value,
     documents: documents.value,
     apiBaseUrl,
+    resolveLabel: getToolLabel,
   }),
   configureSlashCommand({
     mcpTools: resolvedTools.value,
@@ -173,8 +181,33 @@ onMounted(async () => {
   loading.value = false;
 });
 
+// Insert an action chip (mention node) at the current selection. Mirrors what
+// the "@" suggestion menu produces so panel-inserted and typed actions are
+// identical: a `mention` node carrying the tool's id/label/pluginId.
+const insertAction = (tool: MCPTool) => {
+  const editor = editorRef.value?.getEditor();
+  if (!editor) return;
+  editor
+    .chain()
+    .focus()
+    .insertContent([
+      {
+        type: "mention",
+        attrs: {
+          id: tool.id,
+          label: tool.label,
+          type: "action",
+          pluginId: tool.pluginId,
+        },
+      },
+      { type: "text", text: " " },
+    ])
+    .run();
+};
+
 // Expose methods
 defineExpose({
+  insertAction,
   save: () => {
     return currentContent.value || editorRef.value?.getJSON() || null;
   },
@@ -192,7 +225,6 @@ defineExpose({
 <style>
 /* Instructions editor container styles */
 .instructions-editor-container {
-  min-height: 200px;
   border: 1px solid var(--color-border);
   border-radius: 0.375rem;
   background-color: var(--color-background);
@@ -203,6 +235,18 @@ defineExpose({
 .instructions-editor-container:focus-within {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* Bare mode: blend into a surrounding "paper" canvas (document-editor layout) */
+.instructions-editor-bare {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background-color: transparent;
+}
+
+.instructions-editor-bare:focus-within {
+  outline: none;
 }
 
 .instructions-editor-error {

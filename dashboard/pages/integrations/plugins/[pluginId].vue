@@ -632,6 +632,7 @@ import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
 import { sanitizeHtml } from "@/utils/sanitize";
+import { classifyTool } from "@/utils/toolClassification";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
 import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
@@ -747,42 +748,8 @@ function toggleTool(name: string) {
   expandedTools.value = next;
 }
 
-// Classify a tool as read / write / destructive using MCP annotations when
-// present, falling back to name-token heuristics for servers that don't ship
-// annotations (e.g. Klaviyo). Annotations are advisory hints per the MCP
-// spec, not security guarantees.
-const DESTRUCTIVE_TOKENS = new Set(["delete", "destroy", "remove", "drop", "archive", "purge"]);
-const READ_TOKENS = new Set([
-  "get",
-  "list",
-  "find",
-  "show",
-  "describe",
-  "read",
-  "search",
-  "fetch",
-  "query",
-  "retrieve",
-  "inspect",
-]);
-
-function classifyTool(tool: DisplayTool): "read" | "write" | "destructive" {
-  const ann = tool.annotations;
-  if (ann) {
-    if (ann.destructiveHint === true) return "destructive";
-    if (ann.readOnlyHint === true) return "read";
-    if (ann.readOnlyHint === false) return "write";
-  }
-  const segments = tool.name.toLowerCase().split(/[_\-:.]/);
-  for (const seg of segments) {
-    if (DESTRUCTIVE_TOKENS.has(seg)) return "destructive";
-  }
-  for (const seg of segments) {
-    if (READ_TOKENS.has(seg)) return "read";
-  }
-  return "write";
-}
-
+// Read/write/destructive classification is shared with the playbook actions
+// panel — see utils/toolClassification.ts.
 function getToolBadgeVariant(tool: DisplayTool): "success" | "warning" | "destructive" {
   const cls = classifyTool(tool);
   if (cls === "destructive") return "destructive";

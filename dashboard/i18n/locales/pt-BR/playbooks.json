@@ -240,5 +240,20 @@
       "startingPointText": "Este é um ponto de partida. Você poderá refinar tudo no editor.",
       "regenerateButton": "Regenerar"
     }
+  },
+  "editor": {
+    "titlePlaceholder": "Playbook sem título",
+    "documentLabel": "Corpo do playbook",
+    "detailsSection": "Detalhes",
+    "agentsSection": "Agentes",
+    "actionsSection": "Ações disponíveis",
+    "actionsHint": "Digite {'@'} no corpo para inserir uma ação ou documento.",
+    "actionsLoading": "Carregando ações...",
+    "actionsEmpty": "Nenhuma ação disponível ainda. Conecte um plugin para adicionar ações.",
+    "actionsCount": "{count} ações",
+    "actionsAdd": "Adicionar ao playbook",
+    "actionsNoDescription": "Nenhuma descrição disponível.",
+    "metadataSection": "Sobre",
+    "dangerSection": "Zona de perigo"
   }
 }

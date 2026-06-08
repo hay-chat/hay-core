@@ -523,24 +523,25 @@ export class PluginManagerService {
       // Ignore - package.json might not exist
     }
 
-    if (!installCommand) {
-      logger.debug({ pluginName: plugin.name }, "No install command for plugin");
-      await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
-      return;
-    }
-
     try {
-      logger.info({ pluginName: plugin.name }, "Installing plugin");
+      // Install the plugin's own (root) dependencies, if it declares any. A
+      // plugin may have none at the root and still ship a bundled mcp/ server
+      // with its own deps, so this must NOT short-circuit the MCP install below.
+      if (installCommand) {
+        logger.info({ pluginName: plugin.name }, "Installing plugin");
 
-      // For workspace plugins, run from root directory; otherwise run from plugin directory
-      const rootDir = path.join(this.pluginsDir, "..");
-      const execDir = isWorkspacePlugin ? rootDir : pluginPath;
+        // For workspace plugins, run from root directory; otherwise run from plugin directory
+        const rootDir = path.join(this.pluginsDir, "..");
+        const execDir = isWorkspacePlugin ? rootDir : pluginPath;
 
-      execSync(installCommand, {
-        cwd: execDir,
-        stdio: "inherit",
-        env: this.buildMinimalEnv(),
-      });
+        execSync(installCommand, {
+          cwd: execDir,
+          stdio: "inherit",
+          env: this.buildMinimalEnv(),
+        });
+      } else {
+        logger.debug({ pluginName: plugin.name }, "No root install command for plugin");
+      }
 
       // Install bundled MCP server dependencies, if any. The mcp/ server is plain
       // runtime JS spawned over stdio and is NOT part of the npm workspace, so its
@@ -652,7 +653,20 @@ export class PluginManagerService {
    */
   needsInstallation(pluginId: string): boolean {
     const plugin = this.registry.get(pluginId);
-    return plugin ? !plugin.installed : true;
+    if (!plugin) return true;
+    if (!plugin.installed) return true;
+
+    // Even when bookkeeping says "installed", the bundled mcp/ node_modules may
+    // be missing: it's gitignored and lives outside the npm workspace, so it
+    // desyncs from the persisted flag on fresh clones, CI, or `git clean`.
+    // Re-install if a bundled server's deps aren't actually present on disk.
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+    const hasMcpServer = existsSync(path.join(pluginPath, "mcp", "package.json"));
+    if (hasMcpServer && !existsSync(path.join(pluginPath, "mcp", "node_modules"))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
