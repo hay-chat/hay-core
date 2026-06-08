@@ -5,6 +5,7 @@ import { createTRPCClient, httpLink, TRPCClientError } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { reportServerError } from "@/composables/useServerStatus";
 
 // Helper function to get auth cookie
 function getAuthToken(): string {
@@ -155,6 +156,15 @@ const errorLink: TRPCLink<AppRouter> = () => {
                   }, 0);
                 }
               }
+            }
+
+            // Network-level failure (no response) or 5xx => the server may be down.
+            // Trigger an immediate health check so the banner appears without waiting
+            // for the next poll. The health check itself confirms, so a transient blip
+            // won't flip the banner on its own. 4xx app errors are left alone.
+            const httpStatus = data?.httpStatus;
+            if (httpStatus === undefined || httpStatus >= 500) {
+              reportServerError();
             }
           }
 

@@ -19,6 +19,7 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { DocumentSource } from "@server/entities/document-source.entity";
 import { DocumentationStatus, ImportMethod, type Document } from "@server/entities/document.entity";
 import { pluginRouterRegistry } from "./plugin-router-registry.service";
+import { pluginManagerService } from "./plugin-manager.service";
 import { WebsiteImporter, isWebsiteSource } from "./importers/website-importer";
 import { vectorStoreService } from "./vector-store.service";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
@@ -202,7 +203,7 @@ export class DocumentSourceSyncService {
     const report = this.makeProgressReporter(job, source.organizationId);
 
     try {
-      const importer = this.resolveImporter(source);
+      const importer = await this.resolveImporter(source);
 
       initiallyDoingFullSweep = this.shouldDoFullSweep(source, data.forceFullSweep ?? false);
 
@@ -625,10 +626,13 @@ export class DocumentSourceSyncService {
    * native importer; everything else resolves to a document_importer plugin's
    * tRPC router. This is the single seam that lets non-plugin importers exist.
    */
-  private resolveImporter(source: DocumentSource): DocumentImporterContract {
+  private async resolveImporter(source: DocumentSource): Promise<DocumentImporterContract> {
     if (isWebsiteSource(source)) {
       return new WebsiteImporter(source);
     }
+    // Self-heal: register the plugin's router on demand if it wasn't loaded at
+    // boot (e.g. the plugin was built/installed/enabled while the server ran).
+    await pluginManagerService.ensurePluginRouterRegistered(source.pluginId);
     const pluginRouter = pluginRouterRegistry.getRouter(source.pluginId);
     if (!pluginRouter) {
       throw new Error(`Plugin not registered: ${source.pluginId}`);

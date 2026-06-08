@@ -111,6 +111,11 @@ export const documentSourcesRouter = t.router({
         });
       }
 
+      // Self-heal: a plugin built/installed/enabled after server boot may not
+      // have had its router registered yet (registration was boot-only). Load
+      // it on demand so the import wizard works without a server restart.
+      await pluginManagerService.ensurePluginRouterRegistered(input.pluginId);
+
       const pluginRouter = pluginRouterRegistry.getRouter(input.pluginId);
       if (!pluginRouter || typeof pluginRouter.createCaller !== "function") {
         throw new TRPCError({
