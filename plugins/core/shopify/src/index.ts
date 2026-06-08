@@ -1,22 +1,27 @@
 /**
- * Shopify Plugin (self-hosted) — HAY-221
+ * Shopify Plugin — HAY-219 (managed OAuth) + HAY-221 (self-hosted cron)
  *
- * Shopify deprecated legacy custom apps (Jan 1, 2026). Self-hosted Hay users now
- * create their own app in the Shopify Dev Dashboard and authenticate via the
- * **client credentials grant**, which issues access tokens that expire every 24
- * hours. This plugin stores the app's `clientId` + `clientSecret`, obtains a token
- * on demand, and registers a cron job that refreshes the token every 20 hours
- * (buffer before the 24h expiry) — keeping the Shopify MCP server authenticated
- * without any core changes.
+ * Supports TWO connection modes, selected by the `authMode` config field:
  *
- * The token-refresh cron is the focus of HAY-221. The full Admin API tool surface
- * (orders, customers, products, fulfillments) is HAY-219 — the MCP here exposes a
- * single `shopify_get_shop` tool to prove the token round-trips.
+ * - **Managed** (`authMode = "oauth"`, default): the merchant connects via
+ *   hay.chat's Shopify App Store app with one click. Hay Core runs the
+ *   authorization_code OAuth flow using the shared SHOPIFY_OAUTH_CLIENT_ID /
+ *   SHOPIFY_OAUTH_CLIENT_SECRET server env credentials and stores a long-lived
+ *   offline access token. `onStart` reads that token from `ctx.auth.get()`.
  *
- * @see https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant
+ * - **Self-hosted** (`authMode = "self_hosted"`): the merchant creates their own
+ *   Shopify Dev Dashboard app and pastes its Client ID + secret. The plugin runs
+ *   the client-credentials grant (24h tokens) and a cron refreshes them (HAY-221).
+ *
+ * Both modes feed the same Shopify Admin GraphQL MCP server (`./mcp`), which only
+ * ever sees SHOPIFY_SHOP + SHOPIFY_ACCESS_TOKEN + SHOPIFY_API_VERSION.
+ *
+ * @see https://shopify.dev/docs/apps/build/authentication-authorization
  */
 
 import { defineHayPlugin, type HayCronContext } from "@hay/plugin-sdk";
+
+type AuthMode = "oauth" | "self_hosted";
 
 /** Strip protocol / trailing slash from a shop domain (mystore.myshopify.com). */
 function normalizeShopDomain(raw: string): string {
@@ -33,7 +38,7 @@ interface ShopifyToken {
 }
 
 /**
- * Perform the Shopify client credentials grant to obtain a fresh access token.
+ * Self-hosted only: perform the Shopify client credentials grant for a 24h token.
  *
  * @see https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant
  */
@@ -67,15 +72,14 @@ async function clientCredentialsGrant(
     throw new Error("Shopify token response did not include an access_token");
   }
 
-  // Shopify access tokens from this grant last 24h; default defensively if absent.
   const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 24 * 60 * 60;
   const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
 
   return { accessToken: data.access_token, expiresAt };
 }
 
-/** Read + validate the three config fields needed for the grant. */
-function readCredentials(ctx: {
+/** Read the self-hosted credential triple from config. */
+function readSelfHostedCredentials(ctx: {
   config: { getOptional: <T = unknown>(key: string) => T | undefined };
 }): { shopDomain: string; clientId: string; clientSecret: string } | null {
   const shopDomain = ctx.config.getOptional<string>("shopDomain");
@@ -85,6 +89,12 @@ function readCredentials(ctx: {
   return { shopDomain, clientId, clientSecret };
 }
 
+function getAuthMode(ctx: {
+  config: { getOptional: <T = unknown>(key: string) => T | undefined };
+}): AuthMode {
+  return ctx.config.getOptional<AuthMode>("authMode") === "self_hosted" ? "self_hosted" : "oauth";
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "Shopify",
 
@@ -92,6 +102,19 @@ export default defineHayPlugin((globalCtx) => ({
     globalCtx.logger.info("Initializing Shopify plugin");
 
     ctx.register.config({
+      authMode: {
+        type: "string",
+        label: "Connection mode",
+        description:
+          "Managed: connect in one click via hay.chat's Shopify app. " +
+          "Self-hosted: use your own Shopify app's Client ID and secret.",
+        options: [
+          { label: "Managed (recommended)", value: "oauth" },
+          { label: "Self-hosted (own app)", value: "self_hosted" },
+        ],
+        default: "oauth",
+        required: true,
+      },
       shopDomain: {
         type: "string",
         label: "Store domain",
@@ -103,18 +126,20 @@ export default defineHayPlugin((globalCtx) => ({
         type: "string",
         label: "Client ID",
         description:
-          "Your Shopify app's Client ID. Create an app in the Shopify Dev Dashboard " +
-          "(Settings → Apps) and copy the Client ID from its API credentials.",
-        required: true,
+          "Self-hosted mode only. Your Shopify app's Client ID. " +
+          "Managed mode resolves this from server configuration.",
+        required: false,
+        env: "SHOPIFY_OAUTH_CLIENT_ID",
+        showWhen: { field: "authMode", equals: "self_hosted" },
       },
       clientSecret: {
         type: "string",
         label: "Client secret",
-        description:
-          "Your Shopify app's Client secret. Treated as a secret; Hay uses it to mint and " +
-          "refresh 24h access tokens automatically.",
-        required: true,
+        description: "Self-hosted mode only. Your Shopify app's Client secret.",
+        required: false,
         encrypted: true,
+        env: "SHOPIFY_OAUTH_CLIENT_SECRET",
+        showWhen: { field: "authMode", equals: "self_hosted" },
       },
       apiVersion: {
         type: "string",
@@ -124,14 +149,35 @@ export default defineHayPlugin((globalCtx) => ({
       },
     });
 
-    // The user-entered credential is the client secret; validating it runs the grant.
+    // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
+    // resolves client id/secret from the SHOPIFY_OAUTH_CLIENT_* server env vars.
+    ctx.register.auth.oauth2({
+      id: "shopify-oauth",
+      label: "Connect with Shopify",
+      authorizationUrl: "https://{shop}/admin/oauth/authorize",
+      tokenUrl: "https://{shop}/admin/oauth/access_token",
+      scopes: [
+        "read_orders",
+        "write_orders",
+        "read_customers",
+        "write_customers",
+        "read_products",
+        "read_inventory",
+        "read_fulfillments",
+        "write_fulfillments",
+      ],
+      clientId: ctx.config.field("clientId"),
+      clientSecret: ctx.config.field("clientSecret"),
+    });
+
+    // Self-hosted: client-credentials path. Validating the secret runs the grant.
     ctx.register.auth.apiKey({
       id: "shopify-credentials",
-      label: "Shopify App Credentials",
+      label: "Self-hosted app credentials",
       configField: "clientSecret",
     });
 
-    // HAY-221: refresh the 24h token every 20 hours.
+    // HAY-221: refresh the 24h self-hosted token every 20h (no-op in managed mode).
     ctx.register.cron({
       name: "refresh_shopify_token",
       schedule: "0 */20 * * *",
@@ -143,16 +189,28 @@ export default defineHayPlugin((globalCtx) => ({
   },
 
   async onValidateAuth(ctx) {
-    ctx.logger.info("Validating Shopify credentials");
+    const mode = getAuthMode(ctx);
+    ctx.logger.info("Validating Shopify credentials", { authMode: mode });
 
-    const creds = readCredentials(ctx);
-    if (!creds) {
-      throw new Error("Store domain, Client ID and Client secret are all required");
+    const shopDomain = ctx.config.getOptional<string>("shopDomain");
+    if (!shopDomain) {
+      throw new Error("Store domain is required");
     }
 
+    if (mode === "oauth") {
+      // Managed: the OAuth flow proves credentials. Here we only require the
+      // store domain so Hay can build the per-shop authorize URL.
+      return true;
+    }
+
+    // Self-hosted: actually run the grant to prove the Client ID/secret work.
+    const creds = readSelfHostedCredentials(ctx);
+    if (!creds) {
+      throw new Error("Self-hosted mode requires Store domain, Client ID and Client secret");
+    }
     try {
       await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
-      ctx.logger.info("Shopify credentials validated successfully");
+      ctx.logger.info("Shopify self-hosted credentials validated");
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -162,23 +220,50 @@ export default defineHayPlugin((globalCtx) => ({
   },
 
   async onStart(ctx) {
-    ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id });
+    const mode = getAuthMode(ctx);
+    ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id, authMode: mode });
 
-    const creds = readCredentials(ctx);
-    if (!creds) {
-      ctx.logger.info(
-        "Shopify credentials not configured — plugin enabled but MCP tools unavailable. " +
-          "Add your store domain, Client ID and Client secret in the plugin settings.",
-      );
+    const shopRaw = ctx.config.getOptional<string>("shopDomain");
+    if (!shopRaw) {
+      ctx.logger.info("Shopify: no store domain configured yet — MCP not started.");
       return;
     }
+    const shop = normalizeShopDomain(shopRaw);
+    const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
 
-    let token: ShopifyToken;
-    try {
-      token = await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
-    } catch (error) {
-      ctx.logger.error("Failed to obtain Shopify access token on start", error);
-      return; // Stay installed but degraded; the cron will retry.
+    let accessToken: string | undefined;
+
+    if (mode === "oauth") {
+      // Managed: the offline access token was minted by Core's OAuth exchange.
+      const authState = ctx.auth.get();
+      if (authState?.methodId === "shopify-oauth") {
+        accessToken = String(authState.credentials.accessToken ?? "") || undefined;
+      }
+      if (!accessToken) {
+        ctx.logger.info(
+          "Shopify managed mode: not connected yet (no access token). " +
+            "Click Connect in the plugin settings. MCP not started.",
+        );
+        return;
+      }
+    } else {
+      // Self-hosted: run the client-credentials grant for a fresh token.
+      const creds = readSelfHostedCredentials(ctx);
+      if (!creds) {
+        ctx.logger.info("Shopify self-hosted: credentials missing — MCP not started.");
+        return;
+      }
+      try {
+        const token = await clientCredentialsGrant(
+          creds.shopDomain,
+          creds.clientId,
+          creds.clientSecret,
+        );
+        accessToken = token.accessToken;
+      } catch (error) {
+        ctx.logger.error("Failed to obtain Shopify access token on start", error);
+        return; // Stay installed but degraded; the cron will retry.
+      }
     }
 
     try {
@@ -188,9 +273,9 @@ export default defineHayPlugin((globalCtx) => ({
         args: ["index.js"],
         cwd: "./mcp",
         env: {
-          SHOPIFY_SHOP: normalizeShopDomain(creds.shopDomain),
-          SHOPIFY_ACCESS_TOKEN: token.accessToken,
-          SHOPIFY_API_VERSION: ctx.config.getOptional<string>("apiVersion") || "2026-04",
+          SHOPIFY_SHOP: shop,
+          SHOPIFY_ACCESS_TOKEN: accessToken,
+          SHOPIFY_API_VERSION: apiVersion,
         },
       });
       ctx.logger.info("Shopify MCP server started successfully");
@@ -211,12 +296,19 @@ export default defineHayPlugin((globalCtx) => ({
 }));
 
 /**
- * Cron handler: mint a fresh access token via the client credentials grant and
- * persist it. Hay Core restarts the worker afterwards so the MCP server picks up
- * the new token.
+ * Cron handler (self-hosted only): mint a fresh 24h access token via the client
+ * credentials grant and persist it. Managed mode uses non-expiring offline tokens,
+ * so this is a no-op there.
  */
 async function refreshTokenHandler(ctx: HayCronContext): Promise<void> {
-  ctx.logger.info("Refreshing Shopify access token");
+  const mode =
+    ctx.config.getOptional<AuthMode>("authMode") === "self_hosted" ? "self_hosted" : "oauth";
+  if (mode === "oauth") {
+    ctx.logger.info("Shopify managed mode — offline token does not expire, skipping refresh");
+    return;
+  }
+
+  ctx.logger.info("Refreshing Shopify access token (self-hosted)");
 
   const shopDomain = ctx.config.getOptional<string>("shopDomain");
   const clientId = ctx.config.getOptional<string>("clientId");
@@ -229,7 +321,10 @@ async function refreshTokenHandler(ctx: HayCronContext): Promise<void> {
 
   const token = await clientCredentialsGrant(shopDomain, clientId, clientSecret);
 
-  ctx.auth.update({ accessToken: token.accessToken, expiresAt: token.expiresAt }, "shopify-oauth");
+  ctx.auth.update(
+    { accessToken: token.accessToken, expiresAt: token.expiresAt },
+    "shopify-credentials",
+  );
 
   ctx.logger.info("Shopify access token refreshed", { expiresAt: token.expiresAt });
 }

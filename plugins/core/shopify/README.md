@@ -1,42 +1,56 @@
-# Shopify plugin (self-hosted)
+# Shopify plugin
 
-Connect a Shopify store to Hay. Because Shopify [retired legacy custom apps on
-Jan 1, 2026](https://changelog.shopify.com/posts/legacy-custom-apps-can-t-be-created-after-january-1-2026),
-self-hosted Hay instances authenticate with a Dev Dashboard app via the
-[client credentials grant](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant).
-That grant issues access tokens that **expire every 24 hours** — this plugin
-refreshes them automatically with a background cron job (HAY-221), so you only
-ever paste in your Client ID and Client secret once.
+Connect a Shopify store to Hay so the agent can answer order/customer/product
+questions and take actions (cancel, refund, update address) via the Shopify
+Admin API. Two connection modes, chosen by the **Connection mode** (`authMode`)
+setting:
 
-## Self-hosted setup
+## Managed (recommended) — `authMode = "oauth"`
 
-1. **Create a Shopify Partners account** (free) at <https://partners.shopify.com>.
-2. **Create an app in the Dev Dashboard** (Partners → _Dev Dashboard_ →
-   _Apps_ → _Create app_). Configure the Admin API scopes your workflows need
-   (e.g. `read_orders`, `read_customers`, `read_products`, `read_fulfillments`,
-   `read_inventory`).
-3. **Install the app on your store** from the Dev Dashboard.
-4. **Copy the API credentials** — the app's **Client ID** and **Client secret**.
-5. **Configure the Hay plugin** with:
-   - **Store domain** — `yourstore.myshopify.com`
-   - **Client ID**
-   - **Client secret**
-6. Save. Hay obtains a 24h access token immediately and **refreshes it every 20
-   hours** automatically. No further action is needed.
+One-click connect via hay.chat's Shopify App Store app. No app to create.
 
-## How the token refresh works (HAY-221)
+1. In the plugin settings, keep **Connection mode: Managed**, enter your
+   **Store domain** (`yourstore.myshopify.com`), and save.
+2. Click **Connect with Shopify** and approve the permissions on Shopify.
+3. Done — Hay stores a long-lived offline access token and starts the MCP server.
 
-- On enable / worker start, the plugin runs the client credentials grant and
-  starts the Shopify MCP server with the fresh token.
-- The plugin registers a cron job `refresh_shopify_token` (`0 */20 * * *`). Hay
-  Core — not the worker — owns the schedule, so it survives worker idle-kills.
-- When the cron fires, Core wakes the worker, the handler mints a new token and
-  calls `ctx.auth.update(...)`. Core persists the new token (encrypted) and
-  restarts the worker so the MCP server picks it up.
+**Operator setup (hay.chat side, once):**
 
-## Status
+- Set `SHOPIFY_OAUTH_CLIENT_ID` / `SHOPIFY_OAUTH_CLIENT_SECRET` (the App Store
+  app's credentials) in the server env.
+- Add `${API_URL}/oauth/callback` (e.g. `https://eu.hay.chat/oauth/callback`) to
+  the Shopify app's **Allowed redirection URL(s)**.
+- Hay substitutes the per-merchant `{shop}` into the authorize/token URLs
+  automatically (generic `{shop}` support added in `oauth.service.ts`).
 
-- ✅ Token acquisition + automatic 24h refresh (HAY-221).
-- ⏳ Full Admin API tool surface — orders, customers, products, fulfillments,
-  and write operations — is tracked in **HAY-219**. Today the MCP server exposes
-  a single `shopify_get_shop` tool to verify connectivity.
+Managed offline tokens don't expire, so the refresh cron is a no-op in this mode.
+
+## Self-hosted — `authMode = "self_hosted"`
+
+For users who run their own Hay and create their own Shopify app. Because Shopify
+[retired legacy custom apps (Jan 2026)](https://changelog.shopify.com/posts/legacy-custom-apps-can-t-be-created-after-january-1-2026),
+this uses the [client credentials grant](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant),
+whose tokens **expire every 24h** — the plugin refreshes them automatically.
+
+1. Create a Shopify Partners account + an app in the **Dev Dashboard**; configure
+   Admin API scopes; install it on your store.
+2. In the plugin settings, set **Connection mode: Self-hosted** and enter your
+   **Store domain**, **Client ID**, and **Client secret**.
+3. Hay mints a token immediately and **refreshes it every 20 hours** via the
+   `refresh_shopify_token` cron (HAY-221).
+
+## Tools (MCP)
+
+Admin GraphQL (version `apiVersion`, default `2026-04`), mode-agnostic:
+
+- **Orders** — get / by-name / status / list-by-customer / search; **cancel**,
+  **refund**, **add-note** (write).
+- **Fulfillments** — tracking / WISMO.
+- **Customers** — find-by-email / by-identifier / get; **update**, **address
+  create + update** (write).
+- **Products** — get / by-handle / search.
+- **Inventory** — stock check by variant id or SKU.
+- **Shop** — `shopify_get_shop` (connectivity check).
+
+> Several Admin API specifics for `2026-04` are marked `// TODO(HAY-219 §8)` in the
+> tool files and must be confirmed against a real dev store (see `tasks/HAY-219-plan.md` §8).
