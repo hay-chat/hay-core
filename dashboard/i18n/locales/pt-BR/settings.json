@@ -243,6 +243,10 @@
   "apiTokens": {
     "title": "Tokens de API",
     "description": "Gerencie tokens de API para acesso no nível da organização",
+    "connectionDetails": "Detalhes de conexão",
+    "connectionDetailsDescription": "Use estes valores ao conectar o Hay a outra plataforma, como o widget de chat da Shopify.",
+    "serverUrl": "URL do servidor Hay.chat",
+    "organizationId": "ID da organização",
     "createToken": "Criar Token",
     "apiTokens": "Tokens de API",
     "apiTokensDescription": "Tokens fornecem acesso à API no nível da organização. Eles só podem ser visualizados uma vez durante a criação.",
