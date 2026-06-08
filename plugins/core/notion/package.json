@@ -1,0 +1,53 @@
+{
+  "name": "hay-plugin-notion",
+  "version": "0.1.0",
+  "description": "Notion integration — import Notion pages and database entries as documents into Hay's knowledge base",
+  "author": "Hay",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Notion",
+    "category": "integration",
+    "autoActivate": true,
+    "trpcRouter": "./dist/router.cjs",
+    "capabilities": [
+      "auth"
+    ],
+    "documentImporter": true,
+    "config": {
+      "apiToken": {
+        "type": "string",
+        "label": "Internal Integration Token",
+        "encrypted": true,
+        "required": true,
+        "helpText": "Create an internal integration at notion.so/my-integrations, then share the pages/databases you want to import with it. The token starts with 'ntn_' or 'secret_'."
+      },
+      "notionVersion": {
+        "type": "string",
+        "label": "Notion API version",
+        "required": false,
+        "default": "2022-06-28",
+        "helpText": "The Notion-Version header sent with every request. Leave the default unless Notion deprecates it."
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc && esbuild src/router.ts --bundle --platform=node --target=es2022 --format=cjs --external:@server/* --external:@hay/* --external:zod --external:fs --external:path --external:crypto --external:http --external:https --external:url --outfile=dist/router.cjs",
+    "start": "node dist/index.js",
+    "dev": "npm run build && node dist/index.js"
+  },
+  "keywords": [
+    "notion",
+    "document-importer",
+    "knowledge-base"
+  ],
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -698,39 +698,74 @@ export class PluginManagerService {
    * Initialize auto-activated plugins
    */
   private async initializeAutoActivatedPlugins(): Promise<void> {
-    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
-
     for (const plugin of this.registry.values()) {
       const manifest = plugin.manifest as HayPluginManifest;
 
       if (manifest.autoActivate && manifest.trpcRouter) {
-        try {
-          // Dynamically load the plugin's router using the stored plugin path.
-          // For .ts files we go through CommonJS require() because dynamic
-          // ESM import() rejects unknown file extensions under ts-node — but
-          // require() is hooked by ts-node (and tsconfig-paths) so @server/*
-          // aliases inside the plugin's router resolve correctly.
-          const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
-          logger.debug({ routerPath }, "Loading router");
-          const routerModule = routerPath.endsWith(".ts")
-            ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-              require(routerPath)
-            : await import(routerPath);
-          const pluginRouter = routerModule.default || routerModule.router;
-
-          if (pluginRouter) {
-            // Register with the manifest ID, not the directory name
-            const registerId = manifest.id || plugin.pluginId;
-            pluginRouterRegistry.registerRouter(registerId, pluginRouter);
-            logger.info(
-              { pluginName: plugin.name, registerId },
-              "Auto-activated router for plugin",
-            );
-          }
-        } catch (error) {
-          logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
-        }
+        await this.ensurePluginRouterRegistered(plugin.pluginId);
       }
+    }
+  }
+
+  /**
+   * Idempotently load and register a plugin's tRPC router with the
+   * pluginRouterRegistry.
+   *
+   * Registration used to happen only here at boot, so a plugin that was built,
+   * installed, or enabled while the server was already running had no router
+   * registered until the next restart — making document-source listRoots/sync
+   * fail with "does not expose a router". Callers that resolve a plugin router
+   * on demand invoke this first so registration is self-healing.
+   *
+   * Returns true if a router is registered for the plugin after this call.
+   */
+  async ensurePluginRouterRegistered(pluginId: string): Promise<boolean> {
+    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
+
+    if (pluginRouterRegistry.hasRouter(pluginId)) {
+      return true;
+    }
+
+    const plugin = this.registry.get(pluginId);
+    if (!plugin) {
+      return false;
+    }
+
+    const manifest = plugin.manifest as HayPluginManifest;
+    if (!manifest.trpcRouter) {
+      return false;
+    }
+
+    try {
+      // Dynamically load the plugin's router using the stored plugin path.
+      // For .ts files we go through CommonJS require() because dynamic
+      // ESM import() rejects unknown file extensions under ts-node — but
+      // require() is hooked by ts-node (and tsconfig-paths) so @server/*
+      // aliases inside the plugin's router resolve correctly.
+      const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
+      logger.debug({ routerPath }, "Loading router");
+      const routerModule = routerPath.endsWith(".ts")
+        ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require(routerPath)
+        : await import(routerPath);
+      const pluginRouter = routerModule.default || routerModule.router;
+
+      if (!pluginRouter) {
+        logger.warn(
+          { pluginName: plugin.name },
+          "Plugin router module has no default/router export",
+        );
+        return false;
+      }
+
+      // Register with the manifest ID, not the directory name
+      const registerId = manifest.id || plugin.pluginId;
+      pluginRouterRegistry.registerRouter(registerId, pluginRouter);
+      logger.info({ pluginName: plugin.name, registerId }, "Registered router for plugin");
+      return true;
+    } catch (error) {
+      logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
+      return false;
     }
   }
 

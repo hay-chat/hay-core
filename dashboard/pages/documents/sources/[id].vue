@@ -148,7 +148,7 @@
 
           <p
             v-if="activeProgress && (activeProgress.currentTitle || activeProgress.currentUrl)"
-            class="text-xs text-neutral-muted truncate"
+            class="text-xs text-neutral-muted truncate max-w-48"
             :title="activeProgress.currentUrl || ''"
           >
             Now importing: {{ activeProgress.currentTitle || activeProgress.currentUrl }}
