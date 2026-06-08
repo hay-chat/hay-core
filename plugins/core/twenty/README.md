@@ -18,11 +18,9 @@ exposes these tools to the agent:
 | Metadata   | `list_objects`, `get_select_options`                                                                                                      |
 | Any object | `list_records`, `get_record`, `create_record`, `update_record`, `delete_record`                                                           |
 
-All tools are prefixed `twenty_`.
-
 The **metadata** + **generic record** tools are what make this generic: the agent calls
-`twenty_list_objects` to discover the schema of _your_ workspace (including custom objects,
-custom fields, and SELECT options), then reads/writes any of them through the `twenty_*_record`
+`list_objects` to discover the schema of _your_ workspace (including custom objects,
+custom fields, and SELECT options), then reads/writes any of them through the `*_record`
 tools. The typed people/company/note/task tools are a friendly fast-path for the objects every
 workspace has.
 

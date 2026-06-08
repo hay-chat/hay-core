@@ -4,7 +4,7 @@
  * The typed people/companies/notes/tasks tools cover the common path with
  * friendly parameters. These cover everything else: custom objects, custom
  * fields, and any field the typed tools don't expose. Discover object names and
- * field shapes first with `twenty_list_objects`.
+ * field shapes first with `list_objects`.
  *
  * `objectNamePlural` is the REST path segment (e.g. "companies", "opportunities",
  * or a custom object's plural name). `data` is the raw field object Twenty
@@ -18,9 +18,9 @@ const { ok, fail, unwrapData, pageInfo } = require("../lib/format");
 
 function registerRecordTools(server) {
   server.tool(
-    "twenty_list_records",
+    "list_records",
     "List records of any object with optional Twenty filter, ordering, and cursor pagination. " +
-      "Use `twenty_list_objects` to find the object's `namePlural` and filterable fields.",
+      "Use `list_objects` to find the object's `namePlural` and filterable fields.",
     {
       objectNamePlural: z.string().describe("Object plural REST name (e.g. 'opportunities')"),
       filter: z.string().optional().describe("Twenty filter expression (e.g. 'stage[eq]:NEW')"),
@@ -49,7 +49,7 @@ function registerRecordTools(server) {
   );
 
   server.tool(
-    "twenty_get_record",
+    "get_record",
     "Get a single record of any object by its ID.",
     {
       objectNamePlural: z.string().describe("Object plural REST name (e.g. 'opportunities')"),
@@ -69,9 +69,9 @@ function registerRecordTools(server) {
   );
 
   server.tool(
-    "twenty_create_record",
+    "create_record",
     "Create a record of any object. `data` is the raw Twenty field object. For SELECT fields, " +
-      "pass the option `value` (use `twenty_get_select_options` to find valid values). For " +
+      "pass the option `value` (use `get_select_options` to find valid values). For " +
       "composite fields use the nested shape, e.g. emails: { primaryEmail }, " +
       "domainName: { primaryLinkUrl }.",
     {
@@ -89,7 +89,7 @@ function registerRecordTools(server) {
   );
 
   server.tool(
-    "twenty_update_record",
+    "update_record",
     "Update a record of any object. `data` contains only the fields to change. Note: Twenty " +
       "replaces composite fields wholesale, so pass the full nested object for those.",
     {
@@ -108,7 +108,7 @@ function registerRecordTools(server) {
   );
 
   server.tool(
-    "twenty_delete_record",
+    "delete_record",
     "Delete a record of any object by its ID. This is destructive — confirm the ID first.",
     {
       objectNamePlural: z.string().describe("Object plural REST name (e.g. 'opportunities')"),

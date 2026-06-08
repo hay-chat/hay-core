@@ -48,7 +48,7 @@ async function listNotesForTarget(targetFilter, limit) {
 
 function registerNoteTools(server) {
   server.tool(
-    "twenty_create_note",
+    "create_note",
     "Create a note and optionally attach it to a person and/or company. Use this to log " +
       "interactions, context, or summaries against a CRM record.",
     {
@@ -80,7 +80,7 @@ function registerNoteTools(server) {
   );
 
   server.tool(
-    "twenty_list_notes_by_person",
+    "list_notes_by_person",
     "List notes attached to a person, most recent first.",
     {
       personId: z.string().describe("Twenty CRM person ID"),
@@ -96,7 +96,7 @@ function registerNoteTools(server) {
   );
 
   server.tool(
-    "twenty_list_notes_by_company",
+    "list_notes_by_company",
     "List notes attached to a company, most recent first.",
     {
       companyId: z.string().describe("Twenty CRM company ID"),

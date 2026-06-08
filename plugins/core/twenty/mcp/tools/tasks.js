@@ -11,7 +11,7 @@ const TASK_STATUS = ["TODO", "IN_PROGRESS", "DONE"];
 
 function registerTaskTools(server) {
   server.tool(
-    "twenty_create_task",
+    "create_task",
     "Create a task and optionally attach it to a person and/or company. Defaults to TODO status.",
     {
       title: z.string().describe("Task title"),
@@ -47,7 +47,7 @@ function registerTaskTools(server) {
   );
 
   server.tool(
-    "twenty_find_tasks",
+    "find_tasks",
     "List tasks with an optional raw Twenty filter expression. " +
       'E.g. "status[eq]:TODO" or "dueAt[lt]:2025-02-01".',
     {
@@ -65,7 +65,7 @@ function registerTaskTools(server) {
   );
 
   server.tool(
-    "twenty_update_task",
+    "update_task",
     "Update an existing task. Only fields you pass are written. Commonly used to mark a task DONE.",
     {
       taskId: z.string().describe("Twenty CRM task ID"),

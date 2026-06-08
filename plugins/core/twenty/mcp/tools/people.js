@@ -3,7 +3,7 @@
  *
  * Only fields present on a default Twenty workspace are modelled here
  * (name, emails, phones, jobTitle, city, linkedinLink, companyId). For custom
- * fields use the generic `twenty_create_record` / `twenty_update_record` tools.
+ * fields use the generic `create_record` / `update_record` tools.
  */
 
 const { z } = require("zod");
@@ -12,7 +12,7 @@ const { ok, fail, unwrapData, pageInfo, buildLink, andFilter } = require("../lib
 
 function registerPeopleTools(server) {
   server.tool(
-    "twenty_find_person_by_email",
+    "find_person_by_email",
     "Find a person in Twenty CRM by exact email address. Returns the first match or null.",
     { email: z.string().describe("Email address to look up") },
     async ({ email }) => {
@@ -29,7 +29,7 @@ function registerPeopleTools(server) {
   );
 
   server.tool(
-    "twenty_get_person",
+    "get_person",
     "Get a single person by their Twenty CRM ID.",
     { personId: z.string().describe("Twenty CRM person ID") },
     async ({ personId }) => {
@@ -43,7 +43,7 @@ function registerPeopleTools(server) {
   );
 
   server.tool(
-    "twenty_search_people",
+    "search_people",
     "Search people by name with optional filters. Returns up to `limit` results (default 20). " +
       "For arbitrary fields, pass a raw Twenty filter expression via `filter`.",
     {
@@ -84,7 +84,7 @@ function registerPeopleTools(server) {
   );
 
   server.tool(
-    "twenty_create_person",
+    "create_person",
     "Create a new person. Provide at least a name or an email. Email/phone/linkedin are " +
       "accepted at create time so capturing a contact is a single call.",
     {
@@ -126,7 +126,7 @@ function registerPeopleTools(server) {
   );
 
   server.tool(
-    "twenty_update_person",
+    "update_person",
     "Update fields on an existing person. Only fields you pass are written. A partial " +
       "`name` (just firstName or just lastName) is merged with the existing record so the " +
       "other half is preserved.",
@@ -182,7 +182,7 @@ function registerPeopleTools(server) {
   );
 
   server.tool(
-    "twenty_list_people_by_company",
+    "list_people_by_company",
     "List people linked to a specific company (one page).",
     {
       companyId: z.string().describe("Twenty CRM company ID"),

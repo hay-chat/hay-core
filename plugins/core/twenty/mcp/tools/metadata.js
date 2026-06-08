@@ -3,7 +3,7 @@
  *
  * Every Twenty workspace has a different schema (custom objects, custom fields,
  * custom SELECT options). These tools let the agent discover that schema at
- * runtime so the generic record tools (`twenty_*_record`) can target any object
+ * runtime so the generic record tools (`*_record`) can target any object
  * and write valid field values for the user's own account.
  */
 
@@ -38,7 +38,7 @@ function compactField(field) {
 
 function registerMetadataTools(server) {
   server.tool(
-    "twenty_list_objects",
+    "list_objects",
     "List the objects (tables) in this Twenty workspace and their fields, including any " +
       "custom objects and fields. Call this first to discover the REST path (`namePlural`) and " +
       "the available field names/types before using the generic record tools. Pass `objectName` " +
@@ -96,7 +96,7 @@ function registerMetadataTools(server) {
   );
 
   server.tool(
-    "twenty_get_select_options",
+    "get_select_options",
     "Get the valid options for a SELECT or MULTI_SELECT field on an object. Use this before " +
       "writing a SELECT field so you pass a valid `value` (not the label).",
     {

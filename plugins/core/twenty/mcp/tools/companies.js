@@ -3,8 +3,8 @@
  *
  * Only default-workspace fields are modelled (name, domainName, linkedinLink,
  * employees, address). For custom fields (stage, vertical, source, …) use the
- * generic `twenty_create_record` / `twenty_update_record` tools, and
- * `twenty_get_select_options` to discover valid SELECT values first.
+ * generic `create_record` / `update_record` tools, and
+ * `get_select_options` to discover valid SELECT values first.
  */
 
 const { z } = require("zod");
@@ -13,7 +13,7 @@ const { ok, fail, unwrapData, pageInfo, buildLink } = require("../lib/format");
 
 function registerCompanyTools(server) {
   server.tool(
-    "twenty_find_company_by_domain",
+    "find_company_by_domain",
     "Find a company by its website domain (exact match). Returns the first match or null.",
     { domain: z.string().describe("Website domain or URL (e.g. example.com)") },
     async ({ domain }) => {
@@ -30,7 +30,7 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_find_company_by_name",
+    "find_company_by_name",
     "Find a company by exact name. Returns the first match or null.",
     { name: z.string().describe("Company name (exact match)") },
     async ({ name }) => {
@@ -49,7 +49,7 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_get_company",
+    "get_company",
     "Get a single company by its Twenty CRM ID.",
     { companyId: z.string().describe("Twenty CRM company ID") },
     async ({ companyId }) => {
@@ -63,7 +63,7 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_search_companies",
+    "search_companies",
     "Search companies by name (partial match). Returns up to `limit` results (default 20).",
     {
       query: z.string().describe("Company name to search for"),
@@ -82,7 +82,7 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_create_company",
+    "create_company",
     "Create a new company. Only `name` is required.",
     {
       name: z.string().describe("Company name"),
@@ -112,7 +112,7 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_update_company",
+    "update_company",
     "Update fields on an existing company. Only fields you pass are written.",
     {
       companyId: z.string().describe("Twenty CRM company ID"),
@@ -148,11 +148,11 @@ function registerCompanyTools(server) {
   );
 
   server.tool(
-    "twenty_list_companies",
+    "list_companies",
     "List companies with an optional raw Twenty filter expression and cursor pagination. " +
       "Filter syntax: operators are bracketed, clauses comma-separated and combined with " +
       'and(...)/or(...), e.g. "name[ilike]:%acme%", "employees[gte]:100". Use ' +
-      "`twenty_list_objects` to discover filterable fields for your workspace.",
+      "`list_objects` to discover filterable fields for your workspace.",
     {
       filter: z
         .string()
