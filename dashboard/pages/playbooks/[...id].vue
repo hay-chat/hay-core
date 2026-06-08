@@ -1,236 +1,271 @@
 <template>
-  <Page
-    :title="isEditMode ? t('edit.title', { name: playbook?.title }) : t('create.title')"
-    :description="isEditMode ? t('edit.description') : t('create.description')"
-    width="max"
-  >
-    <template #header>
-      <div class="flex items-center gap-2">
-        <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/playbooks')">
-          <ArrowLeft class="h-4 w-4 mr-2" />
-          {{ t("actions.backToList") }}
-        </Button>
-        <Button
-          v-if="isEditMode && playbook"
-          variant="outline"
-          size="sm"
-          @click="showVersionHistory = true"
-        >
-          <History class="h-4 w-4 mr-2" />
-          {{ t("versioning.history.button") }}
-        </Button>
-      </div>
-    </template>
+  <div class="h-screen flex flex-col">
+    <!-- Header bar — matches the conversation playground -->
+    <div
+      class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+    >
+      <div class="flex items-center justify-between gap-4 px-6 py-4">
+        <!-- Left: back navigation + heading -->
+        <div class="flex items-center space-x-4">
+          <Button variant="ghost" size="sm" class="-ml-3" @click="handleCancel">
+            <ArrowLeft class="h-4 w-4 mr-2" />
+            {{ t("actions.backToList") }}
+          </Button>
+          <div>
+            <h1 class="text-xl font-semibold">
+              {{
+                isEditMode ? t("edit.title", { name: playbook?.title || "" }) : t("create.title")
+              }}
+            </h1>
+            <p class="text-sm text-neutral-muted">
+              {{ isEditMode ? t("edit.description") : t("create.description") }}
+            </p>
+          </div>
+        </div>
 
-    <div v-if="loading" class="text-center py-12">
-      <Loading :label="t('loading.loadingPlaybook')" />
+        <!-- Right: auto-save status + actions -->
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <!-- Auto-save status (edit mode) -->
+          <div v-if="isEditMode && draftVersion" class="flex items-center gap-1.5 text-xs mr-1 h-5">
+            <template v-if="autoSaveStatus === 'pending'">
+              <Circle class="h-3 w-3 text-amber-500" />
+              <span class="text-neutral-muted">{{ t("versioning.unsavedChanges") }}</span>
+            </template>
+            <template v-else-if="autoSaveStatus === 'saving'">
+              <Loader2 class="h-3 w-3 animate-spin text-neutral-muted" />
+              <span class="text-neutral-muted">{{ t("versioning.saving") }}</span>
+            </template>
+            <template v-else-if="autoSaveStatus === 'saved'">
+              <Check class="h-3 w-3 text-green-500" />
+              <span class="text-neutral-muted">
+                {{ t("versioning.saved") }}
+                <span v-if="lastSavedAt" class="ml-1">{{
+                  formatDateTime(lastSavedAt.toISOString())
+                }}</span>
+              </span>
+            </template>
+            <template v-else-if="autoSaveStatus === 'error'">
+              <AlertCircle class="h-3 w-3 text-red-500" />
+              <span class="text-red-500">{{ t("versioning.saveError") }}</span>
+              <button class="underline text-red-500 ml-1" @click="retryAutoSave">
+                {{ t("versioning.retry") }}
+              </button>
+            </template>
+          </div>
+
+          <Button
+            v-if="isEditMode && playbook"
+            variant="outline"
+            size="sm"
+            @click="showVersionHistory = true"
+          >
+            <History class="h-4 w-4 mr-2" />
+            {{ t("versioning.history.button") }}
+          </Button>
+
+          <!-- Edit mode: Save (identity) + Publish -->
+          <template v-if="isEditMode">
+            <Button
+              variant="outline"
+              size="sm"
+              :loading="isSubmitting"
+              :disabled="!form.title || !form.trigger"
+              @click="handleSubmit"
+            >
+              {{ t("actions.saveChanges") }}
+            </Button>
+            <Button
+              size="sm"
+              :loading="isPublishing"
+              :disabled="!draftVersion"
+              @click="showPublishDialog = true"
+            >
+              <Upload class="h-4 w-4 mr-2" />
+              {{ t("versioning.publish") }}
+            </Button>
+          </template>
+
+          <!-- Create mode: single Create button -->
+          <Button
+            v-else
+            size="sm"
+            :loading="isSubmitting"
+            :disabled="!form.title || !form.trigger"
+            @click="handleSubmit"
+          >
+            {{ t("actions.createPlaybook") }}
+          </Button>
+        </div>
+      </div>
     </div>
 
-    <Card v-else-if="!isEditMode || playbook">
-      <CardContent class="p-6">
-        <form data-testid="playbook-form" class="space-y-6" @submit.prevent="handleSubmit">
-          <!-- Title Field -->
-          <div class="space-y-2">
-            <Input
-              id="title"
+    <!-- Body -->
+    <div class="flex-1 overflow-hidden">
+      <div v-if="loading" class="text-center py-12">
+        <Loading :label="t('loading.loadingPlaybook')" />
+      </div>
+
+      <div v-else-if="!isEditMode || playbook" data-testid="playbook-form" class="playbook-editor">
+        <!-- Main document column — plain white canvas, no card chrome -->
+        <section class="playbook-editor-main bg-background">
+          <div class="playbook-doc">
+            <input
               v-model="form.title"
-              :label="t('form.titleLabel')"
-              :placeholder="t('form.titlePlaceholder')"
-              :class="errors.title ? 'border-red-500' : ''"
-              required
+              class="playbook-doc-title"
+              :placeholder="t('editor.titlePlaceholder')"
+              :aria-label="t('form.titleLabel')"
             />
-            <p v-if="errors.title" class="text-sm text-red-500">
-              {{ errors.title }}
-            </p>
-          </div>
+            <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
 
-          <!-- Trigger Field -->
-          <div class="space-y-2">
-            <Input
-              id="trigger"
-              v-model="form.trigger"
-              :label="t('form.triggerLabel')"
-              type="textarea"
-              :rows="3"
-              :placeholder="t('form.triggerPlaceholder')"
-              :class="errors.trigger ? 'border-red-500' : ''"
-              :character-limit="250"
-              :hint="t('form.triggerHint')"
-              required
-            />
-            <p v-if="errors.trigger" class="text-sm text-red-500">
-              {{ errors.trigger }}
-            </p>
-          </div>
-
-          <!-- Description Field -->
-          <div class="space-y-2">
-            <Input
-              v-model="form.description"
-              :label="t('form.descriptionLabel')"
-              type="textarea"
-              :placeholder="t('form.descriptionPlaceholder')"
-              :rows="3"
-            />
-          </div>
-
-          <!-- Instructions Field -->
-          <div class="space-y-1.5">
             <InstructionsTiptap
               ref="instructionsEditorRef"
               :initial-data="form.instructions"
-              :label="t('form.instructionsLabel')"
-              :hint="isEditMode ? undefined : t('form.instructionsHint')"
+              :label="t('editor.documentLabel')"
               :error="errors.instructions"
+              bare
+              min-height="calc(100vh - 22rem)"
               @update="handleInstructionsUpdate"
             />
-
-            <!-- Auto-save status (shown right below the editor in edit mode) -->
-            <div v-if="isEditMode && draftVersion" class="flex items-center gap-1.5 text-xs h-5">
-              <template v-if="autoSaveStatus === 'pending'">
-                <Circle class="h-3 w-3 text-amber-500" />
-                <span class="text-neutral-muted">{{ t("versioning.unsavedChanges") }}</span>
-              </template>
-              <template v-else-if="autoSaveStatus === 'saving'">
-                <Loader2 class="h-3 w-3 animate-spin text-neutral-muted" />
-                <span class="text-neutral-muted">{{ t("versioning.saving") }}</span>
-              </template>
-              <template v-else-if="autoSaveStatus === 'saved'">
-                <Check class="h-3 w-3 text-green-500" />
-                <span class="text-neutral-muted">
-                  {{ t("versioning.saved") }}
-                  <span v-if="lastSavedAt" class="ml-1">{{
-                    formatDateTime(lastSavedAt.toISOString())
-                  }}</span>
-                </span>
-              </template>
-              <template v-else-if="autoSaveStatus === 'error'">
-                <AlertCircle class="h-3 w-3 text-red-500" />
-                <span class="text-red-500">{{ t("versioning.saveError") }}</span>
-                <button class="underline text-red-500 ml-1" @click="retryAutoSave">
-                  {{ t("versioning.retry") }}
-                </button>
-              </template>
-            </div>
           </div>
+        </section>
 
-          <!-- Status Field (create mode only) -->
-          <div v-if="!isEditMode" class="space-y-2">
-            <Input
-              id="status"
-              v-model="form.status"
-              type="select"
-              :label="t('form.statusLabel')"
-              :options="[
-                { label: t('filters.statusDraft'), value: 'draft' },
-                { label: t('filters.statusActive'), value: 'active' },
-                { label: t('filters.statusArchived'), value: 'archived' },
-              ]"
-              class="w-full"
-            />
-          </div>
+        <!-- Right sidebar — tinted flush panel (matches conversation playground) -->
+        <aside
+          class="playbook-editor-sidebar border-t lg:border-t-0 lg:border-l bg-background-tertiary"
+        >
+          <div class="playbook-sidebar-inner space-y-6">
+            <!-- Details -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base">{{ t("editor.detailsSection") }}</CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-4">
+                <div class="space-y-1">
+                  <Input
+                    id="trigger"
+                    v-model="form.trigger"
+                    :label="t('form.triggerLabel')"
+                    type="textarea"
+                    :rows="3"
+                    :placeholder="t('form.triggerPlaceholder')"
+                    :class="errors.trigger ? 'border-red-500' : ''"
+                    :character-limit="250"
+                    :hint="t('form.triggerHint')"
+                    required
+                  />
+                  <p v-if="errors.trigger" class="text-sm text-red-500">{{ errors.trigger }}</p>
+                </div>
 
-          <!-- Agent Selection -->
-          <div class="space-y-2">
-            <label class="text-sm font-medium">{{
-              isEditMode ? t("form.assignedAgents") : t("form.assignAgents")
-            }}</label>
-            <div v-if="loadingAgents" class="p-4 text-center text-neutral-muted">
-              {{ t("form.loadingAgents") }}
-            </div>
-            <div v-else-if="agents.length === 0" class="p-4 text-center text-neutral-muted">
-              {{ t("form.noAgentsAvailable") }}
-            </div>
-            <div v-else class="space-y-2 border rounded-md p-4">
-              <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
-                <input
-                  :id="`agent-${agent.id}`"
-                  v-model="form.agentIds"
-                  type="checkbox"
-                  :value="agent.id"
-                  class="h-4 w-4 rounded border-gray-300"
+                <Input
+                  v-model="form.description"
+                  :label="t('form.descriptionLabel')"
+                  type="textarea"
+                  :placeholder="t('form.descriptionPlaceholder')"
+                  :rows="3"
                 />
-                <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
-                  <div class="font-medium">{{ agent.name }}</div>
-                  <div v-if="agent.description" class="text-sm text-neutral-muted">
-                    {{ agent.description }}
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
 
-          <!-- Metadata (only in edit mode) -->
-          <div v-if="isEditMode && playbook" class="space-y-2 text-sm text-neutral-muted">
-            <div v-if="playbook.created_at">
-              {{ t("form.createdDate", { date: formatDateTime(playbook.created_at) }) }}
-            </div>
-            <div v-if="playbook.updated_at">
-              {{ t("form.lastUpdated", { date: formatDateTime(playbook.updated_at) }) }}
-            </div>
-          </div>
+                <Input
+                  v-if="!isEditMode"
+                  id="status"
+                  v-model="form.status"
+                  type="select"
+                  :label="t('form.statusLabel')"
+                  :options="[
+                    { label: t('filters.statusDraft'), value: 'draft' },
+                    { label: t('filters.statusActive'), value: 'active' },
+                    { label: t('filters.statusArchived'), value: 'archived' },
+                  ]"
+                  class="w-full"
+                />
+              </CardContent>
+            </Card>
 
-          <!-- Form Actions -->
-          <div class="flex justify-between pt-4">
-            <Button
-              v-if="isEditMode"
-              type="button"
-              variant="destructive"
-              :loading="isSubmitting"
-              @click="handleDelete"
-            >
-              <Trash2 class="h-4 w-4 mr-2" />
-              {{ t("actions.deletePlaybook") }}
-            </Button>
-
-            <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
-              <Button
-                type="button"
-                variant="outline"
-                :disabled="isSubmitting"
-                @click="handleCancel"
-              >
-                {{ $t("common.cancel") }}
-              </Button>
-
-              <!-- Edit mode: Save (identity) + Publish -->
-              <template v-if="isEditMode">
-                <Button
-                  type="submit"
-                  variant="outline"
-                  :loading="isSubmitting"
-                  :disabled="!form.title || !form.trigger"
+            <!-- Assigned Agents -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-base">
+                  {{ isEditMode ? t("form.assignedAgents") : t("form.assignAgents") }}
+                </CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-3">
+                <div v-if="loadingAgents" class="py-2 text-center text-sm text-neutral-muted">
+                  {{ t("form.loadingAgents") }}
+                </div>
+                <div
+                  v-else-if="agents.length === 0"
+                  class="py-2 text-center text-sm text-neutral-muted"
                 >
-                  {{ t("actions.saveChanges") }}
-                </Button>
+                  {{ t("form.noAgentsAvailable") }}
+                </div>
+                <div v-else class="space-y-2">
+                  <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
+                    <input
+                      :id="`agent-${agent.id}`"
+                      v-model="form.agentIds"
+                      type="checkbox"
+                      :value="agent.id"
+                      class="h-4 w-4 rounded border-gray-300"
+                    />
+                    <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
+                      <div class="text-sm font-medium">{{ agent.name }}</div>
+                      <div v-if="agent.description" class="text-xs text-neutral-muted">
+                        {{ agent.description }}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <!-- Available Actions -->
+            <Card>
+              <CardHeader>
+                <CardTitle class="flex items-center justify-between text-base">
+                  <span>{{ t("editor.actionsSection") }}</span>
+                  <Badge v-if="actionsCount" variant="secondary">
+                    {{ t("editor.actionsCount", { count: actionsCount }) }}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PlaybookActionsPanel @add="handleAddAction" @count="actionsCount = $event" />
+              </CardContent>
+            </Card>
+
+            <!-- About + danger zone (edit mode only) -->
+            <Card v-if="isEditMode && playbook">
+              <CardHeader>
+                <CardTitle class="text-base">{{ t("editor.metadataSection") }}</CardTitle>
+              </CardHeader>
+              <CardContent class="space-y-3">
+                <div class="space-y-1 text-sm text-neutral-muted">
+                  <div v-if="playbook.created_at">
+                    {{ t("form.createdDate", { date: formatDateTime(playbook.created_at) }) }}
+                  </div>
+                  <div v-if="playbook.updated_at">
+                    {{ t("form.lastUpdated", { date: formatDateTime(playbook.updated_at) }) }}
+                  </div>
+                </div>
                 <Button
                   type="button"
-                  :loading="isPublishing"
-                  :disabled="!draftVersion"
-                  @click="showPublishDialog = true"
+                  variant="destructive"
+                  size="sm"
+                  class="w-full"
+                  :loading="isSubmitting"
+                  @click="handleDelete"
                 >
-                  <Upload class="h-4 w-4 mr-2" />
-                  {{ t("versioning.publish") }}
+                  <Trash2 class="h-4 w-4 mr-2" />
+                  {{ t("actions.deletePlaybook") }}
                 </Button>
-              </template>
-
-              <!-- Create mode: single Create button -->
-              <Button
-                v-else
-                type="submit"
-                :loading="isSubmitting"
-                :disabled="!form.title || !form.trigger"
-              >
-                {{ t("actions.createPlaybook") }}
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </aside>
+      </div>
 
-    <div v-else-if="isEditMode && !loading" class="text-center py-12">
-      <Error :label="t('loading.playbookNotFound')" />
+      <div v-else-if="isEditMode && !loading" class="text-center py-12">
+        <Error :label="t('loading.playbookNotFound')" />
+      </div>
     </div>
 
     <!-- Delete Confirmation Dialog -->
@@ -281,7 +316,7 @@
       :playbook-id="playbookId"
       @rollback="handleRollback"
     />
-  </Page>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -298,6 +333,7 @@ import {
   History,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
+import type { MCPTool } from "@/components/tiptap/MentionExtension";
 import type { PlaybookStatus, Agent, Playbook, PlaybookVersion } from "~/types/playbook";
 
 // Instructions are authored in the Tiptap editor and stored as a Tiptap document.
@@ -358,7 +394,16 @@ const isPublishing = ref(false);
 const instructionsEditorRef = ref<{
   save: () => JSONContent | null;
   getJSON: () => JSONContent | null;
+  insertAction: (tool: MCPTool) => void;
 } | null>(null);
+
+// Insert an action chip into the instructions editor from the actions panel.
+const handleAddAction = (tool: MCPTool) => {
+  instructionsEditorRef.value?.insertAction(tool);
+};
+
+// Number of available actions, surfaced by the panel for the card header badge.
+const actionsCount = ref(0);
 const loadingAgents = ref(true);
 const agents = ref<Agent[]>([]);
 const playbook = ref<Playbook | null>(null);
@@ -694,3 +739,81 @@ useHead({
   ],
 });
 </script>
+
+<style scoped>
+/*
+ * Two-pane document-editor layout, modelled on the conversation playground:
+ * a plain white body canvas on the left and a flush, tinted context panel on
+ * the right. The container fills the body region (flex-1) so both columns
+ * scroll independently with no trailing empty space.
+ */
+.playbook-editor {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.playbook-editor-main {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 2rem 2.5rem;
+}
+
+/* Centered document column within the white canvas. */
+.playbook-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 80ch;
+  margin: 0 auto;
+}
+
+.playbook-editor-sidebar {
+  width: 24rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.playbook-sidebar-inner {
+  padding: 1.5rem;
+}
+
+.playbook-doc-title {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.playbook-doc-title::placeholder {
+  color: var(--color-neutral-muted);
+}
+
+/* Stack the panes on narrow viewports. */
+@media (max-width: 1024px) {
+  .playbook-editor {
+    flex-direction: column;
+    height: auto;
+    overflow-y: auto;
+  }
+
+  .playbook-editor-main,
+  .playbook-editor-sidebar {
+    overflow-y: visible;
+  }
+
+  .playbook-editor-main {
+    padding: 1.5rem;
+  }
+
+  .playbook-editor-sidebar {
+    width: 100%;
+  }
+}
+</style>

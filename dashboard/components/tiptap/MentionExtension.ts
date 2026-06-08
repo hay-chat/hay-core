@@ -51,6 +51,13 @@ export interface MentionConfig {
 
 export const configureMentionExtension = (config: MentionConfig) => {
   return Mention.extend({
+    // Let action/document chips be dragged to reorder them within the document.
+    // ProseMirror handles the move (cut from old position, drop at new) for any
+    // node whose schema is draggable. `selectable` must be true as well — the
+    // base Mention extension disables it, which would block the node-selection
+    // that drag-and-drop relies on.
+    draggable: true,
+    selectable: true,
     addAttributes() {
       return {
         id: {
