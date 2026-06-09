@@ -262,6 +262,25 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
   }
 
   /**
+   * Clear stored auth for an instance (OAuth disconnect / revoke).
+   *
+   * Writes SQL NULL explicitly: TypeORM's `.update()` IGNORES `undefined`, so
+   * clearing with `{ authState: undefined }` is a silent no-op — the credentials
+   * would persist and the connection would still report "connected".
+   */
+  async clearAuthState(instanceId: string, orgId: string): Promise<void> {
+    await this.getRepository().update(
+      { id: instanceId, organizationId: orgId },
+      toUpdatePayload({
+        authState: null,
+        authMethod: null,
+        authValidatedAt: null,
+        updatedAt: new Date(),
+      } as unknown as DeepPartial<PluginInstance>),
+    );
+  }
+
+  /**
    * Get auth state for a plugin instance
    */
   async getAuthState(orgId: string, pluginId: string): Promise<AuthState | null> {

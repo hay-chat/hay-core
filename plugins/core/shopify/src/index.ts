@@ -234,11 +234,12 @@ export default defineHayPlugin((globalCtx) => ({
     let accessToken: string | undefined;
 
     if (mode === "oauth") {
-      // Managed: the offline access token was minted by Core's OAuth exchange.
-      const authState = ctx.auth.get();
-      if (authState?.methodId === "shopify-oauth") {
-        accessToken = String(authState.credentials.accessToken ?? "") || undefined;
-      }
+      // Managed: the offline access token was minted by Core's OAuth exchange and
+      // stored in authState. Core merges the DECRYPTED credentials into config, so
+      // read the token via config — `ctx.auth.get()` returns the still-encrypted
+      // credentials in the worker, and its methodId is Core's "${pluginId}-oauth"
+      // convention rather than this plugin's registered method id.
+      accessToken = ctx.config.getOptional<string>("accessToken");
       if (!accessToken) {
         ctx.logger.info(
           "Shopify managed mode: not connected yet (no access token). " +

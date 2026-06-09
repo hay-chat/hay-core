@@ -646,11 +646,10 @@ export class OAuthService {
       throw new Error(`Plugin instance not found`);
     }
 
-    // Clear authState and authMethod
-    await pluginInstanceRepository.update(instance.id, organizationId, {
-      authMethod: undefined,
-      authState: undefined,
-    });
+    // Clear authState + authMethod. Must use an explicit NULL clear: TypeORM's
+    // .update() ignores `undefined`, so the previous code was a silent no-op and
+    // the connection never actually disconnected.
+    await pluginInstanceRepository.clearAuthState(instance.id, organizationId);
 
     logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
   }

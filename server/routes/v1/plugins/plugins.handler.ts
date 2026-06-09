@@ -153,10 +153,11 @@ export const getPlugin = authenticatedProcedure
             if (metadata.configSchema) {
               configSchema = metadata.configSchema;
             }
-            // Update database metadata
+            // Update database metadata (wrap under `metadata` — the repo reads data.metadata)
             await pluginRegistryRepository.updateMetadata(input.pluginId, {
-              ...metadata,
-              updatedAt: new Date(),
+              metadata,
+              metadataFetchedAt: new Date(),
+              metadataState: "fresh",
             });
 
             // Update in-memory registry
@@ -175,10 +176,11 @@ export const getPlugin = authenticatedProcedure
               if (metadata2.configSchema) {
                 configSchema = metadata2.configSchema;
               }
-              // Update database metadata
+              // Update database metadata (wrap under `metadata` — the repo reads data.metadata)
               await pluginRegistryRepository.updateMetadata(input.pluginId, {
-                ...metadata2,
-                updatedAt: new Date(),
+                metadata: metadata2,
+                metadataFetchedAt: new Date(),
+                metadataState: "fresh",
               });
 
               // Update in-memory registry

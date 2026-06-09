@@ -167,7 +167,7 @@ const handleConnect = async () => {
     const errorMessage =
       error instanceof Error
         ? error.message
-        : t("integrations.pluginSettings.toast.oauthConnectFailed", { name: pluginName.value });
+        : t("pluginSettings.toast.oauthConnectFailed", { name: pluginName.value });
     toast.error(errorMessage);
     connecting.value = false;
   }
@@ -184,15 +184,13 @@ const handleDisconnect = async () => {
 
     await Hay.plugins.oauth.revoke.mutate({ pluginId: props.plugin.id });
 
-    toast.success(
-      t("integrations.pluginSettings.toast.oauthDisconnectedFrom", { name: pluginName.value }),
-    );
+    toast.success(t("pluginSettings.toast.oauthDisconnectedFrom", { name: pluginName.value }));
     await fetchOAuthStatus();
   } catch (error) {
     console.error("Failed to revoke OAuth:", error);
     const { useToast } = await import("@/composables/useToast");
     const toast = useToast();
-    toast.error(t("integrations.pluginSettings.toast.oauthDisconnectFailed"));
+    toast.error(t("pluginSettings.toast.oauthDisconnectFailed"));
   } finally {
     disconnecting.value = false;
   }
@@ -220,9 +218,7 @@ onMounted(async () => {
     if (oauthParam === "success" && pluginIdParam === props.plugin.id) {
       const { useToast } = await import("@/composables/useToast");
       const toast = useToast();
-      toast.success(
-        t("integrations.pluginSettings.toast.oauthConnectedTo", { name: pluginName.value }),
-      );
+      toast.success(t("pluginSettings.toast.oauthConnectedTo", { name: pluginName.value }));
 
       // Clean up URL
       window.history.replaceState({}, "", window.location.pathname);
