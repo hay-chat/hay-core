@@ -31,6 +31,7 @@ interface GetMessagesResponse {
   typing?: boolean;
   status?: string;
   isClosed?: boolean;
+  csatRating?: number | null;
   error?: string;
 }
 
@@ -38,6 +39,13 @@ interface SendMessageResponse {
   messageId: string | null;
   nonce: string;
   createdAt: string | null;
+  error?: string;
+  errorMessage?: string;
+}
+
+interface SubmitCsatResponse {
+  success: boolean;
+  nonce: string;
   error?: string;
   errorMessage?: string;
 }
@@ -190,9 +198,58 @@ export function useConversation(config: HayChatConfig) {
     }
   };
 
+  /**
+   * Submit a CSAT (customer satisfaction) rating for a conversation
+   */
+  const submitCsat = async (
+    conversationId: string,
+    rating: number,
+    proof: string,
+    method: string,
+    url: string,
+  ): Promise<SubmitCsatResponse | null> => {
+    try {
+      const response = await fetch(`${baseUrl}/v1/publicConversations.submitCsat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          rating,
+          proof,
+          method,
+          url,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Check if response is OK but contains nonce expiration error
+      if (response.ok && data.result?.data?.error === "NONCE_EXPIRED") {
+        return {
+          success: false,
+          nonce: data.result.data.nonce,
+          error: "NONCE_EXPIRED",
+          errorMessage: data.result.data.errorMessage,
+        };
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to submit rating");
+      }
+
+      return data.result.data;
+    } catch (error) {
+      console.error("[Conversation] Failed to submit CSAT rating:", error);
+      return null;
+    }
+  };
+
   return {
     createConversation,
     getMessages,
     sendMessage,
+    submitCsat,
   };
 }

@@ -28,6 +28,7 @@ export function useChat(config: HayChatConfig) {
   const keypair = ref<Keypair | null>(null);
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
+  const csatSubmitted = ref(false);
   const isSending = ref(false);
   // These start as null and are populated inside initialize() via safeStorage.
   // This matters because consent state may change between useChat() being
@@ -155,6 +156,7 @@ export function useChat(config: HayChatConfig) {
       existingConversationId.value = conversationData.id;
       conversationId.value = conversationData.id;
       isConversationClosed.value = false;
+      csatSubmitted.value = false;
 
       console.log("[Webchat] Conversation created:", conversationData.id);
 
@@ -245,6 +247,11 @@ export function useChat(config: HayChatConfig) {
         if (retryData.isClosed) {
           isConversationClosed.value = true;
         }
+
+        // Reflect a rating that was already submitted
+        if (retryData.csatRating != null) {
+          csatSubmitted.value = true;
+        }
       } else if (messagesData) {
         nonce.value = messagesData.nonce;
 
@@ -256,6 +263,11 @@ export function useChat(config: HayChatConfig) {
         // Check if conversation is closed
         if (messagesData.isClosed) {
           isConversationClosed.value = true;
+        }
+
+        // Reflect a rating that was already submitted
+        if (messagesData.csatRating != null) {
+          csatSubmitted.value = true;
         }
       }
 
@@ -533,6 +545,7 @@ export function useChat(config: HayChatConfig) {
     nonce.value = "";
     messages.value = [];
     isConversationClosed.value = false;
+    csatSubmitted.value = false;
     lastReadMessageId.value = null;
   };
 
@@ -659,6 +672,11 @@ export function useChat(config: HayChatConfig) {
       // Update conversation closed state
       if (messagesData?.isClosed) {
         isConversationClosed.value = true;
+      }
+
+      // Reflect a rating that was already submitted
+      if (messagesData?.csatRating != null) {
+        csatSubmitted.value = true;
       }
     } catch (error) {
       console.error("[Webchat] Failed to refresh messages:", error);
@@ -806,6 +824,61 @@ export function useChat(config: HayChatConfig) {
     }
   };
 
+  // Submit a CSAT rating for the current conversation
+  const submitCsat = async (rating: number, retryCount: number = 0): Promise<boolean> => {
+    if (!conversationId.value || !keypair.value) {
+      console.warn("[Webchat] Cannot submit CSAT: missing conversation or keypair");
+      return false;
+    }
+
+    try {
+      const httpUrl = `${config.baseUrl}/v1/publicConversations.submitCsat`;
+      const proof = await createDPoPProof(
+        "POST",
+        httpUrl,
+        keypair.value.privateKey,
+        keypair.value.publicJwk,
+        nonce.value || "initial",
+      );
+
+      if (!proof) {
+        throw new Error("Failed to create DPoP proof");
+      }
+
+      const result = await conversation.submitCsat(
+        conversationId.value,
+        rating,
+        proof,
+        "POST",
+        httpUrl,
+      );
+
+      if (!result) {
+        return false;
+      }
+
+      // Retry once with a fresh nonce if the previous one expired
+      if (result.error === "NONCE_EXPIRED" && result.nonce && retryCount < 1) {
+        nonce.value = result.nonce;
+        return submitCsat(rating, retryCount + 1);
+      }
+
+      if (result.nonce) {
+        nonce.value = result.nonce;
+      }
+
+      if (result.success) {
+        csatSubmitted.value = true;
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("[Webchat] Failed to submit CSAT rating:", error);
+      return false;
+    }
+  };
+
   // Watch for new messages to detect closure
   const checkMessageForClosure = (message: any) => {
     if (message.metadata?.isClosureMessage === true) {
@@ -877,6 +950,7 @@ export function useChat(config: HayChatConfig) {
     unreadCount,
     isSending,
     isConversationClosed,
+    csatSubmitted,
     currentAgentType,
     currentAgentName,
 
@@ -886,6 +960,7 @@ export function useChat(config: HayChatConfig) {
     openChat,
     closeChat,
     sendMessage,
+    submitCsat,
     startTyping,
     stopTyping,
     disconnect: disconnectAll,

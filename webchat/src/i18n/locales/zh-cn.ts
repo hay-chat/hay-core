@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "对话已关闭",
   "input.placeholder": "输入消息...",
   "input.send": "发送消息",
+  "csat.defaultQuestion": "您如何评价今天获得的支持？",
+  "csat.thankYou": "感谢您的反馈！",
 } as const;
