@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Conversa Encerrada",
   "input.placeholder": "Digite uma mensagem...",
   "input.send": "Enviar mensagem",
+  "csat.defaultQuestion": "Como você avalia o atendimento que recebeu hoje?",
+  "csat.thankYou": "Obrigado pelo seu feedback!",
 } as const;

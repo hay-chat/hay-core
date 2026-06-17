@@ -13,6 +13,9 @@
         :is-typing="isTyping"
         :is-connected="isConnected"
         :is-conversation-closed="isConversationClosed"
+        :csat-enabled="resolvedCsatEnabled"
+        :csat-question="resolvedCsatQuestion"
+        :csat-submitted="csatSubmitted"
         :is-expanded="isExpanded"
         :agent-name="resolvedAgentName"
         :agent-avatar-url="resolvedAvatarUrl"
@@ -21,6 +24,7 @@
         :current-agent-name="currentAgentName || undefined"
         @close="closeChat"
         @send="sendMessage"
+        @submit-csat="submitCsat"
         @start-typing="startTyping"
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
@@ -63,6 +67,8 @@ const fetchedConfig = ref<{
   agentName?: string | null;
   agentAvatarUrl?: string | null;
   organizationLogoUrl?: string | null;
+  csatEnabled?: boolean | null;
+  csatQuestion?: string | null;
 }>({});
 
 const fetchPublicConfig = async () => {
@@ -73,7 +79,11 @@ const fetchPublicConfig = async () => {
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.warn("[Hay Webchat] Public config fetch failed:", response.status, response.statusText);
+      console.warn(
+        "[Hay Webchat] Public config fetch failed:",
+        response.status,
+        response.statusText,
+      );
       return;
     }
 
@@ -86,6 +96,8 @@ const fetchPublicConfig = async () => {
         agentName: result.agentName,
         agentAvatarUrl: result.agentAvatarUrl,
         organizationLogoUrl: result.organizationLogoUrl,
+        csatEnabled: result.csatEnabled,
+        csatQuestion: result.csatQuestion,
       };
       console.log("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
       console.log("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
@@ -120,6 +132,17 @@ const resolvedAgentName = computed(
   () => props.config.agentName || fetchedConfig.value.agentName || undefined,
 );
 
+// CSAT: host config wins, then server config; enabled by default.
+const resolvedCsatEnabled = computed(() => {
+  if (typeof props.config.csatEnabled === "boolean") return props.config.csatEnabled;
+  if (typeof fetchedConfig.value.csatEnabled === "boolean") return fetchedConfig.value.csatEnabled;
+  return true;
+});
+
+const resolvedCsatQuestion = computed(
+  () => props.config.csatQuestion || fetchedConfig.value.csatQuestion || t("csat.defaultQuestion"),
+);
+
 const {
   isOpen,
   isConnected,
@@ -127,11 +150,13 @@ const {
   isTyping,
   unreadCount,
   isConversationClosed,
+  csatSubmitted,
   currentAgentType,
   currentAgentName,
   toggleChat,
   closeChat,
   sendMessage,
+  submitCsat,
   startTyping,
   stopTyping,
   startNewConversation,

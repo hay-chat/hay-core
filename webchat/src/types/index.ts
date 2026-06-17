@@ -7,6 +7,10 @@ export interface HayChatConfig {
   theme?: "blue" | "green" | "purple" | "black";
   showGreeting?: boolean;
   greetingMessage?: string;
+  /** Whether to show a 1–5 satisfaction rating when a conversation ends. Populated from public config. */
+  csatEnabled?: boolean;
+  /** Question shown above the satisfaction rating. Populated from public config. */
+  csatQuestion?: string;
   /** Public context passed to the AI prompt. Safe for non-sensitive data only. */
   context?: Record<string, unknown>;
   /** External ID of the logged-in user in your system. Loads their stored customer context. */

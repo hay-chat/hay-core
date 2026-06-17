@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Conversation Closed",
   "input.placeholder": "Type a message...",
   "input.send": "Send message",
+  "csat.defaultQuestion": "How would you rate the support you received today?",
+  "csat.thankYou": "Thanks for your feedback!",
 } as const;

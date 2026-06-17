@@ -23,6 +23,8 @@ export const webchatRouter = router({
         theme: z.nativeEnum(WebchatTheme).optional(),
         showGreeting: z.boolean().optional(),
         greetingMessage: z.string().nullable().optional(),
+        csatEnabled: z.boolean().optional(),
+        csatQuestion: z.string().min(1).max(300).optional(),
         allowedDomains: z.array(z.string()).optional(),
         isEnabled: z.boolean().optional(),
         customCss: z.string().nullable().optional(),

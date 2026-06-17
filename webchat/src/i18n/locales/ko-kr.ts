@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "대화 종료됨",
   "input.placeholder": "메시지를 입력하세요...",
   "input.send": "메시지 보내기",
+  "csat.defaultQuestion": "오늘 받으신 지원을 어떻게 평가하시겠어요?",
+  "csat.thankYou": "의견 주셔서 감사합니다!",
 } as const;

@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "会話終了",
   "input.placeholder": "メッセージを入力...",
   "input.send": "メッセージを送信",
+  "csat.defaultQuestion": "本日のサポートはいかがでしたか？",
+  "csat.thankYou": "フィードバックありがとうございます！",
 } as const;

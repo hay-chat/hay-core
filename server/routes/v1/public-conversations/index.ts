@@ -46,6 +46,15 @@ const sendMessageSchema = z.object({
   context: z.record(z.any()).optional(),
 });
 
+// Schema for submitting a CSAT rating
+const submitCsatSchema = z.object({
+  conversationId: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  proof: z.string(), // DPoP proof
+  method: z.string(),
+  url: z.string(),
+});
+
 // Schema for getting messages
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
@@ -199,6 +208,7 @@ export const publicConversationsRouter = t.router({
         typing: isTyping,
         status: conversation?.status || "open",
         isClosed: conversation?.status === "closed" || conversation?.status === "resolved",
+        csatRating: conversation?.csat_rating ?? null,
         error: null,
         errorMessage: null,
       };
@@ -282,6 +292,65 @@ export const publicConversationsRouter = t.router({
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to send message",
+      });
+    }
+  }),
+
+  // Submit a CSAT rating for a conversation (requires DPoP proof)
+  submitCsat: publicProcedure.input(submitCsatSchema).mutation(async ({ input }) => {
+    try {
+      // Verify DPoP proof
+      const verified = await verifyDPoPForRequest(
+        input.conversationId,
+        input.proof,
+        input.method,
+        input.url,
+      );
+
+      if (!verified.success) {
+        // Surface an expired nonce the same way other endpoints do so the
+        // client can retry with the fresh nonce.
+        if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+          return {
+            success: false,
+            nonce: verified.newNonce,
+            error: "NONCE_EXPIRED",
+            errorMessage: verified.error,
+          };
+        }
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: verified.error || "Invalid DPoP proof",
+        });
+      }
+
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      await conversationRepository.updateById(input.conversationId, {
+        csat_rating: input.rating,
+        csat_rated_at: new Date(),
+      });
+
+      return {
+        success: true,
+        nonce: verified.newNonce,
+        error: null,
+        errorMessage: null,
+      };
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      logger.error({ err: error }, "Error submitting CSAT rating");
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to submit rating",
       });
     }
   }),

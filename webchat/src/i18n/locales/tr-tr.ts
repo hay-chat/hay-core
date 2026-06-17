@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Görüşme Kapandı",
   "input.placeholder": "Bir mesaj yazın...",
   "input.send": "Mesaj gönder",
+  "csat.defaultQuestion": "Bugün aldığınız desteği nasıl değerlendirirsiniz?",
+  "csat.thankYou": "Geri bildiriminiz için teşekkürler!",
 } as const;

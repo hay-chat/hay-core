@@ -68,6 +68,17 @@ export class WebchatSettings {
   })
   greetingMessage!: string | null;
 
+  // CSAT (customer satisfaction rating shown when a conversation ends)
+  @Column({ type: "boolean", name: "csat_enabled", default: true })
+  csatEnabled!: boolean;
+
+  @Column({
+    type: "text",
+    name: "csat_question",
+    default: "How would you rate the support you received today?",
+  })
+  csatQuestion!: string;
+
   // Security
   @Column({ type: "text", array: true, name: "allowed_domains", default: () => "ARRAY['*']" })
   allowedDomains!: string[];

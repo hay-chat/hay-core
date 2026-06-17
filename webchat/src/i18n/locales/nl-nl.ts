@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Gesprek Gesloten",
   "input.placeholder": "Typ een bericht...",
   "input.send": "Bericht verzenden",
+  "csat.defaultQuestion": "Hoe zou je de ondersteuning van vandaag beoordelen?",
+  "csat.thankYou": "Bedankt voor je feedback!",
 } as const;
