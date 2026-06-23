@@ -123,8 +123,11 @@ interface ShopifyVariantNode {
   inventoryQuantity?: number | null;
   inventoryPolicy?: string;
   availableForSale?: boolean;
-  weight?: number | null;
-  weightUnit?: string | null;
+  // Weight moved off ProductVariant in recent Admin API versions; it now lives
+  // under the variant's inventory item measurement.
+  inventoryItem?: {
+    measurement?: { weight?: { value?: number | null; unit?: string | null } | null } | null;
+  } | null;
   selectedOptions?: Array<{ name: string; value: string }>;
   image?: { url?: string } | null;
 }
@@ -190,8 +193,14 @@ const PRODUCTS_QUERY = /* GraphQL */ `
                 inventoryQuantity
                 inventoryPolicy
                 availableForSale
-                weight
-                weightUnit
+                inventoryItem {
+                  measurement {
+                    weight {
+                      value
+                      unit
+                    }
+                  }
+                }
                 selectedOptions {
                   name
                   value
@@ -259,8 +268,8 @@ function mapVariant(node: ShopifyVariantNode): CanonicalVariant {
             node.inventoryQuantity <= 0
           ? "out_of_stock"
           : "in_stock",
-    weightValue: node.weight ?? undefined,
-    weightUnit: node.weightUnit ?? undefined,
+    weightValue: node.inventoryItem?.measurement?.weight?.value ?? undefined,
+    weightUnit: node.inventoryItem?.measurement?.weight?.unit ?? undefined,
     imageSrc: node.image?.url ?? undefined,
   };
 }
@@ -278,7 +287,7 @@ function mapProduct(node: ShopifyProductNode): CanonicalProduct {
 
   return {
     externalId: node.id,
-    source: "shopify",
+    // `source` is stamped by core from the authenticated plugin id — not set here.
     handle: node.handle,
     title: node.title,
     descriptionHtml: node.descriptionHtml ?? undefined,

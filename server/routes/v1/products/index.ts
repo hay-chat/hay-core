@@ -2,15 +2,23 @@ import { t, scopedProcedure, authenticatedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
-import { Product, ProductSource, ProductStatus } from "@server/entities/product.entity";
+import { Product, ProductStatus, CORE_PRODUCT_SOURCES } from "@server/entities/product.entity";
 import { ProductVariant, VariantAvailability } from "@server/entities/product-variant.entity";
 import { productSyncService } from "@server/services/product-sync.service";
 import { productVectorStoreService } from "@server/services/product-vector-store.service";
+import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { createLogger } from "@server/lib/logger";
 import type { CanonicalProduct } from "@server/types/canonical-product";
 
 const logger = createLogger("products-router");
+
+// This route is a CORE-owned ingestion path (public custom-store API + manual
+// dashboard entry), so it may name its own sources — but ONLY core's two, never
+// a plugin id. Plugin catalogs flow through pluginApi.products.* instead.
+const coreSourceSchema = z
+  .enum([CORE_PRODUCT_SOURCES.CUSTOM, CORE_PRODUCT_SOURCES.MANUAL])
+  .default(CORE_PRODUCT_SOURCES.CUSTOM);
 
 const variantSchema = z.object({
   externalId: z.string().min(1),
@@ -33,7 +41,6 @@ const variantSchema = z.object({
 
 const canonicalProductSchema = z.object({
   externalId: z.string().min(1),
-  source: z.nativeEnum(ProductSource),
   handle: z.string().min(1),
   title: z.string().min(1),
   descriptionHtml: z.string().optional(),
@@ -71,17 +78,24 @@ const canonicalProductSchema = z.object({
 
 const upsertManyInput = z.object({
   products: z.array(canonicalProductSchema).min(1).max(500),
+  source: coreSourceSchema,
+});
+
+const upsertOneInput = z.object({
+  product: canonicalProductSchema,
+  source: coreSourceSchema,
 });
 
 const deleteInput = z.object({
-  source: z.nativeEnum(ProductSource),
+  source: z.enum([CORE_PRODUCT_SOURCES.CUSTOM, CORE_PRODUCT_SOURCES.MANUAL]),
   externalId: z.string().min(1),
 });
 
 const listInput = z.object({
   limit: z.number().int().min(1).max(200).default(50),
   offset: z.number().int().min(0).default(0),
-  source: z.nativeEnum(ProductSource).optional(),
+  // Free-form source filter (a plugin id or a core source) — not enumerated.
+  source: z.string().optional(),
   available: z.boolean().optional(),
   query: z.string().optional(),
 });
@@ -102,10 +116,14 @@ export const productsRouter = t.router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required" });
       }
 
-      logger.info({ organizationId, count: input.products.length }, "Bulk-upserting products");
+      logger.info(
+        { organizationId, count: input.products.length, source: input.source },
+        "Bulk-upserting products",
+      );
       const result = await productSyncService.upsertProducts(
         organizationId,
         input.products as CanonicalProduct[],
+        input.source,
       );
       return result;
     }),
@@ -114,13 +132,17 @@ export const productsRouter = t.router({
    * Single-product upsert (webhook-driven refresh).
    */
   upsert: scopedProcedure(RESOURCES.PRODUCTS, ACTIONS.CREATE)
-    .input(canonicalProductSchema)
+    .input(upsertOneInput)
     .mutation(async ({ input, ctx }) => {
       const organizationId = ctx.organizationId;
       if (!organizationId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required" });
       }
-      return await productSyncService.upsertProduct(organizationId, input as CanonicalProduct);
+      return await productSyncService.upsertProduct(
+        organizationId,
+        input.product as CanonicalProduct,
+        input.source,
+      );
     }),
 
   delete: scopedProcedure(RESOURCES.PRODUCTS, ACTIONS.DELETE)
@@ -196,5 +218,41 @@ export const productsRouter = t.router({
       productVectorStoreService.getStatistics(organizationId),
     ]);
     return { products, embeddings: embeddingStats };
+  }),
+
+  /**
+   * Distinct sources actually present in this org's catalog, each with a
+   * display label. Plugin-id sources are resolved to the plugin's name via the
+   * registry (dynamic discovery — core never hardcodes the list); the two
+   * core-owned sources get static labels. Drives the dashboard source filter so
+   * it only ever shows sources that exist, never a hardcoded plugin roster.
+   */
+  sources: authenticatedProcedure.query(async ({ ctx }) => {
+    const organizationId = ctx.organizationId;
+    if (!organizationId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required" });
+    }
+
+    const rows = await AppDataSource.getRepository(Product)
+      .createQueryBuilder("p")
+      .select("DISTINCT p.source", "source")
+      .where("p.organizationId = :organizationId", { organizationId })
+      .orderBy("source", "ASC")
+      .getRawMany<{ source: string }>();
+
+    const coreLabels: Record<string, string> = {
+      [CORE_PRODUCT_SOURCES.CUSTOM]: "Custom",
+      [CORE_PRODUCT_SOURCES.MANUAL]: "Manual",
+    };
+
+    const sources = await Promise.all(
+      rows.map(async ({ source }) => {
+        if (coreLabels[source]) return { value: source, label: coreLabels[source] };
+        const plugin = await pluginRegistryRepository.findByPluginId(source);
+        return { value: source, label: plugin?.name ?? source };
+      }),
+    );
+
+    return { sources };
   }),
 });

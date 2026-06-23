@@ -130,7 +130,6 @@ export type {
 // ============================================================================
 
 export type {
-  ProductSourceName,
   ProductStatusName,
   VariantAvailabilityName,
   CanonicalCategory,

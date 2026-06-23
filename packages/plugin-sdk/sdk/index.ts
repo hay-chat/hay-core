@@ -101,7 +101,6 @@ export type {
   RouteHandler,
 
   // Products
-  ProductSourceName,
   ProductStatusName,
   VariantAvailabilityName,
   CanonicalCategory,

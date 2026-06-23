@@ -14,7 +14,7 @@
  * `htmlToSanitizedMarkdown`).
  */
 
-import { ProductSource, ProductStatus } from "../entities/product.entity";
+import { ProductStatus } from "../entities/product.entity";
 import { VariantAvailability } from "../entities/product-variant.entity";
 
 export interface CanonicalCategory {
@@ -61,7 +61,10 @@ export interface CanonicalVariant {
 
 export interface CanonicalProduct {
   externalId: string;
-  source: ProductSource;
+  // NOTE: `source` is intentionally NOT part of the canonical shape. Core stamps
+  // it at the ingestion boundary (plugin id for plugin sync, "custom"/"manual"
+  // for core paths) so adapters can't claim an identity and core never learns
+  // platform specifics.
   handle: string;
   title: string;
   /** Raw HTML — core converts to sanitized markdown at the ingestion boundary. */

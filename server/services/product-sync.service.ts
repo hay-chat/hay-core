@@ -14,7 +14,7 @@
 
 import type { EntityManager } from "typeorm";
 import { AppDataSource } from "../database/data-source";
-import { Product, ProductSource, ProductStatus } from "../entities/product.entity";
+import { Product, ProductStatus } from "../entities/product.entity";
 import { ProductVariant, VariantAvailability } from "../entities/product-variant.entity";
 import { htmlToSanitizedMarkdown } from "../utils/sanitize-html";
 import { sanitizeContent } from "../utils/sanitize";
@@ -44,17 +44,18 @@ export class ProductSyncService {
   async upsertProducts(
     organizationId: string,
     products: CanonicalProduct[],
+    source: string,
   ): Promise<BulkSyncResult> {
     const result: BulkSyncResult = { upserted: 0, errors: [] };
 
     for (const product of products) {
       try {
-        await this.upsertProduct(organizationId, product);
+        await this.upsertProduct(organizationId, product, source);
         result.upserted++;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         logger.error(
-          { err, organizationId, source: product.source, externalId: product.externalId },
+          { err, organizationId, source, externalId: product.externalId },
           "Failed to upsert product",
         );
         result.errors.push({ externalId: product.externalId, message });
@@ -64,7 +65,6 @@ export class ProductSyncService {
     // Audit the batch result. Errors are swallowed inside auditLog itself,
     // but keep this defensive in case it ever changes.
     if (products.length > 0) {
-      const source = products[0].source;
       try {
         await auditLogService.logProductSync(undefined, organizationId, source, {
           upserted: result.upserted,
@@ -79,12 +79,15 @@ export class ProductSyncService {
   }
 
   /**
-   * Idempotent upsert of one canonical product (and its variants).
+   * Idempotent upsert of one canonical product (and its variants). The `source`
+   * is supplied by core (plugin id, or "custom" / "manual") — never by the
+   * adapter — and forms half of the (source, externalId) idempotency key.
    * Re-embeds only when the derived search text changes.
    */
   async upsertProduct(
     organizationId: string,
     canonical: CanonicalProduct,
+    source: string,
   ): Promise<ProductSyncResult> {
     this.validateCanonical(canonical);
 
@@ -106,7 +109,7 @@ export class ProductSyncService {
       const variantRepo = manager.getRepository(ProductVariant);
 
       const existing = await productRepo.findOne({
-        where: { organizationId, source: canonical.source, externalId: canonical.externalId },
+        where: { organizationId, source, externalId: canonical.externalId },
       });
 
       const status = canonical.status ?? ProductStatus.ACTIVE;
@@ -115,7 +118,7 @@ export class ProductSyncService {
       const product = existing ?? new Product();
       product.organizationId = organizationId;
       product.externalId = canonical.externalId;
-      product.source = canonical.source;
+      product.source = source;
       product.handle = canonical.handle;
       product.title = sanitizeContent(canonical.title);
       product.description = description || undefined;
@@ -138,7 +141,7 @@ export class ProductSyncService {
       const saved = await productRepo.save(product);
       const created = !existing;
 
-      await this.syncVariants(manager, organizationId, saved.id, canonical);
+      await this.syncVariants(manager, organizationId, saved.id, canonical, source);
 
       const searchTextChanged = !existing || existing.searchText !== searchText;
       let embeddingRefreshed = false;
@@ -152,7 +155,7 @@ export class ProductSyncService {
               content: searchText,
               metadata: {
                 productId: saved.id,
-                source: canonical.source,
+                source,
                 externalId: canonical.externalId,
                 title: saved.title,
                 handle: saved.handle,
@@ -183,7 +186,7 @@ export class ProductSyncService {
           organizationId,
           saved.id,
           {
-            source: canonical.source,
+            source,
             externalId: canonical.externalId,
             title: saved.title,
           },
@@ -203,7 +206,7 @@ export class ProductSyncService {
    */
   async deleteProductByExternalId(
     organizationId: string,
-    source: ProductSource,
+    source: string,
     externalId: string,
   ): Promise<boolean> {
     const repo = AppDataSource.getRepository(Product);
@@ -238,6 +241,7 @@ export class ProductSyncService {
     organizationId: string,
     productId: string,
     canonical: CanonicalProduct,
+    source: string,
   ): Promise<void> {
     const variantRepo = manager.getRepository(ProductVariant);
 
@@ -254,7 +258,7 @@ export class ProductSyncService {
       row.organizationId = organizationId;
       row.productId = productId;
       row.externalId = externalId;
-      row.source = canonical.source;
+      row.source = source;
       row.sku = v.sku;
       row.barcode = v.barcode;
       row.title = sanitizeContent(v.title || "");
@@ -282,7 +286,6 @@ export class ProductSyncService {
 
   private validateCanonical(p: CanonicalProduct): void {
     if (!p.externalId) throw new Error("CanonicalProduct.externalId is required");
-    if (!p.source) throw new Error("CanonicalProduct.source is required");
     if (!p.handle) throw new Error("CanonicalProduct.handle is required");
     if (!p.title) throw new Error("CanonicalProduct.title is required");
     if (!p.variants || p.variants.length === 0) {

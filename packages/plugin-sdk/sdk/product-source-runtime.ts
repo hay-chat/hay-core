@@ -8,12 +8,7 @@
  * @module @hay/plugin-sdk/sdk/product-source-runtime
  */
 
-import type {
-  CanonicalProduct,
-  HayLogger,
-  HayProductSourceRuntimeAPI,
-  ProductSourceName,
-} from "../types/index.js";
+import type { CanonicalProduct, HayLogger, HayProductSourceRuntimeAPI } from "../types/index.js";
 
 export interface ProductSourceRuntimeOptions {
   apiUrl: string;
@@ -74,8 +69,9 @@ export function createProductSourceRuntime(
       };
     },
 
-    async delete(source: ProductSourceName, externalId: string): Promise<{ removed: boolean }> {
-      const data = (await call("products.delete", { source, externalId })) as {
+    async delete(externalId: string): Promise<{ removed: boolean }> {
+      // Source is derived server-side from the authenticated plugin id.
+      const data = (await call("products.delete", { externalId })) as {
         removed: boolean;
       };
       return { removed: Boolean(data?.removed) };

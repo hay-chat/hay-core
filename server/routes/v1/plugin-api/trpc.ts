@@ -11,7 +11,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { productSyncService } from "@server/services/product-sync.service";
-import { ProductSource, ProductStatus } from "@server/entities/product.entity";
+import { ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
 import type { CanonicalProduct } from "@server/types/canonical-product";
 import type {
@@ -771,7 +771,6 @@ export const pluginApiTrpcRouter = router({
           .array(
             z.object({
               externalId: z.string().min(1),
-              source: z.nativeEnum(ProductSource),
               handle: z.string().min(1),
               title: z.string().min(1),
               descriptionHtml: z.string().optional(),
@@ -816,10 +815,13 @@ export const pluginApiTrpcRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "products");
-      const { organizationId } = ctx.pluginAuth;
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      // Core stamps the source from the authenticated plugin identity — the
+      // adapter never names itself, so it can't impersonate another source.
       const result = await productSyncService.upsertProducts(
         organizationId,
         input.products as unknown as CanonicalProduct[],
+        pluginId,
       );
       return result;
     }),
@@ -833,16 +835,17 @@ export const pluginApiTrpcRouter = router({
   "products.delete": pluginProcedure
     .input(
       z.object({
-        source: z.nativeEnum(ProductSource),
         externalId: z.string().min(1),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "products");
-      const { organizationId } = ctx.pluginAuth;
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      // Source is the authenticated plugin id — a plugin can only delete its own
+      // products.
       const removed = await productSyncService.deleteProductByExternalId(
         organizationId,
-        input.source,
+        pluginId,
         input.externalId,
       );
       return { removed };

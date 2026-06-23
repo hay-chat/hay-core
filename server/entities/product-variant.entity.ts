@@ -1,18 +1,12 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
-import { Product, ProductSource } from "./product.entity";
+import { Product } from "./product.entity";
+import { VariantAvailability } from "./product.enums";
+import type { VariantSelectedOption } from "./product.enums";
 
-export enum VariantAvailability {
-  IN_STOCK = "in_stock",
-  OUT_OF_STOCK = "out_of_stock",
-  BACKORDER = "backorder",
-}
-
-export interface VariantSelectedOption {
-  name: string;
-  value: string;
-}
+export { VariantAvailability } from "./product.enums";
+export type { VariantSelectedOption } from "./product.enums";
 
 @Entity("product_variants")
 @Index("idx_product_variants_organization_id", ["organizationId"])
@@ -31,8 +25,8 @@ export class ProductVariant extends OrganizationScopedEntity {
   // Stored here too (mirroring Product.source) so the idempotency key
   // (source, external_id) is self-contained on this row — no join needed
   // for upsert ON CONFLICT.
-  @Column({ type: "enum", enum: ProductSource })
-  source!: ProductSource;
+  @Column({ type: "text" })
+  source!: string;
 
   @Column({ type: "text", nullable: true })
   sku?: string;

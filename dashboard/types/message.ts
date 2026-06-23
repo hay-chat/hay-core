@@ -61,6 +61,8 @@ export interface Message {
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;
+    // Product recommendation payload (type === "ProductRecommendation")
+    productRecommendation?: ProductRecommendationPayload;
   } | null;
   sentiment?: MessageSentiment | null;
   intent?: MessageIntent | null;

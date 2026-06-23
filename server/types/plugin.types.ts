@@ -4,7 +4,13 @@ export interface HayPluginManifest {
   description: string;
   version: string;
   type: Array<
-    "mcp-connector" | "retriever" | "playbook" | "document_importer" | "channel" | "system"
+    | "mcp-connector"
+    | "retriever"
+    | "playbook"
+    | "document_importer"
+    | "channel"
+    | "system"
+    | "products"
   >;
   entry: string;
   channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")

@@ -12,9 +12,6 @@
  * @module @hay/plugin-sdk/types/products
  */
 
-/** Canonical source identifier — also used as half of the idempotency key. */
-export type ProductSourceName = "shopify" | "woocommerce" | "magento" | "custom" | "manual";
-
 export type ProductStatusName = "active" | "draft" | "archived";
 
 export type VariantAvailabilityName = "in_stock" | "out_of_stock" | "backorder";
@@ -63,7 +60,9 @@ export interface CanonicalVariant {
 
 export interface CanonicalProduct {
   externalId: string;
-  source: ProductSourceName;
+  // `source` is stamped by core from the authenticated plugin id — adapters do
+  // not (and cannot) set it. Idempotency key is (source, externalId), where
+  // core supplies the source half.
   handle: string;
   title: string;
   /** Raw HTML — core converts to sanitized markdown at the ingestion boundary. */
@@ -92,8 +91,8 @@ export interface CanonicalProduct {
  * Only available when the plugin declares the `products` capability.
  */
 export interface HayProductSourceRuntimeAPI {
-  /** Bulk upsert. Idempotent on (source, externalId). */
+  /** Bulk upsert. Idempotent on (source, externalId); core supplies the source. */
   upsert(products: CanonicalProduct[]): Promise<{ upserted: number; errors: number }>;
-  /** Delete a single product by its source-scoped external id. */
-  delete(source: ProductSourceName, externalId: string): Promise<{ removed: boolean }>;
+  /** Delete a single product by its external id (scoped to this plugin's source). */
+  delete(externalId: string): Promise<{ removed: boolean }>;
 }

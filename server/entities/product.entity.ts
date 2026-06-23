@@ -2,38 +2,11 @@ import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from "typeorm
 import { OrganizationScopedEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 import { ProductVariant } from "./product-variant.entity";
+import { ProductStatus } from "./product.enums";
+import type { ProductCategoryRef, ProductImage, ProductOptionDef } from "./product.enums";
 
-export enum ProductSource {
-  SHOPIFY = "shopify",
-  WOOCOMMERCE = "woocommerce",
-  MAGENTO = "magento",
-  CUSTOM = "custom",
-  MANUAL = "manual",
-}
-
-export enum ProductStatus {
-  ACTIVE = "active",
-  DRAFT = "draft",
-  ARCHIVED = "archived",
-}
-
-export interface ProductCategoryRef {
-  externalId?: string;
-  name: string;
-  slug?: string;
-}
-
-export interface ProductOptionDef {
-  name: string;
-  position: number;
-  values: string[];
-}
-
-export interface ProductImage {
-  src: string;
-  alt?: string;
-  position?: number;
-}
+export { ProductStatus, CORE_PRODUCT_SOURCES } from "./product.enums";
+export type { ProductCategoryRef, ProductImage, ProductOptionDef } from "./product.enums";
 
 @Entity("products")
 @Index("idx_products_organization_id", ["organizationId"])
@@ -46,8 +19,11 @@ export class Product extends OrganizationScopedEntity {
   @Column({ type: "text" })
   externalId!: string;
 
-  @Column({ type: "enum", enum: ProductSource })
-  source!: ProductSource;
+  // Free-form source identifier: the authenticated plugin id for plugin-ingested
+  // products, or a core-owned value ("custom" / "manual"). Core never enumerates
+  // plugin sources — see CORE_PRODUCT_SOURCES.
+  @Column({ type: "text" })
+  source!: string;
 
   @Column({ type: "text" })
   handle!: string;

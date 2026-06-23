@@ -82,7 +82,7 @@
         </div>
         <CardContent class="p-3 space-y-1">
           <div class="text-sm font-medium line-clamp-2">{{ p.title }}</div>
-          <div class="text-xs text-neutral-muted">{{ p.vendor || p.source }}</div>
+          <div class="text-xs text-neutral-muted">{{ p.vendor || sourceLabel(p.source) }}</div>
           <div class="flex items-center justify-between mt-1">
             <span class="text-sm font-semibold">
               {{ formatPriceRange(p.priceMin, p.priceMax, p.currency) }}
@@ -106,8 +106,11 @@
 <script setup lang="ts">
 import { Package, RefreshCcw, Search, Store } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import type { RouterInputs } from "@/types/trpc";
 
-definePageMeta({ middleware: ["auth"] });
+type ProductListSource = RouterInputs["products"]["list"]["source"];
+
+// Auth is enforced globally via middleware/auth.global.ts — no per-page middleware needed.
 
 const { t } = useI18n();
 const router = useRouter();
@@ -139,14 +142,21 @@ const availabilityFilter = ref<string>("");
 const PAGE_SIZE = 24;
 const offset = ref(0);
 
+// Sources are discovered dynamically from the catalog (resolved to plugin
+// display names server-side) — never a hardcoded plugin roster. Only sources
+// that actually have products appear in the filter.
+const availableSources = ref<{ value: string; label: string }[]>([]);
+
 const sourceOptions = computed(() => [
   { label: t("products.filters.allSources"), value: "" },
-  { label: "Shopify", value: "shopify" },
-  { label: "WooCommerce", value: "woocommerce" },
-  { label: "Magento", value: "magento" },
-  { label: "Custom", value: "custom" },
-  { label: "Manual", value: "manual" },
+  ...availableSources.value,
 ]);
+
+const sourceLabels = computed(() => new Map(availableSources.value.map((s) => [s.value, s.label])));
+
+function sourceLabel(value: string): string {
+  return sourceLabels.value.get(value) ?? value;
+}
 
 const availabilityOptions = computed(() => [
   { label: t("products.filters.any"), value: "" },
@@ -187,7 +197,7 @@ async function reload() {
     const res = await Hay.products.list.query({
       limit: PAGE_SIZE,
       offset: 0,
-      source: sourceFilter.value || undefined,
+      source: (sourceFilter.value || undefined) as ProductListSource,
       available:
         availabilityFilter.value === "in"
           ? true
@@ -210,7 +220,7 @@ async function loadMore() {
     const res = await Hay.products.list.query({
       limit: PAGE_SIZE,
       offset: offset.value,
-      source: sourceFilter.value || undefined,
+      source: (sourceFilter.value || undefined) as ProductListSource,
       available:
         availabilityFilter.value === "in"
           ? true
@@ -234,7 +244,16 @@ async function loadStats() {
   }
 }
 
+async function loadSources() {
+  try {
+    const res = await Hay.products.sources.query();
+    availableSources.value = res.sources;
+  } catch {
+    // Filter degrades to "all sources" only; ignore failures.
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([reload(), loadStats()]);
+  await Promise.all([reload(), loadStats(), loadSources()]);
 });
 </script>
