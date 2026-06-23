@@ -1,0 +1,15 @@
+{
+  "name": "shopify-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Shopify, calling the Admin GraphQL API with a client-credentials access token.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.2"
+  },
+  "//": "Tool modules under ./tools share ./lib/{client,format}.js"
+}

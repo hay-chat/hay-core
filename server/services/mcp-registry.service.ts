@@ -1,6 +1,7 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import type { MCPToolDefinition } from "../types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
+import { getCachedToolDescriptors } from "./plugin-tools.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("mcp-registry");
@@ -14,21 +15,6 @@ export interface MCPTool extends MCPToolDefinition {
   pluginId: string;
   serverId: string;
   createdAt: Date;
-}
-
-/**
- * Tool descriptor returned by a plugin worker's /mcp/list-tools endpoint.
- * Mirrors MCPToolDefinition with an optional serverId for routing.
- */
-interface WorkerToolDescriptor extends MCPToolDefinition {
-  serverId?: string;
-}
-
-/**
- * Shape of the JSON body returned by /mcp/list-tools.
- */
-interface ListToolsResponse {
-  tools?: WorkerToolDescriptor[];
 }
 
 /**
@@ -65,8 +51,14 @@ export class MCPRegistryService {
   }
 
   /**
-   * Get all tools available for an organization
-   * Fetches tools from running workers via /mcp/list-tools endpoint
+   * Get all tools available for an organization.
+   *
+   * Tools are read from the durable per-instance cache (instance config,
+   * populated whenever a worker runs its tool discovery). Listing must NOT
+   * depend on a live worker: idle workers are stopped by the inactivity reaper,
+   * and a just-started worker writes its cache asynchronously — both previously
+   * made this return zero tools (a race the playbook tool-resolution then hit).
+   * The worker is only required to actually EXECUTE a tool, not to list one.
    */
   async getToolsForOrg(organizationId: string): Promise<MCPTool[]> {
     const instances = await pluginInstanceRepository.findByOrganization(organizationId);
@@ -81,48 +73,27 @@ export class MCPRegistryService {
       // instance.pluginId is the UUID, instance.plugin.pluginId is the semantic ID
       const semanticPluginId = instance.plugin?.pluginId || instance.pluginId;
 
-      // Check if worker is running
-      const worker = this.runnerService.getWorker(organizationId, instance.pluginId);
+      const descriptors = getCachedToolDescriptors(instance.config);
+      const createdAt = instance.updatedAt || instance.createdAt;
 
-      if (worker && instance.runtimeState === "ready") {
-        // Fetch tools from worker /mcp/list-tools endpoint
-        try {
-          const response = await fetch(`http://localhost:${worker.port}/mcp/list-tools`, {
-            signal: AbortSignal.timeout(5000),
-          });
+      for (const descriptor of descriptors) {
+        tools.push({
+          id: `${semanticPluginId}:${descriptor.serverId}:${descriptor.name}`,
+          organizationId,
+          pluginId: semanticPluginId,
+          serverId: descriptor.serverId,
+          name: descriptor.name,
+          description: descriptor.description,
+          input_schema: descriptor.input_schema as MCPTool["input_schema"],
+          createdAt,
+        });
+      }
 
-          if (response.ok) {
-            const data = (await response.json()) as ListToolsResponse;
-
-            for (const tool of data.tools || []) {
-              tools.push({
-                id: `${semanticPluginId}:${tool.serverId || "default"}:${tool.name}`,
-                organizationId,
-                pluginId: semanticPluginId,
-                serverId: tool.serverId || "default",
-                name: tool.name,
-                description: tool.description,
-                input_schema: tool.input_schema,
-                createdAt: instance.updatedAt || instance.createdAt,
-              });
-            }
-
-            logger.debug(
-              { pluginId: semanticPluginId, toolCount: data.tools?.length || 0 },
-              "Fetched tools from worker",
-            );
-          } else {
-            logger.warn(
-              { pluginId: semanticPluginId, status: response.status },
-              "Failed to fetch tools from worker",
-            );
-          }
-        } catch (error: unknown) {
-          logger.warn(
-            { pluginId: semanticPluginId, error: error instanceof Error ? error.message : error },
-            "Failed to fetch tools from worker",
-          );
-        }
+      if (descriptors.length > 0) {
+        logger.debug(
+          { pluginId: semanticPluginId, toolCount: descriptors.length },
+          "Loaded tools from instance cache",
+        );
       }
     }
 

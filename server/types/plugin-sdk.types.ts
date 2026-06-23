@@ -63,6 +63,24 @@ export interface PluginMetadata {
     local: LocalMcpDescriptor[];
     external: ExternalMcpDescriptor[];
   };
+  /** Plugin-declared cron jobs (from register.cron). Optional for older plugins. */
+  crons?: CronJobDescriptor[];
+}
+
+/**
+ * Cron job descriptor (from /metadata endpoint).
+ *
+ * Mirrors the SDK's CronJobDescriptor — the schedule + retry policy Hay Core
+ * needs to register the job per enabled org. The handler itself lives in the
+ * plugin worker and is invoked via POST /cron/:name.
+ */
+export interface CronJobDescriptor {
+  name: string;
+  schedule: string;
+  retryPolicy?: {
+    maxRetries?: number;
+    backoff?: "fixed" | "exponential";
+  };
 }
 
 // ============================================================================

@@ -70,7 +70,6 @@ export class ExecutionLayer {
   private promptService: PromptService;
   private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
-  private plannerSchema: object;
   // Per-instance memo for organization settings — both guardrail config
   // helpers read the same row. ExecutionLayer is constructed per turn so this
   // is naturally short-lived.
@@ -82,8 +81,32 @@ export class ExecutionLayer {
     this.companyInterestService = new CompanyInterestGuardrailService();
     this.confidenceService = new ConfidenceGuardrailService();
     logger.debug("ExecutionLayer initialized");
+  }
 
-    this.plannerSchema = {
+  /**
+   * Build the planner JSON schema for a turn. When the conversation has enabled
+   * tools, `toolName` is constrained to that exact set (plus null) so the model
+   * cannot emit a malformed name like a bare plugin id — the failure mode that
+   * produced `hay-plugin-shopify` instead of `hay-plugin-shopify:shopify_get_product`.
+   */
+  private buildPlannerSchema(enabledTools?: string[] | null): object {
+    const hasTools = Array.isArray(enabledTools) && enabledTools.length > 0;
+    const toolName = hasTools
+      ? {
+          // Keep an explicit type alongside the enum so strict structured-output
+          // providers (e.g. OpenAI) accept it; null is allowed because
+          // non-CALL_TOOL steps omit the tool.
+          type: ["string", "null"],
+          enum: [...enabledTools, null],
+          description:
+            "Exact name of the tool to call (for CALL_TOOL step only). MUST be one of the listed values, including the plugin prefix.",
+        }
+      : {
+          type: ["string", "null"],
+          description: "Name of the tool to call (for CALL_TOOL step only)",
+        };
+
+    return {
       type: "object",
       properties: {
         step: {
@@ -94,10 +117,7 @@ export class ExecutionLayer {
           type: ["string", "null"],
           description: "Message to send to user (REQUIRED for ASK and RESPOND steps)",
         },
-        toolName: {
-          type: ["string", "null"],
-          description: "Name of the tool to call (for CALL_TOOL step only)",
-        },
+        toolName,
         toolArgs: {
           type: ["string", "null"],
           description: "JSON string of arguments for the tool (for CALL_TOOL step only)",
@@ -216,7 +236,7 @@ export class ExecutionLayer {
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string
         prompt: finalPrompt,
-        jsonSchema: this.plannerSchema,
+        jsonSchema: this.buildPlannerSchema(conversation.enabled_tools),
       });
 
       const result = JSON.parse(response) as ExecutionResult;
@@ -277,6 +297,23 @@ export class ExecutionLayer {
           log.warn(
             { hasTool: !!result.tool, toolName: result.tool?.name },
             "Invalid CALL_TOOL: missing tool or tool.name",
+          );
+          return null; // Trigger retry
+        }
+
+        // Safety net behind the schema enum: a CALL_TOOL is only valid if the
+        // chosen name is in the conversation's enabled tools. Catches both
+        // malformed names the model may emit (e.g. a bare plugin id
+        // `hay-plugin-shopify` with the `:shopify_get_product` suffix dropped)
+        // and the case where NO tools are enabled at all (e.g. the plugin's MCP
+        // worker isn't running, so its tools never registered). Either way the
+        // name would reach tool execution and surface as a hard 500; returning
+        // null triggers a planner retry instead.
+        const enabledTools = conversation.enabled_tools ?? [];
+        if (!enabledTools.includes(result.tool.name)) {
+          log.warn(
+            { toolName: result.tool.name, enabledTools },
+            "Invalid CALL_TOOL: tool name not in enabled tools — triggering retry",
           );
           return null; // Trigger retry
         }

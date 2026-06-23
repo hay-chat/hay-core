@@ -6,6 +6,7 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
 import { getPluginRunnerService } from "@server/services/plugin-runner.service";
+import { pluginCronService } from "@server/services/plugin-cron.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
@@ -152,10 +153,11 @@ export const getPlugin = authenticatedProcedure
             if (metadata.configSchema) {
               configSchema = metadata.configSchema;
             }
-            // Update database metadata
+            // Update database metadata (wrap under `metadata` — the repo reads data.metadata)
             await pluginRegistryRepository.updateMetadata(input.pluginId, {
-              ...metadata,
-              updatedAt: new Date(),
+              metadata,
+              metadataFetchedAt: new Date(),
+              metadataState: "fresh",
             });
 
             // Update in-memory registry
@@ -174,10 +176,11 @@ export const getPlugin = authenticatedProcedure
               if (metadata2.configSchema) {
                 configSchema = metadata2.configSchema;
               }
-              // Update database metadata
+              // Update database metadata (wrap under `metadata` — the repo reads data.metadata)
               await pluginRegistryRepository.updateMetadata(input.pluginId, {
-                ...metadata2,
-                updatedAt: new Date(),
+                metadata: metadata2,
+                metadataFetchedAt: new Date(),
+                metadataState: "fresh",
               });
 
               // Update in-memory registry
@@ -368,6 +371,16 @@ export const enablePlugin = authenticatedProcedure
 
       logger.info({ pluginName: plugin.name }, "Plugin successfully enabled");
 
+      // Register any plugin-declared cron jobs for this org (HAY-221). Non-fatal.
+      try {
+        await pluginCronService.registerForInstance(ctx.organizationId!, input.pluginId);
+      } catch (cronError) {
+        logger.error(
+          { err: cronError, pluginName: plugin.name },
+          "Failed to register plugin cron jobs",
+        );
+      }
+
       // For MCP plugins, start the worker immediately so it can register its MCP servers
       const manifest = plugin.manifest as any;
       const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
@@ -448,6 +461,9 @@ export const disablePlugin = authenticatedProcedure
         // Continue anyway - cleanup failure should not block disable
       }
     }
+
+    // Unregister plugin-declared cron jobs for this org (HAY-221).
+    pluginCronService.unregisterForInstance(ctx.organizationId!, input.pluginId);
 
     // Stop worker
     await pluginManagerService.stopPluginWorker(ctx.organizationId!, input.pluginId);

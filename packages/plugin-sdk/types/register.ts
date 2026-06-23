@@ -10,6 +10,7 @@ import type { ConfigFieldDescriptor } from "./config";
 import type { RegisterAuthAPI } from "./auth";
 import type { HttpMethod, RouteHandler } from "./route";
 import type { PluginPage } from "./ui";
+import type { CronJobOptions } from "./cron";
 
 /**
  * UI registration API.
@@ -209,6 +210,31 @@ export interface HayRegisterAPI {
    * ```
    */
   auth: RegisterAuthAPI;
+
+  /**
+   * Register a background cron job.
+   *
+   * The job is scheduled by Hay Core (not inside the worker, which is idle-killed).
+   * When it fires, Core wakes this org's worker and invokes the handler with a
+   * fresh org-scoped context. Use it for platform quirks like periodic token
+   * refresh, data sync, or cleanup.
+   *
+   * @param options - Cron job name, schedule, handler, and optional retry policy
+   *
+   * @example
+   * ```typescript
+   * register.cron({
+   *   name: 'refresh_shopify_token',
+   *   schedule: '0 *​/20 * * *', // every 20 hours
+   *   handler: async (ctx) => {
+   *     const token = await refresh(ctx.config.get('clientId'), ctx.config.get('clientSecret'));
+   *     ctx.auth.update({ accessToken: token.accessToken, expiresAt: token.expiresAt });
+   *   },
+   *   retryPolicy: { maxRetries: 3, backoff: 'exponential' },
+   * });
+   * ```
+   */
+  cron(options: CronJobOptions): void;
 
   // Future: mcp descriptor registration (optional)
   // mcp?: RegisterMcpDescriptorAPI;

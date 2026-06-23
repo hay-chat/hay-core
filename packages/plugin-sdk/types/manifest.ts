@@ -11,14 +11,23 @@
  *
  * Determines how the plugin is classified in the Hay marketplace.
  */
-export type PluginCategory = 'integration' | 'channel' | 'tool' | 'analytics';
+export type PluginCategory = "integration" | "channel" | "tool" | "analytics";
 
 /**
  * Plugin capabilities.
  *
  * Declares what features the plugin uses.
  */
-export type PluginCapability = 'routes' | 'mcp' | 'auth' | 'config' | 'ui';
+export type PluginCapability =
+  | "routes"
+  | "mcp"
+  | "auth"
+  | "config"
+  | "ui"
+  | "messages"
+  | "customers"
+  | "sources"
+  | "cron";
 
 /**
  * Hay plugin manifest structure.
@@ -133,7 +142,7 @@ export interface HayPluginPackageJson {
   /**
    * Hay plugin manifest
    */
-  'hay-plugin': HayPluginManifest;
+  "hay-plugin": HayPluginManifest;
 
   /**
    * Other standard package.json fields

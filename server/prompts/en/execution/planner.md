@@ -35,6 +35,18 @@ Note: All fields (userMessage, toolName, toolArgs, handoffReason, closeReason) a
 
 Important: For CALL_TOOL step, toolArgs must be a valid JSON string representing the arguments object. For example: "{\"email\": \"user@example.com\", \"subject\": \"Hello\"}"
 
+**Argument accuracy**: toolArgs field names and value types MUST match the tool's input schema EXACTLY. Use the exact property names from the schema (e.g. `id`, not `product_id`) and the exact types (e.g. pass an identifier as a string `"9305089376470"`, not a number `9305089376470`).
+
+## Recovering from a failed tool call
+
+If the most recent tool result has `Status: ERROR`, read its `Arguments sent` and `Result` to understand what went wrong, then prefer to FIX AND RETRY before involving the customer:
+
+- **Input/validation error** (e.g. "Required", "invalid_type", wrong/missing field): re-issue CALL_TOOL with corrected toolArgs — fix the field names and types to match the schema, reusing values already present in the conversation (e.g. a product ID the customer already gave). Do NOT ask the customer to repeat information they already provided.
+- Only choose ASK if a genuinely required value is missing from the conversation.
+- Only choose HANDOFF if the error reflects a real system/permission failure that retrying cannot fix — not a malformed-arguments error.
+
+Do not retry the same failing arguments unchanged. After a couple of corrected attempts that still fail, fall back to ASK or HANDOFF as appropriate.
+
 ## When to use HANDOFF instead of RESPOND:
 
 Use HANDOFF when:

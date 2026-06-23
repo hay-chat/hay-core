@@ -24,6 +24,27 @@ function asCredentialString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/**
+ * Substitute a per-tenant `{shop}` placeholder in an OAuth URL.
+ *
+ * Some providers (notably Shopify) host the authorize/token endpoints on a
+ * per-merchant domain — `https://{shop}/admin/oauth/...`. SDK oauth2 methods
+ * declare these URLs as static strings, so we resolve `{shop}` from the
+ * instance's `shopDomain` config at flow time. Generic + safe: URLs without
+ * `{shop}` are returned untouched.
+ */
+function substituteShopPlaceholder(url: string, shopDomain: unknown): string {
+  if (!url || !url.includes("{shop}")) return url;
+  const shop = String(shopDomain ?? "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+  if (!shop) {
+    throw new Error("This connection requires a store domain to be saved before connecting.");
+  }
+  return url.replace(/\{shop\}/g, shop);
+}
+
 export class OAuthService {
   /**
    * Get OAuth redirect URI
@@ -221,6 +242,12 @@ export class OAuthService {
     });
     logger.debug("OAuth state stored in Redis");
 
+    // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the authorize URL.
+    oauthConfig.authorizationUrl = substituteShopPlaceholder(
+      oauthConfig.authorizationUrl,
+      resolved.values.shopDomain,
+    );
+
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
     const params = new URLSearchParams({
@@ -383,6 +410,12 @@ export class OAuthService {
         clientId,
         clientSecret,
       };
+
+      // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the token URL.
+      oauthConfig.tokenUrl = substituteShopPlaceholder(
+        oauthConfig.tokenUrl,
+        resolved.values.shopDomain,
+      );
 
       logger.info("Exchanging authorization code for tokens");
       // Exchange code for tokens
@@ -613,11 +646,10 @@ export class OAuthService {
       throw new Error(`Plugin instance not found`);
     }
 
-    // Clear authState and authMethod
-    await pluginInstanceRepository.update(instance.id, organizationId, {
-      authMethod: undefined,
-      authState: undefined,
-    });
+    // Clear authState + authMethod. Must use an explicit NULL clear: TypeORM's
+    // .update() ignores `undefined`, so the previous code was a silent no-op and
+    // the connection never actually disconnected.
+    await pluginInstanceRepository.clearAuthState(instance.id, organizationId);
 
     logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
   }

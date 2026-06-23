@@ -7,6 +7,51 @@
       </Button>
     </template>
 
+    <!-- Connection details (for embedding Hay elsewhere, e.g. the Shopify widget) -->
+    <Card class="mb-6">
+      <CardHeader>
+        <CardTitle>{{ $t("apiTokens.connectionDetails") }}</CardTitle>
+        <CardDescription>{{ $t("apiTokens.connectionDetailsDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div>
+          <Label>{{ $t("apiTokens.serverUrl") }}</Label>
+          <div class="relative mt-1">
+            <Input :value="serverUrl" readonly class="font-mono pr-24" @click="selectOnClick" />
+            <Button
+              variant="ghost"
+              size="sm"
+              class="absolute right-1 top-1"
+              @click="copyValue(serverUrl, 'serverUrl')"
+            >
+              <Copy class="h-4 w-4 mr-1" />
+              {{ copiedKey === "serverUrl" ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
+            </Button>
+          </div>
+        </div>
+        <div>
+          <Label>{{ $t("apiTokens.organizationId") }}</Label>
+          <div class="relative mt-1">
+            <Input
+              :value="organizationId"
+              readonly
+              class="font-mono pr-24"
+              @click="selectOnClick"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              class="absolute right-1 top-1"
+              @click="copyValue(organizationId, 'organizationId')"
+            >
+              <Copy class="h-4 w-4 mr-1" />
+              {{ copiedKey === "organizationId" ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Tokens List -->
     <Card>
       <CardHeader>
@@ -303,6 +348,29 @@ const createdToken = ref("");
 const createdTokenScopes = ref<string[]>([]);
 const copied = ref(false);
 const tokenInput = ref<HTMLInputElement | null>(null);
+
+// Connection details (server URL + organization id) for embedding Hay elsewhere.
+const runtimeConfig = useRuntimeConfig();
+const userStore = useUserStore();
+const serverUrl = computed(() => String(runtimeConfig.public.apiBaseUrl ?? ""));
+const organizationId = computed(() => userStore.activeOrganizationId ?? "");
+const copiedKey = ref<string | null>(null);
+
+const selectOnClick = (event: MouseEvent) => {
+  (event.target as HTMLInputElement | null)?.select?.();
+};
+
+const copyValue = async (text: string, key: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedKey.value = key;
+    setTimeout(() => {
+      if (copiedKey.value === key) copiedKey.value = null;
+    }, 2000);
+  } catch (error) {
+    console.error("Failed to copy value:", error);
+  }
+};
 
 const newToken = ref({
   name: "",

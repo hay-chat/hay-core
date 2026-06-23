@@ -16,9 +16,10 @@ import type {
   HttpMethod,
   RouteHandler,
   PluginPage,
-} from '../types/index.js';
-import { PluginRegistry } from './registry.js';
-import type { HayLogger } from '../types/index.js';
+  CronJobOptions,
+} from "../types/index.js";
+import { PluginRegistry } from "./registry.js";
+import type { HayLogger } from "../types/index.js";
 
 /**
  * Plugin manifest structure (minimal).
@@ -77,7 +78,7 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       // Register the auth method
       registry.registerAuthMethod(authOptions);
 
-      logger.debug('Registered API key auth method', { id: authOptions.id });
+      logger.debug("Registered API key auth method", { id: authOptions.id });
     },
 
     oauth2(authOptions: OAuth2AuthOptions): void {
@@ -87,7 +88,7 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       // Register the auth method
       registry.registerAuthMethod(authOptions);
 
-      logger.debug('Registered OAuth2 auth method', { id: authOptions.id });
+      logger.debug("Registered OAuth2 auth method", { id: authOptions.id });
     },
   };
 
@@ -100,7 +101,7 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       // Register the UI page
       registry.registerUIPage(page);
 
-      logger.debug('Registered UI page', { id: page.id, slot: page.slot });
+      logger.debug("Registered UI page", { id: page.id, slot: page.slot });
     },
   };
 
@@ -115,7 +116,7 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       // Register the route
       registry.registerRoute({ method, path, handler });
 
-      logger.debug('Registered route', { method, path });
+      logger.debug("Registered route", { method, path });
     },
 
     config(schema: Record<string, ConfigFieldDescriptor>): void {
@@ -126,15 +127,74 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
       registry.registerConfig(schema);
 
       const fieldCount = Object.keys(schema).length;
-      logger.debug('Registered config schema', { fields: fieldCount });
+      logger.debug("Registered config schema", { fields: fieldCount });
     },
 
     ui: uiRegistrationAPI,
 
     auth,
+
+    cron(cronOptions: CronJobOptions): void {
+      validateCronOptions(cronOptions);
+
+      registry.registerCronJob(cronOptions);
+
+      logger.debug("Registered cron job", {
+        name: cronOptions.name,
+        schedule: cronOptions.schedule,
+      });
+    },
   };
 
   return registerAPI;
+}
+
+/**
+ * Validate cron job options.
+ *
+ * @param options - Cron options to validate
+ * @throws {Error} If options are invalid
+ *
+ * @internal
+ */
+function validateCronOptions(options: CronJobOptions): void {
+  if (!options || typeof options !== "object") {
+    throw new Error("Cron options must be an object");
+  }
+
+  if (!options.name || typeof options.name !== "string") {
+    throw new Error("Cron job name must be a non-empty string");
+  }
+
+  if (!/^[a-z0-9_-]+$/i.test(options.name)) {
+    throw new Error(
+      `Cron job name "${options.name}" must contain only letters, numbers, hyphens and underscores`,
+    );
+  }
+
+  if (!options.schedule || typeof options.schedule !== "string") {
+    throw new Error("Cron job schedule must be a non-empty cron expression string");
+  }
+
+  // 5-field cron expression (minute hour day-of-month month day-of-week).
+  const fieldCount = options.schedule.trim().split(/\s+/).length;
+  if (fieldCount !== 5) {
+    throw new Error(`Cron job schedule "${options.schedule}" must be a 5-field cron expression`);
+  }
+
+  if (typeof options.handler !== "function") {
+    throw new Error("Cron job handler must be a function");
+  }
+
+  if (options.retryPolicy !== undefined) {
+    const { maxRetries, backoff } = options.retryPolicy;
+    if (maxRetries !== undefined && (typeof maxRetries !== "number" || maxRetries < 0)) {
+      throw new Error("Cron job retryPolicy.maxRetries must be a non-negative number");
+    }
+    if (backoff !== undefined && backoff !== "fixed" && backoff !== "exponential") {
+      throw new Error('Cron job retryPolicy.backoff must be "fixed" or "exponential"');
+    }
+  }
 }
 
 // ============================================================================
@@ -150,12 +210,10 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
  * @internal
  */
 function validateHttpMethod(method: HttpMethod): void {
-  const validMethods: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+  const validMethods: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
   if (!validMethods.includes(method)) {
-    throw new Error(
-      `Invalid HTTP method: ${method}. Must be one of: ${validMethods.join(', ')}`,
-    );
+    throw new Error(`Invalid HTTP method: ${method}. Must be one of: ${validMethods.join(", ")}`);
   }
 }
 
@@ -168,11 +226,11 @@ function validateHttpMethod(method: HttpMethod): void {
  * @internal
  */
 function validateRoutePath(path: string): void {
-  if (!path || typeof path !== 'string') {
-    throw new Error('Route path must be a non-empty string');
+  if (!path || typeof path !== "string") {
+    throw new Error("Route path must be a non-empty string");
   }
 
-  if (!path.startsWith('/')) {
+  if (!path.startsWith("/")) {
     throw new Error(`Route path must start with "/": ${path}`);
   }
 }
@@ -186,8 +244,8 @@ function validateRoutePath(path: string): void {
  * @internal
  */
 function validateRouteHandler(handler: RouteHandler): void {
-  if (typeof handler !== 'function') {
-    throw new Error('Route handler must be a function');
+  if (typeof handler !== "function") {
+    throw new Error("Route handler must be a function");
   }
 }
 
@@ -206,44 +264,42 @@ function validateConfigSchema(
   manifest: PluginManifest | undefined,
   _logger: HayLogger,
 ): void {
-  if (!schema || typeof schema !== 'object') {
-    throw new Error('Config schema must be an object');
+  if (!schema || typeof schema !== "object") {
+    throw new Error("Config schema must be an object");
   }
 
   const allowedEnvVars = manifest?.env || [];
 
   for (const [fieldName, descriptor] of Object.entries(schema)) {
     // Validate field name
-    if (!fieldName || typeof fieldName !== 'string') {
-      throw new Error('Config field name must be a non-empty string');
+    if (!fieldName || typeof fieldName !== "string") {
+      throw new Error("Config field name must be a non-empty string");
     }
 
     // Validate descriptor
-    if (!descriptor || typeof descriptor !== 'object') {
+    if (!descriptor || typeof descriptor !== "object") {
       throw new Error(`Config field "${fieldName}" descriptor must be an object`);
     }
 
     // Validate type
-    const validTypes = ['string', 'number', 'boolean', 'json'];
+    const validTypes = ["string", "number", "boolean", "json"];
     if (!validTypes.includes(descriptor.type)) {
       throw new Error(
-        `Config field "${fieldName}" has invalid type: ${descriptor.type}. Must be one of: ${validTypes.join(', ')}`,
+        `Config field "${fieldName}" has invalid type: ${descriptor.type}. Must be one of: ${validTypes.join(", ")}`,
       );
     }
 
     // Validate env var (if specified)
     if (descriptor.env) {
-      if (typeof descriptor.env !== 'string') {
-        throw new Error(
-          `Config field "${fieldName}" env must be a string`,
-        );
+      if (typeof descriptor.env !== "string") {
+        throw new Error(`Config field "${fieldName}" env must be a string`);
       }
 
       // Check if env var is in manifest allowlist
       if (!allowedEnvVars.includes(descriptor.env)) {
         throw new Error(
           `Config field "${fieldName}" references env var "${descriptor.env}" which is not in manifest allowlist. ` +
-          `Add "${descriptor.env}" to the "env" array in package.json hay-plugin configuration.`,
+            `Add "${descriptor.env}" to the "env" array in package.json hay-plugin configuration.`,
         );
       }
     }
@@ -263,25 +319,22 @@ function validateConfigSchema(
  *
  * @internal
  */
-function validateDefaultValue(
-  fieldName: string,
-  descriptor: ConfigFieldDescriptor,
-): void {
+function validateDefaultValue(fieldName: string, descriptor: ConfigFieldDescriptor): void {
   const { type, default: defaultValue } = descriptor;
 
   let valid = false;
 
   switch (type) {
-    case 'string':
-      valid = typeof defaultValue === 'string';
+    case "string":
+      valid = typeof defaultValue === "string";
       break;
-    case 'number':
-      valid = typeof defaultValue === 'number' && !isNaN(defaultValue);
+    case "number":
+      valid = typeof defaultValue === "number" && !isNaN(defaultValue);
       break;
-    case 'boolean':
-      valid = typeof defaultValue === 'boolean';
+    case "boolean":
+      valid = typeof defaultValue === "boolean";
       break;
-    case 'json':
+    case "json":
       // JSON can be any type (object, array, etc.)
       valid = true;
       break;
@@ -303,34 +356,31 @@ function validateDefaultValue(
  *
  * @internal
  */
-function validateApiKeyAuthOptions(
-  options: ApiKeyAuthOptions,
-  registry: PluginRegistry,
-): void {
-  if (!options || typeof options !== 'object') {
-    throw new Error('API key auth options must be an object');
+function validateApiKeyAuthOptions(options: ApiKeyAuthOptions, registry: PluginRegistry): void {
+  if (!options || typeof options !== "object") {
+    throw new Error("API key auth options must be an object");
   }
 
   // Validate id
-  if (!options.id || typeof options.id !== 'string') {
-    throw new Error('API key auth id must be a non-empty string');
+  if (!options.id || typeof options.id !== "string") {
+    throw new Error("API key auth id must be a non-empty string");
   }
 
   // Validate label
-  if (!options.label || typeof options.label !== 'string') {
-    throw new Error('API key auth label must be a non-empty string');
+  if (!options.label || typeof options.label !== "string") {
+    throw new Error("API key auth label must be a non-empty string");
   }
 
   // Validate configField
-  if (!options.configField || typeof options.configField !== 'string') {
-    throw new Error('API key auth configField must be a non-empty string');
+  if (!options.configField || typeof options.configField !== "string") {
+    throw new Error("API key auth configField must be a non-empty string");
   }
 
   // Verify config field exists
   if (!registry.hasConfigField(options.configField)) {
     throw new Error(
       `API key auth references config field "${options.configField}" which hasn't been registered. ` +
-      `Register config schema before registering auth methods.`,
+        `Register config schema before registering auth methods.`,
     );
   }
 }
@@ -344,75 +394,72 @@ function validateApiKeyAuthOptions(
  *
  * @internal
  */
-function validateOAuth2AuthOptions(
-  options: OAuth2AuthOptions,
-  registry: PluginRegistry,
-): void {
-  if (!options || typeof options !== 'object') {
-    throw new Error('OAuth2 auth options must be an object');
+function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginRegistry): void {
+  if (!options || typeof options !== "object") {
+    throw new Error("OAuth2 auth options must be an object");
   }
 
   // Validate id
-  if (!options.id || typeof options.id !== 'string') {
-    throw new Error('OAuth2 auth id must be a non-empty string');
+  if (!options.id || typeof options.id !== "string") {
+    throw new Error("OAuth2 auth id must be a non-empty string");
   }
 
   // Validate label
-  if (!options.label || typeof options.label !== 'string') {
-    throw new Error('OAuth2 auth label must be a non-empty string');
+  if (!options.label || typeof options.label !== "string") {
+    throw new Error("OAuth2 auth label must be a non-empty string");
   }
 
   // Validate authorizationUrl
-  if (!options.authorizationUrl || typeof options.authorizationUrl !== 'string') {
-    throw new Error('OAuth2 auth authorizationUrl must be a non-empty string');
+  if (!options.authorizationUrl || typeof options.authorizationUrl !== "string") {
+    throw new Error("OAuth2 auth authorizationUrl must be a non-empty string");
   }
 
   // Validate tokenUrl
-  if (!options.tokenUrl || typeof options.tokenUrl !== 'string') {
-    throw new Error('OAuth2 auth tokenUrl must be a non-empty string');
+  if (!options.tokenUrl || typeof options.tokenUrl !== "string") {
+    throw new Error("OAuth2 auth tokenUrl must be a non-empty string");
   }
 
   // Validate clientId field reference
-  if (!options.clientId || typeof options.clientId !== 'object') {
-    throw new Error('OAuth2 auth clientId must be a ConfigFieldReference object');
+  if (!options.clientId || typeof options.clientId !== "object") {
+    throw new Error("OAuth2 auth clientId must be a ConfigFieldReference object");
   }
 
-  if (!options.clientId.name || typeof options.clientId.name !== 'string') {
-    throw new Error('OAuth2 auth clientId.name must be a non-empty string');
+  if (!options.clientId.name || typeof options.clientId.name !== "string") {
+    throw new Error("OAuth2 auth clientId.name must be a non-empty string");
   }
 
   if (!registry.hasConfigField(options.clientId.name)) {
     throw new Error(
       `OAuth2 auth clientId references config field "${options.clientId.name}" which hasn't been registered. ` +
-      `Register config schema before registering auth methods.`,
+        `Register config schema before registering auth methods.`,
     );
   }
 
   // Validate clientSecret field reference
-  if (!options.clientSecret || typeof options.clientSecret !== 'object') {
-    throw new Error('OAuth2 auth clientSecret must be a ConfigFieldReference object');
+  if (!options.clientSecret || typeof options.clientSecret !== "object") {
+    throw new Error("OAuth2 auth clientSecret must be a ConfigFieldReference object");
   }
 
-  if (!options.clientSecret.name || typeof options.clientSecret.name !== 'string') {
-    throw new Error('OAuth2 auth clientSecret.name must be a non-empty string');
+  if (!options.clientSecret.name || typeof options.clientSecret.name !== "string") {
+    throw new Error("OAuth2 auth clientSecret.name must be a non-empty string");
   }
 
   if (!registry.hasConfigField(options.clientSecret.name)) {
     throw new Error(
       `OAuth2 auth clientSecret references config field "${options.clientSecret.name}" which hasn't been registered. ` +
-      `Register config schema before registering auth methods.`,
+        `Register config schema before registering auth methods.`,
     );
   }
 
   // Validate scopes (if provided)
   if (options.scopes !== undefined) {
     if (!Array.isArray(options.scopes)) {
-      throw new Error('OAuth2 auth scopes must be an array');
+      throw new Error("OAuth2 auth scopes must be an array");
     }
 
     for (const scope of options.scopes) {
-      if (typeof scope !== 'string') {
-        throw new Error('OAuth2 auth scopes must be an array of strings');
+      if (typeof scope !== "string") {
+        throw new Error("OAuth2 auth scopes must be an array of strings");
       }
     }
   }
@@ -427,42 +474,42 @@ function validateOAuth2AuthOptions(
  * @internal
  */
 function validatePluginPage(page: PluginPage): void {
-  if (!page || typeof page !== 'object') {
-    throw new Error('Plugin page must be an object');
+  if (!page || typeof page !== "object") {
+    throw new Error("Plugin page must be an object");
   }
 
   // Validate id
-  if (!page.id || typeof page.id !== 'string') {
-    throw new Error('Plugin page id must be a non-empty string');
+  if (!page.id || typeof page.id !== "string") {
+    throw new Error("Plugin page id must be a non-empty string");
   }
 
   // Validate title
-  if (!page.title || typeof page.title !== 'string') {
-    throw new Error('Plugin page title must be a non-empty string');
+  if (!page.title || typeof page.title !== "string") {
+    throw new Error("Plugin page title must be a non-empty string");
   }
 
   // Validate component
-  if (!page.component || typeof page.component !== 'string') {
-    throw new Error('Plugin page component must be a non-empty string');
+  if (!page.component || typeof page.component !== "string") {
+    throw new Error("Plugin page component must be a non-empty string");
   }
 
   // Validate slot (if provided)
   if (page.slot !== undefined) {
-    const validSlots = ['standalone', 'after-settings', 'before-settings'];
+    const validSlots = ["standalone", "after-settings", "before-settings"];
     if (!validSlots.includes(page.slot)) {
       throw new Error(
-        `Plugin page slot must be one of: ${validSlots.join(', ')}. Got: ${page.slot}`,
+        `Plugin page slot must be one of: ${validSlots.join(", ")}. Got: ${page.slot}`,
       );
     }
   }
 
   // Validate icon (if provided)
-  if (page.icon !== undefined && typeof page.icon !== 'string') {
-    throw new Error('Plugin page icon must be a string');
+  if (page.icon !== undefined && typeof page.icon !== "string") {
+    throw new Error("Plugin page icon must be a string");
   }
 
   // Validate requiresSetup (if provided)
-  if (page.requiresSetup !== undefined && typeof page.requiresSetup !== 'boolean') {
-    throw new Error('Plugin page requiresSetup must be a boolean');
+  if (page.requiresSetup !== undefined && typeof page.requiresSetup !== "boolean") {
+    throw new Error("Plugin page requiresSetup must be a boolean");
   }
 }

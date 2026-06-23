@@ -1523,6 +1523,60 @@ export const authRouter = t.router({
     };
   }),
 
+  // Issue a single-use auth code bound to an allowlisted external redirect URI.
+  // Powers the "Connect to Hay" handshake for external apps (e.g. the Shopify
+  // embedded app): the app sends the merchant to the dashboard /connect/authorize
+  // page, which (once the merchant is logged in) calls this and redirects back to
+  // `redirectUri?code=...&state=...`. The external app then calls exchangeAuthCode.
+  //
+  // Security: the redirect origin is validated SERVER-SIDE against the
+  // CONNECT_ALLOWED_REDIRECT_ORIGINS allowlist (comma-separated origins).
+  // Deny-by-default: if the env var is unset/empty, no redirect is permitted.
+  generateConnectAuthCode: protectedProcedureWithoutOrg
+    .input(
+      z.object({
+        redirectUri: z.string().url(),
+        state: z.string().max(512).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      let redirectUrl: URL;
+      try {
+        redirectUrl = new URL(input.redirectUri);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid redirect_uri" });
+      }
+
+      if (!allowed.includes(redirectUrl.origin)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "redirect_uri origin is not allowlisted for connect handshakes",
+        });
+      }
+
+      const rawCode = generateSecureToken(32);
+      const codeHash = await hashApiKey(rawCode);
+
+      const authCodeRepo = AppDataSource.getRepository(AuthCode);
+      const authCode = authCodeRepo.create({
+        userId: ctx.user!.id,
+        codeHash,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        used: false,
+      });
+      await authCodeRepo.save(authCode);
+
+      redirectUrl.searchParams.set("code", rawCode);
+      if (input.state) redirectUrl.searchParams.set("state", input.state);
+
+      return { redirectUrl: redirectUrl.toString() };
+    }),
+
   exchangeAuthCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))
     .mutation(async ({ input }) => {

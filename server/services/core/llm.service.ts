@@ -225,7 +225,14 @@ export class LLMService {
           }
         }
 
-        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+        // Include the arguments that were sent so the planner can see exactly
+        // what it submitted — essential for correcting a failed call (e.g. it
+        // sent `product_id` when the tool's schema requires `id`).
+        const toolInput = message.metadata.toolInput;
+        const inputLine =
+          toolInput !== undefined ? `\nArguments sent:\n${JSON.stringify(toolInput, null, 2)}` : "";
+
+        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}${inputLine}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
       }
 
       return {

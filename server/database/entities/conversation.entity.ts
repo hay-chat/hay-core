@@ -325,6 +325,35 @@ export class Conversation {
         "Fetching tools from MCP registry for playbook update",
       );
 
+      // On-demand startup: a playbook's referenced plugins may have been stopped
+      // by the inactivity reaper. getToolsForOrg only reads RUNNING workers, so
+      // without this the registry returns zero tools and enabled_tools stays null
+      // — the agent then has no tools to call. Start each referenced plugin's
+      // worker (and wait for it to be ready) before fetching tools.
+      const referencedPluginIds = [
+        ...new Set(
+          referencedActions
+            .map((action) => action.slice(0, action.indexOf(":")))
+            .filter((pluginId) => pluginId.length > 0),
+        ),
+      ];
+
+      if (referencedPluginIds.length > 0) {
+        const { pluginManagerService } = await import("../../services/plugin-manager.service");
+        await Promise.all(
+          referencedPluginIds.map(async (pluginId) => {
+            try {
+              await pluginManagerService.getOrStartWorker(this.organization_id, pluginId);
+            } catch (error) {
+              logger.warn(
+                { err: error, conversationId: this.id, pluginId },
+                "Failed to start plugin worker on-demand for playbook tools",
+              );
+            }
+          }),
+        );
+      }
+
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
@@ -617,6 +646,34 @@ The following tools are available for you to use. You MUST return only valid JSO
     // This will fetch tools dynamically from running SDK workers via /mcp/list-tools
     const toolSchemas: Array<Record<string, unknown>> = [];
     try {
+      // On-demand startup: start any referenced plugin's worker (and wait for it
+      // to be ready) before fetching tools — the inactivity reaper may have
+      // stopped it, and getToolsForOrg only reads RUNNING workers. See the
+      // matching block in the playbook tool-resolution path above.
+      const referencedPluginIds = [
+        ...new Set(
+          referencedActions
+            .map((action) => action.slice(0, action.indexOf(":")))
+            .filter((pluginId) => pluginId.length > 0),
+        ),
+      ];
+
+      if (referencedPluginIds.length > 0) {
+        const { pluginManagerService } = await import("../../services/plugin-manager.service");
+        await Promise.all(
+          referencedPluginIds.map(async (pluginId) => {
+            try {
+              await pluginManagerService.getOrStartWorker(this.organization_id, pluginId);
+            } catch (error) {
+              logger.warn(
+                { err: error, conversationId: this.id, pluginId },
+                "Failed to start plugin worker on-demand for handoff tools",
+              );
+            }
+          }),
+        );
+      }
+
       const { mcpRegistryService } = await import("../../services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(this.organization_id);
 
