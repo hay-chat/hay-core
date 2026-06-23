@@ -329,6 +329,7 @@
 import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-next";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
+import { useUserStore } from "@/stores/user";
 
 type ApiToken = RouterOutputs["apiTokens"]["list"][number];
 type EditingToken = Pick<ApiToken, "id" | "name" | "scopes">;
