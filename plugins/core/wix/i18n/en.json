@@ -1,0 +1,60 @@
+{
+  "name": "Wix Stores",
+  "description": "Connect your Wix Stores site to look up orders, read transactions and fulfilment, issue refunds, and browse your catalog",
+  "tools": {
+    "search_orders": {
+      "label": "Search orders",
+      "description": "Find orders by number, buyer email, status or date to resolve an order ID."
+    },
+    "get_order": {
+      "label": "Get order",
+      "description": "Get a full order by ID, including items, totals, payment and fulfilment status."
+    },
+    "get_order_transactions": {
+      "label": "Get order transactions",
+      "description": "List every payment and refund on an order, with transaction IDs and amounts."
+    },
+    "get_order_refundability": {
+      "label": "Check refundability",
+      "description": "Check whether each payment can be refunded via the Wix API before refunding."
+    },
+    "refund_order": {
+      "label": "Refund order",
+      "description": "Issue a full or partial refund, or record an external refund when the provider can't be refunded via API."
+    },
+    "get_order_fulfillments": {
+      "label": "Get order fulfilments",
+      "description": "List an order's fulfilments — shipped items and tracking info."
+    },
+    "create_fulfillment": {
+      "label": "Create fulfilment",
+      "description": "Mark order items as shipped, optionally with carrier and tracking number."
+    },
+    "update_fulfillment": {
+      "label": "Update fulfilment",
+      "description": "Update an existing fulfilment's tracking information."
+    },
+    "delete_fulfillment": {
+      "label": "Delete fulfilment",
+      "description": "Remove a fulfilment from an order, reverting its items to not-fulfilled."
+    },
+    "search_products": {
+      "label": "Search products",
+      "description": "Search the catalog by text or filter to find products."
+    },
+    "get_product": {
+      "label": "Get product",
+      "description": "Get a product by ID, including variants, pricing and inventory."
+    }
+  },
+  "config": {
+    "apiKey": {
+      "label": "API Key",
+      "description": "Wix API key from Settings → API Keys, scoped to Orders (read & manage), Order Billing (refunds), Order Fulfillments (manage) and Catalog (read). Treated as a secret."
+    },
+    "siteId": {
+      "label": "Site ID",
+      "description": "The Wix site ID this key is scoped to (from your dashboard URL or the Query Sites API)."
+    }
+  }
+}
