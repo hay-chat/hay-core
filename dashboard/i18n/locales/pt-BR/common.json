@@ -17,7 +17,8 @@
     "webchat": "Webchat",
     "customerPrivacy": "Privacidade do Cliente",
     "myProfile": "Meu Perfil",
-    "gitConnections": "Conexões Git"
+    "gitConnections": "Conexões Git",
+    "llmProviders": "Modelos de IA"
   },
   "user": {
     "status": "Status",

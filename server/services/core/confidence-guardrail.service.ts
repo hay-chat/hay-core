@@ -178,7 +178,7 @@ export class ConfidenceGuardrailService {
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
-        model: "gpt-4o",
+        tier: "hard",
       });
 
       const parsed = JSON.parse(result);
@@ -236,7 +236,7 @@ export class ConfidenceGuardrailService {
         prompt: certaintyPrompt,
         jsonSchema: schema,
         temperature: 0.2,
-        model: "gpt-4o",
+        tier: "hard",
       });
 
       const parsed = JSON.parse(result);

@@ -249,6 +249,11 @@ const navMain = computed(() => {
         url: "/settings/git-connections",
         isActive: route.path === "/settings/git-connections",
       },
+      {
+        title: t("nav.llmProviders"),
+        url: "/settings/llm",
+        isActive: route.path === "/settings/llm",
+      },
     );
   }
 
