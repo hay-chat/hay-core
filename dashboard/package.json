@@ -30,7 +30,7 @@
     "@tiptap/extension-link": "^2.27.2",
     "@tiptap/extension-mention": "^2.26.3",
     "@tiptap/extension-placeholder": "^2.10.5",
-    "@tiptap/html": "^3.19.0",
+    "@tiptap/html": "^2.27.2",
     "@tiptap/pm": "^2.10.5",
     "@tiptap/starter-kit": "^2.10.5",
     "@tiptap/suggestion": "^2.10.5",
